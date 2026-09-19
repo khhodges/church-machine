@@ -785,6 +785,37 @@ function smartCompile(options) {
     }
 }
 
+// Return the active C-list's name→row view used by assembly operands.  This is
+// intentionally recomputed for every compile so deleted/renamed rows cannot
+// survive through ChurchAssembler's class-wide compatibility map.
+function _activeCompileClistSlots() {
+    const viewer = typeof window !== 'undefined' ? window.CListViewer : null;
+    if (!viewer) return null;
+    const getSlots = typeof viewer.getSlotPetNames === 'function'
+        ? viewer.getSlotPetNames
+        : (typeof viewer.getNullSlotPetNames === 'function'
+            ? viewer.getNullSlotPetNames : null);
+    if (!getSlots) return null;
+
+    const slotToName = getSlots.call(viewer) || {};
+    const nameToSlot = {};
+    for (const [slot, name] of Object.entries(slotToName)) {
+        const row = Number.parseInt(slot, 10);
+        if (name && Number.isInteger(row)) nameToSlot[name] = row;
+    }
+    return nameToSlot;
+}
+
+function _compileWithActiveClist(source, capabilities, slotSnapshot) {
+    const clistSlots = arguments.length >= 3
+        ? slotSnapshot : _activeCompileClistSlots();
+    return cloomcCompiler.compile(
+        source,
+        capabilities,
+        clistSlots === null ? undefined : { clistSlots }
+    );
+}
+
 // Auto-fill rights for capabilities with no declared rights, sourcing defaults
 // from the matching approved capability grants in _lumpsCache.  Mutates caps in place so that
 // downstream draft text and _checkCapAccessRights both see the filled rights.
@@ -1056,7 +1087,7 @@ function compileDraft() {
     switchCodeTab('console');
     if (typeof _clearAsmWarnings === 'function') _clearAsmWarnings();
 
-    let result = cloomcCompiler.compile(source, []);
+    let result = _compileWithActiveClist(source, []);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
@@ -1541,7 +1572,8 @@ async function compileAndBuild(options) {
     _compileDraftToken = window._editorOpenLumpToken ||
         (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
 
-    let result = cloomcCompiler.compile(source, []);
+    const _compileClistSlots = _activeCompileClistSlots();
+    let result = _compileWithActiveClist(source, [], _compileClistSlots);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
@@ -1564,7 +1596,11 @@ async function compileAndBuild(options) {
             const _compileResponse = await fetch('/api/compile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ source, language: result.language || 'cloomc' }),
+                body: JSON.stringify({
+                    source,
+                    language: result.language || 'cloomc',
+                    clist_slots: _compileClistSlots,
+                }),
             });
             _serverCompile = await _compileResponse.json();
             if (!_compileResponse.ok || !_serverCompile || _serverCompile.ok === false) {
@@ -2424,7 +2460,7 @@ function auditLumpOnly() {
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     if (typeof _clearAsmWarnings === 'function') _clearAsmWarnings();
 
-    const result = cloomcCompiler.compile(source, []);
+    const result = _compileWithActiveClist(source, []);
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
         if (con) { con.textContent = `Audit LUMP — compilation errors:\n${errText}`; con.scrollTop = 0; }
@@ -2773,7 +2809,7 @@ function compileAndCreateAbstraction() {
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     if (typeof _clearAsmWarnings === 'function') _clearAsmWarnings();
 
-    const result = cloomcCompiler.compile(source, []);
+    const result = _compileWithActiveClist(source, []);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');

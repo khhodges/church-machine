@@ -544,6 +544,32 @@ ELOADCALL CR0, CR6, #0, 4`;
         /C-list fault: row 0 must be SELF/.test(error.message)));
 });
 
+check('compiler assembly frontend uses an active C-list map without leaking it', () => {
+    const source = [
+        'SWITCH CR12, Thread.1',
+        'SWITCH CR15, Boot.Thread',
+    ].join('\n');
+    const compiler = new CLOOMCCompiler();
+    const mapped = compiler.compile(
+        source,
+        [],
+        { clistSlots: { 'Thread.1': 45 } },
+    );
+    if (mapped.errors.length > 0) {
+        throw new Error(mapped.errors.map(error => error.message).join('; '));
+    }
+
+    assert.strictEqual(mapped.language, 'assembly');
+    assert.strictEqual(mapped.methods[0].code[0] >>> 0, 0x2F63002D);
+    assert.strictEqual(mapped.methods[0].code[1] >>> 0, 0x2F7B0001);
+
+    const headless = compiler.compile(source, []);
+    assert.ok(headless.errors.some(error => /Thread\.1/.test(error.message)),
+        'instance-local active map must not become a stale shared map');
+    assert.ok(!headless.errors.some(error => /Boot\.Thread/.test(error.message)),
+        'fixed Boot.Thread must remain available to headless callers');
+});
+
 checkAssemblyCase(
     'assembly SELF/Foo at row one',
     `capabilities { SELF E, Foo E }

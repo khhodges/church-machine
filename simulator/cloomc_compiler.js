@@ -124,7 +124,8 @@ class CLOOMCCompiler {
         ) >>> 0;
     }
 
-    compile(source, capabilities) {
+    compile(source, capabilities, options) {
+        const compileOptions = options && typeof options === 'object' ? options : {};
         const targetDirective = this._parseTargetDirective(source);
         const portableDirective = this._parsePortableDirective(source);
         // Directives are source-level metadata, not statements in any of the
@@ -155,7 +156,7 @@ class CLOOMCCompiler {
                 result = this.compileJS(cleanSource, capabilities);
             } else if (this._detectAssembly(cleanSource)) {
                 this._reserveCompilerSelfRow = false;
-                result = this.compileAssembly(cleanSource, capabilities);
+                result = this.compileAssembly(cleanSource, capabilities, compileOptions);
             } else {
                 this._reserveCompilerSelfRow = true;
                 result = this.compileJS(cleanSource, capabilities);
@@ -1073,7 +1074,7 @@ class CLOOMCCompiler {
         return score >= 2;
     }
 
-    compileAssembly(source, capabilities) {
+    compileAssembly(source, capabilities, options) {
         const asm = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler() : null;
         if (!asm) {
             return {
@@ -1084,6 +1085,14 @@ class CLOOMCCompiler {
                 errors: [{ line: 1, message: 'ChurchAssembler not available' }],
                 profile: 'IoT'
             };
+        }
+
+        // Browser callers may supply the active C-list viewer's pet names for
+        // this compile.  Keep this instance-local: setClistSlots() deliberately
+        // updates ChurchAssembler's class-wide defaults, which would leak a
+        // browser's old row names into later headless compiler calls.
+        if (options && Object.prototype.hasOwnProperty.call(options, 'clistSlots')) {
+            asm.setLocalClistSlots(options.clistSlots);
         }
 
         const result = asm.assemble(source);

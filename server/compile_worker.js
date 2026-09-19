@@ -117,11 +117,17 @@ if (isMainThread) {
 
     const source   = (payload.source   || '').toString();
     const language = (payload.language || 'auto').toString().toLowerCase();
+    const clistSlots = payload.clist_slots && typeof payload.clist_slots === 'object' &&
+            !Array.isArray(payload.clist_slots)
+        ? Object.fromEntries(Object.entries(payload.clist_slots).filter(
+            ([name, row]) => name && Number.isInteger(row) && row >= 0 && row <= 0x7FFF))
+        : null;
 
     // ── Language → compiler method mapping ───────────────────────────────────
     function dispatch(compiler, lang, src) {
         switch (lang) {
-            case 'assembly':   return compiler.compileAssembly(src);
+            case 'assembly':   return compiler.compileAssembly(
+                src, [], clistSlots === null ? undefined : { clistSlots });
             case 'javascript': return compiler.compileJS(src);
             case 'haskell':    return compiler.compileHaskell(src);
             case 'lambda':     return compiler.compileLambda(src);
@@ -129,7 +135,8 @@ if (isMainThread) {
             // english + auto: use full auto-detect so CLOOMC++ and English prose both work
             case 'english':
             case 'auto':
-            default:           return compiler.compile(src);
+            default:           return compiler.compile(
+                src, [], clistSlots === null ? undefined : { clistSlots });
         }
     }
 

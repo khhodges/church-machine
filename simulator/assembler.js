@@ -318,6 +318,13 @@ class ChurchAssembler {
         this._clistSlots = Object.assign({}, ChurchAssembler._sharedClistSlots);
     }
 
+    // Apply a C-list map only to this assembler. Compiler frontends use this
+    // for an editor snapshot so a later headless compile cannot inherit stale
+    // UI state through the class-wide compatibility map.
+    setLocalClistSlots(nameToSlot) {
+        this._clistSlots = Object.assign({}, nameToSlot || {});
+    }
+
     // setSharedMethodConventions(map) — register bare-call method conventions
     // class-wide so all subsequent new ChurchAssembler() instances (compile,
     // test, decompile paths) inherit them automatically without a page reload.
