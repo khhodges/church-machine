@@ -14,7 +14,9 @@
 //   • AsmInstructionPicker.show is wrapped once, synchronously, at the
 //     bottom of this file, to call CListViewer.hide() before showing.
 //
-// Public API: window.CListViewer = { show, hide, toggle, isVisible, getNullSlotPetNames }
+// Public API: window.CListViewer = {
+//   show, hide, toggle, isVisible, getNullSlotPetNames, getSlotPetNames
+// }
 
 (function () {
     'use strict';
@@ -1613,12 +1615,63 @@
         return Object.assign({}, _nullSlotPetNames);
     }
 
+    // Return every pet name currently addressable through CR6, not only local
+    // names attached to null rows. Live Inform GT rows inherit the Thread or
+    // Namespace pet name for their target, so source such as
+    // `SWITCH CR12, Thread.1` can resolve to the actual row selected by the
+    // current C-list (for example CR6[0x002D]).
+    function getSlotPetNames() {
+        var names = Object.assign({}, _nullSlotPetNames);
+        var s = (typeof sim !== 'undefined') ? sim : null;
+        if (!s || !s.bootComplete) return names;
+
+        var cr6 = s.cr && s.cr[6];
+        if (!cr6 || (cr6.word0 >>> 0) === 0) return names;
+
+        var count = 0;
+        try { count = s._clistCountForCR(6); } catch (e) { count = 0; }
+        if (!count) return names;
+
+        var threadNames = {};
+        try {
+            var rows = s.threadStatusRows ? s.threadStatusRows(10) : [];
+            for (var t = 0; t < rows.length; t++) {
+                if (rows[t] && Number.isInteger(rows[t].slot) && rows[t].name) {
+                    threadNames[rows[t].slot] = rows[t].name;
+                }
+            }
+        } catch (e2) { /* Namespace labels remain available below. */ }
+
+        var base = cr6.word1 >>> 0;
+        for (var i = 0; i < count; i++) {
+            // Explicit local names always win.
+            if (names[i] || names[String(i)]) continue;
+            var rawWord = s.memory && s.memory[base + i] !== undefined
+                ? (s.memory[base + i] >>> 0) : 0;
+            if (!rawWord) continue;
+
+            var _CSSim = (typeof ChurchSimulator !== 'undefined') ? ChurchSimulator : null;
+            if (_CSSim && _CSSim.isPendingGT && _CSSim.isPendingGT(rawWord)) {
+                var pendingName = _CSSim.pendingGTName(rawWord);
+                if (pendingName) names[i] = pendingName;
+                continue;
+            }
+
+            var gt = _decodeGTWord(rawWord);
+            var targetName = threadNames[gt.index] ||
+                (s.nsLabels && (s.nsLabels[gt.index] || s.nsLabels[String(gt.index)]));
+            if (targetName) names[i] = targetName;
+        }
+        return names;
+    }
+
     window.CListViewer = {
         show:                showViewer,
         hide:                hideViewer,
         toggle:              toggleViewer,
         isVisible:           isVisible,
         getNullSlotPetNames: getNullSlotPetNames,
+        getSlotPetNames:     getSlotPetNames,
     };
 
     // ── Mutual exclusion: wrap AsmInstructionPicker.show synchronously ────────

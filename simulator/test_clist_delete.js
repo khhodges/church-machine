@@ -47,13 +47,26 @@ function nextTurn() {
 
     let inputEvents = 0;
     editor.addEventListener('input', () => { inputEvents++; });
+    const liveMemory = [];
+    liveMemory[100 + 45] = 0x10000001;
     window.sim = {
         bootComplete: true,
-        cr: { 14: { word0: 0x4A000006 } },
-        nsLabels: { 6: 'SelfTest' },
+        cr: {
+            6: { word0: 0x10000001, word1: 100 },
+            14: { word0: 0x4A000006 },
+        },
+        memory: liveMemory,
+        nsLabels: { 1: 'Boot.Thread', 6: 'SelfTest' },
+        _clistCountForCR: function () { return 46; },
+        threadStatusRows: function () {
+            return [{ slot: 1, name: 'Thread.1' }];
+        },
     };
     window.AsmInstructionPicker = { hide: function () {} };
     window.eval(fs.readFileSync(path.join(__dirname, 'clist-viewer.js'), 'utf8'));
+    const livePetNames = window.CListViewer.getSlotPetNames();
+    check('CLD-0: live Thread.1 pet name maps to its active C-list row',
+        livePetNames[45] === 'Thread.1', JSON.stringify(livePetNames));
 
     window.CListViewer.show();
     await nextTurn();

@@ -920,6 +920,18 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
             ((kScreenshotResult.words[1] >>> 15) & 0xF) === 6 &&
             (kScreenshotResult.words[1] & 0x7FFF) === 1,
         `word=0x${(kScreenshotResult.words[1] >>> 0).toString(16)}`);
+    const kActivePetName = new ChurchAssembler();
+    kActivePetName.setClistSlots({ 'Thread.1': 0x002D });
+    const kActivePetNameResult = kActivePetName.assemble(
+        'SWITCH CR12, Thread.1 ; CR6, #0 ; M-present'
+    );
+    assert('P12k bare Thread.1 pet name resolves through the active C-list map',
+        kActivePetName.errors.length === 0,
+        kActivePetName.errors.map(e => e.message).join('; '));
+    assert('P12k Thread.1 pet name encodes the active CR6 row 0x002D',
+        kActivePetNameResult.words[0] === 0x2F63002D,
+        `word=0x${(kActivePetNameResult.words[0] >>> 0).toString(16)}`);
+    kActivePetName.setClistSlots({});
 
     // P12l: TPERM CR15 → error
     const l = new ChurchAssembler();

@@ -516,14 +516,18 @@ function assembleAndLoad(options) {
         };
     }
 
-    // ── Pass null-GT row pet names to the assembler ──────────────────────────
-    // CListViewer tracks which c-list slot each pet name (e.g. "Mum") occupies.
-    // Inverting slot→name to name→slot lets _resolveNSName resolve "Mum" to its
-    // c-list offset, so  LOAD CR2, Mum  and  Tunnel.Connect(Mum)  compile cleanly.
-    if (window.CListViewer && typeof window.CListViewer.getNullSlotPetNames === 'function') {
-        const _nullPets  = window.CListViewer.getNullSlotPetNames();
+    // ── Pass active C-list row pet names to the assembler ────────────────────
+    // Include both user-named null rows and names derived from live Inform GTs.
+    // Inverting slot→name to name→slot lets bare operands such as Thread.1
+    // compile to the exact active row (for example CR6[0x002D]).
+    if (window.CListViewer &&
+            (typeof window.CListViewer.getSlotPetNames === 'function' ||
+             typeof window.CListViewer.getNullSlotPetNames === 'function')) {
+        const _slotPets = typeof window.CListViewer.getSlotPetNames === 'function'
+            ? window.CListViewer.getSlotPetNames()
+            : window.CListViewer.getNullSlotPetNames();
         const _nameToSlot = {};
-        for (const [slot, name] of Object.entries(_nullPets)) {
+        for (const [slot, name] of Object.entries(_slotPets)) {
             if (name) _nameToSlot[name] = parseInt(slot, 10);
         }
         assembler.setClistSlots(_nameToSlot);
