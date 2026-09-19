@@ -17,7 +17,9 @@
 // sim_selftest_lump_runs.js which loads a pre-built lump and expects
 // STACK_UNDERFLOW as its (different, already-normal) termination signal.
 //
-// Output (JSON to stdout): { bootComplete, compiled, steps, dr0, faultType,
+// SELFTEST_FORCE_FAILURE may name a test whose success branch is inverted in
+// the in-memory test copy. This proves fail-fast status survives DR0 semantics.
+// Output (JSON to stdout): { bootComplete, compiled, steps, dr0, dr1, faultType,
 //   faultMessage, terminatedBy, pass, failMessage }
 
 'use strict';
@@ -105,7 +107,27 @@ if (!sim.bootComplete) {
 
 // ── Compile post_flash_selftest.cloomc via CLOOMCCompiler ──────────────────
 const SRC_PATH = path.join(ROOT, 'simulator', 'examples', 'post_flash_selftest.cloomc');
-const source   = fs.readFileSync(SRC_PATH, 'utf8');
+let source = fs.readFileSync(SRC_PATH, 'utf8');
+// The canonical artifact builder owns row 0 as the runtime SELF capability
+// even though its source-level name is SelfTest. Compile+Run enforces the
+// front-end spelling SELF, so adapt only this in-memory fixture copy.
+source = source
+    .replace(/^(\s*)SelfTest(\s+E,\s*; slot 0)/m, '$1SELF$2')
+    .replaceAll('LOAD CR1, SelfTest', 'LOAD CR1, SELF')
+    .replaceAll('LOAD CR2, SelfTest', 'LOAD CR2, SELF');
+const forcedFailure = Number(process.env.SELFTEST_FORCE_FAILURE || 0);
+if (forcedFailure) {
+    const failureLine = `IADD DR1, DR0, #${forcedFailure}`;
+    const lineAt = source.indexOf(failureLine);
+    if (lineAt < 0) fail({ failMessage: `Cannot force absent SelfTest failure ${forcedFailure}` });
+    const prefix = source.slice(0, lineAt);
+    const branchMatch = prefix.match(/(\s+)BRANCH(EQ|NE)(\s+\S+\s*)$/);
+    if (!branchMatch) fail({ failMessage: `Cannot locate branch for SelfTest failure ${forcedFailure}` });
+    const inverted = branchMatch[2] === 'EQ' ? 'NE' : 'EQ';
+    source = prefix.slice(0, branchMatch.index) +
+        `${branchMatch[1]}BRANCH${inverted}${branchMatch[3]}` +
+        source.slice(lineAt);
+}
 
 const cloomcCompiler = new CLOOMCCompiler();
 const result = cloomcCompiler.compile(source, []);
@@ -156,6 +178,10 @@ const programEntry = sim.readNSEntry(programSlot);
 const programSeq = sim.parseNSWord1(programEntry.word1_limit).gtSeq;
 sim.cr[14].word0 = sim.createGT(
     programSeq, programSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1) >>> 0;
+// Real SelfTest entry receives its own E-GT in CR0 from the calling Thread.
+// Direct Compile+Run bypasses that CALL, so establish the same entry contract.
+sim.cr[0].word0 = sim.createGT(
+    programSeq, programSlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1) >>> 0;
 if (methodTableSize > 0) sim.pc = methodTableSize;
 
 // Compile+Run adopts the canonical root sentinel already formatted in the
@@ -193,6 +219,11 @@ if (sim.callStack && sim.callStack.length === 0) {
             const capName = (typeof cap === 'string' ? cap : (cap.name || '')).trim();
             const rights  = typeof cap === 'string' ? [] : (cap.rights || []);
             if (!capName) { sim.memory[clistBase + i] = 0; continue; }
+            if (capName.toUpperCase() === 'SELF') {
+                sim.memory[clistBase + i] = sim.createGT(
+                    programSeq, BOOT_ABSTR_SLOT, {E:1}, 1) >>> 0;
+                continue;
+            }
             if (capName.toUpperCase() === 'BOOT.NUCS') {
                 sim.memory[clistBase + i] = sim.createGT(0, 1, {X:1}, 1) >>> 0;
                 continue;
@@ -248,12 +279,14 @@ if (sim.callStack && sim.callStack.length === 0) {
 
 // ── Intercept fault() to capture DR0 at the moment of the first fault ──────
 let capturedDR0       = null;
+let capturedDR1       = null;
 let capturedFaultType = null;
 let capturedFaultMsg  = null;
 const origFault = sim.fault.bind(sim);
 sim.fault = function(type, msg, meta) {
     if (capturedDR0 === null) {
         capturedDR0       = sim.dr[0] >>> 0;
+        capturedDR1       = sim.dr[1] >>> 0;
         capturedFaultType = type;
         capturedFaultMsg  = msg;
     }
@@ -287,13 +320,17 @@ if (capturedDR0 !== null) {
         : (capturedFaultType === 'STACK_UNDERFLOW' ? 'RETURN_NO_SENTINEL' : 'UNEXPECTED_FAULT');
 } else if (steps >= MAX_STEPS) {
     capturedDR0  = sim.dr[0] >>> 0;
+    capturedDR1  = sim.dr[1] >>> 0;
     terminatedBy = 'MAX_STEPS';
 } else {
     capturedDR0  = sim.dr[0] >>> 0;
+    capturedDR1  = sim.dr[1] >>> 0;
     terminatedBy = 'HALT';
 }
 
-const pass = (capturedDR0 === 0) && (terminatedBy === 'RETURN_THROUGH_SENTINEL');
+const expectedDR1 = forcedFailure || 0;
+const pass = (capturedDR0 === 0) && (capturedDR1 === expectedDR1) &&
+    (terminatedBy === 'RETURN_THROUGH_SENTINEL');
 
 let failMessage = null;
 if (!pass) {
@@ -302,7 +339,7 @@ if (!pass) {
     } else if (terminatedBy === 'UNEXPECTED_FAULT') {
         failMessage = `Unexpected fault [${capturedFaultType}] after ${steps} steps: ${capturedFaultMsg}. DR0=${capturedDR0} at fault time.`;
     } else if (terminatedBy === 'RETURN_THROUGH_SENTINEL') {
-        failMessage = `Selftest completed but DR0=${capturedDR0} (test ${capturedDR0} was the first to fail)`;
+        failMessage = `Selftest completed with DR1=${capturedDR1}, DR0=${capturedDR0}; expected DR1=${expectedDR1}, DR0=0`;
     } else {
         failMessage = `Selftest terminated unexpectedly (${terminatedBy}) after ${steps} steps; DR0=${capturedDR0}`;
     }
@@ -313,6 +350,8 @@ const out = {
     compiled: true,
     steps,
     dr0: capturedDR0,
+    dr1: capturedDR1,
+    forcedFailure,
     faultType: capturedFaultType,
     faultMessage: capturedFaultMsg,
     terminatedBy,

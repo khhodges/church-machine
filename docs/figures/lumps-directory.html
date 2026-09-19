@@ -255,17 +255,17 @@ const LUMPS = [
   ns_slot:7, ns_slot_policy:"static", boot_resident:true, variant_group:null,
   lump_size:64, cw:3, cc:2, typ:0,
   language:"assembly", author:"Church Machine", version:"1.0", status:"released",
-  description:"Wukong board software boot coordinator. Three-instruction body: (1) ELOADCALL SelfTest.Main — runs the hardware self-test, result in DR0; (2) ELOADCALL Tunnel.Register — sends DR0 to the IDE as the boot_reason payload; (3) RETURN to the boot-entry caller.",
+  description:"Wukong board software boot coordinator. Three-instruction body: (1) ELOADCALL SelfTest.Main — runs the hardware self-test, result in DR1; (2) ELOADCALL Tunnel.Register — sends DR1 to the IDE as the boot_reason payload; (3) RETURN to the boot-entry caller.",
   ns_state:{ location:"0x00000300", limit:"0x0003D", seal:"0xF8E2", state:"Live" },
   methods:[
     { name:"Main", offset:0, length:3, visibility:"public",
       description:"Run SelfTest, register result with Tunnel, return to IDE. Three instructions: ELOADCALL SelfTest (c-list[0]), ELOADCALL Tunnel (c-list[1]), RETURN.",
-      inputs:[], outputs:["DR0: SelfTest result code forwarded to Tunnel.Register"]
+      inputs:[], outputs:["DR1: SelfTest result code forwarded to Tunnel.Register"]
     }
   ],
   capabilities:[
     { slot:0, name:"SelfTest", rights:["E"], gt:"0x4A000006", note:"NS slot 6 — called first" },
-    { slot:1, name:"Tunnel", rights:["E"], gt:"0x4A000008", note:"NS slot 8 — receives DR0 boot_reason" }
+    { slot:1, name:"Tunnel", rights:["E"], gt:"0x4A000008", note:"NS slot 8 — receives DR1 boot_reason" }
   ],
   source:"; ============================================================\n; Abstraction:  WukongCallHome\n; Description:  Wukong board software boot coordinator \u2014 simulator / IDE side.\n;               Runs SelfTest, then calls Tunnel.Register with the result\n;               so the IDE receives the board's boot_reason payload.\n;\n;               This is the LUMP executed by the Church Machine simulator\n;               when the \u26a1 boot entry is set to WukongCallHome (NS slot 7).\n;               It is distinct from wukong_callhome.cloomc, which is the\n;               exact hardware LED-blink ROM program burned into the Wukong\n;               FPGA (an infinite loop with no RETURN, no capability calls).\n;\n; Sequence:\n;   1. ELOADCALL SelfTest.Main  (c-list[0], NS slot 6)\n;      \u2192 executes the hardware self-test; result code arrives in DR0\n;   2. ELOADCALL Tunnel.Register (c-list[1], NS slot 8)\n;      \u2192 registers DR0 as the boot_reason with the IDE host\n;   3. RETURN to the boot-entry caller (IDE boot-complete handler)\n;\n; C-list layout (2 entries, injected by the lazy loader at runtime):\n;   c-list[0]  SelfTest   E  (NS slot 6)   E-GT: 0x4A000006\n;   c-list[1]  Tunnel     E  (NS slot 8)   E-GT: 0x4A000008\n;\n; Register usage:\n;   DR0  SelfTest result code (passed through to Tunnel.Register)\n;   All CRs are scratch; ELOADCALL manages CR internally.\n;\n; Slot:    NS slot 7  (WukongCallHome \u2014 Wukong board coordinator)\n; Token:   e186c4ec\n; Source:  simulator/examples/wukong_callhome_coordinator.cloomc\n; Author:  Church Machine\n; Version: 1.0\n; ============================================================\n\ncapabilities {\n    SelfTest  E,\n    Tunnel    E\n}\n\nMain:\n    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main \u2192 DR0 = test result\n    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR0) \u2192 IDE ACK\n    RETURN                        ; [2] return to boot-entry caller\n",
   doc_count:7,
@@ -959,6 +959,20 @@ const LUMPS = [
 }
 
 ]; // end LUMPS
+
+// Keep the embedded source viewer on the architectural DR1 status ABI.
+// This figure is static and does not publish or rewrite an immutable LUMP.
+{
+  const callHome = LUMPS.find(lump => lump.id === "WukongCallHome");
+  if (callHome) {
+    callHome.source = callHome.source
+      .replace("result code arrives in DR0", "result code arrives in DR1")
+      .replace("registers DR0 as the boot_reason", "registers DR1 as the boot_reason")
+      .replace("DR0  SelfTest result code", "DR1  SelfTest result code")
+      .replace("→ DR0 = test result", "→ DR1 = test result")
+      .replace("Tunnel.Register(DR0)", "Tunnel.Register(DR1)");
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 //  SPEC COMPLIANCE CHECKS

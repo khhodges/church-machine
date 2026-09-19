@@ -12,9 +12,9 @@
 ;
 ; Sequence:
 ;   1. ELOADCALL SelfTest.Main  (c-list[0], NS slot 6)
-;      → executes the hardware self-test; result code arrives in DR0
+;      → executes the hardware self-test; result code arrives in DR1
 ;   2. ELOADCALL Tunnel.Register (c-list[1], NS slot 8)
-;      → registers DR0 as the boot_reason with the IDE host
+;      → registers DR1 as the boot_reason with the IDE host
 ;   3. RETURN to the boot-entry caller (IDE boot-complete handler)
 ;
 ; C-list layout (2 entries, injected by the lazy loader at runtime):
@@ -22,7 +22,8 @@
 ;   c-list[1]  Tunnel     E  (NS slot 8)   E-GT: 0x4A000008
 ;
 ; Register usage:
-;   DR0  SelfTest result code (passed through to Tunnel.Register)
+;   DR1  SelfTest result code (passed through to Tunnel.Register)
+;   DR0  hardwired zero
 ;   All CRs are scratch; ELOADCALL manages CR internally.
 ;
 ; Slot:    NS slot 7  (WukongCallHome — Wukong board coordinator)
@@ -38,6 +39,6 @@ capabilities {
 }
 
 Main:
-    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main → DR0 = test result
-    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR0) → IDE ACK
+    ELOADCALL CR0, SelfTest, 0    ; [0] call SelfTest.Main → DR1 = test result
+    ELOADCALL CR0, Tunnel, 0      ; [1] call Tunnel.Register(DR1) → IDE ACK
     RETURN                        ; [2] return to boot-entry caller

@@ -9183,7 +9183,24 @@ tL81:
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
     ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
-    RETURN                  ; resume the boot continuation selected by the runtime`,
+    RETURN                  ; resume the boot continuation selected by the runtime`
+            // DR0 is architecturally hardwired zero. Keep this served example
+            // aligned with the canonical DR1 status ABI without publishing a
+            // new immutable LUMP as a side effect of loading the editor.
+            .replaceAll('IADD DR0, DR0, #', 'IADD DR1, DR0, #')
+            .replace('ISUB DR0, DR0, DR0\\n    LOAD CR1',
+                'IADD DR1, DR0, #0       ; explicit success status; DR1 remains scratch until done\\n    LOAD CR1')
+            .replace('ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)',
+                'IADD DR1, DR0, #0       ; DR1 = 0 (all 81 tests passed; DR0 stays hardwired zero)')
+            .replace('All 81 tests passed → DR0 = 0', 'All 81 tests passed → DR1 = 0')
+            .replace('First failure      → DR0 = N', 'First failure      → DR1 = N')
+            .replace('DR0       result register (0 = pass; set to N only on first failure)',
+                'DR0       hardwired zero (never carries status)\\n;   DR1       result register and scratch (explicitly set on every return path)')
+            .replace('DR1, DR2  primary arithmetic operands / scratch',
+                'DR2       primary arithmetic operand / scratch')
+            .replace('IADD DR0, DR0, #N    -- set result = test number',
+                'IADD DR1, DR0, #N    -- set result = test number from hardwired zero')
+            .replace('return to caller with DR0 = N', 'return to caller with DR1 = N'),
         'gt_v1_1_test': `; GT Encoding v1.1 Hardware Self-Test
 ; =====================================
 ; A CLOOMC program that exercises the live mLoad capability pipeline to

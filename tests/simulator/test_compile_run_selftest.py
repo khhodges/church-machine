@@ -39,12 +39,16 @@ def _node_available():
         return False
 
 
-def _run():
+def _run(force_failure=None):
+    env = os.environ.copy()
+    if force_failure is not None:
+        env['SELFTEST_FORCE_FAILURE'] = str(force_failure)
     proc = subprocess.run(
         ['node', HARNESS],
         capture_output=True,
         timeout=60,
         cwd=ROOT,
+        env=env,
     )
     raw = proc.stdout.decode('utf-8', errors='replace').strip()
     stderr = proc.stderr.decode('utf-8', errors='replace').strip()
@@ -89,19 +93,31 @@ def test_compile_run_selftest_terminates_via_sentinel_return():
     )
 
 
-def test_compile_run_selftest_dr0_is_zero():
-    """DR0 === 0 after Compile+Run: all 81 hardware tests passed."""
+def test_compile_run_selftest_status_is_dr1_and_dr0_remains_hardwired_zero():
+    """Success is explicit in DR1 while writes cannot change hardwired DR0."""
     if not _node_available():
         pytest.skip('Node.js not available')
 
     report, returncode, stderr = _run()
 
-    dr0 = report.get('dr0')
-    assert dr0 == 0, (
+    assert report.get('dr1') == 0 and report.get('dr0') == 0, (
         f'Compile+Run selftest FAILED: {report.get("failMessage")}. '
-        f'DR0={dr0} means test {dr0} was the first to fail. '
+        f'DR1={report.get("dr1")} is status; DR0={report.get("dr0")} must remain zero. '
         f'terminatedBy={report.get("terminatedBy")!r}. steps={report.get("steps")}.'
     )
+
+
+@pytest.mark.parametrize('test_number', [1, 42, 63, 81])
+def test_compile_run_selftest_forced_failures_are_not_masked(test_number):
+    """Representative early, middle, TPERM-63, and late failures report in DR1."""
+    if not _node_available():
+        pytest.skip('Node.js not available')
+
+    report, returncode, stderr = _run(test_number)
+    assert report.get('terminatedBy') == 'RETURN_THROUGH_SENTINEL', report
+    assert report.get('dr1') == test_number, report
+    assert report.get('dr0') == 0, report
+    assert report.get('pass') is True, report
 
 
 if __name__ == '__main__':
@@ -111,13 +127,13 @@ if __name__ == '__main__':
     try:
         report, returncode, stderr = _run()
         if report.get('pass'):
-            print(f'PASS: Compile+Run selftest ran {report["steps"]} steps, DR0=0 (all 81 tests passed).')
+            print(f'PASS: Compile+Run selftest ran {report["steps"]} steps, DR1=0 and DR0 remained hardwired zero.')
             sys.exit(0)
         else:
             print(f'FAIL: {report.get("failMessage")}')
             print(f'  terminatedBy={report.get("terminatedBy")}')
             print(f'  steps={report.get("steps")}')
-            print(f'  dr0={report.get("dr0")}')
+            print(f'  dr1={report.get("dr1")}, dr0={report.get("dr0")}')
             if stderr:
                 print(f'stderr:\n{stderr}')
             sys.exit(1)

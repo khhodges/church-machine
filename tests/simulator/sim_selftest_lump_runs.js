@@ -4,15 +4,16 @@
 //
 // Loads the canonical named SelfTest artifact (resolved from manifest + ns-state) into a fresh boot image via
 // ChurchSimulator.loadLumpBinary(), runs the simulator to completion, and
-// verifies that DR0 === 0 (all 81 self-tests passed).
+// verifies that DR1 === 0 (all 81 self-tests passed) and DR0 remains zero.
 //
-// The Post-Flash Self-Test uses DR0 as its result register:
-//   DR0 = 0   — all 81 tests passed
-//   DR0 = N   — test N was the first to fail (fail-fast)
+// The Post-Flash Self-Test uses DR1 as its result register:
+//   DR1 = 0   — all 81 tests passed
+//   DR1 = N   — test N was the first to fail (fail-fast)
+// DR0 is hardwired zero and cannot carry status.
 //
 // The selftest ends with RETURN.  Because loadLumpBinary() resets the call
 // stack, RETURN on an empty stack triggers a STACK_UNDERFLOW fault which
-// causes the simulator to halt.  We intercept fault() to read DR0 before
+// causes the simulator to halt.  We intercept fault() to read DR1 before
 // the fault handler zeroes registers.
 //
 // Output (JSON to stdout):
@@ -20,13 +21,14 @@
 //     "bootComplete":  true,
 //     "loaded":        true,
 //     "steps":         <number of step() calls>,
-//     "dr0":           <DR0 value captured on first fault>,
+//     "dr0":           <hardwired-zero value captured on first fault>,
+//     "dr1":           <DR1 status captured on first fault>,
 //     "faultType":     "STACK_UNDERFLOW" | other,
 //     "faultMessage":  <fault message string>,
 //     "terminatedBy":  "RETURN" | "HALT" | "MAX_STEPS" | "UNEXPECTED_FAULT",
 //     "pass":          true | false,
 //     "failSection":   null | "SECTION X <description> test N",
-//     "failMessage":   null | "SECTION X <description> test N was the first to fail (DR0=N)"
+//     "failMessage":   null | "SECTION X <description> test N was the first to fail (DR1=N)"
 //   }
 
 'use strict';
@@ -155,7 +157,7 @@ if (!loaded) {
     process.exit(1);
 }
 
-// ── Intercept fault() to capture DR0 at the moment of the first fault ────────
+// ── Intercept fault() to capture status at the moment of the first fault ─────
 // Two completion paths:
 //   RETURN path   — selftest ends with RETURN; empty stack → STACK_UNDERFLOW.
 //   ELOADCALL path — selftest ends with ELOADCALL CR1, Next; c-list[1] patched
@@ -165,6 +167,7 @@ if (!loaded) {
 // which would indicate a real error rather than normal completion.
 // DR0 is captured before any recovery handler can clear it.
 let capturedDR0      = null;
+let capturedDR1      = null;
 let capturedFaultType = null;
 let capturedFaultMsg  = null;
 
@@ -173,6 +176,7 @@ sim.fault = function(type, msg, meta) {
     if (capturedDR0 === null) {
         // First fault — capture state before any recovery handler fires
         capturedDR0       = sim.dr[0] >>> 0;
+        capturedDR1       = sim.dr[1] >>> 0;
         capturedFaultType = type;
         capturedFaultMsg  = msg;
     }
@@ -195,11 +199,12 @@ while (steps < MAX_STEPS && !sim.halted && sim.bootComplete) {
     if (r.instr && r.instr.mnemonic === 'ELOADCALL') {
         reachedFinalEloadcall = true;
         capturedDR0 = sim.dr[0] >>> 0;
+        capturedDR1 = sim.dr[1] >>> 0;
         break;
     }
 }
 
-// ── DR0 → section name mapping ────────────────────────────────────────────────
+// ── DR1 → section name mapping ────────────────────────────────────────────────
 // Matches the section table in simulator/examples/post_flash_selftest.cloomc
 const SELFTEST_SECTIONS = [
     { first: 1,  last: 15, name: 'SECTION A', desc: 'Data register independence' },
@@ -230,13 +235,13 @@ let terminatedBy;
 if (reachedFinalEloadcall) {
     terminatedBy = 'ELOADCALL';
 } else if (capturedDR0 !== null) {
-    // A fault was intercepted — classify by type and DR0 value:
+    // A fault was intercepted — classify by type and DR1 status:
     //   STACK_UNDERFLOW  → old RETURN-path completion
-    //   any other fault, DR0=0 → ELOADCALL-path completion (null-sentinel fired)
-    //   any other fault, DR0≠0 → a real failure mid-test
+    //   any other fault, DR1=0 → ELOADCALL-path completion (null-sentinel fired)
+    //   any other fault, DR1≠0 → a real failure mid-test
     if (capturedFaultType === 'STACK_UNDERFLOW') {
         terminatedBy = 'RETURN';
-    } else if (capturedDR0 === 0) {
+    } else if (capturedDR1 === 0) {
         terminatedBy = 'ELOADCALL';
     } else {
         terminatedBy = 'UNEXPECTED_FAULT';
@@ -244,31 +249,34 @@ if (reachedFinalEloadcall) {
 } else if (steps >= MAX_STEPS) {
     // Loop hit step limit without any fault — probably an infinite loop
     capturedDR0  = sim.dr[0] >>> 0;
+    capturedDR1  = sim.dr[1] >>> 0;
     terminatedBy = 'MAX_STEPS';
 } else {
     // Loop exited because !sim.bootComplete (e.g. _returnToBoot) without a fault
     capturedDR0  = sim.dr[0] >>> 0;
+    capturedDR1  = sim.dr[1] >>> 0;
     terminatedBy = 'HALT';
 }
 
 // Both RETURN (old binary) and ELOADCALL (current binary) are valid completions.
-const pass = (capturedDR0 === 0) && (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL');
+const pass = (capturedDR0 === 0) && (capturedDR1 === 0) &&
+    (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL');
 
 let failSection = null;
 let failMessage = null;
 if (!pass) {
     if (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL') {
-        // Normal termination but DR0 != 0: a specific test failed
-        failSection = drToSection(capturedDR0);
-        const sectionLabel = failSection || `test ${capturedDR0}`;
-        failMessage = `${sectionLabel} was the first to fail (DR0=${capturedDR0})`;
+        // Normal termination but DR1 != 0: a specific test failed
+        failSection = drToSection(capturedDR1);
+        const sectionLabel = failSection || `test ${capturedDR1}`;
+        failMessage = `${sectionLabel} was the first to fail (DR1=${capturedDR1})`;
     } else if (terminatedBy === 'UNEXPECTED_FAULT') {
         failMessage = (
             `Unexpected fault [${capturedFaultType}] after ${steps} steps: ${capturedFaultMsg}. ` +
-            `DR0=${capturedDR0} at fault time.`
+            `DR1=${capturedDR1}, DR0=${capturedDR0} at fault time.`
         );
     } else {
-        failMessage = `Selftest terminated unexpectedly (${terminatedBy}) after ${steps} steps; DR0=${capturedDR0}`;
+        failMessage = `Selftest terminated unexpectedly (${terminatedBy}) after ${steps} steps; DR1=${capturedDR1}, DR0=${capturedDR0}`;
     }
 }
 
@@ -280,6 +288,7 @@ const out = {
     loaded: true,
     steps,
     dr0: capturedDR0,
+    dr1: capturedDR1,
     faultType: capturedFaultType,
     faultMessage: capturedFaultMsg,
     faultLog,

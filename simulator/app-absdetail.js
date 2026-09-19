@@ -3689,8 +3689,8 @@ const _ABSTRACTION_CONVENTIONS = {
     // (e.g. CALL SelfTest.Run) resolve to the correct method index even on a
     // fresh page load before the user has opened any detail panel.
     'SelfTest': {
-        'Run':   { index: 0, input: '', output: 'DR0=0 all pass | N first-fail code' },
-        'Audit': { index: 1, input: '', output: 'DR0=0 all pass | N first-fail code' },
+        'Run':   { index: 0, input: '', output: 'DR1=0 all pass | N first-fail code' },
+        'Audit': { index: 1, input: '', output: 'DR1=0 all pass | N first-fail code' },
     },
     'LEDFlash': {
         'Run':   { index: 0, input: '', output: 'LED flash cycle; returns on completion' },

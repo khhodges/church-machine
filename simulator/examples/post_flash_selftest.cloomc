@@ -18,13 +18,14 @@
 ;   SECTION L   Tests  80-81   Final GT immutability and CLEAR verification
 ;
 ; Result:
-;   All 81 tests passed → DR0 = 0, then loops waiting for a valid E-GT in CR0
-;   First failure      → DR0 = N (test N), RETURN to caller with fail code
+;   All 81 tests passed → DR1 = 0, RETURN to caller
+;   First failure      → DR1 = N (test N), RETURN to caller with fail code
 ;
 ; Register conventions
 ; --------------------
-;   DR0       result register (0 = pass; set to N only on first failure)
-;   DR1, DR2  primary arithmetic operands / scratch
+;   DR0       hardwired zero (never carries status)
+;   DR1       result register and scratch (explicitly set on every return path)
+;   DR2       primary arithmetic operand / scratch
 ;   DR3       expected-value comparison scratch
 ;   DR4-DR15  register-independence pattern storage (Section A only)
 ;
@@ -47,8 +48,8 @@ capabilities {
 ;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
 ;   BRANCHEQ ok_N        -- Z=1 = correct, skip fail
-;   IADD DR0, DR0, #N    -- set result = test number
-;   RETURN               -- return to caller with DR0 = N
+;   IADD DR1, DR0, #N    -- set result = test number from hardwired zero
+;   RETURN               -- return to caller with DR1 = N
 ; ok_N:
 ;
 ; To zero a DR:        ISUB DRn, DRn, DRn   (DRn = DRn - DRn = 0)
@@ -58,7 +59,7 @@ capabilities {
 
 ; ── Initialise ───────────────────────────────────────────────────────────────
 start:
-    ISUB DR0, DR0, DR0
+    IADD DR1, DR0, #0       ; explicit success status; DR1 remains scratch until done
     LOAD CR1, SelfTest      ; CR1 = E-GT (Church domain; from c-list slot 0)
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -101,77 +102,77 @@ start:
 
     ISUB DR1, DR1, #11
     BRANCHEQ tA2
-    IADD DR0, DR0, #1
+    IADD DR1, DR0, #1
     RETURN
 tA2:
     ISUB DR2, DR2, #22
     BRANCHEQ tA3
-    IADD DR0, DR0, #2
+    IADD DR1, DR0, #2
     RETURN
 tA3:
     ISUB DR3, DR3, #33
     BRANCHEQ tA4
-    IADD DR0, DR0, #3
+    IADD DR1, DR0, #3
     RETURN
 tA4:
     ISUB DR4, DR4, #44
     BRANCHEQ tA5
-    IADD DR0, DR0, #4
+    IADD DR1, DR0, #4
     RETURN
 tA5:
     ISUB DR5, DR5, #55
     BRANCHEQ tA6
-    IADD DR0, DR0, #5
+    IADD DR1, DR0, #5
     RETURN
 tA6:
     ISUB DR6, DR6, #66
     BRANCHEQ tA7
-    IADD DR0, DR0, #6
+    IADD DR1, DR0, #6
     RETURN
 tA7:
     ISUB DR7, DR7, #77
     BRANCHEQ tA8
-    IADD DR0, DR0, #7
+    IADD DR1, DR0, #7
     RETURN
 tA8:
     ISUB DR8, DR8, #88
     BRANCHEQ tA9
-    IADD DR0, DR0, #8
+    IADD DR1, DR0, #8
     RETURN
 tA9:
     ISUB DR9, DR9, #99
     BRANCHEQ tA10
-    IADD DR0, DR0, #9
+    IADD DR1, DR0, #9
     RETURN
 tA10:
     ISUB DR10, DR10, #110
     BRANCHEQ tA11
-    IADD DR0, DR0, #10
+    IADD DR1, DR0, #10
     RETURN
 tA11:
     ISUB DR11, DR11, #121
     BRANCHEQ tA12
-    IADD DR0, DR0, #11
+    IADD DR1, DR0, #11
     RETURN
 tA12:
     ISUB DR12, DR12, #132
     BRANCHEQ tA13
-    IADD DR0, DR0, #12
+    IADD DR1, DR0, #12
     RETURN
 tA13:
     ISUB DR13, DR13, #143
     BRANCHEQ tA14
-    IADD DR0, DR0, #13
+    IADD DR1, DR0, #13
     RETURN
 tA14:
     ISUB DR14, DR14, #154
     BRANCHEQ tA15
-    IADD DR0, DR0, #14
+    IADD DR1, DR0, #14
     RETURN
 tA15:
     ISUB DR15, DR15, #165
     BRANCHEQ tBstart
-    IADD DR0, DR0, #15
+    IADD DR1, DR0, #15
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -184,7 +185,7 @@ tBstart:
     ISUB DR2, DR2, DR2
     IADD DR3, DR1, DR2
     BRANCHEQ tB17
-    IADD DR0, DR0, #16
+    IADD DR1, DR0, #16
     RETURN
 tB17:
     ; Test 17: 5 + 3 = 8  (Z=0 and value = 8)
@@ -194,12 +195,12 @@ tB17:
     IADD DR2, DR2, #3
     IADD DR3, DR1, DR2
     BRANCHNE tB17v
-    IADD DR0, DR0, #17
+    IADD DR1, DR0, #17
     RETURN
 tB17v:
     ISUB DR3, DR3, #8
     BRANCHEQ tB18
-    IADD DR0, DR0, #17
+    IADD DR1, DR0, #17
     RETURN
 tB18:
     ; Test 18: 100 + 155 = 255
@@ -210,7 +211,7 @@ tB18:
     IADD DR3, DR1, DR2
     ISUB DR3, DR3, #255
     BRANCHEQ tB19
-    IADD DR0, DR0, #18
+    IADD DR1, DR0, #18
     RETURN
 tB19:
     ; Test 19: DRs + #0 = DRs  (identity with immediate 0)
@@ -219,7 +220,7 @@ tB19:
     IADD DR3, DR1, #0
     ISUB DR3, DR3, #42
     BRANCHEQ tB20
-    IADD DR0, DR0, #19
+    IADD DR1, DR0, #19
     RETURN
 tB20:
     ; Test 20: IADD result Z=0 for nonzero sum
@@ -227,7 +228,7 @@ tB20:
     IADD DR1, DR1, #7
     IADD DR3, DR1, #0
     BRANCHNE tB21
-    IADD DR0, DR0, #20
+    IADD DR1, DR0, #20
     RETURN
 tB21:
     ; Test 21: commutativity — a+b == b+a
@@ -239,7 +240,7 @@ tB21:
     IADD DR4, DR2, DR1
     ISUB DR3, DR3, DR4
     BRANCHEQ tB22
-    IADD DR0, DR0, #21
+    IADD DR1, DR0, #21
     RETURN
 tB22:
     ; Test 22: IADD with max 14-bit immediate (16383)
@@ -247,7 +248,7 @@ tB22:
     IADD DR3, DR1, #16383
     ISUB DR3, DR3, #16383
     BRANCHEQ tB23
-    IADD DR0, DR0, #22
+    IADD DR1, DR0, #22
     RETURN
 tB23:
     ; Test 23: IADD nonzero + nonzero gives Z=0
@@ -257,7 +258,7 @@ tB23:
     IADD DR2, DR2, #200
     IADD DR3, DR1, DR2
     BRANCHNE tCstart
-    IADD DR0, DR0, #23
+    IADD DR1, DR0, #23
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -269,7 +270,7 @@ tCstart:
     IADD DR1, DR1, #99
     ISUB DR3, DR1, DR1
     BRANCHEQ tC25
-    IADD DR0, DR0, #24
+    IADD DR1, DR0, #24
     RETURN
 tC25:
     ; Test 25: 10 - 3 = 7  (Z=0, value verify)
@@ -280,7 +281,7 @@ tC25:
     ISUB DR3, DR1, DR2
     ISUB DR3, DR3, #7
     BRANCHEQ tC26
-    IADD DR0, DR0, #25
+    IADD DR1, DR0, #25
     RETURN
 tC26:
     ; Test 26: 3 - 10 gives N=1 (signed negative result)
@@ -290,14 +291,14 @@ tC26:
     IADD DR2, DR2, #10
     ISUB DR3, DR1, DR2
     BRANCHMI tC27
-    IADD DR0, DR0, #26
+    IADD DR1, DR0, #26
     RETURN
 tC27:
     ; Test 27: 0 - 1 gives borrow  (C=0, BRANCHCC)
     ISUB DR1, DR1, DR1
     ISUB DR3, DR1, #1
     BRANCHCC tC28
-    IADD DR0, DR0, #27
+    IADD DR1, DR0, #27
     RETURN
 tC28:
     ; Test 28: 5 - 3 gives no borrow  (C=1, BRANCHCS)
@@ -305,7 +306,7 @@ tC28:
     IADD DR1, DR1, #5
     ISUB DR3, DR1, #3
     BRANCHCS tC29
-    IADD DR0, DR0, #28
+    IADD DR1, DR0, #28
     RETURN
 tC29:
     ; Test 29: subtract immediate to zero
@@ -313,7 +314,7 @@ tC29:
     IADD DR1, DR1, #200
     ISUB DR3, DR1, #200
     BRANCHEQ tC30
-    IADD DR0, DR0, #29
+    IADD DR1, DR0, #29
     RETURN
 tC30:
     ; Test 30: nonzero ISUB result is nonzero  (Z=0)
@@ -321,7 +322,7 @@ tC30:
     IADD DR1, DR1, #50
     ISUB DR3, DR1, #49
     BRANCHNE tDstart
-    IADD DR0, DR0, #30
+    IADD DR1, DR0, #30
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -334,7 +335,7 @@ tDstart:
     SHL DR3, DR1, #0
     ISUB DR3, DR3, #7
     BRANCHEQ tD32
-    IADD DR0, DR0, #31
+    IADD DR1, DR0, #31
     RETURN
 tD32:
     ; Test 32: SHL by 1 doubles value  (6 → 12)
@@ -343,7 +344,7 @@ tD32:
     SHL DR3, DR1, #1
     ISUB DR3, DR3, #12
     BRANCHEQ tD33
-    IADD DR0, DR0, #32
+    IADD DR1, DR0, #32
     RETURN
 tD33:
     ; Test 33: SHL by 8 multiplies by 256  (1 → 256)
@@ -352,7 +353,7 @@ tD33:
     SHL DR3, DR1, #8
     ISUB DR3, DR3, #256
     BRANCHEQ tD34
-    IADD DR0, DR0, #33
+    IADD DR1, DR0, #33
     RETURN
 tD34:
     ; Test 34: SHL carry flag — MSB shifted out sets C=1
@@ -362,11 +363,11 @@ tD34:
     SHL DR1, DR1, #31
     SHL DR3, DR1, #1
     BRANCHEQ tD34c
-    IADD DR0, DR0, #34
+    IADD DR1, DR0, #34
     RETURN
 tD34c:
     BRANCHCS tD35
-    IADD DR0, DR0, #34
+    IADD DR1, DR0, #34
     RETURN
 tD35:
     ; Test 35: SHL result is negative  (N=1 when bit 31 set)
@@ -375,7 +376,7 @@ tD35:
     IADD DR1, DR1, #1
     SHL DR3, DR1, #31
     BRANCHMI tD36
-    IADD DR0, DR0, #35
+    IADD DR1, DR0, #35
     RETURN
 tD36:
     ; Test 36: SHL by 4 on pattern 0xF gives 0xF0
@@ -384,7 +385,7 @@ tD36:
     SHL DR3, DR1, #4
     ISUB DR3, DR3, #240
     BRANCHEQ tEstart
-    IADD DR0, DR0, #36
+    IADD DR1, DR0, #36
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -397,7 +398,7 @@ tEstart:
     SHR DR3, DR1, #0
     ISUB DR3, DR3, #240
     BRANCHEQ tE38
-    IADD DR0, DR0, #37
+    IADD DR1, DR0, #37
     RETURN
 tE38:
     ; Test 38: SHR LSR by 1 halves an even value  (8 → 4, C=0)
@@ -406,7 +407,7 @@ tE38:
     SHR DR3, DR1, #1
     ISUB DR3, DR3, #4
     BRANCHEQ tE39
-    IADD DR0, DR0, #38
+    IADD DR1, DR0, #38
     RETURN
 tE39:
     ; Test 39: SHR LSR carry flag — bit 0 shifted out sets C=1
@@ -415,11 +416,11 @@ tE39:
     IADD DR1, DR1, #1
     SHR DR3, DR1, #1
     BRANCHEQ tE39c
-    IADD DR0, DR0, #39
+    IADD DR1, DR0, #39
     RETURN
 tE39c:
     BRANCHCS tE40
-    IADD DR0, DR0, #39
+    IADD DR1, DR0, #39
     RETURN
 tE40:
     ; Test 40: SHR LSR by 8  (0x800 = 2048 >> 8 = 8)
@@ -429,7 +430,7 @@ tE40:
     SHR DR3, DR1, #8
     ISUB DR3, DR3, #8
     BRANCHEQ tE41
-    IADD DR0, DR0, #40
+    IADD DR1, DR0, #40
     RETURN
 tE41:
     ; Test 41: SHR LSR does not sign-extend  (N=0 after shift of 0x80000000)
@@ -438,7 +439,7 @@ tE41:
     SHL DR1, DR1, #31
     SHR DR3, DR1, #1
     BRANCHPL tFstart
-    IADD DR0, DR0, #41
+    IADD DR1, DR0, #41
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -451,7 +452,7 @@ tFstart:
     SHR DR3, DR1, #1 ASR
     ISUB DR3, DR3, DR1
     BRANCHEQ tF43
-    IADD DR0, DR0, #42
+    IADD DR1, DR0, #42
     RETURN
 tF43:
     ; Test 43: -2 ASR 1 gives C=0  (bit 0 of -2 was 0)
@@ -459,7 +460,7 @@ tF43:
     ISUB DR1, DR1, #2
     SHR DR3, DR1, #1 ASR
     BRANCHCC tF44
-    IADD DR0, DR0, #43
+    IADD DR1, DR0, #43
     RETURN
 tF44:
     ; Test 44: -1 ASR 1 gives C=1  (bit 0 of -1 was 1)
@@ -467,7 +468,7 @@ tF44:
     ISUB DR1, DR1, #1
     SHR DR3, DR1, #1 ASR
     BRANCHCS tF45
-    IADD DR0, DR0, #44
+    IADD DR1, DR0, #44
     RETURN
 tF45:
     ; Test 45: ASR preserves N=1 for any negative input
@@ -476,7 +477,7 @@ tF45:
     SHL DR1, DR1, #31
     SHR DR3, DR1, #4 ASR
     BRANCHMI tGstart
-    IADD DR0, DR0, #45
+    IADD DR1, DR0, #45
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -488,7 +489,7 @@ tGstart:
     ; Test 46: BRANCHEQ taken when Z=1
     ISUB DR1, DR1, DR1
     BRANCHEQ tG47
-    IADD DR0, DR0, #46
+    IADD DR1, DR0, #46
     RETURN
 tG47:
     ; Test 47: BRANCHNE taken when Z=0
@@ -496,7 +497,7 @@ tG47:
     IADD DR1, DR1, #1
     ISUB DR3, DR1, #2
     BRANCHNE tG48
-    IADD DR0, DR0, #47
+    IADD DR1, DR0, #47
     RETURN
 tG48:
     ; Test 48: BRANCHCS taken when C=1  (no borrow: 5-3)
@@ -504,21 +505,21 @@ tG48:
     IADD DR1, DR1, #5
     ISUB DR3, DR1, #3
     BRANCHCS tG49
-    IADD DR0, DR0, #48
+    IADD DR1, DR0, #48
     RETURN
 tG49:
     ; Test 49: BRANCHCC taken when C=0  (borrow: 0-1)
     ISUB DR1, DR1, DR1
     ISUB DR3, DR1, #1
     BRANCHCC tG50
-    IADD DR0, DR0, #49
+    IADD DR1, DR0, #49
     RETURN
 tG50:
     ; Test 50: BRANCHMI taken when N=1  (0-1 = 0xFFFFFFFF)
     ISUB DR1, DR1, DR1
     ISUB DR3, DR1, #1
     BRANCHMI tG51
-    IADD DR0, DR0, #50
+    IADD DR1, DR0, #50
     RETURN
 tG51:
     ; Test 51: BRANCHPL taken when N=0  (positive result)
@@ -526,7 +527,7 @@ tG51:
     IADD DR1, DR1, #1
     ISUB DR3, DR1, #0
     BRANCHPL tG52
-    IADD DR0, DR0, #51
+    IADD DR1, DR0, #51
     RETURN
 tG52:
     ; Test 52: BRANCHGE taken when N=V  (10-3=7, N=0, V=0)
@@ -534,7 +535,7 @@ tG52:
     IADD DR1, DR1, #10
     ISUB DR3, DR1, #3
     BRANCHGE tG53
-    IADD DR0, DR0, #52
+    IADD DR1, DR0, #52
     RETURN
 tG53:
     ; Test 53: BRANCHLT taken when N≠V  (3-10=-7, N=1, V=0)
@@ -544,7 +545,7 @@ tG53:
     IADD DR2, DR2, #10
     ISUB DR3, DR1, DR2
     BRANCHLT tG54
-    IADD DR0, DR0, #53
+    IADD DR1, DR0, #53
     RETURN
 tG54:
     ; Test 54: BRANCHGT taken when Z=0 and N=V  (10-3=7, Z=0, N=V=0)
@@ -552,7 +553,7 @@ tG54:
     IADD DR1, DR1, #10
     ISUB DR3, DR1, #3
     BRANCHGT tG55
-    IADD DR0, DR0, #54
+    IADD DR1, DR0, #54
     RETURN
 tG55:
     ; Test 55: BRANCHLE taken when Z=1 or N≠V  (5-5=0, Z=1)
@@ -560,7 +561,7 @@ tG55:
     IADD DR1, DR1, #5
     ISUB DR3, DR1, #5
     BRANCHLE tG56
-    IADD DR0, DR0, #55
+    IADD DR1, DR0, #55
     RETURN
 tG56:
     ; Test 56: BRANCHHI taken when C=1 and Z=0  (8-3=5, C=1, Z=0)
@@ -568,14 +569,14 @@ tG56:
     IADD DR1, DR1, #8
     ISUB DR3, DR1, #3
     BRANCHHI tG57
-    IADD DR0, DR0, #56
+    IADD DR1, DR0, #56
     RETURN
 tG57:
     ; Test 57: BRANCHLS taken when C=0 or Z=1  (borrow: 0-1, C=0)
     ISUB DR1, DR1, DR1
     ISUB DR3, DR1, #1
     BRANCHLS tHstart
-    IADD DR0, DR0, #57
+    IADD DR1, DR0, #57
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -590,7 +591,7 @@ tHstart:
     BFEXT DR3, DR1, #0, #4
     ISUB DR3, DR3, #13
     BRANCHEQ tH59
-    IADD DR0, DR0, #58
+    IADD DR1, DR0, #58
     RETURN
 tH59:
     ; Test 59: BFEXT 8-bit field at bit 0 from 0x00AB = 171
@@ -600,7 +601,7 @@ tH59:
     BFEXT DR3, DR1, #0, #8
     ISUB DR3, DR3, #171
     BRANCHEQ tH60
-    IADD DR0, DR0, #59
+    IADD DR1, DR0, #59
     RETURN
 tH60:
     ; Test 60: BFINS lower nibble — insert 0xF into bits [3:0] of 0
@@ -610,7 +611,7 @@ tH60:
     BFINS DR3, DR2, #0, #4
     ISUB DR3, DR3, #15
     BRANCHEQ tH61
-    IADD DR0, DR0, #60
+    IADD DR1, DR0, #60
     RETURN
 tH61:
     ; Test 61: BFINS upper nibble — insert 0xA into bits [7:4] of 0
@@ -620,7 +621,7 @@ tH61:
     BFINS DR3, DR2, #4, #4
     ISUB DR3, DR3, #160
     BRANCHEQ tH62
-    IADD DR0, DR0, #61
+    IADD DR1, DR0, #61
     RETURN
 tH62:
     ; Test 62: BFEXT round-trip — insert 7 into bits [7:5], extract back
@@ -631,7 +632,7 @@ tH62:
     BFEXT DR1, DR3, #5, #3
     ISUB DR1, DR1, #7
     BRANCHEQ tIstart
-    IADD DR0, DR0, #62
+    IADD DR1, DR0, #62
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -645,67 +646,67 @@ tIstart:
     ; Test 63: E-GT satisfies TPERM E  (Z=1)
     TPERM CR0, E
     BRANCHEQ tI64
-    IADD DR0, DR0, #63
+    IADD DR1, DR0, #63
     RETURN
 tI64:
     ; Test 64: E-GT does NOT satisfy TPERM L  (Z=0: same-domain missing permission)
     TPERM CR0, L
     BRANCHNE tI65
-    IADD DR0, DR0, #64
+    IADD DR1, DR0, #64
     RETURN
 tI65:
     ; Test 65: E-GT does NOT satisfy TPERM S  (Z=0: same-domain missing permission)
     TPERM CR0, S
     BRANCHNE tI66
-    IADD DR0, DR0, #65
+    IADD DR1, DR0, #65
     RETURN
 tI66:
     ; Test 66: E-GT does NOT satisfy TPERM LS  (Z=0: same-domain missing permissions)
     TPERM CR0, LS
     BRANCHNE tI67
-    IADD DR0, DR0, #66
+    IADD DR1, DR0, #66
     RETURN
 tI67:
     ; Test 67: c-list E-GT satisfies TPERM E  (Z=1: verifies LOAD + TPERM together)
     TPERM CR1, E
     BRANCHEQ tI68
-    IADD DR0, DR0, #67
+    IADD DR1, DR0, #67
     RETURN
 tI68:
     ; Test 68: c-list E-GT does NOT satisfy TPERM L  (Z=0: same-domain missing)
     TPERM CR1, L
     BRANCHNE tI69
-    IADD DR0, DR0, #68
+    IADD DR1, DR0, #68
     RETURN
 tI69:
     ; Test 69: c-list E-GT does NOT satisfy TPERM S  (Z=0: same-domain missing)
     TPERM CR1, S
     BRANCHNE tI70
-    IADD DR0, DR0, #69
+    IADD DR1, DR0, #69
     RETURN
 tI70:
     ; Test 70: c-list E-GT does NOT satisfy TPERM LS  (Z=0: same-domain missing)
     TPERM CR1, LS
     BRANCHNE tI71
-    IADD DR0, DR0, #70
+    IADD DR1, DR0, #70
     RETURN
 tI71:
     ; Test 71: TPERM CLEAR always succeeds on a valid GT  (Z=1)
     TPERM CR0, CLEAR
     BRANCHEQ tI72
-    IADD DR0, DR0, #71
+    IADD DR1, DR0, #71
     RETURN
 tI72:
     ; Test 72: E-GT still satisfies TPERM E after CLEAR (Z=1: CLEAR is non-mutating)
     TPERM CR0, E
     BRANCHEQ tI73
-    IADD DR0, DR0, #72
+    IADD DR1, DR0, #72
     RETURN
 tI73:
     ; Test 73: E-GT still does not satisfy TPERM LS (Z=0: strict multi-permission check)
     TPERM CR0, LS
     BRANCHNE tJstart
-    IADD DR0, DR0, #73
+    IADD DR1, DR0, #73
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -720,25 +721,25 @@ tJstart:
     ; Test 74: CR0 EXACT CR0 — self-comparison always passes  → Z=1
     TPERM CR0, EXACT, CR0
     BRANCHEQ tJ75
-    IADD DR0, DR0, #74
+    IADD DR1, DR0, #74
     RETURN
 tJ75:
     ; Test 75: CR1 EXACT CR1 — self-comparison always passes  → Z=1
     TPERM CR1, EXACT, CR1
     BRANCHEQ tJ76
-    IADD DR0, DR0, #75
+    IADD DR1, DR0, #75
     RETURN
 tJ76:
     ; Test 76: CR0 EXACT CR1 — both are E-GT word 0x4A000006  → Z=1
     TPERM CR0, EXACT, CR1
     BRANCHEQ tJ77
-    IADD DR0, DR0, #76
+    IADD DR1, DR0, #76
     RETURN
 tJ77:
     ; Test 77: CR1 EXACT CR2 — both loaded from same c-list slot 0  → Z=1
     TPERM CR1, EXACT, CR2
     BRANCHEQ tKstart
-    IADD DR0, DR0, #77
+    IADD DR1, DR0, #77
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -753,13 +754,13 @@ tKstart:
     ; Test 78: E-GT does NOT satisfy TPERM LS  (Z=0: same-domain mismatch)
     TPERM CR0, LS
     BRANCHNE tK79
-    IADD DR0, DR0, #78
+    IADD DR1, DR0, #78
     RETURN
 tK79:
     ; Test 79: the failed LS assertion did not mutate E  (Z=1)
     TPERM CR0, E
     BRANCHEQ tLstart
-    IADD DR0, DR0, #79
+    IADD DR1, DR0, #79
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
@@ -771,18 +772,18 @@ tLstart:
     ; Test 80: c-list E-GT still satisfies TPERM E after all tests  (Z=1: immutable)
     TPERM CR1, E
     BRANCHEQ tL81
-    IADD DR0, DR0, #80
+    IADD DR1, DR0, #80
     RETURN
 tL81:
     ; Test 81: TPERM CLEAR on c-list E-GT always succeeds  (Z=1)
     TPERM CR1, CLEAR
     BRANCHEQ done
-    IADD DR0, DR0, #81
+    IADD DR1, DR0, #81
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; All 81 tests passed — return to the runtime-selected boot continuation.
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
-    ISUB DR0, DR0, DR0      ; DR0 = 0 (all 81 tests passed)
+    IADD DR1, DR0, #0       ; DR1 = 0 (all 81 tests passed; DR0 stays hardwired zero)
     RETURN

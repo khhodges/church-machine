@@ -2,8 +2,8 @@
 
 Verifies that the canonical SelfTest artifact (filename from manifest/ns-state) can be
 loaded into a fresh simulator boot image via ChurchSimulator.loadLumpBinary()
-and that the 81-test selftest suite runs to completion with DR0 === 0 (all
-tests passed).
+and that the 81-test selftest suite runs to completion with DR1 === 0 (all
+tests passed) while hardwired DR0 remains zero.
 
 The selftest (simulator/examples/post_flash_selftest.cloomc) covers:
   SECTION A  Tests  1-15  Data register independence
@@ -20,8 +20,9 @@ The selftest (simulator/examples/post_flash_selftest.cloomc) covers:
   SECTION L  Tests 80-81  Final GT immutability and CLEAR verification
 
 Result convention:
-  DR0 = 0  — all 81 tests passed
-  DR0 = N  — test N was the first to fail (fail-fast)
+  DR1 = 0  — all 81 tests passed
+  DR1 = N  — test N was the first to fail (fail-fast)
+  DR0 = 0  — always; hardwired zero is not a status register
 """
 
 import json
@@ -146,11 +147,11 @@ def test_selftest_lump_runs_to_completion():
     )
 
 
-def test_selftest_lump_dr0_is_zero():
-    """DR0 === 0 after running the selftest lump: all 81 hardware tests passed.
+def test_selftest_lump_dr1_is_zero_and_dr0_is_hardwired_zero():
+    """DR1 === 0 reports success; DR0 remains hardwired zero.
 
-    If this assertion fails, DR0 contains the number of the first failing test
-    (the selftest uses a fail-fast strategy: IADD DR0, #N then RETURN).
+    If this assertion fails, DR1 contains the number of the first failing test
+    (the selftest uses a fail-fast strategy: IADD DR1, DR0, #N then RETURN).
     """
     if not _node_available():
         import pytest
@@ -159,14 +160,16 @@ def test_selftest_lump_dr0_is_zero():
     report, returncode, stderr = _run()
 
     dr0 = report.get('dr0')
+    dr1 = report.get('dr1')
     fail_msg = report.get('failMessage')
     fail_section = report.get('failSection')
 
     section_hint = f' ({fail_section})' if fail_section else ''
 
-    assert dr0 == 0, (
+    assert dr1 == 0 and dr0 == 0, (
         f'Selftest lump FAILED: {fail_msg}. '
-        f'DR0={dr0} means test {dr0}{section_hint} was the first to fail. '
+        f'DR1={dr1} means test {dr1}{section_hint} was the first to fail; '
+        f'DR0={dr0} must remain hardwired zero. '
         f'terminatedBy={report.get("terminatedBy")!r}. '
         f'steps={report.get("steps")}.'
     )
@@ -179,13 +182,13 @@ if __name__ == '__main__':
     try:
         report, returncode, stderr = _run()
         if report.get('pass'):
-            print(f'PASS: selftest lump ran {report["steps"]} steps, DR0=0 (all 81 tests passed).')
+            print(f'PASS: selftest lump ran {report["steps"]} steps, DR1=0 and DR0 remained hardwired zero.')
             sys.exit(0)
         else:
             print(f'FAIL: {report.get("failMessage")}')
             print(f'  terminatedBy={report.get("terminatedBy")}')
             print(f'  steps={report.get("steps")}')
-            print(f'  dr0={report.get("dr0")}')
+            print(f'  dr1={report.get("dr1")}, dr0={report.get("dr0")}')
             if stderr:
                 print(f'stderr:\n{stderr}')
             sys.exit(1)

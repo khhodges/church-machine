@@ -73,6 +73,16 @@ global.localStorage = { _store: {}, getItem(k) { return this._store[k] ?? null; 
 vm.runInThisContext(fs.readFileSync(path.join(ROOT, 'simulator', 'assembler.js'), 'utf8'),
     { filename: 'assembler.js' });
 const source = fs.readFileSync(path.join(ROOT, 'simulator', 'examples', 'post_flash_selftest.cloomc'), 'utf8');
+// DR0 is hardwired zero. Refuse to publish a SelfTest whose apparent failure
+// writes are discarded, or whose success status is only accidental scratch.
+const maskedFailures = source.match(/^\s*IADD\s+DR0\s*,\s*DR0\s*,\s*#(?:[1-9]|[1-7][0-9]|8[01])\s*$/gmi) || [];
+if (maskedFailures.length) die('SelfTest status ABI violation: failure status must be written with IADD DR1, DR0, #N');
+for (let test = 1; test <= 81; test++) {
+    if (!new RegExp(`^\\s*IADD\\s+DR1\\s*,\\s*DR0\\s*,\\s*#${test}\\s*$`, 'mi').test(source))
+        die(`SelfTest status ABI violation: missing DR1 failure status for test ${test}`);
+}
+if (!/^\s*IADD\s+DR1\s*,\s*DR0\s*,\s*#0\s*;\s*DR1 = 0 \(all 81 tests passed/m.test(source))
+    die('SelfTest status ABI violation: success must explicitly set DR1 to zero');
 const result = new ChurchAssembler().assemble(source);
 if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
 
