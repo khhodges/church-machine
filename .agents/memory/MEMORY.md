@@ -145,3 +145,4 @@
 - [Callable LUMP method-table prefix](callable-lump-method-table-prefix.md) — any LUMP entered through CALL method N needs canonical dispatch words before its source body
 - [Static path-write guard precision](static-path-write-guard-precision.md) — distinguish write destinations, lexical scope, temp roots, and env-backed fallbacks to avoid unsafe gaps or read-only false positives
 - [GT permission enforcement boundary](authored-gt-permissions.md) — permission changes are a runtime M-bit concern; compiler and save admission must not block them
+- [SelfTest status evidence](selftest-status-evidence.md) — discarded DR0 failure writes can mask test failures; inspect branch evidence independently of DR1 return status
