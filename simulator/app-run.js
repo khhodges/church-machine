@@ -42,6 +42,16 @@ function _clearLumpPetNames() {
 // Populated asynchronously; keyed by token → Uint32Array of lump words.
 let _lumpWordsCache = null;
 
+function _cacheLumpWords(token, payload) {
+    const words = Array.isArray(payload)
+        ? payload
+        : (payload && Array.isArray(payload.words) ? payload.words : null);
+    if (!token || !words || words.length === 0) return false;
+    if (_lumpWordsCache === null) _lumpWordsCache = {};
+    _lumpWordsCache[token] = new Uint32Array(words.map(w => w >>> 0));
+    return true;
+}
+
 function _triggerLumpWordsPreload() {
     if (_lumpWordsCache !== null) return;
     _lumpWordsCache = {};
@@ -51,10 +61,8 @@ function _triggerLumpWordsPreload() {
         if (!tok) continue;
         fetch(`/api/lump/${tok}/words`)
             .then(r => r.ok ? r.json() : null)
-            .then(words => {
-                if (Array.isArray(words) && words.length > 0) {
-                    _lumpWordsCache[tok] = new Uint32Array(words.map(w => w >>> 0));
-                }
+            .then(payload => {
+                _cacheLumpWords(tok, payload);
             })
             .catch(() => {});
     }

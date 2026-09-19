@@ -6881,6 +6881,13 @@ async function openLumpInEditor(token) {
                 }
                 if (_hasExactWordArray) {
                     serverWords = _wj.words;
+                    // openLumpInEditor() completes before its restored-draft
+                    // banner can be used. Preserve these exact immutable words
+                    // for synchronous pet-name resolution during compilation,
+                    // including the pre-Run state where CR6 is not live.
+                    if (typeof _cacheLumpWords === 'function') {
+                        _cacheLumpWords(token, _wj);
+                    }
                     _wordsResponse = _wj;
                     if (_wj && !_tailMetadata &&
                             (Object.prototype.hasOwnProperty.call(_wj, 'raw_tail_hex') ||

@@ -70,8 +70,22 @@ function nextTurn() {
     const savedWords = new Uint32Array(64);
     savedWords[0] = 46;
     savedWords[63] = 0x10000001;
+    const appRunSource = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    const cacheHelperStart = appRunSource.indexOf('function _cacheLumpWords(');
+    const cacheHelperEnd = appRunSource.indexOf('\nfunction _triggerLumpWordsPreload(', cacheHelperStart);
+    const cacheHelperSource = appRunSource.slice(cacheHelperStart, cacheHelperEnd);
+    const cacheEndpointPayload = new Function('token', 'payload',
+        'let _lumpWordsCache = null;\n' + cacheHelperSource +
+        '\n_cacheLumpWords(token, payload);\nreturn _lumpWordsCache;');
+    const endpointCache = cacheEndpointPayload('thread-fixture', {
+        words: Array.from(savedWords),
+    });
+    check('CLD-0a: saved-LUMP API wrapper payload populates the synchronous word cache',
+        endpointCache && endpointCache['thread-fixture'] instanceof Uint32Array &&
+            endpointCache['thread-fixture'].length === 64,
+        endpointCache ? JSON.stringify(Object.keys(endpointCache)) : 'null');
     window._editorLastSavedToken = null;
-    window._lumpWordsCache = { 'thread-fixture': savedWords };
+    window._lumpWordsCache = endpointCache;
     window.localStorage.setItem('church_editor_document_v1', JSON.stringify({
         owner: { type: 'lump', id: 'thread-fixture' },
     }));
