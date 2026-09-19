@@ -1900,10 +1900,11 @@ class ChurchAssembler {
             case 5: {
                 // SWITCH has two forms:
                 //   SWITCH CR12..CR15, CRs, #row  — isolated C-list LOAD
-                //   SWITCH CR12..CR15, CR6[PetName] — source-level named row
-                //   SWITCH CR12..CR15, PetName — shorthand for CR6[PetName]
-                //   SWITCH CR12..CR15, PetName, CRs, #row — runtime M-bit
-                //     annotation; PetName does not add a hardware operand
+                //   SWITCH CR12..CR15, CR6[row] — explicit C-list row
+                //     (`row` may be numeric or a declared abstraction name)
+                //   SWITCH CR12..CR15, Abstraction — shorthand for CR6[row]
+                //   SWITCH CR12..CR15, Annotation, CRs, #row — runtime M-bit
+                //     annotation; Annotation does not add a hardware operand
                 //   SWITCH CR15, CR15             — guarded Boot placeholder no-op
                 const switchRef = (parts[2] || '').replace(/,/g, '').trim()
                     .match(/^CR(\d+)\[(.+)\]$/i);
@@ -1915,7 +1916,8 @@ class ChurchAssembler {
                 const annotationToken = parts.length === 5
                     ? (parts[2] || '').replace(/,/g, '').trim()
                     : '';
-                // The PetName is a source-level M-bit annotation only.  It is
+                // This is a source-level M-bit annotation, not a pet name or a
+                // hardware operand.  It is
                 // deliberately not resolved here: the explicit CRsource/#row
                 // operands completely determine the hardware encoding, and
                 // runtime M-bit enforcement owns whether that authority works.
@@ -1926,7 +1928,7 @@ class ChurchAssembler {
                     !bareNamedSwitch && !annotatedSwitch) {
                     this.errors.push({
                         line: lineNum,
-                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row; SWITCH CR12–CR15, PetName; SWITCH CR12–CR15, CR6[PetName]; SWITCH CR12–CR15, PetName, CRsource, #row; or the guarded Boot form SWITCH CR15, CR15'
+                        message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row; SWITCH CR12–CR15, Abstraction; SWITCH CR12–CR15, CR6[row]; SWITCH CR12–CR15, Annotation, CRsource, #row; or the guarded Boot form SWITCH CR15, CR15'
                     });
                 }
                 crDst = this._parseCR(parts[1], lineNum);
