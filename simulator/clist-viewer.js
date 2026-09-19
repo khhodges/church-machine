@@ -1623,18 +1623,9 @@
     function getSlotPetNames() {
         var names = Object.assign({}, _nullSlotPetNames);
         var s = (typeof sim !== 'undefined') ? sim : null;
-        if (!s || !s.bootComplete) return names;
-
-        var cr6 = s.cr && s.cr[6];
-        if (!cr6 || (cr6.word0 >>> 0) === 0) return names;
-
-        var count = 0;
-        try { count = s._clistCountForCR(6); } catch (e) { count = 0; }
-        if (!count) return names;
-
         var threadNames = {};
         try {
-            var rows = s.threadStatusRows ? s.threadStatusRows(10) : [];
+            var rows = s && s.threadStatusRows ? s.threadStatusRows(10) : [];
             for (var t = 0; t < rows.length; t++) {
                 if (rows[t] && Number.isInteger(rows[t].slot) && rows[t].name) {
                     threadNames[rows[t].slot] = rows[t].name;
@@ -1642,12 +1633,61 @@
             }
         } catch (e2) { /* Namespace labels remain available below. */ }
 
-        var base = cr6.word1 >>> 0;
-        for (var i = 0; i < count; i++) {
+        var cListWords = null;
+        if (s && s.bootComplete) {
+            var cr6 = s.cr && s.cr[6];
+            if (cr6 && (cr6.word0 >>> 0) !== 0) {
+                var count = 0;
+                try { count = s._clistCountForCR(6); } catch (e) { count = 0; }
+                if (count) {
+                    var base = cr6.word1 >>> 0;
+                    cListWords = [];
+                    for (var li = 0; li < count; li++) {
+                        cListWords.push(s.memory && s.memory[base + li] !== undefined
+                            ? (s.memory[base + li] >>> 0) : 0);
+                    }
+                }
+            }
+        }
+
+        // Compilation also happens before Run/Step, when CR6 is not live. Use
+        // the immutable words already preloaded for the editor's saved LUMP so
+        // its C-list pet names remain addressable in that state.
+        if (!cListWords) {
+            var savedToken = (typeof _editorLastSavedToken !== 'undefined')
+                ? _editorLastSavedToken : window._editorLastSavedToken;
+            // Restoring a browser draft intentionally clears the ordinary
+            // saved-token field. The persisted document owner still identifies
+            // the immutable LUMP whose C-list the draft is editing.
+            if (!savedToken) {
+                try {
+                    var ownerRaw = localStorage.getItem('church_editor_document_v1');
+                    var ownerState = ownerRaw ? JSON.parse(ownerRaw) : null;
+                    if (ownerState && ownerState.owner &&
+                            ownerState.owner.type === 'lump' && ownerState.owner.id) {
+                        savedToken = String(ownerState.owner.id);
+                    }
+                } catch (e3) { /* No restorable owner. */ }
+            }
+            var wordsCache = (typeof _lumpWordsCache !== 'undefined')
+                ? _lumpWordsCache : window._lumpWordsCache;
+            var savedWords = savedToken && wordsCache ? wordsCache[savedToken] : null;
+            if (savedWords && savedWords.length) {
+                var hdr = savedWords[0] >>> 0;
+                var cc = hdr & 0xFF;
+                var nMinus6 = (hdr >>> 23) & 0xF;
+                var lumpSize = 1 << (nMinus6 + 6);
+                if (cc > 0 && lumpSize <= savedWords.length && lumpSize >= cc) {
+                    cListWords = Array.from(savedWords.slice(lumpSize - cc, lumpSize));
+                }
+            }
+        }
+        if (!cListWords) return names;
+
+        for (var i = 0; i < cListWords.length; i++) {
             // Explicit local names always win.
             if (names[i] || names[String(i)]) continue;
-            var rawWord = s.memory && s.memory[base + i] !== undefined
-                ? (s.memory[base + i] >>> 0) : 0;
+            var rawWord = cListWords[i] >>> 0;
             if (!rawWord) continue;
 
             var _CSSim = (typeof ChurchSimulator !== 'undefined') ? ChurchSimulator : null;
@@ -1659,7 +1699,8 @@
 
             var gt = _decodeGTWord(rawWord);
             var targetName = threadNames[gt.index] ||
-                (s.nsLabels && (s.nsLabels[gt.index] || s.nsLabels[String(gt.index)]));
+                (s && s.nsLabels &&
+                    (s.nsLabels[gt.index] || s.nsLabels[String(gt.index)]));
             if (targetName) names[i] = targetName;
         }
         return names;

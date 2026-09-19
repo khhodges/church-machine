@@ -67,6 +67,19 @@ function nextTurn() {
     const livePetNames = window.CListViewer.getSlotPetNames();
     check('CLD-0: live Thread.1 pet name maps to its active C-list row',
         livePetNames[45] === 'Thread.1', JSON.stringify(livePetNames));
+    const savedWords = new Uint32Array(64);
+    savedWords[0] = 46;
+    savedWords[63] = 0x10000001;
+    window._editorLastSavedToken = null;
+    window._lumpWordsCache = { 'thread-fixture': savedWords };
+    window.localStorage.setItem('church_editor_document_v1', JSON.stringify({
+        owner: { type: 'lump', id: 'thread-fixture' },
+    }));
+    window.sim.bootComplete = false;
+    const preRunPetNames = window.CListViewer.getSlotPetNames();
+    check('CLD-0b: restored pre-Run draft maps Thread.1 to saved C-list row 45',
+        preRunPetNames[45] === 'Thread.1', JSON.stringify(preRunPetNames));
+    window.sim.bootComplete = true;
 
     window.CListViewer.show();
     await nextTurn();
