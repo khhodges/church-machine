@@ -1027,6 +1027,34 @@
     "filename": "SelfTest.95.37f37c75.lump",
     "issue_n": 95,
     "lump_version": 95,
-    "variant_group": "selftest-history"
+    "variant_group": "selftest-history",
+    "archived": true
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.9beaf6e7.lump",
+    "lump_version": 96,
+    "compiled_at": 1789908698.659968,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      }
+    ],
+    "operation_id": "8d269730-5394-437d-88bf-117102f13689"
   }
 ]

@@ -710,6 +710,21 @@
       ],
       "capability_type": "inform",
       "compiled_at": 1789906251.602
+    },
+    "d2a9819251d0493b440681bedb8dab2646e84ff70289c90126c7ed51055441b2": {
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "d2a9819251d0493b440681bedb8dab2646e84ff70289c90126c7ed51055441b2",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "filename": "SelfTest.1.9beaf6e7.lump",
+      "compiled_at": 1789908698.659968,
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990
     }
   }
 }
