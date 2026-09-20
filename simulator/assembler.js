@@ -1920,6 +1920,12 @@ class ChurchAssembler {
                     ? this._resolveCListName((parts[2] || '').replace(/,/g, '').trim())
                     : null;
                 const bareNamedSwitch = parts.length === 3 && !namedSwitch && !!bareName;
+                const bareSwitchToken = parts.length === 3
+                    ? (parts[2] || '').replace(/,/g, '').trim()
+                    : '';
+                const unknownNamedSwitch = parts.length === 3 && !namedSwitch &&
+                    !bareNamedSwitch && /^[A-Za-z_][A-Za-z0-9_.]*$/.test(bareSwitchToken) &&
+                    !/^CR(?:1[0-5]|[0-9])$/i.test(bareSwitchToken);
                 const annotationToken = parts.length === 5
                     ? (parts[2] || '').replace(/,/g, '').trim()
                     : '';
@@ -1930,9 +1936,10 @@ class ChurchAssembler {
                 // runtime M-bit enforcement owns whether that authority works.
                 const annotatedSwitch = parts.length === 5 &&
                     /^[A-Za-z_][A-Za-z0-9_.]*$/.test(annotationToken);
-                const directSwitch = parts.length === 3 && !namedSwitch && !bareNamedSwitch;
+                const directSwitch = parts.length === 3 && !namedSwitch &&
+                    !bareNamedSwitch && !unknownNamedSwitch;
                 if (parts.length !== 4 && !directSwitch && !namedSwitch &&
-                    !bareNamedSwitch && !annotatedSwitch) {
+                    !bareNamedSwitch && !annotatedSwitch && !unknownNamedSwitch) {
                     this.errors.push({
                         line: lineNum,
                         message: 'SWITCH expects SWITCH CR12–CR15, CRsource, #row; SWITCH CR12–CR15, Abstraction; SWITCH CR12–CR15, CR6[row]; SWITCH CR12–CR15, Annotation, CRsource, #row; or the guarded Boot form SWITCH CR15, CR15'
@@ -1942,7 +1949,14 @@ class ChurchAssembler {
                 if (crDst < 12 || crDst > 15) {
                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, 'CR' + crDst), message: `SWITCH: destination CR${crDst} must be an isolated register CR12–CR15` });
                 }
-                if (namedSwitch) {
+                if (unknownNamedSwitch) {
+                    this.errors.push({
+                        line: lineNum,
+                        ...this._tokenCols(this._currentLineText, bareSwitchToken),
+                        message: `SWITCH: unknown C-list capability "${bareSwitchToken}". Declare it in capabilities { } or supply its row as CR6, #row.`
+                    });
+                    crSrc = 6;
+                } else if (namedSwitch) {
                     crSrc = this._parseCR(`CR${switchRef[1]}`, lineNum);
                 } else if (bareNamedSwitch) {
                     crSrc = 6;
@@ -1970,7 +1984,7 @@ class ChurchAssembler {
                     switchRow = bareName.slot;
                 } else if (annotatedSwitch) {
                     switchRow = this._parseImm(parts[4], lineNum);
-                } else if (!directSwitch) {
+                } else if (!directSwitch && !unknownNamedSwitch) {
                     switchRow = this._parseImm(parts[3], lineNum);
                 }
                 if (!Number.isInteger(switchRow) || switchRow < 0 || switchRow > 0x7FFF) {

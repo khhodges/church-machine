@@ -2308,7 +2308,7 @@ class CLOOMCCompiler {
 
             let asmText = text;
             const namedLoad = nativeInstruction.opcode === 'LOAD'
-                ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_]*)$/i)
+                ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)$/i)
                 : null;
             if (namedLoad) {
                 const capName = namedLoad[2];
@@ -2331,7 +2331,17 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: 'Church Machine assembler is unavailable.' });
                 return;
             }
-            const asmResult = new AsmClass().assemble(asmText);
+            const asmObj = new AsmClass();
+            // Native statements are handed to the assembler one at a time, so
+            // their surrounding capabilities block is not present in asmText.
+            // Supply this method's finalized C-list layout through the
+            // assembler's instance-local context API.  This keeps SELF at row
+            // zero and lets named SWITCH/CALL operands resolve without leaking
+            // revision-specific names into the shared namespace registry.
+            if (typeof asmObj.setLocalClistSlots === 'function') {
+                asmObj.setLocalClistSlots(rom);
+            }
+            const asmResult = asmObj.assemble(asmText);
             if (asmResult.errors && asmResult.errors.length > 0) {
                 for (const error of asmResult.errors) {
                     errors.push({

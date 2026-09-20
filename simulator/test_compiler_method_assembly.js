@@ -109,6 +109,69 @@ const conditionalMapping = conditionalResult.manifest.find(entry => entry.name =
 assert.deepEqual(conditionalMapping.slice(0, 2).map(entry => entry.src), [68, 69],
     'reported source lines must match the original editor lines');
 
+// Native method statements are assembled independently of the enclosing source.
+// Their assembler instance must still receive the declared C-list layout so
+// dotted Thread/Boot names retain the source-assigned rows.
+const switchBody = [
+    '    LOAD CR0, M_BIT_DEV;',
+    '    ISUB DR1,DR1,DR1;',
+    '    IADD DR1,#0b0001000000000000;',
+    '    DWRITE DR1,CR0,#0;',
+    '    SWITCH CR12, Thread.2 ; CR6,#0',
+    '    ISUB DR1,DR1,DR1;',
+    '    IADD DR1,#1;',
+    '    SHL DR1,DR1,15;',
+    '    DWRITE DR1,CR0,#0;',
+    '    SWITCH CR15, Boot.Thread;',
+];
+const switchSource = [
+    'abstraction NativeSwitchHandoff {',
+    'capabilities { SELF E, M_BIT_DEV E, Thread.2, Boot.Thread }',
+    'method Run {',
+    ...switchBody,
+    '}',
+    '}',
+].join('\n');
+const switchSourceBefore = switchSource;
+const switchResult = compile(switchSource);
+assert.equal(switchSource, switchSourceBefore,
+    'named native SWITCH compile must not mutate source text');
+assert.deepEqual(switchResult.capabilities.map(cap => cap.name),
+    ['SELF', 'M_BIT_DEV', 'Thread.2', 'Boot.Thread'],
+    'declared capability order must remain the C-list layout');
+const directSwitch = new global.ChurchAssembler().assemble([
+    'LOAD CR0, CR6, #1',
+    'ISUB DR1,DR1,DR1',
+    'IADD DR1,#0b0001000000000000',
+    'DWRITE DR1,CR0,#0',
+    'SWITCH CR12, CR6, #2',
+    'ISUB DR1,DR1,DR1',
+    'IADD DR1,#1',
+    'SHL DR1,DR1,15',
+    'DWRITE DR1,CR0,#0',
+    'SWITCH CR15, CR6, #3',
+    'RETURN',
+].join('\n'));
+assert.deepEqual(directSwitch.errors, []);
+assert.deepEqual(switchResult.methods[0].code, directSwitch.words,
+    'CLOOMC named native handoff must equal direct numeric assembly');
+
+const dottedLoad = compile([
+    'abstraction DottedLoadHandoff {',
+    'capabilities { SELF E, Device.Control E }',
+    'method Run {',
+    '    LOAD CR0, Device.Control;',
+    '}',
+    '}',
+].join('\n'));
+assert.equal(dottedLoad.methods[0].code[0] & 0x7FFF, 1,
+    'dotted named LOAD must resolve through the declared C-list');
+
+const unknownSwitch = new global.ChurchAssembler().assemble('SWITCH CR12, Missing.Thread');
+assert.equal(unknownSwitch.errors.length, 1,
+    JSON.stringify(unknownSwitch.errors));
+assert.match(unknownSwitch.errors[0].message, /unknown C-list capability "Missing\.Thread"/);
+
 const detector = new CLOOMCCompiler();
 assert.ok(detector._detectAssembly('LOADEQ CR1, CR6, #0 ; comment'));
 assert.ok(detector._detectAssembly('LOADNE CR2, CR6, #1 // comment'));
@@ -223,4 +286,22 @@ assert.equal(conditionalWorkerResult.compiler_record.source_hash,
     crypto.createHash('sha256').update(Buffer.from(conditionalSource, 'utf8')).digest('hex'),
     'worker must attest the unchanged conditional source');
 
-console.log('PASS CLOOMC method assembly: conditional LOAD/comments, exact lines, encodings, full SelfTest, worker path');
+const switchWorker = spawnSync(process.execPath, [path.join(__dirname, '..', 'server', 'compile_worker.js')], {
+    input: JSON.stringify({ source: switchSource, language: 'auto', tier: 0 }),
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+});
+assert.equal(switchWorker.status, 0, switchWorker.stderr);
+const switchWorkerResult = JSON.parse(switchWorker.stdout);
+assert.equal(switchWorkerResult.ok, true, switchWorkerResult.error);
+assert.equal(switchWorkerResult.compiler_record.source_hash,
+    crypto.createHash('sha256').update(Buffer.from(switchSource, 'utf8')).digest('hex'),
+    'worker must attest the unchanged named SWITCH source');
+const signedDirectSwitch = directSwitch.words.map(word => word | 0);
+const signedWorkerWords = switchWorkerResult.words.map(word => word | 0);
+const workerMethodOffset = signedWorkerWords.findIndex((_, start) =>
+    signedDirectSwitch.every((word, index) => signedWorkerWords[start + index] === word));
+assert.ok(workerMethodOffset >= 0,
+    'signed worker LUMP words must contain the direct numeric assembler method words');
+
+console.log('PASS CLOOMC method assembly: conditional LOAD/comments, C-list handoff, SWITCH, exact lines, encodings, full SelfTest, worker path');

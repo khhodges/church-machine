@@ -7,3 +7,14 @@ Normalize symbolic source and upload metadata before resolving generated capabil
 **Why:** Independent upload-index overrides can encode a different capability row from the returned C-list. A blanket offset fixes neither this disagreement nor concrete-layout ownership.
 
 **How to apply:** Compare decoded instruction row bits with the returned capability entry, and test the method selector separately. Preserve the distinction between public auto compilation (implicit SELF), explicitly called language frontends (historically no implicit SELF), and assembly (explicit layout). Do not infer that a double-offset reproduction explains an observed row-zero instruction without its original compile path and source.
+
+Instruction-by-instruction assembly must retain the enclosing method's declared
+C-list authority without adding names to a global registry.
+
+**Why:** A supported named operand can look unsupported when the nested assembler
+never receives the enclosing capability declarations. ISA operand documentation
+alone does not describe all supported source-level shorthand.
+
+**How to apply:** Check the live assembler's name-resolution interfaces before
+recommending numeric operands. Compare named and numeric encodings using the
+same finalized row map, including dotted names and SELF.
