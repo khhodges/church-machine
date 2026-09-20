@@ -304,7 +304,22 @@
 const $  = s => document.querySelector(s);
 const el = (t, c, x) => { const n = document.createElement(t);
   if (c) n.className = c; if (x !== undefined) n.textContent = x; return n; };
-const api = async (p, o) => (await fetch(p, o)).json();
+const api = async (p, o) => {
+  const response = await fetch(p, o);
+  const contentType = (response.headers.get('content-type') || '').toLowerCase();
+  if (!contentType.includes('application/json')) {
+    return { ok: false, transport: true,
+      error: `Server returned HTTP ${response.status} instead of JSON.` };
+  }
+  try {
+    const body = await response.json();
+    if (!response.ok && body && body.ok === undefined) body.ok = false;
+    return body;
+  } catch (_) {
+    return { ok: false, transport: true,
+      error: `Server returned invalid JSON (HTTP ${response.status}).` };
+  }
+};
 const post = (p, b) => api(p, { method: 'POST',
   headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) });
 const short = h => h ? h.slice(0, 16) + '…' : '—';
@@ -467,6 +482,9 @@ $('#go').onclick = async () => {
       source, name: $('#nm').value.trim(),
       language: $('#lang').value, source_mode: $('#smode').value,
       note: $('#note').value.trim() });
+  } catch (_) {
+    r = { ok: false, transport: true,
+      error: 'The compiler request could not be completed.' };
   } finally {
     btn.disabled = false; btn.textContent = 'Compile';
   }

@@ -95,6 +95,12 @@ Add a method called Run
 # Fixtures
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def dedicated_compiler_key(monkeypatch):
+    monkeypatch.setenv(
+        'M_BIT_IDE_SECRET', 'compile-endpoint-test-secret-' + 'a' * 32)
+
+
 @pytest.fixture(scope='module')
 def client():
     """Yield a Flask test client with testing mode enabled."""
@@ -115,6 +121,31 @@ def _post(client, source, language, **extra):
         content_type='application/json',
     )
     return resp
+
+
+@pytest.mark.parametrize('configured_secret', [None, 'too-short', 'dev-secret-key'])
+def test_compile_signing_configuration_failure_is_json_503_before_compile(
+        client, monkeypatch, configured_secret):
+    if configured_secret is None:
+        monkeypatch.delenv('M_BIT_IDE_SECRET', raising=False)
+    else:
+        monkeypatch.setenv('M_BIT_IDE_SECRET', configured_secret)
+
+    with patch.object(compile_api, 'run_compile') as run_compile:
+        resp = _post(client, _ASM_OK, 'assembly')
+
+    assert resp.status_code == 503
+    assert resp.content_type == 'application/json'
+    assert resp.get_json() == {
+        'ok': False,
+        'code': 'compiler_attestation_unavailable',
+        'error': (
+            'Trusted compiler signing is unavailable. Configure '
+            'M_BIT_IDE_SECRET as a dedicated high-entropy secret of at least '
+            '32 characters, then retry.'
+        ),
+    }
+    run_compile.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

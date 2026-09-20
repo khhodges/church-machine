@@ -55,6 +55,12 @@ RETURN DR0
 # Flask test client fixture
 # ---------------------------------------------------------------------------
 
+@pytest.fixture(autouse=True)
+def dedicated_compiler_key(monkeypatch):
+    monkeypatch.setenv(
+        'M_BIT_IDE_SECRET', 'compile-api-test-secret-' + 'a' * 32)
+
+
 @pytest.fixture(scope='module')
 def client():
     _app_module.app.config['TESTING'] = True

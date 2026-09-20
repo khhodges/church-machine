@@ -19793,6 +19793,23 @@ def api_compile():
     if language not in VALID_LANGUAGES:
         return jsonify({'error': f'`language` must be one of: {", ".join(sorted(VALID_LANGUAGES))}'}), 400
 
+    # Fail before resolving repository authorities or invoking the compiler.
+    # A successful compile may only leave this endpoint with evidence signed by
+    # the dedicated key, so configuration failure must not expose unattested
+    # compiler output (or populate the compile cache as a side effect).
+    try:
+        attestation_key = _compiler_attestation_key()
+    except RuntimeError:
+        return jsonify({
+            "ok": False,
+            "code": "compiler_attestation_unavailable",
+            "error": (
+                "Trusted compiler signing is unavailable. Configure "
+                "M_BIT_IDE_SECRET as a dedicated high-entropy secret of at "
+                "least 32 characters, then retry."
+            ),
+        }), 503
+
     # Replace any caller-supplied authority object.  API authority is derived
     # exclusively from exact saved binaries selected by authoritative bindings.
     body = dict(body)
@@ -19826,12 +19843,12 @@ def api_compile():
             "compiler_version": "server-compile-v1",
         }
         _compile_record["attestation"] = hmac.new(
-            _compiler_attestation_key(), _canonical_compiler_record(_compile_record),
+            attestation_key, _canonical_compiler_record(_compile_record),
             hashlib.sha256).hexdigest()
         _compile_canonical = json.dumps(
             _compile_record, sort_keys=True, separators=(",", ":"))
         _compile_record["signature"] = hmac.new(
-            _compiler_attestation_key(), _compile_canonical.encode("utf-8"),
+            attestation_key, _compile_canonical.encode("utf-8"),
             hashlib.sha256).hexdigest()
         result["compiler_record"] = _compile_record
         result["trust_origin"] = "trusted-home-ide"

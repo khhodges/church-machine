@@ -1587,6 +1587,31 @@ async function _confirmLumpRelease() {
     });
 }
 
+async function _readCompileJsonResponse(response) {
+    const contentType = String(
+        response && response.headers &&
+        response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+        // Never put an HTML proxy/debug response into the editor.  It may
+        // contain implementation details and is not actionable.
+        throw new Error(
+            `server returned HTTP ${response ? response.status : 0} instead of JSON`);
+    }
+    let body;
+    try {
+        body = await response.json();
+    } catch (_jsonError) {
+        throw new Error(
+            `server returned invalid JSON (HTTP ${response ? response.status : 0})`);
+    }
+    if (!response.ok) {
+        throw new Error(body && typeof body.error === 'string'
+            ? body.error
+            : `server compiler request failed (HTTP ${response.status})`);
+    }
+    return body;
+}
+
 async function compileAndBuild(options) {
     const _compileOptions = options && typeof options === 'object' ? options : {};
     const editor = document.getElementById('asmEditor');
@@ -1650,7 +1675,7 @@ async function compileAndBuild(options) {
                         : _sourceCallApiBindings(source),
                 }),
             });
-            _serverCompile = await _compileResponse.json();
+            _serverCompile = await _readCompileJsonResponse(_compileResponse);
             if (_compileResponse.ok && _serverCompile &&
                     _serverCompile.ok === false &&
                     Array.isArray(_serverCompile.errors) &&
