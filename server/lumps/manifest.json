@@ -685,7 +685,8 @@
     "filename": "SelfTest.94.c1e03ab9.lump",
     "issue_n": 94,
     "lump_version": 94,
-    "variant_group": "selftest-history"
+    "variant_group": "selftest-history",
+    "archived": true
   },
   {
     "token": "4a00000a",
@@ -1019,5 +1020,13 @@
       }
     ],
     "operation_id": "921cdf50-043d-4df5-88d5-d92ae613a597"
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.95.37f37c75.lump",
+    "issue_n": 95,
+    "lump_version": 95,
+    "variant_group": "selftest-history"
   }
 ]

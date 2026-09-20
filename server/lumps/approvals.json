@@ -692,6 +692,24 @@
       "compiled_at": 1789840006.1047335,
       "bootstrap_t": "4a00000a",
       "bootstrap_runtime_gt": 1241513994
+    },
+    "7ccc640c7f6d3d9158d7f04deef28aa58e2642c37f794b5a16f8fdc52574c1f4": {
+      "binary_hash": "7ccc640c7f6d3d9158d7f04deef28aa58e2642c37f794b5a16f8fdc52574c1f4",
+      "filename": "SelfTest.95.37f37c75.lump",
+      "dot_name": "SelfTest",
+      "issue_n": 95,
+      "identity_string": "SelfTest#95",
+      "identity_hash": "9a8cb773eb69a85d09a1b372f3238e67e80b23ef8c26f12784664d843e8fa615",
+      "identity_seal_location": "approval",
+      "bootstrap_t": "4a000006",
+      "bootstrap_runtime_gt": 1241513990,
+      "token": "4a000006",
+      "abstraction": "SelfTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "compiled_at": 1789906251.602
     }
   }
 }

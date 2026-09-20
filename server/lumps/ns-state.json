@@ -77,14 +77,15 @@
       "seq": 0,
       "seal": "0xDD58D6EF",
       "token": "4a000006",
-      "filename": "SelfTest.94.c1e03ab9.lump",
-      "issue_n": 94,
-      "lump_version": 94,
-      "binary_hash": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
+      "filename": "SelfTest.95.37f37c75.lump",
+      "issue_n": 95,
+      "lump_version": 95,
+      "binary_hash": "7ccc640c7f6d3d9158d7f04deef28aa58e2642c37f794b5a16f8fdc52574c1f4",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
-      "ns_slot_policy": "static"
+      "ns_slot_policy": "static",
+      "identity_hash": "9a8cb773eb69a85d09a1b372f3238e67e80b23ef8c26f12784664d843e8fa615"
     },
     {
       "name": "WukongCallHome",

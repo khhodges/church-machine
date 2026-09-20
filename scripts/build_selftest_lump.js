@@ -143,6 +143,8 @@ const issueN = existingExact && stateRow.binary_hash === binaryHash
     ? (existingExact.issue_n || existingExact.lump_version || 1)
     : priorIssue + 1;
 const filename = `${DOT_NAME}.${issueN}.${crypto.createHash('sha256').update(DOT_NAME).update(bytes).digest('hex').slice(0, 8)}.lump`;
+const identityString = `${DOT_NAME}#${issueN}`;
+const identityHash = crypto.createHash('sha256').update(identityString).digest('hex');
 const entry = {
     // manifest.json is a locator/history index only.  Identity, placement,
     // and intrinsic binary facts are fail-closed in approval + ns-state.
@@ -155,11 +157,18 @@ console.log(`slot=${nsSlot} seq=${seq} cw=${cw} cc=${cc} lump_size=${lumpSize} b
 
 const active = manifest.filter(e => e.token === token && e.abstraction === DOT_NAME && !e.archived);
 const artifactPath = path.join(LUMPS_DIR, filename);
+let existingApproval = null;
+try {
+    existingApproval = JSON.parse(fs.readFileSync(APPROVALS, 'utf8')).approvals?.[binaryHash] || null;
+} catch (_) {}
 const approvalRecord = {
     binary_hash: binaryHash, filename, dot_name: DOT_NAME, issue_n: issueN,
+    identity_string: identityString, identity_hash: identityHash,
+    identity_seal_location: 'approval',
     bootstrap_t: token, bootstrap_runtime_gt: selfGT,
     token, abstraction: DOT_NAME, grants: ['E'],
     capability_type: 'inform',
+    compiled_at: existingApproval?.compiled_at || Date.now() / 1000,
 };
 if (CHECK_ONLY) {
     const failures = [];
@@ -204,6 +213,7 @@ if (CHECK_ONLY) {
     if (stateRow.token !== token ||
         stateRow.slot !== nsSlot || stateRow.seq !== seq ||
         stateRow.filename !== activeRow?.filename ||
+        stateRow.identity_hash !== identityHash ||
         stateRow.binary_hash !== activeHash ||
         stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
         stateRow.resident !== true || stateRow.boot_resident !== true ||
@@ -216,7 +226,10 @@ if (CHECK_ONLY) {
     const approved = approvals && approvals[activeHash];
     if (!approved || approved.binary_hash !== activeHash ||
             approved.filename !== stateRow.filename ||
-            approved.token !== token || approved.abstraction !== DOT_NAME) {
+            approved.token !== token || approved.abstraction !== DOT_NAME ||
+            approved.identity_string !== identityString ||
+            approved.identity_hash !== identityHash ||
+            approved.identity_seal_location !== 'approval') {
         failures.push('SelfTest hash-bound approval is missing or stale');
     }
     if (failures.length) die(failures.join('\nFAIL: '));
@@ -249,7 +262,7 @@ stateRow.token = token;
 stateRow.filename = filename;
 stateRow.lump_version = issueN;
 stateRow.issue_n = issueN;
-    delete stateRow.identity_hash;
+stateRow.identity_hash = identityHash;
 stateRow.binary_hash = binaryHash;
 stateRow.ns_slot_policy = 'static';
 stateRow.load_policy = 'Resident';
