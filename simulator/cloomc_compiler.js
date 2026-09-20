@@ -1867,7 +1867,19 @@ class CLOOMCCompiler {
             // `let count = 1; // explanation` does not become one expression.
             // CLOOMC++ has no string-literal grammar, so `//` is unambiguous here.
             const commentAt = stmt.text ? stmt.text.indexOf('//') : -1;
-            const statementText = (commentAt >= 0 ? stmt.text.slice(0, commentAt) : (stmt.text || '')).trim();
+            let statementText = (commentAt >= 0 ? stmt.text.slice(0, commentAt) : (stmt.text || '')).trim();
+            // Native ISA conventionally uses `;` for comments.  Do not treat every
+            // semicolon as a comment because it is also the CLOOMC++ statement
+            // terminator.  Restrict this handling to native instructions and
+            // labels, where the first semicolon unambiguously starts a comment.
+            const semicolonAt = statementText.indexOf(';');
+            if (semicolonAt >= 0) {
+                const beforeSemicolon = statementText.slice(0, semicolonAt).trim();
+                if (/^[A-Za-z_]\w*:$/.test(beforeSemicolon) ||
+                        /^(?:LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|ASR|HALT|NOP)(?:\s|$)/i.test(beforeSemicolon)) {
+                    statementText = beforeSemicolon;
+                }
+            }
             if (!statementText || statementText.startsWith('--') || statementText.startsWith(';')) continue;
 
             // Parser indexes are zero-based; diagnostics and editor gutters are
@@ -2237,6 +2249,28 @@ class CLOOMCCompiler {
         // abstraction's C-List before handing the statement over.
         const rawInstruction = /^(?!CALL\s+\w+\.\w+\s*\()(LOAD|SAVE|CALL|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|NV)?|SHL|SHR|ASR|HALT|NOP)(?=\s|$)/i;
         if (rawInstruction.test(text)) {
+            // A method is compiled statement-by-statement, while the assembler's
+            // own label pass requires the whole source.  Keep method-local labels
+            // in this compiler pass so both forward and backward native branches
+            // resolve after every statement has been seen.
+            const symbolicBranch = text.match(
+                /^BRANCH(EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?\s+([A-Za-z_]\w*)$/i
+            );
+            if (symbolicBranch) {
+                const suffix = (symbolicBranch[1] || 'AL').toUpperCase();
+                const label = symbolicBranch[2];
+                const branchAddr = code.length;
+                code.push(this.encode(this.opcodes.BRANCH, this.conditions[suffix], 0, 0, 0));
+                labelRefs.push({
+                    addr: branchAddr,
+                    label,
+                    lineNum: stmt.lineNum,
+                    rawLine: stmt.rawLine,
+                });
+                manifest.push({ src: stmt.lineNum, addr: branchAddr, desc: text });
+                return;
+            }
+
             let asmText = text;
             const namedLoad = text.match(/^LOAD\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_]*)$/i);
             if (namedLoad) {
