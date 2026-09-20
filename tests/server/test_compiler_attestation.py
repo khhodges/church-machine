@@ -6,12 +6,17 @@ import struct
 import pytest
 
 import server.app as app_module
-from server.lump_approvals import compiler_tcb_key
+from server.lump_approvals import (
+    COMPILER_SIGNING_KEY_ID,
+    COMPILER_SIGNING_SCHEME,
+    configured_legacy_compiler_tcb_key,
+)
 
 
 @pytest.fixture(autouse=True)
 def _dedicated_compiler_key(monkeypatch):
-    monkeypatch.setenv("M_BIT_IDE_SECRET", "compiler-test-secret-" + "a" * 32)
+    monkeypatch.setenv(
+        "COMPILER_SIGNING_SECRET", "compiler-test-secret-" + "a" * 32)
 
 
 def _record(words):
@@ -20,6 +25,8 @@ def _record(words):
     header = words[0]
     record = {
         "schema": "church-compiler-output/v1",
+        "signing_scheme": COMPILER_SIGNING_SCHEME,
+        "signing_key_id": COMPILER_SIGNING_KEY_ID,
         "compiler": "CLOOMC",
         "compiler_version": "test",
         "language": "assembly",
@@ -73,22 +80,36 @@ def test_server_attestation_validates_unchanged_record():
     )
 
 
-def test_missing_or_historical_default_compiler_key_fails_closed(monkeypatch):
+def test_missing_or_short_new_key_fails_closed_even_with_valid_m_bit(monkeypatch):
     words = [0xF8000401, 0x1F000000]
     record, digest = _record(words)
-    monkeypatch.delenv("M_BIT_IDE_SECRET", raising=False)
-    assert not app_module._verify_compiler_attestation(
-        record, digest, len(words), 1, 1)
+    monkeypatch.setenv("M_BIT_IDE_SECRET", "legacy-valid-secret-" + "b" * 32)
+    for value in (None, "too-short"):
+        if value is None:
+            monkeypatch.delenv("COMPILER_SIGNING_SECRET", raising=False)
+        else:
+            monkeypatch.setenv("COMPILER_SIGNING_SECRET", value)
+        assert not app_module._verify_compiler_attestation(
+            record, digest, len(words), 1, 1)
 
-    forged = copy.deepcopy(record)
-    forged["attestation"] = app_module.hmac.new(
-        compiler_tcb_key("dev-secret-key"),
-        app_module._canonical_compiler_record(forged),
+
+def test_explicit_unversioned_legacy_record_uses_only_historical_key(monkeypatch):
+    words = [0xF8000401, 0x1F000000]
+    record, digest = _record(words)
+    monkeypatch.setenv("M_BIT_IDE_SECRET", "legacy-valid-secret-" + "b" * 32)
+    record.pop("signing_scheme")
+    record.pop("signing_key_id")
+    record["attestation"] = app_module.hmac.new(
+        configured_legacy_compiler_tcb_key(),
+        app_module._canonical_compiler_record(record),
         hashlib.sha256,
     ).hexdigest()
-    monkeypatch.setenv("M_BIT_IDE_SECRET", "compiler-test-secret-" + "b" * 32)
+    assert app_module._verify_compiler_attestation(
+        record, digest, len(words), 1, 1)
+
+    record["signing_key_id"] = "unknown-key"
     assert not app_module._verify_compiler_attestation(
-        forged, digest, len(words), 1, 1)
+        record, digest, len(words), 1, 1)
 
 
 def test_persisted_attested_compiler_artifact_is_trusted_on_read(tmp_path, monkeypatch):
@@ -137,6 +158,21 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
         })
         assert compiled_response.status_code == 200
         compiled = compiled_response.get_json()
+        verified_response = client.post("/api/compile/attest", json={
+            "words": compiled["words"],
+            "compiler_record": compiled["compiler_record"],
+        })
+        assert verified_response.status_code == 200
+        assert verified_response.get_json()["ok"] is True
+
+        tampered_attest_words = list(compiled["words"])
+        tampered_attest_words[1] ^= 1
+        rejected_response = client.post("/api/compile/attest", json={
+            "words": tampered_attest_words,
+            "compiler_record": compiled["compiler_record"],
+        })
+        assert rejected_response.status_code == 403
+
         metadata = {
             "abstraction": "CompilerRouteFixture",
             "dot_name": "CompilerRouteFixture",

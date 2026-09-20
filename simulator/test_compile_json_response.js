@@ -22,7 +22,7 @@ function response(status, contentType, body) {
 }
 
 (async () => {
-    const configuredError = 'Configure M_BIT_IDE_SECRET, then retry.';
+    const configuredError = 'Configure COMPILER_SIGNING_SECRET, then retry.';
     await assert.rejects(
         context._readCompileJsonResponse(response(
         503, 'application/json; charset=utf-8',

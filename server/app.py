@@ -274,12 +274,18 @@ def _bank_custody_key() -> bytes:
     return compiler_tcb_key(app.secret_key)
 
 
-def _compiler_attestation_key() -> bytes:
+def _compiler_attestation_key(record=None) -> bytes:
     """Return the server-only key used for compiler output attestations."""
     try:
-        from server.lump_approvals import configured_compiler_tcb_key
+        from server.lump_approvals import (
+            configured_compiler_tcb_key, compiler_record_verification_key,
+        )
     except ImportError:
-        from lump_approvals import configured_compiler_tcb_key
+        from lump_approvals import (
+            configured_compiler_tcb_key, compiler_record_verification_key,
+        )
+    if record is not None:
+        return compiler_record_verification_key(record)
     return configured_compiler_tcb_key()
 
 
@@ -302,6 +308,7 @@ def _canonical_compiler_record(record) -> bytes:
         raise ValueError("compiler record must be an object")
     unsigned = dict(record)
     unsigned.pop("attestation", None)
+    unsigned.pop("signature", None)
     return json.dumps(
         unsigned, sort_keys=True, separators=(",", ":"), ensure_ascii=True
     ).encode("utf-8")
@@ -334,7 +341,7 @@ def _verify_compiler_attestation(record, binary_hash, words, cw=None, cc=None):
     if cc is not None and record.get("cc") != cc:
         return False
     try:
-        attestation_key = _compiler_attestation_key()
+        attestation_key = _compiler_attestation_key(record)
     except RuntimeError:
         return False
     expected = hmac.new(
@@ -9314,6 +9321,8 @@ _LUMP_APPROVALS_FILENAME = "approvals.json"
 from server.lump_approvals import read_approvals as _shared_read_approvals
 from server.lump_approvals import write_approvals as _shared_write_approvals
 from server.lump_approvals import envelope as _shared_approval_envelope
+from server.lump_approvals import COMPILER_SIGNING_SCHEME
+from server.lump_approvals import COMPILER_SIGNING_KEY_ID
 
 
 class _LumpApprovalStoreError(ValueError):
@@ -10031,7 +10040,7 @@ def _trusted_compile_metadata(metadata, binary_hash, words):
     signature = checked.pop("signature", None)
     canonical = json.dumps(checked, sort_keys=True, separators=(",", ":"))
     try:
-        compiler_key = _compiler_attestation_key()
+        compiler_key = _compiler_attestation_key(checked)
     except RuntimeError:
         return False
     expected_sig = hmac.new(
@@ -19805,7 +19814,7 @@ def api_compile():
             "code": "compiler_attestation_unavailable",
             "error": (
                 "Trusted compiler signing is unavailable. Configure "
-                "M_BIT_IDE_SECRET as a dedicated high-entropy secret of at "
+                "COMPILER_SIGNING_SECRET as a dedicated high-entropy secret of at "
                 "least 32 characters, then retry."
             ),
         }), 503
@@ -19831,6 +19840,8 @@ def api_compile():
         _compile_digest = hashlib.sha256(_compile_raw).hexdigest()
         _compile_record = {
             "schema": "church-compiler-output/v1",
+            "signing_scheme": COMPILER_SIGNING_SCHEME,
+            "signing_key_id": COMPILER_SIGNING_KEY_ID,
             "compiler": "CLOOMC",
             "binary_hash": _compile_digest,
             "source_hash": hashlib.sha256(source.encode("utf-8")).hexdigest(),

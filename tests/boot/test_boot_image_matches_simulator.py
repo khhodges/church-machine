@@ -34,7 +34,8 @@ import sys
 import pytest
 @pytest.fixture(autouse=True)
 def _configured_compiler_attestation_key(monkeypatch):
-    monkeypatch.setenv("M_BIT_IDE_SECRET", "boot-image-test-secret-" + "a" * 32)
+    monkeypatch.setenv(
+        "COMPILER_SIGNING_SECRET", "boot-image-test-secret-" + "a" * 32)
 
 
 def _trusted_compiler_approval(raw, filename, dot_name, issue_n):

@@ -6,7 +6,7 @@ import struct
 from pathlib import Path
 
 from server.lump_approvals import (
-    configured_compiler_tcb_key,
+    compiler_record_verification_key,
     is_trusted_compiler_record,
     read_approvals,
 )
@@ -678,7 +678,8 @@ def _load_admitted_artifact(filename, expected_hash, abstraction):
     try:
         signed = is_trusted_compiler_record(
             record, binary=raw,
-            signing_key=configured_compiler_tcb_key())
+            signing_key=compiler_record_verification_key(
+                record.get("compiler_record")))
     except RuntimeError:
         signed = False
     bootstrap = (isinstance(record.get("bootstrap_t"), str)

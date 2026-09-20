@@ -58,7 +58,7 @@ RETURN DR0
 @pytest.fixture(autouse=True)
 def dedicated_compiler_key(monkeypatch):
     monkeypatch.setenv(
-        'M_BIT_IDE_SECRET', 'compile-api-test-secret-' + 'a' * 32)
+        'COMPILER_SIGNING_SECRET', 'compile-api-test-secret-' + 'a' * 32)
 
 
 @pytest.fixture(scope='module')

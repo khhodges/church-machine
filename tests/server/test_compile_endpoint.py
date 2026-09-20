@@ -98,7 +98,7 @@ Add a method called Run
 @pytest.fixture(autouse=True)
 def dedicated_compiler_key(monkeypatch):
     monkeypatch.setenv(
-        'M_BIT_IDE_SECRET', 'compile-endpoint-test-secret-' + 'a' * 32)
+        'COMPILER_SIGNING_SECRET', 'compile-endpoint-test-secret-' + 'a' * 32)
 
 
 @pytest.fixture(scope='module')
@@ -126,10 +126,12 @@ def _post(client, source, language, **extra):
 @pytest.mark.parametrize('configured_secret', [None, 'too-short', 'dev-secret-key'])
 def test_compile_signing_configuration_failure_is_json_503_before_compile(
         client, monkeypatch, configured_secret):
+    monkeypatch.setenv(
+        'M_BIT_IDE_SECRET', 'still-valid-access-credential-' + 'm' * 32)
     if configured_secret is None:
-        monkeypatch.delenv('M_BIT_IDE_SECRET', raising=False)
+        monkeypatch.delenv('COMPILER_SIGNING_SECRET', raising=False)
     else:
-        monkeypatch.setenv('M_BIT_IDE_SECRET', configured_secret)
+        monkeypatch.setenv('COMPILER_SIGNING_SECRET', configured_secret)
 
     with patch.object(compile_api, 'run_compile') as run_compile:
         resp = _post(client, _ASM_OK, 'assembly')
@@ -141,7 +143,7 @@ def test_compile_signing_configuration_failure_is_json_503_before_compile(
         'code': 'compiler_attestation_unavailable',
         'error': (
             'Trusted compiler signing is unavailable. Configure '
-            'M_BIT_IDE_SECRET as a dedicated high-entropy secret of at least '
+            'COMPILER_SIGNING_SECRET as a dedicated high-entropy secret of at least '
             '32 characters, then retry.'
         ),
     }

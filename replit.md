@@ -42,6 +42,10 @@ The system integrates an Amaranth HDL-based FPGA hardware with a web IDE (HTML/J
 - **Security wording:** “unforgeable,” “impossible,” “guaranteed,” and similar
   absolute claims require a named formal proof or executable test. Otherwise
   describe the implemented check or call the property a goal.
+- **Compiler evidence key:** compiler output signing requires the server-only
+  `COMPILER_SIGNING_SECRET` (at least 32 characters). `M_BIT_IDE_SECRET` remains
+  the separate IDE access credential and is consulted for compiler evidence only
+  when verifying an explicitly unversioned historical record.
 
 **Current documentation entry points:** use `docs/cloomc-foundation.md` for the
 intended CLOOMC architecture and `docs/HARDWARE.md` for the maintained Wukong A7

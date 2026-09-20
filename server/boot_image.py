@@ -42,7 +42,7 @@ authoritative Namespace state and manifest metadata.
 import json
 import hashlib
 from server.lump_approvals import (
-    read_approvals, is_trusted_compiler_record, configured_compiler_tcb_key,
+    read_approvals, is_trusted_compiler_record, compiler_record_verification_key,
 )
 from server.lump_integrity import (
     compute_number, parse_canonical_filename,
@@ -1760,7 +1760,8 @@ def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=
             try:
                 compiler_record = is_trusted_compiler_record(
                     approval, binary=raw,
-                    signing_key=configured_compiler_tcb_key())
+                    signing_key=compiler_record_verification_key(
+                        approval.get("compiler_record")))
             except RuntimeError:
                 # Missing compiler TCB configuration cannot turn untrusted
                 # bytes into compiler-authoritative bytes.

@@ -9,6 +9,8 @@ import tempfile
 VERSION = 1
 ALGORITHM = "sha256"
 DIGEST_RE = re.compile(r"^[0-9a-f]{64}$")
+COMPILER_SIGNING_SCHEME = "church-compiler-hmac-sha256/v2"
+COMPILER_SIGNING_KEY_ID = "compiler-signing-secret/v1"
 RECORD_FIELDS = frozenset({
     "binary_hash", "filename", "dot_name", "issue_n", "identity_hash", "token",
     "abstraction", "author", "version", "compiled_at", "display_name",
@@ -41,15 +43,42 @@ def compiler_tcb_key(secret) -> bytes:
 def configured_compiler_tcb_key(environ=None) -> bytes:
     """Return the dedicated, fail-closed compiler attestation key."""
     source = os.environ if environ is None else environ
-    secret = source.get("M_BIT_IDE_SECRET")
+    secret = source.get("COMPILER_SIGNING_SECRET")
     if (not isinstance(secret, str) or len(secret) < 32
             or secret == "dev-secret-key"):
         raise RuntimeError(
             "trusted compiler attestations require a dedicated high-entropy "
-            "M_BIT_IDE_SECRET")
+            "COMPILER_SIGNING_SECRET")
     return hashlib.sha256(
         ("ChurchMachine.CompilerAttestation.v1|" + secret).encode("utf-8")
     ).digest()
+
+
+def configured_legacy_compiler_tcb_key(environ=None) -> bytes:
+    """Return the pre-separation key for explicitly unversioned evidence."""
+    source = os.environ if environ is None else environ
+    secret = source.get("M_BIT_IDE_SECRET")
+    if (not isinstance(secret, str) or len(secret) < 32
+            or secret == "dev-secret-key"):
+        raise RuntimeError(
+            "legacy compiler attestations require the historical "
+            "M_BIT_IDE_SECRET to satisfy the 32-character policy")
+    return hashlib.sha256(
+        ("ChurchMachine.CompilerAttestation.v1|" + secret).encode("utf-8")
+    ).digest()
+
+
+def compiler_record_verification_key(record, environ=None) -> bytes:
+    """Select exactly one key from an evidence record's explicit format."""
+    if not isinstance(record, dict):
+        raise RuntimeError("compiler evidence record is not an object")
+    scheme = record.get("signing_scheme")
+    key_id = record.get("signing_key_id")
+    if scheme == COMPILER_SIGNING_SCHEME and key_id == COMPILER_SIGNING_KEY_ID:
+        return configured_compiler_tcb_key(environ)
+    if scheme is None and key_id is None:
+        return configured_legacy_compiler_tcb_key(environ)
+    raise RuntimeError("compiler evidence has an unsupported signing scheme or key id")
 
 
 def sign_compiler_record(record, *, signing_key):
@@ -58,6 +87,8 @@ def sign_compiler_record(record, *, signing_key):
         raise ValueError("compiler record must be an object")
     unsigned = dict(record)
     unsigned.pop("signature", None)
+    unsigned["signing_scheme"] = COMPILER_SIGNING_SCHEME
+    unsigned["signing_key_id"] = COMPILER_SIGNING_KEY_ID
     canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"))
     unsigned["signature"] = hmac.new(
         bytes(signing_key), canonical.encode("utf-8"), hashlib.sha256
@@ -161,16 +192,17 @@ def is_trusted_compiler_record(record, *, binary=None, signing_key=None):
             return False
         if hashlib.sha256(bytes(binary)).hexdigest() != record.get("binary_hash"):
             return False
-    if signing_key is not None:
-        signature = inner.get("signature")
-        unsigned = dict(inner)
-        unsigned.pop("signature", None)
-        canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"))
-        expected = hmac.new(
-            bytes(signing_key), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
-        if (not isinstance(signature, str)
-                or not hmac.compare_digest(signature, expected)):
-            return False
+    if signing_key is None:
+        return False
+    signature = inner.get("signature")
+    unsigned = dict(inner)
+    unsigned.pop("signature", None)
+    canonical = json.dumps(unsigned, sort_keys=True, separators=(",", ":"))
+    expected = hmac.new(
+        bytes(signing_key), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+    if (not isinstance(signature, str)
+            or not hmac.compare_digest(signature, expected)):
+        return False
     return True
 
 
