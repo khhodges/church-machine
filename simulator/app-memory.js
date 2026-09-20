@@ -200,16 +200,28 @@ function _renderBootExecutionFreshness(state) {
     const actionButton = document.getElementById('bootExecutionUpdateButton');
     if (actionButton) {
         actionButton.onclick = function() {
+            let internalFailure = false;
             Promise.resolve(_openBootExecutionUpdate()).catch(function(error) {
                 const status = document.getElementById('bootExecutionUpdateStatus');
-                const message = 'Prepare/Run failed: ' +
-                    (error && error.message || String(error)) +
-                    '. No data was changed.';
+                const internal = error && (
+                    error.name === 'ReferenceError' ||
+                    error.name === 'TypeError' ||
+                    error.name === 'SyntaxError');
+                internalFailure = !!internal;
+                const message = internal
+                    ? 'Prepare/Run encountered an IDE internal failure: ' +
+                        (error && error.message || String(error)) +
+                        '. Execution did not start, but preparation state is unknown. ' +
+                        'Reload Namespace state before retrying. This was not a security-policy rejection.'
+                    : 'Prepare/Run failed: ' +
+                        (error && error.message || String(error)) +
+                        '. No data was changed.';
                 if (status) status.textContent = message;
             }).finally(function() {
-                actionButton.disabled = false;
-                actionButton.textContent = failed
-                    ? 'Review IDE repair' : 'Prepare latest & Run';
+                actionButton.disabled = internalFailure;
+                actionButton.textContent = internalFailure
+                    ? 'Reload Namespace before retrying'
+                    : (failed ? 'Review IDE repair' : 'Prepare latest & Run');
             });
         };
     }

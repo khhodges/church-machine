@@ -729,8 +729,6 @@ async function _commitNamespaceBootMarker(slot) {
     const transaction = (async function() {
         if (previousTransaction) await previousTransaction;
         const state = await _namespaceStateForMutation();
-        const pendingArtifactPins = Object.assign(
-            {}, window._prepareRunArtifactPins || {});
         const fingerprint = String(state.namespaceFingerprint || '').trim();
         if (!fingerprint) {
             throw new Error('The authoritative Namespace fingerprint is unavailable; reload Namespace and retry.');
@@ -1031,6 +1029,16 @@ async function savePreparedBootEntry() {
     }
     const savedSlot = bootEntrySlot;
     const savedRevision = _bootEntrySelectionRevision;
+    // Capture the exact browser intent before any asynchronous work. Both the
+    // map and its descriptors are immutable so checkbox edits during either
+    // network request cannot change the submitted/cleared transaction.
+    const pendingArtifactPins = Object.freeze(Object.keys(
+        window._prepareRunArtifactPins || {}).reduce((snapshot, slot) => {
+        const pin = window._prepareRunArtifactPins[slot];
+        snapshot[slot] = pin && typeof pin === 'object'
+            ? Object.freeze(Object.assign({}, pin)) : pin;
+        return snapshot;
+    }, {}));
     _setBootEntryPreparation(savedSlot, 'pending',
         'Saving the Namespace marker and generating its boot image…');
     renderAbstractions();

@@ -1637,8 +1637,7 @@ function prepareAndRunSavedArtifact(propagateError) {
         if (ok) run();
         return !!ok;
     }).catch(error => {
-        _showBootPreparationBlocked('Run',
-            error && error.message ? error.message : String(error));
+        _showBootPreparationBlocked('Run', error);
         if (propagateError) throw error;
         return false;
     });
@@ -2882,12 +2881,23 @@ function _bootHasCommittedImage() {
     return !bootState || bootState.status === 'prepared';
 }
 
+function _isInternalPreparationError(reason) {
+    if (!reason || typeof reason !== 'object') return false;
+    return reason instanceof ReferenceError ||
+        reason instanceof TypeError ||
+        reason instanceof SyntaxError ||
+        reason.name === 'ReferenceError' ||
+        reason.name === 'TypeError' ||
+        reason.name === 'SyntaxError';
+}
+
 function _showBootPreparationBlocked(context, reason) {
     const existing = document.getElementById('bootPreparationBlockedOverlay');
     if (existing) existing.remove();
     const operation = context || 'Execution';
-    const actualReason = reason ||
-        'No valid committed boot image is available for the current Namespace.';
+    const internalFailure = _isInternalPreparationError(reason);
+    const actualReason = reason && reason.message ? reason.message : (reason ||
+        'No valid committed boot image is available for the current Namespace.');
     const overlay = document.createElement('div');
     overlay.id = 'bootPreparationBlockedOverlay';
     overlay.className = 'modal-overlay';
@@ -2901,7 +2911,8 @@ function _showBootPreparationBlocked(context, reason) {
     badge.textContent = 'NOT EXECUTED';
     const title = document.createElement('span');
     title.className = 'fault-modal-title';
-    title.textContent = 'Boot Preparation Blocked';
+    title.textContent = internalFailure
+        ? 'IDE Boot Preparation Failure' : 'Boot Preparation Blocked';
     const close = document.createElement('button');
     close.className = 'fault-modal-close';
     close.title = 'Close';
@@ -2911,15 +2922,23 @@ function _showBootPreparationBlocked(context, reason) {
 
     const summary = document.createElement('div');
     summary.className = 'fault-modal-message execution-blocked-summary';
-    summary.textContent = `${operation} did not execute. This is a boot-image preparation rejection, not a fault raised by the selected Thread. No machine instruction ran and no Thread state was changed.`;
+    summary.textContent = internalFailure
+        ? `${operation} did not execute because the IDE failed internally during boot preparation. No machine instruction ran. Preparation or Namespace state may have changed before the IDE failure, so its current state is unknown.`
+        : `${operation} did not execute. This is a boot-image preparation rejection, not a fault raised by the selected Thread. No machine instruction ran and no Thread state was changed.`;
 
     const details = document.createElement('div');
     details.className = 'fault-detail-grid execution-blocked-details';
-    for (const [label, value] of [
+    const detailRows = internalFailure ? [
+        ['IDE error', `${reason.name || 'Internal error'}: ${actualReason}`],
+        ['State', 'Execution did not start. The preparation commit state could not be confirmed.'],
+        ['Next action', 'Reload the authoritative Namespace state. Retry preparation only after the IDE shows whether the committed image changed.'],
+        ['Safety', 'This is an IDE implementation failure, not a Thread fault, validation error, or security-policy rejection.'],
+    ] : [
         ['Reason', actualReason],
         ['Next action', 'Choose the intended Lightning Bolt target, then click Prepare boot image. Retry execution only after the IDE reports that the committed image is prepared.'],
-        ['Safety', 'The IDE did not substitute a factory image or alter the boot image automatically.'],
-    ]) {
+        ['Safety', 'The IDE did not substitute a factory image or alter the boot image automatically. This is not an IDE-generated security incident.'],
+    ];
+    for (const [label, value] of detailRows) {
         const row = document.createElement('div');
         row.className = 'fault-detail-row';
         const labelEl = document.createElement('span');
@@ -2934,19 +2953,22 @@ function _showBootPreparationBlocked(context, reason) {
 
     const actions = document.createElement('div');
     actions.className = 'modal-buttons fault-modal-actions';
-    const prepare = document.createElement('button');
-    prepare.className = 'btn btn-warning';
-    prepare.textContent = 'Prepare boot image';
-    prepare.onclick = () => {
-        overlay.remove();
-        if (typeof switchView === 'function') switchView('abstractions');
-        if (typeof savePreparedBootEntry === 'function') void savePreparedBootEntry();
-    };
     const dismiss = document.createElement('button');
     dismiss.className = 'btn btn-muted';
     dismiss.textContent = 'Close';
     dismiss.onclick = () => overlay.remove();
-    actions.append(prepare, dismiss);
+    if (!internalFailure) {
+        const prepare = document.createElement('button');
+        prepare.className = 'btn btn-warning';
+        prepare.textContent = 'Prepare boot image';
+        prepare.onclick = () => {
+            overlay.remove();
+            if (typeof switchView === 'function') switchView('abstractions');
+            if (typeof savePreparedBootEntry === 'function') void savePreparedBootEntry();
+        };
+        actions.appendChild(prepare);
+    }
+    actions.appendChild(dismiss);
 
     dialog.append(header, summary, details, actions);
     overlay.appendChild(dialog);
