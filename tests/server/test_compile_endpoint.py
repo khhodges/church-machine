@@ -49,6 +49,7 @@ import importlib
 if 'compile_api' not in sys.modules:
     importlib.import_module('compile_api')
 import compile_api  # noqa: E402  (same object the Flask app uses)
+server_app_module = importlib.import_module('server.app')
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +155,119 @@ def test_cloomc_warnings_field_present(client):
     assert data['ok'] is True
     assert 'warnings' in data, 'response must include a warnings field'
     assert isinstance(data['warnings'], list)
+
+
+def test_compile_call_api_uses_exact_repository_authority(client, monkeypatch):
+    authority = {
+        'Echo': {
+            'source': 'embedded-binary',
+            'embedded': True,
+            'token': '11111111',
+            'selectedToken': '11111111',
+            'revision': 'a' * 64,
+            'selectedRevision': 'a' * 64,
+            'api': {'methods': [{'name': 'Ping', 'index': 0}]},
+        },
+    }
+    seen = {}
+
+    def resolve(bindings):
+        seen['bindings'] = bindings
+        return authority
+
+    monkeypatch.setattr(
+        server_app_module, '_compile_call_api_authorities', resolve)
+    monkeypatch.setattr(
+        server_app_module, '_compiler_attestation_key', lambda: b'k' * 32)
+    resp = _post(
+        client,
+        'capabilities { SELF E, Echo E }\nCALL CR6[Echo], Ping',
+        'assembly',
+        call_api_bindings=[{
+            'petname': 'Echo',
+            'token': '11111111',
+            'binary_hash': 'a' * 64,
+        }],
+        # Must be discarded rather than treated as client attestation.
+        call_api_authorities={'Echo': {'embedded': True, 'api': {'methods': []}}},
+    )
+    data = resp.get_json()
+    assert data['ok'] is True, data
+    assert data['warnings'] == []
+    assert seen['bindings'][0]['token'] == '11111111'
+
+
+def test_compile_call_api_unavailable_is_warning(client, monkeypatch):
+    monkeypatch.setattr(
+        server_app_module, '_compile_call_api_authorities', lambda bindings: {})
+    monkeypatch.setattr(
+        server_app_module, '_compiler_attestation_key', lambda: b'k' * 32)
+    resp = _post(
+        client,
+        'capabilities { SELF E, Future E }\nCALL CR6[Future], #0',
+        'assembly',
+        call_api_bindings=[{'petname': 'Future'}],
+    )
+    data = resp.get_json()
+    assert data['ok'] is True, data
+    warning = next(w for w in data['warnings']
+                   if w.get('code') == 'CALL_API_UNAVAILABLE')
+    assert warning['line'] == 2
+    assert warning['petname'] == 'Future'
+
+
+def test_call_api_authority_is_extracted_from_exact_saved_binary(monkeypatch):
+    monkeypatch.setattr(
+        server_app_module, '_read_authoritative_namespace_rows',
+        lambda: ([{
+            'name': 'Echo',
+            'token': '11111111',
+            'binary_hash': 'a' * 64,
+        }], None))
+    monkeypatch.setattr(
+        server_app_module, '_read_manifest_safe',
+        lambda path: [{
+            'abstraction': 'Echo',
+            'token': '11111111',
+            'binary_hash': 'a' * 64,
+            'filename': 'Echo.1.11111111.lump',
+        }])
+    monkeypatch.setattr(
+        server_app_module, '_inspect_lump_binary',
+        lambda path: {'binary_hash': 'a' * 64, 'words': [1, 2, 3]})
+    monkeypatch.setattr(
+        server_app_module, '_parse_intrinsic_lump_content',
+        lambda words: {
+            'api_definition': {
+                'name': 'Echo',
+                'methods': [{'name': 'Ping', 'index': 0}],
+            },
+        })
+    result = server_app_module._compile_call_api_authorities(
+        [{'petname': 'Echo'}])
+    assert result['Echo']['api']['methods'][0]['name'] == 'Ping'
+    assert result['Echo']['revision'] == 'a' * 64
+
+
+def test_call_api_wrong_revision_is_not_authority(monkeypatch):
+    monkeypatch.setattr(
+        server_app_module, '_read_authoritative_namespace_rows',
+        lambda: ([], None))
+    monkeypatch.setattr(
+        server_app_module, '_read_manifest_safe',
+        lambda path: [{
+            'abstraction': 'Echo',
+            'token': '11111111',
+            'binary_hash': 'b' * 64,
+            'filename': 'Echo.2.11111111.lump',
+        }])
+
+    result = server_app_module._compile_call_api_authorities([{
+        'petname': 'Echo',
+        'token': '11111111',
+        'binary_hash': 'a' * 64,
+    }])
+    assert result == {}
 
 
 def test_cloomc_language_echoed(client):

@@ -811,14 +811,47 @@ function _activeCompileClistSlots() {
     return nameToSlot;
 }
 
-function _compileWithActiveClist(source, capabilities, slotSnapshot) {
+function _compileWithActiveClist(source, capabilities, slotSnapshot, callApiAuthorities) {
     const clistSlots = arguments.length >= 3
         ? slotSnapshot : _activeCompileClistSlots();
-    return cloomcCompiler.compile(
-        source,
-        capabilities,
-        clistSlots === null ? undefined : { clistSlots }
-    );
+    const options = {};
+    if (clistSlots !== null) options.clistSlots = clistSlots;
+    if (callApiAuthorities && typeof callApiAuthorities === 'object') {
+        options.callApiAuthorities = callApiAuthorities;
+    }
+    return cloomcCompiler.compile(source, capabilities,
+        Object.keys(options).length ? options : undefined);
+}
+
+function _compileCallApiBindings(capabilities) {
+    return (Array.isArray(capabilities) ? capabilities : [])
+        .filter(cap => cap && typeof cap === 'object' &&
+            !_isCompilerSelfCapability(cap) && cap.null_row !== true && cap.name)
+        .map(cap => ({
+            petname: String(cap.name).replace(/#[1-9][0-9]*$/, ''),
+            ...(cap.T ? { token: String(cap.T).toLowerCase() } : {}),
+            ...(cap.binary_hash ? { binary_hash: String(cap.binary_hash).toLowerCase() } : {}),
+        }));
+}
+
+function _sourceCallApiBindings(source) {
+    const match = String(source || '').match(/capabilities\s*\{([\s\S]*?)\}/i);
+    if (!match) return [];
+    return match[1].split(',').map(item => {
+        const tokens = item.trim().split(/\s+/).filter(Boolean);
+        if (!tokens.length || /^_?SELF_?$/i.test(tokens[0]) ||
+                /^NULL$/i.test(tokens[0])) return null;
+        const binding = {
+            petname: tokens[0].replace(/#[1-9][0-9]*$/, ''),
+        };
+        for (const token of tokens.slice(1)) {
+            const field = token.match(/^(T|binary_hash)=(.+)$/i);
+            if (!field) continue;
+            if (field[1].toUpperCase() === 'T') binding.token = field[2].toLowerCase();
+            else binding.binary_hash = field[2].toLowerCase();
+        }
+        return binding;
+    }).filter(Boolean);
 }
 
 // Auto-fill rights for capabilities with no declared rights, sourcing defaults
@@ -1580,7 +1613,10 @@ async function compileAndBuild(options) {
     const _compileClistSlots = _activeCompileClistSlots();
     let result = _compileWithActiveClist(source, [], _compileClistSlots);
 
-    if (result.errors.length > 0) {
+    const _browserMethodAuthorityOnly = result.errors.length > 0 &&
+        result.errors.every(error => /not a known method|No method conventions/i.test(
+            String(error && error.message || error)));
+    if (result.errors.length > 0 && !_browserMethodAuthorityOnly) {
         const errText = result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n');
         if (con) { con.textContent = `Compile — compilation errors:\n${errText}`; con.scrollTop = 0; }
         const _ce = result.errors.length; if (typeof _showAsmErrors === 'function') _showAsmErrors(result.errors, 'Compile error' + (_ce > 1 ? 's' : '') + ' \u2014 code not applied');
@@ -1605,9 +1641,36 @@ async function compileAndBuild(options) {
                     source,
                     language: result.language || 'cloomc',
                     clist_slots: _compileClistSlots,
+                    // Names express the programmer's selected C-list binding;
+                    // portable descriptors additionally freeze token/hash.
+                    // The server re-resolves these against repository bytes and
+                    // never trusts browser-supplied API metadata.
+                    call_api_bindings: _compileCallApiBindings(result.capabilities).length
+                        ? _compileCallApiBindings(result.capabilities)
+                        : _sourceCallApiBindings(source),
                 }),
             });
             _serverCompile = await _compileResponse.json();
+            if (_compileResponse.ok && _serverCompile &&
+                    _serverCompile.ok === false &&
+                    Array.isArray(_serverCompile.errors) &&
+                    _serverCompile.errors.length > 0) {
+                const errText = _serverCompile.errors.map(e =>
+                    `Line ${e.line || '?'}: ${e.message}`).join('\n');
+                if (con) {
+                    con.textContent = `Compile — compilation errors:\n${errText}`;
+                    con.scrollTop = 0;
+                }
+                if (typeof _showAsmErrors === 'function') {
+                    _showAsmErrors(_serverCompile.errors,
+                        'Compile error — code not applied');
+                }
+                showNextSteps('error');
+                return {
+                    ok: false, kind: 'cloomc', error: errText,
+                    errors: _serverCompile.errors,
+                };
+            }
             if (!_compileResponse.ok || !_serverCompile || _serverCompile.ok === false) {
                 throw new Error((_serverCompile && _serverCompile.error) ||
                     'server compiler rejected the source');
@@ -1625,6 +1688,27 @@ async function compileAndBuild(options) {
             if (con) { con.textContent = `Compile — ${_message}`; con.scrollTop = 0; }
             showNextSteps('error');
             return { ok: false, kind: 'cloomc', error: _message };
+        }
+        if (_serverCompile.call_api_authorities &&
+                typeof _serverCompile.call_api_authorities === 'object') {
+            // Re-run the editor compiler against the immutable authority
+            // snapshot used by the server request. The snapshot belongs to this
+            // source compile only; it is never installed in a shared registry.
+            result = _compileWithActiveClist(
+                source, [], _compileClistSlots, _serverCompile.call_api_authorities);
+            if (result.errors.length > 0) {
+                const errText = result.errors.map(e =>
+                    `Line ${e.line || '?'}: ${e.message}`).join('\n');
+                if (con) {
+                    con.textContent = `Compile — compilation errors:\n${errText}`;
+                    con.scrollTop = 0;
+                }
+                if (typeof _showAsmErrors === 'function') {
+                    _showAsmErrors(result.errors, 'Compile error — code not applied');
+                }
+                showNextSteps('error');
+                return { ok: false, kind: 'cloomc', error: errText, errors: result.errors };
+            }
         }
         // Reproduce the browser byte array through the attestation endpoint;
         // the signed record, rather than browser-local compilation, remains
@@ -1657,6 +1741,8 @@ async function compileAndBuild(options) {
             trust_origin: _serverCompile.trust_origin,
             compiler_identity: _serverCompile.compiler_identity,
             compiler_version: _serverCompile.compiler_version,
+            warnings: Array.isArray(_serverCompile.warnings)
+                ? _serverCompile.warnings : (result.warnings || []),
         });
     }
 

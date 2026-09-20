@@ -122,12 +122,19 @@ if (isMainThread) {
         ? Object.fromEntries(Object.entries(payload.clist_slots).filter(
             ([name, row]) => name && Number.isInteger(row) && row >= 0 && row <= 0x7FFF))
         : null;
+    // Private server-prepared field only. Public /api/compile callers cannot
+    // attest API provenance by setting an authority-shaped JSON object.
+    const callApiAuthorities = payload._resolved_call_api_authorities &&
+            typeof payload._resolved_call_api_authorities === 'object' &&
+            !Array.isArray(payload._resolved_call_api_authorities)
+        ? payload._resolved_call_api_authorities : null;
 
     // ── Language → compiler method mapping ───────────────────────────────────
     function dispatch(compiler, lang, src) {
         switch (lang) {
             case 'assembly':   return compiler.compileAssembly(
-                src, [], clistSlots === null ? undefined : { clistSlots });
+                src, [], (clistSlots === null && callApiAuthorities === null)
+                    ? undefined : { clistSlots, callApiAuthorities });
             case 'javascript': return compiler.compileJS(src);
             case 'haskell':    return compiler.compileHaskell(src);
             case 'lambda':     return compiler.compileLambda(src);
@@ -136,7 +143,8 @@ if (isMainThread) {
             case 'english':
             case 'auto':
             default:           return compiler.compile(
-                src, [], clistSlots === null ? undefined : { clistSlots });
+                src, [], (clistSlots === null && callApiAuthorities === null)
+                    ? undefined : { clistSlots, callApiAuthorities });
         }
     }
 

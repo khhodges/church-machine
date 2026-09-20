@@ -114,6 +114,130 @@ class CLOOMCCompiler {
         return key === undefined ? null : conventions[key];
     }
 
+    // Compile-time CALL/API diagnostics are deliberately fed by an explicit
+    // snapshot.  The static method registry is useful for encoding names, but
+    // is not evidence that the C-list row selected by this compile contains
+    // that revision of a LUMP.
+    //
+    // options.callApiAuthorities:
+    //   {
+    //     PetName: {
+    //       source: 'embedded-binary', embedded: true,
+    //       token: '...', revision: 3,
+    //       selectedToken: '...', selectedRevision: 3,
+    //       api: { methods: [{ name: 'Open', index: 0 }, ...] }
+    //     }
+    //   }
+    //
+    // An authority is usable only when it came from the selected binary's
+    // embedded API and any supplied token/revision pin agrees exactly.
+    _callApiDiagnostics(source, options) {
+        const warnings = [];
+        const errors = [];
+        const opts = options && typeof options === 'object' ? options : {};
+        const authorities = opts.callApiAuthorities || opts.capabilityApis || {};
+        const authorityKey = name => {
+            const upper = String(name || '').toUpperCase();
+            return Object.keys(authorities).find(k => k.toUpperCase() === upper);
+        };
+        const authorityFor = name => {
+            const key = authorityKey(name);
+            if (key === undefined) return null;
+            const value = authorities[key];
+            if (!value || typeof value !== 'object') return null;
+            const embedded = value.embedded === true ||
+                value.source === 'embedded-binary' ||
+                value.authority === 'embedded-binary';
+            if (!embedded) return null;
+            if (value.selectedToken != null &&
+                    String(value.selectedToken) !== String(value.token)) return null;
+            if (value.selectedRevision != null &&
+                    String(value.selectedRevision) !== String(value.revision)) return null;
+            const api = value.api || value.apiDefinition;
+            return api && Array.isArray(api.methods) ? { value, api } : null;
+        };
+
+        // Exact dotted capability names win over Abstraction.Method splitting,
+        // matching ChurchAssembler's CALL parser.
+        const declaredCaps = new Set();
+        const capMatch = String(source || '').match(/capabilities\s*\{([\s\S]*?)\}/i);
+        if (capMatch) {
+            for (const item of capMatch[1].split(',')) {
+                const name = item.trim().split(/\s+/)[0];
+                if (name && !/^NULL$/i.test(name)) declaredCaps.add(name.toUpperCase());
+            }
+        }
+
+        const lines = String(source || '').split('\n');
+        const addUnknown = (line, petName, token) => {
+            warnings.push({
+                line,
+                colStart: Math.max(0, lines[line - 1].indexOf(token || petName)),
+                colEnd: Math.max(0, lines[line - 1].indexOf(token || petName)) +
+                    String(token || petName).length,
+                petname: petName,
+                code: 'CALL_API_UNAVAILABLE',
+                message: `Cannot verify CALL target "${petName}": the exact selected LUMP API is unavailable.`
+            });
+        };
+        const inspect = (line, petName, methodToken, sourceToken) => {
+            if (!petName || /^(?:CR\d+|DR\d+)$/i.test(petName)) return;
+            const authority = authorityFor(petName);
+            if (!authority) {
+                addUnknown(line, petName, sourceToken);
+                return;
+            }
+            if (!methodToken) return;
+            const methods = authority.api.methods;
+            const numeric = String(methodToken).replace(/^#/, '');
+            let found;
+            if (/^(?:0x[0-9a-f]+|\d+)$/i.test(numeric)) {
+                const requested = Number.parseInt(numeric, /^0x/i.test(numeric) ? 16 : 10);
+                found = methods.some((m, i) => {
+                    const index = m && Number.isInteger(m.index) ? m.index : i;
+                    return index === requested;
+                });
+            } else {
+                found = methods.some(m => m && m.name &&
+                    String(m.name).toUpperCase() === String(methodToken).toUpperCase());
+            }
+            if (!found) {
+                const known = methods.map((m, i) => m && m.name ? m.name :
+                    String(m && Number.isInteger(m.index) ? m.index : i)).join(', ');
+                errors.push({
+                    line,
+                    petname: petName,
+                    code: 'CALL_API_METHOD_INVALID',
+                    message: `"${methodToken}" is not a known method of ${petName}. Known methods: ${known}.`
+                });
+            }
+        };
+
+        for (let i = 0; i < lines.length; i++) {
+            const code = lines[i].replace(/;.*$/, '').replace(/\/\/.*$/, '').trim();
+            if (!code) continue;
+            let match = code.match(/^ELOADCALL\s+[^,]+,\s*([^,\s]+)(?:\s*,\s*([^,\s]+))?/i);
+            if (match) {
+                inspect(i + 1, match[1], match[2] || null, match[1]);
+                continue;
+            }
+            match = code.match(/^CALL\s+([^,\s]+)(?:\s*,\s*([^,\s]+))?/i);
+            if (!match) continue;
+            let petName = match[1];
+            let method = match[2] || null;
+            const indexedPet = petName.match(/^CR6\[([A-Za-z_][\w.]*)\]$/i);
+            if (indexedPet) petName = indexedPet[1];
+            else if (/^CR\d+$/i.test(petName)) continue;
+            if (!method && petName.includes('.') && !declaredCaps.has(petName.toUpperCase())) {
+                const dot = petName.lastIndexOf('.');
+                method = petName.slice(dot + 1);
+                petName = petName.slice(0, dot);
+            }
+            inspect(i + 1, petName, method, match[1]);
+        }
+        return { warnings, errors };
+    }
+
     encode(opcode, cond, dst, src, imm) {
         return (
             ((opcode & 0x1F) << 27) |
@@ -1094,8 +1218,37 @@ class CLOOMCCompiler {
         if (options && Object.prototype.hasOwnProperty.call(options, 'clistSlots')) {
             asm.setLocalClistSlots(options.clistSlots);
         }
+        // Exact embedded APIs, when supplied by the repository preparation
+        // step, are also the canonical name→selector source for this compile.
+        // Apply them only to this assembler instance; never seed the shared
+        // static registry with revision-specific data.
+        const exactAuthorities = options && options.callApiAuthorities;
+        for (const [petname, authority] of Object.entries(exactAuthorities || {})) {
+            const embedded = authority && (authority.embedded === true ||
+                authority.source === 'embedded-binary' ||
+                authority.authority === 'embedded-binary');
+            const api = authority && (authority.api || authority.apiDefinition);
+            if (!embedded || !api || !Array.isArray(api.methods)) continue;
+            if (authority.selectedToken != null &&
+                    String(authority.selectedToken) !== String(authority.token)) continue;
+            if (authority.selectedRevision != null &&
+                    String(authority.selectedRevision) !== String(authority.revision)) continue;
+            const conventions = {};
+            api.methods.forEach((method, index) => {
+                if (method && method.name) {
+                    conventions[method.name] = Object.assign({}, method, {
+                        index: Number.isInteger(method.index) ? method.index : index,
+                    });
+                }
+            });
+            asm.methodConventions[petname] = conventions;
+            asm.methodConventions[String(petname).toUpperCase()] = conventions;
+        }
 
         const result = asm.assemble(source);
+        const callApiDiagnostics = this._callApiDiagnostics(source, options);
+        result.warnings = (result.warnings || []).concat(callApiDiagnostics.warnings);
+        result.errors = (result.errors || []).concat(callApiDiagnostics.errors);
         if (asm._hasCapBlock &&
                 (!result.capabilities[0] ||
                  !/^_?SELF_?$/i.test(String(result.capabilities[0].name || '')))) {
@@ -1119,6 +1272,7 @@ class CLOOMCCompiler {
                 methods: [],
                 capabilities: [],
                 errors: normErrors,
+                warnings: result.warnings || [],
                 profile: 'IoT'
             };
         }
@@ -1158,6 +1312,7 @@ class CLOOMCCompiler {
             methods: [{ name: 'run', code: words, sourceLines: source, lineNums: asmLineNums }],
             capabilities: caps,
             errors: [],
+            warnings: result.warnings || [],
             lineNums: asmLineNums,
             profile: (typeof detectProfile === 'function') ? detectProfile([{ code: words }]) : 'IoT',
             manifest: null

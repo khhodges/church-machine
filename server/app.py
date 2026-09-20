@@ -19637,6 +19637,91 @@ def api_generate_method_available():
 # Compile API — POST /api/compile
 # ---------------------------------------------------------------------------
 
+def _compile_call_api_authorities(bindings):
+    """Resolve programmer-selected CALL bindings to exact repository binaries.
+
+    Client metadata never attests an API.  It supplies only the requested
+    pet-name binding (and, for portable source, its immutable token/hash pin).
+    This function re-resolves that binding against committed Namespace/manifest
+    state, reads the binary, verifies an optional hash pin, and extracts only
+    the API embedded in those bytes.
+    """
+    if not isinstance(bindings, list):
+        return {}
+    try:
+        namespace_rows, _ = _read_authoritative_namespace_rows()
+        manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        namespace_rows, manifest = [], []
+    authorities = {}
+    for binding in bindings[:256]:
+        if not isinstance(binding, dict):
+            continue
+        petname = str(binding.get("petname") or binding.get("name") or "").strip()
+        if not petname:
+            continue
+        token = str(binding.get("token") or binding.get("T") or "").lower()
+        binary_hash = str(binding.get("binary_hash") or "").lower()
+        selected = None
+        if token:
+            candidates = [
+                row for row in manifest
+                if isinstance(row, dict) and row.get("archived") is not True
+                and str(row.get("token") or "").lower() == token
+            ]
+            if binary_hash:
+                candidates = [
+                    row for row in candidates
+                    if str(row.get("binary_hash") or "").lower() == binary_hash
+                ]
+            if len(candidates) == 1:
+                selected = candidates[0]
+        else:
+            ns_matches = [
+                row for row in namespace_rows
+                if isinstance(row, dict)
+                and str(row.get("name") or "").casefold() == petname.casefold()
+                and row.get("archived") is not True
+            ]
+            if len(ns_matches) == 1:
+                ns_row = ns_matches[0]
+                ns_token = str(ns_row.get("token") or "").lower()
+                ns_hash = str(ns_row.get("binary_hash") or "").lower()
+                candidates = [
+                    row for row in manifest
+                    if isinstance(row, dict) and row.get("archived") is not True
+                    and str(row.get("token") or "").lower() == ns_token
+                    and (not ns_hash or
+                         str(row.get("binary_hash") or "").lower() == ns_hash)
+                ]
+                if len(candidates) == 1:
+                    selected, token, binary_hash = candidates[0], ns_token, ns_hash
+        filename = selected.get("filename") if isinstance(selected, dict) else None
+        if not isinstance(filename, str) or os.path.basename(filename) != filename:
+            continue
+        path = os.path.join(LUMPS_DIR, filename)
+        try:
+            inspected = _inspect_lump_binary(path)
+        except (OSError, ValueError):
+            continue
+        actual_hash = str(inspected.get("binary_hash") or "").lower()
+        if binary_hash and actual_hash != binary_hash:
+            continue
+        content = _parse_intrinsic_lump_content(inspected.get("words") or [])
+        api = content.get("api_definition") if isinstance(content, dict) else None
+        if not isinstance(api, dict) or not isinstance(api.get("methods"), list):
+            continue
+        authorities[petname] = {
+            "source": "embedded-binary",
+            "embedded": True,
+            "token": token or str(selected.get("token") or "").lower(),
+            "selectedToken": token or str(selected.get("token") or "").lower(),
+            "revision": actual_hash,
+            "selectedRevision": actual_hash,
+            "api": api,
+        }
+    return authorities
+
 @app.route("/api/compile", methods=["POST"])
 def api_compile():
     """CLOOMC++ Compiler API — compile source text to a Lump binary (ECO-002).
@@ -19708,7 +19793,17 @@ def api_compile():
     if language not in VALID_LANGUAGES:
         return jsonify({'error': f'`language` must be one of: {", ".join(sorted(VALID_LANGUAGES))}'}), 400
 
+    # Replace any caller-supplied authority object.  API authority is derived
+    # exclusively from exact saved binaries selected by authoritative bindings.
+    body = dict(body)
+    body.pop("call_api_authorities", None)
+    _call_api_authorities = _compile_call_api_authorities(
+        body.get("call_api_bindings"))
+    body["_resolved_call_api_authorities"] = _call_api_authorities
     result = run_compile(body)
+    if isinstance(result, dict):
+        result = dict(result)
+        result["call_api_authorities"] = _call_api_authorities
     # A successful local compile carries its admission evidence with the
     # artifact.  Upload callers never receive this record and therefore remain
     # on the untrusted admission path.  The record is bound to the exact
