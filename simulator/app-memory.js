@@ -517,7 +517,17 @@ function _isFixedCatalogLumpSlot(slot, label) {
     return !_isBootstrapSlot(slot, label) && !_isResidentIORegister(slot, label);
 }
 
+function _nsSlotHasResidentThreadBody(slot) {
+    // Thread residency is a property of the object, not of its pet name or
+    // conventional Namespace slot. getThreadInstanceLayout validates the
+    // selected body's word-0 magic and typ=2 header before returning valid.
+    return _threadLayoutForSlot(slot).valid === true;
+}
+
 function _nsSavedLoadPolicy(slot, manifest) {
+    // A saved Lazy/Preload policy from an older IDE can never evict a Thread.
+    // Project Resident without rewriting the committed Namespace snapshot.
+    if (_nsSlotHasResidentThreadBody(slot)) return 'Resident';
     const valid = ['Empty', 'Resident', 'Preload', 'Lazy'];
     const cfg = window.bootConfig || {};
     const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
@@ -3657,6 +3667,9 @@ function updateNamespace() {
         if (_isResidentIORegister(slot, label)) {
             return '<span class="ns-fixed-policy" title="Fixed MMIO capability; no LUMP source or identity">Resident I/O register</span>';
         }
+        if (_nsSlotHasResidentThreadBody(slot)) {
+            return '<span class="ns-fixed-policy" title="Thread objects are resident by design (word-0 typ=2)">Resident · Thread</span>';
+        }
         const value = _nsSavedLoadPolicy(slot, manifest) || 'Lazy';
         return `<select aria-label="Load policy for slot ${slot}" onchange="event.stopPropagation();_nsPrefetchChange(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${value==='Empty'?'selected':''}>Empty</option><option ${value==='Resident'?'selected':''}>Resident</option><option ${value==='Preload'?'selected':''}>Preload</option><option ${value==='Lazy'?'selected':''}>Lazy</option></select>`;
     }
@@ -3709,7 +3722,8 @@ function updateNamespace() {
 
     window._nsPrefetchChange = function(slot, value) {
         const label = sim && sim.nsLabels ? sim.nsLabels[slot] : '';
-        if (_isBootstrapSlot(slot, label) || _isResidentIORegister(slot, label)) return;
+        if (_isBootstrapSlot(slot, label) || _isResidentIORegister(slot, label) ||
+                _nsSlotHasResidentThreadBody(slot)) return;
         const cfg = window.bootConfig || {};
         const policy = ['Empty', 'Resident', 'Preload', 'Lazy'].includes(value)
             ? value : 'Lazy';

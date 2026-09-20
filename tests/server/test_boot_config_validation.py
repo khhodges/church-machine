@@ -32,6 +32,7 @@ if ROOT not in sys.path:
 
 import server.app as _app_module
 from hardware.thread_design import thread_layout
+from shared.namespace_header import NAMESPACE_HEADER_V2_MAX_SLOTS
 from server.app import (
     DEFAULT_BOOT_CONFIG,
     HARDWARE_PROFILES,
@@ -39,7 +40,60 @@ from server.app import (
     _validate_step1,
     _validate_step2,
 )
-from shared.namespace_header import NAMESPACE_HEADER_V2_MAX_SLOTS
+
+
+def test_thread_policy_projection_uses_header_type_not_slot_or_label(tmp_path, monkeypatch):
+    thread_header = (0x1F << 27) | (2 << 8)
+    ordinary_header = (0x1F << 27)
+    image = [0] * 64
+    image[7] = thread_header
+    image[9] = ordinary_header
+    image_path = tmp_path / "boot-image.bin"
+    image_path.write_bytes(struct.pack(f"<{len(image)}I", *image))
+    monkeypatch.setattr(_app_module, "BOOT_IMAGE_PATH", str(image_path))
+
+    state = {
+        "abstractions": [
+            {"slot": 37, "name": "Worker", "location": 7,
+             "load_policy": "Lazy", "resident": False},
+            {"slot": 12, "name": "Thread.3", "location": 9,
+             "load_policy": "Lazy", "resident": False},
+        ]
+    }
+    projected = _app_module._project_effective_thread_policies(state)
+    by_slot = {row["slot"]: row for row in projected["abstractions"]}
+
+    assert by_slot[37]["load_policy"] == "Resident"
+    assert by_slot[37]["resident"] is True
+    assert by_slot[37]["header_typ"] == 2
+    assert by_slot[12]["load_policy"] == "Lazy"
+    assert by_slot[12]["resident"] is False
+    assert state["abstractions"][0]["load_policy"] == "Lazy"
+
+
+def test_stale_thread_config_policy_is_removed_without_touching_nonthread(tmp_path, monkeypatch):
+    image = [0] * 64
+    image[7] = (0x1F << 27) | (2 << 8)
+    image_path = tmp_path / "boot-image.bin"
+    image_path.write_bytes(struct.pack(f"<{len(image)}I", *image))
+    monkeypatch.setattr(_app_module, "BOOT_IMAGE_PATH", str(image_path))
+    rows = [{"slot": 41, "location": 7}]
+    source = {
+        "slotRules": {"41": "Lazy", "42": "Lazy"},
+        "step2": {"lumps": [
+            {"nsSlot": 41, "loadPolicy": "Lazy"},
+            {"nsSlot": 42, "loadPolicy": "Lazy"},
+        ]},
+    }
+
+    normalized = _app_module._normalize_thread_config_policies(source, rows)
+
+    assert normalized["slotRules"] == {"41": "Resident", "42": "Lazy"}
+    assert normalized["step2"]["lumps"] == [
+        {"nsSlot": 42, "loadPolicy": "Lazy"},
+    ]
+    assert source["slotRules"]["41"] == "Lazy"
+    assert len(source["step2"]["lumps"]) == 2
 
 # ---------------------------------------------------------------------------
 # Test constants

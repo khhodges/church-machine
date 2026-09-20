@@ -453,6 +453,28 @@ assert([...modal.querySelectorAll('.thread-zone-hdr')]
         .every(body => body.style.display === 'none'),
     'Thread Namespace popup opens with every memory zone collapsed');
 
+// Load policy follows the real word-0 type, never a Thread label or a
+// conventional generated slot. Historical Lazy state projects as Resident.
+const altThreadSlot = 20;
+const altSource = sim.readNSEntry(12);
+const altLimit = sim.parseNSWord1(altSource.word1_limit).limit;
+sim.withNamespaceWrite('test alternate Thread slot', () => {
+    sim.writeNSEntry(altThreadSlot, altSource.word0_location, altLimit,
+        altSource.bFlag || 0, altSource.gBit || 0, altSource.gtType,
+        sim.parseNSWord1(altSource.word1_limit).gtSeq, altSource.clistCount || 0, 0);
+});
+sim.nsLabels[altThreadSlot] = 'Worker.With.No.Thread.Label';
+sandbox.window._nsState = {
+    abstractions: [
+        { slot: altThreadSlot, load_policy: 'Lazy' },
+        { slot: 6, load_policy: 'Lazy' },
+    ],
+};
+assert.strictEqual(sandbox._nsSavedLoadPolicy(altThreadSlot, null), 'Resident',
+    'a typ=2 body in an alternate slot overrides historical Lazy policy');
+assert.strictEqual(sandbox._nsSavedLoadPolicy(6, null), 'Lazy',
+    'historical Lazy remains valid for a non-Thread LUMP');
+
 // A recognizable Thread label with a damaged body remains a Thread view, but
 // declares the data unavailable instead of falling back to another layout.
 sim.memory[thread2.base] = 0;

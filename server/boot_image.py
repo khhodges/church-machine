@@ -2575,6 +2575,25 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         row["slot"]: row for row in _bootstrap_rows
         if isinstance(row, dict) and isinstance(row.get("slot"), int)
     }
+
+    def _state_binding_is_thread(row):
+        """Classify by the bound body's header, never by its name."""
+        filename = row.get("filename") if isinstance(row, dict) else None
+        if isinstance(filename, str) and os.path.basename(filename) == filename:
+            try:
+                with open(os.path.join(lumps_dir, filename), "rb") as source:
+                    raw_header = source.read(4)
+                if len(raw_header) == 4:
+                    header = struct.unpack(">I", raw_header)[0]
+                    return (((header >> 27) & 0x1F) == 0x1F
+                            and ((header >> 8) & 0x3) == 2)
+            except OSError:
+                pass
+        # Generated contexts have no artifact locator. Their body constructor
+        # below emits the normative typ=2 header from the configured Thread
+        # design, so this is type provenance rather than a pet-name rule.
+        return row.get("slot") in _generated_thread_slots
+
     for _step2_row in step2_lumps:
         if not isinstance(_step2_row, dict):
             continue
@@ -2598,12 +2617,23 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             _state_row.get("load_policy", _state_row.get("loadPolicy"))
             or ("Resident" if _state_row.get("resident") else "Lazy")
         )
+        _state_is_thread = _state_binding_is_thread(_state_row)
+        if _state_is_thread:
+            _state_policy = "Resident"
         _step2_policy = _step2_row.get("loadPolicy", _step2_row.get("load_policy"))
+        if _state_is_thread and _step2_policy is not None:
+            # Historical Lazy is input compatibility only. It cannot change
+            # the effective policy of a Thread object.
+            _step2_policy = "Resident"
         if _step2_policy is not None and str(_step2_policy) != _state_policy:
             raise ValueError(
                 f"generate_boot_image: Step-2 load policy for NS[{_step2_slot}] "
                 "disagrees with Namespace state")
         _state_resident = _state_policy == "Resident"
+        if _state_is_thread and "resident" in _step2_row:
+            # Treat the stale compatibility boolean exactly like stale Lazy.
+            _step2_row = dict(_step2_row)
+            _step2_row["resident"] = True
         if "resident" in _step2_row and bool(_step2_row.get("resident")) != _state_resident:
             raise ValueError(
                 f"generate_boot_image: Step-2 residency for NS[{_step2_slot}] "

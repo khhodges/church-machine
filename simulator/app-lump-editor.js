@@ -469,6 +469,8 @@
                 return row && Number(row.slot) === Number(cat.nsSlot);
             });
             var nsPolicy = nsRow && (nsRow.load_policy || nsRow.loadPolicy);
+            var headerTyp = Number(cat.headerTyp ?? cat.header_typ);
+            if (headerTyp === 2) nsPolicy = 'Resident';
             if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(nsPolicy) &&
                     nsRow && nsRow.resident === true && nsRow.boot_resident === true) {
                 nsPolicy = 'Resident';
@@ -794,11 +796,15 @@
                 var cat = _fixedCatalog[i];
                 var isFixedBoot = _isFixedBootStep2Slot(cat.nsSlot);
                 var st  = _rl.step2State[cat.nsSlot] || {};
+                var isThread = Number(cat.headerTyp ?? cat.header_typ) === 2;
+                if (isThread) st.loadPolicy = 'Resident';
                 var isResident = st.loadPolicy === 'Resident';
                 var physVal = (st.physAddr != null && Number.isFinite(st.physAddr))
                               ? st.physAddr : '';
                 var policyCell = isFixedBoot
                     ? '<span class="le-rl-badge le-rl-badge-bootable" data-tooltip="Foundational boot artifact; not configured in Step 2">Fixed boot</span>'
+                    : isThread
+                    ? '<span class="le-rl-badge le-rl-badge-bootable" data-tooltip="Thread objects are resident by design (word-0 typ=2)">Resident · Thread</span>'
                     : '<select class="le-rl-policy"' +
                       ' data-rl-slot="' + cat.nsSlot + '" data-rl-field="loadPolicy"' +
                       ' aria-label="Load policy for ' + esc(cat.abstraction || ('slot ' + cat.nsSlot)) + '">' +

@@ -4,6 +4,7 @@ import sys
 import io
 import json
 import struct
+import copy
 import logging
 import uuid
 import secrets
@@ -3646,6 +3647,7 @@ def _load_lump_catalog(selected_tokens=None):
                     "nsSlot": None,
                     "lumpSize": binary["lump_size"],
                     "cw": binary["cw"], "cc": binary["cc"],
+                    "headerTyp": binary["typ"],
                     "token": _token,
                     "nsSlotPolicy": policy,
                     "hasExecutableMethods": binary["typ"] == 0 and binary["cw"] > 0,
@@ -3664,6 +3666,7 @@ def _load_lump_catalog(selected_tokens=None):
             "nsSlot": slot,
             "lumpSize": binary["lump_size"],
             "cw": binary["cw"], "cc": binary["cc"],
+            "headerTyp": binary["typ"],
             "token": _token,
             "lumpVersion": entry.get("lump_version", 0),
             "nsSlotPolicy": policy,
@@ -4112,6 +4115,11 @@ def boot_config_get():
             or _validate_step1(cfg.get("targetBoard"), s1 or {}) is not None):
             cfg = None  # corrupt/stale file — fall through to "no config"
         else:
+            try:
+                _policy_rows, _ = _read_authoritative_namespace_rows()
+                cfg = _normalize_thread_config_policies(cfg, _policy_rows)
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                pass
             # Step 2 is optional; if present in the file it must validate. If
             # it doesn't, drop it rather than discarding the whole config.
             s2 = cfg.get("step2")
@@ -4164,10 +4172,104 @@ def _load_existing_boot_config_unchecked():
         return {}
 
 
+def _thread_slots_from_namespace_rows(rows, image_path=None):
+    """Return slots whose real resident body has a valid typ=2 LUMP header.
+
+    Pet names and conventional slot numbers are deliberately ignored.  The
+    current image is preferred; an exact state-owned artifact is a fallback for
+    an alternate Thread slot that is not present in the current image.
+    """
+    image_path = BOOT_IMAGE_PATH if image_path is None else image_path
+    image_words = ()
+    try:
+        with open(image_path, "rb") as image_file:
+            raw = image_file.read()
+        if raw and len(raw) % 4 == 0:
+            image_words = struct.unpack(f"<{len(raw) // 4}I", raw)
+    except OSError:
+        pass
+    slots = set()
+    for row in rows or []:
+        if not isinstance(row, dict) or not isinstance(row.get("slot"), int):
+            continue
+        header = None
+        try:
+            location = int(str(row.get("location")), 0)
+        except (TypeError, ValueError):
+            location = None
+        if location is not None and 0 <= location < len(image_words):
+            header = image_words[location]
+        if header is None:
+            filename = row.get("filename")
+            if isinstance(filename, str) and os.path.basename(filename) == filename:
+                try:
+                    inspected = _inspect_lump_binary(
+                        os.path.join(LUMPS_DIR, filename), allow_compact_fit=True)
+                    if inspected.get("typ") == 2:
+                        slots.add(row["slot"])
+                    continue
+                except (OSError, ValueError, TypeError):
+                    pass
+        if (header is not None
+                and ((header >> 27) & 0x1F) == 0x1F
+                and ((header >> 8) & 0x3) == 2):
+            slots.add(row["slot"])
+    return slots
+
+
+def _project_effective_thread_policies(state):
+    """Project inherent Thread residency without mutating persisted state."""
+    projected = dict(state) if isinstance(state, dict) else {"abstractions": []}
+    rows = projected.get("abstractions")
+    if not isinstance(rows, list):
+        return projected
+    thread_slots = _thread_slots_from_namespace_rows(rows)
+    projected_rows = []
+    for source in rows:
+        row = dict(source) if isinstance(source, dict) else source
+        if isinstance(row, dict) and row.get("slot") in thread_slots:
+            row["load_policy"] = "Resident"
+            row["resident"] = True
+            row["header_typ"] = 2
+        projected_rows.append(row)
+    projected["abstractions"] = projected_rows
+    return projected
+
+
+def _normalize_thread_config_policies(data, authority_rows):
+    """Discard stale configurable policy for inherently resident Threads."""
+    normalized = copy.deepcopy(data)
+    thread_slots = _thread_slots_from_namespace_rows(authority_rows or [])
+    if not thread_slots:
+        return normalized
+    rules = normalized.get("slotRules")
+    if isinstance(rules, dict):
+        for slot in thread_slots:
+            if str(slot) in rules or slot in rules:
+                rules.pop(slot, None)
+                rules[str(slot)] = "Resident"
+    step2 = normalized.get("step2")
+    if isinstance(step2, dict) and isinstance(step2.get("lumps"), list):
+        # Thread bodies are part of the resident image geometry, not Step-2
+        # user-placed LUMPs. Historical rows are redundant and may otherwise
+        # be rejected as attempts to reuse a generated Thread slot.
+        step2["lumps"] = [
+            row for row in step2["lumps"]
+            if not (isinstance(row, dict) and row.get("nsSlot") in thread_slots)
+        ]
+    return normalized
+
+
 def _validated_boot_config_candidate(data, existing=None, authority_rows=None):
     """Normalize a complete config candidate with the boot-config POST rules."""
     if not isinstance(data, dict):
         return None, "Invalid boot configuration body"
+    if authority_rows is None:
+        try:
+            authority_rows, _ = _read_authoritative_namespace_rows()
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            authority_rows = []
+    data = _normalize_thread_config_policies(data, authority_rows)
     existing = _load_existing_boot_config_unchecked() if existing is None else existing
     target_board = data.get("targetBoard")
     step1 = data.get("step1") or {}
@@ -6019,6 +6121,7 @@ def boot_image_ns_state():
     try:
         with open(NS_STATE_PATH) as _fh:
             _state = json.load(_fh)
+        _state = _project_effective_thread_policies(_state)
         # Attach the authoritative raw NS-table view (raw words + header
         # geometry straight from boot-image.bin) for the Namespace Design
         # Page drill-down.  Best-effort: absence just omits the block.
@@ -22683,6 +22786,7 @@ def _ba_build_ns_map():
     thread_size = int(saved_step1.get("threadLumpWords") or 256)
     thread_stack_words = int(saved_step1.get("threadStackWords") or 32)
     thread_layout = _boot_image_gen.thread_layout(thread_size, thread_stack_words)
+    effective_thread_slots = _thread_slots_from_namespace_rows(ns_entries)
 
     def _state_lump_path(state_entry):
         """Resolve a row's exact Namespace-state filename before its token."""
@@ -22746,6 +22850,8 @@ def _ba_build_ns_map():
         }
 
     def _slot_policy(slot_num, state_entry=None, lump_path=None, default='Lazy'):
+        if slot_num in effective_thread_slots:
+            return 'Resident'
         selected_rule = slot_policy_by_slot.get(slot_num)
         if selected_rule in ('Bootstrap', 'Hardware', 'Empty', 'Resident', 'Preload', 'Lazy'):
             return selected_rule
@@ -23004,7 +23110,7 @@ def _ba_build_ns_map():
                 ),
             }],
         }
-        _append_policy_row(row, _slot_policy(slot_num, entry, default='Lazy'))
+        _append_policy_row(row, _slot_policy(slot_num, entry, default='Resident'))
 
     for slot_num in sorted(manifest_by_slot.keys()):
         if slot_num in intrinsic_slots:
