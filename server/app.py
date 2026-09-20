@@ -19696,15 +19696,20 @@ def _compile_call_api_authorities(bindings):
                 ns_row = ns_matches[0]
                 ns_token = str(ns_row.get("token") or "").lower()
                 ns_hash = str(ns_row.get("binary_hash") or "").lower()
-                candidates = [
-                    row for row in manifest
-                    if isinstance(row, dict) and row.get("archived") is not True
-                    and str(row.get("token") or "").lower() == ns_token
-                    and (not ns_hash or
-                         str(row.get("binary_hash") or "").lower() == ns_hash)
-                ]
-                if len(candidates) == 1:
-                    selected, token, binary_hash = candidates[0], ns_token, ns_hash
+                # The committed Namespace row already selects the exact live
+                # artifact. Do not make API loading depend on duplicated
+                # manifest metadata: older live rows can legitimately point at
+                # a filename whose manifest record predates binary_hash.
+                # _inspect_lump_binary below still verifies the selected bytes
+                # against the Namespace hash before they become authority.
+                ns_filename = ns_row.get("filename")
+                if (isinstance(ns_filename, str) and
+                        os.path.basename(ns_filename) == ns_filename):
+                    selected = {
+                        "filename": ns_filename,
+                        "token": ns_token,
+                    }
+                    token, binary_hash = ns_token, ns_hash
         filename = selected.get("filename") if isinstance(selected, dict) else None
         if not isinstance(filename, str) or os.path.basename(filename) != filename:
             continue

@@ -149,6 +149,29 @@ class CLOOMCCompiler {
         return key === undefined ? null : conventions[key];
     }
 
+    _applyCallApiConventions(options) {
+        const authorities = options && options.callApiAuthorities;
+        if (!authorities || typeof authorities !== 'object' || Array.isArray(authorities)) return;
+        for (const [petname, authority] of Object.entries(authorities)) {
+            const embedded = authority && (authority.embedded === true ||
+                authority.source === 'embedded-binary' ||
+                authority.authority === 'embedded-binary');
+            const api = authority && (authority.api || authority.apiDefinition);
+            if (!embedded || !api || !Array.isArray(api.methods)) continue;
+            if (authority.selectedToken != null &&
+                    String(authority.selectedToken) !== String(authority.token)) continue;
+            if (authority.selectedRevision != null &&
+                    String(authority.selectedRevision) !== String(authority.revision)) continue;
+            const conventions = {};
+            api.methods.forEach((method, position) => {
+                if (!method || !method.name) return;
+                const index = Number.isInteger(method.index) ? method.index : position;
+                conventions[method.name] = Object.assign({}, method, { index });
+            });
+            this.setMethodConventions({ [petname]: conventions });
+        }
+    }
+
     // Compile-time CALL/API diagnostics are deliberately fed by an explicit
     // snapshot.  The static method registry is useful for encoding names, but
     // is not evidence that the C-list row selected by this compile contains
@@ -243,7 +266,9 @@ class CLOOMCCompiler {
                     line,
                     petname: petName,
                     code: 'CALL_API_METHOD_INVALID',
-                    message: `"${methodToken}" is not a known method of ${petName}. Known methods: ${known}.`
+                    message: methods.length === 0
+                        ? `"${methodToken}" is absent from the authoritative embedded API of ${petName}; that API declares no methods.`
+                        : `"${methodToken}" is not a known method of ${petName}. Known methods: ${known}.`
                 });
             }
         };
@@ -293,6 +318,13 @@ class CLOOMCCompiler {
         // Haskell, Symbolic, and PetName.
         const cleanSource = source.replace(/^\s*@(target\s+(?:IoT|Full)|portable|legacy)\s*$/gim, '');
         const previousReserveSelfRow = this._reserveCompilerSelfRow;
+        const previousMethodConventions = this.methodConventions;
+        // Exact selected-binary APIs are compile-request context. Install their
+        // name→selector projection before any frontend creates a nested
+        // assembler, then discard it so a later compile cannot inherit stale
+        // revision-specific metadata.
+        this.methodConventions = Object.assign({}, this.methodConventions);
+        this._applyCallApiConventions(compileOptions);
         let result;
         try {
             if (this._detectPetName(cleanSource)) {
@@ -312,16 +344,27 @@ class CLOOMCCompiler {
                 result = this.compileHaskell(cleanSource, capabilities);
             } else if (this._detectCLOOMC(cleanSource)) {
                 this._reserveCompilerSelfRow = true;
-                result = this.compileJS(cleanSource, capabilities);
+                result = this.compileJS(cleanSource, capabilities, compileOptions);
             } else if (this._detectAssembly(cleanSource)) {
                 this._reserveCompilerSelfRow = false;
                 result = this.compileAssembly(cleanSource, capabilities, compileOptions);
             } else {
                 this._reserveCompilerSelfRow = true;
-                result = this.compileJS(cleanSource, capabilities);
+                result = this.compileJS(cleanSource, capabilities, compileOptions);
             }
         } finally {
             this._reserveCompilerSelfRow = previousReserveSelfRow;
+            this.methodConventions = previousMethodConventions;
+        }
+        if (result.language !== 'assembly') {
+            const callApiDiagnostics = this._callApiDiagnostics(cleanSource, compileOptions);
+            result.warnings = (result.warnings || []).concat(callApiDiagnostics.warnings);
+            const authoritativeLines = new Set(callApiDiagnostics.errors.map(error => error.line));
+            result.errors = (result.errors || []).filter(error =>
+                !authoritativeLines.has(error && error.line) ||
+                !/not a known method|Unknown method|No method conventions/i.test(
+                    String(error && error.message || error))
+            ).concat(callApiDiagnostics.errors);
         }
         // The PetName frontend allocates its rows directly (already offset by
         // one), unlike the other generated frontends which finalize via _buildROM.
@@ -474,8 +517,12 @@ class CLOOMCCompiler {
         }
     }
 
-    compileJS(source, capabilities) {
+    compileJS(source, capabilities, options) {
         this._syncRegisteredMethodConventions();
+        // Shared browser conventions are encoding aids, never selected-revision
+        // authority. Re-apply this request's exact embedded API last so it wins
+        // normalization collisions without entering the shared registry.
+        this._applyCallApiConventions(options);
         const errors = [];
         // Auto-wrap code that has no abstraction/method declaration
         if (!/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/m.test(source)) {
@@ -1282,7 +1329,12 @@ class CLOOMCCompiler {
         const result = asm.assemble(source);
         const callApiDiagnostics = this._callApiDiagnostics(source, options);
         result.warnings = (result.warnings || []).concat(callApiDiagnostics.warnings);
-        result.errors = (result.errors || []).concat(callApiDiagnostics.errors);
+        const authoritativeLines = new Set(callApiDiagnostics.errors.map(error => error.line));
+        result.errors = (result.errors || []).filter(error =>
+            !authoritativeLines.has(error && error.line) ||
+            !/not a known method|Unknown method|No method conventions/i.test(
+                String(error && error.message || error))
+        ).concat(callApiDiagnostics.errors);
         if (asm._hasCapBlock &&
                 (!result.capabilities[0] ||
                  !/^_?SELF_?$/i.test(String(result.capabilities[0].name || '')))) {
@@ -2331,7 +2383,11 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: 'Church Machine assembler is unavailable.' });
                 return;
             }
-            const asmObj = new AsmClass();
+            // Carry this compile's normalized method conventions into the fresh
+            // statement assembler. In particular, server workers have no
+            // browser-global convention registry; exact embedded target APIs
+            // arrive through compile(options) and must survive this handoff.
+            const asmObj = new AsmClass(this.methodConventions);
             // Native statements are handed to the assembler one at a time, so
             // their surrounding capabilities block is not present in asmText.
             // Supply this method's finalized C-list layout through the

@@ -135,7 +135,9 @@ if (isMainThread) {
             case 'assembly':   return compiler.compileAssembly(
                 src, [], (clistSlots === null && callApiAuthorities === null)
                     ? undefined : { clistSlots, callApiAuthorities });
-            case 'javascript': return compiler.compileJS(src);
+            case 'javascript': return compiler.compile(
+                src, [], (clistSlots === null && callApiAuthorities === null)
+                    ? undefined : { clistSlots, callApiAuthorities });
             case 'haskell':    return compiler.compileHaskell(src);
             case 'lambda':     return compiler.compileLambda(src);
             case 'symbolic':   return compiler.compileSymbolic(src);

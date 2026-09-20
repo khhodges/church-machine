@@ -256,6 +256,7 @@ def test_call_api_authority_is_extracted_from_exact_saved_binary(monkeypatch):
             'name': 'Echo',
             'token': '11111111',
             'binary_hash': 'a' * 64,
+            'filename': 'Echo.1.11111111.lump',
         }], None))
     monkeypatch.setattr(
         server_app_module, '_read_manifest_safe',
