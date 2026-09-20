@@ -2263,11 +2263,10 @@ async function compileAndBuild(options) {
         ...(rc.identity_contract
             ? { identity_contract: rc.identity_contract } : {}),
     }));
-    // Registry words are the instruction-only source region.  The complete
-    // candidate remains in lumpWordsArray for the save-plan payload and
-    // compiler diagnostics; _computeLumpToken/registerMemory rebuild their
-    // canonical header/allocation from code words and c-list metadata.
-    const _registeredCodeWords = codeRegion.slice();
+    // The server-authenticated LUMP is authoritative, including its dispatch
+    // prefix. Never republish the browser compiler's preliminary body-only
+    // region as though it were the admitted candidate.
+    const _registeredCodeWords = lumpWordsArray.slice(1, 1 + cw);
     const _compiledToken = typeof window._computeLumpToken === 'function'
         ? window._computeLumpToken(_registeredCodeWords, _compiledCapabilities)
         : null;
@@ -2367,6 +2366,11 @@ async function compileAndBuild(options) {
         listing += `  Identity:  ${absName}#${_saveIssueNumber}  ` +
                    `\u26a0 No petname — open IDE Settings to set one\n`;
     }
+    const _nameWasInferred = !/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_.]*/mi.test(source);
+    if (_nameWasInferred) {
+        listing += `  Name:      ${absName} was inferred for this read-only candidate view.\n`;
+        listing += `             Add an explicit abstraction declaration to choose its saved identity.\n`;
+    }
 
     if (Object.keys(drPetNames).length > 0 || Object.keys(crPetNames).length > 0) {
         listing += `\n  Pet Names:\n`;
@@ -2431,22 +2435,16 @@ async function compileAndBuild(options) {
     // Candidate publication is the sole successful-build state transition.
     // It is immutable and does not load RAM, stop execution, or select an
     // execution context.  Save/Export/Run consume this exact source snapshot.
-    // The persisted code region has bodies only; execution additionally needs
-    // the method dispatch table used by CALL. Build that install representation
-    // here without mutating simulator memory.
-    const _candidateExecutionWords = [];
+    // Retain the authenticated code region, including the method dispatch
+    // prefix, without reconstructing it or mutating simulator memory.
+    const _candidateExecutionWords = _registeredCodeWords.slice();
     const _candidateLabels = {};
     const _candidateMethods = result.methods || [];
     let _candidateCodeOffset = _candidateMethods.length;
     for (let _index = 0; _index < _candidateMethods.length; _index++) {
         const _method = _candidateMethods[_index];
-        _candidateExecutionWords.push(_method.visibility === 'private' ? 0 :
-            (((23 << 27) | ((_candidateCodeOffset - _index) & 0x7FFF)) >>> 0));
         _candidateLabels[_method.name] = _candidateCodeOffset;
         _candidateCodeOffset += (_method.code || []).length;
-    }
-    for (const _method of _candidateMethods) {
-        _candidateExecutionWords.push(...(_method.code || []));
     }
     if (window.IDEActionState) {
         window.IDEActionState.recordCandidate({
@@ -2487,6 +2485,12 @@ async function compileAndBuild(options) {
             con.innerHTML = _capRightsHTML(listing +
                 '\n\n  Candidate ready — use Save LUMP, Export LUMP, or Run to install it.');
             con.scrollTop = 0;
+        }
+        if (typeof window._showCompiledCandidateBesideSource === 'function') {
+            window._showCompiledCandidateBesideSource(lumpWordsArray, {
+                abstraction: absName,
+                methodCount: _candidateMethods.length,
+            });
         }
         showNextSteps('compiled');
         const _trustedOutput = null;

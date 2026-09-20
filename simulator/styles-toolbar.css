@@ -461,6 +461,17 @@
     padding: 0;
 }
 
+/* A successful compile shows its authenticated, unsaved candidate beside the
+   draft while retaining the ordinary Console as the build-summary surface. */
+.editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(18rem, 0.8fr);
+}
+.editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout > .console-panel {
+    display: flex;
+    grid-column: 3;
+    grid-row: 1;
+}
+
 #editor .console-panel {
     display: flex;
     flex-direction: column;

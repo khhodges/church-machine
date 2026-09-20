@@ -1877,29 +1877,90 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
     if (panel) panel.style.display = 'flex';
 }
 
-// Compilation keeps the recovered/editable source on the left, but replaces
-// immutable saved-binary inspection on the right with the new compiler output.
-// Preserve the open-LUMP identity and draft context so Save Lump still knows
-// which revision is being edited.
+// Begin a compile presentation without changing the source or pretending that
+// the immutable saved bytes are the result of the new build.  A previous
+// unsaved candidate is hidden while the attempt is in flight; saved-LUMP mode
+// remains intact so a failed attempt can present diagnostics against that
+// editing context.
 function _showCompilerOutputBesideSource() {
-    if (!window._savedLumpEditorMode) return;
-    window._savedLumpEditorMode = false;
+    if (window._compiledCandidateEditorMode) {
+        window._compiledCandidateEditorMode = false;
+        var oldPanel = document.getElementById('savedLumpDisassemblyPanel');
+        var oldText = document.getElementById('savedLumpDisassembly');
+        if (window._savedLumpEditorMode &&
+                typeof window._savedLumpDisassemblyBeforeCandidate === 'string') {
+            if (oldText) oldText.textContent = window._savedLumpDisassemblyBeforeCandidate;
+            if (oldPanel) {
+                oldPanel.setAttribute('aria-label', 'Complete saved LUMP workspace');
+                oldPanel.style.display = 'flex';
+            }
+        } else if (oldPanel) {
+            oldPanel.style.display = 'none';
+        }
+        window._savedLumpDisassemblyBeforeCandidate = null;
+    }
     var layout = document.querySelector('#editor .editor-layout');
-    var tabs = document.getElementById('codeSidebarTabs');
-    var panel = document.getElementById('savedLumpDisassemblyPanel');
-    if (layout) layout.classList.remove('saved-lump-editor-layout');
-    if (tabs) tabs.style.display = '';
-    if (panel) panel.style.display = 'none';
-    ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel']
-        .forEach(function(id, index) {
-            var el = document.getElementById(id);
-            if (el) el.style.display = index === 0 ? 'flex' : 'none';
-        });
-    if (typeof _syncSavedLumpIdentityVisibility === 'function') {
-        _syncSavedLumpIdentityVisibility();
+    if (layout) layout.classList.remove('compiled-candidate-editor-layout');
+    if (!window._savedLumpEditorMode && layout) {
+        layout.classList.remove('saved-lump-editor-layout');
     }
 }
 window._showCompilerOutputBesideSource = _showCompilerOutputBesideSource;
+
+function _showCompiledCandidateBesideSource(words, details) {
+    var binary = Array.from(words || [], function(word) { return Number(word) >>> 0; });
+    if (!binary.length) return false;
+    details = details || {};
+    var header = binary[0] >>> 0;
+    var cw = (header >>> 10) & 0x1FFF;
+    var cc = header & 0xFF;
+    var methodCount = Math.max(0, Math.min(Number(details.methodCount) || 0, cw));
+    var lines = [
+        '; UNSAVED COMPILE CANDIDATE — not the immutable saved LUMP',
+        '; Authenticated server output; Save LUMP is required to create a saved artifact.',
+        '; Abstraction: ' + String(details.abstraction || 'Unnamed'),
+        '[0000]  0x' + header.toString(16).padStart(8, '0').toUpperCase() +
+            '  ; LUMP header, cw=' + cw + ', cc=' + cc
+    ];
+    for (var i = 1; i <= cw && i < binary.length; i++) {
+        var word = binary[i] >>> 0;
+        var decoded = '';
+        if (i <= methodCount) {
+            decoded = 'dispatch[' + (i - 1) + '] -> LUMP word ' + word;
+        } else if (typeof assembler !== 'undefined' && assembler &&
+                typeof assembler.disassemble === 'function') {
+            try { decoded = assembler.disassemble(word); } catch (_e) {}
+        }
+        lines.push('[' + String(i).padStart(4, '0') + ']  0x' +
+            word.toString(16).padStart(8, '0').toUpperCase() +
+            (decoded ? '  ' + decoded : ''));
+    }
+    if (cc > 0) {
+        lines.push('', '; C-list (exact authenticated words)');
+        for (var c = Math.max(cw + 1, binary.length - cc); c < binary.length; c++) {
+            lines.push('[' + String(c).padStart(4, '0') + ']  0x' +
+                (binary[c] >>> 0).toString(16).padStart(8, '0').toUpperCase());
+        }
+    }
+    var panel = document.getElementById('savedLumpDisassemblyPanel');
+    var text = document.getElementById('savedLumpDisassembly');
+    var layout = document.querySelector('#editor .editor-layout');
+    if (window._savedLumpEditorMode && !window._compiledCandidateEditorMode && text) {
+        window._savedLumpDisassemblyBeforeCandidate = text.textContent;
+    }
+    if (text) text.textContent = lines.join('\n');
+    if (panel) {
+        panel.setAttribute('aria-label', 'Unsaved authenticated compile candidate');
+        panel.style.display = 'flex';
+    }
+    if (layout) {
+        layout.classList.add('saved-lump-editor-layout');
+        layout.classList.add('compiled-candidate-editor-layout');
+    }
+    window._compiledCandidateEditorMode = true;
+    return true;
+}
+window._showCompiledCandidateBesideSource = _showCompiledCandidateBesideSource;
 
 function exitSavedLumpEditorMode() {
     // Also invalidate an open that is still awaiting binary/source fetches.
