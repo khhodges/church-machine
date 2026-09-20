@@ -62,7 +62,7 @@ assert.match(css, /\.dash-tab:focus-visible/,
     'keyboard focus remains clearly visible');
 assert.match(run, /function updateThreadIdentityStrip\(\)[\s\S]*replaceChildren\(\)[\s\S]*row\.active/,
     'live Thread updates and active highlighting still render through the original strip');
-assert.match(misc, /function observeToolbarHeight\(\)[\s\S]*new ResizeObserver[\s\S]*requestAnimationFrame\(adjustViewTop\)[\s\S]*observe\(toolbar\)/,
+assert.match(misc, /function observeToolbarHeight\(\)[\s\S]*new ResizeObserver[\s\S]*requestAnimationFrame\(function\(\) \{ setTimeout\(adjustViewTop, 0\); \}\)[\s\S]*observe\(toolbar\)/,
     'dashboard content follows late toolbar height changes so Thread.1 cannot be covered');
 
 console.log('PASS: persistent right-side Thread stack contracts');

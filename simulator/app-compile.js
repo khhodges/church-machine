@@ -801,7 +801,12 @@ function _activeCompileClistSlots() {
     const nameToSlot = {};
     for (const [slot, name] of Object.entries(slotToName)) {
         const row = Number.parseInt(slot, 10);
-        if (name && Number.isInteger(row)) nameToSlot[name] = row;
+        if (!name || !Number.isInteger(row)) continue;
+        const normalized = String(name).trim().toUpperCase();
+        // SELF is compiler-owned row zero. Never let stale/local C-list alias
+        // memory relocate it to an ordinary capability row.
+        if ((normalized === 'SELF' || normalized === '__SELF__') && row !== 0) continue;
+        nameToSlot[name] = row;
     }
     return nameToSlot;
 }

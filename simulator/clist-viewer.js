@@ -35,7 +35,10 @@
     // Keys are numeric slot indices (stored as strings in JSON).
     var _LS_KEY_CLIST_PET = 'church_clist_pet_names';
     var _nullSlotPetNames = (function () {
-        try { return JSON.parse(localStorage.getItem(_LS_KEY_CLIST_PET) || '{}'); } catch (e) { return {}; }
+        try {
+            var stored = JSON.parse(localStorage.getItem(_LS_KEY_CLIST_PET) || '{}');
+            return stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+        } catch (e) { return {}; }
     }());
 
     // ── NS slot→name cache (populated once from /api/lumps/list) ─────────────
@@ -366,8 +369,20 @@
         var _saved = false;
         function _save() {
             if (_saved) return;
-            _saved = true;
             var name = input.value.trim();
+            if (_isSelfPetName(name)) {
+                input.setAttribute('aria-invalid', 'true');
+                var error = row.querySelector('.clist-pet-name-error');
+                if (!error) {
+                    error = document.createElement('span');
+                    error.className = 'clist-pet-name-error';
+                    error.setAttribute('role', 'alert');
+                    row.appendChild(error);
+                }
+                error.textContent = 'SELF is reserved for C-List row 0.';
+                return;
+            }
+            _saved = true;
             var key = String(slotIdx);
             if (name) {
                 _nullSlotPetNames[key] = name;
@@ -395,6 +410,7 @@
 
     function _petAliasHtml(slotIdx) {
         var alias = _nullSlotPetNames[slotIdx] || _nullSlotPetNames[String(slotIdx)] || '';
+        if (slotIdx !== 0 && _isSelfPetName(alias)) return '';
         return alias
             ? '<span class="clist-pet-alias" title="Local pet name for CR' + slotIdx + '">(' +
               escHtml(alias) + ')</span>'
@@ -536,6 +552,7 @@
             if (isNull) {
                 var _nullPet = (petMap && (petMap[i] || petMap[String(i)])) ||
                                (_nullSlotPetNames && (_nullSlotPetNames[i] || _nullSlotPetNames[String(i)])) || '';
+                if (i !== 0 && _isSelfPetName(_nullPet)) _nullPet = '';
                 if (_nullPet) {
                     html += '<div class="clist-row clist-row--null clist-row--named" data-slot="' + i + '" tabindex="-1" title="Click to rename \u2018' + escHtml(_nullPet) + '\u2019 (placeholder, not yet populated)">' +
                         '<span class="clist-slot">' + i + '</span>' +
@@ -564,7 +581,9 @@
             }
 
             var _localPetName = _nullSlotPetNames[i] || _nullSlotPetNames[String(i)] || '';
+            if (i !== 0 && _isSelfPetName(_localPetName)) _localPetName = '';
             var petName = _localPetName || (petMap && petMap[i]) || (nsLabels && nsLabels[nsIdx]) || '';
+            if (i !== 0 && _isSelfPetName(petName)) petName = '';
             if (!petName && gt.type === 3) {
                 try {
                     var ab = _decodeAbstractGTWord(rawWord);
@@ -780,7 +799,9 @@
                         var se = capSrcEntries[si];
                         var sourceSlot = si + 1;
                         var sourceDotName = String(se.name || '');
-                        var sourcePetName = (_nullSlotPetNames[sourceSlot] || _nullSlotPetNames[String(sourceSlot)] ||
+                        var _storedSourcePet = _nullSlotPetNames[sourceSlot] || _nullSlotPetNames[String(sourceSlot)] || '';
+                        var _reservedSourcePet = _isSelfPetName(_storedSourcePet);
+                        var sourcePetName = ((_reservedSourcePet ? '' : _storedSourcePet) ||
                             sourceDotName.split('.')[0] || '\u2014');
                         var rightsHtml = se.rights.length > 0
                             ? '<span class="clist-perms">' +
@@ -794,6 +815,9 @@
                             '<span class="clist-slot" title="C-List row ' + sourceSlot + '">' + sourceSlot + '</span>' +
                             '<span class="clist-name clist-pet-name">' + escHtml(sourcePetName) + '</span>' +
                             '<span class="clist-dot-name">' + escHtml(sourceDotName || '\u2014') + '</span>' +
+                            (_reservedSourcePet
+                                ? '<span class="clist-pet-name-error" role="status">Stored SELF alias ignored: reserved for row 0.</span>'
+                                : '') +
                             rightsHtml +
                             '<button class="clist-pet-name-btn" data-action="edit-pet-name" data-slot="' + sourceSlot +
                                 '" title="Add or rename the pet name for CR' + sourceSlot + '">\u270e</button>' +
@@ -1612,7 +1636,11 @@
     // Used by the assembler to resolve null-GT row names (e.g. "Mum") to their
     // c-list slot indices so  LOAD CR2, Mum  encodes correctly.
     function getNullSlotPetNames() {
-        return Object.assign({}, _nullSlotPetNames);
+        var names = Object.assign({}, _nullSlotPetNames);
+        Object.keys(names).forEach(function (slot) {
+            if (Number(slot) !== 0 && _isSelfPetName(names[slot])) delete names[slot];
+        });
+        return names;
     }
 
     // Return every pet name currently addressable through CR6, not only local
@@ -1621,7 +1649,7 @@
     // `SWITCH CR12, Thread.1` can resolve to the actual row selected by the
     // current C-list (for example CR6[0x002D]).
     function getSlotPetNames() {
-        var names = Object.assign({}, _nullSlotPetNames);
+        var names = getNullSlotPetNames();
         var s = (typeof sim !== 'undefined') ? sim : null;
         var threadNames = {};
         try {

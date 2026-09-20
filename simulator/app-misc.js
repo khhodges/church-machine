@@ -1136,8 +1136,19 @@ function initTabOverflow(container) {
         }
     }
 
+    var overflowResizePending = false;
     var observer = new ResizeObserver(function() {
-        requestAnimationFrame(updateOverflow);
+        if (overflowResizePending) return;
+        overflowResizePending = true;
+        // ResizeObserver notifications run inside layout delivery. Defer DOM
+        // writes through the next frame and then a task so updateOverflow
+        // cannot resize its observed container in the same delivery cycle.
+        requestAnimationFrame(function() {
+            setTimeout(function() {
+                overflowResizePending = false;
+                updateOverflow();
+            }, 0);
+        });
     });
     observer.observe(container);
 
@@ -1179,7 +1190,7 @@ function observeToolbarHeight() {
     const toolbar = document.querySelector('.fixed-toolbar');
     if (!toolbar || toolbar._viewTopResizeObserver || typeof ResizeObserver !== 'function') return;
     toolbar._viewTopResizeObserver = new ResizeObserver(function() {
-        requestAnimationFrame(adjustViewTop);
+        requestAnimationFrame(function() { setTimeout(adjustViewTop, 0); });
     });
     toolbar._viewTopResizeObserver.observe(toolbar);
 }

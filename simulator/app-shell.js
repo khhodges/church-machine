@@ -1867,7 +1867,10 @@ function init() {
         asmEd.addEventListener('scroll', syncLineScroll);
         if (typeof ResizeObserver !== 'undefined') {
             new ResizeObserver(function() {
-                requestAnimationFrame(function() { syncLineScroll(); _debouncedErrorRecalc(); });
+                // Do not write layout during the observer delivery frame.
+                requestAnimationFrame(function() {
+                    setTimeout(function() { syncLineScroll(); _debouncedErrorRecalc(); }, 0);
+                });
             }).observe(asmEd);
         }
         asmEd.addEventListener('keydown', function(e) {
