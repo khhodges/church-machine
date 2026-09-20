@@ -5,6 +5,17 @@ description: The serialized Namespace Table, not the catalog manifest or loose f
 
 The Namespace Table is the sole authoritative source of LUMPs and their metadata in a bitstream. Truth is ordered as: (1) the Namespace Table, then (2) the assigned slots and LUMPs represented by that table. The manifest is not authoritative for membership, metadata, identity, version, slot, size, or any other property.
 
+This authority order also applies when saving LUMPs: an archived, missing, or
+duplicated catalog row must not veto an independently verified Namespace
+selection. Do not make catalog repair a prerequisite for a valid save.
+
+**Why:** The user reaffirmed that the manifest is secondary and unreliable after
+a stale archived flag blocked saving despite an intact Namespace-selected binary.
+
+**How to apply:** Validate the Namespace locator and assigned bytes directly,
+preserving integrity, authorization, CAS, and atomicity checks. Catalog metadata
+must never select a replacement for authoritative Namespace state.
+
 **Why:** The manifest contains catalog, lazy-load, example, and historical artifacts in addition to resident hardware content; treating it as authoritative makes Build Approval and image tooling report unrelated or stale LUMPs and metadata.
 
 **How to apply:** Build-image generation and Build Approval must derive membership and metadata from the final Namespace Table and its assigned slot/LUMP data. The manifest may be treated only as an untrusted catalog or lookup aid, never as truth. Lazy/runtime catalog entries are not bitstream LUMPs unless explicitly represented in the Namespace Table.

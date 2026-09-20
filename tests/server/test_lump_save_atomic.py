@@ -284,6 +284,92 @@ def test_same_token_same_filename_replacement_preserves_old_bytes(repo):
     assert archived["binary_hash"] == hashlib.sha256(old).hexdigest()
 
 
+def test_unrelated_save_accepts_namespace_binary_despite_stale_catalog_rows(
+        repo, monkeypatch):
+    selected = _binary(7)
+    selected_hash = hashlib.sha256(selected).hexdigest()
+    (repo / "selected.lump").write_bytes(selected)
+    (repo / "other-active.lump").write_bytes(_binary(8))
+    selected_row = {
+        "token": "4a000007", "filename": "selected.lump",
+        "abstraction": "Selected", "binary_hash": selected_hash,
+        "archived": True,
+    }
+    other_active = {
+        "token": "4a000007", "filename": "other-active.lump",
+        "abstraction": "Selected",
+        "binary_hash": hashlib.sha256(_binary(8)).hexdigest(),
+    }
+    (repo / "manifest.json").write_text(json.dumps([
+        selected_row, other_active,
+    ]))
+    namespace = {"abstractions": [{
+        "slot": 7, "name": "Selected", "token": "4a000007",
+        "filename": "selected.lump", "binary_hash": selected_hash,
+    }]}
+    ns_path = repo / "ns-state.json"
+    ns_path.write_text(json.dumps(namespace))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(ns_path))
+    new = _binary(9)
+
+    app_module._commit_lump_history_transition(
+        lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+        token8="a70f0002",
+        manifest_entry={
+            "token": "a70f0002", "filename": "unrelated.lump",
+            "abstraction": "Unrelated",
+            "binary_hash": hashlib.sha256(new).hexdigest(),
+        },
+        binary_filename="unrelated.lump", binary_bytes=new,
+        additional_json_builder=lambda _entry: {str(ns_path): namespace},
+    )
+
+    manifest = json.loads((repo / "manifest.json").read_text())
+    assert selected_row in manifest
+    assert other_active in manifest
+    assert (repo / "selected.lump").read_bytes() == selected
+    assert (repo / "unrelated.lump").read_bytes() == new
+    assert json.loads(ns_path.read_text()) == namespace
+
+
+def test_save_refuses_namespace_selected_binary_hash_mismatch(repo, monkeypatch):
+    selected = _binary(7)
+    (repo / "selected.lump").write_bytes(selected)
+    selected_row = {
+        "token": "4a000007", "filename": "selected.lump",
+        "abstraction": "Selected", "binary_hash": "0" * 64,
+        "archived": True,
+    }
+    (repo / "manifest.json").write_text(json.dumps([selected_row]))
+    namespace = {"abstractions": [{
+        "slot": 7, "name": "Selected", "token": "4a000007",
+        "filename": "selected.lump", "binary_hash": "0" * 64,
+    }]}
+    ns_path = repo / "ns-state.json"
+    ns_path.write_text(json.dumps(namespace))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(ns_path))
+    protected = ("manifest.json", "ns-state.json", "selected.lump")
+    before = {name: (repo / name).read_bytes() for name in protected}
+    new = _binary(9)
+
+    with pytest.raises(
+            app_module._LumpNamespaceSelectionError, match="hash mismatch"):
+        app_module._commit_lump_history_transition(
+            lumps_dir=str(repo), manifest_path=str(repo / "manifest.json"),
+            token8="a70f0002",
+            manifest_entry={
+                "token": "a70f0002", "filename": "unrelated.lump",
+                "abstraction": "Unrelated",
+                "binary_hash": hashlib.sha256(new).hexdigest(),
+            },
+            binary_filename="unrelated.lump", binary_bytes=new,
+            additional_json_builder=lambda _entry: {str(ns_path): namespace},
+        )
+
+    assert {name: (repo / name).read_bytes() for name in protected} == before
+    assert not (repo / "unrelated.lump").exists()
+
+
 def test_approval_commit_failure_restores_every_file(repo):
     old = _binary(1)
     new = _binary(2)

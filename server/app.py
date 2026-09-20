@@ -13678,6 +13678,23 @@ def save_lump():
             "The save has been aborted to prevent weakening prior approvals. "
             f"Details: {_approval_err}"
         )}), 500
+    except _LumpNamespaceSelectionError as _namespace_err:
+        _save_lump_diagnostic_event(
+            stage="Commit", event="rejection", outcome="rejected",
+            error={"name": "NamespaceSelectionError",
+                   "message": str(_namespace_err)})
+        return jsonify({
+            "error": (
+                "The authoritative Namespace locator could not be verified "
+                "against its assigned LUMP bytes. The manifest catalog was not "
+                "used to choose a replacement. No save was committed. "
+                f"Details: {_namespace_err}"
+            ),
+            "failure_owner": "ide",
+            "namespace_integrity_failed": True,
+            "committed": False,
+            "safe_retry": False,
+        }), 409
     except ValueError as _mf_lock_err:
         _save_lump_diagnostic_event(
             stage="Commit", event="rejection", outcome="rejected",
@@ -24524,6 +24541,10 @@ class _LumpTransitionConflict(RuntimeError):
     """The current LUMP generation changed before a transition acquired its lock."""
 
 
+class _LumpNamespaceSelectionError(ValueError):
+    """The authoritative Namespace locator does not match its assigned bytes."""
+
+
 _LUMP_TRANSITION_JOURNAL = ".lump-transition-journal.json"
 
 
@@ -24731,6 +24752,43 @@ def _lump_history_transition_lock(lumps_dir: str):
                 finally:
                     _lump_history_lock_state.depth = 0
                     fcntl.flock(lock_fh.fileno(), fcntl.LOCK_UN)
+
+
+def _validate_namespace_selected_binary(
+        lumps_dir: str, namespace_row: dict, staged_bytes: bytes | None = None):
+    """Validate an authoritative Namespace locator without consulting manifest."""
+    filename = namespace_row.get("filename")
+    expected_hash = str(namespace_row.get("binary_hash") or "").lower()
+    slot = namespace_row.get("slot")
+    if (not isinstance(filename, str)
+            or os.path.basename(filename) != filename
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_hash)):
+        raise _LumpNamespaceSelectionError(
+            f"Namespace slot {slot} has an invalid filename/hash binding")
+    path = _lump_transition_path(lumps_dir, filename)
+    if staged_bytes is None:
+        if os.path.islink(path):
+            raise _LumpNamespaceSelectionError(
+                f"Namespace slot {slot} selected locator is a symlink: {filename}")
+        try:
+            inspected = _inspect_lump_binary(path)
+        except (OSError, ValueError) as exc:
+            raise _LumpNamespaceSelectionError(
+                f"Namespace slot {slot} selected LUMP cannot be verified: "
+                f"{filename}: {exc}") from exc
+    else:
+        try:
+            inspected = _inspect_lump_binary(staged_bytes)
+        except ValueError as exc:
+            raise _LumpNamespaceSelectionError(
+                f"Namespace slot {slot} staged LUMP is invalid: "
+                f"{filename}: {exc}") from exc
+    if inspected["binary_hash"] != expected_hash:
+        raise _LumpNamespaceSelectionError(
+            f"Namespace slot {slot} selected LUMP hash mismatch for {filename}: "
+            f"expected {expected_hash}, found {inspected['binary_hash']}")
+    return inspected
+
 
 def _commit_lump_history_transition(
     *,
@@ -25086,25 +25144,22 @@ def _commit_lump_history_transition(
                             continue
                         selected_filename = namespace_row.get("filename")
                         selected_hash = namespace_row.get("binary_hash")
-                        if not selected_filename or not selected_hash:
+                        if not selected_filename and not selected_hash:
                             continue
                         if (selected_filename == manifest_entry.get("filename")
                                 and approval_hash is not None
                                 and selected_hash != approval_hash):
-                            raise ValueError(
+                            raise _LumpNamespaceSelectionError(
                                 "Namespace-selected LUMP hash does not match "
                                 f"the approved publication: {selected_filename}")
-                        active_matches = [
-                            row for row in updated_manifest
-                            if isinstance(row, dict)
-                            and row.get("archived") is not True
-                            and row.get("filename") == selected_filename
-                            and row.get("binary_hash", selected_hash) == selected_hash
-                        ]
-                        if len(active_matches) != 1:
-                            raise ValueError(
-                                "Namespace-selected LUMP must have exactly one "
-                                f"active manifest row: {selected_filename}")
+                        _validate_namespace_selected_binary(
+                            lumps_dir, namespace_row,
+                            staged_bytes=(
+                                binary_bytes
+                                if selected_filename == manifest_entry.get("filename")
+                                and binary_filename is not None
+                                else None
+                            ))
                 for destination, document in additional_json.items():
                     destination = os.path.abspath(destination)
                     if not destination.startswith(os.path.abspath(lumps_dir) + os.sep):
