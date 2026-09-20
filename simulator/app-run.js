@@ -1128,6 +1128,32 @@ let _runStopped = false;
 // call (e.g. double-click on Boot) from spawning a concurrent runBatch() loop.
 let _simRunActive = false;
 
+// Automatic artifact preparation may only publish a next-run image while the
+// simulator control plane is wholly idle. It never starts execution and never
+// mutates the live machine image. If this is false, explicit Run remains the
+// serialization boundary and performs the queued preparation itself.
+function _canPrepareSavedArtifactWhileIdle() {
+    return Boolean(sim) &&
+        !_simRunActive &&
+        !sim.running &&
+        !sim.walkActive &&
+        !walkRunning &&
+        !bootAnimating &&
+        !sim._bootPrefetchPromise;
+}
+window._canPrepareSavedArtifactWhileIdle = _canPrepareSavedArtifactWhileIdle;
+// app-memory starts its Namespace fetch several scripts before this control
+// plane exists. A fast response can therefore queue reconciliation while the
+// idle predicate is still unavailable. Re-offer that exact state once this
+// script has finished evaluating; the fingerprint/candidate guard makes this
+// complementary to the normal fetch-completion path, not a second attempt.
+Promise.resolve().then(function() {
+    if (window._nsState &&
+            typeof window._queueIdleArtifactReconciliation === 'function') {
+        window._queueIdleArtifactReconciliation(window._nsState);
+    }
+});
+
 let _runClickTimer = null;
 let _threadIdentityPage = 0;
 let _threadContextModalSlot = null;

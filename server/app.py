@@ -5234,6 +5234,8 @@ def boot_image_generate():
                         require_entry_resident=for_hardware)
                     _write_boot_image_bytes(blob)
                     next_fingerprint = _namespace_state_fingerprint(prepared_rows)
+                    execution_freshness = _boot_execution_freshness(
+                        {"abstractions": prepared_rows}, LUMPS_DIR)
                 except Exception:
                     # Roll back while still holding the original lock. No
                     # concurrent successful commit can be overwritten.
@@ -5280,6 +5282,10 @@ def boot_image_generate():
                     "lump_version", prepared_boot_row.get("issue_n")),
                 "pinned": "artifact_pin" in prepared_boot_row,
             },
+            # Return the accepted transaction's comparison state so the
+            # browser can retire stale labels without racing a second read.
+            "executionFreshness": execution_freshness,
+            "acceptedSelectionCount": len(changes),
             "dataChanged": bool(changes),
         })
     try:
@@ -6418,6 +6424,11 @@ def boot_image_ns_state():
     try:
         with open(NS_STATE_PATH) as _fh:
             _state = json.load(_fh)
+        # CAS identity belongs to the persisted authoritative rows. Effective
+        # Thread-policy projection is response-only enrichment and must not
+        # produce a fingerprint that no mutation endpoint can ever accept.
+        _authoritative_fingerprint = _namespace_state_fingerprint(
+            _state.get("abstractions") or [])
         _state = _project_effective_thread_policies(_state)
         # Attach the authoritative raw NS-table view (raw words + header
         # geometry straight from boot-image.bin) for the Namespace Design
@@ -6445,8 +6456,7 @@ def boot_image_ns_state():
             _state["nextGtSlot"] = None
         _state["executionFreshness"] = _boot_execution_freshness(
             _state, LUMPS_DIR)
-        _state["namespaceFingerprint"] = _namespace_state_fingerprint(
-            _state.get("abstractions") or [])
+        _state["namespaceFingerprint"] = _authoritative_fingerprint
         resp = jsonify(_state)
         resp.headers["ETag"] = f'"{_state["namespaceFingerprint"]}"'
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"

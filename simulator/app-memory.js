@@ -128,6 +128,88 @@ function _nsPreparePinChange(slot, checked) {
 }
 window._nsPreparePinChange = _nsPreparePinChange;
 
+window._idleArtifactReconciliation = window._idleArtifactReconciliation || {
+    attempted: {},
+    inFlight: null,
+    pendingKey: null,
+    failure: null,
+};
+
+function _idleArtifactReconciliationPlan(state) {
+    const freshness = state && state.executionFreshness;
+    const warnings = freshness && Array.isArray(freshness.warnings)
+        ? freshness.warnings : [];
+    const rows = state && Array.isArray(state.abstractions)
+        ? state.abstractions : [];
+    const pendingPins = window._prepareRunArtifactPins || {};
+    const candidates = warnings.filter(function(warning) {
+        const slot = String(warning && warning.slot);
+        const row = rows.find(function(item) {
+            return item && Number(item.slot) === Number(warning && warning.slot);
+        });
+        // A committed exact pin, or pending exact-pin intent, is programmer
+        // authority to retain the older artifact. Pending unpin intent is not.
+        return row && !row.artifact_pin &&
+            !(pendingPins[slot] && typeof pendingPins[slot] === 'object');
+    });
+    if (!candidates.length) return null;
+    const identities = candidates.map(function(item) {
+        const latest = item.latest || {};
+        return [
+            item.slot, latest.token || '', latest.filename || '',
+            latest.version == null ? '' : latest.version,
+            latest.binaryHash || '',
+        ].join(':');
+    }).sort();
+    return {
+        key: String(state.namespaceFingerprint || 'no-fingerprint') +
+            '|' + identities.join('|'),
+        candidates: candidates,
+    };
+}
+window._idleArtifactReconciliationPlan = _idleArtifactReconciliationPlan;
+
+function _queueIdleArtifactReconciliation(state) {
+    const control = window._idleArtifactReconciliation;
+    const plan = _idleArtifactReconciliationPlan(state);
+    if (!plan) {
+        control.pendingKey = null;
+        return false;
+    }
+    control.pendingKey = plan.key;
+    if (control.inFlight || control.attempted[plan.key]) return false;
+    if (typeof window._canPrepareSavedArtifactWhileIdle !== 'function' ||
+            !window._canPrepareSavedArtifactWhileIdle()) {
+        // The next explicit Run already calls prepareSavedArtifactForRun before
+        // executing one instruction. Do not poll or retry around active state.
+        return false;
+    }
+    if (typeof window.prepareSavedArtifactForRun !== 'function') return false;
+
+    control.attempted[plan.key] = true;
+    const operation = Promise.resolve().then(function() {
+        return window.prepareSavedArtifactForRun();
+    });
+    control.inFlight = operation;
+    operation.then(function(ok) {
+        if (!ok) throw window._lastPrepareRunError ||
+            new Error('automatic preparation was rejected');
+        control.failure = null;
+        control.pendingKey = null;
+        if (window._nsState) _renderBootExecutionFreshness(window._nsState);
+    }).catch(function(error) {
+        control.failure = {
+            key: plan.key,
+            message: error && error.message ? error.message : String(error),
+        };
+        if (window._nsState) _renderBootExecutionFreshness(window._nsState);
+    }).finally(function() {
+        if (control.inFlight === operation) control.inFlight = null;
+    });
+    return true;
+}
+window._queueIdleArtifactReconciliation = _queueIdleArtifactReconciliation;
+
 function _renderBootExecutionFreshness(state) {
     const banner = document.getElementById('bootExecutionFreshnessWarning');
     if (!banner) return;
@@ -139,6 +221,26 @@ function _renderBootExecutionFreshness(state) {
     if (!warnings.length && !failedSaves.length) {
         banner.style.display = 'none';
         banner.textContent = '';
+        return;
+    }
+    if (!failedSaves.length) {
+        // Ordinary stale assignments are reconciled by the IDE. Keep the
+        // per-row red assigned-stale label truthful until the CAS commits, but
+        // do not demand programmer intervention with an informational banner.
+        banner.style.display = 'none';
+        banner.textContent = '';
+        _queueIdleArtifactReconciliation(state);
+        const plan = _idleArtifactReconciliationPlan(state);
+        const failure = window._idleArtifactReconciliation.failure;
+        if (!plan || !failure || failure.key !== plan.key) return;
+        banner.innerHTML =
+            '<div class="boot-execution-freshness-copy">' +
+            '<strong>IDE PREPARATION COULD NOT COMMIT.</strong> ' +
+            _escHtml(failure.message) +
+            '. The previous valid image is unchanged. The IDE will validate ' +
+            'again at the next explicit Run; no artifact metadata should be repaired manually.' +
+            '</div>';
+        banner.style.display = 'flex';
         return;
     }
     const details = warnings.map(function(item) {

@@ -1130,6 +1130,12 @@ async function savePreparedBootEntry() {
             window._nsState = Object.assign({}, state, {
                 abstractions: nextRows,
                 namespaceFingerprint: generated.namespaceFingerprint,
+                executionFreshness: generated.executionFreshness ||
+                    state.executionFreshness,
+                acceptedSelectionCount: Number.isInteger(
+                    generated.acceptedSelectionCount)
+                    ? generated.acceptedSelectionCount
+                    : selections.length,
             });
             _applyNamespaceBootProjection(window._nsState,
                 selected && selected.pinned

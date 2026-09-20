@@ -98,10 +98,10 @@
       "seq": 0,
       "seal": "0xDF53D6EF",
       "token": "4a000007",
-      "filename": "WukongCallHome.1.658e6ba8.lump",
+      "filename": "WukongCallHome.1.74c8ff97.lump",
       "issue_n": 1,
       "lump_version": 11,
-      "binary_hash": "e919f430e7fe00f45335ea0d425dea8bfff15c83eff17a58798c4c0d63f478c0",
+      "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
@@ -184,6 +184,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789908698.9137895,
-  "committed_raw_fingerprint": "8eb4177383eca6d14dad3fe81c23542876d54580d774d26690c6ea2c355ba9fa"
+  "generated_at": 1789913720.6458821
 }

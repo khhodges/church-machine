@@ -21,6 +21,13 @@ assert.ok(abstractions.indexOf('const pendingArtifactPins') <
     abstractions.indexOf('const state = await _namespaceStateForMutation()',
         abstractions.indexOf('async function savePreparedBootEntry')),
     'pending pins are snapshotted before preparation awaits');
+assert.match(runSource,
+    /function _canPrepareSavedArtifactWhileIdle\(\)[\s\S]*!_simRunActive[\s\S]*!sim\.running[\s\S]*!sim\.walkActive/);
+assert.match(runSource,
+    /Promise\.resolve\(\)\.then\(function\(\)[\s\S]*_queueIdleArtifactReconciliation\(window\._nsState\)/);
+assert.match(memory, /latest\.binaryHash \|\| ''/);
+assert.match(memory,
+    /state\.namespaceFingerprint[\s\S]*control\.attempted\[plan\.key\] = true/);
 
 function extract(name, endMarker) {
     const start = memory.indexOf('function ' + name);
@@ -177,6 +184,73 @@ function modalFunctionsSource() {
     return runSource.slice(start, end);
 }
 
+function reconciliationFunctionsSource() {
+    const start = memory.indexOf(
+        'window._idleArtifactReconciliation = window._idleArtifactReconciliation ||');
+    const end = memory.indexOf('function _renderBootExecutionFreshness(', start);
+    assert(start >= 0 && end > start, 'idle reconciliation functions exist');
+    return memory.slice(start, end);
+}
+
+function makeReconciliationContext(options) {
+    const calls = { prepare: 0, execute: 0 };
+    const row = {
+        slot: 7,
+        filename: 'WukongCallHome.old.lump',
+        token: '4a000007',
+        lump_version: 1,
+    };
+    if (options.pinned) {
+        row.artifact_pin = {
+            filename: row.filename, token: row.token, revision: 1,
+        };
+    }
+    const state = {
+        namespaceFingerprint: 'cas-fingerprint',
+        abstractions: [row],
+        executionFreshness: {
+            status: 'stale',
+            warnings: [{
+                slot: 7,
+                abstraction: 'WukongCallHome',
+                selected: { filename: row.filename, token: row.token, version: 1 },
+                latest: {
+                    filename: 'WukongCallHome.new.lump',
+                    token: '4a000107',
+                    version: 2,
+                    binaryHash: 'sha256:new',
+                },
+            }],
+        },
+    };
+    const context = {
+        window: {
+            _nsState: state,
+            _prepareRunArtifactPins: {},
+            _canPrepareSavedArtifactWhileIdle: () => options.idle,
+            async prepareSavedArtifactForRun() {
+                calls.prepare++;
+                if (options.fail) throw new Error('CAS changed in another tab');
+                // Preparation commits state only. An execution callback exists
+                // solely to prove this path never invokes it.
+                state.executionFreshness = { status: 'current', warnings: [] };
+                return true;
+            },
+            executeProgram() { calls.execute++; },
+        },
+        _renderBootExecutionFreshness() {},
+        Error,
+        Promise,
+        Object,
+        Array,
+        Number,
+        String,
+    };
+    vm.createContext(context);
+    vm.runInContext(reconciliationFunctionsSource(), context);
+    return { context, calls, state };
+}
+
 (async () => {
     // Execute the complete production preparation function. No test global or
     // helper supplies pendingArtifactPins: this catches its former scope bug.
@@ -199,6 +273,40 @@ function modalFunctionsSource() {
     assert.deepStrictEqual(rejected.calls.fetchBody.artifactPins['9'], {
         filename: 'worker.lump', token: 'pin-before', revision: 4,
     });
+
+    const idle = makeReconciliationContext({ idle: true });
+    assert.strictEqual(idle.context._queueIdleArtifactReconciliation(idle.state), true);
+    await idle.context.window._idleArtifactReconciliation.inFlight;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(idle.calls.prepare, 1,
+        'idle stale assignment uses exactly one preparation transaction');
+    assert.strictEqual(idle.calls.execute, 0,
+        'automatic reconciliation never executes the prepared artifact');
+    assert.strictEqual(
+        idle.context._queueIdleArtifactReconciliation(idle.state), false,
+        'committed current state does not prepare again');
+
+    const running = makeReconciliationContext({ idle: false });
+    assert.strictEqual(
+        running.context._queueIdleArtifactReconciliation(running.state), false,
+        'active execution queues preparation for explicit Run');
+    assert.strictEqual(running.calls.prepare, 0);
+
+    const pinned = makeReconciliationContext({ idle: true, pinned: true });
+    assert.strictEqual(
+        pinned.context._queueIdleArtifactReconciliation(pinned.state), false,
+        'exact pins are never automatically advanced');
+    assert.strictEqual(pinned.calls.prepare, 0);
+
+    const failed = makeReconciliationContext({ idle: true, fail: true });
+    assert.strictEqual(failed.context._queueIdleArtifactReconciliation(failed.state), true);
+    await failed.context.window._idleArtifactReconciliation.inFlight.catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(
+        failed.context._queueIdleArtifactReconciliation(failed.state), false,
+        'the same CAS fingerprint and candidate identity is attempted once');
+    assert.strictEqual(failed.calls.prepare, 1,
+        'failure does not create a retry/render storm');
 
     await assert.rejects(
         () => actionContext._openBootExecutionUpdate(),

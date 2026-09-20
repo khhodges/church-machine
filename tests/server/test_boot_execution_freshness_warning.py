@@ -1,3 +1,4 @@
+import hashlib
 import json
 import shutil
 from contextlib import contextmanager
@@ -302,7 +303,9 @@ def test_real_validator_binds_wukong_evidence_to_exact_digest(tmp_path):
         "revision": 1,
     })
     assert selected["filename"] == "WukongCallHome.1.658e6ba8.lump"
-    assert selected["binary_hash"] == row["binary_hash"]
+    assert selected["binary_hash"] == hashlib.sha256(
+        (tmp_path / "WukongCallHome.1.658e6ba8.lump").read_bytes()
+    ).hexdigest()
 
     mutated_path = tmp_path / "WukongCallHome.1.658e6ba8.lump"
     mutated = bytearray(mutated_path.read_bytes())
@@ -480,6 +483,39 @@ def test_prepare_run_endpoint_rejects_stale_cas_before_generation(
     assert response.get_json()["dataChanged"] is False
     assert (state_path.read_bytes(), image_path.read_bytes(),
             provenance_path.read_bytes()) == before
+
+
+def test_ns_state_get_fingerprint_matches_authoritative_rows_not_projection(
+        tmp_path, monkeypatch):
+    rows = [{
+        "name": "Entry", "slot": 6, "boot": True,
+        "filename": "Entry.lump", "token": "4a000006",
+    }]
+    state_path = tmp_path / "ns-state.json"
+    state_path.write_text(json.dumps({"abstractions": rows}))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state_path))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(tmp_path / "missing.bin"))
+    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(tmp_path / "missing.json"))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+    monkeypatch.setattr(app_module, "_ensure_ns_state", lambda: None)
+    monkeypatch.setattr(
+        app_module, "_project_effective_thread_policies",
+        lambda state: {
+            **state,
+            "abstractions": [
+                {**state["abstractions"][0], "load_policy": "Resident"}
+            ],
+        })
+
+    response = app_module.app.test_client().get("/api/boot-image/ns-state")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["abstractions"][0]["load_policy"] == "Resident"
+    assert body["namespaceFingerprint"] == (
+        app_module._namespace_state_fingerprint(rows))
+    assert body["namespaceFingerprint"] != (
+        app_module._namespace_state_fingerprint(body["abstractions"]))
 
 
 def test_prepare_run_endpoint_uses_real_exact_digest_validator_for_pin(
