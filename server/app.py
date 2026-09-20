@@ -1014,6 +1014,13 @@ def _save_lump_diagnostic_event(*, stage, event, outcome="unknown", error=None,
 
 def _diagnostic_origin_is_same_site():
     """Accept browser diagnostics only from the current configured origin."""
+    fetch_site = request.headers.get("Sec-Fetch-Site", "").strip().lower()
+    if fetch_site == "cross-site":
+        return False
+    # Browser-controlled fetch metadata remains trustworthy when Replit's
+    # preview proxy rewrites the externally visible host or scheme.
+    if fetch_site == "same-origin":
+        return True
     supplied = request.headers.get("Origin")
     if not supplied:
         # A normal unauthenticated IDE/CLI test caller may omit Origin, but a

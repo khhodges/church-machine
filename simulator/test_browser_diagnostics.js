@@ -86,6 +86,13 @@ assert.equal(stopped, 1, 'non-Error rejections stop later listeners');
 assert.equal(warnings.length, 2, 'contained non-Error rejections remain locally visible');
 assert(!JSON.stringify(warnings).includes('PRIVATE'),
     'rejection warning does not include thrown contents');
+dispatch('error', {
+    target: window, error: null,
+    filename: 'https://ide.example/simulator/app-run.js', lineno: 0, colno: 0,
+    preventDefault: () => {}, stopImmediatePropagation: () => {},
+});
+assert.deepEqual(sent.at(-1).frames, [],
+    'browser line zero is omitted rather than producing a server-invalid frame');
 prevented = 0;
 stopped = 0;
 dispatch('error', {

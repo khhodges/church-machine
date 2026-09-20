@@ -195,6 +195,30 @@ def test_browser_origin_requires_origin_but_bootstraps_diagnostic_session(
     assert approval_session is None
 
 
+def test_browser_same_origin_metadata_survives_proxy_host_rewrite(
+        diagnostic_store):
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/lumps/save-diagnostics",
+            headers={
+                "Origin": "https://public-preview.example",
+                "Sec-Fetch-Site": "same-origin",
+                "User-Agent": "Mozilla/5.0",
+            },
+            json={"events": []},
+        )
+        cross_site = client.post(
+            "/api/lumps/save-diagnostics",
+            headers={
+                "Origin": "http://localhost",
+                "Sec-Fetch-Site": "cross-site",
+            },
+            json={"events": []},
+        )
+    assert response.status_code == 202
+    assert cross_site.status_code == 403
+
+
 def test_fresh_diagnostics_session_does_not_authorize_save(
         diagnostic_store):
     with app_module.app.test_client() as client:

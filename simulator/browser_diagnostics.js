@@ -54,15 +54,22 @@
             return match ? match[1] : '';
         } catch (_) { return ''; }
     }
-    function position(value) {
-        return Number.isInteger(value) && value >= 0 && value <= 1000000 ? value : 0;
+    function position(value, minimum) {
+        minimum = minimum || 0;
+        return Number.isInteger(value) && value >= minimum && value <= 1000000 ? value : 0;
     }
     function framesFor(error, event) {
         var frames = [];
         function add(file, line, column) {
             file = fileName(file);
             if (!file || frames.length >= 8) return;
-            var frame = {file: file, line: position(Number(line)), column: position(Number(column))};
+            var safeLine = position(Number(line), 1);
+            // Browser-generated non-Error events can name a script while
+            // exposing line 0. The ingestion schema correctly rejects that as
+            // a source location, so omit the unusable frame instead of losing
+            // the complete crash report with a 400 response.
+            if (!safeLine) return;
+            var frame = {file: file, line: safeLine, column: position(Number(column))};
             if (!frames.some(function(f) {
                 return f.file === frame.file && f.line === frame.line && f.column === frame.column;
             })) frames.push(frame);
