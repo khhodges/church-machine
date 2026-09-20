@@ -18,3 +18,14 @@ alone does not describe all supported source-level shorthand.
 **How to apply:** Check the live assembler's name-resolution interfaces before
 recommending numeric operands. Compare named and numeric encodings using the
 same finalized row map, including dotted names and SELF.
+
+An explicitly supplied local C-list mapping must outrank the global Namespace
+registry during named operand resolution.
+
+**Why:** Supplying the right local map is insufficient if a later resolver
+selects the same name's Namespace index first. High Namespace indexes then
+appear as invalid CALL rows despite a small, valid local C-list.
+
+**How to apply:** Include a regression where the same name has different local
+and Namespace indexes, with the Namespace index above CALL's row range. Keep
+the real instruction-width check intact.

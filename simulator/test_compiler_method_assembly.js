@@ -167,6 +167,60 @@ const dottedLoad = compile([
 assert.equal(dottedLoad.methods[0].code[0] & 0x7FFF, 1,
     'dotted named LOAD must resolve through the declared C-list');
 
+// Full compiler-pipeline regression for the screenshot failure: the live
+// registry can place a target at NS[53], but native named CALL must encode the
+// target's row in this abstraction's finalized C-list. Build that row map from
+// a real capabilities block rather than injecting a fabricated assembler map.
+const previousNamespace = global.ChurchAssembler._sharedNsSymbols;
+const previousConventions = global.ChurchAssembler._sharedMethodConventions;
+new global.ChurchAssembler().setNamespace({
+    SelfTest: 6,
+    WukongCallHome: 53,
+});
+global.ChurchAssembler.setSharedMethodConventions({
+    SelfTest: { Run: { index: 0 } },
+    WukongCallHome: { Main: { index: 0 } },
+});
+const registryCollisionSource = [
+    'abstraction RegistryCollisionCalls {',
+    'capabilities { SELF E, SelfTest E, WukongCallHome E, Next E }',
+    'method Run {',
+    '    CALL SelfTest.Run',
+    '    CALL WukongCallHome.Main',
+    '    SWITCH CR12, Next',
+    '    LOADNE CR2, Next',
+    '}',
+    '}',
+].join('\n');
+const registryCollision = compile(registryCollisionSource);
+assert.deepEqual(registryCollision.capabilities.map(cap => cap.name),
+    ['SELF', 'SelfTest', 'WukongCallHome', 'Next']);
+const collisionWords = registryCollision.methods[0].code;
+assert.deepEqual(collisionWords.slice(0, 2).map(word => ({
+    opcode: (word >>> 27) & 0x1F,
+    base: (word >>> 15) & 0xF,
+    row: word & 0x1F,
+    method: (word >>> 5) & 0x7F,
+})), [
+    { opcode: 2, base: 6, row: 1, method: 1 },
+    { opcode: 2, base: 6, row: 2, method: 1 },
+], 'named CALL must use local C-list rows, never registry NS slots');
+assert.equal(collisionWords[2] & 0x7FFF, 3,
+    'prior named SWITCH handoff must still use its local C-list row');
+assert.equal(collisionWords[3] & 0x7FFF, 3,
+    'prior conditional named LOAD must still use its local C-list row');
+const unknownCollisionMethod = new CLOOMCCompiler().compile(
+    registryCollisionSource.replace('WukongCallHome.Main', 'WukongCallHome.Missing'),
+    [],
+);
+assert.ok(unknownCollisionMethod.errors.some(error =>
+    /"Missing" is not a known method of WUKONGCALLHOME/.test(error.message)),
+    JSON.stringify(unknownCollisionMethod.errors));
+assert.equal(unknownCollisionMethod.methods.length, 0,
+    'a registry target must not cause an unknown method selector to be fabricated');
+global.ChurchAssembler._sharedNsSymbols = previousNamespace;
+global.ChurchAssembler._sharedMethodConventions = previousConventions;
+
 const unknownSwitch = new global.ChurchAssembler().assemble('SWITCH CR12, Missing.Thread');
 assert.equal(unknownSwitch.errors.length, 1,
     JSON.stringify(unknownSwitch.errors));

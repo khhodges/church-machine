@@ -257,6 +257,10 @@ class ChurchAssembler {
         // Null-GT row pet names: name → c-list slot index (e.g. {Mum: 5}).
         // Set via setClistSlots(); inherited class-wide like nsSymbols.
         this._clistSlots    = Object.assign({}, ChurchAssembler._sharedClistSlots || {});
+        // Compiler/editor snapshot rows are stronger authority than the global
+        // Namespace registry. Keep their provenance so a registry slot (for
+        // example NS[53]) can never be mistaken for this LUMP's local C-list row.
+        this._localClistSlots = null;
         // Capabilities-block slots — rebuilt each assemble() call; always fresh.
         this._capBlockSlots = {};
     }
@@ -322,7 +326,8 @@ class ChurchAssembler {
     // for an editor snapshot so a later headless compile cannot inherit stale
     // UI state through the class-wide compatibility map.
     setLocalClistSlots(nameToSlot) {
-        this._clistSlots = Object.assign({}, nameToSlot || {});
+        this._localClistSlots = Object.assign({}, nameToSlot || {});
+        this._clistSlots = Object.assign({}, this._localClistSlots);
     }
 
     // setSharedMethodConventions(map) — register bare-call method conventions
@@ -512,11 +517,21 @@ class ChurchAssembler {
         const capKey = ChurchAssembler._nameKey(this._capBlockSlots, name);
         if (capKey !== null) return { slot: this._capBlockSlots[capKey], key: capKey };
 
-        // 2. Namespace Table (populated via setNamespace from the abstraction slot map)
+        // 2. Instance-local C-list snapshot. Compiler frontends assemble native
+        //      statements independently of their enclosing capabilities block,
+        //      so setLocalClistSlots() carries that finalized local row map. It
+        //      must win over nsSymbols: Namespace slots identify registry
+        //      targets, not rows in the current abstraction's C-list.
+        const localKey = ChurchAssembler._nameKey(this._localClistSlots, name);
+        if (localKey !== null) {
+            return { slot: this._localClistSlots[localKey], key: localKey };
+        }
+
+        // 3. Namespace Table (populated via setNamespace from the abstraction slot map)
         const nsKey = ChurchAssembler._nameKey(this.nsSymbols, name);
         if (nsKey !== null) return { slot: this.nsSymbols[nsKey], key: nsKey };
 
-        // 2.5. Null-GT row pet names (setClistSlots) — user-named c-list slots that
+        // 3.5. Null-GT row pet names (setClistSlots) — user-named c-list slots that
         //      hold no NS entry (e.g. "Mum" at slot 5).  These map directly to the
         //      c-list offset used in  LOAD  CRd, CR6[0x0005].
         const clistKey = ChurchAssembler._nameKey(this._clistSlots, name);
