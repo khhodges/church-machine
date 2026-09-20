@@ -2961,7 +2961,9 @@ function _showBootPreparationBlocked(context, reason) {
         ['Safety', 'This is an IDE implementation failure, not a Thread fault, validation error, or security-policy rejection.'],
     ] : [
         ['Reason', actualReason],
-        ['Next action', 'Choose the intended Lightning Bolt target, then click Prepare boot image. Retry execution only after the IDE reports that the committed image is prepared.'],
+        ['Next action', reason && reason.nextAction
+            ? reason.nextAction
+            : 'Choose the intended Lightning Bolt target, then click Prepare boot image. Retry execution only after the IDE reports that the committed image is prepared.'],
         ['Safety', 'The IDE did not substitute a factory image or alter the boot image automatically. This is not an IDE-generated security incident.'],
     ];
     for (const [label, value] of detailRows) {

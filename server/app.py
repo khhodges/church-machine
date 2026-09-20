@@ -5210,9 +5210,12 @@ def boot_image_generate():
                 if current_fingerprint != expected_fingerprint:
                     return jsonify({
                         "ok": False,
+                        "errorCode": "NAMESPACE_FINGERPRINT_CONFLICT",
                         "error": "Namespace changed in another tab; reload before Prepare/Run",
                         "currentNamespaceFingerprint": current_fingerprint,
                         "dataChanged": False,
+                        "committed": False,
+                        "safe_retry": True,
                     }), 409
                 snapshots = {}
                 for path in (NS_STATE_PATH, BOOT_IMAGE_PATH,

@@ -655,12 +655,16 @@ function _namespaceResponseError(action, response, body) {
     error.status = response && response.status;
     error.body = body;
     error.action = action;
+    if (response && response.status === 409) {
+        error.nextAction =
+            'Review the authoritative Namespace state, then retry preparation only if its target and exact pins still match your intent.';
+    }
     return error;
 }
 
-async function _namespaceStateForMutation() {
+async function _namespaceStateForMutation(forceRefresh) {
     const current = window._nsState;
-    if (current && typeof current.namespaceFingerprint === 'string' &&
+    if (!forceRefresh && current && typeof current.namespaceFingerprint === 'string' &&
             current.namespaceFingerprint.trim()) {
         return current;
     }
@@ -676,6 +680,61 @@ async function _namespaceStateForMutation() {
     }
     window._nsState = body;
     return body;
+}
+
+function _prepareRunRowPrecondition(row) {
+    if (!row || typeof row !== 'object') return null;
+    const pin = row.artifact_pin && typeof row.artifact_pin === 'object'
+        ? {
+            filename: row.artifact_pin.filename == null
+                ? null : String(row.artifact_pin.filename),
+            token: row.artifact_pin.token == null
+                ? null : String(row.artifact_pin.token),
+            revision: row.artifact_pin.revision == null
+                ? null : String(row.artifact_pin.revision),
+        } : null;
+    return {
+        slot: Number(row.slot),
+        name: row.name == null ? null : String(row.name),
+        boot: row.boot === true,
+        filename: row.filename == null ? null : String(row.filename),
+        token: row.token == null
+            ? (row.cache_token == null ? null : String(row.cache_token))
+            : String(row.token),
+        revision: row.lump_version == null
+            ? (row.issue_n == null ? null : String(row.issue_n))
+            : String(row.lump_version),
+        artifactPin: pin,
+    };
+}
+
+function _prepareRunRetryPreconditionsMatch(before, after, targetSlot, artifactPins) {
+    const beforeRows = before && Array.isArray(before.abstractions)
+        ? before.abstractions : [];
+    const afterRows = after && Array.isArray(after.abstractions)
+        ? after.abstractions : [];
+    const slots = new Set([String(targetSlot)].concat(Object.keys(artifactPins || {})));
+    for (const slot of slots) {
+        const oldRow = beforeRows.find(row => row && Number(row.slot) === Number(slot));
+        const newRow = afterRows.find(row => row && Number(row.slot) === Number(slot));
+        if (JSON.stringify(_prepareRunRowPrecondition(oldRow)) !==
+                JSON.stringify(_prepareRunRowPrecondition(newRow))) {
+            return false;
+        }
+    }
+    const oldBoot = beforeRows.find(row => row && row.boot === true);
+    const newBoot = afterRows.find(row => row && row.boot === true);
+    return !!oldBoot && !!newBoot &&
+        Number(oldBoot.slot) === Number(targetSlot) &&
+        Number(newBoot.slot) === Number(targetSlot);
+}
+
+function _isSafePrepareRunFingerprintConflict(error) {
+    const body = error && error.body;
+    return error.status === 409 && body &&
+        body.errorCode === 'NAMESPACE_FINGERPRINT_CONFLICT' &&
+        body.dataChanged === false && body.committed === false &&
+        body.safe_retry === true;
 }
 
 function _applyNamespaceBootProjection(state, message) {
@@ -1021,6 +1080,23 @@ if (window._nsState && typeof window._applyNamespaceBootProjection === 'function
 }
 
 async function savePreparedBootEntry() {
+    // The toolbar action, idle reconciliation, and explicit Run all share this
+    // operation. The private recursive call owns the operation while public
+    // callers receive the same promise and cannot publish in parallel.
+    if (arguments[0] !== true) {
+        if (window._prepareRunSaveInFlight) {
+            return window._prepareRunSaveInFlight;
+        }
+        const operation = savePreparedBootEntry(true);
+        window._prepareRunSaveInFlight = operation;
+        try {
+            return await operation;
+        } finally {
+            if (window._prepareRunSaveInFlight === operation) {
+                window._prepareRunSaveInFlight = null;
+            }
+        }
+    }
     if (!Number.isInteger(bootEntrySlot)) {
         _setBootEntryPreparation(null, 'error',
             'No prepared selection is available to save. Select a Namespace target first.');
@@ -1039,22 +1115,25 @@ async function savePreparedBootEntry() {
             ? Object.freeze(Object.assign({}, pin)) : pin;
         return snapshot;
     }, {}));
+    const pinControl = document.getElementById('bootArtifactPin');
+    const pinRequested = !!(pinControl && pinControl.checked);
+    const preparedPin = pinRequested && _preparedArtifactSelection &&
+        _preparedArtifactSelection.artifact
+        ? Object.freeze({
+            revision: _preparedArtifactSelection.selection.revision,
+            token: _preparedArtifactSelection.artifact.token ||
+                _preparedArtifactSelection.artifact.cache_token,
+            filename: _preparedArtifactSelection.artifact.filename,
+        }) : null;
     _setBootEntryPreparation(savedSlot, 'pending',
         'Saving the Namespace marker and generating its boot image…');
     renderAbstractions();
     try {
-        const state = await _namespaceStateForMutation();
-        const pinControl = document.getElementById('bootArtifactPin');
-        const pinRequested = !!(pinControl && pinControl.checked);
+        let state = await _namespaceStateForMutation();
         let artifactPin = null;
         if (pinRequested) {
-            if (_preparedArtifactSelection && _preparedArtifactSelection.artifact) {
-                const artifact = _preparedArtifactSelection.artifact;
-                artifactPin = {
-                    revision: _preparedArtifactSelection.selection.revision,
-                    token: artifact.token || artifact.cache_token,
-                    filename: artifact.filename,
-                };
+            if (preparedPin) {
+                artifactPin = preparedPin;
             } else {
                 const marker = Array.isArray(state.abstractions)
                     ? state.abstractions.find(row => row && row.boot === true) : null;
@@ -1072,24 +1151,43 @@ async function savePreparedBootEntry() {
                 }
             }
         }
-        const response = await fetch('/api/boot-image/generate', {
-            method: 'POST',
-            headers: Object.assign({'Content-Type': 'application/json'},
-                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
-                    ? window.BuildApprovalView._authHeaders() : {})),
-            body: JSON.stringify({
-                prepareRun: true,
-                namespaceFingerprint: state.namespaceFingerprint,
-                artifactPin: artifactPin,
-                artifactPins: pendingArtifactPins,
-            }),
-        });
+        // At most one retry is legal, and only for the server's structured
+        // proof that the first CAS failed before commit.
         let generated = null;
-        try { generated = await response.json(); } catch (_) {}
-        if (!response.ok || !generated || generated.ok === false) {
-            throw _namespaceResponseError(
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const response = await fetch('/api/boot-image/generate', {
+                method: 'POST',
+                headers: Object.assign({'Content-Type': 'application/json'},
+                    (window.BuildApprovalView && window.BuildApprovalView._authHeaders
+                        ? window.BuildApprovalView._authHeaders() : {})),
+                body: JSON.stringify({
+                    prepareRun: true,
+                    namespaceFingerprint: state.namespaceFingerprint,
+                    artifactPin: artifactPin,
+                    artifactPins: pendingArtifactPins,
+                }),
+            });
+            try { generated = await response.json(); } catch (_) { generated = null; }
+            if (response.ok && generated && generated.ok !== false) break;
+            const failure = _namespaceResponseError(
                 'Generate the boot image for the Namespace marker',
                 response, generated);
+            if (attempt !== 0 || !_isSafePrepareRunFingerprintConflict(failure)) {
+                throw failure;
+            }
+            const refreshed = await _namespaceStateForMutation(true);
+            if (!_prepareRunRetryPreconditionsMatch(
+                    state, refreshed, savedSlot, pendingArtifactPins)) {
+                const changed = new Error(
+                    'The prepared Namespace target or exact-artifact pins changed in another tab. ' +
+                    'The previous selection was preserved; review the refreshed Namespace before retrying.');
+                changed.status = 409;
+                changed.body = generated;
+                changed.nextAction =
+                    'Review the refreshed target and exact-artifact pins before starting a new preparation.';
+                throw changed;
+            }
+            state = refreshed;
         }
         let cacheError = null;
         try {

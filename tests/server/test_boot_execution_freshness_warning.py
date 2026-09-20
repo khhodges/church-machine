@@ -480,7 +480,11 @@ def test_prepare_run_endpoint_rejects_stale_cas_before_generation(
         })
 
     assert response.status_code == 409
-    assert response.get_json()["dataChanged"] is False
+    body = response.get_json()
+    assert body["errorCode"] == "NAMESPACE_FINGERPRINT_CONFLICT"
+    assert body["dataChanged"] is False
+    assert body["committed"] is False
+    assert body["safe_retry"] is True
     assert (state_path.read_bytes(), image_path.read_bytes(),
             provenance_path.read_bytes()) == before
 

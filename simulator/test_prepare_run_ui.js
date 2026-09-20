@@ -18,7 +18,7 @@ assert.ok(abstractions.indexOf('const pendingArtifactPins') >
     abstractions.indexOf('async function savePreparedBootEntry'),
     'pending pins are declared inside the full preparation transaction');
 assert.ok(abstractions.indexOf('const pendingArtifactPins') <
-    abstractions.indexOf('const state = await _namespaceStateForMutation()',
+    abstractions.indexOf('let state = await _namespaceStateForMutation()',
         abstractions.indexOf('async function savePreparedBootEntry')),
     'pending pins are snapshotted before preparation awaits');
 assert.match(runSource,
@@ -93,14 +93,35 @@ function saveFunctionSource() {
     return abstractions.slice(start, end);
 }
 
+function retryHelpersSource() {
+    const start = abstractions.indexOf('function _prepareRunRowPrecondition(');
+    const end = abstractions.indexOf('function _applyNamespaceBootProjection(', start);
+    assert(start >= 0 && end > start, 'Prepare/Run retry helpers exist');
+    return abstractions.slice(start, end);
+}
+
 function makePrepareContext(options) {
+    options = options || {};
     const state = {
         namespaceFingerprint: 'before',
         abstractions: [{ slot: 7, boot: true, filename: 'boot.lump',
             token: 'old-token', lump_version: 3 }],
     };
     const pin = { filename: 'worker.lump', token: 'pin-before', revision: 4 };
-    const calls = { preparation: [], renders: 0, fetchBody: null };
+    const calls = {
+        preparation: [], renders: 0, fetchBody: null, fetchBodies: [],
+        refreshes: 0,
+    };
+    const responses = (options.responses || [{
+        ok: options.ok,
+        status: options.ok ? 200 : 409,
+        body: options.ok ? {
+            ok: true,
+            namespaceFingerprint: 'after',
+            selections: [],
+            preparation: { status: 'prepared', configuredSlot: 7 },
+        } : { error: 'Namespace changed in another tab' },
+    }]).slice();
     const context = {
         window: {
             _prepareRunArtifactPins: { 9: pin },
@@ -119,30 +140,34 @@ function makePrepareContext(options) {
             calls.preparation.push({ slot, status, message });
         },
         renderAbstractions() { calls.renders++; },
-        async _namespaceStateForMutation() {
+        async _namespaceStateForMutation(refresh) {
             // A real await boundary may permit checkbox edits. The transaction
             // must retain its own descriptor, not this subsequently edited one.
             pin.token = 'pin-edited-during-await';
+            if (refresh) {
+                calls.refreshes++;
+                if (options.refreshError) throw options.refreshError;
+                return options.refreshedState || Object.assign({}, state, {
+                    namespaceFingerprint: 'refreshed',
+                });
+            }
             return state;
         },
         async fetch(url, request) {
             calls.fetchBody = JSON.parse(request.body);
+            calls.fetchBodies.push(calls.fetchBody);
+            if (options.transportError) throw options.transportError;
+            const reply = responses.shift();
             return {
-                ok: options.ok,
-                status: options.ok ? 200 : 409,
-                async json() {
-                    return options.ok ? {
-                        ok: true,
-                        namespaceFingerprint: 'after',
-                        selections: [],
-                        preparation: { status: 'prepared', configuredSlot: 7 },
-                    } : { error: 'Namespace changed in another tab' };
-                },
+                ok: reply.ok,
+                status: reply.status,
+                async json() { return reply.body; },
             };
         },
         _namespaceResponseError(action, response, body) {
             const error = new Error(action + ': ' + body.error);
             error.status = response.status;
+            error.body = body;
             return error;
         },
         _bootEntryMessage(error, fallback) {
@@ -155,7 +180,7 @@ function makePrepareContext(options) {
         JSON,
     };
     vm.createContext(context);
-    vm.runInContext(saveFunctionSource(), context);
+    vm.runInContext(retryHelpersSource() + saveFunctionSource(), context);
     return { context, calls, pin };
 }
 
@@ -274,6 +299,107 @@ function makeReconciliationContext(options) {
         filename: 'worker.lump', token: 'pin-before', revision: 4,
     });
 
+    const conflict = {
+        ok: false, status: 409, body: {
+            ok: false,
+            errorCode: 'NAMESPACE_FINGERPRINT_CONFLICT',
+            error: 'Namespace changed in another tab',
+            dataChanged: false, committed: false, safe_retry: true,
+        },
+    };
+    const accepted = {
+        ok: true, status: 200, body: {
+            ok: true, namespaceFingerprint: 'after', selections: [],
+            preparation: { status: 'prepared', configuredSlot: 7 },
+        },
+    };
+    const recovered = makePrepareContext({ responses: [conflict, accepted] });
+    assert.strictEqual(await recovered.context.savePreparedBootEntry(), true);
+    assert.strictEqual(recovered.calls.fetchBodies.length, 2);
+    assert.strictEqual(recovered.calls.refreshes, 1);
+    assert.strictEqual(recovered.calls.fetchBodies[1].namespaceFingerprint, 'refreshed');
+    assert.deepStrictEqual(recovered.calls.fetchBodies[1].artifactPins['9'], {
+        filename: 'worker.lump', token: 'pin-before', revision: 4,
+    }, 'retry preserves the immutable caller pin snapshot');
+
+    const repeated = makePrepareContext({ responses: [conflict, conflict] });
+    assert.strictEqual(await repeated.context.savePreparedBootEntry(), false);
+    assert.strictEqual(repeated.calls.fetchBodies.length, 2,
+        'a repeated safe CAS conflict is bounded to one retry');
+
+    const validation = makePrepareContext({ responses: [{
+        ok: false, status: 409, body: {
+            errorCode: 'ARTIFACT_VALIDATION_FAILED',
+            error: 'digest approval is missing',
+            dataChanged: false, committed: false, safe_retry: true,
+        },
+    }] });
+    assert.strictEqual(await validation.context.savePreparedBootEntry(), false);
+    assert.strictEqual(validation.calls.fetchBodies.length, 1,
+        'an arbitrary validation 409 is not replayed');
+    assert.strictEqual(validation.calls.refreshes, 0);
+
+    const refreshFailure = makePrepareContext({
+        responses: [conflict],
+        refreshError: new Error('authoritative refresh unavailable'),
+    });
+    assert.strictEqual(await refreshFailure.context.savePreparedBootEntry(), false);
+    assert.strictEqual(refreshFailure.calls.fetchBodies.length, 1);
+
+    const changedState = {
+        namespaceFingerprint: 'other',
+        abstractions: [
+            { slot: 7, boot: false, name: 'DifferentOccupant',
+                filename: 'different.lump', token: 'different', lump_version: 8 },
+            { slot: 8, boot: true, name: 'OtherTarget',
+                filename: 'other.lump', token: 'other', lump_version: 1 },
+        ],
+    };
+    const changedTarget = makePrepareContext({
+        responses: [conflict], refreshedState: changedState,
+    });
+    assert.strictEqual(await changedTarget.context.savePreparedBootEntry(), false);
+    assert.strictEqual(changedTarget.calls.fetchBodies.length, 1,
+        'a changed target or occupant is never overwritten by retry');
+    assert.match(changedTarget.context.window._lastPrepareRunError.message,
+        /target or exact-artifact pins changed/);
+
+    const changedPinState = {
+        namespaceFingerprint: 'other-pin',
+        abstractions: [
+            { slot: 7, boot: true, filename: 'boot.lump',
+                token: 'old-token', lump_version: 3 },
+            { slot: 9, name: 'Worker', filename: 'worker-new.lump',
+                token: 'pin-from-other-tab', lump_version: 5,
+                artifact_pin: {
+                    filename: 'worker-new.lump',
+                    token: 'pin-from-other-tab', revision: 5,
+                } },
+        ],
+    };
+    const changedPin = makePrepareContext({
+        responses: [conflict], refreshedState: changedPinState,
+    });
+    assert.strictEqual(await changedPin.context.savePreparedBootEntry(), false);
+    assert.strictEqual(changedPin.calls.fetchBodies.length, 1,
+        'changed persisted pin authority is never silently overwritten');
+
+    const unknownCommit = makePrepareContext({
+        transportError: new Error('connection reset after upload'),
+    });
+    assert.strictEqual(await unknownCommit.context.savePreparedBootEntry(), false);
+    assert.strictEqual(unknownCommit.calls.fetchBodies.length, 1,
+        'ambiguous transport commit is never replayed');
+
+    const shared = makePrepareContext({ responses: [accepted] });
+    const sharedResults = await Promise.all([
+        shared.context.savePreparedBootEntry(),
+        shared.context.savePreparedBootEntry(),
+    ]);
+    assert.deepStrictEqual(sharedResults, [true, true]);
+    assert.strictEqual(shared.calls.fetchBodies.length, 1,
+        'all preparation entry points share one in-flight mutation');
+
     const idle = makeReconciliationContext({ idle: true });
     assert.strictEqual(idle.context._queueIdleArtifactReconciliation(idle.state), true);
     await idle.context.window._idleArtifactReconciliation.inFlight;
@@ -342,6 +468,39 @@ function makeReconciliationContext(options) {
     assert.match(validationText, /Boot Preparation Blocked/);
     assert.match(validationText, /Choose the intended Lightning Bolt target/);
     assert.match(validationText, /Prepare boot image/);
+
+    modalDocument.body.children.length = 0;
+    const casFailure = new Error('Namespace changed after the bounded retry.');
+    casFailure.nextAction = 'Review the refreshed Namespace and retry only if intent still matches.';
+    modalContext._showBootPreparationBlocked('Run', casFailure);
+    const casText = allText(modalDocument.body.children[0]);
+    assert.match(casText, /Review the refreshed Namespace/);
+    assert.doesNotMatch(casText, /Choose the intended Lightning Bolt target/);
+
+    const prepareAndRunStart = runSource.indexOf(
+        'function prepareAndRunSavedArtifact(');
+    const prepareAndRunEnd = runSource.indexOf(
+        'window.prepareAndRunSavedArtifact = prepareAndRunSavedArtifact;',
+        prepareAndRunStart);
+    const explicitCalls = { prepare: 0, run: 0, modal: 0 };
+    const explicitContext = {
+        window: {
+            async prepareSavedArtifactForRun() {
+                explicitCalls.prepare++;
+                throw new Error('final preparation rejection');
+            },
+            IDEActions: { run() { explicitCalls.run++; } },
+        },
+        _showBootPreparationBlocked() { explicitCalls.modal++; },
+        Promise,
+    };
+    vm.createContext(explicitContext);
+    vm.runInContext(
+        runSource.slice(prepareAndRunStart, prepareAndRunEnd), explicitContext);
+    assert.strictEqual(
+        await explicitContext.prepareAndRunSavedArtifact(false), false);
+    assert.deepStrictEqual(explicitCalls, { prepare: 1, run: 0, modal: 1 },
+        'explicit Run cannot execute before successful preparation');
     console.log('prepare/run UI function tests passed');
 })().catch(error => {
     console.error(error);
