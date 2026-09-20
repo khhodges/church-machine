@@ -67,6 +67,32 @@ def test_execution_freshness_is_current_when_binding_matches_latest(tmp_path):
         state, str(tmp_path)) == {"status": "current", "warnings": []}
 
 
+def test_execution_freshness_includes_newest_immutable_history_row(tmp_path):
+    _write_lump(tmp_path, "Echo.current.lump")
+    _write_lump(tmp_path, "Echo.history.lump")
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        {
+            "abstraction": "Echo", "filename": "Echo.current.lump",
+            "token": "00000001", "lump_version": 1, "compiled_at": 100,
+        },
+        {
+            "abstraction": "Echo", "filename": "Echo.history.lump",
+            "token": "00000002", "lump_version": 2, "compiled_at": 200,
+            "archived": True,
+        },
+    ]))
+    state = {"abstractions": [{
+        "name": "Echo", "slot": 12, "filename": "Echo.current.lump",
+        "token": "00000001", "lump_version": 1,
+    }]}
+
+    result = app_module._boot_execution_freshness(state, str(tmp_path))
+
+    assert result["status"] == "stale"
+    assert result["warnings"][0]["selected"]["token"] == "00000001"
+    assert result["warnings"][0]["latest"]["token"] == "00000002"
+
+
 def test_execution_freshness_excludes_bootstrap_identity_rejections(
         tmp_path, monkeypatch):
     import server.bootstrap_identity as bootstrap_identity

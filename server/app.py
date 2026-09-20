@@ -5707,7 +5707,6 @@ def _boot_execution_freshness(state, lumps_dir):
             entry for entry in manifest
             if isinstance(entry, dict)
             and entry.get("abstraction") == name
-            and entry.get("archived") is not True
             and entry.get("filename")
             and os.path.isfile(os.path.join(lumps_dir, entry["filename"]))
         ]

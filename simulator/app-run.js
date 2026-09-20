@@ -16334,6 +16334,10 @@ async function _refreshNamespaceAuthorityAfterLumpSave() {
             throw new Error('Namespace refresh returned an incomplete snapshot');
         }
         window._nsState = state;
+        if (typeof window._renderBootExecutionFreshness === 'function') {
+            window._renderBootExecutionFreshness(state);
+        }
+        if (typeof updateNamespace === 'function') updateNamespace();
         return true;
     } catch (error) {
         // Do not expose repository synchronization details after a committed

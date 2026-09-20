@@ -43,6 +43,74 @@ window._openSimulatorInstructionSource = _openSimulatorInstructionSource;
 // Fetched once at load and refreshed after every successful Save Namespace.
 // _findSrcLump uses this as its primary lookup to avoid the 3-level fallback.
 window._nsState = null;
+function _nsAssignedLumpFreshness(slot, assigned, state) {
+    const freshness = state && state.executionFreshness;
+    const warnings = freshness && Array.isArray(freshness.warnings)
+        ? freshness.warnings : null;
+    if (!freshness || !warnings || !assigned) return { status: 'unknown' };
+
+    const normaliseToken = function(token) {
+        const text = String(token || '').trim().toLowerCase().replace(/^0x/, '');
+        return /^[0-9a-f]{1,8}$/.test(text) ? text.padStart(8, '0') : '';
+    };
+    const assignedToken = normaliseToken(assigned.token || assigned.lumpToken ||
+        assigned.lump_token);
+    const assignedFilename = String(assigned.filename || '').trim();
+    if (!assignedToken && !assignedFilename) return { status: 'unknown' };
+
+    const warning = warnings.find(function(item) {
+        if (!item || Number(item.slot) !== Number(slot)) return false;
+        const selected = item.selected || {};
+        const selectedToken = normaliseToken(selected.token);
+        const selectedFilename = String(selected.filename || '').trim();
+        if (assignedToken && (!selectedToken || assignedToken !== selectedToken)) return false;
+        if (assignedFilename &&
+                (!selectedFilename || assignedFilename !== selectedFilename)) return false;
+        return true;
+    });
+    if (!warning) {
+        return freshness.status === 'current' || freshness.status === 'stale'
+            ? { status: 'current' }
+            : { status: 'unknown' };
+    }
+
+    const selected = warning.selected || {};
+    const latest = warning.latest || {};
+    const latestToken = normaliseToken(latest.token);
+    const selectedToken = normaliseToken(selected.token);
+    const latestFilename = String(latest.filename || '').trim();
+    const selectedFilename = String(selected.filename || '').trim();
+    const knownDifferent = (latestToken && selectedToken && latestToken !== selectedToken) ||
+        (latestFilename && selectedFilename && latestFilename !== selectedFilename);
+    if (!knownDifferent) return { status: 'unknown' };
+    return { status: 'stale', selected: selected, latest: latest };
+}
+window._nsAssignedLumpFreshness = _nsAssignedLumpFreshness;
+
+function _nsRenderAssignedLumpLabel(label, result) {
+    const escapedLabel = _escHtml(label || '-');
+    if (!result || result.status !== 'stale') return escapedLabel;
+    const selected = result.selected || {};
+    const latest = result.latest || {};
+    const revision = function(artifact) {
+        if (artifact.version !== null && artifact.version !== undefined) {
+            return 'v' + String(artifact.version);
+        }
+        return String(artifact.token || artifact.filename || 'unknown revision');
+    };
+    const explanation = 'Assigned LUMP ' + revision(selected) +
+        ' is not the latest saved revision (' + revision(latest) +
+        '). The exact assigned binding is unchanged.';
+    const escapedExplanation = _escHtml(explanation);
+    return '<span class="ns-assigned-lump-label ns-assigned-lump-label-stale" ' +
+        'style="color:#f87171;font-weight:600;" title="' + escapedExplanation + '">' +
+        escapedLabel + '</span> <span class="ns-assigned-lump-stale-status" ' +
+        'style="color:#f87171;font-size:0.68rem;text-decoration:none;" role="img" ' +
+        'aria-label="' + escapedExplanation + '" title="' + escapedExplanation +
+        '">\u26a0 older saved revision</span>';
+}
+window._nsRenderAssignedLumpLabel = _nsRenderAssignedLumpLabel;
+
 function _renderBootExecutionFreshness(state) {
     const banner = document.getElementById('bootExecutionFreshnessWarning');
     if (!banner) return;
@@ -3874,7 +3942,15 @@ function updateNamespace() {
             : '';
         html += `<tr id="ns-row-${i}" class="ns-row" data-ns-slot="${i}" style="${rowOpacity}">`;
         html += `<td class="ns-idx-cell" style="white-space:nowrap;">${_clearBtn}<span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
-        let nsLabelInner = e.label || '-';
+        const _assignedRows = window._nsState &&
+            Array.isArray(window._nsState.abstractions)
+            ? window._nsState.abstractions : [];
+        const _assignedRow = _assignedRows.find(function(row) {
+            return row && Number(row.slot) === Number(i);
+        }) || null;
+        const _assignedFreshness = _nsAssignedLumpFreshness(
+            i, _assignedRow, window._nsState);
+        let nsLabelInner = _nsRenderAssignedLumpLabel(e.label || '-', _assignedFreshness);
         if (symbolic) nsLabelInner += ' <span data-testid="ns-symbolic-badge" style="color:#f0a040;font-size:0.68rem;border:1px solid #f0a04066;border-radius:8px;padding:1px 5px;text-decoration:none;" title="This Namespace binding has no installed implementation">symbolic · code missing</span>';
         {
             const _reg = (abstractionRegistry && typeof abstractionRegistry.getAbstraction === 'function')
@@ -5240,9 +5316,11 @@ window._nsTableSave = async function(btn) {
                     nextAction: 'Reload Namespace state before making another change.',
                 });
             window._nsState = committedState;
+            _renderBootExecutionFreshness(committedState);
             if (typeof window._applyNamespaceBootProjection === 'function') {
                 window._applyNamespaceBootProjection(committedState);
             }
+            if (typeof updateNamespace === 'function') updateNamespace();
         } catch (refreshError) {
             window._nsState = null;
             cacheRefreshError = cacheRefreshError || refreshError;
