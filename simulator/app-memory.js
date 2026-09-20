@@ -111,6 +111,23 @@ function _nsRenderAssignedLumpLabel(label, result) {
 }
 window._nsRenderAssignedLumpLabel = _nsRenderAssignedLumpLabel;
 
+// Pending Prepare/Run pins are browser intent only until the atomic server CAS
+// succeeds. They never mutate the loaded simulator image or committed state.
+window._prepareRunArtifactPins = window._prepareRunArtifactPins || {};
+function _nsPreparePinChange(slot, checked) {
+    const rows = window._nsState && Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    const row = rows.find(item => item && Number(item.slot) === Number(slot));
+    if (!row || !row.filename || !(row.token || row.cache_token)) return false;
+    window._prepareRunArtifactPins[String(slot)] = checked ? {
+        filename: row.filename,
+        token: row.token || row.cache_token,
+        revision: row.lump_version != null ? row.lump_version : row.issue_n,
+    } : null;
+    return true;
+}
+window._nsPreparePinChange = _nsPreparePinChange;
+
 function _renderBootExecutionFreshness(state) {
     const banner = document.getElementById('bootExecutionFreshnessWarning');
     if (!banner) return;
@@ -129,8 +146,15 @@ function _renderBootExecutionFreshness(state) {
         const latest = item.latest || {};
         const selectedVersion = selected.version == null ? selected.filename : 'v' + selected.version;
         const latestVersion = latest.version == null ? latest.filename : 'v' + latest.version;
-        return String(item.abstraction) + ' is executing ' + selectedVersion +
-            ' instead of latest successful ' + latestVersion;
+        const sameVersion = selected.version != null &&
+            String(selected.version) === String(latest.version);
+        const distinguish = sameVersion
+            ? ' (' + String(selected.filename || selected.binaryHash || 'selected') +
+                ' \u2192 ' + String(latest.filename || latest.binaryHash || 'latest') + ')'
+            : '';
+        return String(item.abstraction) + ' is assigned ' + selectedVersion +
+            ' while latest admissible saved revision is ' + latestVersion +
+            distinguish;
     });
     const failed = failedSaves[0] || null;
     const repair = failed || (warnings[0] && warnings[0].latest) || {};
@@ -146,22 +170,23 @@ function _renderBootExecutionFreshness(state) {
     };
     const repairVersion = repair.version == null ? '' : ' v' + repair.version;
     const headline = failed
-        ? '<strong>IDE SAVE REPAIR REQUIRED.</strong> ' + String(failed.abstraction) +
-            repairVersion + ' was not installed because its sealed identity does not match ' +
-            'authoritative Namespace slot ' + String(failed.slot) + '. ' +
+        ? '<strong>IDE-GENERATED ARTIFACT REPAIR REQUIRED.</strong> ' +
+            String(failed.abstraction) + repairVersion +
+            ' was not installed because the IDE generated an artifact identity that ' +
+            'does not bind to Namespace slot ' + String(failed.slot) + '. ' +
             'The previous valid revision is still running and no saved data was replaced.'
-        : '<strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
+        : '<strong>PREPARE/RUN WILL USE NEWER SAVED ARTIFACTS.</strong> ' +
             details.map(function(text) {
             const span = document.createElement('span');
             span.textContent = text;
             return span.innerHTML;
         }).join('; ');
     banner.innerHTML = '<div class="boot-execution-freshness-copy">' + headline +
-        (failed ? ' Review the IDE-generated correction; the compiler and repository handle the repair internally.' :
-            '. The newer revision cannot boot until the IDE repairs its saved identity.') +
+        (failed ? ' This is an IDE-owned generation defect, not a user identity/security incident. Review the generated correction; no security gate will be bypassed.' :
+            '. Prepare/Run validates every unpinned assigned executable and commits them together. Pin exact revisions in Abstractions to keep older bytes.') +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
         '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn">' +
-        (failed ? 'Review IDE repair' : 'Fix' + repairVersion + ' now') +
+        (failed ? 'Review IDE repair' : 'Prepare latest & Run') +
         '</button>';
 /*
         '. Prepare a new boot image before treating simulator results as current.' +
@@ -175,14 +200,16 @@ function _renderBootExecutionFreshness(state) {
     const actionButton = document.getElementById('bootExecutionUpdateButton');
     if (actionButton) {
         actionButton.onclick = function() {
-            _openBootExecutionUpdate().catch(function(error) {
+            Promise.resolve(_openBootExecutionUpdate()).catch(function(error) {
                 const status = document.getElementById('bootExecutionUpdateStatus');
-                const message = 'Recovery failed: ' +
+                const message = 'Prepare/Run failed: ' +
                     (error && error.message || String(error)) +
                     '. No data was changed.';
                 if (status) status.textContent = message;
+            }).finally(function() {
                 actionButton.disabled = false;
-                actionButton.textContent = 'Try opening source again';
+                actionButton.textContent = failed
+                    ? 'Review IDE repair' : 'Prepare latest & Run';
             });
         };
     }
@@ -272,11 +299,28 @@ async function _openBootExecutionUpdate() {
     const target = window._bootExecutionRepairTarget || {};
     const token = target.token;
     const button = document.getElementById('bootExecutionUpdateButton');
-    const message = 'Opening the guarded repair for the exact saved revision\u2026';
+    const message = target.failedSave
+        ? 'Opening the IDE-generated artifact repair\u2026'
+        : 'Preparing all latest admissible unpinned saved artifacts\u2026';
     if (status) status.textContent = message;
     if (button) {
         button.disabled = true;
         button.textContent = 'Opening source\u2026';
+    }
+    if (!target.failedSave) {
+        if (typeof window.prepareAndRunSavedArtifact !== 'function') {
+            throw new Error('Prepare/Run is unavailable. Reload the IDE and retry.');
+        }
+        const ok = await window.prepareAndRunSavedArtifact(true);
+        if (!ok) {
+            const bootState = window.BootEntryUI &&
+                typeof window.BootEntryUI.get === 'function'
+                ? window.BootEntryUI.get() : null;
+            throw new Error(bootState && bootState.message ||
+                'Prepare/Run was rejected without changing the previous selection.');
+        }
+        if (status) status.textContent = 'Prepare/Run succeeded.';
+        return true;
     }
     if (!token) {
         const unavailable = 'Repair could not open. Reload the IDE and click Fix again.';
@@ -525,7 +569,10 @@ function _nsSavedLoadPolicy(slot, manifest) {
     const cfg = window.bootConfig || {};
     const rows = cfg.step2 && Array.isArray(cfg.step2.lumps) ? cfg.step2.lumps : [];
     const saved = rows.find(row => row && Number(row.nsSlot) === Number(slot)) || null;
-    const savedValue = saved && (saved.loadPolicy || saved.load_policy);
+    const slotRuleValue = cfg.slotRules &&
+        (cfg.slotRules[String(slot)] || cfg.slotRules[slot]);
+    const savedValue = valid.includes(slotRuleValue)
+        ? slotRuleValue : saved && (saved.loadPolicy || saved.load_policy);
     const authorityRows = window._nsState &&
         Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
@@ -558,6 +605,71 @@ function _nsSavedLoadPolicy(slot, manifest) {
     }
     return null;
 }
+
+// Build the rows and summary from one immutable view of the Namespace.  The
+// summary is a projection of the policy shown in each row, not a second scan of
+// LUMP headers.  In particular, Thread objects and MMIO registers are always
+// resident, while an ordinary occupied row follows its effective dropdown
+// policy (Preload is resident at boot; Empty is available in the next image).
+// Cleared generations remain Garbage until that slot is reissued.
+function _namespaceSummarySnapshot() {
+    const max = sim && Number.isInteger(sim.MAX_NS_ENTRIES)
+        ? sim.MAX_NS_ENTRIES : 0;
+    const authorityRows = window._nsState &&
+        Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    const freeSequences = sim && sim._nsFreeSequences
+        ? sim._nsFreeSequences : {};
+    let lastRelevantSlot = Math.max(0, Number(sim && sim.nsCount) || 0) - 1;
+    authorityRows.forEach(function(row) {
+        const slot = row && Number(row.slot);
+        if (Number.isInteger(slot)) lastRelevantSlot = Math.max(lastRelevantSlot, slot);
+    });
+    Object.keys(freeSequences).forEach(function(rawSlot) {
+        const slot = Number(rawSlot);
+        if (Number.isInteger(slot)) lastRelevantSlot = Math.max(lastRelevantSlot, slot);
+    });
+
+    const displayCount = Math.min(max, Math.max(0, lastRelevantSlot + 1));
+    const slots = [];
+    const counts = { max, resident: 0, lazy: 0, garbage: 0, free: 0 };
+    for (let slot = 0; slot < displayCount; slot++) {
+        const entry = sim.readNSEntry(slot);
+        const hasClearedGeneration = !entry &&
+            Object.prototype.hasOwnProperty.call(freeSequences, String(slot)) &&
+            Number.isInteger(freeSequences[slot]);
+        let classification = 'free';
+        let policy = null;
+        if (hasClearedGeneration) {
+            classification = 'garbage';
+        } else if (entry) {
+            const label = entry.label ||
+                (sim.nsLabels && sim.nsLabels[slot]) || '';
+            const manifest = sim.lazyManifest ? sim.lazyManifest[slot] : null;
+            if (_isBootstrapSlot(slot, label) ||
+                    _isResidentIORegister(slot, label) ||
+                    _nsSlotHasResidentThreadBody(slot)) {
+                policy = 'Resident';
+            } else {
+                policy = _nsSavedLoadPolicy(slot, manifest) || 'Lazy';
+            }
+            classification = policy === 'Empty' ? 'free'
+                : (policy === 'Lazy' ? 'lazy' : 'resident');
+        }
+        if (classification !== 'free') counts[classification]++;
+        slots.push({
+            slot,
+            entry,
+            policy,
+            classification,
+            clearedGeneration: hasClearedGeneration ? freeSequences[slot] : null,
+        });
+    }
+    counts.free = Math.max(
+        0, counts.max - counts.resident - counts.lazy - counts.garbage);
+    return { max, displayCount, slots, counts };
+}
+window._namespaceSummarySnapshot = _namespaceSummarySnapshot;
 
 function _findSrcLump(slotIdx, slotLabel) {
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
@@ -3584,31 +3696,14 @@ function updateNamespace() {
         });
     }
     // --- Slot count stats ---
-    // Use readNSEntry() so the inverted NS table layout is handled correctly.
-    let _cntResident = 0, _cntLazy = 0, _cntGarbage = 0;
-    const _cntMax = (sim.MAX_NS_ENTRIES != null) ? sim.MAX_NS_ENTRIES : 0;
-    const _scanTo = Math.min(sim.nsCount || 0, _cntMax);
-    for (let _si = 0; _si < _scanTo; _si++) {
-        const _e = sim.readNSEntry(_si);
-        if (!_e) continue;
-        const _sw0 = _e.word0_location || 0;
-        const _sw1 = _e.word1_limit    || 0;
-        // Canonical NS ABI: gt_seq lives in W1[29:21] (not W2 — W2 is integrity32).
-        const _gtSeq = sim.parseNSWord1(_sw1 >>> 0).gtSeq;
-        if (_sw0 !== 0) {
-            const _mfe = sim.lazyManifest ? sim.lazyManifest[_si] : null;
-            let _notResident = false;
-            if (_mfe && _sw0 > 0 && sim.parseLumpHeader) {
-                const _hdr = sim.parseLumpHeader(sim.memory[_sw0]);
-                if (_hdr && !_hdr.valid) _notResident = true;
-            }
-            if (_notResident) _cntLazy++; else _cntResident++;
-        } else if (_gtSeq > 0) {
-            // W0==0 but a bumped gt_seq survives in W1 → a GC-reclaimed (garbage) slot.
-            _cntGarbage++;
-        }
-    }
-    const _cntFree = Math.max(0, _cntMax - _cntResident - _cntLazy - _cntGarbage);
+    // Rows and chips consume the same snapshot so policy edits cannot leave the
+    // header describing a different Namespace than the table underneath it.
+    const _nsSnapshot = _namespaceSummarySnapshot();
+    const _cntMax = _nsSnapshot.counts.max;
+    const _cntResident = _nsSnapshot.counts.resident;
+    const _cntLazy = _nsSnapshot.counts.lazy;
+    const _cntGarbage = _nsSnapshot.counts.garbage;
+    const _cntFree = _nsSnapshot.counts.free;
     const _statChip = (label, val, color, title) =>
         `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 7px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);font-size:0.72rem;white-space:nowrap;" title="${title}"><span style="color:${color};font-weight:600;">${label}</span><span style="color:#ccc;">${val}</span></span>`;
     let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 4 words per entry (128 bits; word3 reserved) \u2014 click a row to inspect memory</div>';
@@ -3653,7 +3748,7 @@ function updateNamespace() {
     // Namespace Table is the primary policy surface.  Each slot has exactly
     // one policy; transport order, hashes, capacity and bridge details remain
     // derived implementation data.
-    function _nsPrefetchRow(slot, manifest, label) {
+    function _nsPrefetchRow(slot, manifest, label, effectivePolicy) {
         if (_isBootstrapSlot(slot, label)) {
             return '<span class="ns-fixed-policy" title="Foundational boot entry; baked into BRAM">Bootstrap</span>';
         }
@@ -3663,7 +3758,8 @@ function updateNamespace() {
         if (_nsSlotHasResidentThreadBody(slot)) {
             return '<span class="ns-fixed-policy" title="Thread objects are resident by design (word-0 typ=2)">Resident · Thread</span>';
         }
-        const value = _nsSavedLoadPolicy(slot, manifest) || 'Lazy';
+        const value = effectivePolicy ||
+            _nsSavedLoadPolicy(slot, manifest) || 'Lazy';
         return `<select aria-label="Load policy for slot ${slot}" onchange="event.stopPropagation();_nsPrefetchChange(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${value==='Empty'?'selected':''}>Empty</option><option ${value==='Resident'?'selected':''}>Resident</option><option ${value==='Preload'?'selected':''}>Preload</option><option ${value==='Lazy'?'selected':''}>Lazy</option></select>`;
     }
 
@@ -3899,13 +3995,16 @@ function updateNamespace() {
             }
         }
     };
-    for (let i = 0; i < sim.nsCount; i++) {
-        const e = sim.readNSEntry(i);
+    for (let i = 0; i < _nsSnapshot.displayCount; i++) {
+        const _snapshotRow = _nsSnapshot.slots[i];
+        const e = _snapshotRow.entry;
         if (!e) {
             html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.45;">`;
             html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
             const _gapLabel = (sim.nsLabels && sim.nsLabels[i] && sim.nsLabels[i] !== '(free)' && sim.nsLabels[i] !== '(reserved)') ? sim.nsLabels[i] : '';
-            if (_gapLabel) {
+            if (_snapshotRow.classification === 'garbage') {
+                html += `<td colspan="8" style="color:#875f5f;font-style:italic;font-size:0.8rem;">(cleared; generation ${_snapshotRow.clearedGeneration} retained for revocation)</td>`;
+            } else if (_gapLabel) {
                 html += `<td class="ns-label ns-label-clickable" style="color:#666;font-style:italic;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open ${_escHtml(_gapLabel)}">${_escHtml(_gapLabel)}</td>`;
                 html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">(no DMEM entry)</td>`;
             } else {
@@ -3996,6 +4095,17 @@ function updateNamespace() {
                                   !_isThreadNamespaceSlot(i, e))
                 ? `<button type="button" class="btn btn-xs ns-identity-btn" aria-haspopup="dialog" onclick="event.stopPropagation();_nsShowIdentity(${i})" style="background:#27233b;color:#c4a7ff;border:1px solid rgba(196,167,255,0.35);margin-left:5px;font-size:0.65rem;padding:1px 5px;" title="Show canonical dot.name and T-ID">Identity</button>`
                 : '';
+            const _pendingPins = window._prepareRunArtifactPins || {};
+            const _hasPendingPin = Object.prototype.hasOwnProperty.call(
+                _pendingPins, String(i));
+            const _pinChecked = _hasPendingPin
+                ? _pendingPins[String(i)] !== null
+                : !!(_assignedRow && _assignedRow.artifact_pin);
+            const _pinControl = (_assignedRow && _assignedRow.filename &&
+                    (_assignedRow.token || _assignedRow.cache_token) &&
+                    !_residentIO && !_isThreadNamespaceSlot(i, e))
+                ? `<label class="ns-artifact-pin" style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;font-size:0.66rem;color:#d5b66f;cursor:pointer;" title="Keep this exact saved filename/token/revision during the next Prepare/Run"><input type="checkbox" aria-label="Pin exact artifact revision for NS[${i}]" ${_pinChecked ? 'checked' : ''} onchange="event.stopPropagation();_nsPreparePinChange(${i},this.checked)">Pin exact</label>`
+                : '';
             // Show Source for Inform (gtType 1) and Outform (gtType 2) only.
             // Hide for Null (0), Abstract (3), Thread slots, and hardware I/O caps.
             // has_source is intentionally NOT checked — lumps saved before source persistence
@@ -4011,9 +4121,9 @@ function updateNamespace() {
                                 _hwCapRe.test(e.label || '') ||
                                 _residentIO;
             if (symbolic) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">implementation missing</span>${_identityBtn}</td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">implementation missing</span>${_identityBtn}${_pinControl}</td>`;
             } else if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label)}${_identityBtn}</td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
             } else {
                 let _srcBtn = '';
                 if (!_hideSource) {
@@ -4025,7 +4135,7 @@ function updateNamespace() {
                         : `null,${i}`;
                     _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open the complete saved LUMP workspace">Open LUMP</button>`;
                 }
-                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest, e.label)}${_identityBtn}</td>`;
+                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
             }
         }
         html += '</tr>';
@@ -4846,6 +4956,12 @@ function _nsTableAddConfirm() {
         _row.lumpToken = token;
         _row.loadPolicy = loadPolicy;
         _row.resident = loadPolicy === 'Resident';
+        // The installed row is immediately visible before its atomic save
+        // completes. Mark its policy as local intent so both the dropdown and
+        // summary project the chosen Add-LUMP policy during that interval.
+        window._nsPrefetchDirty = true;
+        window._nsPrefetchDirtySlots = window._nsPrefetchDirtySlots || {};
+        window._nsPrefetchDirtySlots[String(slot)] = true;
         delete _row.prefetch;
         delete _row.prefetchRequired;
         delete _row.prefetchOrder;
@@ -5335,6 +5451,7 @@ window._nsTableSave = async function(btn) {
 
         // Clear dirty flag — committed state now matches in-memory state.
         _setNsDirty(false);
+        window._nsPrefetchDirty = false;
         window._nsPrefetchDirtySlots = {};
 
         if (btn) {

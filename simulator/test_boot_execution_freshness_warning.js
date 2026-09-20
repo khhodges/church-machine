@@ -74,7 +74,8 @@ context._renderBootExecutionFreshness({
             abstraction: 'SelfTest',
             token: '4c35bef2',
             version: 88,
-            reason: 'bootstrap-identity-invalid',
+            reason: 'generated-artifact-identity-invalid',
+            owner: 'ide',
         }],
     },
 });
@@ -158,24 +159,36 @@ context._renderBootExecutionFreshness({
     }] },
 });
 if (banner.style.display !== 'flex') throw new Error('stale execution warning was hidden');
-if (!banner.innerHTML.includes('NOT RUNNING THE LATEST COMPILED CODE')) {
+if (!banner.innerHTML.includes('PREPARE/RUN WILL USE NEWER SAVED ARTIFACTS')) {
     throw new Error('warning does not clearly state the consequence');
 }
-if (!banner.innerHTML.includes('SelfTest is executing v86 instead of latest successful v87')) {
+if (!banner.innerHTML.includes('SelfTest is assigned v86 while latest admissible saved revision is v87')) {
     throw new Error('warning does not identify selected and latest versions');
 }
-if (!banner.innerHTML.includes('cannot boot until the IDE repairs its saved identity')) {
-    throw new Error('warning does not explain why the newer revision cannot run');
+if (!banner.innerHTML.includes('validates every unpinned assigned executable')) {
+    throw new Error('warning does not explain Prepare/Run validation');
 }
-if (!banner.innerHTML.includes('Fix v87 now') ||
+if (!banner.innerHTML.includes('Prepare latest & Run') ||
         typeof renderedActionButton.onclick !== 'function') {
-    throw new Error('warning does not provide the exact revision repair action');
+    throw new Error('warning does not provide the Prepare/Run action');
 }
 if (source.includes("fetch('/api/boot-image/update-to-latest'")) {
     throw new Error('freshness UI must not trigger automatic latest promotion');
 }
-if (!source.includes('_showLatestCompilationPromotion(token, target)')) {
-    throw new Error('freshness action does not open guarded identity repair');
+if (!source.includes('window.prepareAndRunSavedArtifact(true)')) {
+    throw new Error('freshness action is not wired to Prepare/Run');
+}
+
+context._renderBootExecutionFreshness({
+    executionFreshness: { warnings: [{
+        abstraction: 'WukongCallHome',
+        selected: { version: 11, filename: 'WukongCallHome.1.658e6ba8.lump' },
+        latest: { version: 11, filename: 'WukongCallHome.1.74c8ff97.lump' },
+    }] },
+});
+if (!banner.innerHTML.includes('658e6ba8') ||
+        !banner.innerHTML.includes('74c8ff97')) {
+    throw new Error('same-version warning does not distinguish exact artifacts');
 }
 
 context._renderBootExecutionFreshness({
@@ -192,8 +205,9 @@ context._renderBootExecutionFreshness({
         }],
     },
 });
-if (!banner.innerHTML.includes('IDE SAVE REPAIR REQUIRED') ||
+if (!banner.innerHTML.includes('IDE-GENERATED ARTIFACT REPAIR REQUIRED') ||
         !banner.innerHTML.includes('Review IDE repair') ||
+        !banner.innerHTML.includes('not a user identity/security incident') ||
         banner.innerHTML.includes('Open recovered source') ||
         banner.innerHTML.includes('Save LUMP')) {
     throw new Error('historical identity incident still delegates compiler repair to the programmer');

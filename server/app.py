@@ -5191,10 +5191,97 @@ def boot_image_generate():
             ),
         }), 409
     entry_slot = saved_entry_slot
+    prepare_run = body.get("prepareRun") is True
     # Hardware-targeted generation (Wukong bridge upload): the entry lump's
     # code body must be resident — the FPGA has no lazy-fetch path.
     for_hardware = bool(body.get("forHardware", False))
     drift_warnings = []
+    if prepare_run:
+        expected_fingerprint = _expected_namespace_fingerprint(body)
+        if expected_fingerprint is None:
+            return jsonify({
+                "ok": False,
+                "error": "namespaceFingerprint is required for atomic Prepare/Run",
+                "dataChanged": False,
+            }), 428
+        try:
+            with _namespace_commit_guard():
+                rows, current_fingerprint = _read_authoritative_namespace_rows()
+                if current_fingerprint != expected_fingerprint:
+                    return jsonify({
+                        "ok": False,
+                        "error": "Namespace changed in another tab; reload before Prepare/Run",
+                        "currentNamespaceFingerprint": current_fingerprint,
+                        "dataChanged": False,
+                    }), 409
+                snapshots = {}
+                for path in (NS_STATE_PATH, BOOT_IMAGE_PATH,
+                             BOOT_IMAGE_PROVENANCE_PATH):
+                    try:
+                        with open(path, "rb") as source:
+                            snapshots[path] = source.read()
+                    except FileNotFoundError:
+                        snapshots[path] = None
+                try:
+                    prepared_rows, changes = _prepare_run_candidates(
+                        rows, LUMPS_DIR,
+                        boot_pin=body.get("artifactPin"),
+                        boot_pin_supplied="artifactPin" in body,
+                        artifact_pins=body.get("artifactPins"))
+                    _write_ns_state(prepared_rows)
+                    blob = _boot_image_gen.generate_boot_image(
+                        cfg, LUMPS_DIR, boot_entry_slot=entry_slot,
+                        require_entry_resident=for_hardware)
+                    _write_boot_image_bytes(blob)
+                    next_fingerprint = _namespace_state_fingerprint(prepared_rows)
+                except Exception:
+                    # Roll back while still holding the original lock. No
+                    # concurrent successful commit can be overwritten.
+                    for path, previous in snapshots.items():
+                        try:
+                            if previous is None:
+                                os.remove(path)
+                            else:
+                                rollback = path + ".prepare-run-rollback"
+                                with open(rollback, "wb") as destination:
+                                    destination.write(previous)
+                                os.replace(rollback, path)
+                        except FileNotFoundError:
+                            pass
+                    raise
+        except Exception as exc:
+            # Preparation is one transaction: retain the previously valid
+            # Namespace selection/image/provenance on every validation, CAS,
+            # dependency, or publication failure.
+            return jsonify({
+                "ok": False,
+                "error": f"Prepare/Run rejected without changing the previous selection: {exc}",
+                "dataChanged": False,
+            }), 409
+        _load_boot_abstr_lump()
+        _load_boot_ns_lump()
+        prepared_boot_row = next(
+            row for row in prepared_rows if row.get("boot") is True)
+        return jsonify({
+            "ok": True,
+            "bytes": len(blob),
+            "words": len(blob) // 4,
+            "downloadUrl": "/api/boot-image/download",
+            "binaryUrl": "/api/boot-image/binary",
+            "preparation": _boot_image_preparation_status(blob, cfg),
+            "namespaceFingerprint": next_fingerprint,
+            "selections": changes,
+            "selection": {
+                "slot": prepared_boot_row.get("slot"),
+                "abstraction": prepared_boot_row.get("name"),
+                "filename": prepared_boot_row.get("filename"),
+                "token": prepared_boot_row.get("token"),
+                "revision": prepared_boot_row.get(
+                    "lump_version", prepared_boot_row.get("issue_n")),
+                "pinned": "artifact_pin" in prepared_boot_row,
+            },
+            "dataChanged": bool(changes),
+        })
     try:
         with _warnings_mod.catch_warnings(record=True) as _caught:
             _warnings_mod.simplefilter("always")
@@ -5860,7 +5947,12 @@ def _boot_execution_freshness(state, lumps_dir):
                         "token": entry.get("token"),
                         "filename": entry.get("filename"),
                         "version": entry.get("lump_version"),
-                        "reason": "bootstrap-identity-invalid",
+                        # This is an IDE-generated binding defect, not an
+                        # ordinary user identity/security mismatch.  Keeping
+                        # that distinction in the API prevents the UI from
+                        # suggesting that bypassing a security gate is a fix.
+                        "reason": "generated-artifact-identity-invalid",
+                        "owner": "ide",
                         "currentToken": selected.get("token"),
                         "archived": entry.get("archived") is True,
                     })
@@ -5907,20 +5999,28 @@ def _boot_execution_freshness(state, lumps_dir):
         if (latest.get("filename") == selected.get("filename")
                 and latest.get("token") == selected.get("token")):
             continue
+        selected_ref = {
+            "filename": selected.get("filename"),
+            "token": selected.get("token"),
+            "version": selected.get("lump_version"),
+        }
+        latest_ref = {
+            "filename": latest.get("filename"),
+            "token": latest.get("token"),
+            "version": latest.get("lump_version"),
+            "compiledAt": latest.get("compiled_at"),
+        }
+        selected_hash = selected.get("binary_hash", selected.get("binaryHash"))
+        latest_hash = latest.get("binary_hash", latest.get("binaryHash"))
+        if selected_hash:
+            selected_ref["binaryHash"] = selected_hash
+        if latest_hash:
+            latest_ref["binaryHash"] = latest_hash
         warnings.append({
             "abstraction": name,
             "slot": selected.get("slot"),
-            "selected": {
-                "filename": selected.get("filename"),
-                "token": selected.get("token"),
-                "version": selected.get("lump_version"),
-            },
-            "latest": {
-                "filename": latest.get("filename"),
-                "token": latest.get("token"),
-                "version": latest.get("lump_version"),
-                "compiledAt": latest.get("compiled_at"),
-            },
+            "selected": selected_ref,
+            "latest": latest_ref,
             "reason": "committed-boot-image-does-not-use-latest-compilation",
         })
     result = {
@@ -5930,6 +6030,174 @@ def _boot_execution_freshness(state, lumps_dir):
     if failed_saves:
         result["failedSaves"] = failed_saves
     return result
+
+
+def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
+    """Resolve the exact saved artifact for the Prepare/Run boundary.
+
+    Passive reads/imports never call this helper.  At the explicit preparation
+    boundary the newest admissible saved body is the default; an exact pin is
+    the sole way to retain an older revision.
+    """
+    boot_rows = [
+        row for row in rows
+        if isinstance(row, dict) and row.get("boot") is True
+        and row.get("archived") is not True
+    ]
+    if len(boot_rows) != 1:
+        raise ValueError("Namespace must contain exactly one live Lightning Bolt row")
+    selected = boot_rows[0]
+    manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
+    if not isinstance(manifest, list):
+        raise ValueError("saved artifact manifest is unavailable")
+
+    if pin is not None:
+        if not isinstance(pin, dict):
+            raise ValueError("artifactPin must be an exact revision descriptor")
+        matches = [
+            entry for entry in manifest
+            if isinstance(entry, dict)
+            and entry.get("abstraction") == selected.get("name")
+            and str(entry.get("filename")) == str(pin.get("filename"))
+            and str(entry.get("token", "")).lower()
+            == str(pin.get("token", "")).lower()
+            and str(entry.get("lump_version", entry.get("issue_n")))
+            == str(pin.get("revision"))
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                "the explicitly pinned artifact revision is missing or ambiguous")
+        candidate = matches[0]
+        pinned = True
+    else:
+        freshness = _boot_execution_freshness(
+            {"abstractions": [selected]}, lumps_dir)
+        failed = freshness.get("failedSaves") or []
+        if failed:
+            incident = failed[0]
+            raise ValueError(
+                f"IDE-generated identity for {incident.get('filename')!r} is "
+                "invalid; rebuild/save it in the IDE before preparing")
+        warnings = freshness.get("warnings") or []
+        latest = warnings[0]["latest"] if warnings else None
+        if latest is None:
+            matches = [
+                entry for entry in manifest
+                if isinstance(entry, dict)
+                and entry.get("filename") == selected.get("filename")
+                and str(entry.get("token", "")).lower()
+                == str(selected.get("token", "")).lower()
+            ]
+        else:
+            matches = [
+                entry for entry in manifest
+                if isinstance(entry, dict)
+                and entry.get("filename") == latest.get("filename")
+                and str(entry.get("token", "")).lower()
+                == str(latest.get("token", "")).lower()
+            ]
+        if len(matches) != 1:
+            raise ValueError("latest admissible saved artifact cannot be resolved exactly")
+        candidate = matches[0]
+        pinned = False
+
+    filename = candidate.get("filename")
+    if not isinstance(filename, str) or os.path.basename(filename) != filename:
+        raise ValueError("selected artifact has an invalid filename")
+    artifact_path = os.path.join(lumps_dir, filename)
+    if not os.path.isfile(artifact_path):
+        raise ValueError(f"selected artifact {filename!r} is missing")
+
+    updated = dict(selected)
+    for key in ("filename", "token", "lump_version", "issue_n",
+                "identity_hash", "identityHash"):
+        if candidate.get(key) is not None:
+            updated[key] = candidate[key]
+    candidate_digest = _file_sha256(artifact_path)
+    previous_digest = selected.get("binary_hash") or selected.get("binaryHash")
+    revision_changed = (
+        selected.get("filename") != candidate.get("filename")
+        or str(selected.get("token", "")).lower()
+        != str(candidate.get("token", "")).lower()
+        or not isinstance(previous_digest, str)
+        or previous_digest.lower() != candidate_digest.lower()
+    )
+    if revision_changed:
+        # Runtime test/reliability claims belong to the exact old binary.
+        # Admission below validates the new bytes, but does not prove that a
+        # runtime test suite ran. Never carry those claims across revisions.
+        for key in (
+                "mtbf", "stable", "tested", "released", "test_results",
+                "testResults", "test_evidence", "testEvidence",
+                "runtime_test_evidence", "runtimeTestEvidence",
+                "validation_evidence", "validationEvidence"):
+            updated.pop(key, None)
+    updated["binary_hash"] = candidate_digest
+    if pinned:
+        updated["artifact_pin"] = {
+            "filename": filename,
+            "token": candidate.get("token"),
+            "revision": candidate.get("lump_version", candidate.get("issue_n")),
+        }
+    else:
+        updated.pop("artifact_pin", None)
+
+    # This validator binds executable admission/approval to this exact digest
+    # and verifies the candidate's Namespace identity. It is not runtime test
+    # suite evidence. No evidence fields are copied from another revision.
+    _boot_image_gen._require_approved_executable_lump(
+        artifact_path, lumps_dir,
+        f"Prepare/Run target NS[{selected.get('slot')}]", updated)
+    return selected, updated
+
+
+def _prepare_run_candidates(rows, lumps_dir, *, boot_pin=None,
+                            boot_pin_supplied=False, artifact_pins=None):
+    """Resolve every assigned executable participating in the generated image."""
+    if artifact_pins is not None and not isinstance(artifact_pins, dict):
+        raise ValueError("artifactPins must be an object keyed by Namespace slot")
+    pending_pin_slots = set((artifact_pins or {}).keys())
+    prepared = [dict(row) for row in rows]
+    changes = []
+    for index, row in enumerate(rows):
+        if (not isinstance(row, dict) or row.get("archived") is True
+                or row.get("symbolic") is True or not row.get("filename")):
+            continue
+        # Hardware/MMIO and generated Namespace/Thread rows do not name saved
+        # executable artifacts. Assigned artifact rows do.
+        if row.get("type") in ("Device", "Thread", "Namespace"):
+            continue
+        slot_key = str(row.get("slot"))
+        if isinstance(artifact_pins, dict) and slot_key in artifact_pins:
+            pending_pin_slots.discard(slot_key)
+            pin = artifact_pins[slot_key]
+        elif row.get("boot") is True and boot_pin_supplied:
+            pin = boot_pin
+        else:
+            pin = row.get("artifact_pin")
+        probe = dict(row)
+        probe["boot"] = True
+        _, selected = _prepare_run_candidate([probe], lumps_dir, pin=pin)
+        if row.get("boot") is True:
+            selected["boot"] = True
+        else:
+            selected.pop("boot", None)
+        prepared[index] = selected
+        if selected != row:
+            changes.append({
+                "slot": selected.get("slot"),
+                "abstraction": selected.get("name"),
+                "filename": selected.get("filename"),
+                "token": selected.get("token"),
+                "revision": selected.get(
+                    "lump_version", selected.get("issue_n")),
+                "pinned": "artifact_pin" in selected,
+            })
+    if pending_pin_slots:
+        raise ValueError(
+            "artifactPins names unassigned or non-executable Namespace slot(s): "
+            + ", ".join(sorted(pending_pin_slots)))
+    return prepared, changes
 
 
 @app.route("/api/boot-image/update-to-latest", methods=["POST"])

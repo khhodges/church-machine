@@ -1619,11 +1619,31 @@ function onRunBtnClick() {
     } else {
         _runClickTimer = setTimeout(() => {
             _runClickTimer = null;
-            if (window.IDEActions) window.IDEActions.run();
-            else runSimGo();
+            prepareAndRunSavedArtifact();
         }, 280);
     }
 }
+
+function prepareAndRunSavedArtifact(propagateError) {
+    const run = () => {
+        if (window.IDEActions) window.IDEActions.run();
+        else runSimGo();
+    };
+    if (typeof window.prepareSavedArtifactForRun !== 'function') {
+        run();
+        return Promise.resolve(true);
+    }
+    return window.prepareSavedArtifactForRun().then(ok => {
+        if (ok) run();
+        return !!ok;
+    }).catch(error => {
+        _showBootPreparationBlocked('Run',
+            error && error.message ? error.message : String(error));
+        if (propagateError) throw error;
+        return false;
+    });
+}
+window.prepareAndRunSavedArtifact = prepareAndRunSavedArtifact;
 
 function showRunPopover() {
     const pop = document.getElementById('runPopover');

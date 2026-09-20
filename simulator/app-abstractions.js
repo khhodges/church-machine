@@ -482,6 +482,9 @@ function renderAbstractions() {
             const stateClass = bootState.status === 'prepared' ? 'abs-boot-binding-ok'
                 : bootState.status === 'pending' ? 'abs-boot-binding-pending'
                 : 'abs-boot-binding-error';
+            const pinChecked = !!(bootState.binding && bootState.binding.artifact_pin);
+            const pinAction = `<label class="abs-boot-binding-pin" title="Keep this exact older revision during Prepare/Run">` +
+                `<input id="bootArtifactPin" type="checkbox"${pinChecked ? ' checked' : ''}> Pin exact revision</label>`;
             const saveAction = bootState.status === 'prepared'
                 ? ` <button type="button" class="abs-boot-binding-save" onclick="savePreparedBootEntry()">Prepare boot image again</button>`
                 : (bootState.status === 'cache-error'
@@ -490,7 +493,7 @@ function renderAbstractions() {
                         ? ''
                         : ` <button type="button" class="abs-boot-binding-save" onclick="savePreparedBootEntry()">Prepare boot image</button>`));
             html += `<div id="bootEntryPreparationStatus" class="abs-boot-binding-status ${stateClass}" role="status">` +
-                `<span class="abs-boot-binding-copy">⚡ Boot entry NS[${bootState.slot == null ? '?' : bootState.slot}]: ${bootState.message}</span>${saveAction}</div>`;
+                `<span class="abs-boot-binding-copy">⚡ Boot entry NS[${bootState.slot == null ? '?' : bootState.slot}]: ${bootState.message}</span>${pinAction}${saveAction}</div>`;
         }
         html += `<div class="abs-layer-items">`;
     for (const abs of filtered) {
@@ -625,9 +628,9 @@ function _bootBindingFingerprint(binding) {
 let _namespaceBootMarkerInFlight = null;
 let _preparedArtifactSelection = null;
 
-// Preparation is intentionally a two-step operation: revision/destination
-// identity is selected first, then the Lightning Bolt is committed.  There is
-// no "latest" or resident fallback.
+// Destination selection remains exact. At the explicit Prepare/Run boundary,
+// however, the server defaults to the latest admissible saved revision unless
+// the programmer checks the exact-revision pin.
 function selectArtifactForPreparation(selection, revisions) {
     const chooser = window.LumpAdmission &&
         typeof window.LumpAdmission.chooseArtifact === 'function'
@@ -708,7 +711,8 @@ function _applyNamespaceBootProjection(state, message) {
             ? `Namespace boot marker committed at NS[${slot}]. The loaded image targets ` +
                 `NS[${evidenceSlot == null ? '?' : evidenceSlot}]; generate the committed image before reset.`
             : `Namespace boot marker committed at NS[${slot}]. Generate the committed image before reset.`);
-    _setBootEntryPreparation(slot, status, detail, evidence || marker);
+    _setBootEntryPreparation(slot, status, detail,
+        Object.assign({}, marker || {}, evidence || {}));
     return slot;
 }
 
@@ -725,6 +729,8 @@ async function _commitNamespaceBootMarker(slot) {
     const transaction = (async function() {
         if (previousTransaction) await previousTransaction;
         const state = await _namespaceStateForMutation();
+        const pendingArtifactPins = Object.assign(
+            {}, window._prepareRunArtifactPins || {});
         const fingerprint = String(state.namespaceFingerprint || '').trim();
         if (!fingerprint) {
             throw new Error('The authoritative Namespace fingerprint is unavailable; reload Namespace and retry.');
@@ -1029,17 +1035,46 @@ async function savePreparedBootEntry() {
         'Saving the Namespace marker and generating its boot image…');
     renderAbstractions();
     try {
-        // Marker CAS is the only boot-plan write. Config remains a projection
-        // and must never be posted merely because this button was clicked.
-        await _commitNamespaceBootMarker(savedSlot);
+        const state = await _namespaceStateForMutation();
+        const pinControl = document.getElementById('bootArtifactPin');
+        const pinRequested = !!(pinControl && pinControl.checked);
+        let artifactPin = null;
+        if (pinRequested) {
+            if (_preparedArtifactSelection && _preparedArtifactSelection.artifact) {
+                const artifact = _preparedArtifactSelection.artifact;
+                artifactPin = {
+                    revision: _preparedArtifactSelection.selection.revision,
+                    token: artifact.token || artifact.cache_token,
+                    filename: artifact.filename,
+                };
+            } else {
+                const marker = Array.isArray(state.abstractions)
+                    ? state.abstractions.find(row => row && row.boot === true) : null;
+                const persisted = marker && marker.artifact_pin;
+                artifactPin = persisted || (marker && {
+                    revision: marker.lump_version != null
+                        ? marker.lump_version : marker.issue_n,
+                    token: marker.token || marker.cache_token,
+                    filename: marker.filename,
+                });
+                if (!artifactPin || artifactPin.revision == null ||
+                        !artifactPin.token || !artifactPin.filename) {
+                    throw new Error(
+                        'Exact pin requested, but no exact saved artifact selection is available.');
+                }
+            }
+        }
         const response = await fetch('/api/boot-image/generate', {
             method: 'POST',
             headers: Object.assign({'Content-Type': 'application/json'},
                 (window.BuildApprovalView && window.BuildApprovalView._authHeaders
                     ? window.BuildApprovalView._authHeaders() : {})),
-            // The marker CAS above is authoritative; generation resolves it
-            // server-side instead of accepting a projected slot as a plan.
-            body: JSON.stringify({}),
+            body: JSON.stringify({
+                prepareRun: true,
+                namespaceFingerprint: state.namespaceFingerprint,
+                artifactPin: artifactPin,
+                artifactPins: pendingArtifactPins,
+            }),
         });
         let generated = null;
         try { generated = await response.json(); } catch (_) {}
@@ -1057,6 +1092,57 @@ async function savePreparedBootEntry() {
         } catch (error) {
             cacheError = error;
         }
+        if (generated.namespaceFingerprint) {
+            const selected = generated.selection || null;
+            const selections = Array.isArray(generated.selections)
+                ? generated.selections : (selected ? [selected] : []);
+            const nextRows = Array.isArray(state.abstractions)
+                ? state.abstractions.map(row => {
+                    const applied = row && selections.find(item =>
+                        item && Number(item.slot) === Number(row.slot));
+                    if (!applied) {
+                        return row;
+                    }
+                    const next = Object.assign({}, row, {
+                        filename: applied.filename,
+                        token: applied.token,
+                        lump_version: applied.revision,
+                    });
+                    if (applied.pinned) {
+                        next.artifact_pin = {
+                            filename: applied.filename,
+                            token: applied.token,
+                            revision: applied.revision,
+                        };
+                    } else {
+                        delete next.artifact_pin;
+                    }
+                    return next;
+                }) : state.abstractions;
+            window._nsState = Object.assign({}, state, {
+                abstractions: nextRows,
+                namespaceFingerprint: generated.namespaceFingerprint,
+            });
+            _applyNamespaceBootProjection(window._nsState,
+                selected && selected.pinned
+                    ? `Prepared pinned revision ${selected.revision}.`
+                    : `Prepared latest saved revision ${selected && selected.revision != null
+                        ? selected.revision : ''}.`);
+            // Pending pin intent becomes committed only after the server CAS
+            // succeeds. Clear the exact submitted snapshot; newer checkbox
+            // edits made while the request was in flight remain pending.
+            Object.keys(pendingArtifactPins).forEach(slot => {
+                const live = window._prepareRunArtifactPins || {};
+                if (JSON.stringify(live[slot]) ===
+                        JSON.stringify(pendingArtifactPins[slot])) {
+                    delete live[slot];
+                }
+            });
+        }
+        // The accepted Prepare/Run response may change artifact selections,
+        // policies, and the Namespace fingerprint. Repaint once from that
+        // accepted snapshot; this deliberately does not start another poll.
+        if (typeof updateNamespace === 'function') updateNamespace();
         const selectionChanged = bootEntrySlot !== savedSlot ||
             _bootEntrySelectionRevision !== savedRevision;
         if (selectionChanged) {
@@ -1080,6 +1166,7 @@ async function savePreparedBootEntry() {
         });
         return true;
     } catch (error) {
+        window._lastPrepareRunError = error;
         // A later selection is authoritative in the UI; an old save failure
         // must not repaint it as failed.
         if (bootEntrySlot === savedSlot && _bootEntrySelectionRevision === savedRevision) {
@@ -1091,6 +1178,39 @@ async function savePreparedBootEntry() {
     }
 }
 window.savePreparedBootEntry = savePreparedBootEntry;
+
+// Run calls this before any boot instruction executes. The promise serializes
+// preparation and prevents a second click from swapping the selected body
+// while an execution batch is active.
+let _prepareSavedArtifactForRunInFlight = null;
+async function prepareSavedArtifactForRun() {
+    if ((typeof _simRunActive !== 'undefined' && _simRunActive) ||
+            (sim && (sim.running || sim.walkActive))) {
+        throw new Error('Stop the active execution before preparing another revision.');
+    }
+    if (_prepareSavedArtifactForRunInFlight) {
+        return _prepareSavedArtifactForRunInFlight;
+    }
+    const operation = savePreparedBootEntry();
+    _prepareSavedArtifactForRunInFlight = operation;
+    try {
+        const ok = await operation;
+        if (!ok) {
+            const state = window.BootEntryUI &&
+                typeof window.BootEntryUI.get === 'function'
+                ? window.BootEntryUI.get() : null;
+            throw window._lastPrepareRunError || new Error(
+                state && state.message ||
+                'Prepare/Run was rejected without changing the previous selection.');
+        }
+        return true;
+    } finally {
+        if (_prepareSavedArtifactForRunInFlight === operation) {
+            _prepareSavedArtifactForRunInFlight = null;
+        }
+    }
+}
+window.prepareSavedArtifactForRun = prepareSavedArtifactForRun;
 
 async function refreshPreparedBootImageCache() {
     const slot = bootEntrySlot;
