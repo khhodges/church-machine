@@ -993,6 +993,7 @@ class ChurchSimulator {
         this.faultLog = [];
         this._instrHistory = [];
         this._currentInstrLabel = null;
+        this._activeFaultRoute = null;
         this._currentThreadSlot = 1;
         // Selection and ownership are distinct before boot: slot 1 is the
         // configured default, but the reset CR/DR banks do not belong to it.
@@ -6088,6 +6089,139 @@ class ChurchSimulator {
         ) >>> 0;
     }
 
+    _captureFaultRoute(d) {
+        const callerCR = this.cr && this.cr[14];
+        let callerSlot = null;
+        let callerName = 'unknown';
+        if (callerCR && (callerCR.word0 >>> 0) !== 0) {
+            try {
+                callerSlot = this.parseGT(callerCR.word0 >>> 0).index;
+                callerName = (this.nsLabels && this.nsLabels[callerSlot]) ||
+                    `NS[${callerSlot}]`;
+            } catch (_) {}
+        }
+        const callerMethod = callerSlot === null
+            ? 'unknown'
+            : (this._methodNameForPC(
+                callerSlot, this.pc, callerCR.word1 >>> 0) || 'unknown');
+        const isCall = d && d.opcode === 2;
+        this._activeFaultRoute = {
+            step: this.stepCount,
+            callerSlot,
+            callerName,
+            callerMethod,
+            destinationSlot: null,
+            destinationName: 'unknown',
+            destinationMethod: isCall
+                ? `method#${d.crSrc === 6 ? ((d.imm >>> 5) & 0x7F) : (d.imm & 0x7FFF)}`
+                : 'unknown',
+            transfer: isCall,
+        };
+    }
+
+    _captureCallTarget(parsed, methodSelector) {
+        if (!this._activeFaultRoute ||
+                this._activeFaultRoute.step !== this.stepCount ||
+                !this._activeFaultRoute.transfer) {
+            this._captureFaultRoute(null);
+        }
+        const route = this._activeFaultRoute;
+        route.transfer = true;
+        route.destinationMethod = Number.isInteger(methodSelector)
+            ? `method#${methodSelector}` : 'unknown';
+        if (parsed && Number.isInteger(parsed.index)) {
+            route.destinationSlot = parsed.index;
+            route.destinationName = (this.nsLabels && this.nsLabels[parsed.index]) ||
+                `NS[${parsed.index}]`;
+            route.destinationMethod =
+                this._methodNameForSelector(parsed.index, methodSelector) ||
+                route.destinationMethod;
+        }
+    }
+
+    _embeddedMethodMap(slot) {
+        try {
+            const entry = this.readNSEntry(slot);
+            if (!entry) return null;
+            const base = entry.word0_location >>> 0;
+            const hdr = this.parseLumpHeader(this.memory[base] >>> 0);
+            if (!hdr.valid || hdr.cw < 1 || base + hdr.lumpSize > this.memory.length) {
+                return null;
+            }
+            const frameStart = base + 1 + hdr.cw;
+            const frameEnd = base + hdr.lumpSize - hdr.cc;
+            if (frameStart >= frameEnd) return null;
+            const frameHeader = this.memory[frameStart] >>> 0;
+            if (((frameHeader >>> 24) & 0xFF) !== 0xAB) return null;
+            const byteLength = frameHeader & 0xFFFF;
+            const wordLength = Math.ceil(byteLength / 4);
+            if (byteLength < 2 || frameStart + 1 + wordLength > frameEnd) return null;
+            const bytes = new Uint8Array(wordLength * 4);
+            for (let i = 0; i < wordLength; i++) {
+                const word = this.memory[frameStart + 1 + i] >>> 0;
+                bytes[i * 4] = word >>> 24;
+                bytes[i * 4 + 1] = word >>> 16;
+                bytes[i * 4 + 2] = word >>> 8;
+                bytes[i * 4 + 3] = word;
+            }
+            const api = JSON.parse(new TextDecoder().decode(bytes.slice(0, byteLength)));
+            if (!api || !Array.isArray(api.methods) || api.methods.length === 0) return null;
+            const methods = [];
+            for (const method of api.methods) {
+                if (!method || typeof method.name !== 'string' ||
+                        !Number.isInteger(method.index) || method.index < 0) return null;
+                const selector = method.index + 1;
+                if (selector > hdr.cw) return null;
+                const tableEntry = this.memory[base + selector] >>> 0;
+                let bodyPC = null;
+                if (((tableEntry >>> 27) & 0x1F) === 23) {
+                    const rawOffset = tableEntry & 0x7FFF;
+                    const offset = (rawOffset & 0x4000)
+                        ? (rawOffset | 0xFFFF8000) : rawOffset;
+                    bodyPC = (selector - 1) + offset;
+                } else if (tableEntry < hdr.cw) {
+                    bodyPC = tableEntry;
+                }
+                if (!Number.isInteger(bodyPC) || bodyPC < api.methods.length ||
+                        bodyPC >= hdr.cw) return null;
+                methods.push({ selector, name: method.name, bodyPC });
+            }
+            methods.sort((a, b) => a.bodyPC - b.bodyPC);
+            if (new Set(methods.map(method => method.selector)).size !== methods.length ||
+                    new Set(methods.map(method => method.bodyPC)).size !== methods.length) {
+                return null;
+            }
+            return { cw: hdr.cw, methods };
+        } catch (_) {
+            return null;
+        }
+    }
+
+    _methodNameForSelector(slot, selector) {
+        const evidence = this._embeddedMethodMap(slot);
+        if (!evidence || !Number.isInteger(selector)) return null;
+        const dispatchSelector = selector === 0 ? 1 : selector;
+        const method = evidence.methods.find(item => item.selector === dispatchSelector);
+        return method ? method.name : null;
+    }
+
+    _methodNameForPC(slot, pc, expectedBase = null) {
+        if (expectedBase !== null) {
+            const entry = this.readNSEntry(slot);
+            if (!entry || (entry.word0_location >>> 0) !== expectedBase) return null;
+        }
+        const evidence = this._embeddedMethodMap(slot);
+        if (!evidence || !Number.isInteger(pc)) return null;
+        for (let i = 0; i < evidence.methods.length; i++) {
+            const method = evidence.methods[i];
+            const next = evidence.methods[i + 1];
+            if (pc >= method.bodyPC && pc < (next ? next.bodyPC : evidence.cw)) {
+                return method.name;
+            }
+        }
+        return null;
+    }
+
     fault(type, message, meta = null) {
         if (this.executionStats) this.executionStats.faults++;
         const lastH = this._instrHistory && this._instrHistory.length > 0
@@ -6187,8 +6321,21 @@ class ChurchSimulator {
                 gate: type,
             };
         }
+        const rawDiagnosticReason = message;
+        const route = this._activeFaultRoute &&
+            this._activeFaultRoute.step === this.stepCount
+            ? {...this._activeFaultRoute}
+            : null;
+        const fromName = route ? route.callerName : (faultLabel || 'unknown');
+        const fromMethod = route ? route.callerMethod : 'unknown';
+        const toName = route && route.transfer ? route.destinationName : 'unknown';
+        const toMethod = route && route.transfer ? route.destinationMethod : 'unknown';
+        const routedMessage =
+            `From ${fromName}.${fromMethod} -> To ${toName}.${toMethod} — ${rawDiagnosticReason}`;
         const entry = {
-            type, message, pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
+            type, message: routedMessage, rawDiagnosticReason,
+            callRoute: route,
+            pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
             threadSlot: this._liveThreadOwned && Number.isInteger(this._currentThreadSlot)
                 ? this._currentThreadSlot : null,
             crSnapshot: this.cr ? this.cr.map(c => c ? {...c} : null) : [],
@@ -6210,7 +6357,7 @@ class ChurchSimulator {
             logicalPC: (meta && Number.isInteger(meta.logicalPC)) ? (meta.logicalPC >>> 0) : null,
             attemptedPhysicalAddress: (meta && Number.isInteger(meta.attemptedPhysicalAddress))
                 ? (meta.attemptedPhysicalAddress >>> 0) : null,
-            diagnosticNote: `${faultingMnemonic ? faultingMnemonic + ' ' : ''}${type} fault${faultLabel ? ' in ' + faultLabel : ''}: ${message}`,
+            diagnosticNote: `${faultingMnemonic ? faultingMnemonic + ' ' : ''}${type} fault${faultLabel ? ' in ' + faultLabel : ''}: ${rawDiagnosticReason}`,
             tier: null,
             catchInvoked: false,
             irqInvoked: false,
@@ -6235,7 +6382,7 @@ class ChurchSimulator {
 
         // Always halt on first fault — the capability system reports the error;
         // the IDE does not attempt recovery or escalation.
-        this.output += `FAULT [${type}] at PC=${this.pc}: ${message}\n`;
+        this.output += `FAULT [${type}] at PC=${this.pc}: ${routedMessage}\n`;
         this.faultLog.push(entry);
         this.halted = true;
         this.running = false;
@@ -6543,6 +6690,9 @@ class ChurchSimulator {
             };
         }
         if (this.halted) return null;
+        // Start each attempt with fresh non-transfer identity so fetch/decode
+        // faults cannot inherit the preceding instruction's CALL destination.
+        this._captureFaultRoute(null);
         this.auditLog = [];
         this._tracePacketsBuf = [];  // clear per-instruction trace packet buffer
 
@@ -6648,6 +6798,11 @@ class ChurchSimulator {
             this.emit('stateChange', this.getState());
             return result;
         }
+
+        // Freeze execution identity before CALL or any other instruction can
+        // mutate CR14. Fault rendering must never infer the caller from the
+        // post-boundary register bank or from editor/registry metadata.
+        this._captureFaultRoute(d);
 
         // ── Hardware privilege fence ──────────────────────────────────────────────
         // CR12–CR15 are hardware-privileged; normal instructions may not name them.
@@ -7239,6 +7394,7 @@ class ChurchSimulator {
     _execIndexedCall(d) {
         const row = d.imm & 0x1F;
         const method = (d.imm >>> 5) & 0x7F;
+        this._captureCallTarget(null, method);
         const clistGT = this.cr[6].word0;
         if (ChurchSimulator.isNullGT(clistGT)) {
             this.fault('NULL_CAP', 'CALL: CR6 C-List is NULL');
@@ -7271,6 +7427,9 @@ class ChurchSimulator {
     }
 
     _execCall(d) {
+        const methodSelector = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
+        // Establish the selector even when no target GT can be resolved.
+        this._captureCallTarget(null, methodSelector);
         let sourceGT = d.indexedSourceGT !== undefined
             ? d.indexedSourceGT >>> 0
             : this.cr[d.crDst].word0;
@@ -7282,6 +7441,7 @@ class ChurchSimulator {
             return null;
         }
         let srcParsed = this.parseGT(sourceGT);
+        this._captureCallTarget(srcParsed, methodSelector);
         if (srcParsed.type === 0) {
             this.fault('TYPE', `CALL: GT type is NULL — cannot CALL a NULL GT`);
             return;
@@ -7308,6 +7468,7 @@ class ChurchSimulator {
             }
             sourceGT = informGT;
             srcParsed = this.parseGT(informGT);
+            this._captureCallTarget(srcParsed, methodSelector);
             this.output += `[LOADER] CALL: Outform→Inform promotion complete for NS[${nsSlot}], proceeding with CALL CR${d.crDst}\n`;
         }
         if (srcParsed.type !== 1 && srcParsed.type !== 3) {
@@ -7368,6 +7529,7 @@ class ChurchSimulator {
             this.fault(check.fault, `CALL: ${callCrLabel}: ${check.message}`);
             return null;
         }
+        this._captureCallTarget(check.parsed, methodSelector);
         const nsEntry = check.entry;
 
         const handler = this.nsHandlers[check.index];
