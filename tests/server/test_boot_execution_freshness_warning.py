@@ -138,8 +138,48 @@ def test_execution_freshness_excludes_bootstrap_identity_rejections(
                 "filename": "SelfTest.rejected.lump",
                 "version": 88,
                 "reason": "bootstrap-identity-invalid",
+                "currentToken": "4a000006",
+                "archived": False,
             }],
         }
+
+
+def test_execution_freshness_suppresses_rejected_history_superseded_by_valid_revision(
+        tmp_path, monkeypatch):
+    import server.bootstrap_identity as bootstrap_identity
+
+    expected_gt = 0x4A000006
+    _write_structural_lump(tmp_path, "SelfTest.v76.lump", expected_gt)
+    _write_structural_lump(tmp_path, "SelfTest.v95.lump", expected_gt)
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        {
+            "abstraction": "SelfTest", "filename": "SelfTest.v76.lump",
+            "token": "00000600", "lump_version": 76, "archived": True,
+        },
+        {
+            "abstraction": "SelfTest", "filename": "SelfTest.v95.lump",
+            "token": "4a000006", "lump_version": 95,
+        },
+    ]))
+    state = {"abstractions": [{
+        "name": "SelfTest", "slot": 6, "seq": 0,
+        "filename": "SelfTest.v95.lump",
+        "token": "4a000006", "lump_version": 95,
+    }]}
+    monkeypatch.setattr(
+        app_module,
+        "_bootstrap_snapshot_identity",
+        lambda _dir, entry, _inspected, **_kwargs: {
+            "valid": entry["lump_version"] == 95,
+        },
+    )
+    monkeypatch.setattr(
+        bootstrap_identity, "resident_inform_egt",
+        lambda _row: expected_gt,
+    )
+
+    assert app_module._boot_execution_freshness(
+        state, str(tmp_path)) == {"status": "current", "warnings": []}
 
 
 def test_update_to_latest_is_retired_without_mutating_repository(tmp_path, monkeypatch):

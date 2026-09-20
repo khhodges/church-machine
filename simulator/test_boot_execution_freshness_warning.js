@@ -179,6 +179,32 @@ if (!source.includes('_showLatestCompilationPromotion(token, target)')) {
 }
 
 context._renderBootExecutionFreshness({
+    executionFreshness: {
+        warnings: [],
+        failedSaves: [{
+            abstraction: 'SelfTest',
+            slot: 6,
+            token: '00000600',
+            currentToken: '4a000006',
+            filename: 'SelfTest.v76.lump',
+            version: 76,
+            archived: true,
+        }],
+    },
+});
+if (!banner.innerHTML.includes('IDE SAVE REPAIR REQUIRED') ||
+        !banner.innerHTML.includes('Review IDE repair') ||
+        banner.innerHTML.includes('Open recovered source') ||
+        banner.innerHTML.includes('Save LUMP')) {
+    throw new Error('historical identity incident still delegates compiler repair to the programmer');
+}
+if (!source.includes("_switchLumpTab(tk, 'history')") ||
+        !source.includes('await _lumpHistoryPreview(') ||
+        source.includes("'/diagnostic-source'")) {
+    throw new Error('historical incident does not open the IDE-owned History repair control');
+}
+
+context._renderBootExecutionFreshness({
     executionFreshness: { warnings: [] },
 });
 if (banner.style.display !== 'none') throw new Error('current execution warning did not clear');

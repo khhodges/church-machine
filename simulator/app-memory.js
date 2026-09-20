@@ -140,12 +140,15 @@ function _renderBootExecutionFreshness(state) {
         token: repair.token || null,
         revision: repair.version,
         failedSave: !!failed,
+        currentToken: failed && failed.currentToken || null,
+        archiveFilename: failed && failed.filename || null,
+        archived: failed && failed.archived === true,
     };
     const repairVersion = repair.version == null ? '' : ' v' + repair.version;
     const headline = failed
-        ? '<strong>SAVE FAILED.</strong> ' + String(failed.abstraction) +
-            repairVersion + ' was not installed because the new file contains a different ' +
-            'SelfTest ID than Namespace slot ' + String(failed.slot) + ' requires. ' +
+        ? '<strong>IDE SAVE REPAIR REQUIRED.</strong> ' + String(failed.abstraction) +
+            repairVersion + ' was not installed because its sealed identity does not match ' +
+            'authoritative Namespace slot ' + String(failed.slot) + '. ' +
             'The previous valid revision is still running and no saved data was replaced.'
         : '<strong>WARNING: SIMULATOR IS NOT RUNNING THE LATEST COMPILED CODE.</strong> ' +
             details.map(function(text) {
@@ -154,11 +157,11 @@ function _renderBootExecutionFreshness(state) {
             return span.innerHTML;
         }).join('; ');
     banner.innerHTML = '<div class="boot-execution-freshness-copy">' + headline +
-        (failed ? ' Open the recovered source, then click Save LUMP to create a corrected revision.' :
+        (failed ? ' Review the IDE-generated correction; the compiler and repository handle the repair internally.' :
             '. The newer revision cannot boot until the IDE repairs its saved identity.') +
         '<div id="bootExecutionUpdateStatus" class="boot-execution-update-status"></div></div>' +
         '<button type="button" id="bootExecutionUpdateButton" class="boot-execution-update-btn">' +
-        (failed ? 'Open source to save again' : 'Fix' + repairVersion + ' now') +
+        (failed ? 'Review IDE repair' : 'Fix' + repairVersion + ' now') +
         '</button>';
 /*
         '. Prepare a new boot image before treating simulator results as current.' +
@@ -282,46 +285,36 @@ async function _openBootExecutionUpdate() {
         return false;
     }
     if (target.failedSave) {
-        try {
-            const response = await fetch(
-                '/api/lump/' + encodeURIComponent(String(token).replace(/^0x/i, '')) +
-                '/diagnostic-source',
-                { cache: 'no-store' }
-            );
-            let body = null;
-            try { body = await response.json(); } catch (_) {}
-            if (!response.ok || !body || typeof body.source !== 'string' ||
-                    !body.source.length) {
-                throw new Error(body && body.error ||
-                    'The server did not return the saved source.');
-            }
-            const editor = document.getElementById('asmEditor');
-            if (!editor) throw new Error('The Programs editor is unavailable.');
-            editor.value = body.source;
-            editor.dispatchEvent(new Event('input', { bubbles: true }));
-            window._pendingBootstrapRepairMetadata =
-                body.metadata && typeof body.metadata === 'object'
-                    ? JSON.parse(JSON.stringify(body.metadata))
-                    : null;
-            window._editorOpenLumpToken = null;
-            window._pendingLumpData = null;
-            window._saveNSPreparedSnapshot = null;
-            if (typeof switchView === 'function') switchView('editor');
-            if (status) status.textContent =
-                'Source opened. Click Save LUMP to build and save the corrected revision.';
-            return true;
-        } catch (error) {
-            const failure = 'Source could not be opened: ' +
-                (error && error.message || String(error)) +
-                '. No data was changed.';
-            if (status) status.textContent = failure;
-            if (typeof appendOutput === 'function') appendOutput(failure, 'error');
-            if (button) {
-                button.disabled = false;
-                button.textContent = 'Try opening source again';
-            }
-            return false;
+        if (!target.archived || !target.currentToken || !target.archiveFilename ||
+                typeof switchView !== 'function' ||
+                typeof _switchLumpTab !== 'function' ||
+                typeof _lumpHistoryPreview !== 'function') {
+            throw new Error(
+                'This incident has no server-authorized historical repair plan. ' +
+                'The IDE will not publish it or weaken identity validation.');
         }
+        switchView('lumps');
+        if (typeof renderLumps === 'function') await renderLumps();
+        const tk = typeof _lumpTokenIdentity === 'function'
+            ? _lumpTokenIdentity(target.currentToken)
+            : String(target.currentToken).replace(/^0x/i, '').toLowerCase();
+        const liveLump = typeof _lumpsCache !== 'undefined' &&
+            Array.isArray(_lumpsCache)
+            ? _lumpsCache.find(item =>
+                _lumpTokenIdentity(item.token) === tk)
+            : null;
+        if (!liveLump || typeof _fetchAndShowLumpTimeline !== 'function') {
+            throw new Error('The authoritative live LUMP is unavailable. Reload the IDE.');
+        }
+        _lumpTimelineLoaded[tk] = true;
+        await _fetchAndShowLumpTimeline(target.currentToken, liveLump);
+        _switchLumpTab(tk, 'history');
+        await _lumpHistoryPreview(
+            target.token, Number(target.revision), 0, 0, 0, tk, true,
+            target.currentToken, target.archiveFilename, false);
+        if (status) status.textContent =
+            'Review and approve the listed IDE-generated corrections. The archive remains unchanged.';
+        return true;
     }
     if (typeof window._showLatestCompilationPromotion !== 'function') {
         if (status) status.textContent = 'Repair could not open. Reload the IDE and click Fix again.';

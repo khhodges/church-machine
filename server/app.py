@@ -5821,6 +5821,7 @@ def _boot_execution_freshness(state, lumps_dir):
             from server.bootstrap_identity import resident_inform_egt
             expected_self = resident_inform_egt(selected)
             compatible = []
+            rejected = []
             inspected_any = False
             for entry in candidates:
                 raw = open(os.path.join(lumps_dir, entry["filename"]), "rb").read()
@@ -5853,18 +5854,46 @@ def _boot_execution_freshness(state, lumps_dir):
                 # impossible promotion flow for it.
                 if (bootstrap_identity is not None
                         and bootstrap_identity.get("valid") is not True):
-                    failed_saves.append({
+                    rejected.append({
                         "abstraction": name,
                         "slot": selected.get("slot"),
                         "token": entry.get("token"),
                         "filename": entry.get("filename"),
                         "version": entry.get("lump_version"),
                         "reason": "bootstrap-identity-invalid",
+                        "currentToken": selected.get("token"),
+                        "archived": entry.get("archived") is True,
                     })
                     continue
                 compatible.append(entry)
             if inspected_any:
                 candidates = compatible
+                # A rejected immutable archive is an actionable incident only
+                # while it is newer than every exact, identity-valid revision.
+                # In particular, a persisted v76 diagnostic must not keep
+                # asking to replace an authoritative v95 (or later) SelfTest.
+                # Version comparison is used only after binary/SELF validation
+                # above; manifest prose alone is never treated as evidence.
+                valid_versions = [
+                    entry.get("lump_version") for entry in compatible
+                    if isinstance(entry.get("lump_version"), int)
+                ]
+                selected_version = selected.get("lump_version")
+                selected_is_valid = any(
+                    entry.get("filename") == selected.get("filename")
+                    and entry.get("token") == selected.get("token")
+                    for entry in compatible
+                )
+                if selected_is_valid and isinstance(selected_version, int):
+                    valid_versions.append(selected_version)
+                newest_valid_version = max(valid_versions) if valid_versions else None
+                for incident in rejected:
+                    incident_version = incident.get("version")
+                    if (isinstance(newest_valid_version, int)
+                            and isinstance(incident_version, int)
+                            and incident_version <= newest_valid_version):
+                        continue
+                    failed_saves.append(incident)
         except (OSError, ValueError, KeyError, TypeError):
             pass
         if not candidates:
