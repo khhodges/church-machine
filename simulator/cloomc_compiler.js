@@ -49,12 +49,14 @@ class CLOOMCCompiler {
             BFEXT: 18, BFINS: 19,
             MCMP: 20, IADD: 21, ISUB: 22,
             BRANCH: 23, SHL: 24, SHR: 25,
+            WORD: 0x1E,
         };
         this.conditions = {
             EQ: 0, NE: 1, CS: 2, CC: 3,
             MI: 4, PL: 5, VS: 6, VC: 7,
             HI: 8, LS: 9, GE: 10, LT: 11,
             GT: 12, LE: 13, AL: 14, NV: 15,
+            HS: 2, LO: 3,
         };
         this.DR_ARGS_START = 1;
         this.DR_ARGS_END = 3;
@@ -73,6 +75,39 @@ class CLOOMCCompiler {
         // artifact builder.
         this.nativeCapabilityPredicates = false;
         this.setMethodConventions(methodConventions);
+    }
+
+    _nativeMnemonic(text, requireUppercase = false) {
+        const match = String(text || '').match(/^([A-Za-z][A-Za-z0-9]*)(?=\s|$)/);
+        if (!match || (requireUppercase && match[1] !== match[1].toUpperCase())) return null;
+        const mnemonic = match[1].toUpperCase();
+
+        // Match ChurchAssembler._assembleLine exactly: a complete opcode name,
+        // optionally followed by one complete condition code. A startsWith-only
+        // check would incorrectly admit junk such as LOADNEVER or BRANCHXYZ.
+        for (const name of Object.keys(this.opcodes)) {
+            if (mnemonic === name) return { mnemonic, opcode: name, condition: 'AL' };
+            if (!mnemonic.startsWith(name)) continue;
+            const suffix = mnemonic.slice(name.length);
+            if (Object.prototype.hasOwnProperty.call(this.conditions, suffix)) {
+                return { mnemonic, opcode: name, condition: suffix };
+            }
+        }
+
+        // Assembler pass-one pseudo-instructions are not opcode-table entries.
+        if (mnemonic === 'HALT' || mnemonic === 'NOP') {
+            return { mnemonic, opcode: mnemonic, condition: 'AL', pseudo: true };
+        }
+        if (mnemonic === 'MVN') {
+            return { mnemonic, opcode: 'MVN', condition: 'AL', pseudo: true };
+        }
+        if (mnemonic.startsWith('MVN')) {
+            const suffix = mnemonic.slice(3);
+            if (Object.prototype.hasOwnProperty.call(this.conditions, suffix)) {
+                return { mnemonic, opcode: 'MVN', condition: suffix, pseudo: true };
+            }
+        }
+        return null;
     }
 
     static _normalizeAbstractionName(name) {
@@ -1184,7 +1219,6 @@ class CLOOMCCompiler {
     }
 
     _detectAssembly(source) {
-        const CM_MNEMONICS = /^(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|WORD|NOP)(\s|$|\.)/ ;
         const lines = source.split('\n');
         let score = 0;
         for (const line of lines) {
@@ -1192,7 +1226,7 @@ class CLOOMCCompiler {
             if (!t) continue;
             if (t.startsWith(';')) { score++; continue; }
             if (/^[A-Za-z_]\w*:\s*$/.test(t)) { score++; continue; }
-            if (CM_MNEMONICS.test(t)) { score += 2; continue; }
+            if (this._nativeMnemonic(t, true)) { score += 2; continue; }
             if (/^\.pet\s+/i.test(t) || /^\.word\s+/i.test(t)) { score += 2; continue; }
         }
         return score >= 2;
@@ -1876,7 +1910,7 @@ class CLOOMCCompiler {
             if (semicolonAt >= 0) {
                 const beforeSemicolon = statementText.slice(0, semicolonAt).trim();
                 if (/^[A-Za-z_]\w*:$/.test(beforeSemicolon) ||
-                        /^(?:LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|ASR|HALT|NOP)(?:\s|$)/i.test(beforeSemicolon)) {
+                        this._nativeMnemonic(beforeSemicolon)) {
                     statementText = beforeSemicolon;
                 }
             }
@@ -2247,18 +2281,19 @@ class CLOOMCCompiler {
         // Keep the assembler as the single owner of instruction syntax/encoding,
         // but resolve the convenient two-operand named LOAD form against this
         // abstraction's C-List before handing the statement over.
-        const rawInstruction = /^(?!CALL\s+\w+\.\w+\s*\()(LOAD|SAVE|CALL|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|NV)?|SHL|SHR|ASR|HALT|NOP)(?=\s|$)/i;
-        if (rawInstruction.test(text)) {
+        const nativeInstruction = this._nativeMnemonic(text);
+        const highLevelCall = /^CALL\s+\w+\.\w+\s*\(/i.test(text);
+        if (nativeInstruction && !highLevelCall) {
             // A method is compiled statement-by-statement, while the assembler's
             // own label pass requires the whole source.  Keep method-local labels
             // in this compiler pass so both forward and backward native branches
             // resolve after every statement has been seen.
-            const symbolicBranch = text.match(
-                /^BRANCH(EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?\s+([A-Za-z_]\w*)$/i
-            );
+            const symbolicBranch = nativeInstruction.opcode === 'BRANCH'
+                ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+([A-Za-z_]\w*)$/)
+                : null;
             if (symbolicBranch) {
-                const suffix = (symbolicBranch[1] || 'AL').toUpperCase();
-                const label = symbolicBranch[2];
+                const suffix = nativeInstruction.condition;
+                const label = symbolicBranch[1];
                 const branchAddr = code.length;
                 code.push(this.encode(this.opcodes.BRANCH, this.conditions[suffix], 0, 0, 0));
                 labelRefs.push({
@@ -2272,7 +2307,9 @@ class CLOOMCCompiler {
             }
 
             let asmText = text;
-            const namedLoad = text.match(/^LOAD\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_]*)$/i);
+            const namedLoad = nativeInstruction.opcode === 'LOAD'
+                ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_]*)$/i)
+                : null;
             if (namedLoad) {
                 const capName = namedLoad[2];
                 const row = rom[capName.toUpperCase()];
@@ -2284,7 +2321,7 @@ class CLOOMCCompiler {
                     });
                     return;
                 }
-                asmText = `LOAD ${namedLoad[1].toUpperCase()}, CR6, #${row}`;
+                asmText = `${nativeInstruction.mnemonic} ${namedLoad[1].toUpperCase()}, CR6, #${row}`;
             }
 
             const AsmClass = typeof ChurchAssembler !== 'undefined'
@@ -4450,14 +4487,13 @@ class CLOOMCCompiler {
         // files over the englishScore >= 3 threshold, hijacking them away
         // from _detectAssembly. Skip any line whose raw (pre-lowercase) first
         // token is a known CM mnemonic before scoring it.
-        const _cmMnemonicLine = /^(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV)?|SHL|SHR|WORD|NOP)(\s|$|\.)/;
         const lines = source.split('\n');
         let englishScore = 0;
         let hasBlockMethod = false;
         let hasEnglishBody = false;
         for (const line of lines) {
             const rawTrim = line.trim();
-            if (!rawTrim || _cmMnemonicLine.test(rawTrim)) continue;
+            if (!rawTrim || this._nativeMnemonic(rawTrim, true)) continue;
             const t = rawTrim.toLowerCase();
             if (!t || t.startsWith('//') || t.startsWith('--')) continue;
             if (t.match(/^english\s+abstraction\s+/)) return true;
@@ -4946,7 +4982,6 @@ class CLOOMCCompiler {
 
         const lines = source.split('\n');
         let petNameScore = 0;
-        const asmMnemonics = /^\s*(LOAD|SAVE|CALL|RETURN|CHANGE|SWITCH|TPERM|LAMBDA|ELOADCALL|XLOADLAMBDA|DREAD|DWRITE|BFEXT|BFINS|MCMP|IADD|ISUB|BRANCH\w*|SHL|SHR|ASR|HALT|NOP)\b/i;
         const operatorPattern = /^\s*[A-Za-z_]\w*\s*=\s*[A-Za-z_\d]\S*\s*[\+\-\*\/%\^]\s*/;
         const assignPattern = /^\s*[A-Za-z_]\w*\s*=\s*.+/;
         const petLoadPattern = /^\s*LOAD\s+([A-Za-z_]\w*(?:\[\d+\])?)\s*$/i;
@@ -4956,7 +4991,7 @@ class CLOOMCCompiler {
             if (!t || t.startsWith(';') || t.startsWith('//') || t.startsWith('--')) continue;
             const petLoad = t.match(petLoadPattern);
             if (petLoad && !/^(CR\d+|DR\d+)$/i.test(petLoad[1])) { petNameScore += 3; exprLines++; continue; }
-            if (asmMnemonics.test(t)) continue;
+            if (this._nativeMnemonic(t)) continue;
             if (funcPattern.test(t)) { petNameScore += 3; exprLines++; continue; }
             if (constPattern && constPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
             if (operatorPattern.test(t)) { petNameScore += 2; exprLines++; continue; }
