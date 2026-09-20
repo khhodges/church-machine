@@ -450,22 +450,40 @@
         context = context || {};
         const errors = [];
         const results = [];
+        const pendingRows = Array.isArray(context.compilerPendingRows)
+            ? context.compilerPendingRows : [];
         for (let i = 0; i < resolvedCaps.length; i++) {
             const word = (words[clistStart + i] || 0) >>> 0;
-            // This is the sole client-side exception for a placeholder during
-            // the save flow.  It is intentionally narrow: exact compiler
-            // provenance, exact c-list row zero, and the exact SELF marker.
-            // Final validation omits allowCompilerSelfPlaceholder, so an
-            // unresolved marker can never be approved or persisted.
+            // This is the sole client-side exception for an unbound SELF during
+            // candidate preparation. It is intentionally narrow: exact compiler
+            // provenance and exact c-list row zero. Server compiler artifacts
+            // serialize that row as zero; older browser artifacts use the SELF
+            // marker. Final validation omits allowCompilerSelfPlaceholder.
             const allowSelfPlaceholder =
                 context.allowCompilerSelfPlaceholder === true &&
                 i === 0 &&
                 isCompilerOwnedSelf(resolvedCaps[i]) &&
-                word === _selfPlaceholder(context);
-            const check = allowSelfPlaceholder
+                (word === 0 || word === _selfPlaceholder(context));
+            const declaredPending = pendingRows.find(row =>
+                row && row.pending_symbolic === true &&
+                Number(row.relocation_row) === i);
+            const capName = String(resolvedCaps[i] && resolvedCaps[i].name || '');
+            const capRights = normalizeRights(
+                resolvedCaps[i] && (resolvedCaps[i].rights || resolvedCaps[i].grants));
+            const declaredRights = normalizeRights(
+                declaredPending && declaredPending.rights);
+            const allowAuthenticatedPending =
+                word === 0 &&
+                i > 0 &&
+                declaredPending &&
+                String(declaredPending.name || '').toUpperCase() === capName.toUpperCase() &&
+                declaredRights.join('') === capRights.join('');
+            const check = (allowSelfPlaceholder || allowAuthenticatedPending)
                 ? {
                     ok: true, error: null, parsed: null,
-                    compiler_owned_self: true, intermediate: true,
+                    ...(allowSelfPlaceholder ? { compiler_owned_self: true } :
+                        { pending_symbolic: true, name: capName }),
+                    intermediate: true,
                 }
                 : validateToken(word, resolvedCaps[i], context);
             results.push(check);

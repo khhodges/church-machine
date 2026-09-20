@@ -81,6 +81,24 @@ def _compile(tier=None):
     return result, words
 
 
+@pytest.mark.parametrize("tier,expected_size", [(0, 64), (1, 64), (2, 8192)])
+def test_worker_profiles_keep_self_at_signed_binary_tail(tier, expected_size):
+    """API/Compact/Full all derive C-list placement from final framed bytes."""
+    source = ("// " + ("generated source frame " * 900) + "\n"
+              "abstraction ProfileCheck { method Run() { return(1) } }\n")
+    payload = {"source": source, "language": "auto", "tier": tier}
+    out = subprocess.run(
+        ["node", os.path.join(ROOT, "server", "compile_worker.js")],
+        input=json.dumps(payload).encode(), capture_output=True, timeout=60)
+    result = json.loads(out.stdout)
+    assert result.get("ok"), result
+    words = result["words"]
+    header = _header(words)
+    assert len(words) == header["size"] == expected_size
+    assert header["cc"] == 1
+    assert words[len(words) - header["cc"]] == 0
+
+
 def _header(words):
     hdr = words[0]
     return {"cw": (hdr >> 10) & 0x1FFF, "cc": hdr & 0xFF,

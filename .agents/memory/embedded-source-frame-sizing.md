@@ -17,3 +17,15 @@ fallback Save, must use the same final frame words before placing the C-list;
 server preflight should reject any recognized 0xAB frame whose declared
 API/source extent exceeds the declared freespace, with a specific allocation
 error.
+
+When browser-preliminary output is replaced by a signed server artifact, all
+layout metadata must switch to that artifact together; never repair its signed
+words to fit the preliminary browser layout.
+
+**Why:** Full-source framing can enlarge the server allocation independently
+of the browser estimate. Mixing the old C-list offset with the new binary
+incorrectly rejects valid compiler output and tempts unsafe byte rewriting.
+
+**How to apply:** At the authenticated artifact handoff, derive allocation,
+code extent, and C-list tail from the final header and byte length before
+candidate validation. Test the whole handoff, not only either compiler.

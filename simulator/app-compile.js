@@ -959,7 +959,7 @@ function _isCompilerSelfCapability(cap) {
         (name === 'SELF' || name === '__SELF__'));
 }
 
-function _validateCompiledCandidateClist(words, clistStart, resolvedCaps) {
+function _validateCompiledCandidateClist(words, clistStart, resolvedCaps, compilerRecord) {
     const binary = Array.from(words || [], word => Number(word) >>> 0);
     const caps = Array.isArray(resolvedCaps) ? resolvedCaps : [];
     const errors = [];
@@ -985,10 +985,42 @@ function _validateCompiledCandidateClist(words, clistStart, resolvedCaps) {
         const validation = CapabilityTokens.validateClist(
             binary, clistStart, caps,
             { sim: typeof sim !== 'undefined' ? sim : null,
-                allowCompilerSelfPlaceholder: true });
+                allowCompilerSelfPlaceholder: true,
+                compilerPendingRows: compilerRecord &&
+                    Array.isArray(compilerRecord.capability_rows)
+                    ? compilerRecord.capability_rows : [] });
         if (!validation.ok) errors.push(...validation.errors);
     }
     return { ok: errors.length === 0, errors };
+}
+
+function _deriveCompiledLumpLayout(words) {
+    const binary = Array.from(words || [], word => Number(word) >>> 0);
+    if (binary.length === 0) {
+        return { ok: false, error: 'The authenticated compiler artifact has no words.' };
+    }
+    const header = binary[0] >>> 0;
+    const tag = header >>> 27;
+    const allocationWords = 64 << ((header >>> 23) & 0x0F);
+    const cw = (header >>> 10) & 0x1FFF;
+    const cc = header & 0xFF;
+    const clistStart = binary.length - cc;
+    if (tag !== 0x1F) {
+        return { ok: false, error: `Header type is 0x${tag.toString(16)}, expected LUMP type 0x1f.` };
+    }
+    if (allocationWords !== binary.length) {
+        return {
+            ok: false,
+            error: `Header declares ${allocationWords} words but the authenticated artifact contains ${binary.length}.`,
+        };
+    }
+    if (1 + cw > clistStart) {
+        return {
+            ok: false,
+            error: `Code ends at word ${cw}, overlapping the C-list at word ${clistStart}.`,
+        };
+    }
+    return { ok: true, header, allocationWords, cw, cc, clistStart };
 }
 
 // The bootstrap has no symbolic/token projection layer: its sole identifier is
@@ -1861,7 +1893,7 @@ async function compileAndBuild(options) {
     // ─────────────────────────────────────────────────────────────────────────
 
     const codeRegion = [...allCode];
-    const cw = codeRegion.length;
+    let cw = codeRegion.length;
     if (cw === 0) {
         const _emptyCodeError = 'Compile produced no executable instruction words.';
         if (con) con.textContent = `Compile failed: ${_emptyCodeError}`;
@@ -1933,7 +1965,7 @@ async function compileAndBuild(options) {
     let nMinus6 = 0;
     while ((64 << nMinus6) < lumpSize) nMinus6++;
 
-    const header = ((0x1F & 0x1F) << 27) |
+    let header = ((0x1F & 0x1F) << 27) |
                    ((nMinus6 & 0x0F) << 23) |
                    ((cw & 0x1FFF) << 10) |
                    ((0 & 0x03) << 8) |
@@ -1947,7 +1979,7 @@ async function compileAndBuild(options) {
     for (let i = 0; i < _frameWords.length; i++) {
         lumpWords[_frameStart + i] = _frameWords[i] >>> 0;
     }
-    const clistStart = lumpSize - cc;
+    let clistStart = lumpSize - cc;
     const _capContext = {
         sim: (typeof sim !== 'undefined' ? sim : null),
         lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
@@ -2028,6 +2060,39 @@ async function compileAndBuild(options) {
     // carried unchanged through preflight and save.
     if (Array.isArray(result.words) && result.compiler_record) {
         lumpWords = Uint32Array.from(result.words, word => Number(word) >>> 0);
+        const _signedLayout = _deriveCompiledLumpLayout(lumpWords);
+        if (!_signedLayout.ok || _signedLayout.cc !== cc) {
+            const _layoutReason = !_signedLayout.ok
+                ? _signedLayout.error
+                : `Header declares ${_signedLayout.cc} C-list rows but compiler metadata has ${cc}.`;
+            const _layoutError = {
+                line: null,
+                message: '[ARTIFACT-LAYOUT] The IDE could not admit the authenticated compiler artifact.',
+                detail: _layoutReason,
+            };
+            if (con) {
+                con.textContent =
+                    'Compile failed — internal generated-artifact layout mismatch.\n' +
+                    'This is an IDE/compiler integration error, not a capability declaration or source syntax error.\n' +
+                    `Technical detail: ${_layoutReason}\n\n` +
+                    'No candidate was created or persisted. Your draft and the previous runnable candidate are unchanged.\n' +
+                    'Reload the IDE to obtain matching generated assets, then build again. If it repeats, report the technical detail.';
+                con.scrollTop = 0;
+            }
+            if (typeof _showAsmErrors === 'function') {
+                _showAsmErrors([_layoutError],
+                    'Internal compiler artifact mismatch — candidate not created');
+            }
+            showNextSteps('error');
+            return { ok: false, kind: 'integration', error: _layoutReason, errors: [_layoutError] };
+        }
+        // The authenticated words are authoritative.  In particular, embedding
+        // Full source can grow 2K preliminary output to 8K and relocate the
+        // C-list.  Never retain browser-preliminary offsets for signed bytes.
+        header = _signedLayout.header;
+        lumpSize = _signedLayout.allocationWords;
+        cw = _signedLayout.cw;
+        clistStart = _signedLayout.clistStart;
     }
     const resolvedCaps = _capMaterialized.resolvedCaps;
     const _candidateCLOOMCLump = {
@@ -2038,22 +2103,27 @@ async function compileAndBuild(options) {
     const _candidateClistValidation = _validateCompiledCandidateClist(
         _candidateCLOOMCLump.words,
         _candidateCLOOMCLump.clistStart,
-        _candidateCLOOMCLump.resolvedCaps);
+        _candidateCLOOMCLump.resolvedCaps,
+        result.compiler_record);
     if (!_candidateClistValidation.ok) {
         const _candidateErrors = _candidateClistValidation.errors.map(message => ({
             line: null,
-            message: `[CAP-GT] ${message}`,
+            message: '[CAP-GT] The generated capability binding could not be admitted.',
+            detail: message,
         }));
         const _candidateMessage =
-            'Capability validation failed — compiled candidate not created:\n' +
-            _candidateClistValidation.errors.join('\n');
+            'Compile failed — generated capability binding was not admitted.\n' +
+            'The source compiled, but a declared dependency did not match the authenticated compiler rows or current binding policy.\n' +
+            `Technical detail: ${_candidateClistValidation.errors.join('\n')}\n\n` +
+            'No candidate was created or persisted. Your draft and the previous runnable candidate are unchanged.\n' +
+            'Check the capability name/rights and Namespace binding, then build again. Do not discard the draft.';
         if (con) {
             con.textContent = _candidateMessage;
             con.scrollTop = 0;
         }
         if (typeof _showAsmErrors === 'function') {
             _showAsmErrors(_candidateErrors,
-                'Capability validation failed — candidate not created');
+                'Capability binding not admitted — candidate not created');
         }
         showNextSteps('error');
         return {

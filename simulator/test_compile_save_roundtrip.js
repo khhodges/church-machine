@@ -134,6 +134,8 @@ const context = {
     _runStopped: false,
     _compileDraftToken: null,
     _autoFillCapRights() {},
+    _activeCompileClistSlots() { return {}; },
+    _compileWithActiveClist(source) { return context.cloomcCompiler.compile(source); },
     requirePermission() { return true; },
     onLangChange() {},
     _clearAsmErrors() {},

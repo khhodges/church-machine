@@ -544,6 +544,12 @@ function _showAsmErrors(errors, titleOverride, action) {
                   + pickBtn
                   + '</div>';
         }
+        if (e.detail) {
+            html += '<details class="asm-error-suggestion">'
+                  + '<summary>Technical details</summary>'
+                  + '<pre class="aes-example">' + _escHtml(e.detail) + '</pre>'
+                  + '</details>';
+        }
         html += '</li>';
     });
     html += '</ul>';

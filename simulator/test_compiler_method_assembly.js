@@ -107,6 +107,12 @@ const workerResult = JSON.parse(worker.stdout);
 assert.equal(workerResult.ok, true, workerResult.error);
 assert.equal(workerResult.language, 'javascript');
 assert.equal(workerResult.methods[0].name, 'Run');
+assert.deepEqual(workerResult.capabilities.map(cap => ({
+    name: cap.name, row: cap.relocation_row, pending: cap.pending_symbolic,
+})), [
+    { name: 'SELF', row: 0, pending: false },
+    { name: 'Next', row: 1, pending: true },
+]);
 assert.equal(workerResult.compiler_record.source_hash,
     crypto.createHash('sha256').update(Buffer.from(wrapped, 'utf8')).digest('hex'));
 

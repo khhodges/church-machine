@@ -69,6 +69,72 @@ console.log('\n--- compiler SELF placeholder boundary ---');
         !final.ok && /placeholder/.test(final.errors.join(' '))
     );
 
+    const signedServerWords = new Array(64).fill(0);
+    const signedIntermediate = CapabilityTokens.validateClist(
+        signedServerWords, 63, resolved,
+        { sim, allowCompilerSelfPlaceholder: true }
+    );
+    const signedFinal = CapabilityTokens.validateClist(
+        signedServerWords, 63, resolved, { sim }
+    );
+    check(
+        'server-signed unbound SELF is accepted only during candidate preparation',
+        signedIntermediate.ok && signedIntermediate.results[0].intermediate === true
+    );
+    check(
+        'server-signed unbound SELF remains rejected by strict final validation',
+        !signedFinal.ok
+    );
+
+    const declaredNext = {
+        name: 'Next', rights: ['E'], grants: ['E'], nsIndex: null,
+    };
+    const signedPortable = new Array(64).fill(0);
+    const authenticatedPending = CapabilityTokens.validateClist(
+        signedPortable, 62, [self, declaredNext], {
+            sim,
+            allowCompilerSelfPlaceholder: true,
+            compilerPendingRows: [{
+                name: 'Next', rights: ['E'], relocation_row: 1,
+                pending_symbolic: true,
+            }],
+        }
+    );
+    check(
+        'exact authenticated named pending dependency is accepted for candidate preparation',
+        authenticatedPending.ok &&
+            authenticatedPending.results[1].pending_symbolic === true
+    );
+    const wrongPendingName = CapabilityTokens.validateClist(
+        signedPortable, 62, [self, declaredNext], {
+            sim,
+            allowCompilerSelfPlaceholder: true,
+            compilerPendingRows: [{
+                name: 'Other', rights: ['E'], relocation_row: 1,
+                pending_symbolic: true,
+            }],
+        }
+    );
+    check(
+        'pending dependency metadata with the wrong row name is rejected',
+        !wrongPendingName.ok
+    );
+    signedPortable[63] = 0x12345678;
+    const tamperedPendingWord = CapabilityTokens.validateClist(
+        signedPortable, 62, [self, declaredNext], {
+            sim,
+            allowCompilerSelfPlaceholder: true,
+            compilerPendingRows: [{
+                name: 'Next', rights: ['E'], relocation_row: 1,
+                pending_symbolic: true,
+            }],
+        }
+    );
+    check(
+        'nonzero tampering of an authenticated pending row is rejected',
+        !tamperedPendingWord.ok
+    );
+
     const misplacedWords = new Array(64).fill(0);
     misplacedWords[62] = sim.createGT(0, 4, { E: 1 }, 1) >>> 0;
     misplacedWords[63] = placeholder;

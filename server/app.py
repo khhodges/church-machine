@@ -19850,6 +19850,18 @@ def api_compile():
             "cw": (_compile_words[0] >> 10) & 0x1FFF,
             "cc": _compile_words[0] & 0xFF,
             "static_validated": True,
+            "capability_rows": [
+                {
+                    "name": str(cap.get("name") or ""),
+                    "rights": list(cap.get("rights") or []),
+                    "relocation_row": int(cap.get("relocation_row", row)),
+                    "compiler_owned_self": bool(cap.get("compiler_owned_self")),
+                    "symbolic_self": bool(cap.get("symbolic_self")),
+                    "pending_symbolic": bool(cap.get("pending_symbolic")),
+                }
+                for row, cap in enumerate(result.get("capabilities") or [])
+                if isinstance(cap, dict)
+            ],
             "compiler_identity": "Trusted Home IDE compiler",
             "compiler_version": "server-compile-v1",
         }

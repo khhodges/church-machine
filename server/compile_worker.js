@@ -274,12 +274,21 @@ if (isMainThread) {
         visibility: m.visibility || 'public',
         ...(m.aliasOf ? { aliasOf: m.aliasOf } : {}),
     }));
+    const capabilities = (compileResult.capabilities || []).map((cap, row) => ({
+        name: String(cap && cap.name || ''),
+        rights: Array.isArray(cap && cap.rights) ? cap.rights.slice() : [],
+        relocation_row: row,
+        compiler_owned_self: !!(cap && cap.compiler_owned_self),
+        symbolic_self: !!(cap && cap.symbolic_self),
+        pending_symbolic: !(cap && (cap.compiler_owned_self || cap.symbolic_self)),
+    }));
 
     parentPort.postMessage({
         ok:              true,
         language:        compileResult.language || language,
         abstractionName: compileResult.abstractionName || '',
         methods,
+        capabilities,
         words:           Array.from(words),
         lump_binary,
         compiler_record,
