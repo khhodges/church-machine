@@ -1655,12 +1655,11 @@ function _lumpSrcToggle(bodyId, headerEl) {
 }
 
 // Open a LUMP method in the assembly editor (without requiring Abstractions tab DOM)
-function _lumpSrcEditMethod(absIdx, mName) {
+async function _lumpSrcEditMethod(absIdx, mName) {
     const key = `${absIdx}:${mName}`;
     const abs = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry)
         ? abstractionRegistry.getAbstraction(absIdx) : null;
     let code;
-    window._advanceEditorNavigationEpoch('edit LUMP method source');
     if (userMethodData && userMethodData[key] && userMethodData[key].example) {
         code = userMethodData[key].example;
     } else {
@@ -1669,11 +1668,14 @@ function _lumpSrcEditMethod(absIdx, mName) {
         code = (examples && examples[mName])
             || `; ${abs ? abs.name + '.' : ''}${mName}\n; Write CLOOMC++ assembly here and click Compile & Save.\n`;
     }
-    if (typeof switchView === 'function') switchView('editor');
-    const sel = document.getElementById('langSelector');
-    if (sel) sel.value = 'assembly';
     const asmEd = document.getElementById('asmEditor');
     if (asmEd) {
+        if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+            asmEd, code, 'Open this method body in the assembly editor, replacing the current source.')) return;
+        window._advanceEditorNavigationEpoch('edit LUMP method source');
+        if (typeof switchView === 'function') switchView('editor');
+        const sel = document.getElementById('langSelector');
+        if (sel) sel.value = 'assembly';
         asmEd.value = code;
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
     }
@@ -4027,7 +4029,7 @@ async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, arc
     }
 }
 
-function _openLumpHistorySourceInEditor(source, name, version) {
+async function _openLumpHistorySourceInEditor(source, name, version) {
     if (typeof source !== 'string' || !source.trim()) return;
     const editor = document.getElementById('asmEditor');
     if (!editor || typeof createUserTab !== 'function') {
@@ -4039,14 +4041,16 @@ function _openLumpHistorySourceInEditor(source, name, version) {
     const previousLanguage = (document.getElementById('langSelector') || {}).value;
     const needsBackup = (typeof activeUserTabId === 'undefined' || !activeUserTabId) &&
         previousSource && previousSource.trim();
-    window._editorSourceFilePath = null;
-    window._activeBuiltInKey = null;
-    if (needsBackup) {
-        createUserTab('Previous editor draft', previousLanguage || 'assembly', previousSource);
-    }
     const language = typeof _isRawISASource === 'function' && _isRawISASource(source)
         ? 'assembly' : 'cloomc';
-    createUserTab(name, language, source, Number(version));
+    if (!await createUserTab(name, language, source, Number(version))) return;
+    if (needsBackup) {
+        userTabs.push({id: generateTabId(), name: 'Previous editor draft',
+            lang: previousLanguage || 'assembly', code: previousSource});
+        _openFileCache = null;
+        saveUserTabsToStorage();
+        renderUserTabs();
+    }
     window._editorStartupBufferDirty = true;
     _closeLumpHistoryPreviewModal();
     switchView('editor');
@@ -4969,8 +4973,14 @@ function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
         }
     });
 
-    cancelBtn.addEventListener('click', () => {
-        if (ta.value !== text && !confirm('Discard changes?')) return;
+    cancelBtn.addEventListener('click', async () => {
+        var beforeCancel = ta.value;
+        if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
+            title: 'Discard text draft',
+            reason: 'Delete the browser recovery copy and restore the selected saved text.',
+            changes: ['Before:\n' + beforeCancel, 'After:\n' + text],
+        })) return;
+        if (ta.value !== beforeCancel) return;
         _lumpEditDirty = false;
         _lumpEditorOpen[tk] = false;
         delete _lumpEditorDraftText[tk];
@@ -6779,7 +6789,12 @@ async function _absOpenInEditorByName(name, methodName) {
             var _langSel = document.getElementById('langSelector');
             if (_langSel) _langSel.value = 'assembly';
             var _asmEd = document.getElementById('asmEditor');
-            if (_asmEd) { _asmEd.readOnly = false; _asmEd.value = _tmplLines.join('\n'); }
+            if (_asmEd) {
+                if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                    _asmEd, _tmplLines.join('\n'), 'Create a method template, replacing the current source.')) return;
+                _asmEd.readOnly = false;
+                _asmEd.value = _tmplLines.join('\n');
+            }
             switchView('editor');
             return;
         }
@@ -6969,6 +6984,18 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // every other view.  sim.memory is used only for structural location info
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
 async function openLumpInEditor(token, options) {
+    var _reviewEditor = document.getElementById('asmEditor');
+    var _reviewBefore = _reviewEditor ? _reviewEditor.value : '';
+    var _reviewEpoch = window._editorNavigationEpoch;
+    if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
+        title: 'Open saved LUMP source',
+        reason: 'Opening this artifact replaces the editor context and source with the selected saved LUMP. A different browser copy is not proof of unsaved work.',
+        changes: ['Selected artifact token: ' + token,
+            'Current editor source:\n' + _reviewBefore,
+            'The repository binary is not changed by opening it. Browser draft storage is retained.'],
+    })) return;
+    if ((_reviewEditor && _reviewEditor.value !== _reviewBefore) ||
+            window._editorNavigationEpoch !== _reviewEpoch) return;
     // Opening a LUMP is normally explicit navigation. Claim that authority
     // synchronously, before the artifact fetch, so the asynchronous startup
     // default cannot replace a Namespace/editor selection that is still
@@ -7842,7 +7869,7 @@ async function openLumpInEditor(token, options) {
             _draftBanner.id = '_lumpDraftBanner';
             _draftBanner.className = 'lump-draft-restore-banner';
             _draftBanner.innerHTML =
-                '<strong>Unsaved draft available</strong>' +
+                '<strong>Different browser copy available</strong>' +
                 '<span class="lump-draft-copy" title="The editor is showing the latest saved LUMP source. Your browser draft is preserved until you restore or discard it.">Showing latest saved source.</span>' +
                 '<button class="btn btn-sm lump-draft-restore-btn" id="_lumpDraftBannerRestore">Restore Draft</button>' +
                 '<button class="btn btn-sm lump-draft-discard-btn" id="_lumpDraftBannerDiscard">Discard Draft</button>';
@@ -7853,7 +7880,9 @@ async function openLumpInEditor(token, options) {
             var _bannerDiscardBtn = _draftBanner.querySelector('#_lumpDraftBannerDiscard');
             var _bannerRestoreBtn = _draftBanner.querySelector('#_lumpDraftBannerRestore');
             if (_bannerRestoreBtn) {
-                _bannerRestoreBtn.addEventListener('click', function() {
+                _bannerRestoreBtn.addEventListener('click', async function() {
+                    if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                        asmEd, _savedDraft, 'Restore the preserved browser copy instead of the selected binary source.')) return;
                     window._advanceEditorNavigationEpoch('restore saved LUMP draft');
                     _setSavedLumpEditorSource(_savedDraft);
                     if (typeof saveEditorState === 'function') saveEditorState();
@@ -7868,7 +7897,14 @@ async function openLumpInEditor(token, options) {
                 });
             }
             if (_bannerDiscardBtn) {
-                _bannerDiscardBtn.addEventListener('click', function() {
+                _bannerDiscardBtn.addEventListener('click', async function() {
+                    if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
+                        title: 'Delete browser draft',
+                        reason: 'Discard permanently removes this browser recovery copy and restores the selected saved source.',
+                        changes: ['Copy to delete:\n' + _savedDraft,
+                            'Replacement:\n' + (window._editorOriginalDisasm || '')],
+                    })) return;
+                    if (_draftLsGet(token) !== _savedDraft) return;
                     window._advanceEditorNavigationEpoch('discard saved LUMP draft');
                     _draftLsDel(token);
                     _setSavedLumpEditorSource(window._editorOriginalDisasm || '');
@@ -8001,7 +8037,18 @@ async function openLumpInEditor(token, options) {
     _discardBtn.className = 'ham-item lump-editor-discard-btn';
     _discardBtn.setAttribute('data-tooltip', 'Discard Draft — Clear recovered edits, restore the last saved source, and return to the LUMP panel');
     _discardBtn.textContent = 'Discard Draft';
-    _discardBtn.addEventListener('click', function() {
+    _discardBtn.addEventListener('click', async function() {
+        var _beforeDiscard = document.getElementById('asmEditor');
+        var _beforeText = _beforeDiscard ? _beforeDiscard.value : '';
+        var _beforeEpoch = window._editorNavigationEpoch;
+        if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
+            title: 'Discard LUMP edits',
+            reason: 'Delete the browser draft, replace editor source and return to the LUMP panel.',
+            changes: ['Before:\n' + _beforeText,
+                'After:\n' + (window._editorOriginalDisasm || '')],
+        })) return;
+        if ((_beforeDiscard && _beforeDiscard.value !== _beforeText) ||
+                window._editorNavigationEpoch !== _beforeEpoch) return;
         window._advanceEditorNavigationEpoch('discard saved LUMP edit');
         _draftLsDel(token);
         var _ed = document.getElementById('asmEditor');
@@ -8082,6 +8129,7 @@ async function openLumpInEditor(token, options) {
     if (window.IDEActions) window.IDEActions.refresh();
     if (typeof _refreshEditorJumpLinks === 'function') _refreshEditorJumpLinks();
     if (typeof saveEditorState === 'function') saveEditorState();
+    return true;
 }
 window._configuredBootLumpOpenerReady = true;
 if (typeof window._requestConfiguredBootLumpOpen === 'function') {

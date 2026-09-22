@@ -650,7 +650,7 @@
         }, 3200);
     }
 
-    function _removeUnusedCapabilities() {
+    async function _removeUnusedCapabilities() {
         var ed = activeEditor || document.getElementById('asmEditor');
         var popup = getOrCreatePopup();
         if (!ed) return;
@@ -696,6 +696,8 @@
         }
 
         var newBlock = _formatCapBlock(kept);
+        if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+            ed, before + newBlock + after, 'Remove unused capabilities from source.')) return;
         ed.value = before + newBlock + after;
         ed.dispatchEvent(new Event('input', { bubbles: true }));
 
@@ -708,7 +710,7 @@
     // CR0 is the immutable source/self capability and intentionally has no
     // delete control. Rewrite the same capabilities block used by POLA/Add so
     // the editor, compiler, and popup remain in sync.
-    function _deleteCapability(sourceIndex, displaySlot) {
+    async function _deleteCapability(sourceIndex, displaySlot) {
         var ed = activeEditor || document.getElementById('asmEditor');
         var popup = getOrCreatePopup();
         if (!ed || !Number.isInteger(sourceIndex) || sourceIndex < 0) return;
@@ -737,7 +739,10 @@
         var removed = userEntries[sourceIndex][0];
         userEntries.splice(sourceIndex, 1);
         var newBlock = _formatCapBlock(selfEntries.concat(userEntries));
-        ed.value = src.slice(0, cm.index) + newBlock + src.slice(cm.index + cm[0].length);
+        var replacement = src.slice(0, cm.index) + newBlock + src.slice(cm.index + cm[0].length);
+        if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+            ed, replacement, 'Delete the selected capability from source.')) return;
+        ed.value = replacement;
         ed.dispatchEvent(new Event('input', { bubbles: true }));
         showViewer('\u2702 Deleted CR' + displaySlot + ' (' + removed + ') from the source C-List.', true);
     }
@@ -1502,7 +1507,7 @@
             .filter(function (e) { return e && !/^[;/]/.test(e[0]); });
     }
 
-    function _insertCapability(capName, rights, mBitClickGrant) {
+    async function _insertCapability(capName, rights, mBitClickGrant) {
         if (!capName) { hideViewer(); return; }
         if (capName === 'M_BIT_DEV' && mBitClickGrant !== true) {
             _showPolaToast(getOrCreatePopup(), 'M_BIT_DEV requires the private IDE unlock.');
@@ -1541,6 +1546,8 @@
             var newBlock = _formatCapBlock(entries);
             var before = src.slice(0, cm.index);
             var after  = src.slice(cm.index + cm[0].length);
+            if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                ed, before + newBlock + after, 'Add a capability to source.')) return;
             ed.value = before + newBlock + after;
             // Position cursor on the newly added entry (last line before closing })
             var nameOffset = before.length + newBlock.lastIndexOf(capName);

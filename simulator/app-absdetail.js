@@ -1426,11 +1426,17 @@ function absGenerateMethod(absIdx, methodName) {
             description: desc,
             capabilities: caps
         })
-    }).then(function(r) { return r.json(); }).then(function(data) {
+    }).then(async function(r) {
+        if (!r.ok) throw new Error('Generate request rejected (HTTP ' + r.status + '). No draft was loaded.');
+        return r.json();
+    }).then(async function(data) {
         if (data.source && !writeGuard.accepts()) return;
         if (data.source) {
-            if (typeof switchView === 'function') switchView('editor');
             const asmEd = document.getElementById('asmEditor');
+            if (!asmEd || !window.confirmSourceReplacement ||
+                !await window.confirmSourceReplacement(asmEd, data.source,
+                    'Load the generated method draft.') || !writeGuard.accepts()) return;
+            if (typeof switchView === 'function') switchView('editor');
             if (asmEd) {
                 if (typeof window._clearAuthoritativeDraftBanner === 'function') {
                     window._clearAuthoritativeDraftBanner();

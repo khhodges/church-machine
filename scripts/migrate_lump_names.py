@@ -39,6 +39,10 @@ import struct
 import subprocess
 import sys
 import shutil
+try:
+    from .live_lump_guard import assert_offline_output
+except ImportError:
+    from live_lump_guard import assert_offline_output
 
 
 def to_dot_name(abstraction_name: str) -> str:
@@ -227,6 +231,8 @@ def orphan_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
 
     Returns a list of deleted filenames (empty in dry-run or when nothing found).
     """
+    if not dry_run:
+        assert_offline_output(lumps_dir)
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     if not os.path.isfile(manifest_path):
         print(f'ERROR: manifest.json not found at {manifest_path}', file=sys.stderr)
@@ -356,6 +362,8 @@ def archive_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
 
     Returns a list of deleted filenames (empty in dry-run or when nothing found).
     """
+    if not dry_run:
+        assert_offline_output(lumps_dir)
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     if not os.path.isfile(manifest_path):
         print(f'ERROR: manifest.json not found at {manifest_path}', file=sys.stderr)
@@ -447,6 +455,8 @@ def archive_cleanup(lumps_dir: str, dry_run: bool = False, force: bool = False):
 
 
 def migrate(lumps_dir: str, dry_run: bool = False):
+    if not dry_run:
+        assert_offline_output(lumps_dir)
     manifest_path = os.path.join(lumps_dir, 'manifest.json')
     if not os.path.isfile(manifest_path):
         print(f'ERROR: manifest.json not found at {manifest_path}', file=sys.stderr)

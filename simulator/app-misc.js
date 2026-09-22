@@ -427,6 +427,9 @@ async function importFromLibrary(path) {
 
         if (data.source && writeGuard.accepts()) {
             const editor = document.getElementById('asmEditor');
+            if (!editor || !window.confirmSourceReplacement ||
+                !await window.confirmSourceReplacement(editor, data.source,
+                    'Import library source "' + path + '".') || !writeGuard.accepts()) return;
             if (editor) {
                 if (typeof window._clearAuthoritativeDraftBanner === 'function') {
                     window._clearAuthoritativeDraftBanner();
@@ -1771,8 +1774,8 @@ function _devRelativeTime(unixSec) {
     return Math.floor(diff / 86400) + 'd ago';
 }
 
-function setDeviceLabelAndSync(deviceId, label) {
-    setDeviceLabel(deviceId, label);
+async function setDeviceLabelAndSync(deviceId, label) {
+    if (!await setDeviceLabel(deviceId, label)) return;
     const nameEl = document.getElementById('devRowName_' + deviceId);
     if (nameEl) {
         const boardName = nameEl.dataset.boardName || '';
@@ -2505,12 +2508,21 @@ function refreshTunnelStatuses() {
         .catch(function() {});
 }
 
-function setDeviceLabel(deviceId, label) {
-    fetch('/api/device/' + deviceId + '/label', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: label })
-    });
+async function setDeviceLabel(deviceId, label) {
+    try {
+        const response = await fetch('/api/device/' + deviceId + '/label', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ label: label })
+        });
+        if (!response.ok) throw await _actionableResponseError(response, 'Change the device label', {
+            dataChanged: false, nextAction: 'Review the current device label before retrying.',
+        });
+        return true;
+    } catch (error) {
+        alert(error.message);
+        return false;
+    }
 }
 
 function _resolveNIA(nia) {

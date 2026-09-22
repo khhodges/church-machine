@@ -18,6 +18,7 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
 const LUMPS_DIR = path.join(ROOT, 'server', 'lumps');
+require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
 const MANIFEST_PATH = path.join(LUMPS_DIR, 'manifest.json');
 const SOURCE_FILE = path.join(ROOT, 'simulator', 'cloomc', 'bank.cloomc');
 const IDENTITY_PROJECTION_PATH = path.join(ROOT, 'simulator', 'bank_lump_identity.js');

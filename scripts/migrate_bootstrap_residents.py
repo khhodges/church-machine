@@ -20,6 +20,10 @@ import struct
 import subprocess
 import sys
 import tempfile
+try:
+    from .live_lump_guard import assert_offline_output
+except ImportError:
+    from live_lump_guard import assert_offline_output
 
 ROOT = Path(__file__).resolve().parents[1]
 RESIDENTS = {"SelfTest": (6, 0x4A000006), "WukongCallHome": (7, 0x4A000007),
@@ -384,6 +388,7 @@ def _validate_stage(directory):
 
 
 def migrate(lumps_dir, fault_after_stage=False, fault_during_publication=False):
+    assert_offline_output(lumps_dir)
     """Stage all products, validate them, then swap image/state/config together."""
     target = Path(lumps_dir).resolve()
     parent = target.parent

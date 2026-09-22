@@ -3606,8 +3606,8 @@ window._r1TryDemoProgram = function() {
     if (typeof switchView === 'function') switchView('editor');
     if (typeof closeHamburger === 'function') closeHamburger();
     // Give the view a tick to render before touching the editor.
-    setTimeout(function() {
-        loadExample('led_control');
+    setTimeout(async function() {
+        if (!await loadExample('led_control')) return;
         // Build a candidate first, then make the same explicit install/run
         // transition as every other Run entry point. Never call runSimGo
         // straight after assembly: candidate construction has no pending load.
@@ -5608,7 +5608,11 @@ async function triggerLazyLoad(absentResult, mode) {
 //   ⟳ Absent lump — fetching Slot 3 (Math.Add)
 //   ✓ Installed: Math.Add — 64 words @ 0x<addr> [local cache]
 //   ✓ PASS — reached HALT after 2 step(s) post-retry.
-function runLazyLoadTest() {
+async function runLazyLoadTest() {
+    const ed = document.getElementById('codeEditor');
+    const testSource = '; Lazy-load test — absent Math.Add (Outform token=0xDEAD0003)\nLOAD CR3, CR6, 3   ; triggers fetch if absent\nHALT               ; machine stops after retry succeeds\n';
+    if (ed && (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+        ed, testSource, 'Load lazy-load test source before starting the simulation test.'))) return;
     // Switch to the editor/console view FIRST so the user can watch the log live.
     switchView('editor');
     switchCodeTab('console');
@@ -5643,8 +5647,7 @@ function runLazyLoadTest() {
     log('[LazyTest] Slot 3 is Outform (Math.Add, absent). Stepping…');
 
     // 4. Show test source in editor.
-    const ed = document.getElementById('codeEditor');
-    if (ed) ed.value = '; Lazy-load test — absent Math.Add (Outform token=0xDEAD0003)\nLOAD CR3, CR6, 3   ; triggers fetch if absent\nHALT               ; machine stops after retry succeeds\n';
+    if (ed) ed.value = testSource;
 
     // 5. Run first step — should trigger the absent-lump intercept.
     //    Call sim.step() directly and invoke triggerLazyLoad in 'run' mode
@@ -7378,32 +7381,9 @@ DWRITE DR0, CR3, 5        ; LED5 off
 BRANCH fail               ; infinite halt loop
 `;
 
-function loadExample(name) {
-    if (typeof _beginBuiltInEditorTransition === 'function') {
-        _beginBuiltInEditorTransition();
-    }
-    window._activeBuiltInKey = name;
-    if (typeof window.exitSavedLumpEditorMode === 'function') {
-        window.exitSavedLumpEditorMode();
-    }
-    // User explicitly chose an example — discard any wizard scaffold.
-    window._wizardScaffoldActive = false;
+async function loadExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
-    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Program switched; assemble it to establish a new identity');
-    _editorCREditActive = false;
-    _editorCREditCR = null;
-    _editorCREditNS = null;
-    _updateEditorPatchBar();
-    if (activeUserTabId && userTabDirty) saveActiveUserTab();
-    activeUserTabId = null;
-    userTabDirty = false;
-    // Loading a built-in example abandons any in-progress catalog edit context
-    if (typeof clearPseudoEditContext === 'function') clearPseudoEditContext();
-    // Assembly examples are inline strings — no server file path to write back to.
-    window._editorSourceFilePath = null;
-    renderUserTabs();
-    updateSaveUserTabBtn();
 
     const examples = {
         'ada_note_g': `; ============================================================
@@ -10626,6 +10606,24 @@ SelfTest Run
 
     const code = examples[name];
     if (code) {
+        if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+            editor, code, 'Load the selected example, replacing the current editor source.')) return;
+        if (typeof _beginBuiltInEditorTransition === 'function') _beginBuiltInEditorTransition();
+        window._activeBuiltInKey = name;
+        if (typeof window.exitSavedLumpEditorMode === 'function') window.exitSavedLumpEditorMode();
+        window._wizardScaffoldActive = false;
+        if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Program switched; assemble it to establish a new identity');
+        _editorCREditActive = false;
+        _editorCREditCR = null;
+        _editorCREditNS = null;
+        _updateEditorPatchBar();
+        if (activeUserTabId && userTabDirty) saveActiveUserTab();
+        activeUserTabId = null;
+        userTabDirty = false;
+        if (typeof clearPseudoEditContext === 'function') clearPseudoEditContext();
+        window._editorSourceFilePath = null;
+        renderUserTabs();
+        updateSaveUserTabBtn();
         editor.value = code;
         updateLineNumbers();
         document.querySelectorAll('.example-tab').forEach(t => {
@@ -10654,6 +10652,7 @@ SelfTest Run
             noticeBar.style.display = 'none';
         }
     }
+    return !!code;
 }
 
 var _polaChangedLines = [];
@@ -12630,7 +12629,9 @@ function _offerEditorOwnerDraftRestore(owner, draft, editor) {
     var parent = editor.parentNode && editor.parentNode.parentNode;
     if (parent) parent.insertBefore(banner, editor.parentNode);
     var dispose = _bindAuthoritativeBannerInvalidation(banner, editor);
-    banner.querySelector('#_authoritativeRestore').onclick = function() {
+    banner.querySelector('#_authoritativeRestore').onclick = async function() {
+        if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+            editor, draft, 'Restore the preserved owner draft, replacing current editor source.')) return;
         if (!sameOwner() || editor.value !== capturedCode) return;
         window._advanceEditorNavigationEpoch('accept recovered owner draft');
         dispose();
@@ -12889,7 +12890,9 @@ function _reconcileAuthoritativeEditor(owner, localCode, editor) {
         var parent = editor.parentNode && editor.parentNode.parentNode;
         if (parent) parent.insertBefore(banner, editor.parentNode);
         var dispose = _bindAuthoritativeBannerInvalidation(banner, editor);
-        banner.querySelector('#_authoritativeAccept').onclick = function() {
+        banner.querySelector('#_authoritativeAccept').onclick = async function() {
+            if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                editor, authoritative, 'Accept the offered saved source, replacing the current browser copy.')) return;
             // Acceptance belongs to the exact bytes previewed above. An owner
             // transition or even one intervening edit invalidates this offer.
             if ((window._editorNavigationEpoch || 0) !== capturedEpoch ||
@@ -16208,15 +16211,14 @@ function openSubject(key) {
     el.innerHTML = html;
 }
 
-function startLesson(subjectKey, lessonTitle) {
+async function startLesson(subjectKey, lessonTitle) {
     const subject = SUBJECTS.find(s => s.key === subjectKey);
     if (!subject) return;
     const lesson = subject.lessons.find(l => l.title === lessonTitle);
     if (!lesson) return;
 
-    closeSettings();
-
     if (lesson.view) {
+        closeSettings();
         switchView(lesson.view);
         if (lesson.tab) {
             setTimeout(() => {
@@ -16227,6 +16229,10 @@ function startLesson(subjectKey, lessonTitle) {
         return;
     }
 
+    if (lesson.code && (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+        document.getElementById('asmEditor'), lesson.code,
+        'Open this lesson, replacing the current editor source.'))) return;
+    closeSettings();
     window._advanceEditorNavigationEpoch('open lesson source');
     switchView('editor');
     const langMap = { english: 'english', javascript: 'javascript', haskell: 'haskell', symbolic: 'symbolic', lambda: 'lambda', assembly: 'assembly' };

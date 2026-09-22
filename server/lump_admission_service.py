@@ -49,7 +49,7 @@ class NavanaService:
     def __init__(self, replace_func=None):
         self._replace = replace_func or os.replace
 
-    def recover(self, lumps_dir):
+    def recover(self, lumps_dir, *, transaction_rollback=False):
         """Finish or roll back a publication interrupted by process death."""
         journal_path = os.path.join(lumps_dir, self.JOURNAL_NAME)
         try:
@@ -57,6 +57,10 @@ class NavanaService:
                 journal = json.load(stream)
         except FileNotFoundError:
             return False
+        if not transaction_rollback:
+            raise AdmissionError(
+                "Interrupted admission requires reviewed offline recovery; "
+                "journal and artifacts have been left unchanged.", status=503)
         entries = journal.get("entries")
         if not isinstance(entries, list):
             raise AdmissionError("admission recovery journal is invalid", status=500)
@@ -159,7 +163,9 @@ class NavanaService:
             os.unlink(journal_path)
             _fsync_directory(lumps_dir)
         except Exception:
-            self.recover(lumps_dir)
+            # Rollback is part of the currently authorized transaction, not
+            # startup recovery of a previous process's operation.
+            self.recover(lumps_dir, transaction_rollback=True)
             raise
         finally:
             for filename in os.listdir(stage):

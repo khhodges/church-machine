@@ -3116,7 +3116,7 @@ function compileAndCreateAbstraction() {
     updateDashboard();
 }
 
-function loadCLOOMCExample(name) {
+async function loadCLOOMCExample(name) {
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
     const writeGuard = window._captureEditorWriteGuard(
@@ -3148,11 +3148,14 @@ function loadCLOOMCExample(name) {
     const fileExamples  = _CLOOMC_FILE_EXAMPLES;
     const fileLanguages = _CLOOMC_FILE_LANGUAGES;
     if (fileExamples[name]) {
-        fetch(fileExamples[name])
+        return fetch(fileExamples[name])
             .then(r => r.ok ? r.text() : Promise.reject(new Error('File not found')))
-            .then(code => {
+            .then(async code => {
                 // Fetch completion is not navigation authority. Typing or
                 // selecting another document while it was pending wins.
+                if (!stillOwnsRequest()) return;
+                if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                    editor, code, 'Open the selected source file, replacing the current editor source.')) return;
                 if (!stillOwnsRequest()) return;
                 claimExampleOwnership();
                 editor.value = code;
@@ -3193,9 +3196,9 @@ function loadCLOOMCExample(name) {
                         nb.style.display = 'none';
                     }
                 }
+                return true;
             })
             .catch(err => console.error('Failed to load example:', err));
-        return;
     }
 
     const examples = {
@@ -5292,6 +5295,10 @@ abstraction DMABuffer {
     window._cloomcExampleLanguages    = exampleLanguages;
 
     if (!stillOwnsRequest()) return;
+    if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+        editor, examples[name] || examples['integer_ops'],
+        'Load the selected CLOOMC example, replacing the current editor source.')) return;
+    if (!stillOwnsRequest()) return;
     claimExampleOwnership();
     editor.value = examples[name] || examples['integer_ops'];
     updateLineNumbers();
@@ -5330,6 +5337,7 @@ abstraction DMABuffer {
             noticeBar.style.display = 'none';
         }
     }
+    return true;
 }
 
 /* ── Initialize structural example globals at script load time ───────────── *

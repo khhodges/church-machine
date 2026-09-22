@@ -57,6 +57,7 @@ const APPROVALS   = path.join(LUMPS_DIR, 'approvals.json');
 const DOT_NAME = 'CapabilityTest';
 const ISSUE_N = 2;
 const CHECK_ONLY = process.argv.includes('--check');
+if (!CHECK_ONLY) require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
 fs.mkdirSync(LUMPS_DIR, { recursive: true });
 
 function stableRepositoryJson(value) {

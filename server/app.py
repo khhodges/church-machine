@@ -4702,7 +4702,8 @@ except ImportError:
     )
 # Recover an interrupted multi-file admission before any route can observe a
 # partially published artifact, Namespace row, manifest, or evidence record.
-_NavanaAdmissionService().recover(LUMPS_DIR)
+# Startup is observational: a retained admission journal blocks catalogue
+# access below, rather than modifying user artifacts without review.
 _namespace_commit_lock = threading.RLock()
 _namespace_commit_state = threading.local()
 
@@ -24588,17 +24589,18 @@ def _durable_atomic_json(path, document):
 
 
 def _recover_lump_history_transition(lumps_dir):
-    """Recover an interrupted multi-file LUMP transition while its lock is held.
+    """Fail closed on retained history journals; never recover automatically.
 
-    ``prepared`` deliberately rolls back, even if every replacement happened:
-    there is no durable commit marker proving all authoritative files became a
-    single revision.  ``committed`` retains replacements and merely removes
-    crash debris.  This is conservative by design: an operation status can
-    report true only after the durable commit marker.
+    The previous recovery implementation below is intentionally unreachable
+    until a separately reviewed recovery path exists. Even cleanup of a
+    committed journal changes protected state and must not happen on startup.
     """
     journal_path = os.path.join(lumps_dir, _LUMP_TRANSITION_JOURNAL)
     if not os.path.isfile(journal_path):
         return
+    raise RuntimeError(
+        "Interrupted LUMP transition requires reviewed offline recovery; "
+        "journal and artifacts have been left unchanged.")
     journal = None
     try:
         with open(journal_path, encoding="utf-8") as handle:
@@ -25481,21 +25483,89 @@ def _release_lump_transition_request_locks(_exception=None):
         namespace_guard.__exit__(None, None, None)
 
 
-# Imports are startup for both the development server and WSGI workers.  Do an
-# eager best-effort recovery here; the before-request guard above remains the
-# fail-closed boundary if an operator-visible corrupt journal cannot be read.
+# Imports never recover interrupted transactions. Request admission below
+# reports pending recovery without preventing health checks or WSGI startup.
+
+
 try:
-    with _namespace_commit_guard():
-        with _lump_history_transition_lock(LUMPS_DIR):
-            pass
-except RuntimeError:
-    logging.exception("[lumps] startup transition recovery is blocked")
+    from change_confirmation import install as _install_change_confirmation
+except ImportError:
+    from server.change_confirmation import install as _install_change_confirmation
+
+
+def _change_confirmation_paths():
+    # Exact bytes, not mtimes. Include source files so another tab cannot approve
+    # a stale source overwrite. Operational journals/drafts are not user artifacts.
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    paths = [BOOT_CONFIG_PATH, NS_STATE_PATH, LUMPS_MANIFEST_PATH]
+    for pattern in ("*.lump", "*.json", "*.bin"):
+        paths.extend(Path(LUMPS_DIR).glob(pattern))
+    paths.extend((root / "simulator" / "examples").rglob("*"))
+    payload = request.get_json(silent=True)
+    if request.path == "/api/source-file/save" and isinstance(payload, dict):
+        candidate = (root / str(payload.get("path", ""))).resolve()
+        if candidate.is_relative_to(root):
+            paths.append(candidate)
+    return paths
+
+
+def _describe_protected_change(payload):
+    """Show proposed text/Namespace deltas without leaking approval credentials."""
+    import difflib
+    from pathlib import Path
+    if not isinstance(payload, dict):
+        return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
+    root = Path(__file__).resolve().parent.parent
+    before = None
+    after = None
+    if request.path == "/api/source-file/save":
+        candidate = (root / str(payload.get("path", ""))).resolve()
+        if candidate.is_relative_to(root / "simulator") and candidate.suffix == ".cloomc":
+            before = candidate.read_text(encoding="utf-8") if candidate.is_file() else ""
+            after = str(payload.get("content", ""))
+    elif request.path == "/api/boot-image/save-ns":
+        saved = {}
+        if os.path.isfile(NS_STATE_PATH):
+            with open(NS_STATE_PATH, encoding="utf-8") as stream:
+                saved = json.load(stream)
+        before = json.dumps(saved.get("abstractions", []), indent=2, sort_keys=True)
+        proposed = payload.get("ns_state") or {}
+        if isinstance(proposed, dict):
+            after = json.dumps(proposed.get("abstractions", []), indent=2, sort_keys=True)
+    if before is not None and after is not None:
+        delta = "".join(difflib.unified_diff(
+            before.splitlines(keepends=True), after.splitlines(keepends=True),
+            fromfile="current", tofile="proposed"))
+        return [delta or "No source/Namespace row differences in the submitted projection.",
+                "Derived boot-image layout may also be regenerated by the existing save validation."]
+    if request.path == "/api/lumps/save":
+        metadata = payload.get("metadata") or {}
+        preview = {}
+        if isinstance(metadata, dict):
+            for key in ("abstraction", "token", "filename", "ns_slot", "save_plan", "save_plan_id"):
+                if key in metadata:
+                    preview[key] = metadata[key]
+        words = payload.get("binary")
+        return ["Publication target: " + json.dumps(preview, sort_keys=True),
+                "Submitted binary words: " + str(len(words) if isinstance(words, list) else "server-plan bytes"),
+                "Confirm only if the existing Save LUMP plan shown in the IDE matches your intended destination and revision."]
+    return []
+
+
+_install_change_confirmation(
+    app, _change_confirmation_paths, _namespace_commit_guard,
+    describe=_describe_protected_change,
+    store_path=os.path.join(
+        os.path.dirname(__file__), ".change-reviews",
+        hashlib.sha256(os.path.realpath(LUMPS_DIR).encode()).hexdigest() + ".sqlite"),
+    recovery_pending=lambda: any(os.path.lexists(os.path.join(LUMPS_DIR, name))
+                                 for name in (
+                                     _LUMP_TRANSITION_JOURNAL,
+                                     _NavanaAdmissionService.JOURNAL_NAME)))
 
 
 if __name__ == "__main__":
     _port = int(os.environ.get("E2E_PORT", 5000))
-    with _namespace_commit_guard():
-        with _lump_history_transition_lock(LUMPS_DIR):
-            pass
     logging.info("Starting Church Machine server on port %d", _port)
     _bind_with_retry(_port)

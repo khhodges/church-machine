@@ -22,6 +22,7 @@ const MANIFEST = path.join(LUMPS_DIR, 'manifest.json');
 const NS_STATE = path.join(LUMPS_DIR, 'ns-state.json');
 const APPROVALS = path.join(LUMPS_DIR, 'approvals.json');
 const CHECK_ONLY = process.argv.includes('--check');
+if (!CHECK_ONLY) require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
 const DOT_NAME = 'SelfTest';
 
 function json(value) {

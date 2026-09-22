@@ -293,6 +293,7 @@ if (CHECK_MODE) {
 // ── Write binary ──────────────────────────────────────────────────────────────
 
 // All preparation succeeded.  The binary is the sole build output.
+require('./live-lump-guard').assertOfflineOutput(existingLumpPath);
 fs.writeFileSync(existingLumpPath, newBytes);
 
 console.log(`Updated ${TOKEN}: cw=${newCW} cc=${newCC} lump_size=${lumpSize}`);

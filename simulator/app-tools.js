@@ -372,9 +372,13 @@ function copyLedAssembly() {
     navigator.clipboard.writeText(asm).then(() => {
         const btn = document.querySelector('.led-copy-btn');
         if (btn) { btn.textContent = '✓ Copied'; setTimeout(() => { btn.textContent = '↗ Copy assembly'; }, 1600); }
-    }).catch(() => {
+    }).catch(async () => {
         const ta = document.getElementById('editorCode');
-        if (ta) { ta.value = asm; ta.focus(); }
+        if (ta && window.confirmSourceReplacement && await window.confirmSourceReplacement(
+            ta, asm, 'Clipboard is unavailable. Replace editor text with LED assembly instead.')) {
+            ta.value = asm;
+            ta.focus();
+        }
     });
 }
 

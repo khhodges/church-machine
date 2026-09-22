@@ -541,8 +541,10 @@ function generateTabId() {
     return 'ut_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
 }
 
-function createUserTab(name, lang, initialCode, sourceRevision) {
+async function createUserTab(name, lang, initialCode, sourceRevision) {
     const code = (initialCode !== undefined) ? initialCode : '';
+    if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+        document.getElementById('asmEditor'), code, 'Create and open a personal program.')) return null;
     const tab = { id: generateTabId(), name: name, lang: lang || 'assembly', code };
     if (Number.isInteger(sourceRevision) && sourceRevision >= 0) tab.sourceRevision = sourceRevision;
     userTabs.push(tab);
@@ -554,11 +556,14 @@ function createUserTab(name, lang, initialCode, sourceRevision) {
         _openFileCache = null;
         _loadOpenFileCatalog();
     }
-    selectUserTab(tab.id);
+    _commitUserTabSelection(tab);
     return tab;
 }
 
-function deleteUserTab(id) {
+async function deleteUserTab(id) {
+    if (activeUserTabId === id && (!window.confirmSourceReplacement ||
+        !await window.confirmSourceReplacement(document.getElementById('asmEditor'), '',
+            'Delete the active personal program and clear its editor.'))) return false;
     userTabs = userTabs.filter(t => t.id !== id);
     _openFileCache = null;
     saveUserTabsToStorage();
@@ -576,23 +581,35 @@ function deleteUserTab(id) {
     renderUserTabs();
     updateSaveUserTabBtn();
     updateSavePseudoBtn();
+    return true;
 }
 
-function selectUserTab(id) {
+async function selectUserTab(id) {
+    const tab = userTabs.find(t => t.id === id);
+    if (!tab) return false;
+    const code = tab.code;
+    if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+        document.getElementById('asmEditor'), code, 'Open personal program "' + tab.name + '".')) return false;
+    if (!userTabs.includes(tab) || tab.code !== code) return false;
+    _commitUserTabSelection(tab);
+    return true;
+}
+
+function _commitUserTabSelection(tab) {
     if (typeof window._clearAuthoritativeDraftBanner === 'function') {
         window._clearAuthoritativeDraftBanner();
     }
     if (activeUserTabId && userTabDirty) {
         saveActiveUserTab();
     }
-    const tab = userTabs.find(t => t.id === id);
-    if (!tab) return;
     window._advanceEditorNavigationEpoch('select personal tab');
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Program switched; assemble it to establish a new identity');
     if (typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();
     }
-    activeUserTabId = id;
+    activeUserTabId = tab.id;
+    window._editorSourceFilePath = null;
+    window._activeBuiltInKey = null;
     userTabDirty = false;
     _updateEditorCodeName(tab.name);
     // Leaving catalog edit context when user picks a personal tab
@@ -968,26 +985,31 @@ function _renderOpenFileList(query) {
 }
 
 function _catalogArg(raw) { return JSON.parse(raw); }
-function openCatalogBuiltin(raw) {
+async function openCatalogBuiltin(raw) {
     var e = _catalogArg(raw), fn = e.lang === 'assembly' ? loadExample : loadCLOOMCExample;
+    if (!await fn(e.lang === 'assembly' ? e.key : e.key.replace(/^cloomc_/, ''))) return;
     closeOpenFileDialog();
     _catalogActiveIdentity = e.path;
-    fn(e.lang === 'assembly' ? e.key : e.key.replace(/^cloomc_/, ''));
 }
-function openCatalogFile(raw) { var e = _catalogArg(raw); _catalogActiveIdentity = e.path; openSourceFile(e.path); }
-function openCatalogLump(raw) {
+function openCatalogFile(raw) { var e = _catalogArg(raw); openSourceFile(e.path); }
+async function openCatalogLump(raw) {
     var e = _catalogArg(raw); if (e.token && typeof openLumpInEditor === 'function') {
-        closeOpenFileDialog(); _catalogActiveIdentity = e.path; openLumpInEditor(e.token);
+        if (!await openLumpInEditor(e.token)) return;
+        closeOpenFileDialog();
+        _catalogActiveIdentity = e.path;
     }
 }
-function openCatalogPersonal(raw) {
-    var e = _catalogArg(raw); closeOpenFileDialog(); _catalogActiveIdentity = e.path; selectUserTab(e.id);
+async function openCatalogPersonal(raw) {
+    var e = _catalogArg(raw);
+    if (!await selectUserTab(e.id)) return;
+    closeOpenFileDialog();
+    _catalogActiveIdentity = e.path;
 }
-function deleteCatalogPersonal(id) {
+async function deleteCatalogPersonal(id) {
     var tab = userTabs.find(function(t) { return t.id === id; });
     if (tab && confirm('Delete program "' + tab.name + '"?')) {
         var cachedCatalog = _openFileCache;
-        deleteUserTab(id);
+        if (!await deleteUserTab(id)) return;
         if (cachedCatalog) {
             _openFileCache = cachedCatalog.filter(function(entry) {
                 return !(entry.kind === 'personal' && entry.id === id);
@@ -1029,7 +1051,6 @@ function _escHtml(s) {
 }
 
 function openSourceFile(path) {
-    closeOpenFileDialog();
     var writeGuard = window._captureEditorWriteGuard('open source file: ' + path);
     fetch('/' + path)
         .then(function(r) {
@@ -1039,9 +1060,13 @@ function openSourceFile(path) {
             }).then(function(error) { throw error; });
             return r.text();
         })
-        .then(function(code) {
+        .then(async function(code) {
             var ed = document.getElementById('asmEditor');
             if (!ed || !writeGuard.accepts()) return;
+            if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                ed, code, 'Open source file "' + path + '".') || !writeGuard.accepts()) return;
+            closeOpenFileDialog();
+            _catalogActiveIdentity = path;
             if (typeof window._clearAuthoritativeDraftBanner === 'function') {
                 window._clearAuthoritativeDraftBanner();
             }
@@ -1357,7 +1382,7 @@ function hideNewTabDialog() {
     if (dialog) dialog.style.display = 'none';
 }
 
-function confirmNewTab() {
+async function confirmNewTab() {
     const nameInput = document.getElementById('newTabName');
     const langSel = document.getElementById('newTabLang');
     const name = nameInput ? nameInput.value.trim() : '';
@@ -1365,26 +1390,18 @@ function confirmNewTab() {
     const lang = 'assembly';
     const sourceName = _newAbstractionSourceName(name);
     const initialCode = _newAbstractionProforma(sourceName, lang);
-    hideNewTabDialog();
-    const sel = document.getElementById('langSelector');
-    if (sel && sel.value !== lang) {
-        sel.value = lang;
-        onLangChange(true);
-    }
-    // A new abstraction is not an edit of whichever server file was open.
-    window._editorSourceFilePath = null;
-    createUserTab(name, lang, initialCode);
+    if (await createUserTab(name, lang, initialCode)) hideNewTabDialog();
 }
 
 // File → New and Namespace labels without saved source open the same canonical
 // assembler proforma instead of maintaining separate editor templates.
-function newAbstraction(requestedName) {
+async function newAbstraction(requestedName) {
     const name = _newAbstractionSourceName(requestedName || 'New.Abstraction');
     const lang = 'assembly';
     const initialCode = _newAbstractionProforma(name);
-    window._editorSourceFilePath = null;
+    if (!await createUserTab(name, lang, initialCode)) return false;
     if (typeof switchView === 'function') switchView('editor');
-    createUserTab(name, lang, initialCode);
+    return true;
 }
 
 // The New command always starts with the editable abstraction proforma.

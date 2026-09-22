@@ -556,7 +556,7 @@ function _showAsmErrors(errors, titleOverride, action) {
             var colStart = parseInt(btn.getAttribute('data-col-start'), 10);
             var colEnd   = parseInt(btn.getAttribute('data-col-end'),   10);
             if (typeof window._showApiPopupForAbs === 'function') {
-                window._showApiPopupForAbs(absName, btn, function(methodName) {
+                window._showApiPopupForAbs(absName, btn, async function(methodName) {
                     var editor = document.getElementById('asmEditor');
                     if (!editor) return;
                     if (!isNaN(linePick) && !isNaN(colStart) && !isNaN(colEnd)) {
@@ -564,7 +564,10 @@ function _showAsmErrors(errors, titleOverride, action) {
                         var idx = linePick - 1;
                         if (lines[idx] !== undefined) {
                             lines[idx] = lines[idx].slice(0, colStart) + methodName + lines[idx].slice(colEnd);
-                            editor.value = lines.join('\n');
+                            var replacement = lines.join('\n');
+                            if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
+                                editor, replacement, 'Replace the selected method reference.')) return;
+                            editor.value = replacement;
                             if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
                             if (window.IDEActions) window.IDEActions.compile();
                             else if (typeof assembleAndLoad === 'function') assembleAndLoad();

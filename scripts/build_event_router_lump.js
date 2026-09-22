@@ -33,6 +33,7 @@ const LUMPS_DIR   = (_outDirIdx !== -1 && process.argv[_outDirIdx + 1])
     ? path.resolve(process.argv[_outDirIdx + 1])
     : path.join(ROOT, 'server', 'lumps');
 const MANIFEST    = path.join(LUMPS_DIR, 'manifest.json');
+require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
 
 const NS_SLOT = 52;
 

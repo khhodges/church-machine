@@ -20,6 +20,7 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
         { url: 'http://localhost/simulator/', runScripts: 'outside-only' }
     );
     const { window } = dom;
+    window.confirmSourceReplacement = async () => true;
     window.AsmInstructionPicker = { hide: function () {} };
     window.sim = {
         nsTable: [],
@@ -137,6 +138,7 @@ function nextTurn() { return new Promise(resolve => setTimeout(resolve, 0)); }
     const symbolicInput = popup.querySelector('.clist-symbolic-name-input');
     symbolicInput.value = 'Future.Member';
     popup.querySelector('[data-action="insert-symbolic-capability"]').click();
+    await nextTurn();
     check('CPV-12: a not-yet-created abstraction can be declared by pet name',
         window.document.getElementById('asmEditor').value.includes('Future.Member E'));
 

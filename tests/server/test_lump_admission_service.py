@@ -207,13 +207,21 @@ def test_interrupted_publication_recovers_at_every_replace_boundary(tmp_path):
         else:
             raise AssertionError(f"boundary {boundary} did not interrupt")
 
-        assert NavanaService().recover(str(root)) is True
-        assert json.loads(manifest_path.read_text()) == []
-        assert json.loads(state_path.read_text()) == original_state
-        assert not list(root.glob("Interrupted.*.lump"))
-        assert not (root / "approvals.json").exists()
-        evidence_dir = root / ("admission" + "-evidence")
-        assert not evidence_dir.exists() or not list(evidence_dir.iterdir())
+        # A previous process's transaction must remain pending, not mutate
+        # on startup. Current-request exception rollback is tested separately.
+        before = {str(p.relative_to(root)): p.read_bytes()
+                  for p in root.rglob("*") if p.is_file()}
+        try:
+            NavanaService().recover(str(root))
+        except AdmissionError as exc:
+            assert exc.status == 503
+            assert "reviewed offline recovery" in str(exc)
+        else:
+            raise AssertionError("startup recovery bypassed review")
+        after = {str(p.relative_to(root)): p.read_bytes()
+                 for p in root.rglob("*") if p.is_file()}
+        assert after == before
+        assert (root / NavanaService.JOURNAL_NAME).exists()
 
 
 def test_repeat_admission_uses_immutable_destination_local_derivatives(tmp_path):

@@ -21,6 +21,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 from server.lump_approvals import read_approvals, write_approvals
 from server.lump_integrity import (compute_number, parse_canonical_filename)
+from scripts.live_lump_guard import assert_offline_output
 
 
 APPROVABLE_ANNOTATION_FIELDS = frozenset({
@@ -38,6 +39,7 @@ EXCLUDED_FIELDS = frozenset({
 
 
 def _write_json_atomic(path: Path, value: object) -> None:
+    assert_offline_output(path)
     fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as out:
@@ -88,6 +90,11 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--write requires at least one explicit --accept FILE.json")
     if args.accept and not args.write:
         parser.error("--accept is inert without --write; supply both after review")
+    if args.write:
+        try:
+            assert_offline_output(approvals_path)
+        except RuntimeError as exc:
+            parser.error(str(exc))
 
     try:
         approvals = read_approvals(approvals_path, missing_ok=True)

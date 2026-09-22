@@ -33,6 +33,10 @@ import json
 import os
 import struct
 import zlib
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts"))
+from live_lump_guard import assert_offline_output
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT    = os.path.dirname(SCRIPT_DIR)
@@ -323,9 +327,13 @@ def main():
     ap.add_argument('--dry-run', action='store_true',
                     help='Print what would be written without writing files.')
     ap.add_argument('--verbose', '-v', action='store_true')
+    ap.add_argument('--out-dir', default=OUTPUT_DIR)
     args = ap.parse_args()
 
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    output_dir = os.path.abspath(args.out_dir)
+    if not args.dry_run:
+        assert_offline_output(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
 
     json_files = collect_json_files()
     manifest   = []
@@ -351,7 +359,7 @@ def main():
             continue
 
         token8   = entry['token']
-        out_path = os.path.join(OUTPUT_DIR, f'{token8}.lump')
+        out_path = os.path.join(output_dir, f'{token8}.lump')
 
         if args.dry_run:
             print(f'  [dry-run] would write {out_path}  ({len(binary)} bytes)')
@@ -362,7 +370,7 @@ def main():
         manifest.append(entry)
         ok += 1
 
-    manifest_path = os.path.join(OUTPUT_DIR, 'manifest.json')
+    manifest_path = os.path.join(output_dir, 'manifest.json')
     if args.dry_run:
         print(f'  [dry-run] would write {manifest_path}')
     else:

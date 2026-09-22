@@ -94,6 +94,7 @@ function main() {
 
     const outBuf = Buffer.alloc(raw.length);
     for (let i = 0; i < outWords.length; i++) outBuf.writeUInt32BE(outWords[i] >>> 0, i * 4);
+    require('./live-lump-guard').assertOfflineOutput(lumpPath);
     fs.writeFileSync(lumpPath, outBuf);
     console.log(`${token}: wrote ${lumpPath} (${changed} words remapped, lump_size unchanged)`);
 }

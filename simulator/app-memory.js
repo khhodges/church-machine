@@ -4507,11 +4507,13 @@ function _nsTableAdd() {
         });
 }
 
-function _nsOpenNewAssembler() {
+async function _nsOpenNewAssembler() {
     const overlay = document.getElementById('_nsAddModalOverlay');
-    if (overlay) overlay.remove();
-    if (typeof newAbstraction === 'function') newAbstraction();
+    if (typeof newAbstraction === 'function') {
+        if (!await newAbstraction()) return;
+    }
     else if (typeof switchView === 'function') switchView('editor');
+    if (overlay) overlay.remove();
 }
 
 function _nsAddSetMode(mode) {

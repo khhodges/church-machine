@@ -9,6 +9,7 @@ const ChurchAssembler = require('../simulator/assembler.js');
 
 const ROOT = path.resolve(__dirname, '..');
 const LUMPS = path.join(ROOT, 'server', 'lumps');
+require('./live-lump-guard').assertOfflineOutput(LUMPS);
 const MANIFEST = path.join(LUMPS, 'manifest.json');
 const SELF_PLACEHOLDER = 0xFEED5E1F;
 const PRIVATE_DATA_PLACEHOLDER = 0xFEEDDA7A;

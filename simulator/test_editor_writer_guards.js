@@ -105,6 +105,8 @@ async function crossWriterAndAbaRaces() {
         },
         _CLOOMC_FILE_EXAMPLES: { private_fixture: '/private-example.cloomc' },
         _CLOOMC_FILE_LANGUAGES: { private_fixture: 'cloomc' },
+        confirmSourceReplacement: async () => true,
+        confirmProtectedChange: async () => true,
         closeOpenFileDialog() {},
         renderUserTabs() {},
         updateSaveUserTabBtn() {},
@@ -132,6 +134,7 @@ async function crossWriterAndAbaRaces() {
         extractFunction(shell, '_beginBuiltInEditorTransition') + '\n' +
         extractFunction(shell, 'openSourceFile') + '\n' +
         extractFunction(shell, 'selectUserTab') + '\n' +
+        extractFunction(shell, '_commitUserTabSelection') + '\n' +
         extractFunction(compile, 'loadCLOOMCExample') + '\n' +
         extractFunction(lumps, 'openLumpInEditor'),
         context);
@@ -143,7 +146,7 @@ async function crossWriterAndAbaRaces() {
     // A later saved-LUMP selection invalidates the earlier file writer through
     // the same epoch before either request completes.
     context.openSourceFile('private-before-lump.cloomc');
-    context.openLumpInEditor('private-lump-token');
+    await context.openLumpInEditor('private-lump-token');
     pending.get('/private-before-lump.cloomc')({
         ok: true, text: () => Promise.resolve('stale before LUMP'),
     });
@@ -173,8 +176,8 @@ async function crossWriterAndAbaRaces() {
     context.window._activeBuiltInKey = null;
     editor.value = 'private A bytes';
     context.openSourceFile('private-aba.cloomc');
-    context.selectUserTab('B');
-    context.selectUserTab('A');
+    await context.selectUserTab('B');
+    await context.selectUserTab('A');
     assert.equal(editor.value, 'private A bytes');
     pending.get('/private-aba.cloomc')({
         ok: true, text: () => Promise.resolve('stale ABA result'),
