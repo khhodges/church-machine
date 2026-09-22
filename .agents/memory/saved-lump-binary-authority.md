@@ -81,3 +81,15 @@ C-List while a different saved abstraction executes.
 **How to apply:** Match the immutable token against live Namespace bindings
 first, then use the abstraction label as a secondary lookup. Use the canonical
 boot slot only for genuinely unbound legacy artifacts.
+
+Disassembly restoration and editor-source restoration are separate authorities.
+Reload must reconstruct the saved binary display without reopening or replacing
+the owned source buffer.
+
+**Why:** Fixing a post-save binary fetch alone did not fix refresh: restoring
+editor ownership restored the draft but never hydrated the binary pane. Shared
+tokens also cannot identify an exact saved revision.
+
+**How to apply:** Verify both post-save and real reload paths, including legacy
+browser state. Preserve exact saved filename/hash evidence where available and
+keep draft text untouched while fetching binary-only presentation.

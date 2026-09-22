@@ -12680,6 +12680,10 @@ function saveEditorState() {
         code: code,
         lang: lang
     };
+    if (state.owner.type === 'lump' && window._editorSavedBinaryReceipt &&
+            window._editorSavedBinaryReceipt.token === state.owner.id) {
+        state.savedBinary = window._editorSavedBinaryReceipt;
+    }
     localStorage.setItem(_EDITOR_DOCUMENT_STATE_KEY, JSON.stringify(state));
     // Keep the legacy keys during migration for older cached clients.
     if (editor) localStorage.setItem('church_editor_code', code);
@@ -12823,6 +12827,13 @@ function loadEditorState() {
         }
     }
     window._editorStateHydrated = true;
+    if (documentState && documentState.owner.type === 'lump' &&
+            typeof window._restoreSavedLumpBinaryPresentation === 'function') {
+        // Source hydration is finished; fetch only the adjacent immutable
+        // binary. No source-replacement consent or saved-content loader.
+        void window._restoreSavedLumpBinaryPresentation(
+            documentState.owner.id, documentState.savedBinary, editor);
+    }
 }
 
 function _reconcileAuthoritativeEditor(owner, localCode, editor) {

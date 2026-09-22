@@ -1860,6 +1860,10 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken) {
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection) {
     window._savedLumpEditorMode = true;
     window._compiledCandidateEditorMode = false;
+    window._editorSavedBinaryReceipt = lump && lump.filename && lump.binary_hash
+        ? { token: lookupToken, filename: lump.filename, binary_hash: lump.binary_hash,
+            abstraction: lump.abstraction, lump_version: lump.lump_version }
+        : null;
     var tabs = document.getElementById('codeSidebarTabs');
     var layout = document.querySelector('#editor .editor-layout');
     var panel = document.getElementById('savedLumpDisassemblyPanel');
@@ -2050,7 +2054,7 @@ function _formatCanonicalSavedLumpWords(words, details) {
     var clistStart = Math.max(1, words.length - cc);
     var lines = [
         '; SAVED BINARY — exact canonical server response',
-        '; Source at left is unchanged. These are the words fetched after Save LUMP.',
+        '; Source at left is unchanged. These are the exact fetched saved words.',
         '; Abstraction: ' + String(details.abstraction || 'Unnamed') +
             (details.token ? '  Token: ' + String(details.token) : ''),
         _formatLumpHeaderDisassembly(header)
@@ -2099,6 +2103,11 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
     window._compiledCandidateEditorMode = false;
     window._savedLumpEditorMode = true;
     if (!unavailable) {
+        window._editorSavedBinaryReceipt = {
+            token: descriptor.token, filename: descriptor.filename,
+            binary_hash: descriptor.binary_hash, abstraction: descriptor.abstraction,
+            lump_version: descriptor.lump_version
+        };
         window._editorCompiledDisasm = text;
         window._savedLumpDisassemblyBeforeCompile = text;
     }
@@ -2150,7 +2159,7 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
         }
         if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
         var exactText = _formatCanonicalSavedLumpWords(data.words, {
-            abstraction: descriptor.abstraction,
+            abstraction: data.abstraction || descriptor.abstraction,
             token: resp.token,
             methodCount: data.api_definition && Array.isArray(data.api_definition.methods)
                 ? data.api_definition.methods.length : 0,
@@ -2163,7 +2172,9 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
     } catch (error) {
         if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
         _showCanonicalSavedLumpBesideSource(
-            '; SAVE SUCCEEDED — SAVED BINARY UNAVAILABLE\n' +
+            (descriptor && descriptor.restoring
+                ? '; SAVED BINARY UNAVAILABLE\n'
+                : '; SAVE SUCCEEDED — SAVED BINARY UNAVAILABLE\n') +
             '; No saved-byte claim is shown because the canonical binary fetch failed.\n' +
             '; ' + String(error && error.message || error),
             descriptor, true);
@@ -2171,6 +2182,19 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
     }
 }
 window._fetchAndPresentCommittedLump = _fetchAndPresentCommittedLump;
+
+// Refresh restores programmer source separately. Rehydrate only read-only
+// binary output here: never reopen the LUMP or replace the restored draft.
+function _restoreSavedLumpBinaryPresentation(token, receipt, editor) {
+    if (!token || !editor) return Promise.resolve(false);
+    var descriptor = Object.assign({}, receipt || {}, { token: token, restoring: true });
+    window._editorSavedBinaryReceipt = receipt || null;
+    return _fetchAndPresentCommittedLump({ token: token }, descriptor, {
+        source: editor.value,
+        epoch: window._editorNavigationEpoch || 0
+    });
+}
+window._restoreSavedLumpBinaryPresentation = _restoreSavedLumpBinaryPresentation;
 
 function exitSavedLumpEditorMode() {
     // Also invalidate an open that is still awaiting binary/source fetches.
@@ -2220,6 +2244,7 @@ function exitSavedLumpEditorMode() {
     window._editorOpenLumpToken = null;
     window._editorOpenLumpMeta = null;
     window._editorOpenLumpBaseIdentity = null;
+    window._editorSavedBinaryReceipt = null;
     var discardBtn = document.getElementById('btnDiscardLumpEdit');
     if (discardBtn) discardBtn.remove();
     if (typeof switchCodeTab === 'function') switchCodeTab('console');
@@ -4681,6 +4706,7 @@ function _commitSavedLumpClientState(resp, fallback, draftSource) {
             linkedDocumentUnchanged = !!(state && state.code === frozenSource);
             if (linkedDocumentUnchanged) {
                 state.owner = { type: 'lump', id: resp.token };
+                state.savedBinary = descriptor;
                 localStorage.setItem(
                     'church_editor_document_v1', JSON.stringify(state));
             }
@@ -7463,7 +7489,7 @@ async function openLumpInEditor(token, options) {
             _wordsResponse.binary_valid === true &&
             _wordsResponse.validation_errors.length === 0;
         _exactResponseLump = Object.assign({}, lump);
-        ['token', 'binary_hash', 'pet_name', 'dot_name', 'issue_n', 'identity_hash',
+        ['token', 'filename', 'binary_hash', 'pet_name', 'dot_name', 'issue_n', 'identity_hash',
             'bootstrap_t', 'bootstrap_runtime_gt',
             'trusted', 'approved', 'binary_valid', 'validation_errors', 'source',
             'byte_count', 'raw_tail_hex']

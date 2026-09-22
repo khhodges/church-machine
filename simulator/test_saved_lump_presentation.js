@@ -65,6 +65,7 @@ vm.runInContext([
     extractFunction(source, '_formatCanonicalSavedLumpWords'),
     extractFunction(source, '_showCanonicalSavedLumpBesideSource'),
     extractFunction(source, '_fetchAndPresentCommittedLump'),
+    extractFunction(source, '_restoreSavedLumpBinaryPresentation'),
 ].join('\n'), context);
 
 // Private fixture matching the relevant entry bytes, not a live artifact.
@@ -195,6 +196,27 @@ assert(source.includes('trimmed.slice(_dispatchLines.length)'),
         filename: receipt.filename, binary_hash: receipt.binary_hash});
     assert.equal(await context._fetchAndPresentCommittedLump(
         {token: 'shared-token'}, receipt, frozen), true);
+
+    // Reload restores only ownership/source synchronously; its new hydration
+    // hook must fetch the binary without opening/replacing programmer source.
+    const restoredDraft = 'unsaved programmer draft after refresh';
+    dom.window.document.getElementById('asmEditor').value = restoredDraft;
+    dom.window.document.getElementById('savedLumpDisassembly').textContent =
+        'SAVE SUCCEEDED — SAVED BINARY UNAVAILABLE';
+    assert.equal(await context._restoreSavedLumpBinaryPresentation(
+        'shared-token', receipt, dom.window.document.getElementById('asmEditor')), true);
+    assert.equal(dom.window.document.getElementById('asmEditor').value, restoredDraft);
+    assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+        /SAVED BINARY — exact canonical server response/);
+    assert.doesNotMatch(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+        /UNAVAILABLE/);
+    assert.equal(dom.window._editorSavedBinaryReceipt.filename, receipt.filename);
+    const runSource = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
+    assert(extractFunction(runSource, 'loadEditorState')
+        .includes('window._restoreSavedLumpBinaryPresentation('),
+        'actual refresh hydration invokes binary-only reload');
+    assert(extractFunction(runSource, 'saveEditorState').includes('state.savedBinary'),
+        'future reloads retain exact receipt rather than only a shared token');
 
     console.log('Saved LUMP canonical presentation tests passed');
 })().catch(error => {
