@@ -30,6 +30,14 @@ const conflict = _formatActionableHttpError(
     });
 check('409 report identifies the failed operation and status',
     conflict.includes('Audit of this saved LUMP failed (HTTP 409)'));
+const reviewConflict = _formatActionableHttpError('Save', 409, {
+    error: 'change_confirmation_invalid',
+    message: 'Review expired, was already used, or the request or saved state changed. Review again.',
+}, {dataChanged: false});
+check('structured review rejection displays code and explanation',
+    reviewConflict.includes('change_confirmation_invalid: Review expired') &&
+    reviewConflict.includes('saved state changed') &&
+    reviewConflict.includes('No data was changed.'));
 check('409 report preserves the server reason',
     conflict.includes('canonical binary hash does not match'));
 check('409 report says whether data changed',

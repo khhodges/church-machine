@@ -64,6 +64,22 @@ function storageMock() {
 // The queue is bounded, persisted, and delivery is scheduled rather than
 // performed synchronously in the save call.
 {
+    const error = new Error('session_binding=private proof=private');
+    const serialized = serializeError(error, 'commit', 'rejected', {
+        http_status: 409,
+        server_code: 'change_confirmation_invalid',
+    });
+    check('protected review rejection retains server code and safe exact reason',
+        serialized.code === 'change_confirmation_invalid' &&
+        serialized.reason === 'Review expired, was already used, or the request or saved state changed. Review again.' &&
+        !JSON.stringify(serialized).includes('private'));
+    check('unknown server codes cannot leak response content',
+        serializeError(error, 'commit', 'rejected', {
+            http_status: 409, server_code: 'private payload',
+        }).code === 'commit_rejected');
+}
+
+{
     const storage = storageMock();
     const timers = [];
     let fetchCalls = 0;

@@ -540,6 +540,7 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
                 _lumpSaveDiagnosticStageComplete(payload, 'commit',
                     classification.committed === false ? 'rejected' : 'unknown', {
                         http_status: r.status,
+                        server_code: resp && (resp.code || resp.error),
                         error: resp && resp.error ? new Error(String(resp.error)) : null,
                     });
                 if (classification.kind === 'ide' && classification.safeRetry &&

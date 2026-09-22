@@ -674,6 +674,8 @@ _LUMP_DIAGNOSTIC_ERROR_NAMES = {
     "transitionrecovered": "TransitionRecovered",
 }
 _LUMP_DIAGNOSTIC_CODES = frozenset({
+    "change_confirmation_invalid", "change_confirmation_required",
+    "change_review_busy", "recovery_approval_required",
     "capture_failed", "preflight_rejected", "approval_rejected",
     "commit_rejected", "commit_unknown", "reconciliation_unknown",
     "repository_unavailable", "invalid_response", "reload_failed",
@@ -681,6 +683,10 @@ _LUMP_DIAGNOSTIC_CODES = frozenset({
     "diagnostic_failure", "unexpected_failure",
 })
 _LUMP_DIAGNOSTIC_CODE_REASONS = {
+    "change_confirmation_invalid": "Review expired, was already used, or the request or saved state changed. Review again.",
+    "change_confirmation_required": "Review protected change before publication.",
+    "change_review_busy": "Too many pending reviews; wait for expiry.",
+    "recovery_approval_required": "Interrupted artifact transaction requires explicitly reviewed offline recovery.",
     "capture_failed": "Save capture failed before the repository request.",
     "preflight_rejected": "The repository rejected save preparation.",
     "approval_rejected": "The repository rejected the approval step.",
@@ -25543,7 +25549,10 @@ def _change_confirmation_paths():
     root = Path(__file__).resolve().parent.parent
     paths = [BOOT_CONFIG_PATH, NS_STATE_PATH, LUMPS_MANIFEST_PATH]
     for pattern in ("*.lump", "*.json", "*.bin"):
-        paths.extend(Path(LUMPS_DIR).glob(pattern))
+        # Lease heartbeats are coordination state, not reviewed artifacts.
+        # Exclude only the registry; manifests and other JSON stay protected.
+        paths.extend(path for path in Path(LUMPS_DIR).glob(pattern)
+                     if path.name != _LUMP_LEASE_REGISTRY)
     paths.extend((root / "simulator" / "examples").rglob("*"))
     payload = request.get_json(silent=True)
     if request.path == "/api/source-file/save" and isinstance(payload, dict):

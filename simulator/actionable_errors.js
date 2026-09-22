@@ -6,6 +6,12 @@ function _actionableReason(body) {
         try { parsed = JSON.parse(body); } catch (_err) { parsed = null; }
     }
     var reason = parsed && (parsed.error || parsed.reason || parsed.message);
+    // Structured rejections use error/code for identity and message for the
+    // explanation. Show both instead of discarding the actionable explanation.
+    if (parsed && typeof parsed.message === 'string' &&
+            typeof reason === 'string' && reason !== parsed.message) {
+        reason += ': ' + parsed.message;
+    }
     if (!reason && typeof body === 'string') {
         var plain = body.replace(/\s+/g, ' ').trim();
         if (plain && plain[0] !== '<') reason = plain.slice(0, 240);

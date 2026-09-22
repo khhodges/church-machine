@@ -23,6 +23,88 @@ def _consume_shared(args):
     return IntentStore(path).consume(token, binding)
 
 
+@pytest.mark.parametrize("changed,allowed", [
+    (".lump-write-leases.json", True),
+    ("example.lump", False),
+    ("manifest.json", False),
+    ("ns-state.json", False),
+    ("boot-image.bin", False),
+    ("other.json", False),
+])
+def test_review_fingerprint_excludes_only_lease_registry(tmp_path, changed, allowed):
+    """Exercise production path selection without importing the live app."""
+    from flask import request
+    root = Path(__file__).parents[2]
+    module = ast.parse((root / "server/app.py").read_text())
+    function = next(n for n in module.body if isinstance(n, ast.FunctionDef)
+                    and n.name == "_change_confirmation_paths")
+    lumps = tmp_path / "lumps"
+    lumps.mkdir()
+    for name in (".lump-write-leases.json", "example.lump", "manifest.json",
+                 "ns-state.json", "boot-image.bin", "other.json"):
+        (lumps / name).write_text("before")
+    scope = {
+        "__file__": str(tmp_path / "server/app.py"),
+        "LUMPS_DIR": str(lumps),
+        "BOOT_CONFIG_PATH": str(lumps / "boot-config.json"),
+        "NS_STATE_PATH": str(lumps / "ns-state.json"),
+        "LUMPS_MANIFEST_PATH": str(lumps / "manifest.json"),
+        "_LUMP_LEASE_REGISTRY": ".lump-write-leases.json",
+        "request": request,
+    }
+    exec(compile(ast.Module(body=[function], type_ignores=[]), "<isolated>", "exec"), scope)
+    app = Flask(__name__)
+    app.secret_key = "test-only"
+    calls = []
+    install(app, scope[function.name], nullcontext,
+            store_path=tmp_path / "private/intents.sqlite")
+
+    @app.post("/api/lumps/save")
+    def save():
+        calls.append(True)
+        return {"ok": True}
+
+    with app.test_client() as client:
+        review = client.post("/api/lumps/save", json={"value": 1})
+        assert review.status_code == 428
+        token = review.json["change_confirmation"]["id"]
+        # Simulate a heartbeat or an artifact mutation while review is open.
+        (lumps / changed).write_text("after")
+        headers = {"X-Change-Confirmation": token}
+        response = client.post("/api/lumps/save", json={"value": 1}, headers=headers)
+        assert response.status_code == (200 if allowed else 409)
+        assert bool(calls) is allowed
+        if not allowed:
+            assert response.json["error"] == "change_confirmation_invalid"
+            assert response.json["committed"] is False
+        # Excluding coordination data must not weaken one-use authorization.
+        assert client.post("/api/lumps/save", json={"value": 1},
+                           headers=headers).status_code == 409
+
+
+def test_review_rejection_diagnostics_keep_safe_server_code():
+    """AST-isolate the production sanitizer to avoid live app initialization."""
+    root = Path(__file__).parents[2]
+    module = ast.parse((root / "server/app.py").read_text())
+    names = {"_LUMP_DIAGNOSTIC_CODES", "_LUMP_DIAGNOSTIC_CODE_REASONS",
+             "_lump_diagnostic_error_code", "_sanitize_lump_diagnostic_error"}
+    nodes = [n for n in module.body
+             if (isinstance(n, ast.FunctionDef) and n.name in names)
+             or (isinstance(n, ast.Assign) and any(
+                 isinstance(t, ast.Name) and t.id in names for t in n.targets))]
+    scope = {
+        "_lump_diagnostic_error_name": lambda value: "Error",
+        "_lump_diagnostic_stack_locations": lambda value: None,
+    }
+    exec(compile(ast.Module(body=nodes, type_ignores=[]), "<isolated>", "exec"), scope)
+    result = scope["_sanitize_lump_diagnostic_error"]({
+        "code": "change_confirmation_invalid", "message": "private payload",
+    })
+    assert result["code"] == "change_confirmation_invalid"
+    assert "saved state changed" in result["reason"]
+    assert "private payload" not in str(result)
+
+
 def test_shared_store_process_restart_and_atomic_one_use(tmp_path):
     path = tmp_path / "private" / "reviews.sqlite"
     secret_binding = ("private-session-value", "private-request-value")

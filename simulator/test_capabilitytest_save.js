@@ -42,6 +42,45 @@ function response(status, body) {
     }
     check('validation does not commit browser state', commits === 0);
 
+    const {createSaveDiagnostics} = require('./save_diagnostics.js');
+    const diagnosticValues = new Map();
+    const diagnostics = createSaveDiagnostics({
+        root: {},
+        storage: {
+            getItem: key => diagnosticValues.get(key) || null,
+            setItem: (key, value) => diagnosticValues.set(key, value),
+            removeItem: key => diagnosticValues.delete(key),
+        },
+        setTimeout: () => 1,
+    });
+    globalThis.LumpSaveDiagnostics = diagnostics;
+    let reviewRequests = 0;
+    try {
+        await _lumpSaveRequest((url) => {
+            if (url !== '/api/lumps/save') {
+                return response(404, '{"error":"operation not found"}');
+            }
+            reviewRequests++;
+            return response(409, JSON.stringify({
+                error: 'change_confirmation_invalid', committed: false,
+                message: 'Review expired, was already used, or the request or saved state changed. Review again.',
+            }));
+        }, '/api/lumps/save', {metadata: {}}, () => { commits++; });
+        check('invalid review rejects save', false);
+    } catch (error) {
+        check('save UI retains actual review rejection and explanation',
+            error.message.includes('change_confirmation_invalid') &&
+            error.message.includes('saved state changed'));
+    } finally {
+        delete globalThis.LumpSaveDiagnostics;
+    }
+    check('review rejection is never retried or committed',
+        reviewRequests === 1 && commits === 0);
+    check('commit diagnostics retain actual protected review rejection',
+        diagnostics.getQueue().some(event => event.stage === 'commit' &&
+            event.error && event.error.code === 'change_confirmation_invalid' &&
+            event.error.reason.includes('saved state changed')));
+
     const ideClassification = _lumpSaveFailureClassification(422, {
         namespace_identity_failed: true,
         failure_owner: 'ide',

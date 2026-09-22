@@ -118,6 +118,10 @@ function _redactDiagnosticText(value, max) {
 }
 
 const _SAVE_DIAGNOSTIC_REASON_BY_CODE = Object.freeze({
+    change_confirmation_invalid: 'Review expired, was already used, or the request or saved state changed. Review again.',
+    change_confirmation_required: 'Review protected change before publication.',
+    change_review_busy: 'Too many pending reviews; wait for expiry.',
+    recovery_approval_required: 'Interrupted artifact transaction requires explicitly reviewed offline recovery.',
     capture_failed: 'Save capture failed before the repository request.',
     preflight_rejected: 'The repository rejected save preparation.',
     approval_rejected: 'The repository rejected the approval step.',
@@ -135,6 +139,8 @@ const _SAVE_DIAGNOSTIC_REASON_BY_CODE = Object.freeze({
 });
 
 const _SAVE_DIAGNOSTIC_KINDS = new Set([
+    'change_confirmation_invalid', 'change_confirmation_required',
+    'change_review_busy', 'recovery_approval_required',
     'capture_failed', 'preflight_rejected', 'approval_rejected',
     'commit_rejected', 'commit_unknown', 'reconciliation_unknown',
     'repository_unavailable', 'invalid_response', 'reload_failed',
@@ -164,6 +170,13 @@ function _diagnosticErrorLocation(error) {
 }
 
 function _diagnosticErrorCode(stage, outcome, error, values) {
+    // Preserve known server rejection codes, never arbitrary response prose,
+    // credentials or payloads. The matching reason is a fixed safe enum.
+    const serverCode = values && values.server_code;
+    if (['change_confirmation_invalid', 'change_confirmation_required',
+        'change_review_busy', 'recovery_approval_required'].includes(serverCode)) {
+        return serverCode;
+    }
     const normalizedStage = _diagnosticStage(stage);
     const normalizedOutcome = _diagnosticOutcome(outcome);
     const kind = _diagnosticRead(error, 'kind').toLowerCase();
