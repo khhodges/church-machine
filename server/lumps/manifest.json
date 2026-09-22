@@ -1055,6 +1055,63 @@
         "placeholder": true
       }
     ],
-    "operation_id": "8d269730-5394-437d-88bf-117102f13689"
+    "operation_id": "8d269730-5394-437d-88bf-117102f13689",
+    "archived": true
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest_v97.lump",
+    "lump_version": 97,
+    "compiled_at": 1790085913.6234372,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      }
+    ],
+    "operation_id": "2071d46a-72d2-4a70-8fc0-74c3627571af",
+    "archived": true,
+    "binary_hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de"
+  },
+  {
+    "token": "4a000006",
+    "abstraction": "SelfTest",
+    "filename": "SelfTest.1.8b19abd7.lump",
+    "lump_version": 98,
+    "compiled_at": 1790086304.7276406,
+    "dot_name": "SelfTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      }
+    ],
+    "operation_id": "5039e5cd-59e6-4400-84c5-76593be20c95"
   }
 ]

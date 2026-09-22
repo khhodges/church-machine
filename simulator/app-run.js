@@ -2709,9 +2709,18 @@ function _configuredBootLumpToken(bootCatalog, selectedSlot) {
 }
 
 function _openConfiguredBootLumpInDefaultEditor() {
+    if (window._explicitEditorNavigationClaimed === true) {
+        return Promise.resolve(false);
+    }
     if (window._configuredBootLumpOpenPromise) {
         return window._configuredBootLumpOpenPromise;
     }
+    // Capture editor navigation ownership before any of the catalog requests
+    // below. An explicit LUMP open (for example, Namespace → Open LUMP)
+    // increments this sequence synchronously, before its own asynchronous
+    // artifact fetch completes. The default opener is only a startup fallback;
+    // it must not claim the editor after a newer navigation has begun.
+    const editorOpenRequestId = window._savedLumpOpenRequestId || 0;
     const editor = document.getElementById('asmEditor');
     const hasEditorSource = !!(editor && editor.value && editor.value.trim());
     const hasUserTab = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
@@ -2729,6 +2738,10 @@ function _openConfiguredBootLumpInDefaultEditor() {
     }
 
     const openResolved = function(results) {
+        if (window._explicitEditorNavigationClaimed === true ||
+                (window._savedLumpOpenRequestId || 0) !== editorOpenRequestId) {
+            return false;
+        }
         const bootCatalog = results && Array.isArray(results[1]) ? results[1] : [];
         const namespaceState = results && results[2] &&
             typeof results[2] === 'object' ? results[2] : null;
@@ -2742,7 +2755,9 @@ function _openConfiguredBootLumpInDefaultEditor() {
         const token = _configuredBootLumpToken(
             bootCatalog, bootMarker ? Number(bootMarker.slot) : null);
         if (!token) return false;
-        return Promise.resolve(openLumpInEditor(token)).then(function() {
+        return Promise.resolve(openLumpInEditor(token, {
+            startupDefault: true,
+        })).then(function() {
             return true;
         });
     };
@@ -2792,6 +2807,9 @@ function _openConfiguredBootLumpInDefaultEditor() {
 function _scheduleConfiguredBootLumpOpen() {
     let attempts = 0;
     const tryOpen = function() {
+        // Explicit navigation permanently ends startup-default authority for
+        // this page load. Do not retry later and reclaim the editor.
+        if (window._explicitEditorNavigationClaimed === true) return;
         attempts += 1;
         let opening;
         try {

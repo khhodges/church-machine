@@ -75,14 +75,14 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x007FE",
+      "limit": "0x001F4",
       "seq": 0,
-      "seal": "0xDE56B6EF",
+      "seal": "0xDE97F6EF",
       "token": "4a000006",
-      "filename": "SelfTest.1.9beaf6e7.lump",
+      "filename": "SelfTest.1.8b19abd7.lump",
       "issue_n": 1,
-      "lump_version": 96,
-      "binary_hash": "d2a9819251d0493b440681bedb8dab2646e84ff70289c90126c7ed51055441b2",
+      "lump_version": 98,
+      "binary_hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
       "identity_hash": "9a8cb773eb69a85d09a1b372f3238e67e80b23ef8c26f12784664d843e8fa615",
       "resident": true,
       "boot_resident": true,
@@ -161,7 +161,9 @@
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEBA96EF"
+      "seal": "0xDEBA96EF",
+      "resident": true,
+      "load_policy": "Resident"
     },
     {
       "name": "Thread.3",
@@ -172,7 +174,9 @@
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEBB16EF"
+      "seal": "0xDEBB16EF",
+      "resident": true,
+      "load_policy": "Resident"
     },
     {
       "name": "M_BIT_DEV",
@@ -186,5 +190,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1790079252.5807724
+  "generated_at": 1790086357.2558465,
+  "committed_raw_fingerprint": "fbcee0ac08421fb49583e41f91c81adfa000ca9f92a306e8786361792356e09b"
 }

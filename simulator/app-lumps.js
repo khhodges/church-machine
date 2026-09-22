@@ -6688,7 +6688,14 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // Content / Audit tabs) so the editor disassembly is always consistent with
 // every other view.  sim.memory is used only for structural location info
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
-async function openLumpInEditor(token) {
+async function openLumpInEditor(token, options) {
+    // Opening a LUMP is normally explicit navigation. Claim that authority
+    // synchronously, before the artifact fetch, so the asynchronous startup
+    // default cannot replace a Namespace/editor selection that is still
+    // loading. The startup fallback identifies its sole non-explicit call.
+    if (!(options && options.startupDefault === true)) {
+        window._explicitEditorNavigationClaimed = true;
+    }
     if (typeof window._clearAuthoritativeDraftBanner === 'function') {
         window._clearAuthoritativeDraftBanner();
     }
