@@ -148,3 +148,4 @@
 - [GT permission enforcement boundary](authored-gt-permissions.md) — permission changes are a runtime M-bit concern; compiler and save admission must not block them
 - [SelfTest status evidence](selftest-status-evidence.md) — discarded DR0 failure writes can mask test failures; inspect branch evidence independently of DR1 return status
 - [Namespace save layout versus identity](namespace-save-layout-identity.md) — regeneration may normalize descriptors without substituting artifacts; ordinary unchanged saves preserve layout
+- [Resident installation isolation](resident-install-execution-isolation.md) — background deployments must not splice a new c-list into running code; direct-run activation is explicit

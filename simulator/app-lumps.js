@@ -1030,14 +1030,9 @@ function _runSelectedLumpInSim(btn) {
     if (!_selectedLumpToken) return;
     const lump = _lumpsCache.find(l => l.token === _selectedLumpToken);
     if (!lump) return;
-    // Always force NS slot 3 (Boot.Abstr) for interactive execution.
-    // CR14 is the code register and always points to the boot-entry slot (3)
-    // after boot.  If we loaded into the lump's own ns_slot (which may be any
-    // slot 4-63), CR14.word0 would still encode slot 3 and the first fetch
-    // would fail a RANGE check against the old LED-flash lump bounds — the
-    // classic "LED flash LUMP stays in place" bug.  Passing null forces
-    // loadLumpBinary to target BOOT_ABSTR_NS_SLOT so the new code is reachable
-    // via CR14 immediately.
+    // The loader resolves the immutable LUMP's live Namespace destination and
+    // explicitly activates that resident without changing the prepared boot
+    // selection.
     _loadLumpBinaryIntoSim(_selectedLumpToken, lump.abstraction || _selectedLumpToken, btn, null);
 }
 
@@ -9961,8 +9956,12 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         // loader remints row zero for this slot's current Namespace sequence.
         const loaded = sim.loadLumpBinary(
             rawWords,
-            (nsSlot !== null && nsSlot !== undefined) ? nsSlot : undefined,
+            _targetSlot,
             {
+                // "Load into Sim" is an explicit direct-run action. Ordinary
+                // deployment/reload callers omit this flag and therefore cannot
+                // splice a background resident into the live CR14/CR6 context.
+                activateExecution: true,
                 // Bootstrap identity is the literal frozen resident row-0 GT.
                 // Do not feed it through the dynamic reminting path.
                 identityContract: _identityContract,

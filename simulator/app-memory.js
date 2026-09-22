@@ -879,6 +879,59 @@ function _resolveCListPetName(gtWord) {
     } catch(e) { return null; }
 }
 
+// Classify the leading code words that hardware CALL treats as method selectors.
+// Declared metadata supplies only the table width/names; the resident binary is
+// authoritative for entry kind and target.  Without metadata, mirror the saved
+// LUMP viewer's deliberately narrow legacy rule: only a bounded, non-zero first
+// word can be a bare-PC entry.
+function _codeViewMethodEntries(codeWords, methods) {
+    const words = Array.isArray(codeWords)
+        ? codeWords.map(word => Number(word) >>> 0) : [];
+    const declaredMethods = Array.isArray(methods) ? methods : [];
+    const declared = declaredMethods.length > 0;
+    let count = declaredMethods.length;
+
+    if (declared) {
+        if (count > words.length) return [];
+        for (let i = 0; i < count; i++) {
+            const entry = words[i] >>> 0;
+            if ((entry >>> 27) !== 23 && entry >= words.length) return [];
+        }
+    } else {
+        const first = words.length ? (words[0] >>> 0) : 0;
+        if (!(first > 0 && first < words.length)) return [];
+        count = 1;
+    }
+
+    const entries = [];
+    for (let i = 0; i < count; i++) {
+        const word = words[i] >>> 0;
+        const method = declaredMethods[i] || null;
+        const opcode = word >>> 27;
+        let kind = 'legacy';
+        let targetIndex = word;
+        if (word === 0) {
+            kind = 'private';
+            targetIndex = null;
+        } else if (opcode === 23) {
+            const rawOffset = word & 0x7FFF;
+            const signedOffset = (rawOffset & 0x4000)
+                ? (rawOffset | 0xFFFF8000) : rawOffset;
+            kind = 'branch';
+            targetIndex = i + signedOffset;
+        }
+        entries.push({
+            selector: i + 1,
+            word,
+            kind,
+            targetIndex,
+            lumpWord: targetIndex === null ? null : targetIndex + 1,
+            method,
+        });
+    }
+    return entries;
+}
+
 function updateCRDetail() {
     if (typeof window !== 'undefined') {
         window._currentCodeControlFlowAddresses = {
@@ -1195,6 +1248,12 @@ function updateCRDetail() {
             if (a >= sim.memory.length) break;
             _codeWords.push(sim.memory[a] >>> 0);
         }
+        const _cloomcMethods = (typeof _lumpManifests !== 'undefined' &&
+                                _lumpManifests[nsIdx] &&
+                                Array.isArray(_lumpManifests[nsIdx]._methods))
+            ? _lumpManifests[nsIdx]._methods : [];
+        const _methodEntries = _codeViewMethodEntries(_codeWords, _cloomcMethods);
+        const _methodTableCount = _methodEntries.length;
         const _brArrows = _computeBranchArrows(_codeWords);
 
         let codeHtml = '<table class="cr-table code-view-table"><thead><tr>';
@@ -1279,33 +1338,13 @@ function updateCRDetail() {
         const _brLabelMap = new Map();
         Array.from(_brTargetSet).sort((a, b) => a - b).forEach((idx, n) => _brLabelMap.set(idx, `L${n}`));
 
-        // CLOOMC method table: the first N code words are method pointers, not
-        // instructions.  Read the count from the manifest so we can render them
-        // as .method_ptr rows instead of passing them to the disassembler.
-        const _cloomcMethods = (typeof _lumpManifests !== 'undefined' &&
-                                _lumpManifests[nsIdx] &&
-                                Array.isArray(_lumpManifests[nsIdx]._methods))
-            ? _lumpManifests[nsIdx]._methods : [];
-        const _methodTableCount = _cloomcMethods.length;
-
         // Build a map from instruction word-index → method info, using the
-        // pointer values stored in the method table (each value is the word
-        // offset of that method's first instruction within _codeWords).
+        // binary-decoded targets stored in the method table.
         const _methodStartMap = new Map();
-        for (let i = 0; i < _methodTableCount; i++) {
-            const pointerWord = _codeWords[i] >>> 0;
-            const pointerOpcode = (pointerWord >>> 27) & 0x1F;
-            const rawOffset = pointerWord & 0x7FFF;
-            const signedOffset = (rawOffset & 0x4000)
-                ? (rawOffset | 0xFFFF8000) : rawOffset;
-            // Canonical tables store opcode-23 PC-relative BRANCH words. Keep
-            // raw positive offsets as a deliberate legacy-read fallback only.
-            const offset = pointerOpcode === 23
-                ? i + signedOffset
-                : pointerWord;
-            const method = _cloomcMethods[i];
-            if (method && typeof offset === 'number' && offset >= _methodTableCount) {
-                _methodStartMap.set(offset, method);
+        for (const entry of _methodEntries) {
+            if (entry.method && Number.isInteger(entry.targetIndex) &&
+                    entry.targetIndex >= _methodTableCount) {
+                _methodStartMap.set(entry.targetIndex, entry.method);
             }
         }
         if (typeof window !== 'undefined') {
@@ -1329,18 +1368,30 @@ function updateCRDetail() {
 
             // Method table entry — render as data annotation, not an instruction
             if (w < _methodTableCount) {
-                const _mth = _cloomcMethods[w];
-                const _mthName = _mth ? _mth.name : `method_${w}`;
-                const _mthInternal = _mth && _mth._internal;
-                const _vis = _mthInternal
-                    ? '<span style="color:#888">internal</span>'
-                    : '<span style="color:#4ec9b0">public</span>';
+                const _entry = _methodEntries[w];
+                const _mth = _entry.method;
+                const _mthName = _mth && _mth.name
+                    ? ` \u00b7 ${String(_mth.name).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}`
+                    : '';
+                let _target;
+                let _vis;
+                if (_entry.kind === 'private') {
+                    _target = 'private entry \u2014 CALL rejected';
+                    _vis = '<span style="color:#888">private</span>';
+                } else {
+                    const _targetAddr = codeStart + _entry.targetIndex;
+                    _target = `target 0x${_targetAddr.toString(16).toUpperCase().padStart(4,'0')}` +
+                        ` (LUMP word ${_entry.lumpWord})`;
+                    _vis = _mth && _mth._internal
+                        ? '<span style="color:#888">internal</span>'
+                        : (_mth ? '<span style="color:#4ec9b0">public</span>' : '');
+                }
                 codeHtml += `<tr class="code-row-infra">`;
                 codeHtml += `<td class="cr-idx">0x${addr.toString(16).toUpperCase().padStart(4,'0')}</td>`;
                 codeHtml += `<td class="cr-gt">0x${word.toString(16).toUpperCase().padStart(8,'0')}</td>`;
-                codeHtml += `<td class="code-disasm">.method_ptr&nbsp;&nbsp;${_mthName}</td>`;
+                codeHtml += `<td class="code-disasm">.method_entry&nbsp;&nbsp;#${_entry.selector}${_mthName}</td>`;
                 if (_brArrows.hasBranches) codeHtml += '<td class="br-arrow-col"></td>';
-                codeHtml += `<td class="code-decompiled code-decompiled-infra">method table[${w}] \u00b7 ${_vis}</td>`;
+                codeHtml += `<td class="code-decompiled code-decompiled-infra">${_target}${_vis ? ' \u00b7 ' + _vis : ''}</td>`;
                 codeHtml += '</tr>';
                 continue;
             }

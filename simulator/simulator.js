@@ -10690,6 +10690,24 @@ class ChurchSimulator {
         const LEGACY_EXTENDED_BASE = 0x0400;
         const _nsSlotRaw     = (nsSlot !== undefined && nsSlot !== null) ? Number(nsSlot) : NaN;
         const abstrSlot      = Number.isInteger(_nsSlotRaw) ? _nsSlotRaw : this.bootEntrySlot;
+        // A deployment may replace any Namespace resident while another LUMP
+        // is executing.  Only the resident named by the live CR14 code view is
+        // allowed to refresh CR14/CR6.  Using bootEntrySlot here is insufficient:
+        // CALL can make another LUMP current, and unconditionally rewriting CR6
+        // for a background deployment splices the new resident's c-list into
+        // the old resident's code context.
+        let _activeCodeSlot = null;
+        if (this.cr && this.cr[14] && !ChurchSimulator.isNullGT(this.cr[14].word0 >>> 0)) {
+            try {
+                _activeCodeSlot = this.parseGT(this.cr[14].word0 >>> 0).index;
+            } catch (_) {
+                _activeCodeSlot = null;
+            }
+        }
+        const _activateInstalledContext =
+            options.activateExecution === true ||
+            _activeCodeSlot === abstrSlot ||
+            (!this.bootComplete && abstrSlot === this.bootEntrySlot);
 
         if (!words || !words.length) {
             this.output += '[loadLumpBinary] ERROR: empty words array.\n';
@@ -10939,36 +10957,30 @@ class ChurchSimulator {
             this.output += `[loadLumpBinary] NOTE: NS[${abstrSlot}] is a stub LUMP — all code words are RETURN; CALL will fault with STUB_METHOD.\n`;
         }
 
-        // CR14 update strategy depends on the target slot:
+        // CR14/CR6 update strategy depends on the live execution slot:
         //
-        // • abstrSlot === this.bootEntrySlot — interactive execution path
-        //   ("▶ Run" on a LUMP).  Always rebuild CR14 completely, including
-        //   word0 (the R+X GT), so that mLoad's bounds check uses the correct
-        //   NS slot limits regardless of what bootEntrySlot was before this call.
-        //   If bootEntrySlot previously referenced a different slot the old word0
-        //   GT would fail bounds checks — the "boots wrong slot / LUMP_MAGIC" bug.
+        // • abstrSlot is the slot named by live CR14 — refresh both code and
+        //   c-list views from the replacement binary.
         //
-        // • abstrSlot !== this.bootEntrySlot (service install into another slot) —
-        //   only update word1/word2/word3; word0 already encodes the correct GT.
-        if (abstrSlot === this.bootEntrySlot) {
-            // Interactive execution path ("▶ Run" on a LUMP, or any load into the
-            // current boot-entry slot).  Rebuild CR14 word0 completely so mLoad's
-            // bounds check uses this slot's limits, then confirm bootEntrySlot.
+        // • any other slot — deployment only.  Do not alter either live view;
+        //   the resident becomes active later through CALL/CHANGE/boot.
+        if (_activateInstalledContext) {
             const cr14 = this.cr[14];
             if (cr14) {
-                cr14.word0 = this.createGT(existingGtSeq, this.bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
+                cr14.word0 = this.createGT(existingGtSeq, abstrSlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
                 cr14.word1 = installBase >>> 0;
                 cr14.word2 = this.memory[nsBase + 1];
                 cr14.word3 = this.memory[nsBase + 2];
             }
-            this.bootEntrySlot = abstrSlot;
         }
 
-        // Set CR6 to point to the c-list that is already embedded in the lump.
+        // When replacing the active resident, set CR6 to the c-list already
+        // embedded in that same LUMP.  Background service deployment must leave
+        // CR6 untouched so code and c-list can never name different residents.
         // The c-list occupies the last cc words of the lump slot:
         //   clistBase = installBase + lumpSize - cc
         // When cc = 0 zero CR6 so any downstream lazy-injection path can take over.
-        if (this.cr[6]) {
+        if (_activateInstalledContext && this.cr[6]) {
             if (hdr.cc > 0) {
                 const clistBase = installBase + lumpSize - hdr.cc;
                 const cr6GT = this.createGT(existingGtSeq, abstrSlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
