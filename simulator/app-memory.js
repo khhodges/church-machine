@@ -3858,7 +3858,8 @@ function updateNamespace() {
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
-    html += `<button type="button" id="nsSaveBtn" aria-live="polite" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
+    html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
+    html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save preserves the submitted layout. If a missing image must be regenerated, locations and limits are recalculated from build settings and LUMP sizes, and descriptor seals are recomputed. This does not select a different artifact revision or boot target. The rebuilt image takes effect on reset; live execution is not reset by saving.</div>';
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -5480,9 +5481,7 @@ window._nsTableSave = async function(btn) {
                 const w0 = words[b] >>> 0;
                 if (w0 === 0) continue;             // unoccupied slot — skip
                 const w1     = words[b + 1] >>> 0;
-                const gtSeq  = sim.parseNSWord1(w1).gtSeq;
-                const lim17  = w1 & 0x1FFFF;
-                words[b + 2] = sim.makeVersionSeals(gtSeq, w0, lim17) >>> 0;
+                words[b + 2] = sim._integrity32(w0, w1) >>> 0;
             }
         }
 
@@ -5648,7 +5647,8 @@ window._nsTableSave = async function(btn) {
             cacheRefreshError = cacheRefreshError || refreshError;
         }
 
-        // Clear dirty flag — committed state now matches in-memory state.
+        // Clear staged edits. A regenerated committed layout may differ from
+        // live execution memory, which remains untouched until reset.
         _setNsDirty(false);
         window._nsPrefetchDirty = false;
         window._nsPrefetchDirtySlots = {};

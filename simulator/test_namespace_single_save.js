@@ -25,6 +25,10 @@ check('Namespace toolbar has Save for next build button',
     toolbarStart !== -1 && toolbar.includes('Save for next build'));
 check('Namespace save button acknowledges errors before allowing retry',
     toolbar.includes('_nsTableSaveClick(this)'));
+check('Namespace save explains layout normalization separately from artifact selection',
+    toolbar.includes('aria-describedby="nsSaveLayoutNote"') &&
+    toolbar.includes('locations and limits are recalculated') &&
+    toolbar.includes('does not select a different artifact revision or boot target'));
 check('Namespace toolbar does not expose a separate policy-save button',
     !toolbar.includes('nsPrefetchSaveBtn') && !source.includes('id="nsPrefetchSaveBtn"'));
 
@@ -43,6 +47,29 @@ check('Namespace save carries the authoritative Namespace fingerprint',
 const saveStart = source.indexOf('window._nsTableSave = async function(btn)');
 const saveEnd = source.indexOf('// ── NS Table Load', saveStart);
 const save = source.slice(saveStart, saveEnd);
+// Execute the preparation block with real integrity code. Nonzero G/F and
+// high limit bits must not be dropped by the legacy version-seal wrapper.
+const vm = require('vm');
+const ChurchSimulator = require('./simulator.js');
+const sealBlock = save.slice(
+    save.indexOf('        {\n            const nsBase'),
+    save.indexOf('        // ── Build ns_state'));
+const sealWords = new Uint32Array([0x100, 0xC0623456, 0, 0]);
+const sealSim = {
+    NS_TABLE_BASE: 0, NS_ENTRY_WORDS: 4, MAX_NS_ENTRIES: 1,
+    _integrity32: ChurchSimulator.prototype._integrity32,
+};
+vm.runInNewContext(sealBlock, {
+    sim: sealSim, words: sealWords, bootWordCount: sealWords.length,
+});
+const expectedSeal = sealSim._integrity32(sealWords[0], sealWords[1]) >>> 0;
+check('Namespace preparation seals the exact full descriptor authority word',
+    sealWords[2] === expectedSeal && sealWords[1] === 0xC0623456);
+vm.runInNewContext(sealBlock, {
+    sim: sealSim, words: sealWords, bootWordCount: sealWords.length,
+});
+check('unchanged Namespace preparation preserves the descriptor seal',
+    sealWords[2] === expectedSeal);
 const saveRaw = save.indexOf("fetch('/api/boot-image/save-ns'");
 const clearDirty = save.indexOf('_setNsDirty(false)');
 check('single save submits Namespace bytes without a competing boot-config plan',

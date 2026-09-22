@@ -147,3 +147,4 @@
 - [Static path-write guard precision](static-path-write-guard-precision.md) — distinguish write destinations, lexical scope, temp roots, and env-backed fallbacks to avoid unsafe gaps or read-only false positives
 - [GT permission enforcement boundary](authored-gt-permissions.md) — permission changes are a runtime M-bit concern; compiler and save admission must not block them
 - [SelfTest status evidence](selftest-status-evidence.md) — discarded DR0 failure writes can mask test failures; inspect branch evidence independently of DR1 return status
+- [Namespace save layout versus identity](namespace-save-layout-identity.md) — regeneration may normalize descriptors without substituting artifacts; ordinary unchanged saves preserve layout
