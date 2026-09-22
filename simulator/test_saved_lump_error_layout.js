@@ -20,17 +20,25 @@ function extractFunction(source, name) {
 
 const dom = new JSDOM(`<!doctype html><body>
     <div id="compileFailedBanner" style="display:none"><span id="compileFailedBannerText"></span></div>
-    <div id="codeSidebarTabs"></div>
-    <section id="savedLumpDisassemblyPanel" style="display:none">
+    <div id="editor"><div class="editor-layout">
+    <div class="editor-panel"><textarea id="asmEditor">CALL SelfTest.Run</textarea></div>
+    <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none">
+        <div id="disassemblyPresentationStatus"></div>
         <pre id="savedLumpDisassembly"></pre>
     </section>
+    <div class="editor-panel console-panel">
+    <div id="codeSidebarTabs"></div>
     <div id="asmErrorPanel" style="display:none"></div>
     <div id="asmWarningPanel"></div>
     <div id="codeConsoleContent"></div>
     <div id="codeHistoryPanel"></div>
     <div id="codeSyntaxPanel"></div>
     <div id="codeJsPanel"></div>
+    </div></div></div>
 </body>`, { url: 'http://localhost/simulator/' });
+const style = dom.window.document.createElement('style');
+style.textContent = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
+dom.window.document.head.appendChild(style);
 
 const context = vm.createContext({
     window: dom.window,
@@ -51,12 +59,15 @@ assert(
     'editing source invalidates stale compiler diagnostics without full pane teardown'
 );
 vm.runInContext([
+    extractFunction(lumpsSource, '_setDisassemblyPresentationStatus'),
+    extractFunction(lumpsSource, '_showCompilerOutputBesideSource'),
     extractFunction(errorsSource, '_showCompileFailedBanner'),
     extractFunction(errorsSource, '_hideCompileFailedBanner'),
     extractFunction(errorsSource, '_showAsmErrors'),
     extractFunction(errorsSource, '_clearAsmErrors'),
     extractFunction(lumpsSource, '_enterSavedLumpEditorMode'),
 ].join('\n'), context);
+context.window._showCompilerOutputBesideSource = context._showCompilerOutputBesideSource;
 
 vm.runInContext('_enterSavedLumpEditorMode("LOAD CR1, CR6, #0", "CapabilityTest")', context);
 const disassembly = dom.window.document.getElementById('savedLumpDisassemblyPanel');
@@ -65,8 +76,22 @@ assert.equal(disassembly.style.display, 'flex', 'saved disassembly starts visibl
 assert.equal(errors.style.display, 'none', 'stale errors are cleared on entry');
 
 vm.runInContext('_showAsmErrors([{line:66,message:"Expected a capability register"}])', context);
-assert.equal(disassembly.style.display, 'none', 'errors replace saved disassembly');
+assert.equal(disassembly.style.display, 'flex', 'errors do not hide saved disassembly');
+assert.equal(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    'LOAD CR1, CR6, #0', 'failed compile preserves exact previously rendered bytes');
 assert.equal(errors.style.display, 'flex', 'compiler errors are visible');
+assert.equal(dom.window.getComputedStyle(dom.window.document.querySelector('.console-panel')).display,
+    'flex', 'diagnostics are not hidden behind saved-LUMP CSS');
+assert.match(dom.window.document.getElementById('disassemblyPresentationStatus').textContent,
+    /Exact saved binary.*Not the result/);
+assert.equal(dom.window.document.getElementById('asmEditor').value, 'CALL SelfTest.Run');
+// Repeated failures and a restored/edited draft keep the previous exact
+// disassembly, never manufacturing new words from rejected source.
+dom.window.document.getElementById('asmEditor').value = 'restored CR11 draft';
+vm.runInContext('_showAsmErrors([{line:1,message:"Unknown method"}])', context);
+assert.equal(disassembly.style.display, 'flex');
+assert.equal(dom.window.document.getElementById('savedLumpDisassembly').textContent, 'LOAD CR1, CR6, #0');
+assert.equal(dom.window.document.getElementById('asmEditor').value, 'restored CR11 draft');
 
 let actionCalled = false;
 context.testAction = function() { actionCalled = true; };
@@ -80,5 +105,11 @@ assert.equal(actionCalled, true, 'Namespace action invokes its callback');
 vm.runInContext('_clearAsmErrors()', context);
 assert.equal(errors.style.display, 'none', 'cleared compiler errors are hidden');
 assert.equal(disassembly.style.display, 'flex', 'saved disassembly returns after clearing errors');
+vm.runInContext('_enterSavedLumpEditorMode("NEW SAVED HEADER AND WORDS", "Other")', context);
+assert(!dom.window.document.querySelector('.editor-layout').classList.contains('disassembly-diagnostics-layout'),
+    'opening another exact artifact resets failed-attempt layout');
+assert.equal(dom.window.document.getElementById('savedLumpDisassembly').textContent, 'NEW SAVED HEADER AND WORDS');
+assert.match(dom.window.document.getElementById('disassemblyPresentationStatus').textContent,
+    /^Exact saved binary/);
 
 console.log('saved-LUMP compiler error layout tests passed');

@@ -1859,12 +1859,15 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken) {
 
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection) {
     window._savedLumpEditorMode = true;
+    window._compiledCandidateEditorMode = false;
     var tabs = document.getElementById('codeSidebarTabs');
     var layout = document.querySelector('#editor .editor-layout');
     var panel = document.getElementById('savedLumpDisassemblyPanel');
     var text = document.getElementById('savedLumpDisassembly');
     if (tabs) tabs.style.display = 'none';
     if (layout) layout.classList.add('saved-lump-editor-layout');
+    if (layout) layout.classList.remove('disassembly-diagnostics-layout', 'compiled-candidate-editor-layout');
+    _setDisassemblyPresentationStatus('Exact saved binary — source edits and restored drafts do not change these bytes.');
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
         'asmWarningPanel'].forEach(function(id) {
@@ -1884,33 +1887,35 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
     if (panel) panel.style.display = 'flex';
 }
 
-// Begin a compile presentation without changing the source or pretending that
-// the immutable saved bytes are the result of the new build.  A previous
-// unsaved candidate is hidden while the attempt is in flight; saved-LUMP mode
-// remains intact so a failed attempt can present diagnostics against that
-// editing context.
+function _setDisassemblyPresentationStatus(message) {
+    var status = document.getElementById('disassemblyPresentationStatus');
+    if (status) status.textContent = message;
+}
+
+// Keep the last exact binary visible while compiling. Diagnostics must not
+// replace the only disassembly surface: a failure produces no new bytes, and
+// therefore cannot restore a pane previously hidden at compile start.
 function _showCompilerOutputBesideSource() {
-    // Compilation diagnostics belong in the Console.  Saved-LUMP layout hides
-    // that surface, so suspend the two-column artifact presentation while the
-    // compile is in flight without discarding the last exact saved rendering.
     var savedPanel = document.getElementById('savedLumpDisassemblyPanel');
     var savedText = document.getElementById('savedLumpDisassembly');
+    var hasBinary = savedText && savedText.textContent.trim() !== '';
     if (window._savedLumpEditorMode && savedText &&
             !window._compiledCandidateEditorMode) {
         window._savedLumpDisassemblyBeforeCompile = savedText.textContent;
     }
-    if (window._compiledCandidateEditorMode) {
-        window._compiledCandidateEditorMode = false;
-        if (typeof window._savedLumpDisassemblyBeforeCandidate === 'string') {
-            window._savedLumpDisassemblyBeforeCompile =
-                window._savedLumpDisassemblyBeforeCandidate;
-        }
-        window._savedLumpDisassemblyBeforeCandidate = null;
-    }
     var layout = document.querySelector('#editor .editor-layout');
-    if (layout) layout.classList.remove('compiled-candidate-editor-layout');
-    if (layout) layout.classList.remove('saved-lump-editor-layout');
-    if (savedPanel) savedPanel.style.display = 'none';
+    if (hasBinary) {
+        if (layout) layout.classList.add('saved-lump-editor-layout', 'disassembly-diagnostics-layout');
+        if (savedPanel) savedPanel.style.display = 'flex';
+        _setDisassemblyPresentationStatus(
+            (window._compiledCandidateEditorMode
+                ? 'Previous successful compile — UNSAVED candidate.'
+                : 'Exact saved binary.') +
+            ' Not the result of this compile attempt; may differ from editor source. See diagnostics below.');
+    } else {
+        if (layout) layout.classList.remove('saved-lump-editor-layout', 'disassembly-diagnostics-layout');
+        if (savedPanel) savedPanel.style.display = 'none';
+    }
     var details = document.getElementById('savedLumpBuildDetails');
     if (details) details.open = false;
     var tabs = document.getElementById('codeSidebarTabs');
@@ -2020,7 +2025,9 @@ function _showCompiledCandidateBesideSource(words, details) {
     if (layout) {
         layout.classList.add('saved-lump-editor-layout');
         layout.classList.add('compiled-candidate-editor-layout');
+        layout.classList.remove('disassembly-diagnostics-layout');
     }
+    _setDisassemblyPresentationStatus('Successful compile — UNSAVED authenticated candidate. Not a saved LUMP; later source edits do not change these bytes.');
     window._compiledCandidateEditorMode = true;
     return true;
 }
@@ -2082,8 +2089,11 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
     }
     if (layout) {
         layout.classList.remove('compiled-candidate-editor-layout');
+        layout.classList.remove('disassembly-diagnostics-layout');
         layout.classList.add('saved-lump-editor-layout');
     }
+    _setDisassemblyPresentationStatus(unavailable ? 'Saved binary unavailable — see details below.' :
+        'Exact saved binary — source edits and restored drafts do not change these bytes.');
     var details = document.getElementById('savedLumpBuildDetails');
     if (details) details.open = false;
     window._compiledCandidateEditorMode = false;
@@ -2108,22 +2118,25 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
         var exactFilename = descriptor && descriptor.filename;
         var wordsUrl = '/api/lump/' + encodeURIComponent(resp.token) + '/words' +
             (exactFilename
-                ? '?archive_filename=' + encodeURIComponent(exactFilename)
+                ? '?exact_filename=' + encodeURIComponent(exactFilename)
                 : '');
+        var expectedHash = descriptor && descriptor.binary_hash;
+        if (exactFilename && expectedHash) {
+            wordsUrl += '&binary_hash=' + encodeURIComponent(expectedHash);
+        }
         var response = await fetch(wordsUrl, { cache: 'no-store' });
         if (!response.ok) {
             throw new Error('server returned HTTP ' + response.status);
         }
         var data = await response.json();
         var returnedFilename = data.filename || data.lump || data.archive_filename;
-        if (exactFilename && returnedFilename &&
+        if (exactFilename &&
                 String(returnedFilename) !== String(exactFilename)) {
             throw new Error('the canonical response identity does not match the saved filename');
         }
-        var expectedHash = descriptor && descriptor.binary_hash;
         var returnedHash = data.binary_hash ||
             (data.inspection && data.inspection.binary_hash);
-        if (expectedHash && returnedHash &&
+        if (expectedHash &&
                 String(returnedHash).toLowerCase() !==
                     String(expectedHash).toLowerCase()) {
             throw new Error('the canonical response digest does not match the save receipt');
@@ -2174,7 +2187,10 @@ function exitSavedLumpEditorMode() {
     try { localStorage.removeItem('cm_sealed_lump'); } catch (_e) {}
     var layout = document.querySelector('#editor .editor-layout');
     if (layout) layout.classList.remove('saved-lump-editor-layout');
-    if (!window._savedLumpEditorMode) return;
+    if (layout) layout.classList.remove('disassembly-diagnostics-layout', 'compiled-candidate-editor-layout');
+    var hadBinaryPresentation = window._savedLumpEditorMode || window._compiledCandidateEditorMode;
+    window._compiledCandidateEditorMode = false;
+    if (!hadBinaryPresentation) return;
     window._savedLumpEditorMode = false;
     _syncSavedLumpIdentityVisibility();
     var tabs = document.getElementById('codeSidebarTabs');

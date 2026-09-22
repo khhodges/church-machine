@@ -1288,6 +1288,7 @@ trackAsync((async function t21() {
     };
     vm.createContext(sandbox);
     vm.runInContext(
+        extractFunctionByName('app-lumps.js', '_setDisassemblyPresentationStatus') + '\n' +
         extractFunctionByName('app-lumps.js', '_syncSavedLumpIdentityVisibility') + '\n' +
         SWITCH_CODE_TAB_SRC + '\n' + SAVED_LUMP_ENTER_SRC + '\n' + SAVED_LUMP_EXIT_SRC,
         sandbox);

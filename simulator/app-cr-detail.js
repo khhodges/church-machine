@@ -474,12 +474,10 @@ function _showAsmErrors(errors, titleOverride, action) {
     var panel = document.getElementById('asmErrorPanel');
     if (!panel) return;
     if (!errors || errors.length === 0) { _clearAsmErrors(); return; }
-    // In saved-LUMP split mode, compiled disassembly and compiler diagnostics
-    // share the right pane. Never render both flex surfaces at once: the error
-    // panel temporarily replaces disassembly instead of visually overwriting it.
-    if (window._savedLumpEditorMode) {
-        var disassemblyPanel = document.getElementById('savedLumpDisassemblyPanel');
-        if (disassemblyPanel) disassemblyPanel.style.display = 'none';
+    // Errors produce no replacement binary. Keep the previous exact bytes
+    // visible with a stale/identity label and a separate diagnostics region.
+    if (typeof window._showCompilerOutputBesideSource === 'function') {
+        window._showCompilerOutputBesideSource();
     }
     var count = errors.length;
     var title = titleOverride || ('Assembly error' + (count > 1 ? 's' : '') + ' \u2014 code not applied');

@@ -35,6 +35,7 @@ const canonicalWords = [header, 0x18000000, 0x08000001, 0, 0x07800100];
 let fetchResult = {
     ok: true,
     json: async () => ({
+        filename: 'Ada.Run.4.server-token.lump',
         words: canonicalWords,
         raw_tail_hex: '',
         byte_count: canonicalWords.length * 4,
@@ -55,6 +56,7 @@ const context = vm.createContext({
 });
 dom.window._editorNavigationEpoch = 7;
 vm.runInContext([
+    extractFunction(source, '_setDisassemblyPresentationStatus'),
     extractFunction(source, '_lumpDispatchAnnotation'),
     extractFunction(source, '_formatLumpHeaderDisassembly'),
     extractFunction(source, '_isExactSavedLumpWordArray'),
@@ -105,7 +107,7 @@ assert(source.includes('trimmed.slice(_dispatchLines.length)'),
         frozen);
     assert.equal(shown, true);
     assert.match(fetchedUrl,
-        /archive_filename=Ada\.Run\.4\.server-token\.lump/,
+        /exact_filename=Ada\.Run\.4\.server-token\.lump/,
         'post-save fetch is pinned to the exact saved filename');
     const output = dom.window.document.getElementById('savedLumpDisassembly').textContent;
     assert.match(output, /SAVED BINARY — exact canonical server response/);
@@ -156,7 +158,7 @@ assert(source.includes('trimmed.slice(_dispatchLines.length)'),
 
     // A committed save with an unavailable canonical response is explicit
     // about the failure and never displays the pre-save candidate as saved.
-    fetchResult = { ok: false, status: 503 };
+    fetchResult = { ok: false, status: 404 };
     const unavailable = await context._fetchAndPresentCommittedLump(
         { token: 'server-token' },
         { token: 'server-token', abstraction: 'RunAbstraction' },
@@ -165,8 +167,34 @@ assert(source.includes('trimmed.slice(_dispatchLines.length)'),
     const failure = dom.window.document.getElementById('savedLumpDisassembly').textContent;
     assert.match(failure, /SAVED BINARY UNAVAILABLE/);
     assert.match(failure, /No saved-byte claim/);
+    assert.match(failure, /HTTP 404/);
     assert(!failure.includes('UNSAVED COMPILE CANDIDATE'));
     assert.equal(dom.window.document.getElementById('asmEditor').value, frozen.source);
+
+    // Pin both receipt locators. A successful HTTP response with missing or
+    // contradictory identity must not be painted as the just-saved bytes.
+    const receipt = {
+        abstraction: 'RunAbstraction', filename: 'saved.lump', binary_hash: 'a'.repeat(64),
+    };
+    fetchResult = {
+        ok: true,
+        json: async () => ({words: canonicalWords, filename: receipt.filename,
+            binary_hash: 'b'.repeat(64)}),
+    };
+    assert.equal(await context._fetchAndPresentCommittedLump(
+        {token: 'shared-token'}, receipt, frozen), false);
+    assert(fetchedUrl.includes('exact_filename=saved.lump&binary_hash=' + 'a'.repeat(64)));
+    assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+        /digest does not match/);
+    fetchResult.json = async () => ({words: canonicalWords});
+    assert.equal(await context._fetchAndPresentCommittedLump(
+        {token: 'shared-token'}, receipt, frozen), false);
+    assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+        /identity does not match/);
+    fetchResult.json = async () => ({words: canonicalWords,
+        filename: receipt.filename, binary_hash: receipt.binary_hash});
+    assert.equal(await context._fetchAndPresentCommittedLump(
+        {token: 'shared-token'}, receipt, frozen), true);
 
     console.log('Saved LUMP canonical presentation tests passed');
 })().catch(error => {

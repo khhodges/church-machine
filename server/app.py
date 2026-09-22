@@ -14823,7 +14823,42 @@ def get_lump_words(token_hex):
     archive_manifest_entry = None
     archive_provenance = None
     namespace_selected_active_entry = None
-    if archive_filename is not None:
+    exact_filename = request.args.get("exact_filename")
+    exact_manifest_entry = None
+    if exact_filename is not None:
+        # Save receipts name a current artifact, not an archive. Resolve the
+        # exact manifest locator without following the token's latest revision
+        # or the legacy filename compatibility symlink.
+        if (archive_filename is not None or not exact_filename
+                or os.path.basename(exact_filename) != exact_filename
+                or not exact_filename.endswith(".lump")):
+            return jsonify({"error": "Invalid exact filename"}), 400
+        try:
+            exact_manifest = _read_manifest_safe(
+                os.path.join(LUMPS_DIR, "manifest.json"))
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 409
+        exact_matches = [
+            row for row in exact_manifest
+            if isinstance(row, dict)
+            and str(row.get("token") or "").lower() == key8
+            and row.get("filename") == exact_filename
+        ]
+        if len(exact_matches) != 1:
+            return jsonify({"error": "Exact saved LUMP record is unavailable or ambiguous"}), (
+                404 if not exact_matches else 409)
+        exact_manifest_entry = exact_matches[0]
+        lump_path = os.path.join(LUMPS_DIR, exact_filename)
+        if os.path.islink(lump_path):
+            return jsonify({"error": "Exact saved filename is a compatibility alias, not an immutable artifact"}), 409
+        if exact_manifest_entry.get("archived") is True:
+            archive_filename = exact_filename
+            archive_manifest_entry = exact_manifest_entry
+            archive_provenance = _lump_archive_provenance(
+                exact_filename, pattern_discovered=False)
+        else:
+            namespace_selected_active_entry = exact_manifest_entry
+    elif archive_filename is not None:
         # History supplies this immutable locator for archived records. Do not
         # accept an arbitrary path: it must be either an exact archived
         # manifest filename for this abstraction or one of the active LUMP's
@@ -15029,6 +15064,12 @@ def get_lump_words(token_hex):
     # Compute a fresh SHA-256 of the binary bytes so the caller can verify
     # the served content matches the hash recorded at compile time.
     _bh_live = inspected["binary_hash"]
+    expected_binary_hash = request.args.get("binary_hash")
+    if exact_filename is not None and expected_binary_hash is not None:
+        if not _re_words.fullmatch(r"[0-9a-fA-F]{64}", expected_binary_hash):
+            return jsonify({"error": "Invalid expected binary hash"}), 400
+        if _bh_live.lower() != expected_binary_hash.lower():
+            return jsonify({"error": "Exact saved binary hash no longer matches the save receipt"}), 409
 
     try:
         _approval_ret = _matching_lump_approval(LUMPS_DIR, _bh_live)
@@ -15044,6 +15085,7 @@ def get_lump_words(token_hex):
         return jsonify({"error": str(exc)}), 409
     response = {
         "token":           key8,
+        "filename":        os.path.basename(lump_path),
         "words":           words,
         "count":           num_words,
         "binary_hash":     _bh_live,
@@ -15064,7 +15106,7 @@ def get_lump_words(token_hex):
         manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
     except ValueError:
         manifest = []
-    manifest_entry = next(
+    manifest_entry = exact_manifest_entry or next(
         (row for row in manifest
          if isinstance(row, dict)
          and row.get("archived") is not True

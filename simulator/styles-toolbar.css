@@ -478,6 +478,27 @@
     display: none;
 }
 
+/* A failed build has diagnostics, not replacement machine words. Keep the
+   last exact disassembly above those diagnostics instead of hiding it. */
+#editor .editor-layout.disassembly-diagnostics-layout {
+    grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+#editor .editor-layout.disassembly-diagnostics-layout > .editor-panel:not(.console-panel) {
+    grid-column: 1;
+    grid-row: 1 / 3;
+}
+#editor .editor-layout.disassembly-diagnostics-layout > .console-panel {
+    display: flex;
+    grid-column: 2;
+    grid-row: 2;
+}
+.disassembly-presentation-status {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.65rem;
+    font-size: 0.78rem;
+    color: var(--church-gold);
+}
+
 .disassembly-pane-heading {
     flex: 0 0 auto;
     padding: 0.45rem 0.65rem;
@@ -560,7 +581,23 @@
     tab-size: 4;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
+    #editor .editor-layout.disassembly-diagnostics-layout {
+        grid-template-rows: minmax(10rem, 2fr) minmax(8rem, 2fr) minmax(6rem, 1fr);
+        overflow: auto;
+    }
+    #editor .editor-layout.disassembly-diagnostics-layout > .editor-panel:not(.console-panel) {
+        grid-column: 1;
+        grid-row: 1;
+    }
+    #editor .editor-layout.disassembly-diagnostics-layout > .console-panel {
+        grid-column: 1;
+        grid-row: 3;
+    }
+    #editor .editor-layout.disassembly-diagnostics-layout > .saved-lump-disassembly-panel {
+        grid-column: 1;
+        grid-row: 2;
+    }
     .editor-layout.saved-lump-editor-layout,
     .editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
         grid-template-columns: minmax(0, 1fr);

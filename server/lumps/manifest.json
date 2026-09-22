@@ -1020,7 +1020,8 @@
         "nsIndex": 1
       }
     ],
-    "operation_id": "921cdf50-043d-4df5-88d5-d92ae613a597"
+    "operation_id": "921cdf50-043d-4df5-88d5-d92ae613a597",
+    "archived": true
   },
   {
     "token": "4a000006",
@@ -1271,5 +1272,110 @@
       }
     ],
     "operation_id": "39863996-7358-4f2d-83b6-25bad2be2657"
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.3f7e1c54.lump",
+    "lump_version": 33,
+    "compiled_at": 1790113197.088158,
+    "dot_name": "CapabilityTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      },
+      {
+        "name": "LED_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 2
+      },
+      {
+        "name": "BTN_DEV",
+        "rights": [
+          "R"
+        ],
+        "grants": [],
+        "nsIndex": 4
+      },
+      {
+        "name": "TIMER_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 5
+      },
+      {
+        "name": "M_BIT_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 13
+      },
+      {
+        "name": "WukongCallHome",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 7
+      },
+      {
+        "name": "Thread.2",
+        "rights": [],
+        "grants": [],
+        "nsIndex": 11
+      },
+      {
+        "name": "Thread.3",
+        "rights": [],
+        "grants": [],
+        "nsIndex": 12
+      },
+      {
+        "name": "Boot.Thread",
+        "rights": [],
+        "grants": [],
+        "nsIndex": 1
+      }
+    ],
+    "operation_id": "7dfd9395-c174-4f88-bc9a-13e8a2b63e06"
   }
 ]

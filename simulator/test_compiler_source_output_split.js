@@ -26,6 +26,8 @@ function node(id) {
         style: {},
         classList: {
             removed: [],
+            added: [],
+            add(...names) { this.added.push(...names); },
             remove(name) { this.removed.push(name); },
         },
     };
@@ -44,6 +46,7 @@ elements.savedLumpDisassembly.textContent = '; exact saved words';
 const layout = node('layout');
 const context = {
     window: { _savedLumpEditorMode: true },
+    _setDisassemblyPresentationStatus: message => { elements.status = message; },
     document: {
         querySelector: selector => selector === '#editor .editor-layout' ? layout : null,
         getElementById: id => elements[id] || null,
@@ -57,8 +60,9 @@ assert.equal(context.window._savedLumpEditorMode, true,
     'compiler diagnostics suspend presentation without destroying saved ownership');
 assert.equal(context.window._savedLumpDisassemblyBeforeCompile,
     '; exact saved words', 'exact saved rendering is retained internally');
-assert(layout.classList.removed.includes('saved-lump-editor-layout'));
-assert.equal(elements.savedLumpDisassemblyPanel.style.display, 'none');
+assert(layout.classList.added.includes('disassembly-diagnostics-layout'));
+assert.equal(elements.savedLumpDisassemblyPanel.style.display, 'flex');
+assert.match(elements.status, /Not the result of this compile attempt/);
 assert.equal(elements.codeSidebarTabs.style.display, '');
 assert.equal(elements.codeConsoleContent.style.display, 'flex');
 assert.equal(elements.codeHistoryPanel.style.display, 'none');

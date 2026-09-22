@@ -22,6 +22,7 @@ const dom = new JSDOM(`<!doctype html><body><div id="editor">
   <div class="editor-layout">
     <textarea id="asmEditor">method Run() { return(1) }</textarea>
     <section id="savedLumpDisassemblyPanel" style="display:none">
+      <div id="disassemblyPresentationStatus"></div>
       <pre id="savedLumpDisassembly"></pre>
     </section>
     <div class="console-panel"><div id="asmErrorPanel" style="display:none"></div></div>
@@ -38,6 +39,7 @@ const context = vm.createContext({
     assembler: { disassemble: word => 'WORD_' + (word >>> 0).toString(16) },
 });
 vm.runInContext([
+    extractFunction(source, '_setDisassemblyPresentationStatus'),
     extractFunction(source, '_lumpDispatchAnnotation'),
     extractFunction(source, '_formatLumpHeaderDisassembly'),
     extractFunction(source, '_showCompilerOutputBesideSource'),
@@ -73,15 +75,26 @@ assert.match(html, /<details id="savedLumpBuildDetails"[^>]*>/,
 assert.doesNotMatch(html, /<details id="savedLumpBuildDetails"[^>]*\sopen(?:\s|>)/,
     'audit disclosure is collapsed by default');
 
-// Starting the next compile removes the old candidate. A failed compile can
-// now occupy the diagnostics surface without stale bytes posing as its output.
+// Starting or failing the next compile retains the last successful binary,
+// explicitly marked as previous, while exposing diagnostics independently.
 vm.runInContext('_showCompilerOutputBesideSource()', context);
-assert.equal(panel.style.display, 'none', 'failed/new compile does not retain stale candidate');
+assert.equal(panel.style.display, 'flex', 'failed/new compile retains exact previous candidate');
+assert.equal(dom.window.document.getElementById('savedLumpDisassembly').textContent, text);
+assert.match(dom.window.document.getElementById('disassemblyPresentationStatus').textContent,
+    /Previous successful compile.*UNSAVED candidate.*Not the result/);
 assert.equal(dom.window.getComputedStyle(
     dom.window.document.querySelector('.console-panel')).display, 'flex',
     'failed or pending compilation can show diagnostics');
 assert.equal(dom.window.document.getElementById('asmEditor').value,
     'method Run() { return(1) }', 'presentation never rewrites the draft');
+// A later successful attempt replaces the previous bytes and leaves the
+// failure layout. No source replacement approval is needed for read-only output.
+assert.equal(context._showCompiledCandidateBesideSource(words,
+    { abstraction: 'RunAbstraction', methodCount: 1 }), true);
+assert(!dom.window.document.querySelector('.editor-layout')
+    .classList.contains('disassembly-diagnostics-layout'));
+assert.match(dom.window.document.getElementById('disassemblyPresentationStatus').textContent,
+    /^Successful compile.*UNSAVED authenticated candidate/);
 
 const compileSource = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
 assert(compileSource.includes('const _registeredCodeWords = lumpWordsArray.slice(1, 1 + cw)'),
