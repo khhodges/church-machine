@@ -4,11 +4,18 @@ from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 import ast
 import subprocess
+import threading
+import time
 import pytest
 
 from flask import Flask
 
-from server.change_confirmation import IntentStore, install, protected_request
+from server.change_confirmation import (
+    IntentStore,
+    describe_lump_save_plan,
+    install,
+    protected_request,
+)
 
 
 def _consume_shared(args):
@@ -151,6 +158,95 @@ def test_intent_consumed_on_mismatch_expiry_and_replay():
     key = store.issue(("binding",), now=0)
     assert store.consume(key, ("binding",), now=1)
     assert not store.consume(key, ("binding",), now=2)
+
+
+@pytest.mark.parametrize(
+    ("plan", "expected"),
+    [
+        (
+            {
+                "lump_name": "Church.Example",
+                "current_version": 7,
+                "proposed_version": 9,
+                "consequence": "replace",
+                "session": "must-not-leak",
+            },
+            ["LUMP: Church.Example", "Version: 7 \u2192 9"],
+        ),
+        (
+            {
+                "lump_name": "Church.New",
+                "current_version": None,
+                "proposed_version": 1,
+                "consequence": "create",
+            },
+            ["LUMP: Church.New", "Version: New Entry \u2192 1"],
+        ),
+    ],
+)
+def test_authoritative_lump_plan_review_lines(plan, expected):
+    lines = describe_lump_save_plan(plan)
+    assert lines == expected
+    assert "must-not-leak" not in "\n".join(lines)
+
+
+def test_lump_plan_review_never_fabricates_unresolved_revision():
+    assert describe_lump_save_plan(None) == [
+        "LUMP: unavailable (authoritative save plan could not be resolved)",
+        "Version: unavailable (authoritative save plan could not be resolved)",
+    ]
+    assert describe_lump_save_plan({
+        "lump_name": "Church.Unknown",
+        "current_version": 4,
+        "proposed_version": None,
+        "consequence": "replace",
+    })[1] == "Version: unavailable (authoritative save plan could not be resolved)"
+
+
+def test_save_plan_binding_includes_reviewed_versions():
+    """Exercise only the extracted validator; never import the production app."""
+    module = ast.parse((Path(__file__).parents[2] / "server/app.py").read_text())
+    function = next(
+        node for node in module.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_check_lump_save_plan"
+    )
+    record = {
+        "expires": time.time() + 60,
+        "session": "isolated-session",
+        "digest": "digest",
+        "action": "replace",
+        "token": "token",
+        "filename": "name.lump",
+        "consequence": "replace",
+        "replacement_identity": ("identity",),
+        "generation": "generation",
+        "current_version": 4,
+        "proposed_version": 6,
+        "save_as_latest": False,
+    }
+    scope = {
+        "_LUMP_SAVE_PLANS": {"plan": record},
+        "_LUMP_SAVE_PLANS_LOCK": threading.RLock(),
+        "session": {"_lump_approval_session": "isolated-session"},
+        "time": time,
+    }
+    exec(compile(ast.Module(body=[function], type_ignores=[]),
+                 "<isolated>", "exec"), scope)
+    common = {
+        "digest": "digest",
+        "action": "replace",
+        "token": "token",
+        "filename": "name.lump",
+        "consequence": "replace",
+        "replacement_identity": ("identity",),
+        "generation": "generation",
+        "current_version": 4,
+        "proposed_version": 6,
+    }
+    assert scope[function.name]("plan", **common) is record
+    with pytest.raises(ValueError, match="proposed version does not match"):
+        scope[function.name]("plan", **dict(common, proposed_version=7))
 
 
 def test_protected_route_inventory():

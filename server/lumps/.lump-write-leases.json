@@ -1,5 +1,17 @@
 {
-  "leases": {},
+  "leases": {
+    "CapabilityTest": {
+      "canonical_dot_name": "CapabilityTest",
+      "owner_key": "rTSIa5wFDjKCYJzMCcUprX2hqn3iPsqF",
+      "holder": "Another IDE session",
+      "operation": "update",
+      "stage": "Approving",
+      "started_at": 1790112549.2851548,
+      "expires_at": 1790112879.626794,
+      "operation_id": "7dfd9395-c174-4f88-bc9a-13e8a2b63e06",
+      "contact_thread_id": "thread-j4DEohamA-t-5zsOqh391nGZ"
+    }
+  },
   "waiters": {},
   "messages": {}
 }

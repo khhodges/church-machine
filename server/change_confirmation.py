@@ -16,6 +16,32 @@ from pathlib import Path
 from flask import g, jsonify, request, session
 
 
+def describe_lump_save_plan(plan):
+    """Return safe review lines from an authoritative, session-checked plan."""
+    unavailable = "unavailable (authoritative save plan could not be resolved)"
+    if not isinstance(plan, dict):
+        return [f"LUMP: {unavailable}", f"Version: {unavailable}"]
+
+    name = plan.get("lump_name")
+    name_text = str(name).strip() if isinstance(name, str) else ""
+    current = plan.get("current_version")
+    proposed = plan.get("proposed_version")
+    new_entry = plan.get("consequence") == "create"
+
+    lines = [f"LUMP: {name_text or unavailable}"]
+    if (isinstance(proposed, bool) or not isinstance(proposed, int)
+            or proposed < 1):
+        lines.append(f"Version: {unavailable}")
+    elif new_entry:
+        lines.append(f"Version: New Entry \u2192 {proposed}")
+    elif (isinstance(current, bool) or not isinstance(current, int)
+          or current < 1):
+        lines.append(f"Version: unavailable \u2192 {proposed}")
+    else:
+        lines.append(f"Version: {current} \u2192 {proposed}")
+    return lines
+
+
 def protected_request(path, method):
     if method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return False

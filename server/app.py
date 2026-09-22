@@ -9817,6 +9817,7 @@ def _allocate_new_lump_slot():
 
 def _check_lump_save_plan(plan, *, digest, action, token, filename,
                           consequence, replacement_identity, generation,
+                          current_version, proposed_version,
                           save_as_latest=False, consume=False):
     """Validate (and only at mutation time consume) a save plan."""
     plan_id = str(plan or "")
@@ -9834,6 +9835,8 @@ def _check_lump_save_plan(plan, *, digest, action, token, filename,
             "filename": filename, "consequence": consequence,
             "replacement_identity": replacement_identity,
             "generation": generation,
+            "current_version": current_version,
+            "proposed_version": proposed_version,
             # This mode is part of the plan identity.  A commit may not turn
             # an ordinary plan into a stale-editor latest save (or vice
             # versa) by changing metadata after approval.
@@ -13144,6 +13147,14 @@ def save_lump():
 
     _plan_consequence = "replace" if _destination_entry else "create"
     _derived_save_action = "replace" if _destination_entry else "save"
+    _current_lump_version = (
+        _destination_entry.get("lump_version")
+        if isinstance(_destination_entry, dict) else None
+    )
+    if (isinstance(_current_lump_version, bool)
+            or not isinstance(_current_lump_version, int)
+            or _current_lump_version < 1):
+        _current_lump_version = None
     # This endpoint only performs save/replace transitions. Alternate approval
     # classes belong to their dedicated mutation endpoints and must never let
     # an API caller bypass this endpoint's authoritative save plan.
@@ -13234,6 +13245,9 @@ def save_lump():
                 "consequence": _plan_consequence,
                 "replacement_identity": _replacement_identity,
                 "generation": _library_generation, "expires": time.time() + 300,
+                "lump_name": abs_name,
+                "current_version": _current_lump_version,
+                "proposed_version": next_lump_version,
                 "save_as_latest": _save_as_latest,
                 # The output of canonicalisation is the approved artifact.  The
                 # commit endpoint accepts only these words, not a browser
@@ -13269,6 +13283,9 @@ def save_lump():
             "candidate_id": _candidate_id,
             "action": _approval_action,
             "destination": lump_filename, "consequence": _plan_consequence,
+            "lump_name": abs_name,
+            "current_version": _current_lump_version,
+            "proposed_version": next_lump_version,
             "save_as_latest": _save_as_latest,
             "replacement_identity": _replacement_identity,
             "current_lump": ({
@@ -13296,6 +13313,8 @@ def save_lump():
                 consequence=_plan_consequence,
                 replacement_identity=_replacement_identity,
                 generation=_library_generation,
+                current_version=_current_lump_version,
+                proposed_version=next_lump_version,
                 save_as_latest=_save_as_latest, consume=False)
         _intent_approval = (
             {"trust_origin": "trusted-home-ide",
@@ -13581,6 +13600,8 @@ def save_lump():
                 consequence=_plan_consequence,
                 replacement_identity=_replacement_identity,
                 generation=_library_generation,
+                current_version=_current_lump_version,
+                proposed_version=next_lump_version,
                 save_as_latest=_save_as_latest, consume=True)
         if not _trusted_compiler:
             _consume_lump_approval_intent(
@@ -25504,9 +25525,15 @@ def _release_lump_transition_request_locks(_exception=None):
 
 
 try:
-    from change_confirmation import install as _install_change_confirmation
+    from change_confirmation import (
+        describe_lump_save_plan as _describe_lump_save_plan,
+        install as _install_change_confirmation,
+    )
 except ImportError:
-    from server.change_confirmation import install as _install_change_confirmation
+    from server.change_confirmation import (
+        describe_lump_save_plan as _describe_lump_save_plan,
+        install as _install_change_confirmation,
+    )
 
 
 def _change_confirmation_paths():
@@ -25558,12 +25585,24 @@ def _describe_protected_change(payload):
     if request.path == "/api/lumps/save":
         metadata = payload.get("metadata") or {}
         preview = {}
+        plan = None
         if isinstance(metadata, dict):
             for key in ("abstraction", "token", "filename", "ns_slot", "save_plan", "save_plan_id"):
                 if key in metadata:
                     preview[key] = metadata[key]
+            plan_id = metadata.get(
+                "save_plan", metadata.get("save_plan_id", metadata.get("plan")))
+            if plan_id:
+                with _LUMP_SAVE_PLANS_LOCK:
+                    candidate = _LUMP_SAVE_PLANS.get(str(plan_id))
+                    if (candidate is not None
+                            and candidate.get("expires", 0) >= time.time()
+                            and candidate.get("session")
+                            == session.get("_lump_approval_session")):
+                        plan = dict(candidate)
         words = payload.get("binary")
-        return ["Publication target: " + json.dumps(preview, sort_keys=True),
+        return _describe_lump_save_plan(plan) + [
+                "Publication target: " + json.dumps(preview, sort_keys=True),
                 "Submitted binary words: " + str(len(words) if isinstance(words, list) else "server-plan bytes"),
                 "Confirm only if the existing Save LUMP plan shown in the IDE matches your intended destination and revision."]
     return []
