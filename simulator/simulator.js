@@ -6194,8 +6194,8 @@ class ChurchSimulator {
                     const offset = (rawOffset & 0x4000)
                         ? (rawOffset | 0xFFFF8000) : rawOffset;
                     bodyPC = (selector - 1) + offset;
-                } else if (tableEntry < hdr.cw) {
-                    bodyPC = tableEntry;
+                } else if (tableEntry > 0 && tableEntry <= hdr.cw) {
+                    bodyPC = tableEntry - 1;
                 }
                 if (!Number.isInteger(bodyPC) || bodyPC < api.methods.length ||
                         bodyPC >= hdr.cw) return null;
@@ -7801,11 +7801,14 @@ class ChurchSimulator {
                     ? ((tableEntry & 0x7FFF) | 0xFFFF8000)
                     : (tableEntry & 0x7FFF);
                 this.pc = (methodIndex - 1) + soff;  // = bodyOffset
-            } else if (tableEntry < hdr.cw) {
-                // Legacy: a bounded bare lump-relative PC from pre-method-table
-                // LUMPs.  Never promote an arbitrary instruction/data word into
-                // the PC merely because its opcode is not BRANCH.
-                this.pc = tableEntry;
+            } else if (tableEntry > 0 && tableEntry <= hdr.cw) {
+                // Legacy entries are physical lump-word offsets: 1 names the
+                // first word after the header.  The live PC is code-view
+                // relative (fetch = base + 1 + PC), so remove that header word.
+                // Treating the stored offset as an already-logical PC skipped
+                // the first instruction of old one-method LUMPs (for example a
+                // bare entry 2 incorrectly entered at lump word 3).
+                this.pc = tableEntry - 1;
             } else {
                 this.fault('INVALID_OP',
                     `CALL CR${d.crDst}: method index ${methodIndex} entry 0x${tableEntry.toString(16).padStart(8, '0')} is neither a BRANCH nor a valid legacy code offset`);
@@ -9526,7 +9529,7 @@ class ChurchSimulator {
         // base+1+pc).
         // ecMethodIdx=k>0: read table entry at lump word k; 0 = private → FAULT.
         //   BRANCH-encoded entry (opcode 23): pc = (k-1) + soff.
-        //   Legacy bare-PC entry (< lumpSize): pc = tableEntry.
+        //   Legacy physical lump-word entry: pc = tableEntry - 1.
         //   Unrecognised entry (flat-assembly lump with no method table): fall back
         //   to fast-path (pc=0) so lumps like SelfTest v53 — whose word-1 is an
         //   instruction, not a BRANCH dispatcher — still execute.
@@ -9545,9 +9548,10 @@ class ChurchSimulator {
                     ? ((ecMethodEntry & 0x7FFF) | 0xFFFF8000)
                     : (ecMethodEntry & 0x7FFF);
                 this.pc = (ecMethodIdx - 1) + soff;
-            } else if (ecMethodEntry < hdr_ec.lumpSize) {
-                // Legacy: bare lump-relative PC (pre-task-1134 on-disk LUMPs).
-                this.pc = ecMethodEntry;
+            } else if (ecMethodEntry > 0 && ecMethodEntry <= hdr_ec.cw) {
+                // Legacy on-disk entries include the header word; live PC does
+                // not because fetch already adds base+1.
+                this.pc = ecMethodEntry - 1;
             } else {
                 // Not a BRANCH and not a valid lump-relative PC — this lump has
                 // no method table (flat-assembly binary, e.g. SelfTest v53 where

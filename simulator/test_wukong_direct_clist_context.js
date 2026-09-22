@@ -73,18 +73,33 @@ assert.strictEqual(
     `exact active ${wukong.filename} installs`
 );
 
-// Model direct execution of the saved Wukong LUMP. Its first word is a
-// one-entry method table, so executable code begins at logical PC 1.
+// Enter the exact saved Wukong LUMP through the real CALL selector path.  Its
+// legacy one-entry table stores physical lump word 2, which is logical PC 1
+// because the live fetch formula already adds the header word.
 const wukongEntry = sim.readNSEntry(wukongSlot);
 const wukongHeader = sim.parseLumpHeader(wukongWords[0]);
 const wukongSeq = sim.parseNSWord1(wukongEntry.word1_limit).gtSeq;
-const wukongEnter = sim.parseGT(
-    sim.createGT(wukongSeq, wukongSlot, { E: 1 }, 1));
-sim._installLumpHeaderContext(
-    wukongEnter, wukongSlot, wukongEntry, wukongHeader);
-sim.pc = 1;
-sim.halted = false;
-sim.programName = 'WukongCallHome';
+const wukongEnter = sim.createGT(wukongSeq, wukongSlot, { E: 1 }, 1);
+const btnGT = 0x12000004;
+const btnCheck = sim.mLoad(btnGT, 'R', 3);
+assert(btnCheck.ok, 'committed BTN capability validates before Wukong entry');
+assert(sim._writeCR(3, btnGT, btnCheck.entry),
+    'committed BTN capability is installed through the normal CR write path');
+sim.cr[0] = {
+    word0: wukongEnter, word1: wukongEntry.word0_location,
+    word2: wukongEntry.word1_limit, word3: wukongEntry.word2_seals, m: 0,
+};
+const priorCR3 = sim.cr[3].word0 >>> 0;
+assert.strictEqual(priorCR3, btnGT,
+    'pre-entry CR3 exactly matches the reported BTN R capability');
+const callResult = sim._execCall({
+    opcode: 2, cond: 14, crDst: 0, crSrc: 0, imm: 1, mnemonic: 'CALL',
+});
+assert(callResult, 'committed CALL WukongCallHome method 1 retires');
+assert.strictEqual(wukongWords[1] >>> 0, 2,
+    'regression fixture carries the legacy physical word-2 entry');
+assert.strictEqual(sim.pc, 1,
+    'legacy physical word 2 dispatches to logical PC 1, not logical PC 2');
 
 const expectedClistBase =
     wukongEntry.word0_location + wukongHeader.lumpSize - wukongHeader.cc;
@@ -107,6 +122,8 @@ assert.strictEqual(sim.parseGT(sim.cr[6].word0).index, wukongSlot,
 assert.strictEqual(sim.cr[6].word1, expectedClistBase,
     'background deployment preserves active Wukong c-list base');
 
+assert.strictEqual(sim.cr[3].word0 >>> 0, priorCR3,
+    'CALL itself preserves the caller CR3 before the first callee LOAD');
 for (let step = 0; step < 4; step++) {
     assert(sim.step(), `Wukong instruction ${step + 1} retires`);
 }
@@ -150,3 +167,4 @@ assert(savedLumpLoader.includes('activateExecution: true'),
     'saved-LUMP direct run explicitly requests execution activation');
 
 console.log('Wukong direct-run c-list context regression passed');
+console.log('CR3 path: 0x12000004 before CALL -> 0x32000003 at physical 0x112 -> DWRITE physical 0x115 retired');

@@ -895,11 +895,11 @@ function _codeViewMethodEntries(codeWords, methods) {
         if (count > words.length) return [];
         for (let i = 0; i < count; i++) {
             const entry = words[i] >>> 0;
-            if ((entry >>> 27) !== 23 && entry >= words.length) return [];
+            if ((entry >>> 27) !== 23 && entry > words.length) return [];
         }
     } else {
         const first = words.length ? (words[0] >>> 0) : 0;
-        if (!(first > 0 && first < words.length)) return [];
+        if (!(first > 0 && first <= words.length)) return [];
         count = 1;
     }
 
@@ -909,7 +909,10 @@ function _codeViewMethodEntries(codeWords, methods) {
         const method = declaredMethods[i] || null;
         const opcode = word >>> 27;
         let kind = 'legacy';
-        let targetIndex = word;
+        // Legacy entries are physical LUMP-word offsets. codeWords[] and the
+        // live PC both start after the header, so convert to their zero-based
+        // code index before deriving the displayed physical lump word.
+        let targetIndex = word > 0 ? word - 1 : word;
         if (word === 0) {
             kind = 'private';
             targetIndex = null;

@@ -1934,11 +1934,11 @@ function _lumpDispatchAnnotation(words, index, methodCount) {
     if (declared) {
         for (var entryIndex = 1; entryIndex <= methodCount; entryIndex++) {
             var entry = words[entryIndex] >>> 0;
-            if ((entry >>> 27) !== 23 && entry >= cw) return '';
+            if ((entry >>> 27) !== 23 && entry > cw) return '';
         }
     }
     if (declared ? index > methodCount :
-            !(index === 1 && word > 0 && word < cw)) return '';
+            !(index === 1 && word > 0 && word <= cw)) return '';
     var prefix = 'DISPATCH #' + index + ': ';
     if (word === 0) return prefix + 'private entry (CALL rejected)';
     if ((word >>> 27) === 23) {
@@ -1946,7 +1946,7 @@ function _lumpDispatchAnnotation(words, index, methodCount) {
         if (offset & 0x4000) offset -= 0x8000;
         return prefix + 'BRANCH ' + offset + ' -> LUMP word ' + (index + offset);
     }
-    if (word < cw) {
+    if (word <= cw) {
         return prefix + 'legacy entry value ' + word +
             ' (CALL selector ' + index + '; not an instruction)' +
             (declared ? '' : ' — inferred from bounded entry word; method metadata absent');
@@ -7486,7 +7486,7 @@ async function openLumpInEditor(token, options) {
                 // Attempt structured reconstruction when:
                 //   a) abstraction name is known
                 //   b) registry has method list (>= 1 method)
-                //   c) first registry.methods.length words are all opcode-23 BRANCH
+                //   c) first registry.methods.length words are valid dispatch entries
                 var _methods = _binaryFrameApi &&
                     Array.isArray(_binaryFrameApi.methods) &&
                     _binaryFrameApi.methods.length >= 1
@@ -7535,27 +7535,31 @@ async function openLumpInEditor(token, options) {
                     }
                 }
 
-                // ── Path B: BRANCH-dispatch reconstruction ─────────────────
+                // ── Path B: binary-dispatch reconstruction ─────────────────
                 // New-format LUMPs assembled by _assembleLumpFromCatalog have an
-                // opcode-23 BRANCH entry at position i pointing to method body i.
+                // opcode-23 BRANCH entry at position i. Legacy LUMPs store the
+                // physical LUMP-word target, including the header word.
                 // Only runs if Path A did not already reconstruct the source.
                 if (!structured && _methods && trimmed.length >= _methods.length) {
-                    // Verify all N dispatch entries are opcode-23 BRANCH
                     var N = _methods.length;
-                    var allBranch = _methods.every(function(_, i) {
-                        return ((trimmed[i] >>> 27) & 0x1F) === BRANCH_OP;
+                    var allDispatch = _methods.every(function(_, i) {
+                        var entry = trimmed[i] >>> 0;
+                        return ((entry >>> 27) & 0x1F) === BRANCH_OP ||
+                            (entry > 0 && entry <= codeLimit);
                     });
 
-                    if (allBranch) {
-                        // Decode body slice offsets from BRANCH table.
-                        // decodeBranchEntry formula (from lump_assembler.js):
-                        //   soff = signed 15-bit (trimmed[i] & 0x7FFF)
-                        //   bodyLumpPC = i + soff   (lump-relative PC of body start)
-                        //   trim index = bodyLumpPC (0-based into trimmed array)
+                    if (allDispatch) {
+                        // trimmed[] starts at LUMP word 1. BRANCH entries already
+                        // resolve in that logical coordinate system; legacy bare
+                        // entries must drop their physical header-word offset.
                         var bodyStarts = _methods.map(function(_, i) {
-                            var raw = trimmed[i] & 0x7FFF;
-                            var soff = (raw & 0x4000) ? (raw | 0xFFFF8000) : raw;
-                            return i + soff;   // lump-relative PC of body (= index into trimmed)
+                            var entry = trimmed[i] >>> 0;
+                            if (((entry >>> 27) & 0x1F) === BRANCH_OP) {
+                                var raw = entry & 0x7FFF;
+                                var soff = (raw & 0x4000) ? (raw | 0xFFFF8000) : raw;
+                                return i + soff;
+                            }
+                            return entry - 1;
                         });
 
                         // Emit one `method Name { ... }` block per method

@@ -21,15 +21,15 @@ const source = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
 const context = vm.createContext({});
 vm.runInContext(extractFunction(source, '_codeViewMethodEntries'), context);
 
-// WukongCallHome-style legacy table: raw PC 2 is selector #1 data, targeting
-// logical code PC 2 / LUMP word 3, and must never reach the disassembler.
+// WukongCallHome-style legacy table: physical LUMP word 2 is selector #1 data,
+// targeting logical code PC 1 / LUMP word 2, and must never reach disassembly.
 const legacy = context._codeViewMethodEntries(
     [0x00000002, 0x071b0001, 0x07230002, 0xaf084001], []);
 assert.equal(legacy.length, 1);
 assert.equal(legacy[0].selector, 1);
 assert.equal(legacy[0].kind, 'legacy');
-assert.equal(legacy[0].targetIndex, 2);
-assert.equal(legacy[0].lumpWord, 3);
+assert.equal(legacy[0].targetIndex, 1);
+assert.equal(legacy[0].lumpWord, 2);
 assert.equal(legacy[0].method, null, 'metadata-free entry must not invent a name');
 
 // Declared tables retain binary-authoritative branch/private decoding while
