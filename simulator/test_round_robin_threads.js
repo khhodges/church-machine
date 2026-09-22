@@ -642,6 +642,9 @@ uiSim.pc = 0x2A;
 const initialThreadRows = uiSim.threadStatusRows();
 assert.strictEqual(initialThreadRows.length, 3,
     'Thread status strip shows only the three configured Thread images');
+assert.deepStrictEqual(initialThreadRows.map(row => row.lifecycleStatus),
+    ['running', 'suspended', 'suspended'],
+    'three dynamically discovered Threads project live ownership and canonical suspension');
 assert.strictEqual(initialThreadRows[0].active, true,
     'Thread status strip highlights the selected Thread');
 assert.strictEqual(initialThreadRows[0].nia, 0x2A,
@@ -700,10 +703,12 @@ vm.runInContext([
     functionSource(appRunSource, 'selectThreadContext'),
 ].join('\n'), uiContext);
 uiContext.updateThreadControl();
-assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
+assert.strictEqual(status.textContent, 'Thread.1 · 1/3 · running',
     'active Thread status remains visible without a Next Thread button');
 uiSim.running = true;
 const runningSlot = uiSim.activeThreadStatus().slot;
+assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'running',
+    'browser Run-loop activity does not redefine the architectural running state');
 uiContext.selectThreadContext(12);
 assert.strictEqual(uiSim.activeThreadStatus().slot, runningSlot,
     'direct Thread selection is rejected while Run owns execution');
@@ -713,6 +718,11 @@ uiContext.selectThreadContext(12);
 assert.strictEqual(uiSim.activeThreadStatus().slot, runningSlot,
     'direct Thread selection is rejected between Run batches while the UI run lifecycle owns execution');
 vm.runInContext('_simRunActive = false;', uiContext);
+uiSim.running = false;
+uiSim.halted = true;
+assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'halted',
+    'HALT projects only from the live Thread execution latch');
+uiSim.halted = false;
 
 // Walk executes one instruction and then waits for its next timer tick. During
 // that interval sim.running is false, so invoke the real Walk lifecycle with
@@ -768,9 +778,12 @@ const dashboardUpdatesBeforeThreadClicks = dashboardUpdates;
 uiContext.selectThreadContext(12);
 assert.strictEqual(uiSim.activeThreadStatus().slot, 12,
     'browser-shaped row selection switches directly from Thread.1 to Thread.3');
+assert.deepStrictEqual(uiSim.threadStatusRows().map(row => row.lifecycleStatus),
+    ['suspended', 'suspended', 'running'],
+    'CHANGE moves running ownership to the selected Thread and canonically suspends the old owner');
 assert.strictEqual(openedCR, 12,
     'Thread row selection opens the selected Thread CR12 memory-map view');
-assert.strictEqual(status.textContent, 'Thread.3 · 3/3',
+assert.strictEqual(status.textContent, 'Thread.3 · 3/3 · running',
     'toolbar status follows the newly active Thread LUMP');
 const dashboardAfterSwitch = dashboardUpdates;
 uiContext.selectThreadContext(12);
@@ -781,7 +794,14 @@ assert.strictEqual(openedCR, 12,
 uiContext.selectThreadContext(1);
 assert.strictEqual(uiSim.activeThreadStatus().slot, 1,
     'direct row selection restores the saved boot Thread');
-assert.strictEqual(status.textContent, 'Thread.1 · 1/3',
+uiSim.halted = true;
+assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'halted',
+    'selected live Thread reports HALT without relabeling suspended peers');
+const resetLifecycle = uiSim.resetThreadToBaseline(1);
+assert.strictEqual(resetLifecycle.ok, true, 'selected halted Thread resets from its immutable baseline');
+assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'running',
+    'reset clears HALT and restores live running ownership');
+assert.strictEqual(status.textContent, 'Thread.1 · 1/3 · running',
     'toolbar status follows the restored boot Thread');
 assert.strictEqual(dashboardUpdates - dashboardUpdatesBeforeThreadClicks, 3,
     'each row selection refreshes the Thread strip and dashboard');

@@ -1165,7 +1165,12 @@ function updateThreadControl() {
     if (typeof updateThreadIdentityStrip === 'function') updateThreadIdentityStrip();
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
-    if (status) status.textContent = `${state.name} · ${state.position}/${state.count}`;
+    if (status) {
+        const lifecycle = state.lifecycleStatus
+            ? ` · ${state.lifecycleStatus}` : '';
+        status.textContent =
+            `${state.name} · ${state.position}/${state.count}${lifecycle}`;
+    }
     if (typeof _threadContextModalSlot !== 'undefined' &&
             _threadContextModalSlot !== null &&
             typeof updateThreadContextModal === 'function') {
@@ -1194,7 +1199,11 @@ function updateThreadIdentityStrip() {
     strip.hidden = allRows.length === 0;
     rows.forEach((row) => {
         const card = document.createElement('div');
-        card.className = `thread-identity-card${row.active ? ' is-active' : ''}`;
+        const selected = typeof _threadContextModalSlot !== 'undefined' &&
+            row.slot === _threadContextModalSlot;
+        card.className = `thread-identity-card thread-status-${row.lifecycleStatus}` +
+            `${row.active ? ' is-active' : ''}` +
+            `${selected ? ' is-selected' : ''}`;
         card.dataset.threadSlot = String(row.slot);
         card.setAttribute('role', 'button');
         card.setAttribute('tabindex', '0');
@@ -1208,6 +1217,7 @@ function updateThreadIdentityStrip() {
             ? `0x${(row.physicalAddress >>> 0).toString(16).toUpperCase().padStart(4, '0')}`
             : '\u2014';
         const gtName = row.gtPetName || 'No entry GT';
+        const lifecycleText = row.lifecycleStatus || 'unavailable';
         const gtKeyText = row.active ? 'Executing code' : 'Saved entry code';
         const flagsKeyText = row.active ? 'Current FLAGS' : 'Saved FLAGS';
         const indicatorFlags = row.indicatorFlags &&
@@ -1217,11 +1227,12 @@ function updateThreadIdentityStrip() {
                 `${flag}${indicatorFlags[flag] ? 1 : 0}`).join(' ')
             : '\u2014';
         card.setAttribute('aria-label',
-            `Thread context ${row.name}${row.active ? ', active' : ''}; ` +
+            `Thread context ${row.name}${row.active ? ', active' : ''}; ${lifecycleText}; ` +
             `LUMP-relative NIA ${niaText}; physical instruction address ${physicalText}; ` +
             `${flagsKeyText} ${flagText}; ${gtKeyText} ${gtName}`);
         card.setAttribute('title',
             `Thread context: ${row.name}${row.active ? ' (active)' : ''}\n` +
+            `Lifecycle: ${lifecycleText}\n` +
             `${gtKeyText}: ${gtName}\nLUMP-relative NIA: ${niaText}\n` +
             `Physical instruction address: ${physicalText}\n${flagsKeyText}: ${flagText}`);
         card.setAttribute('title', `${card.getAttribute('title')}\nInspect ${row.name} (${row.active ? 'live' : 'saved snapshot'})`);
@@ -1246,6 +1257,11 @@ function updateThreadIdentityStrip() {
         name.className = 'thread-identity-name';
         name.textContent = row.name;
         name.setAttribute('title', 'Thread context identity (the saved register and indicator state)');
+
+        const lifecycle = document.createElement('span');
+        lifecycle.className = 'thread-identity-lifecycle';
+        lifecycle.textContent = lifecycleText;
+        lifecycle.setAttribute('aria-label', `Lifecycle status ${lifecycleText}`);
 
         const nia = document.createElement('span');
         nia.className = 'thread-identity-value';
@@ -1298,7 +1314,7 @@ function updateThreadIdentityStrip() {
         flags.append(flagsKey, flagsCode);
         values.appendChild(flags);
 
-        card.append(marker, name, values);
+        card.append(marker, name, lifecycle, values);
         strip.appendChild(card);
     });
     if (pageCount > 1) {
@@ -1363,18 +1379,8 @@ function _latestThreadFault(slot) {
 
 function _threadModalState(row) {
     if (!row) return 'Unavailable';
-    const owns = _threadExecutionOwner(row);
-    const executing = Boolean(_simRunActive || sim.running || walkRunning || sim.walkActive);
-    const lastFault = _latestThreadFault(row.slot);
-    if (owns && lastFault && sim.halted && lastFault.step === sim.stepCount) return 'Faulted';
-    if (owns && sim.halted) {
-        const outcome = _threadRunOutcomes.get(row.slot);
-        return outcome && outcome.stopReason === 'halted' && !outcome.faulted
-            ? 'Completed' : 'Halted';
-    }
-    if (owns && executing) return 'Running';
-    if (owns) return 'Paused';
-    return 'Dormant';
+    const state = row.lifecycleStatus || 'unavailable';
+    return state.charAt(0).toUpperCase() + state.slice(1);
 }
 
 function _threadStopReason(row) {
@@ -1440,16 +1446,25 @@ function updateThreadContextModal() {
     const run = document.getElementById('threadContextRun');
     const stop = document.getElementById('threadContextStop');
     const reset = document.getElementById('threadContextReset');
+    const resumable = row.lifecycleStatus === 'running' ||
+        row.lifecycleStatus === 'suspended';
+    run.textContent = row.lifecycleStatus === 'suspended' ? 'Resume & Run' : 'Run';
     _setThreadModalAction(run,
-        !_pendingSimLoad && !executing && !bootAnimating,
-        executing ? 'Stop the current Run or Walk before starting this Thread'
+        resumable && !_pendingSimLoad && !executing && !bootAnimating,
+        row.lifecycleStatus === 'halted'
+            ? 'This Thread is halted; reset it before running again'
+            : (row.lifecycleStatus === 'unavailable'
+                ? 'This Thread has no valid canonical CHURCH resume frame'
+                : (executing ? 'Stop the current Run or Walk before starting this Thread'
             : (_pendingSimLoad
                 ? 'Run or clear the pending compiled program before resuming a Thread'
-                : 'Wait for the boot animation to finish'));
+                : 'Wait for the boot animation to finish'))));
     _setThreadModalAction(stop, owns && executing,
-        owns ? 'This Thread is paused' : 'Only the active Thread can stop execution');
-    _setThreadModalAction(reset, row.baselineAvailable,
-        'No matching immutable loaded-image baseline is available');
+        owns ? 'No Run or Walk is executing for this Thread'
+            : 'Only the active Thread can stop execution');
+    _setThreadModalAction(reset, row.baselineAvailable && !executing,
+        executing ? 'Stop the current Run or Walk before resetting a Thread'
+            : 'No matching immutable loaded-image baseline is available');
     const reasons = [run, stop, reset].filter(b => b && b.disabled && b.title)
         .map(b => `${b.textContent}: ${b.title}`);
     document.getElementById('threadContextDisabledReason').textContent =
@@ -1548,6 +1563,11 @@ function runThreadFromModal() {
     const row = _threadModalRow();
     if (!row || _pendingSimLoad || _simRunActive || sim.running ||
             walkRunning || sim.walkActive || bootAnimating) return;
+    if (row.lifecycleStatus !== 'running' &&
+            row.lifecycleStatus !== 'suspended') {
+        updateThreadContextModal();
+        return;
+    }
     if (!_requireCommittedImageForExecution('Thread Run')) {
         updateThreadContextModal();
         return;
@@ -1592,6 +1612,10 @@ function stopThreadFromModal() {
 function resetThreadFromModal() {
     const row = _threadModalRow();
     if (!row || !row.baselineAvailable) return;
+    if (_simRunActive || sim.running || walkRunning || sim.walkActive) {
+        updateThreadContextModal();
+        return;
+    }
     if (!window.confirm(`Reset ${row.name} to its immutable loaded-image state?`)) return;
     if (_threadExecutionOwner(row)) {
         if (walkRunning || sim.walkActive) finishWalk();

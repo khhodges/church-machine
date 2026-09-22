@@ -5653,6 +5653,16 @@ class ChurchSimulator {
         }
     }
 
+    _threadLifecycleStatus(active, savedIndicator) {
+        // "Running" means this Thread owns the architectural live context.  It
+        // intentionally does not mirror the browser Run timer: pausing Run does
+        // not suspend or halt a Thread.  A dormant Thread is suspended only
+        // when its protected STO names the canonical CHURCH resume frame.
+        if (active) return this.halted ? 'halted' : 'running';
+        if (savedIndicator && savedIndicator.sz === 1) return 'suspended';
+        return 'unavailable';
+    }
+
     threadStatusRows(maxRows = 4) {
         const requested = Number.isInteger(maxRows) ? maxRows : 4;
         const limit = Math.max(0, Math.min(10, requested));
@@ -5674,6 +5684,7 @@ class ChurchSimulator {
                 ? this._unpackFrameWord(
                     this.memory[entry.word0_location + savedIndicator.sto + 2] >>> 0)
                 : null;
+            const lifecycleStatus = this._threadLifecycleStatus(active, savedIndicator);
             const logicalNia = active ? (this.pc >>> 0)
                 : (savedFrame ? (savedFrame.returnPC >>> 0) : null);
             let resolvedPhysicalAddress = active && nextPhysicalAddr >= 0
@@ -5700,6 +5711,7 @@ class ChurchSimulator {
                         this.nsLabels[slot] || `Thread slot ${slot}`),
                 position: index + 1,
                 active,
+                lifecycleStatus,
                 nia: logicalNia,
                 physicalAddress: resolvedPhysicalAddress,
                 indicatorFlags: active
@@ -5724,6 +5736,8 @@ class ChurchSimulator {
         const activeSlot = Number.isInteger(this._currentThreadSlot)
             ? this._currentThreadSlot : 1;
         const position = Math.max(0, slots.indexOf(activeSlot));
+        const activeRow = this.threadStatusRows(10)
+            .find(row => row.slot === activeSlot);
         return {
             slot: activeSlot,
             name: activeSlot === 1 ? 'Thread.1'
@@ -5732,6 +5746,7 @@ class ChurchSimulator {
             position: position + 1,
             count: slots.length,
             slots,
+            lifecycleStatus: activeRow ? activeRow.lifecycleStatus : 'unavailable',
         };
     }
 

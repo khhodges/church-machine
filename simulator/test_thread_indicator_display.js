@@ -21,6 +21,13 @@ check(
   'Thread status rows expose live or saved indicator flags'
 );
 check(
+  sim.includes("_threadLifecycleStatus(active, savedIndicator)") &&
+  sim.includes("if (active) return this.halted ? 'halted' : 'running'") &&
+  sim.includes("savedIndicator.sz === 1") &&
+  !sim.includes("this.running ? 'running'"),
+  'Thread lifecycle comes from live ownership, HALT, and canonical suspension rather than the UI Run loop'
+);
+check(
   sim.includes('const bindingMatches = parsedGT && codeEntry && codeHeader') &&
   sim.includes('resolvedPhysicalAddress'),
   'physical instruction address requires a validated canonical code binding'
@@ -28,6 +35,13 @@ check(
 check(
   /thread-identity-flags[\s\S]{0,500}flagsCode\.textContent = flagText/.test(run),
   'Thread cards render the current indicator flags'
+);
+check(
+  run.includes("lifecycle.textContent = lifecycleText") &&
+  run.includes("thread-status-${row.lifecycleStatus}") &&
+  css.includes('.thread-status-suspended .thread-identity-marker') &&
+  css.includes('.thread-status-halted .thread-identity-marker'),
+  'every discovered Thread card renders its projected lifecycle state'
 );
 check(
   /LUMP-relative NIA/.test(run) &&
@@ -64,6 +78,12 @@ check(
   'modal Reset and dormant Run use simulator-owned baseline and canonical CHANGE'
 );
 check(
+  run.includes("row.lifecycleStatus === 'suspended' ? 'Resume & Run' : 'Run'") &&
+  run.includes('This Thread is halted; reset it before running again') &&
+  run.includes('Stop the current Run or Walk before resetting a Thread'),
+  'selected-Thread controls reject halted resume and reset during another live execution'
+);
+check(
   run.includes('!_pendingSimLoad && !executing && !bootAnimating') &&
   !run.includes('Boot the machine before running a specific Thread') &&
   run.includes('if (!sim.bootComplete && !instantBoot())') &&
@@ -80,8 +100,8 @@ check(
 check(
   run.includes('_latestThreadFault(row.slot)') &&
   sim.includes('threadSlot: this._liveThreadOwned') &&
-  run.includes('lastFault.step === sim.stepCount'),
-  'fault details remain attributed to the owning Thread and current halt'
+  run.includes("document.getElementById('threadContextFault').textContent"),
+  'fault details remain attributed to the owning Thread without redefining lifecycle status'
 );
 check(
   run.includes('const _threadRunOutcomes = new Map()') &&
@@ -91,7 +111,8 @@ check(
   'Thread controls retain and display the terminal stop reason'
 );
 check(
-  /closeThreadContextModal\(\);\s*runSimGo\(\);/.test(run),
+  run.includes('closeThreadContextModal();') &&
+  run.includes('runSimGo(undefined, { applyPendingLoad: false });'),
   'Thread Run closes its dialog so completion and fault UI remains visible'
 );
 check(

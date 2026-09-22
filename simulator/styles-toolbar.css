@@ -1157,8 +1157,8 @@
 
 .thread-identity-card {
     display: grid;
-    grid-template-columns: auto minmax(4.8rem, 0.55fr) minmax(0, 2fr);
-    grid-template-areas: "marker name values";
+    grid-template-columns: auto minmax(4.8rem, 0.55fr) auto minmax(0, 2fr);
+    grid-template-areas: "marker name lifecycle values";
     align-items: center;
     column-gap: 0.32rem;
     min-width: 0;
@@ -1171,6 +1171,11 @@
     font-family: 'Courier New', monospace;
     line-height: 1.05;
     overflow: hidden;
+}
+
+.thread-identity-card.is-selected {
+    outline: 1px solid rgba(143, 200, 255, 0.9);
+    outline-offset: 1px;
 }
 
 .thread-identity-card.is-active {
@@ -1223,6 +1228,16 @@
     box-shadow: 0 0 7px rgba(218, 165, 32, 0.7);
 }
 
+.thread-status-suspended .thread-identity-marker {
+    background: #58a6ff;
+    box-shadow: 0 0 7px rgba(88, 166, 255, 0.55);
+}
+
+.thread-status-halted .thread-identity-marker {
+    background: #ef6b73;
+    box-shadow: 0 0 7px rgba(239, 107, 115, 0.58);
+}
+
 .thread-identity-name {
     grid-area: name;
     min-width: 0;
@@ -1232,6 +1247,33 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.thread-identity-lifecycle {
+    grid-area: lifecycle;
+    padding: 0.08rem 0.28rem;
+    border: 1px solid rgba(116, 138, 163, 0.35);
+    border-radius: 999px;
+    color: #9fb0c4;
+    font-size: 0.52rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.thread-status-running .thread-identity-lifecycle {
+    border-color: rgba(141, 227, 197, 0.45);
+    color: #8de3c5;
+}
+
+.thread-status-suspended .thread-identity-lifecycle {
+    border-color: rgba(88, 166, 255, 0.5);
+    color: #8fc8ff;
+}
+
+.thread-status-halted .thread-identity-lifecycle {
+    border-color: rgba(239, 107, 115, 0.5);
+    color: #ef9ba1;
 }
 
 .thread-identity-values {
