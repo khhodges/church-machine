@@ -42,6 +42,135 @@ def describe_lump_save_plan(plan):
     return lines
 
 
+def describe_boot_config_change(before, after, rows, manifest, prepare=False,
+                                binary_hash_for=None):
+    """Describe normalized config changes using exact saved catalogue evidence.
+
+    No name-only/latest-revision lookup: stable tokens can identify many revisions.
+    Namespace sequence, issue_n and semantic version are not saved LUMP versions.
+    """
+    lines = ["Boot configuration review (saved → proposed).",
+             "This changes configuration, not saved LUMP revisions; no new LUMP version is created."]
+    if prepare:
+        lines.append("Explicit Prepare: the committed boot image will also be prepared/patched for the Namespace boot target.")
+    else:
+        lines.append("No explicit Prepare requested. Existing boot-image inputs may become stale.")
+    missing = object()
+
+    def value(item):
+        return "(absent)" if item is missing else json.dumps(item, ensure_ascii=False, sort_keys=True)
+
+    def differences(old, new, prefix=""):
+        if isinstance(old, dict) and isinstance(new, dict):
+            for key in sorted(old.keys() | new.keys()):
+                yield from differences(old.get(key, missing), new.get(key, missing),
+                                       f"{prefix}.{key}" if prefix else key)
+        elif old != new:
+            yield f"{prefix}: {value(old)} → {value(new)}"
+
+    # Per-slot Step-2 changes below are more useful than an array dump.
+    old_fields = {k: v for k, v in before.items() if k != "step2"}
+    new_fields = {k: v for k, v in after.items() if k != "step2"}
+    changes = list(differences(old_fields, new_fields))
+    lines.extend(changes)
+    def placements(cfg):
+        return {str(r["nsSlot"]): r for r in (cfg.get("step2") or {}).get("lumps", [])
+                if isinstance(r, dict) and "nsSlot" in r}
+
+    old_slots, new_slots = placements(before), placements(after)
+    changed_slots = {s for s in old_slots.keys() | new_slots.keys()
+                     if old_slots.get(s) != new_slots.get(s)}
+    for slot in sorted(changed_slots, key=lambda s: int(s)):
+        lines.extend(differences(old_slots.get(slot, {}), new_slots.get(slot, {}),
+                                 f"NS[{slot}] placement"))
+    for key in ("slotRules", "slotLabels"):
+        old, new = before.get(key) or {}, after.get(key) or {}
+        changed_slots.update(str(s) for s in old.keys() | new.keys() if old.get(s) != new.get(s))
+    authority = {str(r["slot"]): r for r in rows
+                 if isinstance(r, dict) and "slot" in r}
+    duplicate_slots = {s for s in authority if sum(
+        isinstance(r, dict) and str(r.get("slot")) == s for r in rows) > 1}
+    # Geometry affects the whole resident layout, not just explicitly sent rows.
+    geometry = any(before.get(k) != after.get(k) for k in ("targetBoard", "step1", "step3"))
+    affected = set(changed_slots)
+    if geometry:
+        affected.update(authority)
+    for cfg in (before, after):
+        if cfg.get("bootEntrySlot") is not None:
+            affected.add(str(cfg["bootEntrySlot"]))
+    lines.append(f"Namespace boot target: NS[{before.get('bootEntrySlot', 'unresolved')}]"
+                 f" → NS[{after.get('bootEntrySlot', 'unresolved')}].")
+
+    def token(raw):
+        try:
+            return f"{int(str(raw).removeprefix('0x'), 16):08x}"
+        except (TypeError, ValueError):
+            return None
+
+    def identity(slot, placement):
+        row = authority.get(slot, {})
+        label = row.get("name") or "(pet name unresolved)"
+        if slot in duplicate_slots:
+            return "pet name / saved version unresolved (ambiguous Namespace slot)"
+        # A placement can select a different LUMP without changing the NS row yet.
+        selectors = {}
+        if placement and placement.get("lumpToken"):
+            selectors["token"] = placement["lumpToken"]
+            if (not placement.get("binaryHash")
+                    and token(placement["lumpToken"]) == token(row.get("token"))):
+                selectors.update({k: row[k] for k in ("filename", "binary_hash") if row.get(k)})
+            if placement.get("binaryHash"):
+                selectors["binary_hash"] = placement["binaryHash"]
+        else:
+            selectors = {k: row[k] for k in ("token", "filename", "binary_hash") if row.get(k)}
+        if "token" in selectors and token(selectors["token"]) is None:
+            return f"pet name {label}; saved version unresolved (invalid token)"
+        def matches_selector(record):
+            for key, expected in selectors.items():
+                actual = record.get(key)
+                if key == "token":
+                    if token(actual) != token(expected):
+                        return False
+                elif key == "binary_hash" and actual is None and binary_hash_for:
+                    # Many real manifest records intentionally omit binary_hash.
+                    # Verify their exact named bytes; never discard the hash pin.
+                    if binary_hash_for(record) != expected:
+                        return False
+                elif actual != expected:
+                    return False
+            return True
+
+        matches = [r for r in manifest if isinstance(r, dict) and selectors
+                   and matches_selector(r)]
+        if len(matches) != 1:
+            why = "ambiguous saved revision" if len(matches) > 1 else "no exact saved record"
+            return f"pet name {label}; saved version unresolved ({why})"
+        record = matches[0]
+        version = record.get("lump_version")
+        version_text = (f"v{version}" if isinstance(version, int) and not isinstance(version, bool)
+                        and version >= 0 else "unresolved (missing saved lump_version)")
+        return (f"pet name {label}; LUMP {record.get('abstraction') or '(name unresolved)'}; "
+                f"saved version {version_text}; file {record.get('filename') or '(unresolved)'}")
+
+    if not changes and not changed_slots:
+        lines.append("No persisted configuration field changes.")
+    lines.append("Affected saved artifacts / boot target (versions below are not Namespace sequences):")
+    for slot in sorted(affected, key=lambda s: int(s)):
+        old_identity = identity(slot, old_slots.get(slot))
+        new_identity = identity(slot, new_slots.get(slot))
+        if old_identity == new_identity:
+            lines.append(f"NS[{slot}]: {old_identity} → unchanged saved revision")
+        else:
+            lines.append(f"NS[{slot}]: {old_identity} → {new_identity}")
+        if slot in old_slots and slot not in new_slots:
+            lines.append(f"NS[{slot}]: removed from Step-2 configuration; saved binary is not deleted.")
+        elif slot in new_slots and slot not in old_slots:
+            lines.append(f"NS[{slot}]: added to Step-2 configuration; not a new LUMP revision.")
+    if not affected:
+        lines.append("No affected slot identity could be resolved.")
+    return lines
+
+
 def protected_request(path, method):
     if method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return False
@@ -170,6 +299,9 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
         if describe is not None:
             target.extend(describe(payload))
         reason = "You requested a persisted change. It may update source, repository history, Namespace bindings or the generated boot image."
+        if request.path == "/api/boot-config":
+            reason = ("Review the boot configuration fields and affected pet names / saved LUMP versions below. "
+                      "This does not publish a new LUMP revision. Reject if any identity is unresolved.")
         if request.path == "/api/lumps/save":
             reason = ("Publish the reviewed LUMP and related repository/Namespace state. "
                       "Existing admission checks still apply. Save processing may add a "

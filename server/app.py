@@ -25574,11 +25574,13 @@ def _release_lump_transition_request_locks(_exception=None):
 
 try:
     from change_confirmation import (
+        describe_boot_config_change as _describe_boot_config_change,
         describe_lump_save_plan as _describe_lump_save_plan,
         install as _install_change_confirmation,
     )
 except ImportError:
     from server.change_confirmation import (
+        describe_boot_config_change as _describe_boot_config_change,
         describe_lump_save_plan as _describe_lump_save_plan,
         install as _install_change_confirmation,
     )
@@ -25611,6 +25613,42 @@ def _describe_protected_change(payload):
     if not isinstance(payload, dict):
         return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
     root = Path(__file__).resolve().parent.parent
+    if request.path == "/api/boot-config":
+        # Read-only candidate normalization is the same one used by the route.
+        # Do not silently replace unreadable evidence with invented defaults.
+        try:
+            existing = {}
+            if os.path.exists(BOOT_CONFIG_PATH):
+                with open(BOOT_CONFIG_PATH, encoding="utf-8") as stream:
+                    existing = json.load(stream)
+            rows, _ = _read_authoritative_namespace_rows()
+            with open(LUMPS_MANIFEST_PATH, encoding="utf-8") as stream:
+                manifest = json.load(stream)
+            if not isinstance(existing, dict) or not isinstance(manifest, list):
+                raise ValueError("Unexpected saved configuration/catalogue shape")
+            candidate, error = _validated_boot_config_candidate(
+                payload, existing=existing, authority_rows=rows)
+            if error:
+                return ["Boot configuration cannot be validated: " + str(error),
+                        "Pet names and proposed versions unavailable: reject and correct the configuration."]
+            def saved_binary_hash(record):
+                filename = record.get("filename")
+                if not isinstance(filename, str) or os.path.basename(filename) != filename:
+                    return None
+                binary_path = Path(LUMPS_DIR) / filename
+                if binary_path.is_symlink() or not binary_path.is_file():
+                    return None
+                try:
+                    return hashlib.sha256(binary_path.read_bytes()).hexdigest()
+                except OSError:
+                    return None
+            return _describe_boot_config_change(
+                existing, candidate, rows, manifest,
+                prepare=payload.get("prepareBootEntry") is True,
+                binary_hash_for=saved_binary_hash)
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            return ["Authoritative boot review unavailable (" + type(exc).__name__ + ").",
+                    "Pet names and saved versions could not be resolved. Reject; do not approve from hashes alone."]
     before = None
     after = None
     if request.path == "/api/source-file/save":
