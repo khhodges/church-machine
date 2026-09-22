@@ -6491,17 +6491,39 @@ def _validate_symbolic_namespace_entries(entries):
 
 
 def _validate_active_namespace_lumps(entries):
-    try:
-        from lump_admission_service import (
-            AdmissionError, validate_active_manifest_selections)
-    except ImportError:
-        from server.lump_admission_service import (
-            AdmissionError, validate_active_manifest_selections)
-    manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
-    try:
-        validate_active_manifest_selections(entries, manifest, LUMPS_DIR)
-    except AdmissionError as exc:
-        raise ValueError(str(exc)) from exc
+    """Validate the exact binaries selected by Namespace state.
+
+    The catalog is history/index data and is intentionally not consulted here.
+    In particular, an archived, absent, duplicated, or same-token catalog row
+    cannot veto or replace the Namespace-selected filename and digest.
+    """
+    if not isinstance(entries, list):
+        raise ValueError("Namespace data is invalid")
+    for entry in entries:
+        if not isinstance(entry, dict) or entry.get("symbolic") is True:
+            continue
+        filename = entry.get("filename")
+        binary_hash = entry.get("binary_hash", entry.get("binaryHash"))
+        has_artifact_identity = any(entry.get(key) not in (None, "") for key in (
+            "token", "cache_token", "cacheToken",
+            "filename", "binary_hash", "binaryHash",
+        ))
+        if not has_artifact_identity:
+            continue
+        normalized = dict(entry)
+        normalized["binary_hash"] = binary_hash
+        try:
+            _validate_namespace_selected_binary(LUMPS_DIR, normalized)
+            if (entry.get("resident") is True
+                    and entry.get("boot_resident") is True
+                    and entry.get(
+                        "load_policy", entry.get("loadPolicy")) == "Resident"
+                    and entry.get("type") in ("Inform", "Resident")):
+                _boot_image_gen._require_approved_executable_lump(
+                    os.path.join(LUMPS_DIR, filename), LUMPS_DIR,
+                    f"Namespace slot {entry.get('slot')}", normalized)
+        except _LumpNamespaceSelectionError as exc:
+            raise ValueError(str(exc)) from exc
 
 
 @app.route("/api/boot-image/save-ns", methods=["POST"])

@@ -240,6 +240,7 @@ class TestBootImageMissingLump:
         with open(os.path.join(self.tmpdir, "ns-state.json"), "w") as f:
             json.dump({"abstractions": [{
                 "name": "SelfTest", "slot": slot, "token": token, "filename": filename,
+                "binary_hash": "0" * 64,
             }]}, f)
 
         cfg = _minimal_cfg()

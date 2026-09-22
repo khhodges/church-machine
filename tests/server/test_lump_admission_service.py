@@ -289,6 +289,20 @@ def test_boot_resident_admission_builds_an_image(tmp_path):
     root = tmp_path / "lumps"
     repository_root = Path(__file__).resolve().parents[2]
     shutil.copytree(repository_root / "server" / "lumps", root)
+    # Admission intentionally retains the stricter catalog-publication gate.
+    # Make this private fixture internally current instead of inheriting stale
+    # archived flags from the repository's catalog-history test data.
+    state_fixture = json.loads((root / "ns-state.json").read_text())
+    manifest_fixture = json.loads((root / "manifest.json").read_text())
+    for binding in state_fixture.get("abstractions", []):
+        filename = binding.get("filename") if isinstance(binding, dict) else None
+        matches = [
+            row for row in manifest_fixture
+            if isinstance(row, dict) and row.get("filename") == filename
+        ]
+        if filename and len(matches) == 1:
+            matches[0].pop("archived", None)
+    (root / "manifest.json").write_text(json.dumps(manifest_fixture))
     raw = _portable_lump()
     portable_token = hashlib.sha256(raw).hexdigest()[:8]
     quarantine = root / "quarantine"

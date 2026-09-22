@@ -51,6 +51,7 @@ from server.bootstrap_identity import (
     bootstrap_t_from_self_gt, verify_bootstrap_self_gt,
 )
 import os
+import re
 import struct
 import warnings
 from shared.architecture_contracts import (
@@ -1497,20 +1498,25 @@ def _ns_n_minus_6(lump_words):
 def _read_lump_body(lumps_dir, token_hex, filename=None):
     """Read raw 32-bit words from lumps_dir.
 
-    Prefers `filename` (a versioned name such as ``SelfTest_v75.lump``) when
-    provided and the file exists; otherwise falls back to ``{token_hex}.lump``.
+    When ``filename`` is supplied it is the authoritative locator; failure to
+    read it never falls back to a catalog or token-named alias.
     Lump files are stored big-endian on disk (written by build_*_lump.js and
     /api/lumps/save).  Words are returned as native Python ints so they can
     be written directly into mem[] and later packed as little-endian by
     struct.pack('<...I', *mem).
     """
     if filename:
+        if not isinstance(filename, str) or os.path.basename(filename) != filename:
+            return None
         path = os.path.join(lumps_dir, filename)
         if os.path.isfile(path):
             with open(path, "rb") as f:
                 raw = f.read()
+            if len(raw) % 4:
+                return None
             n = len(raw) // 4
-            return list(struct.unpack(f">{n}I", raw[: n * 4]))
+            return list(struct.unpack(f">{n}I", raw))
+        return None
     if not token_hex:
         return None
     try:
@@ -1542,9 +1548,8 @@ def _read_lump_body(lumps_dir, token_hex, filename=None):
 def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
     """Find the canonical lump assigned to a Namespace-state slot.
 
-    Namespace state selects the slot/token and may provide its exact filename.
-    Otherwise the token must have one unique manifest locator. Directory scans
-    and token-named aliases are deliberately not consulted.
+    Namespace state selects the exact slot/token/filename/hash. Catalog,
+    approval-ledger, directory, and token-named guesses are not locators.
     """
     try:
         with open(os.path.join(lumps_dir, "ns-state.json")) as _f:
@@ -1556,54 +1561,21 @@ def find_lump_file_by_abstraction(lumps_dir, abstraction_name, ns_slot):
                 continue
             _tok = _e.get("token") or _e.get("cache_token")
             _state_filename = _e.get("filename")
+            _state_hash = _e.get("binary_hash", _e.get("binaryHash"))
             if (_tok and isinstance(_state_filename, str)
-                    and os.path.basename(_state_filename) == _state_filename):
+                    and os.path.basename(_state_filename) == _state_filename
+                    and isinstance(_state_hash, str)
+                    and re.fullmatch(r"[0-9a-fA-F]{64}", _state_hash)):
                 _located = os.path.join(lumps_dir, _state_filename)
                 if os.path.isfile(_located):
+                    with open(_located, "rb") as source:
+                        if hashlib.sha256(source.read()).hexdigest() != _state_hash.lower():
+                            raise ValueError(
+                                f"{abstraction_name} Namespace-selected artifact "
+                                "hash does not match its assigned bytes")
                     _require_approved_executable_lump(
                         _located, lumps_dir, abstraction_name)
                     return _located
-            if _tok:
-                try:
-                    with open(os.path.join(lumps_dir, "manifest.json")) as _mf:
-                        _rows = json.load(_mf)
-                    _matches = [
-                        row.get("filename") for row in _rows
-                        if isinstance(row, dict)
-                        and str(row.get("token", "")).lower() == str(_tok).lower()
-                        and isinstance(row.get("filename"), str)
-                    ]
-                    if len(_matches) == 1:
-                        _located = os.path.join(lumps_dir, _matches[0])
-                        if os.path.isfile(_located):
-                            _require_approved_executable_lump(
-                                _located, lumps_dir, abstraction_name)
-                            return _located
-                except ValueError:
-                    # Approval/identity failures from the exact located body
-                    # are execution diagnostics, not a missing-locator result.
-                    raise
-                except (OSError, TypeError):
-                    pass
-            # Older persisted Namespace state predates token/filename fields.
-            # It still identifies a fixed boot abstraction and slot, so resolve
-            # only an exact hash-approved canonical artifact for that name.  A
-            # missing or ambiguous approval remains a hard failure.
-            if not _tok and not _state_filename:
-                approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
-                candidates = [
-                    value.get("filename") for value in approvals.values()
-                    if isinstance(value, dict)
-                    and value.get("dot_name") == abstraction_name
-                    and isinstance(value.get("filename"), str)
-                    and os.path.basename(value["filename"]) == value["filename"]
-                ]
-                if len(candidates) == 1:
-                    _located = os.path.join(lumps_dir, candidates[0])
-                    if os.path.isfile(_located):
-                        _require_approved_executable_lump(
-                            _located, lumps_dir, abstraction_name)
-                        return _located
     except ValueError:
         raise
     except Exception:
@@ -1615,17 +1587,13 @@ def _resolve_authoritative_selftest_lump(lumps_dir):
     """Return SelfTest's one live, explicitly-bound executable artifact.
 
     SelfTest is boot code, so neither a slot-derived filename nor a manifest
-    history entry is authority to execute it.  Namespace state selects the
-    exact ``(slot, token, filename)`` tuple; the locator-only manifest repeats
-    token + filename/name, while placement remains solely in Namespace state.
-    Approval validation is deliberately performed by the caller on the
-    returned path, after this binding check.
+    history entry is authority to execute it. Namespace state selects the
+    exact filename and SHA-256. Approval validation is deliberately performed
+    by the caller on that same path after this binding check.
     """
     try:
         with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as source:
             state = json.load(source)
-        with open(os.path.join(lumps_dir, "manifest.json"), encoding="utf-8") as source:
-            manifest = json.load(source)
     except (OSError, ValueError, TypeError) as exc:
         raise ValueError(
             f"generate_boot_image: SelfTest authoritative Namespace binding is unreadable: {exc}"
@@ -1643,36 +1611,31 @@ def _resolve_authoritative_selftest_lump(lumps_dir):
     slot = selected.get("slot")
     token = selected.get("token") or selected.get("cache_token")
     filename = selected.get("filename")
+    selected_hash = selected.get("binary_hash", selected.get("binaryHash"))
     if (isinstance(slot, bool) or not isinstance(slot, int) or slot < 2
             or not isinstance(token, str) or not token
             or not isinstance(filename, str) or not filename
-            or os.path.basename(filename) != filename):
+            or os.path.basename(filename) != filename
+            or not isinstance(selected_hash, str)
+            or not re.fullmatch(r"[0-9a-fA-F]{64}", selected_hash)):
         raise ValueError(
             "generate_boot_image: SelfTest Namespace-state binding requires its "
-            "exact non-foundational slot, token, and canonical filename")
-    if not isinstance(manifest, list):
-        raise ValueError("generate_boot_image: SelfTest manifest must be an array")
-    token = token.lower()
-    manifest_rows = [
-        row for row in manifest if isinstance(row, dict)
-        and row.get("abstraction") == "SelfTest"
-        and not row.get("archived")
-        and str(row.get("token") or "").lower() == token
-        and row.get("filename") == filename
-    ]
-    if len(manifest_rows) != 1:
-        raise ValueError(
-            "generate_boot_image: SelfTest requires one manifest locator matching "
-                "the authoritative Namespace-state filename and token")
+            "exact non-foundational slot, token, canonical filename, and hash")
     path = os.path.join(lumps_dir, filename)
     if not os.path.isfile(path):
         raise ValueError(
             f"generate_boot_image: SelfTest Namespace-selected locator {filename} is missing")
+    with open(path, "rb") as source:
+        actual_hash = hashlib.sha256(source.read()).hexdigest()
+    if actual_hash != selected_hash.lower():
+        raise ValueError(
+            "generate_boot_image: SelfTest Namespace-selected locator hash "
+            "does not match the authoritative Namespace binding")
     return path, slot
 
 
 def _resolve_selected_lump_locator(lumps_dir, slot, token):
-    """Resolve one selected slot/token without aliases or directory guessing."""
+    """Resolve one selected slot/token without catalog or alias fallback."""
     normalized = str(token or "").lower()
     if not normalized:
         raise ValueError(
@@ -1693,37 +1656,37 @@ def _resolve_selected_lump_locator(lumps_dir, slot, token):
             f"generate_boot_image: resident slot {slot} has ambiguous Namespace state")
     if matches:
         filename = matches[0].get("filename")
+        selected_hash = matches[0].get(
+            "binary_hash", matches[0].get("binaryHash"))
         if isinstance(filename, str) and os.path.basename(filename) == filename:
             path = os.path.join(lumps_dir, filename)
             if os.path.isfile(path):
+                if (not isinstance(selected_hash, str)
+                        or not re.fullmatch(r"[0-9a-fA-F]{64}", selected_hash)):
+                    raise ValueError(
+                        f"generate_boot_image: resident slot {slot} has no exact "
+                        "Namespace-selected artifact hash")
+                with open(path, "rb") as source:
+                    actual_hash = hashlib.sha256(source.read()).hexdigest()
+                if actual_hash != selected_hash.lower():
+                    raise ValueError(
+                        f"generate_boot_image: Namespace-selected resident slot "
+                        f"{slot} artifact hash mismatch")
                 return path
             raise ValueError(
                 f"generate_boot_image: Namespace-selected resident locator {filename} is missing")
-    try:
-        with open(os.path.join(lumps_dir, "manifest.json")) as source:
-            manifest = json.load(source)
-    except (OSError, ValueError, TypeError) as exc:
-        raise ValueError(
-            f"generate_boot_image: resident manifest is unreadable: {exc}") from exc
-    locators = [
-        row.get("filename") for row in manifest
-        if isinstance(row, dict)
-        and str(row.get("token") or "").lower() == normalized
-        and isinstance(row.get("filename"), str)
-        and os.path.basename(row["filename"]) == row["filename"]
-    ]
-    if len(locators) != 1:
-        raise ValueError(
-            f"generate_boot_image: resident token {normalized} requires one exact locator")
-    path = os.path.join(lumps_dir, locators[0])
-    if not os.path.isfile(path):
-        raise ValueError(
-            f"generate_boot_image: resident locator {locators[0]} is missing")
-    return path
+    raise ValueError(
+        f"generate_boot_image: resident slot {slot} has no exact "
+        "Namespace-selected locator")
 
 
 def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=None):
-    """Return exact words only for a canonically named, hash-approved body."""
+    """Return exact words only for a canonically named, hash-approved body.
+
+    ``bootstrap_binding`` is an available owner, not a declaration that every
+    resident is bootstrap-authorized. Compiler-attested approvals ignore it;
+    only approvals carrying bootstrap T/runtime fields consume and verify it.
+    """
     if not path or not os.path.isfile(path):
         raise ValueError(
             f"generate_boot_image: {label} approval-required executable LUMP is missing")
@@ -1766,11 +1729,6 @@ def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=
                 # Missing compiler TCB configuration cannot turn untrusted
                 # bytes into compiler-authoritative bytes.
                 compiler_record = False
-        if bootstrap_binding is not None and not (
-                approval.get("bootstrap_t") is not None
-                and approval.get("bootstrap_runtime_gt") is not None):
-            raise ValueError(
-                "frozen resident approval requires bootstrap_t and bootstrap_runtime_gt")
         # Delivery is a TCB boundary: a display label or approval row alone
         # is not provenance.  Require the server HMAC over this exact raw
         # byte stream before accepting trusted compiler output.
@@ -2042,15 +2000,14 @@ def _load_trusted_cache_token_map(manifest_path):
     # token for one abstraction into a slot now owned by another abstraction.
     slot_tokens = _load_ns_state_token_map(lumps_dir)
     try:
-        from lump_integrity import resolve_canonical_lump
-    except ImportError:
-        from server.lump_integrity import resolve_canonical_lump
-
-    try:
-        with open(manifest_path, "r") as f:
-            entries = json.load(f)
+        with open(os.path.join(lumps_dir, "ns-state.json"), "r") as f:
+            state = json.load(f)
     except Exception:
-        entries = []
+        return {}
+    rows_by_slot = {
+        row["slot"]: row for row in state.get("abstractions", [])
+        if isinstance(row, dict) and isinstance(row.get("slot"), int)
+    } if isinstance(state, dict) else {}
 
     trusted = {}
     for slot, token_hex in slot_tokens.items():
@@ -2061,28 +2018,44 @@ def _load_trusted_cache_token_map(manifest_path):
             token_value = int(token, 16)
         except ValueError:
             continue
-        matches = [
-            e for e in entries if isinstance(e, dict)
-            and not e.get("archived")
-            and str(e.get("token", "")).lower() == token
-        ]
-        if len(matches) != 1:
-            continue
-        filename = matches[0].get("filename")
-        if not isinstance(filename, str) or not filename:
+        selected = rows_by_slot.get(slot)
+        filename = selected.get("filename") if isinstance(selected, dict) else None
+        selected_hash = selected.get(
+            "binary_hash", selected.get("binaryHash")
+        ) if isinstance(selected, dict) else None
+        if (not isinstance(filename, str)
+                or os.path.basename(filename) != filename
+                or not isinstance(selected_hash, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", selected_hash)):
             continue
         try:
             with open(os.path.join(lumps_dir, filename), "rb") as f:
                 raw = f.read()
         except OSError:
             continue
-        resolved = resolve_canonical_lump(lumps_dir, token, raw)
-        if resolved.get("ok") and resolved.get("identity_verified"):
-            try:
-                canonical_t = int(resolved.get("cache_token", ""), 16)
-            except (TypeError, ValueError):
-                continue
-            trusted[int(slot)] = canonical_t & 0xFFFFFFFF
+        if hashlib.sha256(raw).hexdigest() != selected_hash.lower():
+            continue
+        try:
+            selected_approval = read_approvals(
+                os.path.join(lumps_dir, "approvals.json")).get(
+                    selected_hash.lower())
+        except (OSError, ValueError, TypeError):
+            continue
+        # Frozen bootstrap owners receive W3 from their already-verified
+        # runtime SELF GT later in generation. This map is only for ordinary
+        # compiler-attested cache identities.
+        if (isinstance(selected_approval, dict)
+                and (selected_approval.get("bootstrap_t") is not None
+                     or selected_approval.get("bootstrap_runtime_gt") is not None)
+                and selected_approval.get("portable_binding") is None):
+            continue
+        try:
+            _require_approved_executable_lump(
+                os.path.join(lumps_dir, filename), lumps_dir,
+                f"resident slot {slot}", selected)
+        except ValueError:
+            continue
+        trusted[int(slot)] = token_value & 0xFFFFFFFF
     return trusted
 
 
@@ -2115,24 +2088,7 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
             continue
         if e.get("resident") is False or e.get("boot_resident") is False:
             continue
-        # Migration path for the checked-in pre-token Namespace state: an
-        # approved canonical artifact is an exact binding, unlike a manifest
-        # history lookup.  It permits old projects to produce a V2 image while
-        # retaining fail-closed ambiguity handling.
         if not tok:
-            name = e.get("name")
-            try:
-                approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
-                candidates = [
-                    row.get("filename") for row in approvals.values()
-                    if isinstance(row, dict) and row.get("dot_name") == name
-                    and isinstance(row.get("filename"), str)
-                ]
-            except (OSError, ValueError, TypeError):
-                candidates = []
-            if len(candidates) != 1:
-                continue
-            out.append((slot, "", candidates[0], 0))
             continue
         out.append((
             slot,
@@ -2731,6 +2687,36 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                 or not (0 <= _slot < len(catalog))
                 or _slot in _MMIO_SLOT_SPECS):
             continue
+        _selected_rows = [
+            row for row in _bootstrap_rows
+            if isinstance(row, dict) and row.get("slot") == _slot
+            and str(row.get("token") or row.get("cache_token") or "").lower()
+            == str(_tok).lower()
+            and row.get("filename") == _filename
+        ]
+        if len(_selected_rows) != 1:
+            raise ValueError(
+                f"generate_boot_image: resident slot {_slot} has no unique exact "
+                "Namespace-selected binding")
+        _selected_hash = _selected_rows[0].get(
+            "binary_hash", _selected_rows[0].get("binaryHash"))
+        if (not isinstance(_selected_hash, str)
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", _selected_hash)):
+            raise ValueError(
+                f"generate_boot_image: resident slot {_slot} has no exact "
+                "Namespace-selected artifact hash")
+        _selected_path = os.path.join(lumps_dir, _filename)
+        try:
+            with open(_selected_path, "rb") as _selected_file:
+                _selected_raw = _selected_file.read()
+        except OSError as exc:
+            raise ValueError(
+                f"generate_boot_image: Namespace-selected resident slot {_slot} "
+                f"artifact {_filename!r} is unavailable: {exc}") from exc
+        if hashlib.sha256(_selected_raw).hexdigest() != _selected_hash.lower():
+            raise ValueError(
+                f"generate_boot_image: Namespace-selected resident slot {_slot} "
+                "artifact hash mismatch")
         _body = _read_lump_body(lumps_dir, _tok, _filename)
         if _body is None:
             raise ValueError(
@@ -2749,27 +2735,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _cw = (_body[0] >> 10) & 0x1FFF
         _typ = (_body[0] >> 8) & 0x3
         if _typ == 0 and _cw > 0:
-            _body_path = (
-                os.path.join(lumps_dir, _filename)
-                if _filename and os.path.isfile(os.path.join(lumps_dir, _filename))
-                else None
-            )
-            if _body_path is None:
-                try:
-                    with open(_manifest_path_for_cache) as _source:
-                        _manifest_rows = json.load(_source)
-                    _matches = [
-                        row.get("filename") for row in _manifest_rows
-                        if isinstance(row, dict)
-                        and str(row.get("token", "")).lower() == str(_tok).lower()
-                        and isinstance(row.get("filename"), str)
-                    ]
-                    if len(_matches) == 1:
-                        _body_path = os.path.join(lumps_dir, _matches[0])
-                except (OSError, ValueError, TypeError):
-                    _body_path = None
             _body = _require_approved_executable_lump(
-                _body_path, lumps_dir, f"boot-resident catalog slot {_slot}",
+                _selected_path, lumps_dir, f"boot-resident Namespace slot {_slot}",
                 _bootstrap_by_slot.get(_slot))
             _declared_words = len(_body)
         _boot_resident_bodies[_slot] = _body[:_declared_words]

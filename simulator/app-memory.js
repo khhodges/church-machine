@@ -555,6 +555,36 @@ function _nsInheritSavedArtifactMetadata(rich, saved, symbolic) {
     }
     return rich;
 }
+
+function _nsApplyArtifactBindingForSave(rich, saved, explicit, symbolic) {
+    if (symbolic) return rich;
+    const sameGeneration = function(binding) {
+        return binding && binding.name === rich.name &&
+            Number(binding.slot) === Number(rich.slot) &&
+            Number(binding.seq) === Number(rich.seq);
+    };
+    if (explicit && !sameGeneration(explicit)) {
+        throw new Error(
+            `Namespace selection integrity failed for NS[${rich.slot}]: ` +
+            'the staged artifact binding does not match the selected slot generation.');
+    }
+    const binding = explicit || (sameGeneration(saved) ? saved : null);
+    if (!binding) return rich;
+    _nsInheritSavedArtifactMetadata(rich, binding, false);
+    if (explicit) {
+        const hash = String(rich.binary_hash || rich.binaryHash || '')
+            .trim().replace(/^sha256:/i, '').toLowerCase();
+        if (!String(rich.token || '').trim() ||
+                !String(rich.filename || '').trim() ||
+                !/^[0-9a-f]{64}$/.test(hash)) {
+            throw new Error(
+                `Namespace selection integrity failed for NS[${rich.slot}]: ` +
+                'the explicitly selected LUMP has no exact token, filename, and binary hash binding. ' +
+                'Reload the LUMP picker; catalog metadata was not substituted.');
+        }
+    }
+    return rich;
+}
 (function _initNsStateFetch() {
     fetch('/api/boot-image/ns-state', { cache: 'no-store' })
         .then(function(r) { return r.ok ? r.json() : null; })
@@ -4307,6 +4337,8 @@ window._nsAddAvailableList   = null;   // full _available array from last list f
 window._nsAddCurrentWords        = null;   // cached words[] from per-selection /words fetch
 window._nsAddCurrentToken        = null;   // token these cached words belong to
 window._nsAddCurrentInspection = null; // immutable-binary inspection for selected LUMP
+window._nsAddCurrentCatalogIndex = null; // exact picker record, including duplicate-token variants
+window._nsExplicitArtifactBindings = window._nsExplicitArtifactBindings || {};
 
 // Persistent token-keyed cache for ns_slot_policy / ns_slot choices made by the
 // programmer.  Unlike the per-modal state above, this is intentionally NOT cleared
@@ -4391,6 +4423,7 @@ function _nsTableAdd() {
     window._nsAddCurrentWords         = null;
     window._nsAddCurrentToken         = null;
     window._nsAddCurrentInspection    = null;
+    window._nsAddCurrentCatalogIndex  = null;
 
     // Show loading overlay immediately
     const _overlay = document.createElement('div');
@@ -4456,9 +4489,11 @@ function _nsTableAdd() {
 
             // Wire change event → populate metadata panel
             const sel = document.getElementById('_nsAddSelect');
-            sel.addEventListener('change', function() { _nsPopulateAddMeta(sel.value); });
+            sel.addEventListener('change', function() {
+                _nsPopulateAddMeta(sel.value, sel.selectedIndex);
+            });
             // Populate for the initially selected LUMP immediately
-            _nsPopulateAddMeta(sel.value);
+            _nsPopulateAddMeta(sel.value, sel.selectedIndex);
         })
         .catch(function(err) {
             const st = document.getElementById('_nsAddStatus');
@@ -4537,11 +4572,16 @@ async function _nsDefineSymbolicConfirm() {
 // Performs a real per-selection fetch of /api/lump/<token>/words to get
 // authoritative cw/cc from the binary; shows spinner while loading, error inline
 // on failure. Caches fetched words in window._nsAddCurrentWords for confirm.
-async function _nsPopulateAddMeta(token) {
+async function _nsPopulateAddMeta(token, catalogIndex) {
     const container = document.getElementById('_nsAddMeta');
     if (!container) return;
 
-    const approval = (window._nsAddAvailableList || []).find(function(l) { return l.token === token; }) || null;
+    const available = window._nsAddAvailableList || [];
+    const exactIndex = Number.isInteger(catalogIndex) ? catalogIndex : -1;
+    const indexedApproval = exactIndex >= 0 ? available[exactIndex] : null;
+    const approval = indexedApproval && indexedApproval.token === token
+        ? indexedApproval
+        : (available.find(function(l) { return l.token === token; }) || null);
 
     if (!approval) { container.innerHTML = ''; return; }
 
@@ -4557,7 +4597,9 @@ async function _nsPopulateAddMeta(token) {
     let binaryCw = null, binaryCc = null;
 
     // Cache hit: same token and immutable-binary inspection already fetched.
-    if (window._nsAddCurrentToken === token && window._nsAddCurrentWords && window._nsAddCurrentInspection) {
+    if (window._nsAddCurrentToken === token &&
+            window._nsAddCurrentCatalogIndex === exactIndex &&
+            window._nsAddCurrentWords && window._nsAddCurrentInspection) {
         const hdr = sim ? sim.parseLumpHeader(window._nsAddCurrentWords[0] >>> 0) : null;
         if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
         approvedMetadata = window._nsAddCurrentApproval;
@@ -4568,7 +4610,8 @@ async function _nsPopulateAddMeta(token) {
 
             // Stale-guard: abort if user changed selection while fetching.
             const nowSel = document.getElementById('_nsAddSelect');
-            if (!nowSel || nowSel.value !== token) return;
+            if (!nowSel || nowSel.value !== token ||
+                    nowSel.selectedIndex !== exactIndex) return;
 
             if (!wordsResp.ok) throw await _actionableResponseError(
                 wordsResp, 'Load LUMP metadata for Namespace', {
@@ -4585,6 +4628,7 @@ async function _nsPopulateAddMeta(token) {
 
             window._nsAddCurrentWords = words;
             window._nsAddCurrentToken = token;
+            window._nsAddCurrentCatalogIndex = exactIndex;
 
             const hdr = sim ? sim.parseLumpHeader(words[0] >>> 0) : null;
             if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
@@ -4599,7 +4643,8 @@ async function _nsPopulateAddMeta(token) {
 
         } catch (fetchErr) {
             const nowSel2 = document.getElementById('_nsAddSelect');
-            if (!nowSel2 || nowSel2.value !== token) return;
+            if (!nowSel2 || nowSel2.value !== token ||
+                    nowSel2.selectedIndex !== exactIndex) return;
             const message = fetchErr && /\bNo data was changed\b/.test(fetchErr.message)
                 ? fetchErr.message
                 : _formatActionableNetworkError('Load LUMP metadata for Namespace', fetchErr, {
@@ -4753,14 +4798,20 @@ function _nsTableAddConfirm() {
     if (!sel || !sim) return;
     const token = sel.value;
     const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : token;
-    const listed = (window._nsAddAvailableList || []).find(function(row) { return row.token === token; }) || {};
+    const listed = (window._nsAddAvailableList || [])[sel.selectedIndex] || {};
+    if (listed.token !== token) {
+        if (errEl) errEl.textContent =
+            'The selected catalog row changed while installing. Reopen Add LUMP and select it again.';
+        return;
+    }
     const installCanonicalName = listed.dot_name || listed.dotName || listed.abstraction || listed.name || name;
     if (!token) { if (errEl) errEl.textContent = 'Please select a LUMP.'; return; }
 
     // Guard: refuse to install until immutable binary inspection has completed.
     // _nsPopulateAddMeta keeps Install disabled while loading, but this catch handles
     // any race where confirm fires before the async fetch completes.
-    if (!window._nsAddCurrentWords || window._nsAddCurrentToken !== token) {
+    if (!window._nsAddCurrentWords || window._nsAddCurrentToken !== token ||
+            window._nsAddCurrentCatalogIndex !== sel.selectedIndex) {
         if (errEl) errEl.textContent = 'LUMP metadata is still loading — please wait a moment and try again.';
         return;
     }
@@ -4964,6 +5015,19 @@ function _nsTableAddConfirm() {
         const identityHash = _canon64(_idMeta.identity_hash != null ? _idMeta.identity_hash : _idMeta.identityHash);
         const binaryHash   = actualBinaryHash;
         const dotName      = _idMeta.dot_name || _idMeta.dotName || name || '';
+        const listedBinaryHash = _canon64(
+            listed.binary_hash != null ? listed.binary_hash : listed.binaryHash);
+        if (listedBinaryHash && listedBinaryHash !== actualBinaryHash) {
+            return Promise.reject(new Error(
+                'Namespace selection integrity failed: the selected catalog row does not match ' +
+                'the fetched immutable LUMP. Reload the picker; refusing a same-token catalog substitution.'));
+        }
+        const selectedFilename = (_idMeta && _idMeta.filename) || listed.filename;
+        if (!String(selectedFilename || '').trim()) {
+            return Promise.reject(new Error(
+                'Namespace selection integrity failed: the explicitly selected LUMP has no exact filename binding. ' +
+                'Reload the LUMP picker; refusing to substitute another catalog record.'));
+        }
 
         // A SECURE Outform (gtType === 2, network-fetched on first CALL/LOAD)
         // requires the full trusted identity: cache tag T, a positive integer
@@ -5031,6 +5095,21 @@ function _nsTableAddConfirm() {
         if (sim._nsSymbolicEntries) delete sim._nsSymbolicEntries[slot];
         if (sim._tokenSlotMap) sim._tokenSlotMap.set(token, slot);
         sim.nsLabels[slot] = name;
+        window._nsExplicitArtifactBindings[String(slot)] = Object.assign(
+            {}, listed, _idMeta, {
+                name,
+                slot,
+                seq: _identity.ordinary ? _identity.entry.seq : slotGtSeq,
+                token,
+                filename: selectedFilename,
+                binary_hash: actualBinaryHash,
+                binaryHash: actualBinaryHash,
+                load_policy: loadPolicy,
+                loadPolicy,
+                ns_slot_policy: slotPolicy,
+                resident: loadPolicy === 'Resident',
+                boot_resident: loadPolicy === 'Resident',
+            });
 
         // Persist slot→label to boot-config so the label survives hard resets.
         // Uses a lightweight PATCH endpoint that merges into the existing config
@@ -5210,6 +5289,9 @@ function _nsTableClear(slot) {
                 return !row || Number(row.slot) !== Number(slot);
             }),
         });
+    }
+    if (window._nsExplicitArtifactBindings) {
+        delete window._nsExplicitArtifactBindings[String(slot)];
     }
 
     _setNsDirty(true);
@@ -5462,7 +5544,10 @@ window._nsTableSave = async function(btn) {
             // perfectly valid resident LUMP impossible for the resolver to
             // locate on the next regeneration.
             const _saved = _savedBySlot.get(_si);
-            _nsInheritSavedArtifactMetadata(_rich, _saved, Boolean(_symbolic));
+            const _explicit = window._nsExplicitArtifactBindings &&
+                window._nsExplicitArtifactBindings[String(_si)];
+            _nsApplyArtifactBindingForSave(
+                _rich, _saved, _explicit, Boolean(_symbolic));
             if (_si === nsSaveBootEntry) _rich.boot = true;
             nsAbstractions.push(_rich);
         }
@@ -5567,6 +5652,7 @@ window._nsTableSave = async function(btn) {
         _setNsDirty(false);
         window._nsPrefetchDirty = false;
         window._nsPrefetchDirtySlots = {};
+        window._nsExplicitArtifactBindings = {};
 
         if (btn) {
             btn.textContent = cacheRefreshError

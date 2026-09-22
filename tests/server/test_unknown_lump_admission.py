@@ -5,6 +5,8 @@ import struct
 import threading
 import time
 
+import pytest
+
 import server.app as app_module
 
 
@@ -68,40 +70,77 @@ def test_malformed_uploaded_lump_is_rejected_before_persistence(
     assert app_module.LAZY_LUMPS == {}
 
 
-def test_namespace_import_rejects_archived_only_selector_before_commit(
+def test_namespace_validation_accepts_exact_binary_despite_archived_catalog(
         tmp_path, monkeypatch):
-    digest = "a" * 64
+    raw = _unknown_lump()
+    digest = hashlib.sha256(raw).hexdigest()
     archived_name = "Imported_v1.lump"
-    (tmp_path / archived_name).write_bytes(b"archived")
+    (tmp_path / archived_name).write_bytes(raw)
     (tmp_path / "manifest.json").write_text(json.dumps([{
         "token": digest[:8],
         "filename": archived_name,
         "binary_hash": digest,
         "archived": True,
     }]))
-    original = {"revision": 4, "abstractions": []}
-    state_path = tmp_path / "ns-state.json"
-    state_path.write_text(json.dumps(original))
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
-    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state_path))
 
-    response = app_module.app.test_client().post(
-        "/api/boot-image/save-ns",
-        json={
-            "data_b64": base64.b64encode(b"\0\0\0\0").decode(),
-                "namespaceFingerprint": app_module._namespace_state_fingerprint(
-                    original["abstractions"]),
-            "ns_state": {"abstractions": [{
-                "name": "Imported",
-                "slot": 14,
-                "filename": archived_name,
-                "binary_hash": digest,
-            }]},
-        })
+    app_module._validate_active_namespace_lumps([{
+        "name": "Imported",
+        "slot": 14,
+        "filename": archived_name,
+        "binary_hash": digest,
+    }])
 
-    assert response.status_code == 409
-    assert "exactly one active manifest row" in response.get_json()["error"]
-    assert json.loads(state_path.read_text()) == original
+
+@pytest.mark.parametrize("catalog", [
+    [],
+    [
+        {"token": "4a000006", "filename": "selected.lump", "archived": True},
+        {"token": "4a000006", "filename": "selected.lump", "archived": True},
+    ],
+    [{
+        "token": "4a000006",
+        "filename": "different-active.lump",
+        "binary_hash": "f" * 64,
+    }],
+])
+def test_namespace_binary_validation_ignores_stale_catalog_variants(
+        tmp_path, monkeypatch, catalog):
+    raw = _unknown_lump()
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / "selected.lump").write_bytes(raw)
+    (tmp_path / "manifest.json").write_text(json.dumps(catalog))
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+
+    app_module._validate_active_namespace_lumps([{
+        "name": "Selected",
+        "slot": 6,
+        "token": "4a000006",
+        "filename": "selected.lump",
+        "binary_hash": digest,
+    }])
+
+
+@pytest.mark.parametrize("failure", ["missing", "corrupt", "hash"])
+def test_namespace_binary_validation_fails_closed_on_selected_bytes(
+        tmp_path, monkeypatch, failure):
+    raw = _unknown_lump()
+    digest = hashlib.sha256(raw).hexdigest()
+    if failure == "corrupt":
+        (tmp_path / "selected.lump").write_bytes(b"not a LUMP")
+    elif failure == "hash":
+        (tmp_path / "selected.lump").write_bytes(raw)
+        digest = "0" * 64
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
+
+    with pytest.raises(ValueError):
+        app_module._validate_active_namespace_lumps([{
+            "name": "Selected",
+            "slot": 6,
+            "token": "4a000006",
+            "filename": "selected.lump",
+            "binary_hash": digest,
+        }])
 
 
 def test_stale_namespace_snapshot_is_rejected_before_manifest_details_leak(
@@ -139,8 +178,10 @@ def test_stale_namespace_snapshot_is_rejected_before_manifest_details_leak(
 
 def test_history_transition_cannot_cross_namespace_validation_and_commit(
         tmp_path, monkeypatch):
-    old_raw = b"active revision"
-    new_raw = b"replacement revision"
+    old_raw = _unknown_lump()
+    new_words = list(struct.unpack(">64I", old_raw))
+    new_words[1] = 0x1F000001
+    new_raw = struct.pack(">64I", *new_words)
     old_hash = hashlib.sha256(old_raw).hexdigest()
     new_hash = hashlib.sha256(new_raw).hexdigest()
     filename = "Example.1.12345678.lump"
@@ -214,7 +255,7 @@ def test_history_transition_cannot_cross_namespace_validation_and_commit(
 
     assert not save_thread.is_alive()
     assert not replace_thread.is_alive()
-    assert errors and "exactly one active manifest row" in errors[0]
+    assert errors and "hash mismatch" in errors[0]
     assert json.loads(manifest_path.read_text()) == [active]
     assert json.loads(state_path.read_text())["abstractions"] == [row]
     assert (tmp_path / filename).read_bytes() == old_raw

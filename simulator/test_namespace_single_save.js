@@ -64,9 +64,12 @@ check('Namespace save preserves a validated live image after cache invalidation'
     save.includes('sim._bootImageLoaded !== true'));
 check('Namespace save preserves resident artifact locators for unchanged rows',
     save.includes('_savedBySlot') &&
-    save.includes('_nsInheritSavedArtifactMetadata(_rich, _saved, Boolean(_symbolic))') &&
+    save.includes('_nsApplyArtifactBindingForSave(') &&
     source.includes("'token', 'filename', 'issue_n'") &&
-    source.includes('saved.name !== rich.name'));
+    source.includes('Number(binding.seq) === Number(rich.seq)'));
+check('Namespace save prefers exact staged selection over catalog lookup',
+    save.includes('_nsExplicitArtifactBindings') &&
+    !save.includes('_lumpsCache'));
 
 const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
 const step1Start = editorSource.indexOf('function _postStep1(');

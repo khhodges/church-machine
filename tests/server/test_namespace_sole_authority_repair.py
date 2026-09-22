@@ -43,6 +43,204 @@ def _set_marker(state, slot):
     next(row for row in state["abstractions"] if row["slot"] == slot)["boot"] = True
 
 
+def _endpoint_fixture(tmp_path, monkeypatch):
+    from server import app as app_module
+
+    lumps, config = _copy_fixture(tmp_path)
+    paths = {
+        "state": lumps / "ns-state.json",
+        "manifest": lumps / "manifest.json",
+        "image": lumps / "boot-image.bin",
+        "provenance": lumps / "boot-image.provenance.json",
+        "config": tmp_path / "boot-config.json",
+    }
+    paths["config"].write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setattr(app_module, "LUMPS_DIR", str(lumps))
+    monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(paths["manifest"]))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(paths["state"]))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(paths["image"]))
+    monkeypatch.setattr(
+        app_module, "BOOT_IMAGE_PROVENANCE_PATH", str(paths["provenance"]))
+    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(paths["config"]))
+    monkeypatch.setattr(
+        app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "no-legacy.json"))
+    app_module.app.config["TESTING"] = True
+    state = _state(lumps)
+    image = boot_image.generate_boot_image(config, str(lumps))
+    payload = {
+        "data_b64": base64.b64encode(image).decode(),
+        "ns_state": {"abstractions": state["abstractions"]},
+        "boot_config": config,
+        "namespaceFingerprint": app_module._namespace_state_fingerprint(
+            state["abstractions"]),
+    }
+    return app_module, lumps, paths, state, payload
+
+
+def _report_headers():
+    token = os.environ.get("REPORT_TOKEN")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+@pytest.mark.parametrize("catalog_variant", [
+    "missing",
+    "selected-archived",
+    "selected-duplicated",
+    "different-active-same-token",
+])
+def test_save_ns_endpoint_uses_exact_namespace_binary_not_stale_catalog(
+        tmp_path, monkeypatch, catalog_variant):
+    app_module, lumps, paths, state, payload = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    selected = next(row for row in state["abstractions"]
+                    if row.get("name") == "SelfTest")
+    selected_bytes = (lumps / selected["filename"]).read_bytes()
+    manifest = json.loads(paths["manifest"].read_text(encoding="utf-8"))
+    selected_rows = [
+        row for row in manifest
+        if isinstance(row, dict) and row.get("filename") == selected["filename"]
+    ]
+    if catalog_variant == "missing":
+        manifest = [row for row in manifest if row not in selected_rows]
+    elif catalog_variant == "selected-archived":
+        for row in selected_rows:
+            row["archived"] = True
+    elif catalog_variant == "selected-duplicated":
+        manifest.extend(json.loads(json.dumps(selected_rows)))
+    else:
+        for row in selected_rows:
+            row["archived"] = True
+        other = next(row for row in manifest
+                     if isinstance(row, dict)
+                     and row.get("filename") != selected["filename"])
+        other["token"] = selected["token"]
+        other.pop("archived", None)
+    paths["manifest"].write_text(json.dumps(manifest), encoding="utf-8")
+    # Generation consumes the same exact Namespace-selected files; changing
+    # only stale catalog history cannot veto or substitute the resulting image.
+    regenerated = boot_image.generate_boot_image(
+        payload["boot_config"], str(lumps))
+    assert regenerated == base64.b64decode(payload["data_b64"])
+
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+    committed = _state(lumps)
+    committed_selected = next(row for row in committed["abstractions"]
+                              if row.get("slot") == selected["slot"])
+    for field in ("name", "slot", "token", "filename", "binary_hash",
+                  "resident", "boot_resident", "load_policy",
+                  "ns_slot_policy", "identity_hash"):
+        assert committed_selected.get(field) == selected.get(field)
+    assert (lumps / selected["filename"]).read_bytes() == selected_bytes
+
+
+@pytest.mark.parametrize("failure", [
+    "missing", "hash", "corrupt", "approval", "token-only", "cache-token-only",
+])
+def test_save_ns_endpoint_integrity_failures_publish_no_mutation(
+        tmp_path, monkeypatch, failure):
+    app_module, lumps, paths, state, payload = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    selected = next(row for row in state["abstractions"]
+                    if row.get("name") == "SelfTest")
+    selected_path = lumps / selected["filename"]
+    if failure == "missing":
+        selected_path.unlink()
+    elif failure == "hash":
+        payload["ns_state"]["abstractions"] = json.loads(json.dumps(
+            state["abstractions"]))
+        row = next(row for row in payload["ns_state"]["abstractions"]
+                   if row.get("slot") == selected["slot"])
+        row["binary_hash"] = "0" * 64
+    elif failure == "corrupt":
+        selected_path.write_bytes(b"corrupt")
+    elif failure == "approval":
+        approvals_path = lumps / "approvals.json"
+        approvals = json.loads(approvals_path.read_text(encoding="utf-8"))
+        approvals["approvals"].pop(selected["binary_hash"])
+        approvals_path.write_text(json.dumps(approvals), encoding="utf-8")
+    else:
+        payload["ns_state"]["abstractions"] = json.loads(json.dumps(
+            state["abstractions"]))
+        payload["ns_state"]["abstractions"].append({
+            "name": "LazyMissingBinding",
+            "slot": 12,
+            "type": "Inform",
+            ("token" if failure == "token-only" else "cache_token"): "1234abcd",
+            "resident": False,
+            "boot_resident": False,
+            "load_policy": "Lazy",
+        })
+    before = {name: path.read_bytes() for name, path in paths.items()}
+
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+
+    assert response.status_code == 409, response.get_data(as_text=True)
+    assert response.get_json()["dataChanged"] is False
+    assert {name: path.read_bytes() for name, path in paths.items()} == before
+
+
+def test_save_ns_endpoint_accepts_attested_nonbootstrap_resident(
+        tmp_path, monkeypatch):
+    from server.lump_approvals import (
+        configured_compiler_tcb_key, sign_compiler_record)
+
+    monkeypatch.setenv(
+        "COMPILER_SIGNING_SECRET", "task3520-compiler-test-secret-" + "x" * 32)
+    app_module, lumps, _paths, state, payload = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    selected = next(row for row in state["abstractions"]
+                    if row.get("name") == "SelfTest")
+    approvals_path = lumps / "approvals.json"
+    envelope = json.loads(approvals_path.read_text(encoding="utf-8"))
+    approval = envelope["approvals"][selected["binary_hash"]]
+    approval.pop("bootstrap_t", None)
+    approval.pop("bootstrap_runtime_gt", None)
+    approval.update({
+        "trust_origin": "trusted-home-ide",
+        "compiler_identity": "CLOOMC",
+        "compiler_version": "task3520-test",
+        "compiler_record": sign_compiler_record(
+            {
+                "schema": "church-compiler-output/v1",
+                "binary_hash": selected["binary_hash"],
+                "compiler": "CLOOMC",
+                "compiler_version": "task3520-test",
+            },
+            signing_key=configured_compiler_tcb_key(),
+        ),
+    })
+    approvals_path.write_text(json.dumps(envelope), encoding="utf-8")
+
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+
+    assert response.status_code == 200, response.get_data(as_text=True)
+
+
+def test_save_ns_endpoint_stale_cas_publishes_no_mutation(
+        tmp_path, monkeypatch):
+    app_module, _lumps, paths, _state_doc, payload = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    payload["namespaceFingerprint"] = "stale-browser-fingerprint"
+    before = {name: path.read_bytes() for name, path in paths.items()}
+
+    with app_module.app.test_client() as client:
+        response = client.post(
+            "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+
+    assert response.status_code == 409
+    assert response.get_json()["refreshRequired"] is True
+    assert response.get_json()["dataChanged"] is False
+    assert {name: path.read_bytes() for name, path in paths.items()} == before
+
+
 def test_alternate_eligible_target_is_authoritative_and_stale_explicit_slot_rejected(
         tmp_path):
     lumps, config = _copy_fixture(tmp_path)

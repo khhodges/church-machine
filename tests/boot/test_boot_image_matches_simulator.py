@@ -354,6 +354,7 @@ def _write_synthetic_boot_abstr_lump(
                 "seq": 0,
                 "token": lump_token,
                 "filename": lump_name,
+                "binary_hash": digest,
                 "type": "Inform" if bootstrap_token is not None else "Abstraction",
                 "resident": True,
                 "boot_resident": True,
@@ -611,7 +612,8 @@ def test_boot_image_places_saved_lump(tmp_path, lump_size, cc):
             "slot": BOOT_ABSTR_NS_SLOT,
             "seq": 0,
             "token": saved_token,
-                "filename": saved_filename,
+            "filename": saved_filename,
+            "binary_hash": digest,
             "resident": True,
             "boot_resident": True,
             "ns_slot_policy": "static",
@@ -703,7 +705,7 @@ def test_selftest_requires_exact_ns_state_manifest_binding(tmp_path):
     state["abstractions"][0]["filename"] = "different-approved-name.lump"
     state_path.write_text(json.dumps(state))
 
-    with pytest.raises(ValueError, match="matching.*filename and token"):
+    with pytest.raises(ValueError, match="Namespace-selected locator"):
         generate_boot_image(_cfg_default(), str(tmp_path))
     # The valid file must not become an implicit fallback after the binding
     # disagreement above.
@@ -781,6 +783,7 @@ def test_boot_image_next_gt_follows_lightning_bolt(tmp_path, lightning_slot, sta
             "seq": 0,
             "token": SAVED_TOKEN,
             "filename": CANONICAL_FILENAME,
+            "binary_hash": _digest,
             "resident": True,
             "boot_resident": True,
             "ns_slot_policy": "static",

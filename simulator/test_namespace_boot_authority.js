@@ -34,6 +34,7 @@ const markerSource = [
     'let bootEntrySlot = null;',
     'let _bootEntrySelectionRevision = 0;',
     'let _namespaceBootMarkerInFlight = null;',
+    "let _preparedArtifactSelection = { selection: { slot: 10, revision: 7 }, artifact: { token: 'selected-token', filename: 'Selected.lump' } };",
     extract(abstractions, '_namespaceResponseError'),
     extract(abstractions, '_namespaceStateForMutation'),
     extract(abstractions, '_applyNamespaceBootProjection'),
@@ -85,6 +86,9 @@ async function main() {
         const body = JSON.parse(options.body);
         assert.deepStrictEqual(body, {
             slot: 10,
+            revision: 7,
+            token: 'selected-token',
+            filename: 'Selected.lump',
             namespaceFingerprint: 'fp-old',
         });
         return {
@@ -152,6 +156,7 @@ async function main() {
             },
             _nsPrefetchDirty: false,
         },
+        _nsSlotHasResidentThreadBody: () => false,
         Number, Array, String, Object,
     };
     vm.runInNewContext(
@@ -168,11 +173,14 @@ async function main() {
     const saveState = {
         namespaceFingerprint: 'fp-save',
         abstractions: [{
-            name: 'CapabilityTest', slot: 6, boot: true, token: 'token-6',
-            filename: 'CapabilityTest.lump', load_policy: 'Resident',
+            name: 'CapabilityTest', slot: 6, seq: 0, boot: true,
+            token: 'stale-token',
+            filename: 'CapabilityTest.archived.lump',
+            binary_hash: 'a'.repeat(64), load_policy: 'Resident',
             resident: true, boot_resident: true,
         }],
     };
+    const selectedHash = 'b'.repeat(64);
     const saveContext = {
         window: {
             _nsState: saveState,
@@ -184,7 +192,43 @@ async function main() {
             LumpSaveDiagnostics: null,
             _refreshCommittedBootImageCache: async () => {},
             _applyNamespaceBootProjection: () => {},
+            _nsExplicitArtifactBindings: {
+                6: {
+                    name: 'CapabilityTest',
+                    slot: 6,
+                    seq: 0,
+                    token: 'selected-token',
+                    filename: 'CapabilityTest.selected.lump',
+                    binary_hash: selectedHash,
+                    load_policy: 'Resident',
+                    resident: true,
+                    boot_resident: true,
+                },
+            },
         },
+        // Misleading catalog variants are deliberately visible in the VM. The
+        // save payload must use the committed/staged Namespace selection only.
+        _lumpsCache: [
+            {
+                abstraction: 'CapabilityTest',
+                token: 'selected-token',
+                filename: 'CapabilityTest.archived-same-token.lump',
+                binary_hash: 'c'.repeat(64),
+                archived: true,
+            },
+            {
+                abstraction: 'CapabilityTest',
+                token: 'different-token',
+                filename: 'CapabilityTest.newer.lump',
+                binary_hash: 'd'.repeat(64),
+            },
+            {
+                abstraction: 'AbsentFromNamespace',
+                token: 'absent-token',
+                filename: 'AbsentFromNamespace.lump',
+                binary_hash: 'e'.repeat(64),
+            },
+        ],
         bootEntrySlot: 6,
         sim: {
             _bootImageLoaded: true,
@@ -233,7 +277,8 @@ async function main() {
         Promise, Error, Map, Math,
     };
     vm.runInNewContext(
-        `${extract(memory, '_nsInheritSavedArtifactMetadata')}\n${saveSource}\n` +
+        `${extract(memory, '_nsInheritSavedArtifactMetadata')}\n` +
+        `${extract(memory, '_nsApplyArtifactBindingForSave')}\n${saveSource}\n` +
         'result = window._nsTableSave();', saveContext);
     assert.strictEqual(await saveContext.result, true);
     assert.ok(!saveCalls.some(call => call.url === '/api/namespace/boot-marker'),
@@ -242,7 +287,15 @@ async function main() {
     assert.ok(saveCall, 'Namespace save endpoint was called');
     const savePayload = JSON.parse(saveCall.options.body);
     assert.strictEqual(savePayload.namespaceFingerprint, 'fp-save');
-    assert.strictEqual(savePayload.ns_state.abstractions[0].token, 'token-6');
+    assert.strictEqual(savePayload.ns_state.abstractions[0].token, 'selected-token');
+    assert.strictEqual(
+        savePayload.ns_state.abstractions[0].filename,
+        'CapabilityTest.selected.lump');
+    assert.strictEqual(
+        savePayload.ns_state.abstractions[0].binary_hash,
+        selectedHash);
+    assert.strictEqual(savePayload.ns_state.abstractions[0].slot, 6);
+    assert.strictEqual(savePayload.ns_state.abstractions[0].seq, 0);
     assert.strictEqual(savePayload.ns_state.abstractions[0].load_policy, 'Resident');
     assert.strictEqual(savePayload.ns_state.abstractions[0].boot, true);
     assert.strictEqual(savePayload.boot_config, null,

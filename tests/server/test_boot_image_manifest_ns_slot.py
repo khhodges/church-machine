@@ -25,7 +25,7 @@ def _approve(root, raw, filename, dot_name):
     }))
 
 
-def test_namespace_state_wins_over_manifest_placement(tmp_path):
+def test_namespace_state_wins_over_manifest_placement(tmp_path, monkeypatch):
     raw = _lump(0xAAAA)
     aaaa_name = f"aaaa.1.{compute_number('aaaa', raw)}.lump"
     other = _lump(0xBBBB)
@@ -37,12 +37,19 @@ def test_namespace_state_wins_over_manifest_placement(tmp_path):
         "abstractions": [{
             "name": "Chosen", "slot": 9, "token": "aaaa0001",
             "filename": aaaa_name,
+            "binary_hash": hashlib.sha256(raw).hexdigest(),
         }],
     }))
     (tmp_path / "manifest.json").write_text(json.dumps([{
         "token": "bbbb0002", "filename": bbbb_name,
         "abstraction": "Chosen", "ns_slot": 9, "boot_resident": True,
     }]))
+    monkeypatch.setattr(
+        boot_image, "_require_approved_executable_lump",
+        lambda path, *_args, **_kwargs: (
+            [] if path == str(tmp_path / aaaa_name)
+            else (_ for _ in ()).throw(AssertionError("catalog substituted bytes"))
+        ))
 
     assert boot_image.find_lump_file_by_abstraction(
         str(tmp_path), "Chosen", 9

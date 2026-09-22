@@ -38,7 +38,7 @@ def test_trusted_cache_map_uses_current_ns_state_not_stale_manifest_slots():
     # not promote either ambiguous historical manifest family.
     assert 6 not in tokens
     assert 2 not in tokens
-    assert tokens[7] == 0x4A000007
+    assert 7 not in tokens
 
     # Manifest history still contains Constants at slot 9, while current
     # ns-state owns it at slot 46.  Its metadata lacks a full identity hash, so
@@ -68,5 +68,6 @@ def test_generated_resident_entries_use_cache_tokens_not_permission_annotations(
     # ordinary unbound catalog slots remain zero.
     assert _slot_words(words, 6)[3] == 0x4A000006
     assert _slot_words(words, 7)[3] == 0x4A000007
-    assert _slot_words(words, 2)[3] == 0x4A000002
+    assert _slot_words(words, 10)[3] == 0x4A00000A
+    assert _slot_words(words, 2)[3] == 0
     assert _slot_words(words, 8)[3] == 0
