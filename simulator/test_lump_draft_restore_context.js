@@ -9,7 +9,7 @@ function expect(ok, message) {
   if (!ok) throw new Error(`LUMP draft restore regression: ${message}`);
 }
 
-const openStart = source.indexOf('async function openLumpInEditor(token)');
+const openStart = source.indexOf('async function openLumpInEditor(token, options)');
 const openSource = source.slice(openStart);
 
 expect(openStart >= 0, 'openLumpInEditor must exist');
@@ -39,7 +39,7 @@ expect(
   'discard must clear both draft stores and opening alone must not create a draft'
 );
 expect(
-  index.includes('app-lumps.js?v=sha256-31348baea5e3'),
+  index.includes('app-lumps.js?v=sha256-43ec0baf2fff'),
   'the editor must request the corrected draft script'
 );
 
@@ -84,6 +84,9 @@ function loadDraftHelpers(storage) {
     'const _lumpEditorDraftText = {}; function exitSavedLumpEditorMode() {' +
       ' window._savedLumpEditorMode = false; window._editorOpenLumpToken = null;' +
       ' window._editorLumpDirtyToken = null; }\n' +
+    'function _sameLumpToken(a,b) { if (a == null || b == null) return false;' +
+      " return String(a).replace(/^0x/i,'').toLowerCase() ===" +
+      " String(b).replace(/^0x/i,'').toLowerCase(); }\n" +
     source.slice(identityStart, identityEnd) +
       source.slice(draftStart, draftEnd) +
       '\nthis.drafts = {_draftLsKey, _draftLsGet, _draftLsSet, _draftLsDel,' +
@@ -138,8 +141,16 @@ const helperSandbox = {
     _editorLumpDirtyToken: oldDraftToken,
   },
 };
+storage.set('church_editor_document_v1', JSON.stringify({
+  owner: { type: 'lump', id: '0xOLD-DRAFT-TOKEN' },
+  code: 'restored source',
+  lang: 'assembly',
+}));
 vm.runInNewContext(
   "function _lumpTokenIdentity(token) { return encodeURIComponent(String(token == null ? '' : token)); }" +
+  "function _sameLumpToken(a,b) { if (a == null || b == null) return false;" +
+    " return String(a).replace(/^0x/i,'').toLowerCase() ===" +
+    " String(b).replace(/^0x/i,'').toLowerCase(); }" +
   'const _lumpEditorDraftText = {}; function exitSavedLumpEditorMode() {' +
   ' window._savedLumpEditorMode = false; window._editorOpenLumpToken = null;' +
   ' window._editorLumpDirtyToken = null; }\n' + helperSource,
@@ -153,7 +164,10 @@ const descriptor = helperSandbox.window._commitSavedLumpClientState({
   filename: 'Ada.CapabilityTest.7.fresh123.lump',
   binary_hash: 'a'.repeat(64),
   lump_version: 8,
-}, { ns_slot: 10 }, oldDraftToken);
+}, { ns_slot: 10 }, {
+  token: '0xOLD-DRAFT-TOKEN',
+  source: 'restored source',
+});
 expect(
   descriptor.dot_name === 'Ada.CapabilityTest' &&
     registryEntries.get(savedToken).filename === 'Ada.CapabilityTest.7.fresh123.lump',
@@ -163,7 +177,49 @@ expect(
   drafts._draftLsGet(oldDraftToken) === null &&
     registryEvents.join('|').includes(`current:${savedToken}|pending:${savedToken}`) &&
     helperSandbox.window._editorOpenLumpToken === null,
-  'a successful fresh save must delete the old draft and transfer editor selection'
+  'a successful save must clear its exact frozen draft through a token alias and transfer editor selection'
+);
+expect(
+  JSON.parse(storage.get('church_editor_document_v1')).owner.id === savedToken,
+  'an unchanged generic LUMP owner snapshot must be rebound to the saved token'
+);
+
+// Typing after Save starts must survive completion. The save only acknowledges
+// the frozen source and must neither delete nor detach the newer draft.
+const pendingToken = '0xABC123';
+storage.set('cm_lump_draft_v2_' + encodeURIComponent('abc123'), 'typed while pending');
+storage.set('church_editor_document_v1', JSON.stringify({
+  owner: { type: 'lump', id: 'abc123' },
+  code: 'typed while pending',
+  lang: 'assembly',
+}));
+helperSandbox.window._editorOpenLumpToken = 'abc123';
+helperSandbox.window._editorLumpDirtyToken = 'abc123';
+helperSandbox.window._savedLumpEditorMode = true;
+helperSandbox.window._commitSavedLumpClientState({
+  token: 'saved-after-race',
+  abstraction: 'CapabilityTest',
+}, {}, { token: pendingToken, source: 'source sent to save' });
+expect(
+  storage.get('cm_lump_draft_v2_' + encodeURIComponent('abc123')) ===
+      'typed while pending' &&
+    JSON.parse(storage.get('church_editor_document_v1')).owner.id === 'abc123' &&
+    helperSandbox.window._editorOpenLumpToken === 'abc123',
+  'edits typed during a pending save must remain owned and recoverable'
+);
+
+// A genuinely divergent pre-existing draft is not proof of the source saved.
+storage.set('cm_lump_draft_v2_' + encodeURIComponent('divergent'), 'real divergent draft');
+helperSandbox.window._editorOpenLumpToken = 'divergent';
+helperSandbox.window._editorLumpDirtyToken = 'divergent';
+helperSandbox.window._commitSavedLumpClientState({
+  token: 'saved-divergent',
+  abstraction: 'CapabilityTest',
+}, {}, { token: 'divergent', source: 'different frozen source' });
+expect(
+  storage.get('cm_lump_draft_v2_' + encodeURIComponent('divergent')) ===
+      'real divergent draft',
+  'a successful unrelated save must preserve a genuine divergent draft'
 );
 
 drafts = loadDraftHelpers(storage);

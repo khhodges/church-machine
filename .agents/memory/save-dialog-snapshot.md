@@ -5,6 +5,12 @@ description: The two-step LUMP save contract for preserving the exact editor/com
 
 When a multi-step LUMP save opens its format or Namespace dialog, freeze the compiler-owned source, compiled words, capabilities, identity metadata, language, and pending binary together. Preserve a divergent editor buffer separately; never pair it with old compiled words. Confirmation and retry must consume the immutable snapshot rather than live focus or registry selection.
 
+Draft reconciliation must acknowledge only the frozen source and owner that were saved, not the editor state at response time.
+
+**Why:** Delayed saves can overlap later typing or another compile. Unconditional token-based cleanup risks deleting unsaved edits, while an unchanged persisted session owner can reopen the pre-save revision.
+
+**How to apply:** Remove only byte-matching draft copies; retain divergent buffers and rebind an unchanged session to the committed revision. Token aliases may establish equality but must not merge unrelated draft keys.
+
 **Why:** Editor navigation, focus changes, refreshes, or a later compile can change live state while the dialog remains open; rebuilding from that state can save a different artifact or silently lose source.
 
 **How to apply:** Capture before asynchronous catalog/UI work begins and retain it through failed-save retries. Output profile controls embedded source, not source retention: API-only saves must still retain the compiler source and original artifact outside the executable binary.

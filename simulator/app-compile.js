@@ -1417,7 +1417,8 @@ function _lumpSummaryLabel(absName, ver, nsSlot, cw) {
 
 async function _doWipVersionSave() {
     if (!_pendingWipSave) return;
-    const { savePayload, listing, con, binaryBuf, sizeBytes, absName, _autoVer } = _pendingWipSave;
+    const { savePayload, listing, con, binaryBuf, sizeBytes, absName, _autoVer,
+        draftSource } = _pendingWipSave;
     _pendingWipSave   = null;
     _wipTestedMethods = null;
     // Clear WIP token — this abstraction is now a proper released version
@@ -1456,7 +1457,7 @@ async function _doWipVersionSave() {
                 window._commitSavedLumpClientState(resp, {
                     abstraction: absName, ns_slot: savePayload.metadata.ns_slot,
                     language: savePayload.metadata.language
-                }, _compileDraftToken);
+                }, draftSource);
             }
             _compileDraftToken = null;
             if (typeof switchView === 'function') switchView('lumps');
@@ -1597,7 +1598,7 @@ async function _confirmLumpRelease() {
                 window._commitSavedLumpClientState(resp, {
                     abstraction: data.absName, ns_slot: data.savePayload.metadata.ns_slot,
                     language: data.savePayload.metadata.language
-                }, _compileDraftToken);
+                }, data.draftSource);
             }
             _compileDraftToken = null;
             if (typeof switchView === 'function') switchView('lumps');
@@ -1656,6 +1657,13 @@ async function compileAndBuild(options) {
     }
     const source = _compileOptions.source !== undefined
         ? String(_compileOptions.source) : editor.value;
+    // Save completion can race with later typing or another compile. Bind
+    // cleanup to this exact compiler-owned source and its source LUMP.
+    const _compileDraftSource = {
+        token: window._editorOpenLumpToken ||
+            (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null),
+        source: source,
+    };
     if (typeof window._showCompilerOutputBesideSource === 'function') {
         window._showCompilerOutputBesideSource();
     }
@@ -1664,8 +1672,7 @@ async function compileAndBuild(options) {
     switchCodeTab('console');
     // Capture draft provenance, but do not evict the prior candidate or stop
     // the installed program. Failed builds must be observational only.
-    _compileDraftToken = window._editorOpenLumpToken ||
-        (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null);
+    _compileDraftToken = _compileDraftSource.token;
 
     const _compileClistSlots = _activeCompileClistSlots();
     let result = _compileWithActiveClist(source, [], _compileClistSlots);
@@ -2554,7 +2561,10 @@ async function compileAndBuild(options) {
     // the permanent version save until every method has been ticked as tested.
     const _wipTokNow = (() => { try { return localStorage.getItem('church_wip_token') || ''; } catch (_e) { return ''; } })();
     if (_wipTokNow) {
-        _pendingWipSave   = { savePayload, listing, con, binaryBuf, sizeBytes, absName, methodMeta, _autoVer };
+        _pendingWipSave   = {
+            savePayload, listing, con, binaryBuf, sizeBytes, absName,
+            methodMeta, _autoVer, draftSource: _compileDraftSource
+        };
         _wipTestedMethods = new Set();
         // Persist compiled binary first — gate is shown only AFTER the save
         // commits the real binary to LAZY_LUMPS.  This eliminates the race
@@ -2567,7 +2577,7 @@ async function compileAndBuild(options) {
                 window._commitSavedLumpClientState(resp, {
                     abstraction: absName, ns_slot: resolvedNsSlot,
                     language: result.language
-                }, _compileDraftToken);
+                }, _compileDraftSource);
                 _compileDraftToken = null;
             }
             _renderWipMethodGate(con, methodMeta, listing);
@@ -2598,7 +2608,7 @@ async function compileAndBuild(options) {
                 window._commitSavedLumpClientState(resp, {
                     abstraction: absName, ns_slot: resolvedNsSlot,
                     language: result.language
-                }, _compileDraftToken);
+                }, _compileDraftSource);
             }
             if (window.IDEActionState) {
                 window.IDEActionState.recordSaved({

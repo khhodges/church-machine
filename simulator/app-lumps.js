@@ -5,6 +5,15 @@ function _lumpTokenIdentity(token) {
     return encodeURIComponent(String(token == null ? '' : token));
 }
 
+// Token spelling is part of persisted UI identity, but API and registry callers
+// may refer to the same token with an optional 0x prefix or different hex case.
+// Use this only for equality; storage keys must remain reversible and exact.
+function _sameLumpToken(left, right) {
+    if (left == null || right == null) return false;
+    return String(left).replace(/^0x/i, '').toLowerCase() ===
+        String(right).replace(/^0x/i, '').toLowerCase();
+}
+
 function showLumpDetail(token) {
     _lumpEditDirty = false;
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
@@ -4377,7 +4386,7 @@ async function _offerArchivedOnlyLumpRecovery(token, diagnostic) {
 }
 window._offerArchivedOnlyLumpRecovery = _offerArchivedOnlyLumpRecovery;
 
-function _commitSavedLumpClientState(resp, fallback, draftToken) {
+function _commitSavedLumpClientState(resp, fallback, draftSource) {
     if (!resp || !resp.token) throw new Error('Saved LUMP response has no token');
     if (Array.isArray(resp.warnings) && resp.warnings.length &&
             typeof _showAsmWarnings === 'function') {
@@ -4401,15 +4410,60 @@ function _commitSavedLumpClientState(resp, fallback, draftToken) {
         window.LumpRegistry.registerFromServer([descriptor]);
         window.LumpRegistry.evictMemory(resp.token);
     }
-    if (draftToken) {
-        _draftLsDel(draftToken);
-        delete _lumpEditorDraftText[_lumpTokenIdentity(draftToken)];
-    }
-    const ownsDraft = draftToken && (
-        window._editorOpenLumpToken === draftToken ||
-        window._editorLumpDirtyToken === draftToken
+    // A save acknowledges the frozen compiler source, not whatever happens to
+    // be in the editor when its asynchronous request finishes. Delete only
+    // copies proven byte-for-byte equal to that source. A later keystroke is a
+    // genuine divergent draft and must remain recoverable.
+    const frozen = draftSource && typeof draftSource === 'object'
+        ? draftSource : { token: draftSource, source: null };
+    const draftToken = frozen.token;
+    const frozenSource = typeof frozen.source === 'string' ? frozen.source : null;
+    const aliases = [];
+    [draftToken, window._editorOpenLumpToken, window._editorLumpDirtyToken]
+        .forEach(function(candidate) {
+            if (candidate != null && draftToken != null &&
+                    _sameLumpToken(candidate, draftToken) &&
+                    aliases.indexOf(candidate) < 0) aliases.push(candidate);
+        });
+    let hasDivergentDraft = false;
+    aliases.forEach(function(candidate) {
+        const stored = _draftLsGet(candidate);
+        if (frozenSource !== null && stored === frozenSource) _draftLsDel(candidate);
+        else if (stored !== null && frozenSource !== null) hasDivergentDraft = true;
+        const identity = _lumpTokenIdentity(candidate);
+        if (frozenSource !== null &&
+                _lumpEditorDraftText[identity] === frozenSource) {
+            delete _lumpEditorDraftText[identity];
+        } else if (Object.prototype.hasOwnProperty.call(
+                _lumpEditorDraftText, identity) && frozenSource !== null) {
+            hasDivergentDraft = true;
+        }
+    });
+    const ownsDraft = draftToken != null && (
+        _sameLumpToken(window._editorOpenLumpToken, draftToken) ||
+        _sameLumpToken(window._editorLumpDirtyToken, draftToken)
     );
-    if (ownsDraft && typeof exitSavedLumpEditorMode === 'function') {
+    let linkedDocumentUnchanged = false;
+    if (ownsDraft && frozenSource !== null && !hasDivergentDraft) {
+        try {
+            const raw = localStorage.getItem('church_editor_document_v1');
+            const state = raw ? JSON.parse(raw) : null;
+            linkedDocumentUnchanged = !!(state && state.owner &&
+                state.owner.type === 'lump' &&
+                _sameLumpToken(state.owner.id, draftToken) &&
+                state.code === frozenSource);
+            if (linkedDocumentUnchanged) {
+                state.owner.id = resp.token;
+                localStorage.setItem(
+                    'church_editor_document_v1', JSON.stringify(state));
+            }
+        } catch (_) {}
+    }
+    // Leaving saved-LUMP mode while newer typing still belongs to it would
+    // orphan that draft. Only transfer the editor when the linked snapshot is
+    // exactly the source that was committed.
+    if (ownsDraft && linkedDocumentUnchanged &&
+            typeof exitSavedLumpEditorMode === 'function') {
         exitSavedLumpEditorMode();
     }
     if (window.LumpRegistry) {
