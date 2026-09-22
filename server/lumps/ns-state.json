@@ -20,7 +20,9 @@
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEB256EF"
+      "seal": "0xDEB256EF",
+      "resident": true,
+      "load_policy": "Resident"
     },
     {
       "name": "UART_DEV",
@@ -69,23 +71,23 @@
     {
       "name": "SelfTest",
       "slot": 6,
-      "location": "0x00001590",
+      "location": "0x00000990",
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x01FFD",
+      "limit": "0x007FE",
       "seq": 0,
-      "seal": "0xDD58D6EF",
+      "seal": "0xDE56B6EF",
       "token": "4a000006",
       "filename": "SelfTest.1.9beaf6e7.lump",
       "issue_n": 1,
       "lump_version": 96,
       "binary_hash": "d2a9819251d0493b440681bedb8dab2646e84ff70289c90126c7ed51055441b2",
+      "identity_hash": "9a8cb773eb69a85d09a1b372f3238e67e80b23ef8c26f12784664d843e8fa615",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
-      "ns_slot_policy": "static",
-      "identity_hash": "9a8cb773eb69a85d09a1b372f3238e67e80b23ef8c26f12784664d843e8fa615"
+      "ns_slot_policy": "static"
     },
     {
       "name": "WukongCallHome",
@@ -94,9 +96,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x00FF7",
+      "limit": "0x003FC",
       "seq": 0,
-      "seal": "0xDF53D6EF",
+      "seal": "0xDED2B6EF",
       "token": "4a000007",
       "filename": "WukongCallHome.1.74c8ff97.lump",
       "issue_n": 1,
@@ -110,35 +112,35 @@
     {
       "name": "Tunnel",
       "slot": 8,
-      "location": "0x00001110",
+      "location": "0x00000510",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA2D6EF"
+      "seal": "0xDEA8D6EF"
     },
     {
       "name": "Ethernet",
       "slot": 9,
-      "location": "0x00001150",
+      "location": "0x00000550",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA2F6EF"
+      "seal": "0xDEA8F6EF"
     },
     {
       "name": "CapabilityTest",
       "slot": 10,
-      "location": "0x00001190",
+      "location": "0x00000590",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x003F4",
       "seq": 0,
-      "seal": "0xDEDBF6EF",
+      "seal": "0xDED1F6EF",
       "token": "4a00000a",
       "filename": "CapabilityTest.1.8efa26a3.lump",
       "issue_n": 1,
@@ -153,24 +155,24 @@
     {
       "name": "Thread.2",
       "slot": 11,
-      "location": "0x00003590",
+      "location": "0x00001190",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEA896EF"
+      "seal": "0xDEBA96EF"
     },
     {
       "name": "Thread.3",
       "slot": 12,
-      "location": "0x00003690",
+      "location": "0x00001290",
       "type": "Inform",
       "f": 0,
       "g": 0,
       "limit": "0x000FF",
       "seq": 0,
-      "seal": "0xDEA916EF"
+      "seal": "0xDEBB16EF"
     },
     {
       "name": "M_BIT_DEV",
@@ -184,5 +186,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1789921789.2500222
+  "generated_at": 1790079160.7169707,
+  "committed_raw_fingerprint": "5af0fc791970a9f911c532dc99e366831eab4fa4c7d1e93d2435350592d84ab1"
 }
