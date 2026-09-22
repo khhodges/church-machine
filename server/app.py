@@ -19776,6 +19776,22 @@ def _compile_call_api_authorities(bindings):
         }
     return authorities
 
+@app.route("/api/compile/call-methods", methods=["POST"])
+def api_compile_call_methods():
+    """Read-only editor lookup using precisely the compiler's binary authority."""
+    if _COMPILE_API_TOKEN:
+        header = request.headers.get("Authorization", "")
+        supplied = header[len("Bearer "):] if header.startswith("Bearer ") else request.args.get("token", "")
+        if supplied != _COMPILE_API_TOKEN:
+            return jsonify({"error": "Unauthorized"}), 401
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or not isinstance(body.get("call_api_bindings"), list):
+        return jsonify({"error": "call_api_bindings must be a list"}), 400
+    if len(body["call_api_bindings"]) > 256:
+        return jsonify({"error": "Too many CALL bindings"}), 400
+    return jsonify({"call_api_authorities": _compile_call_api_authorities(body["call_api_bindings"])})
+
+
 @app.route("/api/compile", methods=["POST"])
 def api_compile():
     """CLOOMC++ Compiler API — compile source text to a Lump binary (ECO-002).

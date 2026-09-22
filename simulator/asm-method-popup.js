@@ -1,550 +1,206 @@
-// asm-method-popup.js
-// Method-name completion popup for the assembly editor.
-//
-// Fires automatically when the cursor lands after  AbstrName.suffix  where
-// AbstrName is a key in METHOD_REGISTER_CONVENTIONS (defined in
-// app-absdetail.js).  A compact dropdown lists matching method names with a
-// short descriptor; clicking one (or pressing Enter) replaces the suffix
-// with the chosen name.
-//
-// Additionally shows an inline parameter-hint bar (VS Code style) when the
-// cursor is on a fully-typed dot-notation token like  CALL Navana.Init  and
-// the method exists in API_DATA.  The hint shows the full signature and the
-// required permission.
-//
-// Public API:  window.AsmMethodPopup  (attach, hide)
-
+// Assembly dot completion. Only exact embedded APIs accepted by compile are
+// authority; documentation catalogs and conventional Run/Main are not fallbacks.
 (function () {
     'use strict';
+    var popup, list, editor, snapshot, items = [], selected = -1, generation = 0;
 
-    // ── Pattern that triggers the popup ──────────────────────────────────────
-    // Matches  <word>.<suffix>  at the very end of text-before-cursor.
-    // suffix may be empty (just typed the dot) or a partial method name.
-    var TRIGGER_RE = /\b([A-Z][A-Za-z0-9]*)\.([A-Za-z0-9]*)$/;
-
-    // ── State ─────────────────────────────────────────────────────────────────
-    var popupEl      = null;   // the popup DOM node
-    var listEl       = null;   // <ul> inside the popup
-    var activeEditor = null;   // textarea currently being served
-    var items        = [];     // { name, index, short, sig, perms } objects for current abstraction
-    var selectedIdx  = -1;     // which item is highlighted
-    var dotAbsPos    = -1;     // absolute position of the '.' in textarea.value
-    var filterLen    = 0;      // length of what the user typed after the '.'
-    var _currentAbsName = '';  // abstraction name currently being served
-
-    // ── API_DATA lookup helper ────────────────────────────────────────────────
-    // Returns the API_DATA method object for the given abstraction + method names,
-    // or null if not found.  Works whether API_DATA is loaded or not.
-
-    function apiMethodData(absName, methodName) {
-        if (typeof API_DATA === 'undefined') return null;
-        var nameLower = methodName.toLowerCase();
-        for (var i = 0; i < API_DATA.length; i++) {
-            if (API_DATA[i].name === absName) {
-                var meths = API_DATA[i].methods;
-                for (var j = 0; j < meths.length; j++) {
-                    if (meths[j].name.toLowerCase() === nameLower) return meths[j];
-                }
-                return null;
-            }
-        }
-        return null;
+    function context(textarea) {
+        if (textarea.readOnly || textarea.disabled) return null;
+        var pos = textarea.selectionStart;
+        if (pos !== textarea.selectionEnd) return null;
+        var before = textarea.value.slice(0, pos);
+        // Mask comments and quoted literals without shifting source offsets.
+        var clean = before.replace(/\/\*[\s\S]*?(?:\*\/|$)|\/\/[^\n]*|;[^\n]*|"(?:\\.|[^"\\])*(?:"|$)|'(?:\\.|[^'\\])*(?:'|$)/g,
+            function (s) { return s.replace(/[^\n]/g, ' '); });
+        var m = /(?:^|\s)CALL\s+([A-Za-z_][\w.]*)\.([A-Za-z0-9_]*)$/i.exec(clean);
+        if (!m || /^(?:CR|DR)\d+$/i.test(m[1])) return null;
+        var bindings = typeof _sourceCallApiBindings === 'function'
+            ? _sourceCallApiBindings(textarea.value) : [];
+        // A fully declared dotted capability is a target, not a method.
+        if (m[2] && bindings.some(function (b) {
+            return b.petname.toLowerCase() === (m[1] + '.' + m[2]).toLowerCase();
+        })) return null;
+        var matches = bindings.filter(function (b) { return b.petname.toLowerCase() === m[1].toLowerCase(); });
+        return {
+            target: m[1], filter: m[2], start: pos - m[2].length,
+            end: pos + (textarea.value.slice(pos).match(/^\w*/)[0].length),
+            binding: matches.length === 1 ? matches[0] : { petname: m[1] },
+            collision: matches.length > 1
+        };
     }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    function getConventions() {
-        return (typeof METHOD_REGISTER_CONVENTIONS !== 'undefined')
-            ? METHOD_REGISTER_CONVENTIONS : null;
+    function ensure() {
+        if (popup) return;
+        popup = document.createElement('div');
+        popup.id = 'asmMethodPopup';
+        popup.className = 'asm-method-popup';
+        popup.setAttribute('role', 'listbox');
+        popup.setAttribute('aria-label', 'Method picker');
+        var header = document.createElement('div');
+        header.className = 'asm-method-popup-header';
+        header.textContent = 'Methods · ↑↓ navigate · Enter/Tab choose · Esc dismiss';
+        popup.appendChild(header);
+        list = document.createElement('ul');
+        list.className = 'asm-method-popup-list';
+        popup.appendChild(list);
+        document.body.appendChild(popup);
     }
-
-    // Build a short one-line descriptor for display.
-    function shortDesc(conv) {
-        var parts = [];
-        if (conv.input  && conv.input  !== 'none') parts.push('\u2190 ' + conv.input);
-        if (conv.output && conv.output !== 'none') parts.push('\u2192 ' + conv.output);
-        return parts.join('  ');
+    function hide() {
+        generation++;
+        if (popup) popup.style.display = 'none';
+        editor = snapshot = null;
+        items = [];
+        selected = -1;
     }
-
-    // Mirror of the caret-position approach in asm-instruction-picker.js.
+    function current() {
+        return editor && snapshot && document.activeElement === editor &&
+            snapshot.owner === owner() && !editor.readOnly && !editor.disabled &&
+            editor.value === snapshot.value && editor.selectionStart === snapshot.pos &&
+            editor.selectionEnd === snapshot.pos && editor.isConnected !== false;
+    }
+    function owner() {
+        return typeof _currentEditorOwner === 'function' ? JSON.stringify(_currentEditorOwner()) : '';
+    }
+    function highlight() {
+        Array.from(list.children).forEach(function (li, i) {
+            li.classList.toggle('asm-method-popup-item--active', i === selected);
+            li.setAttribute('aria-selected', String(i === selected));
+            if (i === selected) li.scrollIntoView({ block: 'nearest' });
+        });
+    }
+    // Keep the existing textarea-mirror placement: completion belongs at the
+    // caret, including in scrolled source, not at the top of the editor.
     function caretPixelPos(textarea) {
-        var cs = window.getComputedStyle(textarea);
-        var div = document.createElement('div');
-        ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing',
-         'padding','paddingTop','paddingRight','paddingBottom','paddingLeft',
-         'border','borderTop','borderRight','borderBottom','borderLeft',
-         'boxSizing','whiteSpace','wordWrap','overflowWrap','tabSize']
-            .forEach(function (p) { div.style[p] = cs[p]; });
-        div.style.position = 'absolute';
-        div.style.visibility = 'hidden';
-        div.style.whiteSpace = 'pre-wrap';
-        div.style.wordWrap = 'break-word';
-        div.style.width = textarea.clientWidth + 'px';
-        div.style.height = 'auto';
-        div.style.top = '-9999px';
-        div.style.left = '-9999px';
-        div.style.overflow = 'hidden';
-
-        var textBefore = textarea.value.substring(0, textarea.selectionStart);
-        div.textContent = textBefore;
-
+        var cs = window.getComputedStyle(textarea), div = document.createElement('div');
+        ['fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing',
+            'padding', 'border', 'boxSizing', 'tabSize'].forEach(function (p) { div.style[p] = cs[p]; });
+        Object.assign(div.style, { position: 'absolute', visibility: 'hidden',
+            whiteSpace: 'pre-wrap', wordWrap: 'break-word', width: textarea.clientWidth + 'px',
+            top: '-9999px', left: '-9999px' });
+        div.textContent = textarea.value.slice(0, textarea.selectionStart);
         var span = document.createElement('span');
         span.textContent = '\u200b';
         div.appendChild(span);
         document.body.appendChild(div);
-
-        var taRect = textarea.getBoundingClientRect();
-        var lineH  = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4 || 16;
-        var x = taRect.left + span.offsetLeft - textarea.scrollLeft;
-        var y = taRect.top  + span.offsetTop  - textarea.scrollTop + lineH + 4;
-
+        var rect = textarea.getBoundingClientRect();
+        var pos = { x: rect.left + span.offsetLeft - textarea.scrollLeft,
+            y: rect.top + span.offsetTop - textarea.scrollTop + (parseFloat(cs.lineHeight) || 16) + 4 };
         document.body.removeChild(div);
-        return { x: x, y: y };
+        return pos;
     }
-
-    // ── Inline signature hint ─────────────────────────────────────────────────
-
-    var sigHintEl = null;
-    var sigHintTimer = null;
-
-    function ensureSigHint() {
-        if (sigHintEl) return sigHintEl;
-        sigHintEl = document.createElement('div');
-        sigHintEl.id = 'asmSigHint';
-        sigHintEl.className = 'asm-sig-hint';
-        sigHintEl.style.display = 'none';
-        document.body.appendChild(sigHintEl);
-        return sigHintEl;
+    function choose(i) {
+        if (!current() || !items[i]) { hide(); return; }
+        var el = editor, ctx = snapshot.ctx, name = items[i].name;
+        // Explicit selection is consent to this token-only edit, not to any
+        // background source replacement or Namespace/repository mutation.
+        el.setRangeText(name, ctx.start, ctx.end, 'end');
+        hide();
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        hide();
+        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+        if (typeof markUserTabDirty === 'function') markUserTabDirty();
     }
-
-    function showSigHint(absName, methodName, textarea) {
-        var mData = apiMethodData(absName, methodName);
-        if (!mData) { hideSigHint(); return; }
-
-        var el = ensureSigHint();
-
-        var sigText = mData.signature || (methodName + '()');
-        var perms   = mData.perms || '';
-        var desc    = mData.description || '';
-        var impl    = mData.implemented;
-        var implClass = impl ? 'asm-sig-hint-badge--impl' : 'asm-sig-hint-badge--planned';
-        var implLabel = impl ? 'Implemented' : 'Planned';
-
-        el.innerHTML =
-            '<span class="asm-sig-hint-abs">' + _esc(absName) + '</span>'
-          + '<span class="asm-sig-hint-dot">.</span>'
-          + '<span class="asm-sig-hint-method">' + _esc(methodName) + '</span>'
-          + '<span class="asm-sig-hint-sig">' + _esc(sigText) + '</span>'
-          + (perms ? '<span class="asm-sig-hint-perm-label">Permission:</span>'
-                   + '<span class="asm-sig-hint-perm">' + _esc(perms) + '</span>' : '')
-          + (desc ? '<span class="asm-sig-hint-desc">' + _esc(desc) + '</span>' : '')
-          + '<span class="asm-sig-hint-badge ' + implClass + '">' + implLabel + '</span>'
-          + '<span class="asm-sig-hint-dismiss" title="Dismiss (Esc)">\u00d7</span>';
-
-        el.querySelector('.asm-sig-hint-dismiss').addEventListener('mousedown', function (e) {
-            e.preventDefault();
-            hideSigHint();
-        });
-
-        var pos = caretPixelPos(textarea);
-        var ew  = el.offsetWidth  || 480;
-        var eh  = el.offsetHeight || 28;
-        var vw  = window.innerWidth;
-        var vh  = window.innerHeight;
-
-        var left = pos.x - 4;
-        var top  = pos.y + 2;
-
-        if (left + ew > vw - 8) left = vw - ew - 8;
-        if (left < 4) left = 4;
-        if (top + eh > vh - 8) top = pos.y - eh - 24;
-        if (top < 4) top = 4;
-
-        el.style.left    = left + 'px';
-        el.style.top     = top  + 'px';
-        el.style.display = 'flex';
-    }
-
-    function hideSigHint() {
-        clearTimeout(sigHintTimer);
-        if (sigHintEl) sigHintEl.style.display = 'none';
-    }
-
-    function _esc(s) {
-        if (!s) return '';
-        return String(s)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
-    }
-
-    // Check whether the cursor is sitting on or just after a complete Abs.Method
-    // token (i.e. the user has finished typing the method name and has not moved on).
-    // Returns { absName, methodName } or null.
-    function detectCompleteToken(textarea) {
-        var pos    = textarea.selectionStart;
-        var text   = textarea.value;
-        // Look at a window around the cursor position on the current line
-        var lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-        var lineEnd   = text.indexOf('\n', pos);
-        if (lineEnd === -1) lineEnd = text.length;
-        var line   = text.slice(lineStart, lineEnd);
-        var col    = pos - lineStart;
-
-        // Scan the line for all Abs.Method occurrences, pick the one that contains col
-        var re = /\b([A-Z][A-Za-z0-9]*)\.([A-Za-z][A-Za-z0-9]+)\b/g;
-        var m;
-        while ((m = re.exec(line)) !== null) {
-            var start = m.index;
-            var end   = m.index + m[0].length;
-            if (col >= start && col <= end) {
-                return { absName: m[1], methodName: m[2] };
-            }
+    function render(methods, message) {
+        list.innerHTML = '';
+        items = methods;
+        selected = methods.length ? 0 : -1;
+        if (!methods.length) {
+            var status = document.createElement('li');
+            status.textContent = message;
+            status.setAttribute('role', 'status');
+            list.appendChild(status);
         }
-        return null;
-    }
-
-    // ── DOM ───────────────────────────────────────────────────────────────────
-
-    function ensurePopup() {
-        if (popupEl) return popupEl;
-        popupEl = document.createElement('div');
-        popupEl.id = 'asmMethodPopup';
-        popupEl.className = 'asm-method-popup';
-        popupEl.setAttribute('role', 'listbox');
-        popupEl.setAttribute('aria-label', 'Method picker');
-        popupEl.style.display = 'none';
-
-        var hdr = document.createElement('div');
-        hdr.className = 'asm-method-popup-header';
-        hdr.textContent = 'Methods \u00b7 \u2191\u2193 navigate \u00b7 Enter confirm \u00b7 Esc dismiss';
-        popupEl.appendChild(hdr);
-
-        listEl = document.createElement('ul');
-        listEl.className = 'asm-method-popup-list';
-        popupEl.appendChild(listEl);
-
-        document.body.appendChild(popupEl);
-        return popupEl;
-    }
-
-    function renderList(filteredItems) {
-        listEl.innerHTML = '';
-        filteredItems.forEach(function (item, i) {
+        methods.forEach(function (method, i) {
             var li = document.createElement('li');
             li.className = 'asm-method-popup-item';
             li.setAttribute('role', 'option');
-            li.dataset.idx = i;
-
-            var nameSpan = document.createElement('span');
-            nameSpan.className = 'asm-method-popup-name';
-            nameSpan.textContent = item.name;
-
-            var idxSpan = document.createElement('span');
-            idxSpan.className = 'asm-method-popup-index';
-            idxSpan.textContent = '#' + item.index;
-
-            li.appendChild(nameSpan);
-            li.appendChild(idxSpan);
-
-            // Signature from API_DATA (if available)
-            if (item.sig) {
-                var sigSpan = document.createElement('span');
-                sigSpan.className = 'asm-method-popup-sig';
-                sigSpan.textContent = item.sig;
-                li.appendChild(sigSpan);
+            li.textContent = method.name;
+            if (method.signature || method.perms) {
+                var detail = document.createElement('span');
+                detail.className = 'asm-method-popup-desc';
+                detail.textContent = [method.signature, method.perms].filter(Boolean).join(' · ');
+                li.appendChild(detail);
             }
-
-            // Permissions badge from API_DATA (if available)
-            if (item.perms) {
-                var permSpan = document.createElement('span');
-                permSpan.className = 'asm-method-popup-perms';
-                permSpan.textContent = item.perms;
-                li.appendChild(permSpan);
-            }
-
-            // Fall back to old short desc if no signature/perms
-            if (!item.sig && item.short) {
-                var descSpan = document.createElement('span');
-                descSpan.className = 'asm-method-popup-desc';
-                descSpan.textContent = item.short;
-                li.appendChild(descSpan);
-            }
-
-            li.addEventListener('mousedown', function (e) {
-                e.preventDefault();   // don't blur the textarea
-                confirmItem(i);
-            });
-            li.addEventListener('mousemove', function () { highlight(i); });
-
-            listEl.appendChild(li);
+            li.addEventListener('mousedown', function (e) { e.preventDefault(); choose(i); });
+            li.addEventListener('mousemove', function () { selected = i; highlight(); });
+            list.appendChild(li);
         });
-        items = filteredItems;
-        selectedIdx = filteredItems.length > 0 ? 0 : -1;
-        applyHighlight();
+        highlight();
     }
-
-    function highlight(i) {
-        selectedIdx = i;
-        applyHighlight();
-    }
-
-    function applyHighlight() {
-        if (!listEl) return;
-        var lis = listEl.querySelectorAll('.asm-method-popup-item');
-        lis.forEach(function (li, i) {
-            li.classList.toggle('asm-method-popup-item--active', i === selectedIdx);
-        });
-        if (selectedIdx >= 0 && lis[selectedIdx]) {
-            lis[selectedIdx].scrollIntoView({ block: 'nearest' });
-        }
-    }
-
-    function positionPopup(textarea) {
-        var pos = caretPixelPos(textarea);
-        var popup = ensurePopup();
-        var pw = 420;
-        var ph = 220;
-        var vw = window.innerWidth;
-        var vh = window.innerHeight;
-
-        var left = pos.x;
-        var top  = pos.y;
-        if (left + pw > vw) left = vw - pw - 8;
-        if (left < 4) left = 4;
-        if (top + ph > vh) top = pos.y - ph - 22;
-        if (top < 4) top = 4;
-
-        popup.style.left = left + 'px';
-        popup.style.top  = top  + 'px';
-    }
-
-    // ── Show / hide ───────────────────────────────────────────────────────────
-
-    function show(textarea, absName, filter, dotPos) {
-        var conv = getConventions();
-        if (!conv || !conv[absName]) { hide(); return; }
-
-        var allMethods = Object.keys(conv[absName]).map(function (mName) {
-            var c = conv[absName][mName];
-            // Enrich with API_DATA if available
-            var mApi  = apiMethodData(absName, mName);
-            return {
-                name:  mName,
-                index: c.index,
-                short: shortDesc(c),
-                sig:   mApi ? mApi.signature   : null,
-                perms: mApi ? mApi.perms        : null
-            };
-        }).sort(function (a, b) { return a.index - b.index; });
-
-        var lower = filter.toLowerCase();
-        var filtered = allMethods.filter(function (m) {
-            return m.name.toLowerCase().indexOf(lower) === 0;
-        });
-
-        if (filtered.length === 0) { hide(); return; }
-
-        dotAbsPos      = dotPos;
-        filterLen      = filter.length;
-        activeEditor   = textarea;
-        _currentAbsName = absName;
-
-        var popup = ensurePopup();
-        renderList(filtered);
-        popup.style.display = 'flex';
-        positionPopup(textarea);
-
-        // If there is exactly one match and the filter already equals it exactly,
-        // the user has already finished typing; show the sig hint immediately.
-        if (filtered.length === 1 && filter.length > 0
-                && filter.toLowerCase() === filtered[0].name.toLowerCase()) {
-            showSigHint(absName, filtered[0].name, textarea);
-        } else {
-            hideSigHint();
-        }
-    }
-
-    function hide() {
-        if (popupEl) popupEl.style.display = 'none';
-        selectedIdx   = -1;
-        dotAbsPos     = -1;
-        filterLen     = 0;
-        activeEditor  = null;
-        _currentAbsName = '';
-    }
-
-    function isVisible() {
-        return !!(popupEl && popupEl.style.display !== 'none');
-    }
-
-    // ── Confirm a selection ───────────────────────────────────────────────────
-
-    function confirmItem(idx) {
-        if (!activeEditor || idx < 0 || idx >= items.length) { hide(); return; }
-        var item   = items[idx];
-        var absName = _currentAbsName;
-        var editor = activeEditor;
-
-        // Replace the characters the user typed after the dot with the method name.
-        var val = editor.value;
-        var replaceStart = dotAbsPos + 1;          // character right after '.'
-        var replaceEnd   = replaceStart + filterLen;
-        editor.value = val.substring(0, replaceStart) + item.name + val.substring(replaceEnd);
-
-        var newPos = replaceStart + item.name.length;
-        editor.selectionStart = newPos;
-        editor.selectionEnd   = newPos;
-        editor.focus();
-
+    async function refresh(el) {
         hide();
-
-        if (typeof updateLineNumbers === 'function') updateLineNumbers();
-        if (typeof markUserTabDirty === 'function') markUserTabDirty();
-
-        // Show the parameter hint for the confirmed method
-        showSigHint(absName, item.name, editor);
+        var ctx = context(el);
+        if (!ctx || document.activeElement !== el) return;
+        var requestId = generation;
+        editor = el;
+        snapshot = { value: el.value, pos: el.selectionStart, ctx: ctx, owner: owner() };
+        if (window.AsmInstructionPicker) window.AsmInstructionPicker.hide();
+        ensure();
+        var pos = caretPixelPos(el);
+        popup.style.left = Math.max(4, Math.min(pos.x, window.innerWidth - 430)) + 'px';
+        popup.style.top = Math.max(4, Math.min(pos.y, window.innerHeight - 230)) + 'px';
+        popup.style.display = 'flex';
+        render([], 'Loading exact selected LUMP API…');
+        try {
+            if (ctx.collision) throw new Error('Ambiguous target binding');
+            var response = await fetch('/api/compile/call-methods', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ call_api_bindings: [ctx.binding] })
+            });
+            if (!response.ok) throw new Error('API lookup failed (HTTP ' + response.status + ')');
+            var data = await response.json();
+            if (requestId !== generation) return;
+            if (!current()) { hide(); return; }
+            var authorities = data.call_api_authorities || {};
+            var keys = Object.keys(authorities).filter(function (key) { return key.toLowerCase() === ctx.target.toLowerCase(); });
+            var a = keys.length === 1 ? authorities[keys[0]] : null;
+            if (!a || !(a.embedded === true || a.source === 'embedded-binary' || a.authority === 'embedded-binary') ||
+                (a.selectedToken != null && String(a.selectedToken) !== String(a.token)) ||
+                (a.selectedRevision != null && String(a.selectedRevision) !== String(a.revision)) ||
+                !a.api || !Array.isArray(a.api.methods)) {
+                render([], 'Exact selected LUMP API unavailable.'); return;
+            }
+            var methods = a.api.methods.filter(function (m) {
+                return m && typeof m.name === 'string' && /^[A-Za-z_]\w*$/.test(m.name) &&
+                    m.name.toLowerCase().indexOf(ctx.filter.toLowerCase()) === 0;
+            });
+            render(methods, a.api.methods.length ? 'No matching API methods.' : 'The embedded API declares no methods.');
+        } catch (err) {
+            if (requestId === generation && current()) render([], 'Exact selected LUMP API unavailable: ' + err.message);
+        }
     }
-
-    // ── Attach to a textarea ──────────────────────────────────────────────────
-
-    function attachToEditor(textarea) {
-        if (!textarea || textarea._asmMethodPopupAttached) return;
-        textarea._asmMethodPopupAttached = true;
-
-        // On every keystroke update, re-evaluate trigger pattern.
-        textarea.addEventListener('input', function () {
-            var pos    = textarea.selectionStart;
-            var before = textarea.value.substring(0, pos);
-            var m      = TRIGGER_RE.exec(before);
-            if (!m) {
-                hide();
-                // Even if no dropdown trigger, check for a complete Abs.Method token
-                // and show the signature hint inline.
-                clearTimeout(sigHintTimer);
-                sigHintTimer = setTimeout(function () {
-                    var tok = detectCompleteToken(textarea);
-                    if (tok) {
-                        showSigHint(tok.absName, tok.methodName, textarea);
-                    } else {
-                        hideSigHint();
-                    }
-                }, 200);
-                return;
-            }
-
-            var absName = m[1];
-            var filter  = m[2];
-            var dotPos  = pos - filter.length - 1;   // absolute index of '.'
-
-            var conv = getConventions();
-            if (!conv || !conv[absName]) { hide(); return; }
-
-            // Hide sig hint while dropdown is open (avoid double-display)
-            hideSigHint();
-            show(textarea, absName, filter, dotPos);
+    function attach(el) {
+        if (!el || el._asmMethodPopupAttached) return;
+        el._asmMethodPopupAttached = true;
+        el.addEventListener('input', function () { refresh(el); });
+        el.addEventListener('click', function () { refresh(el); });
+        el.addEventListener('keyup', function (e) {
+            if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].indexOf(e.key) >= 0) refresh(el);
         });
-
-        // Keyboard navigation while popup is open.
-        textarea.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-                if (isVisible()) {
-                    e.preventDefault();
-                    hide();
-                    return;
-                }
-                if (sigHintEl && sigHintEl.style.display !== 'none') {
-                    e.preventDefault();
-                    hideSigHint();
-                    return;
-                }
-            }
-            if (!isVisible()) return;
-
-            if (e.key === 'ArrowDown') {
+        el.addEventListener('keydown', function (e) {
+            if (editor !== el) return;
+            if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); hide(); return; }
+            if (!current()) { hide(); return; }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                var next = selectedIdx < 0 ? 0 : Math.min(selectedIdx + 1, items.length - 1);
-                highlight(next);
-                return;
-            }
-            if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                var prev = selectedIdx < 0 ? items.length - 1 : Math.max(selectedIdx - 1, 0);
-                highlight(prev);
-                return;
-            }
-            if ((e.key === 'Enter' || e.key === 'Tab') && selectedIdx >= 0) {
-                e.preventDefault();
-                confirmItem(selectedIdx);
-                return;
-            }
-        });
-
-        // Also show sig hint when the cursor moves onto a complete token via
-        // keyup (arrow keys, clicking, etc.) — with a short delay.
-        textarea.addEventListener('keyup', function (e) {
-            if (isVisible()) return;
-            clearTimeout(sigHintTimer);
-            sigHintTimer = setTimeout(function () {
-                var tok = detectCompleteToken(textarea);
-                if (tok) {
-                    showSigHint(tok.absName, tok.methodName, textarea);
-                } else {
-                    hideSigHint();
-                }
-            }, 300);
-        });
-
-        textarea.addEventListener('click', function () {
-            if (isVisible()) return;
-            clearTimeout(sigHintTimer);
-            sigHintTimer = setTimeout(function () {
-                var tok = detectCompleteToken(textarea);
-                if (tok) {
-                    showSigHint(tok.absName, tok.methodName, textarea);
-                } else {
-                    hideSigHint();
-                }
-            }, 150);
-        });
-
-        // Dismiss on outside click.
-        document.addEventListener('mousedown', function (e) {
-            if (!isVisible()) return;
-            if (popupEl && !popupEl.contains(e.target) && e.target !== textarea) {
-                hide();
-            }
-        }, true);
-
-        // Dismiss when the editor loses focus (unless click went into popup).
-        // The signature hint is always hidden on blur; it re-appears when the
-        // editor regains focus and input/keyup fires again.
-        textarea.addEventListener('blur', function () {
-            setTimeout(function () {
-                if (popupEl && document.activeElement && popupEl.contains(document.activeElement)) return;
-                hide();
-                hideSigHint();
-            }, 80);
-        });
-
-        // Dismiss sig hint on scroll
-        textarea.addEventListener('scroll', function () { hideSigHint(); });
+                e.stopImmediatePropagation();
+                if (items.length) selected = (selected + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length;
+                highlight();
+            } else if ((e.key === 'Enter' || e.key === 'Tab') && selected >= 0) {
+                e.preventDefault(); e.stopImmediatePropagation(); choose(selected);
+            } else { hide(); }
+        }, true); // Before the editor's ordinary Tab indentation/Enter handlers.
+        el.addEventListener('blur', hide);
+        el.addEventListener('scroll', hide);
     }
-
-    // ── Auto-attach ───────────────────────────────────────────────────────────
-
+    document.addEventListener('selectionchange', function () { if (editor && !current()) hide(); });
+    document.addEventListener('mousedown', function (e) {
+        if (popup && !popup.contains(e.target) && e.target !== editor) hide();
+    }, true);
     function autoAttach() {
-        attachToEditor(document.getElementById('asmEditor'));
-        attachToEditor(document.getElementById('codeEditor'));
+        attach(document.getElementById('asmEditor'));
+        attach(document.getElementById('codeEditor'));
     }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', autoAttach);
-    } else {
-        autoAttach();
-    }
-
-    window.AsmMethodPopup = { attach: attachToEditor, hide: hide };
-
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', autoAttach);
+    else autoAttach();
+    window.AsmMethodPopup = { attach: attach, hide: hide };
 }());
