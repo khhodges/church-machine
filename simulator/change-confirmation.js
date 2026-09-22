@@ -69,6 +69,18 @@
             window._editorNavigationEpoch === epoch;
     };
     var nativeFetch = window.fetch.bind(window);
+    var mutationQueue = Promise.resolve();
+    function needsReview(url) {
+        if (url.origin !== window.location.origin) return false;
+        var path = url.pathname;
+        if (['/api/lumps/save-plan', '/api/lumps/finalize',
+            '/api/lumps/save-diagnostics', '/api/lumps/approval-intent',
+            '/api/lumps/deploy-authorize'].includes(path) ||
+            path.startsWith('/api/lumps/lease')) return false;
+        return ['/api/lump/', '/api/lumps/', '/api/boot-config',
+            '/api/boot-image/', '/api/namespace/', '/api/source-file/']
+            .some(function (prefix) { return path.startsWith(prefix); });
+    }
     window.fetch = async function (input, options) {
         var method = String((options && options.method) ||
             (input instanceof Request && input.method) || 'GET').toUpperCase();
@@ -77,6 +89,15 @@
         }
         var request = new Request(input instanceof Request ? input :
             new URL(input, window.location.href), options);
+        if (!needsReview(new URL(request.url))) return nativeFetch(request);
+        // Queue the entire review/commit, not merely the visible dialogs.
+        // Otherwise later intents bind pre-commit state (and first-use session
+        // cookies) before an earlier approved mutation has completed.
+        var result = mutationQueue.then(function () { return reviewedFetch(request); });
+        mutationQueue = result.catch(function () {});
+        return result;
+    };
+    async function reviewedFetch(request) {
         var response = await nativeFetch(request.clone());
         if (response.status !== 428 || new URL(request.url).origin !== window.location.origin) return response;
         var payload;
@@ -93,5 +114,5 @@
         headers.set('X-Change-Confirmation', payload.change_confirmation.id);
         // One retry only. Expiry, stale state and replay require a new action.
         return nativeFetch(new Request(request, {headers: headers}));
-    };
+    }
 })();

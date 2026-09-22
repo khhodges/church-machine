@@ -23,6 +23,76 @@ def _consume_shared(args):
     return IntentStore(path).consume(token, binding)
 
 
+@pytest.mark.parametrize("index,reason", [
+    (0, "session_changed"), (1, "request_changed"), (2, "request_changed"),
+    (3, "request_changed"), (4, "saved_state_changed"),
+])
+def test_safe_rejection_facets(tmp_path, index, reason):
+    store = IntentStore(tmp_path / "reviews.sqlite")
+    binding = ["private-session", "POST", "/api/boot-config?", "body-hash", "state-hash"]
+    token = store.issue(binding, now=100)
+    changed = list(binding)
+    changed[index] += "-changed"
+    assert store.consume_reason(token, changed, now=101) == reason
+    assert store.consume_reason(token, binding, now=101) == "missing_or_used"
+    # Persist only hashes, never session/request values.
+    assert b"private-session" not in store.path.read_bytes()
+
+
+def test_expiry_and_legacy_schema(tmp_path):
+    import sqlite3
+    path = tmp_path / "reviews.sqlite"
+    with sqlite3.connect(path) as db:
+        db.execute("CREATE TABLE intents (token TEXT PRIMARY KEY, expires REAL NOT NULL, binding TEXT NOT NULL)")
+    store = IntentStore(path)
+    binding = ["session", "POST", "/api/boot-config?", "body", "state"]
+    token = store.issue(binding, now=100)
+    assert store.consume_reason(token, binding, now=400) == "expired"
+    token = store.issue(binding, now=401)
+    assert store.consume_reason(token, binding, now=402) == "accepted"
+
+
+def test_boot_config_full_reviews_must_be_prepared_after_prior_commit(tmp_path):
+    from flask import request
+    state = tmp_path / "boot-config.json"
+    state.write_text("initial")
+    app = Flask(__name__)
+    app.secret_key = "isolated-only"
+    install(app, lambda: [state], nullcontext, store_path=tmp_path / "reviews.sqlite")
+
+    @app.post("/api/boot-config")
+    def save():
+        state.write_text(request.get_json()["value"])
+        return {"ok": True}
+
+    client = app.test_client()
+
+    def review(value):
+        response = client.post("/api/boot-config", json={"value": value})
+        assert response.status_code == 428
+        return response.json["change_confirmation"]["id"]
+
+    def confirm(value, token):
+        return client.post("/api/boot-config", json={"value": value},
+                           headers={"X-Change-Confirmation": token})
+
+    first = review("first")
+    premature = review("second")
+    assert confirm("first", first).status_code == 200
+    rejected = confirm("second", premature)
+    assert rejected.status_code == 409
+    assert rejected.json["rejection_reason"] == "saved_state_changed"
+    assert state.read_text() == "first"
+    # The browser now waits for the preceding commit before requesting this
+    # review, so ordinary sequential actions both succeed without retries.
+    second = review("second")
+    assert confirm("second", second).status_code == 200
+    assert state.read_text() == "second"
+    replay = confirm("second", second)
+    assert replay.status_code == 409
+    assert replay.json["rejection_reason"] == "missing_or_used"
+
+
 @pytest.mark.parametrize("changed,allowed", [
     (".lump-write-leases.json", True),
     ("example.lump", False),

@@ -211,6 +211,13 @@ class IntentStore:
         os.close(fd)
         with self._connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS intents (token TEXT PRIMARY KEY, expires REAL NOT NULL, binding TEXT NOT NULL)")
+            if "facets" not in {row[1] for row in db.execute("PRAGMA table_info(intents)")}:
+                try:
+                    db.execute("ALTER TABLE intents ADD COLUMN facets TEXT")
+                except sqlite3.OperationalError:
+                    # Another worker may have performed the same migration.
+                    if "facets" not in {row[1] for row in db.execute("PRAGMA table_info(intents)")}:
+                        raise
 
     @contextmanager
     def _connect(self):
@@ -234,18 +241,36 @@ class IntentStore:
             if db.execute("SELECT count(*) FROM intents").fetchone()[0] >= 1024:
                 raise RuntimeError("Too many pending reviews; wait for expiry.")
             token = secrets.token_urlsafe(32)
-            db.execute("INSERT INTO intents VALUES (?, ?, ?)",
-                       (self._hash(token), now + 300, self._hash(binding)))
+            facets = ([self._hash(value) for value in binding]
+                      if isinstance(binding, (tuple, list)) and len(binding) == 5 else None)
+            db.execute("INSERT INTO intents (token, expires, binding, facets) VALUES (?, ?, ?, ?)",
+                       (self._hash(token), now + 300, self._hash(binding), json.dumps(facets)))
             return token
 
     def consume(self, token, binding, now=None):
+        return self.consume_reason(token, binding, now) == "accepted"
+
+    def consume_reason(self, token, binding, now=None):
         now = time.time() if now is None else now
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             key = self._hash(token)
-            intent = db.execute("SELECT expires, binding FROM intents WHERE token = ?", (key,)).fetchone()
+            intent = db.execute("SELECT expires, binding, facets FROM intents WHERE token = ?", (key,)).fetchone()
             db.execute("DELETE FROM intents WHERE token = ?", (key,))
-            return bool(intent and intent[0] > now and intent[1] == self._hash(binding))
+            if not intent:
+                return "missing_or_used"
+            if intent[0] <= now:
+                return "expired"
+            if intent[1] == self._hash(binding):
+                return "accepted"
+            facets = json.loads(intent[2]) if intent[2] else None
+            if facets and isinstance(binding, (tuple, list)) and len(binding) == 5:
+                for index, reason in enumerate(("session_changed", "request_changed",
+                                               "request_changed", "request_changed",
+                                               "saved_state_changed")):
+                    if facets[index] != self._hash(binding[index]):
+                        return reason
+            return "binding_changed"
 
 
 def install(app, paths, commit_guard, describe=None, store_path=None, recovery_pending=None):
@@ -284,10 +309,20 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
         )
         token = request.headers.get("X-Change-Confirmation")
         if token:
-            if store.consume(token, binding):
+            rejection_reason = store.consume_reason(token, binding)
+            if rejection_reason == "accepted":
                 return None
+            explanation = {
+                "missing_or_used": "This review is no longer available or was already used.",
+                "expired": "This review expired after five minutes.",
+                "session_changed": "The browser session changed after this review was issued.",
+                "request_changed": "The submitted request differs from the reviewed request.",
+                "saved_state_changed": "Protected saved data changed after this review was issued.",
+                "binding_changed": "This older review no longer matches the request or saved state.",
+            }[rejection_reason]
             return jsonify(error="change_confirmation_invalid",
-                           message="Review expired, was already used, or the request or saved state changed. Review again.",
+                           rejection_reason=rejection_reason,
+                           message=explanation + " No change was authorized. Review again.",
                            committed=False), 409
         payload = request.get_json(silent=True)
         # Do not echo credentials, approval proofs, source bodies or binary arrays.

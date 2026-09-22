@@ -17,3 +17,14 @@ provided request/state hashes without recognizable identities or versions.
 **How to apply:** Distinguish saved revision numbers from Namespace generations.
 Configuration-only edits must say whether saved revisions remain unchanged;
 unresolved or ambiguous identities must be reported rather than guessed.
+
+Serialize the whole protected request→review→commit cycle, not only visible
+confirmation dialogs.
+
+**Why:** Queued dialogs can already hold server approvals for pre-commit state;
+an earlier approved change then invalidates the next queued approval. Parallel
+first-use reviews can also compete to establish the browser's session binding.
+
+**How to apply:** Prepare each protected review only after the previous operation
+finishes. Keep reads and lease heartbeats independent, and still reject genuine
+external state changes rather than silently retrying or reapproving them.

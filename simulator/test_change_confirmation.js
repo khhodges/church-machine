@@ -49,6 +49,23 @@ async function waitForDialog(h) {
     assert.strictEqual(h.calls[1].headers.get('X-Change-Confirmation'), 'one-use');
     assert.strictEqual(await h.calls[0].text(), await h.calls[1].text());
 
+    h = harness([challenge(), new Response('{"ok":true}'),
+        challenge(), new Response('{"ok":true}')]);
+    const first = h.window.fetch('/api/boot-config', {method: 'POST', body: '{"value":1}'});
+    const second = h.window.fetch('/api/boot-config', {method: 'POST', body: '{"value":2}'});
+    dialog = await waitForDialog(h);
+    assert.strictEqual(h.calls.length, 1, 'second review cannot bind state before first commit');
+    dialog.children[4].onclick();
+    assert.strictEqual((await first).status, 200);
+    for (let i = 0; i < 100 && h.dialogs.length < 2; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1));
+    }
+    assert.strictEqual(h.dialogs.length, 2);
+    assert.strictEqual(h.calls.length, 3, 'second review is prepared only after first commit');
+    h.dialogs[1].children[4].onclick();
+    assert.strictEqual((await second).status, 200);
+    assert.strictEqual(await h.calls[2].text(), await h.calls[3].text());
+
     h = harness([challenge()]);
     pending = h.window.fetch('/api/lumps/save', {method: 'POST', body: 'exact'});
     dialog = await waitForDialog(h);
