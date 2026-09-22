@@ -56,6 +56,7 @@ const context = vm.createContext({
 dom.window._editorNavigationEpoch = 7;
 vm.runInContext([
     extractFunction(source, '_lumpDispatchAnnotation'),
+    extractFunction(source, '_formatLumpHeaderDisassembly'),
     extractFunction(source, '_isExactSavedLumpWordArray'),
     extractFunction(source, '_readSavedLumpExactTail'),
     extractFunction(source, '_savedLumpPresentationStillOwnsSource'),
@@ -71,6 +72,9 @@ const originalDispatchWords = dispatchWords.slice();
 const dispatchOutput = context._formatCanonicalSavedLumpWords(dispatchWords, {});
 assert.match(dispatchOutput, /\[0001\].*00000002.*DISPATCH #1: legacy entry value 2/);
 assert.match(dispatchOutput, /method metadata absent/);
+assert.match(dispatchOutput, /\[0000\].*HEADER\n.*magic=0x1F \(valid\), n_minus_6=0, typ=0\n.*cw=5, cc=0, size=64 words/);
+assert(!dispatchOutput.includes('; DISPATCH'), 'dispatch is decoded data, not a comment');
+assert(dispatchOutput.indexOf('HEADER') < dispatchOutput.indexOf('DISPATCH #1'));
 assert(!dispatchOutput.includes('WORD_2\n'), 'entry data is not decoded as an instruction');
 assert.deepEqual(dispatchWords, originalDispatchWords, 'display must not rewrite binary words');
 assert.equal(context._lumpDispatchAnnotation([dispatchWords[0], 0x071b0001], 1, 0), '',

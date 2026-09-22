@@ -39,6 +39,7 @@ const context = vm.createContext({
 });
 vm.runInContext([
     extractFunction(source, '_lumpDispatchAnnotation'),
+    extractFunction(source, '_formatLumpHeaderDisassembly'),
     extractFunction(source, '_showCompilerOutputBesideSource'),
     extractFunction(source, '_showCompiledCandidateBesideSource'),
 ].join('\n'), context);

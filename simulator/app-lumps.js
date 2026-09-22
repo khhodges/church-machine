@@ -1959,6 +1959,21 @@ function _lumpDispatchAnnotation(words, index, methodCount) {
     return '';
 }
 
+function _formatLumpHeaderDisassembly(word) {
+    word = word >>> 0;
+    var magic = word >>> 27;
+    var sizeField = (word >>> 23) & 15;
+    var typ = (word >>> 8) & 3;
+    return '[0000]  0x' + word.toString(16).padStart(8, '0').toUpperCase() +
+        '  HEADER\n' +
+        '        magic=0x' + magic.toString(16).toUpperCase() +
+        (magic === 31 ? ' (valid)' : ' (invalid)') +
+        ', n_minus_6=' + sizeField + ', typ=' + typ + '\n' +
+        '        cw=' + ((word >>> 10) & 0x1FFF) +
+        ', cc=' + (word & 255) +
+        ', size=' + Math.pow(2, sizeField + (typ === 1 ? 13 : 6)) + ' words';
+}
+
 function _showCompiledCandidateBesideSource(words, details) {
     var binary = Array.from(words || [], function(word) { return Number(word) >>> 0; });
     if (!binary.length) return false;
@@ -1971,8 +1986,7 @@ function _showCompiledCandidateBesideSource(words, details) {
         '; UNSAVED COMPILE CANDIDATE — not the immutable saved LUMP',
         '; Authenticated server output; Save LUMP is required to create a saved artifact.',
         '; Abstraction: ' + String(details.abstraction || 'Unnamed'),
-        '[0000]  0x' + header.toString(16).padStart(8, '0').toUpperCase() +
-            '  ; LUMP header, cw=' + cw + ', cc=' + cc
+        _formatLumpHeaderDisassembly(header)
     ];
     for (var i = 1; i <= cw && i < binary.length; i++) {
         var word = binary[i] >>> 0;
@@ -2035,8 +2049,7 @@ function _formatCanonicalSavedLumpWords(words, details) {
         '; Source at left is unchanged. These are the words fetched after Save LUMP.',
         '; Abstraction: ' + String(details.abstraction || 'Unnamed') +
             (details.token ? '  Token: ' + String(details.token) : ''),
-        '[0000]  0x' + header.toString(16).padStart(8, '0').toUpperCase() +
-            '  ; LUMP header, cw=' + cw + ', cc=' + cc
+        _formatLumpHeaderDisassembly(header)
     ];
     for (var i = 1; i < words.length; i++) {
         var word = words[i] >>> 0;
@@ -2051,7 +2064,7 @@ function _formatCanonicalSavedLumpWords(words, details) {
         }
         lines.push('[' + String(i).padStart(4, '0') + ']  0x' +
             word.toString(16).padStart(8, '0').toUpperCase() +
-            (annotation ? '  ; ' + annotation : ''));
+            (annotation ? '  ' + annotation : ''));
     }
     if (details.rawTailHex) {
         lines.push('', '; Trailing raw bytes: ' +
@@ -7452,9 +7465,12 @@ async function openLumpInEditor(token, options) {
                 : '';
             var _lhFree2 = lhdr.lumpSize - 1 - lhdr.cw - lhdr.cc;
             disasmLines = [
-                '; ' + lumpName + '  ' + addrStr +
+                lumpName + '  ' + addrStr +
                 '(' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') +
-                ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free)'
+                ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free)',
+                '',
+                _formatLumpHeaderDisassembly(lhdrW),
+                ''
             ];
             // Embedded API declarations may annotate intrinsic c-list rows.
             // Never manufacture names or rights from a sidecar/catalog record.
@@ -7580,12 +7596,12 @@ async function openLumpInEditor(token, options) {
                 for (var _di = 1; _di <= Math.max(1, _dispatchCount); _di++) {
                     var _dispatchText = _lumpDispatchAnnotation(serverWords, _di, _dispatchCount);
                     if (!_dispatchText) break;
-                    _dispatchLines.push('; [' + String(_di).padStart(4, '0') +
+                    _dispatchLines.push('[' + String(_di).padStart(4, '0') +
                         '] 0x' + (serverWords[_di] >>> 0).toString(16).padStart(8, '0').toUpperCase() +
                         '  ' + _dispatchText);
                 }
                 if (_dispatchLines.length) {
-                    disasmLines.splice(1, 0, ..._dispatchLines, '');
+                    disasmLines.splice(3, 0, '', 'Dispatch table', ..._dispatchLines);
                 }
                 if (!structured && typeof ChurchAssembler !== 'undefined') {
                     disasmLines.push.apply(disasmLines, ChurchAssembler.decompileWords(
