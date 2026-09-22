@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const crypto = require('crypto');
 
 const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 const index = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
@@ -39,7 +40,8 @@ expect(
   'discard must clear both draft stores and opening alone must not create a draft'
 );
 expect(
-  index.includes('app-lumps.js?v=sha256-43ec0baf2fff'),
+  index.includes('app-lumps.js?v=sha256-' +
+    crypto.createHash('sha256').update(source).digest('hex').slice(0, 12)),
   'the editor must request the corrected draft script'
 );
 
@@ -129,6 +131,10 @@ const helperSource = source.slice(
   source.indexOf('\n\nfunction _buildTextEditor')
 );
 const helperSandbox = {
+  document: {
+    getElementById: id => id === 'asmEditor'
+      ? { value: 'restored source' } : null,
+  },
   localStorage: {
     getItem: key => storage.has(key) ? storage.get(key) : null,
     setItem: (key, value) => storage.set(key, String(value)),
@@ -139,6 +145,7 @@ const helperSandbox = {
     _savedLumpEditorMode: true,
     _editorOpenLumpToken: oldDraftToken,
     _editorLumpDirtyToken: oldDraftToken,
+    _editorNavigationEpoch: 4,
   },
 };
 storage.set('church_editor_document_v1', JSON.stringify({
@@ -167,6 +174,7 @@ const descriptor = helperSandbox.window._commitSavedLumpClientState({
 }, { ns_slot: 10 }, {
   token: '0xOLD-DRAFT-TOKEN',
   source: 'restored source',
+  epoch: 4,
 });
 expect(
   descriptor.dot_name === 'Ada.CapabilityTest' &&
@@ -176,8 +184,8 @@ expect(
 expect(
   drafts._draftLsGet(oldDraftToken) === null &&
     registryEvents.join('|').includes(`current:${savedToken}|pending:${savedToken}`) &&
-    helperSandbox.window._editorOpenLumpToken === null,
-  'a successful save must clear its exact frozen draft through a token alias and transfer editor selection'
+    helperSandbox.window._editorOpenLumpToken === savedToken,
+  'a successful save must clear its exact frozen draft and bind the unchanged editor to the saved token'
 );
 expect(
   JSON.parse(storage.get('church_editor_document_v1')).owner.id === savedToken,

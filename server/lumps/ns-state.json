@@ -75,9 +75,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x001F4",
+      "limit": "0x007FE",
       "seq": 0,
-      "seal": "0xDE97F6EF",
+      "seal": "0xDE56B6EF",
       "token": "4a000006",
       "filename": "SelfTest.1.8b19abd7.lump",
       "issue_n": 1,
@@ -100,10 +100,10 @@
       "seq": 0,
       "seal": "0xDED2B6EF",
       "token": "4a000007",
-      "filename": "WukongCallHome.1.74c8ff97.lump",
+      "filename": "WukongCallHome.1.ba8b8e76.lump",
       "issue_n": 1,
-      "lump_version": 11,
-      "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
+      "lump_version": 13,
+      "binary_hash": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
@@ -190,5 +190,5 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1790089044.28409
+  "generated_at": 1790095077.4085157
 }

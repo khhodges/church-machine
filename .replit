@@ -887,12 +887,12 @@ isValidation = true
 name = "editor-roundtrip-tests"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/test_editor_roundtrip.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_editor_roundtrip.js && node simulator/test_editor_restore_containment.js && node simulator/test_editor_buffer_ownership_races.js && node simulator/test_editor_writer_guards.js && node simulator/test_draft_exact_text.js && node simulator/test_default_editor_navigation_authority.js && node simulator/test_owner_transition_reconciliation.js && node simulator/test_prepare_run_ui.js && node simulator/test_boot_execution_freshness_warning.js"
 
 [[workflows.workflow]]
 name = "call-cr6-l-perm-tests"

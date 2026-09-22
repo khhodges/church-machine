@@ -27,6 +27,9 @@ const dom = new JSDOM(`<!doctype html><body><div id="editor">
     <div class="console-panel"><div id="asmErrorPanel" style="display:none"></div></div>
   </div>
 </div></body>`);
+const stylesheet = dom.window.document.createElement('style');
+stylesheet.textContent = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
+dom.window.document.head.appendChild(stylesheet);
 const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
 const context = vm.createContext({
     window: dom.window,
@@ -35,6 +38,7 @@ const context = vm.createContext({
     assembler: { disassemble: word => 'WORD_' + (word >>> 0).toString(16) },
 });
 vm.runInContext([
+    extractFunction(source, '_lumpDispatchAnnotation'),
     extractFunction(source, '_showCompilerOutputBesideSource'),
     extractFunction(source, '_showCompiledCandidateBesideSource'),
 ].join('\n'), context);
@@ -50,17 +54,31 @@ const text = dom.window.document.getElementById('savedLumpDisassembly').textCont
 assert.equal(panel.style.display, 'flex', 'successful CLOOMC compile shows candidate');
 assert.match(text, /UNSAVED COMPILE CANDIDATE/, 'candidate is distinct from saved binary');
 assert.match(text, /\[0000\].*F8000C00/i, 'actual authenticated header is rendered');
-assert.match(text, /\[0001\].*00000002.*dispatch\[0\]/i,
+assert.match(text, /\[0001\].*00000002.*DISPATCH #1: legacy entry value 2/i,
     'actual authenticated dispatch prefix is rendered');
 assert.match(text, /\[0002\].*18000000.*WORD_18000000/i,
     'actual authenticated code word is rendered');
 assert(dom.window.document.querySelector('.editor-layout')
     .classList.contains('compiled-candidate-editor-layout'));
+assert.equal(dom.window.getComputedStyle(
+    dom.window.document.querySelector('.console-panel')).display, 'none',
+    'successful compile prioritizes disassembly, not the console');
+assert.equal(dom.window.getComputedStyle(
+    dom.window.document.querySelector('.editor-layout')).gridTemplateColumns,
+    'minmax(0, 1fr) minmax(0, 1fr)', 'success has two equally usable panes');
+const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+assert.match(html, /<details id="savedLumpBuildDetails"[^>]*>/,
+    'build and audit output is available in an explicit disclosure');
+assert.doesNotMatch(html, /<details id="savedLumpBuildDetails"[^>]*\sopen(?:\s|>)/,
+    'audit disclosure is collapsed by default');
 
 // Starting the next compile removes the old candidate. A failed compile can
 // now occupy the diagnostics surface without stale bytes posing as its output.
 vm.runInContext('_showCompilerOutputBesideSource()', context);
 assert.equal(panel.style.display, 'none', 'failed/new compile does not retain stale candidate');
+assert.equal(dom.window.getComputedStyle(
+    dom.window.document.querySelector('.console-panel')).display, 'flex',
+    'failed or pending compilation can show diagnostics');
 assert.equal(dom.window.document.getElementById('asmEditor').value,
     'method Run() { return(1) }', 'presentation never rewrites the draft');
 

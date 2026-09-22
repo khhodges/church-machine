@@ -416,6 +416,7 @@ async function confirmPublish() {
 }
 
 async function importFromLibrary(path) {
+    const writeGuard = window._captureEditorWriteGuard('import library source: ' + path);
     try {
         const resp = await fetch(`/api/library/get/${encodeURIComponent(path)}`);
         if (!resp.ok) throw await _actionableResponseError(resp, 'Import the shared abstraction', {
@@ -424,9 +425,24 @@ async function importFromLibrary(path) {
         });
         const data = await resp.json();
 
-        if (data.source) {
+        if (data.source && writeGuard.accepts()) {
             const editor = document.getElementById('asmEditor');
             if (editor) {
+                if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+                    window._clearAuthoritativeDraftBanner();
+                }
+                if (typeof window.exitSavedLumpEditorMode === 'function') {
+                    window.exitSavedLumpEditorMode();
+                }
+                if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
+                        typeof userTabDirty !== 'undefined' && userTabDirty &&
+                        typeof saveActiveUserTab === 'function') {
+                    saveActiveUserTab();
+                }
+                if (typeof activeUserTabId !== 'undefined') activeUserTabId = null;
+                if (typeof userTabDirty !== 'undefined') userTabDirty = false;
+                window._activeBuiltInKey = null;
+                window._editorSourceFilePath = null;
                 editor.value = data.source;
                 updateLineNumbers();
                 saveEditorState();

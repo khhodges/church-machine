@@ -212,7 +212,7 @@ register_suite "lump-roundtrip" \
     'node simulator/test_lump_roundtrip.js'
 
 register_suite "editor-roundtrip-tests" \
-    'node simulator/test_editor_roundtrip.js'
+    'node simulator/test_editor_roundtrip.js && node simulator/test_editor_restore_containment.js && node simulator/test_editor_buffer_ownership_races.js && node simulator/test_editor_writer_guards.js && node simulator/test_draft_exact_text.js && node simulator/test_default_editor_navigation_authority.js && node simulator/test_owner_transition_reconciliation.js && node simulator/test_prepare_run_ui.js && node simulator/test_boot_execution_freshness_warning.js'
 
 register_suite "lump-gt-display-tests" \
     'node tests/lump/test_lump_gt_display.js'

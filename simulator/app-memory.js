@@ -170,43 +170,10 @@ function _idleArtifactReconciliationPlan(state) {
 window._idleArtifactReconciliationPlan = _idleArtifactReconciliationPlan;
 
 function _queueIdleArtifactReconciliation(state) {
-    const control = window._idleArtifactReconciliation;
-    const plan = _idleArtifactReconciliationPlan(state);
-    if (!plan) {
-        control.pendingKey = null;
-        return false;
-    }
-    control.pendingKey = plan.key;
-    if (control.inFlight || control.attempted[plan.key]) return false;
-    if (typeof window._canPrepareSavedArtifactWhileIdle !== 'function' ||
-            !window._canPrepareSavedArtifactWhileIdle()) {
-        // The next explicit Run already calls prepareSavedArtifactForRun before
-        // executing one instruction. Do not poll or retry around active state.
-        return false;
-    }
-    if (typeof window.prepareSavedArtifactForRun !== 'function') return false;
-
-    control.attempted[plan.key] = true;
-    const operation = Promise.resolve().then(function() {
-        return window.prepareSavedArtifactForRun();
-    });
-    control.inFlight = operation;
-    operation.then(function(ok) {
-        if (!ok) throw window._lastPrepareRunError ||
-            new Error('automatic preparation was rejected');
-        control.failure = null;
-        control.pendingKey = null;
-        if (window._nsState) _renderBootExecutionFreshness(window._nsState);
-    }).catch(function(error) {
-        control.failure = {
-            key: plan.key,
-            message: error && error.message ? error.message : String(error),
-        };
-        if (window._nsState) _renderBootExecutionFreshness(window._nsState);
-    }).finally(function() {
-        if (control.inFlight === operation) control.inFlight = null;
-    });
-    return true;
+    // Compatibility entry point for delayed refresh callers. Observation is
+    // never permission to replace selected executable bytes, even while idle.
+    // Only the explicit Prepare/Run action may commit a newer revision.
+    return false;
 }
 window._queueIdleArtifactReconciliation = _queueIdleArtifactReconciliation;
 
@@ -221,26 +188,6 @@ function _renderBootExecutionFreshness(state) {
     if (!warnings.length && !failedSaves.length) {
         banner.style.display = 'none';
         banner.textContent = '';
-        return;
-    }
-    if (!failedSaves.length) {
-        // Ordinary stale assignments are reconciled by the IDE. Keep the
-        // per-row red assigned-stale label truthful until the CAS commits, but
-        // do not demand programmer intervention with an informational banner.
-        banner.style.display = 'none';
-        banner.textContent = '';
-        _queueIdleArtifactReconciliation(state);
-        const plan = _idleArtifactReconciliationPlan(state);
-        const failure = window._idleArtifactReconciliation.failure;
-        if (!plan || !failure || failure.key !== plan.key) return;
-        banner.innerHTML =
-            '<div class="boot-execution-freshness-copy">' +
-            '<strong>IDE PREPARATION COULD NOT COMMIT.</strong> ' +
-            _escHtml(failure.message) +
-            '. The previous valid image is unchanged. The IDE will validate ' +
-            'again at the next explicit Run; no artifact metadata should be repaired manually.' +
-            '</div>';
-        banner.style.display = 'flex';
         return;
     }
     const details = warnings.map(function(item) {

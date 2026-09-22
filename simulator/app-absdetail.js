@@ -970,6 +970,7 @@ function absRestoreMethodVersion(absIdx, methodName, histIdx) {
     if (!md || !md.history || !md.history[histIdx]) return;
     const hv = md.history[histIdx];
     const src = hv.src || '';
+    window._advanceEditorNavigationEpoch('restore method history');
 
     if (typeof switchView === 'function') switchView('editor');
     const sel = document.getElementById('langSelector');
@@ -1410,6 +1411,8 @@ function absGenerateMethod(absIdx, methodName) {
 
     const btn = document.activeElement;
     if (btn) { btn.textContent = 'Generating\u2026'; btn.disabled = true; }
+    const writeGuard = window._captureEditorWriteGuard(
+        'generate method: ' + absIdx + ':' + methodName);
 
     const _genHeaders = { 'Content-Type': 'application/json' };
     if (window._generateToken) _genHeaders['X-Generate-Token'] = window._generateToken;
@@ -1424,10 +1427,26 @@ function absGenerateMethod(absIdx, methodName) {
             capabilities: caps
         })
     }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.source && !writeGuard.accepts()) return;
         if (data.source) {
             if (typeof switchView === 'function') switchView('editor');
             const asmEd = document.getElementById('asmEditor');
             if (asmEd) {
+                if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+                    window._clearAuthoritativeDraftBanner();
+                }
+                if (typeof window.exitSavedLumpEditorMode === 'function') {
+                    window.exitSavedLumpEditorMode();
+                }
+                if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
+                        typeof userTabDirty !== 'undefined' && userTabDirty &&
+                        typeof saveActiveUserTab === 'function') {
+                    saveActiveUserTab();
+                }
+                if (typeof activeUserTabId !== 'undefined') activeUserTabId = null;
+                if (typeof userTabDirty !== 'undefined') userTabDirty = false;
+                window._activeBuiltInKey = null;
+                window._editorSourceFilePath = null;
                 asmEd.value = data.source;
                 if (typeof updateLineNumbers === 'function') updateLineNumbers();
             }

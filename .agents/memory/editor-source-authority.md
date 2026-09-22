@@ -1,10 +1,12 @@
 ---
 name: Editor source authority
-description: Rules for reopening saved editor documents without stale browser state replacing current persisted source.
+description: Rules for preserving user-owned editor bytes while offering newer authoritative source explicitly.
 ---
 
-Saved source files, built-in examples, and LUMPs must reopen from their current authoritative source. A divergent browser buffer is a draft, not the default reopened document, and must remain available through explicit Restore Draft or Discard Draft actions.
+The persisted editor document is the user-owned source buffer. Restore its bytes and typed owner exactly. Server, built-in, and immutable-artifact source is advisory until the user explicitly accepts an exact before/after replacement. Never let startup, navigation, background reconciliation, syntax repair, or a stale asynchronous result silently replace the current buffer. Preserve replaced drafts under their owner, and keep editable source authority separate from immutable LUMP binary authority.
 
-**Why:** Generic editor snapshots can outlive newer server files or immutable LUMP revisions. Treating the snapshot as authoritative silently replaces newer saved work and can also lose binary-only LUMP state.
+**Why:** Freshness or artifact authority does not imply overwrite intent. Startup and asynchronous work can race with typing, navigation, and unsaved-draft recovery; preferring another source can destroy the only copy of user text. Exact restoration, explicit acceptance, and owner-scoped recovery preserve user agency while still exposing authoritative content.
 
-**How to apply:** Persist document identity independently of navigation DOM. Re-resolve that identity when entering Code or reloading, guard asynchronous reconciliation against owner changes and new typing, and restore LUMPs through their canonical artifact loader so source availability and compiled context remain accurate.
+Successful builds and saves should prioritize source beside exact binary disassembly, with build diagnostics available separately. Candidate bytes must never be labeled as the saved artifact.
+
+**Why:** The user wants to inspect generated instructions, not have successful audit messages replace that view. Source preservation and binary inspection are independent requirements.

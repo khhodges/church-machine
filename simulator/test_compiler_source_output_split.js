@@ -34,11 +34,13 @@ function node(id) {
 const elements = {
     codeSidebarTabs: node('codeSidebarTabs'),
     savedLumpDisassemblyPanel: node('savedLumpDisassemblyPanel'),
+    savedLumpDisassembly: node('savedLumpDisassembly'),
     codeConsoleContent: node('codeConsoleContent'),
     codeHistoryPanel: node('codeHistoryPanel'),
     codeSyntaxPanel: node('codeSyntaxPanel'),
     codeJsPanel: node('codeJsPanel'),
 };
+elements.savedLumpDisassembly.textContent = '; exact saved words';
 const layout = node('layout');
 const context = {
     window: { _savedLumpEditorMode: true },
@@ -51,7 +53,10 @@ vm.createContext(context);
 vm.runInContext(extractFunction(lumps, '_showCompilerOutputBesideSource'), context);
 context._showCompilerOutputBesideSource();
 
-assert.equal(context.window._savedLumpEditorMode, false);
+assert.equal(context.window._savedLumpEditorMode, true,
+    'compiler diagnostics suspend presentation without destroying saved ownership');
+assert.equal(context.window._savedLumpDisassemblyBeforeCompile,
+    '; exact saved words', 'exact saved rendering is retained internally');
 assert(layout.classList.removed.includes('saved-lump-editor-layout'));
 assert.equal(elements.savedLumpDisassemblyPanel.style.display, 'none');
 assert.equal(elements.codeSidebarTabs.style.display, '');

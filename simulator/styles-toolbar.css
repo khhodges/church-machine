@@ -461,15 +461,10 @@
     padding: 0;
 }
 
-/* A successful compile shows its authenticated, unsaved candidate beside the
-   draft while retaining the ordinary Console as the build-summary surface. */
+/* Success prioritizes source and exact binary disassembly. Diagnostics remain
+   available through the compact disclosure, not a competing third column. */
 .editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(18rem, 0.8fr);
-}
-.editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout > .console-panel {
-    display: flex;
-    grid-column: 3;
-    grid-row: 1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
 #editor .console-panel {
@@ -477,6 +472,28 @@
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
+}
+
+#editor .editor-layout.saved-lump-editor-layout > .console-panel {
+    display: none;
+}
+
+.disassembly-pane-heading {
+    flex: 0 0 auto;
+    padding: 0.45rem 0.65rem;
+    color: var(--church-gold);
+    font-weight: 600;
+}
+.disassembly-build-details {
+    flex: 0 0 auto;
+    max-height: 35%;
+    overflow: auto;
+    border: 1px solid var(--border);
+}
+.disassembly-build-details summary {
+    cursor: pointer;
+    padding: 0.45rem 0.65rem;
+    color: var(--text-secondary);
 }
 
 .saved-lump-disassembly-panel {
@@ -544,7 +561,8 @@
 }
 
 @media (max-width: 760px) {
-    .editor-layout.saved-lump-editor-layout {
+    .editor-layout.saved-lump-editor-layout,
+    .editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
         grid-template-columns: minmax(0, 1fr);
         grid-template-rows: minmax(16rem, 1fr) minmax(16rem, 1fr);
     }

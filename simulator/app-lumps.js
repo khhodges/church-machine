@@ -1665,6 +1665,7 @@ function _lumpSrcEditMethod(absIdx, mName) {
     const abs = (typeof abstractionRegistry !== 'undefined' && abstractionRegistry)
         ? abstractionRegistry.getAbstraction(absIdx) : null;
     let code;
+    window._advanceEditorNavigationEpoch('edit LUMP method source');
     if (userMethodData && userMethodData[key] && userMethodData[key].example) {
         code = userMethodData[key].example;
     } else {
@@ -1892,29 +1893,71 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
 // remains intact so a failed attempt can present diagnostics against that
 // editing context.
 function _showCompilerOutputBesideSource() {
+    // Compilation diagnostics belong in the Console.  Saved-LUMP layout hides
+    // that surface, so suspend the two-column artifact presentation while the
+    // compile is in flight without discarding the last exact saved rendering.
+    var savedPanel = document.getElementById('savedLumpDisassemblyPanel');
+    var savedText = document.getElementById('savedLumpDisassembly');
+    if (window._savedLumpEditorMode && savedText &&
+            !window._compiledCandidateEditorMode) {
+        window._savedLumpDisassemblyBeforeCompile = savedText.textContent;
+    }
     if (window._compiledCandidateEditorMode) {
         window._compiledCandidateEditorMode = false;
-        var oldPanel = document.getElementById('savedLumpDisassemblyPanel');
-        var oldText = document.getElementById('savedLumpDisassembly');
-        if (window._savedLumpEditorMode &&
-                typeof window._savedLumpDisassemblyBeforeCandidate === 'string') {
-            if (oldText) oldText.textContent = window._savedLumpDisassemblyBeforeCandidate;
-            if (oldPanel) {
-                oldPanel.setAttribute('aria-label', 'Complete saved LUMP workspace');
-                oldPanel.style.display = 'flex';
-            }
-        } else if (oldPanel) {
-            oldPanel.style.display = 'none';
+        if (typeof window._savedLumpDisassemblyBeforeCandidate === 'string') {
+            window._savedLumpDisassemblyBeforeCompile =
+                window._savedLumpDisassemblyBeforeCandidate;
         }
         window._savedLumpDisassemblyBeforeCandidate = null;
     }
     var layout = document.querySelector('#editor .editor-layout');
     if (layout) layout.classList.remove('compiled-candidate-editor-layout');
-    if (!window._savedLumpEditorMode && layout) {
-        layout.classList.remove('saved-lump-editor-layout');
-    }
+    if (layout) layout.classList.remove('saved-lump-editor-layout');
+    if (savedPanel) savedPanel.style.display = 'none';
+    var details = document.getElementById('savedLumpBuildDetails');
+    if (details) details.open = false;
+    var tabs = document.getElementById('codeSidebarTabs');
+    if (tabs) tabs.style.display = '';
+    var consoleContent = document.getElementById('codeConsoleContent');
+    if (consoleContent) consoleContent.style.display = 'flex';
+    ['codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel'].forEach(function(id) {
+        var alternate = document.getElementById(id);
+        if (alternate) alternate.style.display = 'none';
+    });
 }
 window._showCompilerOutputBesideSource = _showCompilerOutputBesideSource;
+
+// Display-only interpretation: never rewrite entry words or infer method names.
+// With no method metadata, expose the bounded first-word legacy CALL entry as
+// an interpretation rather than pretending it is an ordinary LOAD instruction.
+function _lumpDispatchAnnotation(words, index, methodCount) {
+    var cw = ((words[0] >>> 0) >>> 10) & 0x1FFF;
+    if (index < 1 || index > cw || index >= words.length) return '';
+    var word = words[index] >>> 0;
+    var declared = Number.isInteger(methodCount) && methodCount > 0;
+    if (declared && (methodCount > cw || words.length <= methodCount)) return '';
+    if (declared) {
+        for (var entryIndex = 1; entryIndex <= methodCount; entryIndex++) {
+            var entry = words[entryIndex] >>> 0;
+            if ((entry >>> 27) !== 23 && entry >= cw) return '';
+        }
+    }
+    if (declared ? index > methodCount :
+            !(index === 1 && word > 0 && word < cw)) return '';
+    var prefix = 'DISPATCH #' + index + ': ';
+    if (word === 0) return prefix + 'private entry (CALL rejected)';
+    if ((word >>> 27) === 23) {
+        var offset = word & 0x7FFF;
+        if (offset & 0x4000) offset -= 0x8000;
+        return prefix + 'BRANCH ' + offset + ' -> LUMP word ' + (index + offset);
+    }
+    if (word < cw) {
+        return prefix + 'legacy entry value ' + word +
+            ' (CALL selector ' + index + '; not an instruction)' +
+            (declared ? '' : ' — inferred from bounded entry word; method metadata absent');
+    }
+    return '';
+}
 
 function _showCompiledCandidateBesideSource(words, details) {
     var binary = Array.from(words || [], function(word) { return Number(word) >>> 0; });
@@ -1934,9 +1977,8 @@ function _showCompiledCandidateBesideSource(words, details) {
     for (var i = 1; i <= cw && i < binary.length; i++) {
         var word = binary[i] >>> 0;
         var decoded = '';
-        if (i <= methodCount) {
-            decoded = 'dispatch[' + (i - 1) + '] -> LUMP word ' + word;
-        } else if (typeof assembler !== 'undefined' && assembler &&
+        decoded = _lumpDispatchAnnotation(binary, i, methodCount);
+        if (!decoded && typeof assembler !== 'undefined' && assembler &&
                 typeof assembler.disassemble === 'function') {
             try { decoded = assembler.disassemble(word); } catch (_e) {}
         }
@@ -1962,6 +2004,8 @@ function _showCompiledCandidateBesideSource(words, details) {
         panel.setAttribute('aria-label', 'Unsaved authenticated compile candidate');
         panel.style.display = 'flex';
     }
+    var auditDetails = document.getElementById('savedLumpBuildDetails');
+    if (auditDetails) auditDetails.open = false;
     if (layout) {
         layout.classList.add('saved-lump-editor-layout');
         layout.classList.add('compiled-candidate-editor-layout');
@@ -1970,6 +2014,140 @@ function _showCompiledCandidateBesideSource(words, details) {
     return true;
 }
 window._showCompiledCandidateBesideSource = _showCompiledCandidateBesideSource;
+
+function _savedLumpPresentationStillOwnsSource(frozen) {
+    if (!frozen || typeof frozen.source !== 'string' ||
+            !Number.isInteger(frozen.epoch)) return false;
+    var editor = document.getElementById('asmEditor');
+    return !!editor && editor.value === frozen.source &&
+        (window._editorNavigationEpoch || 0) === frozen.epoch;
+}
+
+function _formatCanonicalSavedLumpWords(words, details) {
+    if (!_isExactSavedLumpWordArray(words) || words.length === 0) return '';
+    details = details || {};
+    var header = words[0] >>> 0;
+    var cw = (header >>> 10) & 0x1FFF;
+    var cc = header & 0xFF;
+    var clistStart = Math.max(1, words.length - cc);
+    var lines = [
+        '; SAVED BINARY — exact canonical server response',
+        '; Source at left is unchanged. These are the words fetched after Save LUMP.',
+        '; Abstraction: ' + String(details.abstraction || 'Unnamed') +
+            (details.token ? '  Token: ' + String(details.token) : ''),
+        '[0000]  0x' + header.toString(16).padStart(8, '0').toUpperCase() +
+            '  ; LUMP header, cw=' + cw + ', cc=' + cc
+    ];
+    for (var i = 1; i < words.length; i++) {
+        var word = words[i] >>> 0;
+        var annotation = _lumpDispatchAnnotation(words, i, details.methodCount);
+        if (!annotation && i <= cw && typeof assembler !== 'undefined' && assembler &&
+                typeof assembler.disassemble === 'function') {
+            try { annotation = assembler.disassemble(word); } catch (_error) {}
+        } else if (i >= clistStart && cc > 0) {
+            annotation = 'C-list[' + (i - clistStart) + ']';
+        } else if (i > cw) {
+            annotation = 'non-code data / embedded source / API frame';
+        }
+        lines.push('[' + String(i).padStart(4, '0') + ']  0x' +
+            word.toString(16).padStart(8, '0').toUpperCase() +
+            (annotation ? '  ; ' + annotation : ''));
+    }
+    if (details.rawTailHex) {
+        lines.push('', '; Trailing raw bytes: ' +
+            String(details.rawTailHex).replace(/(.{2})/g, '$1 ').trim());
+    }
+    return lines.join('\n');
+}
+
+function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
+    var panel = document.getElementById('savedLumpDisassemblyPanel');
+    var output = document.getElementById('savedLumpDisassembly');
+    var layout = document.querySelector('#editor .editor-layout');
+    if (output) output.textContent = text;
+    if (panel) {
+        panel.setAttribute('aria-label', unavailable
+            ? 'Saved binary unavailable' : 'Exact saved LUMP binary');
+        panel.style.display = 'flex';
+    }
+    if (layout) {
+        layout.classList.remove('compiled-candidate-editor-layout');
+        layout.classList.add('saved-lump-editor-layout');
+    }
+    var details = document.getElementById('savedLumpBuildDetails');
+    if (details) details.open = false;
+    window._compiledCandidateEditorMode = false;
+    window._savedLumpEditorMode = true;
+    if (!unavailable) {
+        window._editorCompiledDisasm = text;
+        window._savedLumpDisassemblyBeforeCompile = text;
+    }
+    if (typeof _renderSavedLumpIdentityPanel === 'function') {
+        _renderSavedLumpIdentityPanel(descriptor || null,
+            descriptor && descriptor.token);
+    }
+    _syncSavedLumpIdentityVisibility();
+}
+
+async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
+    if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
+    try {
+        // A token may be reused by a later revision. Pin this read to the exact
+        // filename acknowledged by Save so a delayed fetch cannot display a
+        // newer same-token artifact as the bytes just committed.
+        var exactFilename = descriptor && descriptor.filename;
+        var wordsUrl = '/api/lump/' + encodeURIComponent(resp.token) + '/words' +
+            (exactFilename
+                ? '?archive_filename=' + encodeURIComponent(exactFilename)
+                : '');
+        var response = await fetch(wordsUrl, { cache: 'no-store' });
+        if (!response.ok) {
+            throw new Error('server returned HTTP ' + response.status);
+        }
+        var data = await response.json();
+        var returnedFilename = data.filename || data.lump || data.archive_filename;
+        if (exactFilename && returnedFilename &&
+                String(returnedFilename) !== String(exactFilename)) {
+            throw new Error('the canonical response identity does not match the saved filename');
+        }
+        var expectedHash = descriptor && descriptor.binary_hash;
+        var returnedHash = data.binary_hash ||
+            (data.inspection && data.inspection.binary_hash);
+        if (expectedHash && returnedHash &&
+                String(returnedHash).toLowerCase() !==
+                    String(expectedHash).toLowerCase()) {
+            throw new Error('the canonical response digest does not match the save receipt');
+        }
+        if (!_isExactSavedLumpWordArray(data.words) || data.words.length === 0) {
+            throw new Error('the canonical response contained no complete saved words');
+        }
+        var tail = _readSavedLumpExactTail(data, data.words);
+        if ((data.raw_tail_hex || data.byte_count != null) && !tail) {
+            throw new Error('the canonical response contained an invalid trailing-byte record');
+        }
+        if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
+        var exactText = _formatCanonicalSavedLumpWords(data.words, {
+            abstraction: descriptor.abstraction,
+            token: resp.token,
+            methodCount: data.api_definition && Array.isArray(data.api_definition.methods)
+                ? data.api_definition.methods.length : 0,
+            rawTailHex: tail ? tail.rawTailHex : ''
+        });
+        if (!exactText) throw new Error('the canonical saved words could not be rendered');
+        _showCanonicalSavedLumpBesideSource(
+            exactText, Object.assign({}, descriptor, data), false);
+        return true;
+    } catch (error) {
+        if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
+        _showCanonicalSavedLumpBesideSource(
+            '; SAVE SUCCEEDED — SAVED BINARY UNAVAILABLE\n' +
+            '; No saved-byte claim is shown because the canonical binary fetch failed.\n' +
+            '; ' + String(error && error.message || error),
+            descriptor, true);
+        return false;
+    }
+}
+window._fetchAndPresentCommittedLump = _fetchAndPresentCommittedLump;
 
 function exitSavedLumpEditorMode() {
     // Also invalidate an open that is still awaiting binary/source fetches.
@@ -4144,6 +4322,7 @@ function _packDataLumpWords(bytes) {
 async function _saveLumpText(token, text, bodyEl, lump) {
     const saveBtn = bodyEl.querySelector('.lump-edit-save-btn');
     const statusEl = bodyEl.querySelector('.lump-edit-status');
+    const editorAtStart = bodyEl.querySelector('.lump-edit-textarea');
     try {
         const words = _packDataLumpWords(new TextEncoder().encode(text));
         const metadata = _lumpApprovalView(lump || {});
@@ -4157,13 +4336,30 @@ async function _saveLumpText(token, text, bodyEl, lump) {
         const result = await _lumpSaveRequest(
             fetch, '/api/lumps/save',
             { binary: approval.final_binary.slice(), metadata });
-        _lumpEditDirty = false;
-        const _tk = _lumpTokenIdentity(token);
-        _lumpEditorOpen[_tk] = false;
-        delete _lumpEditorDraftText[_tk];
-        _draftLsDel(token);
-        if (statusEl) { statusEl.textContent = 'Saved.'; statusEl.style.color = 'var(--accent-green, #4caf50)'; }
-        setTimeout(() => _loadLumpContent(token, lump), 800);
+        // The response acknowledges only the frozen text sent above. A later
+        // keystroke or navigation owns the editor and must not be erased by
+        // this delayed completion.
+        const stillOwnsFrozenText = editorAtStart &&
+            bodyEl.querySelector('.lump-edit-textarea') === editorAtStart &&
+            editorAtStart.value === text && bodyEl.isConnected !== false;
+        if (stillOwnsFrozenText) {
+            _lumpEditDirty = false;
+            const _tk = _lumpTokenIdentity(token);
+            _lumpEditorOpen[_tk] = false;
+            delete _lumpEditorDraftText[_tk];
+            _draftLsDel(token);
+            if (statusEl) {
+                statusEl.textContent = 'Saved.';
+                statusEl.style.color = 'var(--accent-green, #4caf50)';
+            }
+            setTimeout(() => {
+                if (bodyEl.isConnected !== false &&
+                        bodyEl.querySelector('.lump-edit-textarea') === editorAtStart &&
+                        editorAtStart.value === text) {
+                    _loadLumpContent(token, lump);
+                }
+            }, 800);
+        }
     } catch (err) {
         if (statusEl) {
             statusEl.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :
@@ -4208,13 +4404,8 @@ async function _saveLumpMeta(token, metaId) {
 
 const _DRAFT_LS_PREFIX = 'cm_lump_draft_v2_';
 const _LEGACY_DRAFT_LS_PREFIX = 'cm_lump_draft_';
-// _migrateBfextBfinsSyntax(text)
-// One-shot migration for text that may contain the old, never-valid,
-// disassembler-only `BFEXT`/`BFINS ... pos=<N>, w=<N>` argument syntax
-// (produced only by a since-fixed disassembler bug). Rewrites it to the
-// correct, re-parseable `#<N>, #<N>` form. No-op when the pattern is not
-// present, so it is safe to run unconditionally on any stored text (drafts,
-// tab code, etc.) before it is rendered into an editor.
+// Syntax repair is a preview helper only. Persisted source and drafts are user
+// documents: callers must never apply this result without an explicit accept.
 function _migrateBfextBfinsSyntax(text) {
     if (!text || typeof text !== 'string') return text;
     if (!/\bBF(?:EXT|INS)\b/i.test(text)) return text;
@@ -4223,7 +4414,10 @@ function _migrateBfextBfinsSyntax(text) {
         function(_m, prefix, pos, w) { return prefix + '#' + pos + ', #' + w; }
     );
 }
-window._migrateBfextBfinsSyntax = _migrateBfextBfinsSyntax;
+// Expose only as a preview producer. There is deliberately no legacy
+// _migrateBfextBfinsSyntax export: old startup/tab loaders called that hook
+// automatically and consequently changed user-owned bytes without consent.
+window._previewBfextBfinsSyntaxCorrection = _migrateBfextBfinsSyntax;
 
 function _draftLsKey(token) { return _DRAFT_LS_PREFIX + _lumpTokenIdentity(token); }
 function _draftLsGet(token) {
@@ -4418,6 +4612,18 @@ function _commitSavedLumpClientState(resp, fallback, draftSource) {
         ? draftSource : { token: draftSource, source: null };
     const draftToken = frozen.token;
     const frozenSource = typeof frozen.source === 'string' ? frozen.source : null;
+    const frozenEpoch = Number.isInteger(frozen.epoch) ? frozen.epoch : null;
+    const navigationUnchanged = frozenEpoch === null ||
+        (window._editorNavigationEpoch || 0) === frozenEpoch;
+    const sourceEditor = typeof document !== 'undefined'
+        ? document.getElementById('asmEditor') : null;
+    // Presentation and ownership have a stricter rule than draft cleanup:
+    // both the compiler-frozen source and the shared navigation epoch must be
+    // explicit and must still match. A save response alone never authorizes a
+    // delayed callback to take over whichever document is now visible.
+    const frozenDocumentUnchanged = frozenSource !== null &&
+        frozenEpoch !== null && navigationUnchanged && sourceEditor &&
+        sourceEditor.value === frozenSource;
     const aliases = [];
     [draftToken, window._editorOpenLumpToken, window._editorLumpDirtyToken]
         .forEach(function(candidate) {
@@ -4439,36 +4645,46 @@ function _commitSavedLumpClientState(resp, fallback, draftSource) {
             hasDivergentDraft = true;
         }
     });
-    const ownsDraft = draftToken != null && (
-        _sameLumpToken(window._editorOpenLumpToken, draftToken) ||
-        _sameLumpToken(window._editorLumpDirtyToken, draftToken)
-    );
     let linkedDocumentUnchanged = false;
-    if (ownsDraft && frozenSource !== null && !hasDivergentDraft) {
+    if (frozenDocumentUnchanged && !hasDivergentDraft) {
         try {
             const raw = localStorage.getItem('church_editor_document_v1');
             const state = raw ? JSON.parse(raw) : null;
-            linkedDocumentUnchanged = !!(state && state.owner &&
-                state.owner.type === 'lump' &&
-                _sameLumpToken(state.owner.id, draftToken) &&
-                state.code === frozenSource);
+            linkedDocumentUnchanged = !!(state && state.code === frozenSource);
             if (linkedDocumentUnchanged) {
-                state.owner.id = resp.token;
+                state.owner = { type: 'lump', id: resp.token };
                 localStorage.setItem(
                     'church_editor_document_v1', JSON.stringify(state));
             }
         } catch (_) {}
     }
-    // Leaving saved-LUMP mode while newer typing still belongs to it would
-    // orphan that draft. Only transfer the editor when the linked snapshot is
-    // exactly the source that was committed.
-    if (ownsDraft && linkedDocumentUnchanged &&
-            typeof exitSavedLumpEditorMode === 'function') {
-        exitSavedLumpEditorMode();
+    // Keep the source exactly where it is. Rebind only the ownership metadata;
+    // never reopen the LUMP (which would replace the source from its content
+    // frame) and never tear down the adjacent saved-byte presentation.
+    if (frozenDocumentUnchanged && linkedDocumentUnchanged &&
+            !hasDivergentDraft) {
+        if (typeof _restoreSavedLumpEditorOwnership === 'function') {
+            _restoreSavedLumpEditorOwnership(resp.token, sourceEditor);
+        } else {
+            window._savedLumpEditorMode = true;
+            window._editorOpenLumpToken = resp.token;
+            window._editorLumpDirtyToken = resp.token;
+        }
     }
     if (window.LumpRegistry) {
-        window.LumpRegistry.setCurrent(resp.token);
+        // A delayed save may finish after the programmer navigated elsewhere.
+        // Keep the new artifact discoverable, but do not move current source
+        // authority away from the document selected since the request began.
+        if (draftToken == null || frozenDocumentUnchanged) {
+            window.LumpRegistry.setCurrent(resp.token);
+        }
         window.LumpRegistry.setPending(resp.token);
+    }
+    if (frozenDocumentUnchanged &&
+            typeof _fetchAndPresentCommittedLump === 'function') {
+        // Save acknowledgement is not byte evidence. Fetch the canonical
+        // artifact after commit and render only that response.
+        void _fetchAndPresentCommittedLump(resp, descriptor, frozen);
     }
     return descriptor;
 }
@@ -4477,10 +4693,9 @@ window._commitSavedLumpClientState = _commitSavedLumpClientState;
 function _buildTextEditor(token, text, bodyEl, lump, renderFn) {
     const tk = _lumpTokenIdentity(token);
     const hasDraft = Object.prototype.hasOwnProperty.call(_lumpEditorDraftText, tk);
-    let lsDraft  = _draftLsGet(token);
-    if (lsDraft !== null) lsDraft = _migrateBfextBfinsSyntax(lsDraft);
+    const lsDraft = _draftLsGet(token);
     const hasLsDraft = lsDraft !== null && lsDraft !== text;
-    const initialText = hasDraft ? _migrateBfextBfinsSyntax(_lumpEditorDraftText[tk]) : text;
+    const initialText = hasDraft ? _lumpEditorDraftText[tk] : text;
     const startOpen   = !!_lumpEditorOpen[tk];
 
     const wrapper = document.createElement('div');
@@ -6509,6 +6724,8 @@ function _goToAbstractionByName(name, methodName) {
 // navigation) when no compiled LUMP exists yet for this abstraction.
 async function _absOpenInEditorByName(name, methodName) {
     if (!name) return;
+    var _absOpenGuard = window._captureEditorWriteGuard(
+        'open abstraction source: ' + name);
 
     // Always open the full LUMP source so the user can edit all methods together.
     if (!window.LumpRegistry || window.LumpRegistry.getServerList().length === 0) {
@@ -6518,6 +6735,7 @@ async function _absOpenInEditorByName(name, methodName) {
         } catch (e) {}
     }
     const existing = window.LumpRegistry ? window.LumpRegistry.getServerList().find(l => l.abstraction === name) : null;
+    if (!_absOpenGuard.accepts()) return;
     if (!existing) {
         // No compiled LUMP — if the abstraction is in the registry, open a ready-to-fill
         // template so the user can start writing code immediately.
@@ -6750,11 +6968,10 @@ async function openLumpInEditor(token, options) {
     if (!(options && options.startupDefault === true)) {
         window._explicitEditorNavigationClaimed = true;
     }
-    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
-        window._clearAuthoritativeDraftBanner();
-    }
-    window._activeBuiltInKey = null;
-    if (window._savedLumpEditorMode) exitSavedLumpEditorMode();
+    // Capture the one shared navigation epoch before awaiting artifact data.
+    // Any document transition in any editor path invalidates this open.
+    var _openWriteGuard = window._captureEditorWriteGuard(
+        'open saved LUMP: ' + token);
     var _openRequestId = (window._savedLumpOpenRequestId || 0) + 1;
     window._savedLumpOpenRequestId = _openRequestId;
     var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
@@ -7064,7 +7281,8 @@ async function openLumpInEditor(token, options) {
                 'Exact saved-binary inspection is unavailable; no binary response was received.';
         }
     }
-    if (window._savedLumpOpenRequestId !== _openRequestId) return;
+    if (window._savedLumpOpenRequestId !== _openRequestId ||
+            !_openWriteGuard.accepts()) return;
 
     // ── Inspect embedded content from the immutable binary ──────────────────
     var _serverFrameSource = _wordsResponse &&
@@ -7357,8 +7575,21 @@ async function openLumpInEditor(token, options) {
                     }
                 }
 
+                var _dispatchCount = _methods ? _methods.length : 0;
+                var _dispatchLines = [];
+                for (var _di = 1; _di <= Math.max(1, _dispatchCount); _di++) {
+                    var _dispatchText = _lumpDispatchAnnotation(serverWords, _di, _dispatchCount);
+                    if (!_dispatchText) break;
+                    _dispatchLines.push('; [' + String(_di).padStart(4, '0') +
+                        '] 0x' + (serverWords[_di] >>> 0).toString(16).padStart(8, '0').toUpperCase() +
+                        '  ' + _dispatchText);
+                }
+                if (_dispatchLines.length) {
+                    disasmLines.splice(1, 0, ..._dispatchLines, '');
+                }
                 if (!structured && typeof ChurchAssembler !== 'undefined') {
-                    disasmLines.push.apply(disasmLines, ChurchAssembler.decompileWords(trimmed));
+                    disasmLines.push.apply(disasmLines, ChurchAssembler.decompileWords(
+                        trimmed.slice(_dispatchLines.length)));
                 }
             }
         }
@@ -7474,6 +7705,15 @@ async function openLumpInEditor(token, options) {
     // tab/example markers. Without this handoff the previous example (for
     // example Ada Note G) remains highlighted while a different LUMP's draft
     // is restored, making the draft appear to belong to the wrong document.
+    // Recheck immediately before the first destructive ownership operation.
+    // Promise callbacks and source inspection above may have yielded control.
+    if (window._savedLumpOpenRequestId !== _openRequestId ||
+            !_openWriteGuard.accepts()) return;
+    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+        window._clearAuthoritativeDraftBanner();
+    }
+    window._activeBuiltInKey = null;
+    if (window._savedLumpEditorMode) exitSavedLumpEditorMode();
     if (typeof activeUserTabId !== 'undefined' && activeUserTabId &&
             typeof userTabDirty !== 'undefined' && userTabDirty &&
             typeof saveActiveUserTab === 'function') {
@@ -7560,7 +7800,6 @@ async function openLumpInEditor(token, options) {
 
         // ── Check for a saved draft from a previous session ───────────────
         var _savedDraft = _draftLsGet(token);
-        if (_savedDraft !== null) _savedDraft = _migrateBfextBfinsSyntax(_savedDraft);
         var _hasDraft   = _sourceRestored && _savedDraft !== null &&
             _savedDraft.trim() !== '' && _savedDraft !== _recoveredSource;
         // Saved-LUMP source changes are programmatic, so they do not emit the
@@ -7600,6 +7839,7 @@ async function openLumpInEditor(token, options) {
             var _bannerRestoreBtn = _draftBanner.querySelector('#_lumpDraftBannerRestore');
             if (_bannerRestoreBtn) {
                 _bannerRestoreBtn.addEventListener('click', function() {
+                    window._advanceEditorNavigationEpoch('restore saved LUMP draft');
                     _setSavedLumpEditorSource(_savedDraft);
                     if (typeof saveEditorState === 'function') saveEditorState();
                     asmEd.classList.add('cm-editor-draft');
@@ -7614,6 +7854,7 @@ async function openLumpInEditor(token, options) {
             }
             if (_bannerDiscardBtn) {
                 _bannerDiscardBtn.addEventListener('click', function() {
+                    window._advanceEditorNavigationEpoch('discard saved LUMP draft');
                     _draftLsDel(token);
                     _setSavedLumpEditorSource(window._editorOriginalDisasm || '');
                     if (typeof saveEditorState === 'function') saveEditorState();
@@ -7746,6 +7987,7 @@ async function openLumpInEditor(token, options) {
     _discardBtn.setAttribute('data-tooltip', 'Discard Draft — Clear recovered edits, restore the last saved source, and return to the LUMP panel');
     _discardBtn.textContent = 'Discard Draft';
     _discardBtn.addEventListener('click', function() {
+        window._advanceEditorNavigationEpoch('discard saved LUMP edit');
         _draftLsDel(token);
         var _ed = document.getElementById('asmEditor');
         if (_ed) {

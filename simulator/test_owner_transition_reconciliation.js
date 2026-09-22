@@ -23,10 +23,21 @@ const elements = {
     _authoritativeDraftBanner: banner
 };
 const sandbox = {
-    window: {},
+    window: {
+        _editorNavigationEpoch: 0,
+        _advanceEditorNavigationEpoch() {
+            return ++this._editorNavigationEpoch;
+        },
+    },
     document: {
         getElementById(id) { return elements[id] || null; },
-        querySelectorAll() { return []; }
+        querySelectorAll() { return []; },
+        createElement() {
+            return {
+                remove() {},
+                querySelector() { return {}; }
+            };
+        }
     },
     localStorage: {
         getItem(k) { return storage.has(k) ? storage.get(k) : null; },
@@ -44,7 +55,11 @@ const sandbox = {
     clearPseudoEditContext() {},
     exitSavedLumpEditorMode() {},
     saveActiveUserTab() {},
-    updateLineNumbers() {}
+    updateLineNumbers() {},
+    _editorNavigationEpoch: 0,
+    _advanceEditorNavigationEpoch() {
+        return ++this._editorNavigationEpoch;
+    }
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
@@ -78,8 +93,8 @@ setImmediate(() => {
     assert.strictEqual(editor.value, 'draft');
     assert.strictEqual(storage.has('church_editor_owner_draft_v1:' +
         encodeURIComponent(JSON.stringify({ type: 'source', id: 'server/current.cloomc' }))), false);
-    // A response for the still-current owner persists its divergent draft
-    // under that owner, so a crash/reload can offer Restore Draft.
+    // A response for the still-current owner is advisory: it offers an
+    // explicit accept action without replacing or persisting over the draft.
     sandbox._editorSourceFilePath = 'server/current.cloomc';
     sandbox._reconcileAuthoritativeEditor(
         { type: 'source', id: 'server/current.cloomc' }, 'draft', editor);
@@ -87,9 +102,8 @@ setImmediate(() => {
     setImmediate(() => {
         const key = 'church_editor_owner_draft_v1:' +
             encodeURIComponent(JSON.stringify({ type: 'source', id: 'server/current.cloomc' }));
-        assert.strictEqual(JSON.parse(storage.get(key)), 'draft');
-        assert.strictEqual(sandbox._readEditorOwnerDraft(
-            { type: 'source', id: 'server/current.cloomc' }), 'draft');
+        assert.strictEqual(storage.has(key), false);
+        assert.strictEqual(editor.value, 'draft');
         console.log('Owner transition/reconciliation behavior: PASS');
     });
 });

@@ -1,6 +1,6 @@
 {
   "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
-  "image_sha256": "a2436b460c43a64e6942e3c9625b88f9b002dc1ff199f819c0b8c0e839598fb1",
+  "image_sha256": "c6dd4f2106e52d4c2c864518f8e6145c51905caa9cc8cda4624139cf81f0a740",
   "origin": "generated",
   "resident_bindings": [
     {
@@ -15,11 +15,11 @@
       "token": "4a000006"
     },
     {
-      "artifact_sha256": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
+      "artifact_sha256": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
       "boot_resident": true,
-      "filename": "WukongCallHome.1.74c8ff97.lump",
+      "filename": "WukongCallHome.1.ba8b8e76.lump",
       "load_policy": "Resident",
-      "localized_clist_sha256": "16473821db96fd35113b74199edec873e691821342837b53ef39434867d03e5c",
+      "localized_clist_sha256": "9490f2f2d477701107d2bb38df964a4b286eb808d9a5bfa243086954bdda006c",
       "ns_slot_policy": "static",
       "resident": true,
       "slot": 7,
@@ -38,8 +38,8 @@
     }
   ],
   "source_sha256": {
-    "manifest": "bb5e34ec345cd8455eaa097741ae657cede668ba4e82aa664eef9029fc0cd758",
-    "ns_state": "7009e55031340680ec614a84a3dc2a931d4c9111acc726c1d6de7a158929d15d"
+    "manifest": "c5f1467090ee2101b0a3d4f3113314a207d6d989841cdb27444c9b9b8d9a4423",
+    "ns_state": "2dc9936ce2661d1ab2fdb48803ab4620727071360d0b6175993229f993a31b9f"
   },
   "version": 1
 }

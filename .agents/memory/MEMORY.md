@@ -103,7 +103,7 @@
 - [Namespace header boot fallback](namespace-header-boot-fallback.md) — a missing selected dynamic boot slot must not crash reset; header falls back to a resident canonical entry
 - [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized
 - [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows
-- [Editor source authority](editor-source-authority.md) — persisted sources reopen from current authority; divergent browser buffers remain explicit recoverable drafts
+- [Editor source authority](editor-source-authority.md) — preserve owned drafts; authority refresh is advisory and replacement requires explicit preview and acceptance
 - [C-list row zero SELF boundary](clist-row-zero-advisory-self.md) — compiler output must establish SELF at row zero; immutable historical bytes remain inspectable without rewriting
 - [Latest saved LUMP selection](latest-saved-lump-selection.md) — live identity stays exact, while editor and Run choose the newest saved revision even if history-marked
 - [Trace-symbol preview isolation](trace-symbol-preview-isolation.md) — invalid factory artifacts must block hardware builds without taking down the web IDE’s fallback trace labels

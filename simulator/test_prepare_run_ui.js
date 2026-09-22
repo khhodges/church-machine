@@ -26,8 +26,7 @@ assert.match(runSource,
 assert.match(runSource,
     /Promise\.resolve\(\)\.then\(function\(\)[\s\S]*_queueIdleArtifactReconciliation\(window\._nsState\)/);
 assert.match(memory, /latest\.binaryHash \|\| ''/);
-assert.match(memory,
-    /state\.namespaceFingerprint[\s\S]*control\.attempted\[plan\.key\] = true/);
+assert.doesNotMatch(memory, /control\.attempted\[plan\.key\] = true/);
 
 function extract(name, endMarker) {
     const start = memory.indexOf('function ' + name);
@@ -401,11 +400,13 @@ function makeReconciliationContext(options) {
         'all preparation entry points share one in-flight mutation');
 
     const idle = makeReconciliationContext({ idle: true });
-    assert.strictEqual(idle.context._queueIdleArtifactReconciliation(idle.state), true);
-    await idle.context.window._idleArtifactReconciliation.inFlight;
+    const originalState = JSON.stringify(idle.state);
+    assert.strictEqual(idle.context._queueIdleArtifactReconciliation(idle.state), false);
     await new Promise(resolve => setImmediate(resolve));
-    assert.strictEqual(idle.calls.prepare, 1,
-        'idle stale assignment uses exactly one preparation transaction');
+    assert.strictEqual(idle.calls.prepare, 0,
+        'idle stale assignment never starts a preparation transaction');
+    assert.strictEqual(JSON.stringify(idle.state), originalState,
+        'idle observation preserves exact selection and freshness evidence');
     assert.strictEqual(idle.calls.execute, 0,
         'automatic reconciliation never executes the prepared artifact');
     assert.strictEqual(
@@ -425,14 +426,13 @@ function makeReconciliationContext(options) {
     assert.strictEqual(pinned.calls.prepare, 0);
 
     const failed = makeReconciliationContext({ idle: true, fail: true });
-    assert.strictEqual(failed.context._queueIdleArtifactReconciliation(failed.state), true);
-    await failed.context.window._idleArtifactReconciliation.inFlight.catch(() => {});
+    assert.strictEqual(failed.context._queueIdleArtifactReconciliation(failed.state), false);
     await new Promise(resolve => setImmediate(resolve));
     assert.strictEqual(
         failed.context._queueIdleArtifactReconciliation(failed.state), false,
         'the same CAS fingerprint and candidate identity is attempted once');
-    assert.strictEqual(failed.calls.prepare, 1,
-        'failure does not create a retry/render storm');
+    assert.strictEqual(failed.calls.prepare, 0,
+        'background refresh cannot attempt even a failing transaction');
 
     await assert.rejects(
         () => actionContext._openBootExecutionUpdate(),

@@ -378,17 +378,10 @@ console.log('\n--- T-ER06: Re-assembled binary uses BRANCH-encoded method table 
     }
 }
 
-// ── T-ER07: stale Post-Flash SelfTest editor snapshot migration ──────────────
-// The retired self-test used `TPERM CR0, X` before strict same-domain TPERM
-// was enforced. It must migrate to the current built-in test, while an
-// arbitrary user DOMAIN_PURITY probe remains untouched.
-console.log('\n--- T-ER07: legacy SelfTest editor-state migration ---');
+// ── T-ER07: startup source restoration is byte-preserving ────────────────────
+console.log('\n--- T-ER07: legacy SelfTest source remains user-owned ---');
 {
     const appRunSrc = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
-    const _LEGACY_SELFTEST_TPERM_MIGRATION_KEY = 'church_editor_legacy_selftest_tperm_migrated_v1';
-    const _LEGACY_SELFTEST_TPERM_BACKUP_KEY = 'church_editor_legacy_selftest_tperm_backup_v1';
-    const _isLegacyPostFlashSelftestTpermSource =
-        eval('(' + extractFunction(appRunSrc, '_isLegacyPostFlashSelftestTpermSource') + ')');
     const _readEditorDocumentState =
         eval('(' + extractFunction(appRunSrc, '_readEditorDocumentState') + ')');
     const _clearEditorOwnerMarkers =
@@ -413,36 +406,24 @@ console.log('\n--- T-ER07: legacy SelfTest editor-state migration ---');
     global._updateEditorCodeName = function() {};
     global.updateSavePseudoBtn = function() {};
     let selectedExample = null;
-    global.loadExample = function(name) {
-        selectedExample = name;
-        editor.value = '; Church Machine Post-Flash Exhaustive Self-Test v1.1\nTPERM CR0, E\n';
-    };
+    global.loadExample = function(name) { selectedExample = name; };
 
     const legacy = '; Church Machine Post-Flash Exhaustive Self-Test v1.0\nTPERM CR0, X\n';
     stored.church_editor_code = legacy;
+    const before = JSON.stringify(stored);
     loadEditorState();
-    check('T-ER07a: recognizes only the retired Post-Flash SelfTest signature',
-        _isLegacyPostFlashSelftestTpermSource(legacy) === true);
-    check('T-ER07b: stale SelfTest loads the current built-in example',
-        selectedExample === 'post_flash_selftest');
-    check('T-ER07c: stale SelfTest is backed up before replacement',
-        stored.church_editor_legacy_selftest_tperm_backup_v1 === legacy);
-    check('T-ER07d: migrated editor snapshot contains same-domain TPERM',
-        editor.value.includes('TPERM CR0, E') && !editor.value.includes('TPERM CR0, X'));
-    check('T-ER07e: migration is marked and persisted',
-        stored.church_editor_legacy_selftest_tperm_migrated_v1 === '1' &&
-        stored.church_editor_code === editor.value);
+    check('T-ER07a: retired SelfTest source is restored exactly',
+        editor.value === legacy);
+    check('T-ER07b: startup does not load a replacement example',
+        selectedExample === null);
+    check('T-ER07c: startup leaves persisted bytes unchanged',
+        JSON.stringify(stored) === before);
 
-    // A user-authored program must never be rewritten merely because it probes X.
     selectedExample = null;
     editor.value = '';
     stored.church_editor_code = '; User experiment\nTPERM CR0, X\n';
-    delete stored.church_editor_legacy_selftest_tperm_migrated_v1;
-    delete stored.church_editor_legacy_selftest_tperm_backup_v1;
     loadEditorState();
-    check('T-ER07f: ordinary user TPERM-X source is not recognized as legacy SelfTest',
-        _isLegacyPostFlashSelftestTpermSource(stored.church_editor_code) === false);
-    check('T-ER07g: ordinary user TPERM-X source is restored unchanged',
+    check('T-ER07d: ordinary user TPERM-X source is restored unchanged',
         selectedExample === null && editor.value === '; User experiment\nTPERM CR0, X\n');
 }
 

@@ -1663,6 +1663,7 @@ async function compileAndBuild(options) {
         token: window._editorOpenLumpToken ||
             (window.LumpRegistry ? window.LumpRegistry.getCurrent() : null),
         source: source,
+        epoch: window._editorNavigationEpoch || 0,
     };
     if (typeof window._showCompilerOutputBesideSource === 'function') {
         window._showCompilerOutputBesideSource();
@@ -3116,28 +3117,33 @@ function compileAndCreateAbstraction() {
 }
 
 function loadCLOOMCExample(name) {
-    if (typeof _beginBuiltInEditorTransition === 'function') {
-        _beginBuiltInEditorTransition();
-    }
-    window._activeBuiltInKey = 'cloomc_' + name;
-    if (typeof window.exitSavedLumpEditorMode === 'function') {
-        window.exitSavedLumpEditorMode();
-    }
-    // User explicitly chose an example — discard any wizard scaffold.
-    window._wizardScaffoldActive = false;
     const editor = document.getElementById('asmEditor');
     if (!editor) return;
-    _editorCREditActive = false;
-    _editorCREditCR = null;
-    _editorCREditNS = null;
-    _updateEditorPatchBar();
-    if (activeUserTabId && userTabDirty) saveActiveUserTab();
-    activeUserTabId = null;
-    userTabDirty = false;
-    // Loading a built-in example abandons any in-progress catalog edit context
-    if (typeof clearPseudoEditContext === 'function') clearPseudoEditContext();
-    renderUserTabs();
-    updateSaveUserTabBtn();
+    const writeGuard = window._captureEditorWriteGuard(
+        'select CLOOMC example: ' + name);
+    const stillOwnsRequest = () => writeGuard.accepts();
+    const claimExampleOwnership = () => {
+        if (typeof _beginBuiltInEditorTransition === 'function') {
+            _beginBuiltInEditorTransition();
+        }
+        window._activeBuiltInKey = 'cloomc_' + name;
+        if (typeof window.exitSavedLumpEditorMode === 'function') {
+            window.exitSavedLumpEditorMode();
+        }
+        // User explicitly chose an example — discard any wizard scaffold.
+        window._wizardScaffoldActive = false;
+        _editorCREditActive = false;
+        _editorCREditCR = null;
+        _editorCREditNS = null;
+        _updateEditorPatchBar();
+        if (activeUserTabId && userTabDirty) saveActiveUserTab();
+        activeUserTabId = null;
+        userTabDirty = false;
+        // Loading a built-in example abandons any in-progress catalog edit context.
+        if (typeof clearPseudoEditContext === 'function') clearPseudoEditContext();
+        renderUserTabs();
+        updateSaveUserTabBtn();
+    };
 
     const fileExamples  = _CLOOMC_FILE_EXAMPLES;
     const fileLanguages = _CLOOMC_FILE_LANGUAGES;
@@ -3145,6 +3151,10 @@ function loadCLOOMCExample(name) {
         fetch(fileExamples[name])
             .then(r => r.ok ? r.text() : Promise.reject(new Error('File not found')))
             .then(code => {
+                // Fetch completion is not navigation authority. Typing or
+                // selecting another document while it was pending wins.
+                if (!stillOwnsRequest()) return;
+                claimExampleOwnership();
                 editor.value = code;
                 // Track the server-side path so "Save File" can write back to it.
                 window._editorSourceFilePath = fileExamples[name].replace(/^\//, '');
@@ -5281,6 +5291,8 @@ abstraction DMABuffer {
     window._cloomcFileLanguages       = fileLanguages;
     window._cloomcExampleLanguages    = exampleLanguages;
 
+    if (!stillOwnsRequest()) return;
+    claimExampleOwnership();
     editor.value = examples[name] || examples['integer_ops'];
     updateLineNumbers();
     if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();

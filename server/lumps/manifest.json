@@ -701,7 +701,8 @@
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.658e6ba8.lump",
-    "lump_version": 1
+    "lump_version": 1,
+    "archived": true
   },
   {
     "token": "4a00000a",
@@ -1113,5 +1114,56 @@
       }
     ],
     "operation_id": "5039e5cd-59e6-4400-84c5-76593be20c95"
+  },
+  {
+    "token": "4a000007",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.ba8b8e76.lump",
+    "lump_version": 13,
+    "compiled_at": 1790092311.6340477,
+    "dot_name": "WukongCallHome",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "LED0",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [
+          "R",
+          "W"
+        ],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_TX",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [
+          "R",
+          "W"
+        ],
+        "nsIndex": 2
+      }
+    ],
+    "operation_id": "eeda69cc-ff3b-4735-baa3-6ccf681924bb"
   }
 ]

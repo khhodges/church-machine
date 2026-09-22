@@ -2709,6 +2709,11 @@ function _configuredBootLumpToken(bootCatalog, selectedSlot) {
 }
 
 function _openConfiguredBootLumpInDefaultEditor() {
+    // The scheduler is installed while scripts are still evaluating. It has no
+    // authority until local editor ownership has been hydrated from storage.
+    if (window._editorStateHydrated !== true) {
+        return Promise.resolve(false);
+    }
     if (window._explicitEditorNavigationClaimed === true) {
         return Promise.resolve(false);
     }
@@ -2721,24 +2726,27 @@ function _openConfiguredBootLumpInDefaultEditor() {
     // artifact fetch completes. The default opener is only a startup fallback;
     // it must not claim the editor after a newer navigation has begun.
     const editorOpenRequestId = window._savedLumpOpenRequestId || 0;
-    const editor = document.getElementById('asmEditor');
-    const hasEditorSource = !!(editor && editor.value && editor.value.trim());
+    const navigationEpoch = window._editorNavigationEpoch || 0;
+    const initialOwner = JSON.stringify(_currentEditorOwner());
     const hasUserTab = (typeof activeUserTabId !== 'undefined') && !!activeUserTabId;
     const hasProtectedEditorOwner =
         hasUserTab ||
         !!window._editorSourceFilePath ||
         !!window._pseudoEditContext ||
+        window._editorRestoredDocumentPresent === true ||
         window._editorStartupBufferDirty === true;
     const isDefaultCodeView =
         (typeof currentView !== 'undefined' && currentView === 'editor') ||
         window._startupDefaultView === 'editor';
-    if (!isDefaultCodeView || (hasEditorSource && hasProtectedEditorOwner) ||
+    if (!isDefaultCodeView || hasProtectedEditorOwner ||
             typeof openLumpInEditor !== 'function' || !window.LumpRegistry) {
         return Promise.resolve(false);
     }
 
     const openResolved = function(results) {
         if (window._explicitEditorNavigationClaimed === true ||
+                (window._editorNavigationEpoch || 0) !== navigationEpoch ||
+                JSON.stringify(_currentEditorOwner()) !== initialOwner ||
                 (window._savedLumpOpenRequestId || 0) !== editorOpenRequestId) {
             return false;
         }
@@ -2809,7 +2817,8 @@ function _scheduleConfiguredBootLumpOpen() {
     const tryOpen = function() {
         // Explicit navigation permanently ends startup-default authority for
         // this page load. Do not retry later and reclaim the editor.
-        if (window._explicitEditorNavigationClaimed === true) return;
+        if (window._explicitEditorNavigationClaimed === true ||
+                window._editorRestoredDocumentPresent === true) return;
         attempts += 1;
         let opening;
         try {
@@ -12532,6 +12541,10 @@ function _clearEditorOwnerDraft(owner) {
 function _clearAuthoritativeDraftBanner() {
     const banner = document.getElementById('_authoritativeDraftBanner');
     if (banner) {
+        if (banner._authorityInputEl && banner._authorityInputListener) {
+            banner._authorityInputEl.removeEventListener(
+                'input', banner._authorityInputListener);
+        }
         banner.querySelectorAll('button').forEach(function(button) {
             button.onclick = null;
         });
@@ -12539,6 +12552,76 @@ function _clearAuthoritativeDraftBanner() {
     }
 }
 window._clearAuthoritativeDraftBanner = _clearAuthoritativeDraftBanner;
+
+function _bindAuthoritativeBannerInvalidation(banner, editor) {
+    if (!banner || !editor || typeof editor.addEventListener !== 'function') {
+        return function() {};
+    }
+    var disposed = false;
+    var dispose = function() {
+        if (disposed) return;
+        disposed = true;
+        editor.removeEventListener('input', invalidate);
+        banner._authorityInputEl = null;
+        banner._authorityInputListener = null;
+    };
+    var invalidate = function() {
+        dispose();
+        banner.querySelectorAll('button').forEach(function(button) {
+            button.onclick = null;
+            button.disabled = true;
+        });
+        banner.remove();
+    };
+    banner._authorityInputEl = editor;
+    banner._authorityInputListener = invalidate;
+    editor.addEventListener('input', invalidate);
+    return dispose;
+}
+
+function _offerEditorOwnerDraftRestore(owner, draft, editor) {
+    if (!owner || !editor || typeof draft !== 'string' || draft === editor.value) return;
+    var capturedCode = editor.value;
+    var capturedOwner = { type: owner.type, id: owner.id || null };
+    var sameOwner = function() {
+        var current = _currentEditorOwner();
+        return current && current.type === capturedOwner.type &&
+            (current.id || null) === capturedOwner.id;
+    };
+    _clearAuthoritativeDraftBanner();
+    var banner = document.createElement('div');
+    banner.id = '_authoritativeDraftBanner';
+    banner.className = 'lump-draft-restore-banner';
+    banner._ownerDraftRecovery = true;
+    banner.innerHTML = '<strong>Recoverable local draft available</strong>' +
+        '<span class="lump-draft-copy">Keeping the current source until you choose.</span>' +
+        '<div class="authoritative-source-preview">' +
+        '<label>Current source</label><pre id="_authoritativeBefore"></pre>' +
+        '<label>Recoverable draft</label><pre id="_authoritativeAfter"></pre>' +
+        '</div>' +
+        '<button class="btn btn-sm" id="_authoritativeRestore">Restore Draft</button>' +
+        '<button class="btn btn-sm" id="_authoritativeKeep">Keep Current</button>';
+    banner.querySelector('#_authoritativeBefore').textContent = capturedCode;
+    banner.querySelector('#_authoritativeAfter').textContent = draft;
+    var parent = editor.parentNode && editor.parentNode.parentNode;
+    if (parent) parent.insertBefore(banner, editor.parentNode);
+    var dispose = _bindAuthoritativeBannerInvalidation(banner, editor);
+    banner.querySelector('#_authoritativeRestore').onclick = function() {
+        if (!sameOwner() || editor.value !== capturedCode) return;
+        window._advanceEditorNavigationEpoch('accept recovered owner draft');
+        dispose();
+        editor.value = draft;
+        _clearEditorOwnerDraft(capturedOwner);
+        saveEditorState();
+        banner.remove();
+        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+    };
+    banner.querySelector('#_authoritativeKeep').onclick = function() {
+        if (!sameOwner() || editor.value !== capturedCode) return;
+        dispose();
+        banner.remove();
+    };
+}
 
 function _clearEditorOwnerMarkers() {
     document.querySelectorAll('.example-tab').forEach(function(tab) {
@@ -12591,22 +12674,18 @@ function _readEditorDocumentState() {
     }
 }
 
-const _LEGACY_SELFTEST_TPERM_MIGRATION_KEY = 'church_editor_legacy_selftest_tperm_migrated_v1';
-const _LEGACY_SELFTEST_TPERM_BACKUP_KEY = 'church_editor_legacy_selftest_tperm_backup_v1';
-
-function _isLegacyPostFlashSelftestTpermSource(source) {
-    if (typeof source !== 'string') return false;
-    // This is deliberately limited to the retired built-in Post-Flash
-    // SelfTest. A user may legitimately write a DOMAIN_PURITY probe, so do not
-    // rewrite arbitrary programs that contain `TPERM CR0, X`.
-    const hasPostFlashHeader = /(?:^|\n)\s*;\s*Church Machine Post-Flash Exhaustive Self-Test\b/i.test(source);
-    const hasRetiredProbe = /(?:^|\n)\s*TPERM\s+CR0\s*,\s*X\b/im.test(source);
-    return hasPostFlashHeader && hasRetiredProbe;
-}
-
 function loadEditorState() {
     const editor = document.getElementById('asmEditor');
     const documentState = _readEditorDocumentState();
+    var _hasLegacyEditorSnapshot = false;
+    try {
+        _hasLegacyEditorSnapshot = localStorage.getItem('church_editor_code') !== null;
+    } catch (_) {}
+    // This durable marker is distinct from _restoredEditorOwnerPending, which
+    // is consumed by view setup. Startup default navigation must continue to
+    // respect even a generic or exactly-empty restored document afterward.
+    window._editorRestoredDocumentPresent =
+        !!documentState || _hasLegacyEditorSnapshot;
     window._restoredEditorOwnerPending = !!documentState;
     let restoredPersonalTab = null;
     if (documentState && documentState.owner.type === 'personal' &&
@@ -12624,54 +12703,18 @@ function loadEditorState() {
         // editor locked across a restore.
         editor.readOnly = false;
         if (editor.classList) editor.classList.remove('cm-editor-sealed');
-        try { localStorage.removeItem('cm_sealed_lump'); } catch (e) {}
         // A saved personal owner gets its content from the personal-tab store,
         // never from the generic editor snapshot. This keeps owner and buffer
         // consistent even if an older generic auto-save happened later.
-        const ownerDraft = documentState && (documentState.owner.type === 'source' ||
-            documentState.owner.type === 'example')
-            ? _readEditorOwnerDraft(documentState.owner) : null;
         let saved = restoredPersonalTab
             ? documentState.code
-            : (ownerDraft !== null ? ownerDraft
             : (documentState
-                ? (documentState.owner.type === 'lump' ? '' : documentState.code)
-                : localStorage.getItem('church_editor_code')));
-        if (saved) {
-            // Before strict same-domain TPERM enforcement, an old built-in
-            // Post-Flash SelfTest checked X against CR0's Church E-GT. That
-            // program now correctly traps DOMAIN_PURITY, but a saved browser
-            // snapshot can keep reloading it forever. Preserve the old source
-            // for audit/recovery, then install the current built-in SelfTest.
-            // This one-time migration intentionally does not touch user code.
-            if (_isLegacyPostFlashSelftestTpermSource(saved) &&
-                localStorage.getItem(_LEGACY_SELFTEST_TPERM_MIGRATION_KEY) !== '1') {
-                try {
-                    localStorage.setItem(_LEGACY_SELFTEST_TPERM_BACKUP_KEY, saved);
-                    loadExample('post_flash_selftest');
-                    if (editor.value) {
-                        saved = editor.value;
-                        localStorage.setItem('church_editor_code', saved);
-                        localStorage.setItem(_LEGACY_SELFTEST_TPERM_MIGRATION_KEY, '1');
-                    }
-                } catch (e) {
-                    // Restoration must remain non-destructive if the built-in
-                    // example cannot be loaded for any reason.
-                    editor.value = saved;
-                }
-            }
-            // Migrate stale pos=N, w=N BFEXT/BFINS operand syntax (from a since-fixed
-            // disassembler bug) to the current #N, #N syntax before restoring into the
-            // editor — otherwise a browser with an old cached snapshot re-surfaces the
-            // "recreated" compile-error bug on every reload. See _migrateBfextBfinsSyntax
-            // in app-lumps.js (also applied to lump-editor drafts and user tabs).
-            if (typeof window._migrateBfextBfinsSyntax === 'function') {
-                const migrated = window._migrateBfextBfinsSyntax(saved);
-                if (migrated !== saved) {
-                    saved = migrated;
-                    try { localStorage.setItem('church_editor_code', saved); } catch (e) {}
-                }
-            }
+                ? documentState.code
+                : localStorage.getItem('church_editor_code'));
+        // Restore is byte-preserving. Syntax upgrades and retired-example
+        // substitutions require an explicit user action; startup must not edit
+        // either the persisted source or the buffer reconstructed from it.
+        if (saved !== null && saved !== undefined) {
             editor.value = saved;
         }
     }
@@ -12723,13 +12766,13 @@ function loadEditorState() {
             }
         } else if (documentState && documentState.owner.type === 'lump') {
             window._editorSourceFilePath = null;
-            // A saved LUMP is an immutable canonical artifact, not a generic
-            // editor snapshot. Reopen it through the same authoritative path
-            // used by the catalog so source-unavailable/read-only state and
-            // compiled context are reconstructed after reload.
-            if (typeof openLumpInEditor === 'function' && documentState.owner.id) {
-                openLumpInEditor(documentState.owner.id);
-            } else if (typeof window._restoreSavedLumpEditorOwnership === 'function') {
+            // Restore ownership without starting an asynchronous canonical
+            // open. The atomic document snapshot is the user's current draft;
+            // a delayed LUMP fetch must not replace it merely because startup
+            // completed. The LUMP helper installs exact-token draft autosave,
+            // while an explicit catalog open remains the route to immutable
+            // binary/source inspection.
+            if (typeof window._restoreSavedLumpEditorOwnership === 'function') {
                 window._restoreSavedLumpEditorOwnership(documentState.owner.id, editor);
             } else {
                 window._editorOpenLumpToken = documentState.owner.id || null;
@@ -12744,6 +12787,17 @@ function loadEditorState() {
         }
         if (typeof renderUserTabs === 'function') renderUserTabs();
     }
+    if (documentState && editor && documentState.owner &&
+            (documentState.owner.type === 'source' ||
+             documentState.owner.type === 'example')) {
+        var _recoverableOwnerDraft = _readEditorOwnerDraft(documentState.owner);
+        if (_recoverableOwnerDraft !== null &&
+                _recoverableOwnerDraft !== editor.value) {
+            _offerEditorOwnerDraftRestore(
+                documentState.owner, _recoverableOwnerDraft, editor);
+        }
+    }
+    window._editorStateHydrated = true;
 }
 
 function _reconcileAuthoritativeEditor(owner, localCode, editor) {
@@ -12754,6 +12808,7 @@ function _reconcileAuthoritativeEditor(owner, localCode, editor) {
     // exact buffer that was present when reconciliation began.
     var capturedOwner = { type: owner.type, id: owner.id || null };
     var capturedCode = editor.value;
+    var capturedEpoch = window._editorNavigationEpoch || 0;
     if (capturedCode !== localCode) return;
     var sameOwner = function() {
         var current = _currentEditorOwner();
@@ -12773,53 +12828,61 @@ function _reconcileAuthoritativeEditor(owner, localCode, editor) {
         var clean = key.replace(/^cloomc_/, '');
         var sources = key.indexOf('cloomc_') === 0
             ? (window._cloomcExampleSources || {}) : (window._asmExampleSources || {});
-        if (sources[key] || sources[clean]) request = Promise.resolve(sources[key] || sources[clean]);
-        else {
-            try {
-                if (key.indexOf('cloomc_') === 0 && typeof loadCLOOMCExample === 'function') {
-                    loadCLOOMCExample(clean);
-                } else if (typeof loadExample === 'function') loadExample(key);
-            } catch (_) {}
-            sources = key.indexOf('cloomc_') === 0
-                ? (window._cloomcExampleSources || {}) : (window._asmExampleSources || {});
-            request = Promise.resolve(sources[key] || sources[clean] || '');
+        // Do not invoke an example loader to discover authority: loaders own
+        // the editor and would synchronously replace the restored draft. If
+        // the source catalog is not ready, reconciliation is simply deferred.
+        if (sources[key] || sources[clean]) {
+            request = Promise.resolve(sources[key] || sources[clean]);
         }
     }
     if (!request) return;
     request.then(function(authoritative) {
-        if (!sameOwner() || editor.value !== capturedCode) return;
+        if ((window._editorNavigationEpoch || 0) !== capturedEpoch ||
+                !sameOwner() || editor.value !== capturedCode) return;
         if (typeof authoritative !== 'string' || authoritative === localCode) return;
-        // The server/built-in is authoritative, exactly as a saved LUMP is.
-        // Keep the divergent browser snapshot only for the explicit Restore
-        // Draft action; never make stale cached text the default buffer.
-        var localDraft = localCode;
-        _writeEditorOwnerDraft(capturedOwner, localDraft);
-        editor.value = authoritative;
-        saveEditorState();
+        // Reconciliation is advisory. A delayed authority response must never
+        // rewrite the restored/user-owned buffer or its persisted bytes.
         var banner = document.getElementById('_authoritativeDraftBanner');
-        if (banner) banner.remove();
+        // A persisted replaced draft is the user's only recovery affordance;
+        // an authority refresh must not hide that offer.
+        if (banner && banner._ownerDraftRecovery === true) return;
+        _clearAuthoritativeDraftBanner();
         banner = document.createElement('div');
         banner.id = '_authoritativeDraftBanner';
         banner.className = 'lump-draft-restore-banner';
         banner.innerHTML = '<strong>Local draft differs from latest source</strong>' +
-            '<span class="lump-draft-copy">Showing the latest authoritative source.</span>' +
-            '<button class="btn btn-sm" id="_authoritativeRestore">Restore Draft</button>' +
-            '<button class="btn btn-sm" id="_authoritativeDiscard">Discard Draft</button>';
+            '<span class="lump-draft-copy">Keeping your restored draft.</span>' +
+            '<div class="authoritative-source-preview">' +
+            '<label>Current draft (before)</label>' +
+            '<pre id="_authoritativeBefore"></pre>' +
+            '<label>Latest source (after)</label>' +
+            '<pre id="_authoritativeAfter"></pre>' +
+            '</div>' +
+            '<button class="btn btn-sm" id="_authoritativeAccept">Accept Latest Source</button>' +
+            '<button class="btn btn-sm" id="_authoritativeKeep">Keep Draft</button>';
+        banner.querySelector('#_authoritativeBefore').textContent = capturedCode;
+        banner.querySelector('#_authoritativeAfter').textContent = authoritative;
         var parent = editor.parentNode && editor.parentNode.parentNode;
         if (parent) parent.insertBefore(banner, editor.parentNode);
-        banner.querySelector('#_authoritativeRestore').onclick = function() {
-            if (!sameOwner()) return;
-            editor.value = localDraft;
-            _clearEditorOwnerDraft(capturedOwner);
+        var dispose = _bindAuthoritativeBannerInvalidation(banner, editor);
+        banner.querySelector('#_authoritativeAccept').onclick = function() {
+            // Acceptance belongs to the exact bytes previewed above. An owner
+            // transition or even one intervening edit invalidates this offer.
+            if ((window._editorNavigationEpoch || 0) !== capturedEpoch ||
+                    !sameOwner() || editor.value !== capturedCode) return;
+            // Preserve the bytes about to be replaced under their owner before
+            // committing the explicitly accepted authoritative source.
+            _writeEditorOwnerDraft(capturedOwner, capturedCode);
+            window._advanceEditorNavigationEpoch('accept authoritative source');
+            dispose();
+            editor.value = authoritative;
             saveEditorState();
             banner.remove();
             if (typeof updateLineNumbers === 'function') updateLineNumbers();
         };
-        banner.querySelector('#_authoritativeDiscard').onclick = function() {
+        banner.querySelector('#_authoritativeKeep').onclick = function() {
             if (!sameOwner()) return;
-            editor.value = authoritative;
-            _clearEditorOwnerDraft(capturedOwner);
-            saveEditorState();
+            dispose();
             banner.remove();
         };
     }).catch(function() {
@@ -13086,6 +13149,7 @@ function _captureLumpSaveSnapshot() {
         sourceText: sourceText,
         editorSourceText: editorSourceText,
         sourceMatchesEditor: sourceText === editorSourceText,
+        editorNavigationEpoch: window._editorNavigationEpoch || 0,
         editorBaseIdentity: editorBaseIdentity,
         language: entry && entry.sources && entry.sources.server
             ? (entry.sources.server.language || '') : '',
@@ -16139,6 +16203,7 @@ function startLesson(subjectKey, lessonTitle) {
         return;
     }
 
+    window._advanceEditorNavigationEpoch('open lesson source');
     switchView('editor');
     const langMap = { english: 'english', javascript: 'javascript', haskell: 'haskell', symbolic: 'symbolic', lambda: 'lambda', assembly: 'assembly' };
     const sel = document.getElementById('langSelector');
@@ -16554,6 +16619,12 @@ async function confirmSaveToNamespace() {
             _staleSnapshotReason = 'the compiled registry entry changed after the save dialog opened';
         }
         const _liveEditor = document.getElementById('asmEditor');
+        if (!_staleSnapshotReason &&
+                Number.isInteger(_saveSnapshot.editorNavigationEpoch) &&
+                (window._editorNavigationEpoch || 0) !==
+                    _saveSnapshot.editorNavigationEpoch) {
+            _staleSnapshotReason = 'the editor document changed after the save dialog opened';
+        }
         if (!_staleSnapshotReason &&
                 typeof _saveSnapshot.editorSourceText === 'string' &&
                 _liveEditor &&
@@ -17067,7 +17138,15 @@ async function confirmSaveToNamespace() {
                         ns_slot: idx,
                         language: _svLang,
                         capabilities: _caps
-                        }, window._editorOpenLumpToken || null);
+                        }, {
+                            token: window._editorOpenLumpToken || null,
+                            source: _saveSnapshot &&
+                                typeof _saveSnapshot.editorSourceText === 'string'
+                                ? _saveSnapshot.editorSourceText : null,
+                            epoch: _saveSnapshot &&
+                                Number.isInteger(_saveSnapshot.editorNavigationEpoch)
+                                ? _saveSnapshot.editorNavigationEpoch : null,
+                        });
                     } else {
                         window.LumpRegistry.registerFromServer([{
                             token: resp.token,

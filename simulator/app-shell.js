@@ -440,6 +440,9 @@ window.ExecutionIdentity = {
 
 document.addEventListener('input', function(e) {
     if (e.target && e.target.id === 'asmEditor') {
+        if (typeof window._advanceEditorNavigationEpoch === 'function') {
+            window._advanceEditorNavigationEpoch('editor input');
+        }
         _executionIdentityUpdateEditor(e.target.value);
     }
 });
@@ -475,6 +478,38 @@ let userTabDirty = false;
 // work typed while the image is loading.
 window._editorStartupBufferDirty = false;
 
+// One epoch orders every document selection and async editor writer. It is
+// deliberately independent of owner/text so navigating A -> B -> A (ABA)
+// invalidates an older A request even when the final bytes are identical.
+window._advanceEditorNavigationEpoch = function(reason) {
+    window._editorNavigationEpoch = (window._editorNavigationEpoch || 0) + 1;
+    window._editorNavigationReason = reason || 'document transition';
+    return window._editorNavigationEpoch;
+};
+
+// Shared compare-and-swap guard for asynchronous editor writers. Capture is
+// itself an explicit navigation intent and synchronously advances the epoch.
+window._captureEditorWriteGuard = function(reason) {
+    var editor = document.getElementById('asmEditor');
+    var source = editor ? editor.value : null;
+    var owner = typeof _currentEditorOwner === 'function'
+        ? _currentEditorOwner() : null;
+    var epoch = window._advanceEditorNavigationEpoch(
+        reason || 'asynchronous document selection');
+    return {
+        epoch: epoch,
+        accepts: function() {
+            if (!editor || document.getElementById('asmEditor') !== editor ||
+                    window._editorNavigationEpoch !== epoch ||
+                    editor.value !== source) return false;
+            if (!owner || typeof _currentEditorOwner !== 'function') return true;
+            var current = _currentEditorOwner();
+            return !!current && current.type === owner.type &&
+                (current.id || null) === (owner.id || null);
+        }
+    };
+};
+
 function loadUserTabs() {
     try {
         const raw = localStorage.getItem('church_user_tabs');
@@ -492,18 +527,9 @@ function loadUserTabs() {
             }
         }
         if (historyLabelsChanged) saveUserTabsToStorage();
-        // Migrate any stale BFEXT/BFINS `pos=N, w=N` syntax captured before the
-        // disassembler fix, so re-opened tabs never show unparseable code.
-        if (typeof window._migrateBfextBfinsSyntax === 'function') {
-            let _migratedAny = false;
-            for (const t of userTabs) {
-                if (t && typeof t.code === 'string') {
-                    const migrated = window._migrateBfextBfinsSyntax(t.code);
-                    if (migrated !== t.code) { t.code = migrated; _migratedAny = true; }
-                }
-            }
-            if (_migratedAny) saveUserTabsToStorage();
-        }
+        // Tab source is user-owned. Syntax corrections, when offered by the
+        // editor, require an explicit preview and acceptance; startup preserves
+        // every code string byte-for-byte.
     } catch (e) { userTabs = []; }
 }
 
@@ -537,6 +563,7 @@ function deleteUserTab(id) {
     _openFileCache = null;
     saveUserTabsToStorage();
     if (activeUserTabId === id) {
+        window._advanceEditorNavigationEpoch('delete active personal tab');
         activeUserTabId = null;
         userTabDirty = false;
         _updateEditorCodeName('');
@@ -560,6 +587,7 @@ function selectUserTab(id) {
     }
     const tab = userTabs.find(t => t.id === id);
     if (!tab) return;
+    window._advanceEditorNavigationEpoch('select personal tab');
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Program switched; assemble it to establish a new identity');
     if (typeof window.exitSavedLumpEditorMode === 'function') {
         window.exitSavedLumpEditorMode();
@@ -760,6 +788,7 @@ var _openFileTrap = null;
 // All built-in loaders use this handoff so a server file, saved LUMP, or
 // personal tab can never leak into the next built-in's Save File destination.
 function _beginBuiltInEditorTransition() {
+    window._advanceEditorNavigationEpoch('select built-in example');
     if (typeof window._clearAuthoritativeDraftBanner === 'function') {
         window._clearAuthoritativeDraftBanner();
     }
@@ -1001,12 +1030,7 @@ function _escHtml(s) {
 
 function openSourceFile(path) {
     closeOpenFileDialog();
-    if (typeof window._clearAuthoritativeDraftBanner === 'function') {
-        window._clearAuthoritativeDraftBanner();
-    }
-    if (typeof window.exitSavedLumpEditorMode === 'function') {
-        window.exitSavedLumpEditorMode();
-    }
+    var writeGuard = window._captureEditorWriteGuard('open source file: ' + path);
     fetch('/' + path)
         .then(function(r) {
             if (!r.ok) return _actionableResponseError(r, 'Open the source file', {
@@ -1017,7 +1041,13 @@ function openSourceFile(path) {
         })
         .then(function(code) {
             var ed = document.getElementById('asmEditor');
-            if (!ed) return;
+            if (!ed || !writeGuard.accepts()) return;
+            if (typeof window._clearAuthoritativeDraftBanner === 'function') {
+                window._clearAuthoritativeDraftBanner();
+            }
+            if (typeof window.exitSavedLumpEditorMode === 'function') {
+                window.exitSavedLumpEditorMode();
+            }
             ed.readOnly = false;
             if (ed.classList) ed.classList.remove('cm-editor-sealed');
             // Save active user tab if dirty before clobbering
@@ -1078,6 +1108,8 @@ function _saveSourceFileToPath(path, callback) {
         if (callback) callback('Editor is empty');
         return;
     }
+    const writeGuard = window._captureEditorWriteGuard(
+        'save source file ownership: ' + path);
     fetch('/api/source-file/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1086,7 +1118,10 @@ function _saveSourceFileToPath(path, callback) {
     .then(function(r) { return r.json(); })
     .then(function(j) {
         if (j.ok) {
-            window._editorSourceFilePath = j.path;
+            // The server result still belongs to the frozen save operation,
+            // but a later document selection owns the live editor. Do not
+            // attach that later document to this completed path.
+            if (writeGuard.accepts()) window._editorSourceFilePath = j.path;
             _openFileCache = null;  // bust picker cache so new file appears on next open
             var outEl = document.getElementById('assemblyOutput');
             if (outEl) {
