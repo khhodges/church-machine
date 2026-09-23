@@ -25661,14 +25661,18 @@ def _release_lump_transition_request_locks(_exception=None):
 
 try:
     from change_confirmation import (
+        describe_boot_image_generation as _describe_boot_image_generation,
         describe_boot_config_change as _describe_boot_config_change,
         describe_lump_save_plan as _describe_lump_save_plan,
+        resolve_saved_lump_versions as _resolve_saved_lump_versions,
         install as _install_change_confirmation,
     )
 except ImportError:
     from server.change_confirmation import (
+        describe_boot_image_generation as _describe_boot_image_generation,
         describe_boot_config_change as _describe_boot_config_change,
         describe_lump_save_plan as _describe_lump_save_plan,
+        resolve_saved_lump_versions as _resolve_saved_lump_versions,
         install as _install_change_confirmation,
     )
 
@@ -25751,6 +25755,57 @@ def _describe_protected_change(payload):
         except (OSError, ValueError, TypeError, KeyError) as exc:
             return ["Authoritative boot review unavailable (" + type(exc).__name__ + ").",
                     "Pet names and saved versions could not be resolved. Reject; do not approve from hashes alone."]
+    if request.path == "/api/boot-image/generate":
+        try:
+            rows, current_fingerprint = _read_authoritative_namespace_rows()
+            saved_entry_slot = _authoritative_boot_slot()
+            requested_slot = payload.get("entrySlot", saved_entry_slot)
+            if (isinstance(requested_slot, bool)
+                    or not isinstance(requested_slot, int)
+                    or requested_slot != saved_entry_slot):
+                raise ValueError(
+                    "entrySlot does not match the authoritative Namespace boot marker")
+            prepare_run = payload.get("prepareRun") is True
+            prepared = [dict(row) for row in rows]
+            if prepare_run:
+                expected_fingerprint = _expected_namespace_fingerprint(payload)
+                if expected_fingerprint is None:
+                    raise ValueError(
+                        "namespaceFingerprint is required for atomic Prepare/Run")
+                if expected_fingerprint != current_fingerprint:
+                    raise ValueError(
+                        "namespaceFingerprint does not match authoritative Namespace state")
+                prepared, _ = _prepare_run_candidates(
+                    rows, LUMPS_DIR,
+                    boot_pin=payload.get("artifactPin"),
+                    boot_pin_supplied="artifactPin" in payload,
+                    artifact_pins=payload.get("artifactPins"))
+            with open(LUMPS_MANIFEST_PATH, encoding="utf-8") as stream:
+                manifest = json.load(stream)
+            if not isinstance(manifest, list):
+                raise ValueError("Unexpected saved catalogue shape")
+            def saved_binary_hash(record):
+                filename = record.get("filename")
+                if not isinstance(filename, str) or os.path.basename(filename) != filename:
+                    return None
+                binary_path = Path(LUMPS_DIR) / filename
+                if binary_path.is_symlink() or not binary_path.is_file():
+                    return None
+                return hashlib.sha256(binary_path.read_bytes()).hexdigest()
+            reviewed_rows = _resolve_saved_lump_versions(
+                rows, manifest, saved_binary_hash)
+            reviewed_prepared = _resolve_saved_lump_versions(
+                prepared, manifest, saved_binary_hash)
+            return _describe_boot_image_generation(
+                reviewed_rows, reviewed_prepared, saved_entry_slot,
+                prepare_run=prepare_run)
+        except (OSError, ValueError, TypeError, KeyError,
+                json.JSONDecodeError) as exc:
+            return [
+                "Boot-image operation unavailable (" + type(exc).__name__ + ").",
+                "Namespace selections and saved versions could not be resolved. "
+                "Reject; existing route validation still applies.",
+            ]
     before = None
     after = None
     if request.path == "/api/source-file/save":

@@ -5441,6 +5441,7 @@ window._nsTableSave = async function(btn) {
                     body: JSON.stringify({}),
                 });
                 await _actionableJsonResponse(_genResp, 'Generate the image for Namespace save', {
+                    allowReviewCancellation: true,
                     dataChanged: false,
                     nextAction: 'Review the boot configuration, then click Save for next build again.',
                 });

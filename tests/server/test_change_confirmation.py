@@ -12,15 +12,112 @@ from flask import Flask
 
 from server.change_confirmation import (
     IntentStore,
+    describe_boot_image_generation,
     describe_lump_save_plan,
     install,
     protected_request,
+    resolve_saved_lump_versions,
 )
 
 
 def _consume_shared(args):
     path, token, binding = args
     return IntentStore(path).consume(token, binding)
+
+
+def test_boot_image_review_reports_generation_without_namespace_promotion():
+    rows = [
+        {
+            "slot": 7, "name": "Church.Entry", "filename": "entry-v3.lump",
+            "_review_saved_version": 3, "type": "LUMP", "boot": True,
+        },
+        {"slot": 8, "name": "UART", "type": "Device"},
+    ]
+
+    review = "\n".join(describe_boot_image_generation(
+        rows, [dict(row) for row in rows], 7))
+
+    assert "Replace boot-image.bin and its provenance" in review
+    assert "Namespace image boot target: NS[7]" in review
+    assert "Namespace state rows: unchanged." in review
+    assert "Saved LUMP catalogue revisions: unchanged" in review
+    assert "NS[7] Church.Entry: entry-v3.lump; saved version 3" in review
+    assert "selection unchanged" in review
+    assert "update source" not in review
+
+
+def test_boot_image_prepare_review_reports_resolved_namespace_revision_change():
+    before = [{
+        "slot": 4, "name": "Demo.Main", "filename": "demo-v1.lump",
+        "_review_saved_version": 1, "type": "LUMP", "boot": True,
+    }]
+    after = [{
+        "slot": 4, "name": "Demo.Main", "filename": "demo-v2.lump",
+        "_review_saved_version": 2, "type": "LUMP", "boot": True,
+        "binary_hash": "a" * 64,
+    }]
+
+    review = "\n".join(describe_boot_image_generation(
+        before, after, 4, prepare_run=True))
+
+    assert "Atomically update resolved Namespace artifact bindings" in review
+    assert "Namespace state rows updated by Prepare/Run: NS[4]" in review
+    assert "demo-v1.lump saved version 1 → demo-v2.lump saved version 2" in review
+    # Selecting a different saved revision does not rewrite that revision.
+    assert "Saved LUMP catalogue revisions: unchanged" in review
+
+
+def test_boot_image_review_does_not_claim_unchanged_revisions_without_evidence():
+    review = "\n".join(describe_boot_image_generation(
+        [{"slot": 1}], "unresolved", 1))
+
+    assert "could not be resolved" in review
+    assert "revision effects unavailable" in review
+    assert "revisions: unchanged" not in review
+
+
+def test_boot_image_saved_version_requires_exact_catalogue_match_not_issue_number():
+    rows = [{
+        "slot": 2, "name": "Worker", "filename": "worker.lump",
+        "token": "0x42", "binary_hash": "a" * 64, "issue_n": 99,
+    }]
+    manifest = [{
+        "filename": "worker.lump", "token": "00000042",
+        "binary_hash": "a" * 64, "lump_version": 7,
+    }]
+    resolved = resolve_saved_lump_versions(rows, manifest)
+    assert resolved[0]["_review_saved_version"] == 7
+
+    unresolved = resolve_saved_lump_versions(
+        rows, [{**manifest[0], "binary_hash": "b" * 64}])
+    review = "\n".join(describe_boot_image_generation(
+        unresolved, unresolved, 2))
+    assert "saved version unresolved" in review
+    assert "saved version 99" not in review
+
+
+def test_boot_image_confirmation_uses_narrow_route_reason(tmp_path):
+    app = Flask(__name__)
+    app.secret_key = "isolated-only"
+    install(
+        app, lambda: [], nullcontext,
+        describe=lambda payload: ["Namespace state rows: unchanged."],
+        store_path=tmp_path / "reviews.sqlite")
+
+    @app.post("/api/boot-image/generate")
+    def generate():
+        return {"ok": True}
+
+    response = app.test_client().post(
+        "/api/boot-image/generate", json={"entrySlot": 3})
+
+    assert response.status_code == 428
+    confirmation = response.json["change_confirmation"]
+    assert confirmation["title"] == "Review Namespace image generation"
+    assert "Namespace image" in confirmation["reason"]
+    assert "boot image/provenance" in confirmation["reason"]
+    assert "may update source" not in confirmation["reason"]
+    assert "Namespace state rows: unchanged." in confirmation["changes"]
 
 
 @pytest.mark.parametrize("index,reason", [

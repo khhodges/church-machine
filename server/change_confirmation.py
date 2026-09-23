@@ -42,6 +42,140 @@ def describe_lump_save_plan(plan):
     return lines
 
 
+def resolve_saved_lump_versions(rows, manifest, binary_hash_for=None):
+    """Attach a review-only saved version after an exact catalogue match."""
+    if not isinstance(rows, list) or not isinstance(manifest, list):
+        raise ValueError("Namespace rows and saved catalogue must be lists")
+
+    def normalized_token(raw):
+        try:
+            return f"{int(str(raw).removeprefix('0x'), 16):08x}"
+        except (TypeError, ValueError):
+            return None
+
+    resolved = []
+    for row in rows:
+        item = dict(row) if isinstance(row, dict) else row
+        if not isinstance(item, dict) or not item.get("filename"):
+            resolved.append(item)
+            continue
+        expected_hash = item.get("binary_hash") or item.get("binaryHash")
+        if expected_hash is None and binary_hash_for is not None:
+            expected_hash = binary_hash_for(item)
+        expected_token = normalized_token(item.get("token") or item.get("cache_token"))
+
+        def exact(record):
+            if not isinstance(record, dict):
+                return False
+            if record.get("filename") != item["filename"]:
+                return False
+            if expected_token is not None and normalized_token(record.get("token")) != expected_token:
+                return False
+            if expected_hash:
+                actual_hash = record.get("binary_hash") or record.get("binaryHash")
+                if actual_hash is None and binary_hash_for is not None:
+                    actual_hash = binary_hash_for(record)
+                if not isinstance(actual_hash, str) or actual_hash.lower() != str(expected_hash).lower():
+                    return False
+            return True
+
+        matches = [record for record in manifest if exact(record)]
+        if len(matches) == 1:
+            version = matches[0].get("lump_version")
+            if (isinstance(version, int) and not isinstance(version, bool)
+                    and version >= 0):
+                item["_review_saved_version"] = version
+        resolved.append(item)
+    return resolved
+
+
+def describe_boot_image_generation(before_rows, after_rows, entry_slot,
+                                   prepare_run=False):
+    """Describe the persisted effects of boot-image generation.
+
+    ``after_rows`` must come from the same Prepare/Run candidate resolver used
+    by the route.  This formatter deliberately does not infer "latest"
+    revisions or treat Namespace sequence numbers as saved LUMP versions.
+    """
+    if (not isinstance(before_rows, list) or not isinstance(after_rows, list)
+            or len(before_rows) != len(after_rows)):
+        return [
+            "Boot-image operation unavailable: authoritative Namespace candidates could not be resolved.",
+            "Saved LUMP catalogue revision effects unavailable; reject and review again.",
+        ]
+
+    operation = (
+        "Atomically update resolved Namespace artifact bindings, then replace "
+        "boot-image.bin and its provenance with a generated Namespace image."
+        if prepare_run else
+        "Replace boot-image.bin and its provenance with a generated Namespace "
+        "image; authoritative Namespace rows are not changed."
+    )
+    lines = [
+        "Boot image generation review.",
+        operation,
+        f"Namespace image boot target: NS[{entry_slot}].",
+    ]
+
+    changed_slots = set()
+    for before, after in zip(before_rows, after_rows):
+        if before != after and isinstance(after, dict):
+            changed_slots.add(str(after.get("slot", "unresolved")))
+
+    if prepare_run:
+        if changed_slots:
+            lines.append(
+                "Namespace state rows updated by Prepare/Run: "
+                + ", ".join(f"NS[{slot}]" for slot in sorted(
+                    changed_slots, key=lambda value: (
+                        not value.isdigit(), int(value) if value.isdigit() else value)))
+                + ".")
+        else:
+            lines.append("Namespace state rows: unchanged (all resolved bindings already match).")
+    else:
+        lines.append("Namespace state rows: unchanged.")
+
+    # This endpoint never publishes, rewrites, or deletes catalogue revisions.
+    # State whether that is true only after authoritative candidate resolution.
+    lines.append(
+        "Saved LUMP catalogue revisions: unchanged; generation does not create, "
+        "rewrite, or delete a saved revision.")
+    lines.append("Resolved Namespace artifact selections considered by generation:")
+
+    represented = 0
+    for before, after in zip(before_rows, after_rows):
+        if not isinstance(after, dict) or not after.get("filename"):
+            continue
+        if (after.get("archived") is True or after.get("symbolic") is True
+                or after.get("type") in ("Device", "Thread", "Namespace")):
+            continue
+        represented += 1
+        slot = after.get("slot", "unresolved")
+        name = after.get("name") or "(name unresolved)"
+        filename = after.get("filename") or "(file unresolved)"
+        revision = after.get("_review_saved_version")
+        version = (str(revision) if revision is not None
+                   and not isinstance(revision, bool) else "unresolved")
+        prior_revision = (before.get("_review_saved_version")
+                          if isinstance(before, dict) else None)
+        prior_filename = before.get("filename") if isinstance(before, dict) else None
+        if (prior_filename, prior_revision) == (filename, revision):
+            selection = "selection unchanged"
+        else:
+            prior_name = prior_filename or "(file unresolved)"
+            prior_version = ("unresolved" if prior_revision is None
+                             or isinstance(prior_revision, bool)
+                             else str(prior_revision))
+            selection = (
+                f"selection {prior_name} saved version {prior_version} → "
+                f"{filename} saved version {version}")
+        lines.append(
+            f"NS[{slot}] {name}: {filename}; saved version {version}; {selection}.")
+    if not represented:
+        lines.append("No selected saved artifact identity could be resolved.")
+    return lines
+
+
 def describe_boot_config_change(before, after, rows, manifest, prepare=False,
                                 binary_hash_for=None):
     """Describe normalized config changes using exact saved catalogue evidence.
@@ -341,6 +475,13 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
             reason = ("Publish the reviewed LUMP and related repository/Namespace state. "
                       "Existing admission checks still apply. Save processing may add a "
                       "required SELF C-list entry and padding; reject if you do not approve that transformation.")
+        if request.path == "/api/boot-image/generate":
+            reason = ("Generate the reviewed Namespace image and replace the committed "
+                      "boot image/provenance. Review the exact Namespace and selected "
+                      "saved-revision effects below.")
+            title = "Review Namespace image generation"
+        else:
+            title = "Review protected change"
         try:
             intent = store.issue(binding)
         except RuntimeError as exc:
@@ -348,7 +489,7 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
         return jsonify(
             error="change_confirmation_required", committed=False,
             change_confirmation={
-                "id": intent, "title": "Review protected change",
+                "id": intent, "title": title,
                 "reason": reason,
                 "changes": [f"{request.method} {request.path}"] + target + [
                     f"Exact request SHA-256: {body_hash}",

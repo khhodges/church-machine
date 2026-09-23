@@ -82,7 +82,7 @@ async function waitForDialog(h) {
     const catchStart = memory.indexOf("        if (err.code === 'change_rejected') {",
         memory.indexOf("const data = await _actionableJsonResponse(resp, 'Save the Namespace'"));
     const cancellationCatch = memory.slice(catchStart, memory.indexOf('        try {', catchStart));
-    for (const endpoint of ['/api/boot-image/save-ns', '/api/boot-config']) {
+    for (const endpoint of ['/api/boot-image/save-ns', '/api/boot-config', '/api/boot-image/generate']) {
         for (const action of ['reject', 'escape', 'close']) {
             h = harness([challenge()]);
             pending = h.window.fetch(endpoint, {method: 'POST', body: '{}'});
@@ -118,6 +118,7 @@ async function waitForDialog(h) {
     }), {status: 409}), 'Save the Namespace', {allowReviewCancellation: true}),
     error => error.code !== 'change_rejected' && /failed \(HTTP 409\)/.test(error.message));
     assert(memory.includes("response, 'Save the Namespace build configuration', {\n                allowReviewCancellation: true"));
+    assert(memory.includes("_genResp, 'Generate the image for Namespace save', {\n                    allowReviewCancellation: true"));
     assert(memory.includes("resp, 'Save the Namespace', {\n            allowReviewCancellation: true"));
     const prefetchSource = memory.slice(
         memory.indexOf('    window._nsPrefetchSaveClick = async function(btn) {'),
