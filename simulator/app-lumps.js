@@ -1845,7 +1845,7 @@ function _syncSavedLumpIdentityVisibility() {
     }
 }
 
-function _renderSavedLumpIdentityPanel(lump, lookupToken) {
+function _renderSavedLumpIdentityPanel(lump, lookupToken, savedWords) {
     var panel = document.getElementById('savedLumpIdentityPanel');
     if (!panel) return;
     var identity = _verifiedSavedLumpIdentity(lump, lookupToken);
@@ -1896,12 +1896,35 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken) {
         (_identityVerified ? 'Verified artifact identity' :
             'Artifact identity — provenance unverified') + '</div>' +
         _identityRows;
+    _renderSavedLumpWordUsage(panel, savedWords);
     if (typeof window.renderBuildHandoff === 'function') {
         window.renderBuildHandoff(panel, lump, lookupToken, _identityVerified);
     }
 }
 
-function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection) {
+function _renderSavedLumpWordUsage(panel, savedWords) {
+    var row = document.createElement('div');
+    row.className = 'saved-lump-identity-row';
+    row.setAttribute('data-testid', 'saved-lump-word-usage');
+    var label = document.createElement('span');
+    label.textContent = 'Saved word usage';
+    var value = document.createElement('code');
+    value.textContent = savedWords ? 'Reading exact saved allocation…' : 'word usage unavailable';
+    row.appendChild(label);
+    row.appendChild(value);
+    panel.appendChild(row);
+    if (!savedWords) return;
+    _getSavedLumpWordUsageSummary(savedWords).then(function(summary) {
+        // An earlier decode must never annotate a later selected document.
+        if (!panel.contains(row)) return;
+        value.textContent = summary;
+        value.title = 'Exact saved binary; independent of editor changes and unsaved compilation.';
+    }).catch(function() {
+        if (panel.contains(row)) value.textContent = 'word usage unavailable';
+    });
+}
+
+function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection, savedWords) {
     window._savedLumpEditorMode = true;
     window._compiledCandidateEditorMode = false;
     window._editorSavedBinaryReceipt = lump && lump.filename && lump.binary_hash
@@ -1923,7 +1946,7 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
         if (el) el.style.display = 'none';
     });
     if (typeof _renderSavedLumpIdentityPanel === 'function') {
-        _renderSavedLumpIdentityPanel(lump, lookupToken);
+        _renderSavedLumpIdentityPanel(lump, lookupToken, savedWords);
     }
     _syncSavedLumpIdentityVisibility();
     var _displayDisassembly = compiledDisasm || '; Compiled disassembly unavailable.';
@@ -2101,6 +2124,7 @@ function _formatCanonicalSavedLumpWords(words, details) {
         '; Source at left is unchanged. These are the exact fetched saved words.',
         '; Abstraction: ' + String(details.abstraction || 'Unnamed') +
             (details.token ? '  Token: ' + String(details.token) : ''),
+        '; Saved word usage: ' + (details.wordUsage || 'word usage unavailable'),
         _formatLumpHeaderDisassembly(header)
     ];
     for (var i = 1; i < words.length; i++) {
@@ -2157,7 +2181,7 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
     }
     if (typeof _renderSavedLumpIdentityPanel === 'function') {
         _renderSavedLumpIdentityPanel(descriptor || null,
-            descriptor && descriptor.token);
+            descriptor && descriptor.token, !unavailable && descriptor && descriptor.words);
     }
     _syncSavedLumpIdentityVisibility();
 }
@@ -2201,10 +2225,12 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
         if ((data.raw_tail_hex || data.byte_count != null) && !tail) {
             throw new Error('the canonical response contained an invalid trailing-byte record');
         }
+        var wordUsage = await _getSavedLumpWordUsageSummary(data.words);
         if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
         var exactText = _formatCanonicalSavedLumpWords(data.words, {
             abstraction: data.abstraction || descriptor.abstraction,
             token: resp.token,
+            wordUsage: wordUsage,
             methodCount: data.api_definition && Array.isArray(data.api_definition.methods)
                 ? data.api_definition.methods.length : 0,
             rawTailHex: tail ? tail.rawTailHex : ''
@@ -4141,9 +4167,20 @@ async function _openLumpHistorySourceInEditor(source, name, version) {
     switchView('editor');
 }
 
-async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename, isCurrent) {
+// Inspect exactly the displayed saved revision without navigating the editor or
+// resolving a shared token to a newer repository revision.
+window._openSavedLumpVersionDetails = function (identity) {
+    if (!identity || !/^[0-9a-f]{8}$/i.test(identity.token || '') ||
+            !identity.filename || !/^[0-9a-f]{64}$/i.test(identity.binary_hash || '') ||
+            !Number.isInteger(identity.lump_version) || identity.lump_version < 1) return;
+    return _lumpHistoryPreview(identity.token, identity.lump_version, null, null,
+        null, '', true, identity.token, identity.filename, true,
+        Object.assign({}, identity));
+};
+
+async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename, isCurrent, exactIdentity) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
-    if (!previewEl) return;
+    if (!previewEl && !exactIdentity) return;
     const e = _escHtml;
     const hexw = w => (w >>> 0).toString(16).padStart(8, '0').toUpperCase().replace(/(.{2})/g, '$1 ').trim();
     const pack4ascii = w => {
@@ -4156,8 +4193,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
     };
     _showLumpHistoryPreviewModal(
         version,
-        `<div class="lump-hex-loading">Loading ${isCurrent ? 'current' : 'archived'} source\u2026</div>`
+        `<div class="lump-hex-loading">Loading ${exactIdentity ? 'exact saved revision' : isCurrent ? 'current' : 'archived'} source\u2026</div>`
     );
+    const pendingModal = document.getElementById('lumpHistoryPreviewModal');
     const _noPreview = (msg, nextAction) => {
         _showLumpHistoryPreviewModal(
             version,
@@ -4169,7 +4207,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         // A History panel is scoped to the active LUMP. Ask the server for
         // that panel's exact archive filename rather than guessing a path
         // from an archived record's old token.
-        const archivedUrl = isCurrent
+        const archivedUrl = exactIdentity
+            ? `/api/lump/${encodeURIComponent(exactIdentity.token)}/words?exact_filename=${encodeURIComponent(exactIdentity.filename)}&binary_hash=${encodeURIComponent(exactIdentity.binary_hash)}`
+            : isCurrent
             ? liveUrl
             : `/api/lumps/${currentToken || token}/words/${version}${
                 archiveFilename
@@ -4179,6 +4219,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             fetch(archivedUrl),
             isCurrent ? Promise.resolve(null) : fetch(liveUrl)
         ]);
+        if (exactIdentity && document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
         if (!archResp.ok) {
             const error = await _actionableResponseError(archResp, 'Load archived LUMP words', {
                 dataChanged: false,
@@ -4188,11 +4229,22 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             return;
         }
         const data = await archResp.json();
+        if (exactIdentity && document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
+        if (exactIdentity && (data.filename !== exactIdentity.filename ||
+                data.binary_hash !== exactIdentity.binary_hash)) {
+            _noPreview('Saved artifact identity does not match the requested revision');
+            return;
+        }
         const words = data.words || [];
         const rawTailHex = typeof data.raw_tail_hex === 'string'
             ? data.raw_tail_hex : '';
         const numWords = words.length;
         const inspection = _lumpBinaryInspection(data);
+        if (exactIdentity && words.length) {
+            cw = (words[0] >>> 10) & 0x1fff;
+            cc = words[0] & 0xff;
+            lumpSize = words.length;
+        }
 
         // The archived endpoint returns the source embedded in the exact
         // historical bytes. Show that source as the primary preview instead
@@ -4214,8 +4266,8 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `<div class="lump-section-title">Source \u2014 v${version}</div>` +
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${sourceLabel}</span>` +
-                `<span class="lump-stored-src-ts">Embedded in the ${isCurrent ? 'current' : 'archived'} binary</span>` +
-                `<button type="button" class="btn lump-history-open-editor" title="Open this exact revision's source as a new editable draft. The active LUMP and boot selection are unchanged.">Open in Editor</button>` +
+                `<span class="lump-stored-src-ts">Embedded in the ${exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} binary</span>` +
+                (exactIdentity ? '' : `<button type="button" class="btn lump-history-open-editor" title="Open this exact revision's source as a new editable draft. The active LUMP and boot selection are unchanged.">Open in Editor</button>`) +
                 `</div>` +
                 `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre">${_highlightCLOOMCSource(archivedSource, sourceLanguage)}</pre>` +
                 `</div>`;
@@ -4223,7 +4275,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             sourcePreview =
                 `<div class="lump-detail-section lump-history-source-section">` +
                 `<div class="lump-section-title">Source \u2014 v${version}</div>` +
-                `<div class="lump-stored-src-empty">No source is embedded in this ${isCurrent ? 'current' : 'archived'} revision.</div>` +
+                `<div class="lump-stored-src-empty">No source is embedded in this ${exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} revision.</div>` +
                 `</div>`;
         }
 
@@ -4231,7 +4283,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             data, currentToken || token, version, archiveFilename, tk,
             historicalRecord, isCurrent
         );
-        const issueSummary = _lumpHistoryPreviewIssueSummary(
+        const issueSummary = exactIdentity
+            ? `<div class="lump-detail-section"><b>${e(exactIdentity.abstraction || token)} — v${version}</b><p>${e(exactIdentity.filename)}</p><p>Binary seal: ${e(exactIdentity.binary_hash)}</p></div>`
+            : _lumpHistoryPreviewIssueSummary(
             data, isCurrent, historicalRecord
         );
         let curWords = [];
@@ -4254,8 +4308,10 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
 
         const COLS = 8;
         const rowCount = Math.ceil(numWords / COLS);
-        let t = `<div class="lump-detail-section"><div class="lump-section-title">${isCurrent ? 'Hex' : 'Hex Diff'} \u2014 v${version}${isCurrent ? ' (current)' : ' vs current'}</div>`;
-        if (isCurrent) {
+        let t = `<div class="lump-detail-section"><div class="lump-section-title">${isCurrent ? 'Hex' : 'Hex Diff'} \u2014 v${version}${exactIdentity ? ' (exact saved revision)' : isCurrent ? ' (current)' : ' vs current'}</div>`;
+        if (exactIdentity) {
+            t += '<div class="lump-hex-diff-summary">Read-only saved revision details. Editor text and Namespace are unchanged.</div>';
+        } else if (isCurrent) {
             t += '<div class="lump-hex-diff-summary lump-hex-diff-summary--none">Viewing the current live binary.</div>';
         } else if (curFetchFailed) {
             t += `<div class="lump-hex-diff-summary lump-hex-diff-summary--warn">Could not load current version \u2014 diff unavailable; showing archived words only</div>`;
@@ -4316,6 +4372,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         _showLumpHistoryPreviewModal(
             version, issueSummary + repairControls + sourcePreview + t
         );
+        if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
         const openEditorButton = document.querySelector(
             '#lumpHistoryPreviewModal .lump-history-open-editor');
         if (openEditorButton && archivedSource) {
@@ -4332,6 +4389,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             });
         }
     } catch (err) {
+        if (exactIdentity && document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
         _noPreview(err.message);
     }
 }
@@ -8136,7 +8194,7 @@ async function openLumpInEditor(token, options) {
                 unverified: !serverWords || !!_sourceResolution.integrityError ||
                     !!(_exactResponseLump &&
                         _exactResponseLump._identityProvenance === 'unverified')
-            });
+            }, _inMemoryLump ? null : serverWords);
 
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
         // Title must always follow the code module name without exception.

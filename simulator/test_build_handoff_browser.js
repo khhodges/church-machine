@@ -46,7 +46,7 @@ const assert = require('assert');
             throw Error('Missing function ' + name);
         }
         await page.addScriptTag({content: ['_verifiedSavedLumpIdentity', '_sameSavedLumpWord',
-            '_renderSavedLumpIdentityPanel'].map(extract).join('\n')});
+            '_renderSavedLumpWordUsage', '_renderSavedLumpIdentityPanel'].map(extract).join('\n')});
         const render = () => page.evaluate(row => {
             window._savedLumpEditorMode = true;
             _renderSavedLumpIdentityPanel(row, row.token);

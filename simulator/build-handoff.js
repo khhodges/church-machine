@@ -55,6 +55,19 @@
             current = data;
             if (data.csrf) csrf = data.csrf;
             version.textContent = 'v' + data.identity.lump_version;
+            if (typeof window._openSavedLumpVersionDetails === 'function') {
+                var link = document.createElement('a');
+                link.href = '#saved-lump-details';
+                link.textContent = version.textContent;
+                link.setAttribute('aria-label', 'View LUMP details for saved version ' + data.identity.lump_version);
+                link.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    if (live()) window._openSavedLumpVersionDetails(
+                        Object.assign({}, data.identity), link);
+                });
+                version.textContent = '';
+                version.append(link);
+            }
             date.textContent = data.identity.compiled_at || 'unavailable in saved metadata';
             checkbox.checked = data.handoff.released;
             checkbox.disabled = !csrf || (!data.identity.eligible && !data.handoff.released);

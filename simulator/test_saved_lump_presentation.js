@@ -43,6 +43,10 @@ let fetchResult = {
 };
 let fetchedUrl = '';
 const context = vm.createContext({
+    TextDecoder,
+    Uint8Array,
+    ArrayBuffer,
+    LumpContentFrame: require('./lump-content-frame.js'),
     window: dom.window,
     document: dom.window.document,
     console,
@@ -62,6 +66,8 @@ vm.runInContext([
     extractFunction(source, '_isExactSavedLumpWordArray'),
     extractFunction(source, '_readSavedLumpExactTail'),
     extractFunction(source, '_savedLumpPresentationStillOwnsSource'),
+    extractFunction(source, '_getLumpFieldSizeLayout'),
+    extractFunction(source, '_getSavedLumpWordUsageSummary'),
     extractFunction(source, '_formatCanonicalSavedLumpWords'),
     extractFunction(source, '_showCanonicalSavedLumpBesideSource'),
     extractFunction(source, '_fetchAndPresentCommittedLump'),

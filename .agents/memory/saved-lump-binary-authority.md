@@ -93,3 +93,13 @@ tokens also cannot identify an exact saved revision.
 **How to apply:** Verify both post-save and real reload paths, including legacy
 browser state. Preserve exact saved filename/hash evidence where available and
 keep draft text untouched while fetching binary-only presentation.
+
+Saved artifact summaries must survive canonical re-rendering, not only initial
+open.
+
+**Why:** Word usage added only to an initial reconstructed heading disappeared
+when the canonical saved-word renderer replaced it after reload.
+
+**How to apply:** Verify visible saved metadata on both real open and reload;
+compute storage usage from exact saved spans, including embedded framing and
+padding, never decompressed text length or nonzero-word counts.
