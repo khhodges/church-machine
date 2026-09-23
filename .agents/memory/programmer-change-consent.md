@@ -34,3 +34,13 @@ first-use reviews can also compete to establish the browser's session binding.
 **How to apply:** Prepare each protected review only after the previous operation
 finishes. Keep reads and lease heartbeats independent, and still reject genuine
 external state changes rather than silently retrying or reapproving them.
+
+A single user Save must review and commit its dependent label persistence
+together with the artifact, rather than asking for a second background approval.
+
+**Why:** A post-save slot-label write produced a surprise second confirmation;
+cancelling it then misleadingly appeared to invalidate the already completed save.
+
+**How to apply:** Include all dependent persisted changes in the initial review
+and transaction. Standalone label edits remain separately protected; cancellation
+must not be presented as validation failure or an unknown commit outcome.

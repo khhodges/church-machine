@@ -4666,26 +4666,38 @@ def boot_config_slot_label():
     data = request.get_json(silent=True) or {}
     slot = data.get("slot")
     label = str(data.get("label", "") or "").strip()
-    if not isinstance(slot, int) or slot < 2 or slot >= 256:
-        return jsonify({"ok": False, "error": "slot must be an integer 2–255"}), 400
+    if isinstance(slot, bool) or not isinstance(slot, int) or slot < 2 or slot >= 256:
+        return jsonify({"ok": False, "committed": False, "error": "slot must be an integer 2–255"}), 400
     if not label:
-        return jsonify({"ok": False, "error": "label must be a non-empty string"}), 400
+        return jsonify({"ok": False, "committed": False, "error": "label must be a non-empty string"}), 400
+    try:
+        cfg = _lump_save_slot_label_document({"slot_label": label}, slot)
+        _atomic_write_json(BOOT_CONFIG_PATH, cfg)
+    except Exception as e:
+        return jsonify({"ok": False, "committed": False, "error": f"Failed to write boot-config.json: {e}"}), 500
+    return jsonify({"ok": True, "committed": True, "slot": slot, "label": label})
+
+
+def _lump_save_slot_label_document(metadata, slot):
+    """Build, but never write, the label document for the reviewed transaction."""
+    if "slot_label" not in metadata:
+        return None
+    label = metadata["slot_label"]
+    if not isinstance(label, str) or not label.strip() or label != label.strip():
+        raise ValueError("slot_label must be a non-empty, trimmed string")
+    if isinstance(slot, bool) or not isinstance(slot, int) or not 2 <= slot < 256:
+        raise ValueError("slot_label requires an authoritative Namespace slot 2–255")
     cfg = {}
     if os.path.exists(BOOT_CONFIG_PATH):
-        try:
-            with open(BOOT_CONFIG_PATH) as f:
-                cfg = json.load(f)
-        except Exception:
-            pass
-    if not isinstance(cfg.get("slotLabels"), dict):
-        cfg["slotLabels"] = {}
-    cfg["slotLabels"][str(slot)] = label
-    try:
-        with open(BOOT_CONFIG_PATH, "w") as f:
-            json.dump(cfg, f, indent=2)
-    except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to write boot-config.json: {e}"}), 500
-    return jsonify({"ok": True, "slot": slot, "label": label})
+        with open(BOOT_CONFIG_PATH, encoding="utf-8") as source:
+            cfg = json.load(source)
+    if not isinstance(cfg, dict):
+        raise ValueError("Saved boot configuration is not an object")
+    labels = cfg.setdefault("slotLabels", {})
+    if not isinstance(labels, dict):
+        raise ValueError("Saved slotLabels is not an object")
+    labels[str(slot)] = label
+    return cfg
 
 # ---------------------------------------------------------------------------
 # Boot image binary generator (Task #217)
@@ -13477,6 +13489,11 @@ def save_lump():
                     "safe_retry": True,
                 }), 422
 
+    try:
+        _label_document = _lump_save_slot_label_document(metadata, ns_slot)
+    except (ValueError, OSError) as exc:
+        return jsonify(error=str(exc), committed=False), 422
+
     def _resident_additional_json(final_manifest_entry):
         if _prepared_ns_entries is None:
             return {}
@@ -13524,9 +13541,13 @@ def save_lump():
         "final_binary": list(_sl_words),
         "operation_id": _operation_id,
     }
+    if _label_document is not None:
+        _operation_response["slot_label"] = metadata["slot_label"]
 
     def _save_additional_json(final_manifest_entry):
         documents = _resident_additional_json(final_manifest_entry)
+        if _label_document is not None:
+            documents[BOOT_CONFIG_PATH] = _label_document
         if getattr(g, "_lump_save_operation_active", False):
             # Storing this with the history transition makes a committed status
             # durable across response loss and process restart.
@@ -13852,6 +13873,8 @@ def save_lump():
     }
     if boot_refresh_note:
         resp["boot_image_note"] = boot_refresh_note
+    if _label_document is not None:
+        resp["slot_label"] = metadata["slot_label"]
     if _is_server_bootstrap_history_repair:
         resp.update({
             "namespace_slot": ns_slot,
@@ -24704,12 +24727,17 @@ def _recover_lump_history_transition(lumps_dir):
             if not path.startswith(root):
                 raise ValueError("transition journal path escapes LUMP store")
             return path
-        destinations = [_safe(path) for path in destinations]
+        def _safe_destination(path):
+            path = os.path.abspath(path)
+            if path == os.path.abspath(BOOT_CONFIG_PATH) and not os.path.islink(path):
+                return path
+            return _safe(path)
+        destinations = [_safe_destination(path) for path in destinations]
         backup_rows = []
         for row in backups:
             if not isinstance(row, dict):
                 raise ValueError("invalid transition backup record")
-            backup_rows.append((_safe(row["destination"]), _safe(row["backup"])))
+            backup_rows.append((_safe_destination(row["destination"]), _safe(row["backup"])))
         staged = [_safe(path) for path in staged]
         if journal.get("state") == "prepared":
             # Verify every durable original before removing even one published
@@ -25271,8 +25299,11 @@ def _commit_lump_history_transition(
                             ))
                 for destination, document in additional_json.items():
                     destination = os.path.abspath(destination)
-                    if not destination.startswith(os.path.abspath(lumps_dir) + os.sep):
+                    if (not destination.startswith(os.path.abspath(lumps_dir) + os.sep)
+                            and destination != os.path.abspath(BOOT_CONFIG_PATH)):
                         raise ValueError("additional JSON destination is outside lumps_dir")
+                    if os.path.islink(destination):
+                        raise ValueError("additional JSON destination must not be a symlink")
                     staged.append((destination, _stage_json(document)))
             manifest_stage = _stage_json(updated_manifest)
             staged.append((_destination(os.path.basename(manifest_path)), manifest_stage))
@@ -25405,15 +25436,19 @@ def _commit_lump_history_transition(
                 except OSError:
                     rollback_ok = False
                     logging.exception("[lumps] Failed to restore transition backup %s", destination)
-            try:
-                directory_fd = os.open(lumps_dir, os.O_RDONLY)
+            rollback_directories = {os.path.abspath(lumps_dir)}
+            rollback_directories.update(os.path.dirname(path) for path in committed)
+            rollback_directories.update(os.path.dirname(path) for path, _ in backups)
+            for directory in rollback_directories:
                 try:
-                    os.fsync(directory_fd)
-                finally:
-                    os.close(directory_fd)
-            except OSError:
-                rollback_ok = False
-                logging.exception("[lumps] Failed to fsync restored transition")
+                    directory_fd = os.open(directory, os.O_RDONLY)
+                    try:
+                        os.fsync(directory_fd)
+                    finally:
+                        os.close(directory_fd)
+                except OSError:
+                    rollback_ok = False
+                    logging.exception("[lumps] Failed to fsync restored transition")
             if not rollback_ok:
                 # Keep the prepared journal and every backup.  Startup recovery
                 # can retry from durable originals; reporting rolled_back here
@@ -25613,6 +25648,21 @@ def _describe_protected_change(payload):
     if not isinstance(payload, dict):
         return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
     root = Path(__file__).resolve().parent.parent
+    if request.path == "/api/boot-config/slot-label":
+        try:
+            slot = payload.get("slot")
+            proposed = _lump_save_slot_label_document(
+                {"slot_label": payload.get("label")}, slot)
+            current = {}
+            if os.path.exists(BOOT_CONFIG_PATH):
+                with open(BOOT_CONFIG_PATH, encoding="utf-8") as stream:
+                    current = json.load(stream)
+            return [f"NS[{slot}] slot label: "
+                    f"{json.dumps(current.get('slotLabels', {}).get(str(slot)))} \u2192 "
+                    f"{json.dumps(proposed['slotLabels'][str(slot)])}",
+                    "Only the display label changes; no LUMP revision is created."]
+        except (ValueError, OSError, AttributeError) as exc:
+            return [f"Slot label unavailable: {exc}. Do not confirm."]
     if request.path == "/api/boot-config":
         # Read-only candidate normalization is the same one used by the route.
         # Do not silently replace unreadable evidence with invented defaults.
@@ -25690,7 +25740,23 @@ def _describe_protected_change(payload):
                             == session.get("_lump_approval_session")):
                         plan = dict(candidate)
         words = payload.get("binary")
-        return _describe_lump_save_plan(plan) + [
+        label_review = []
+        if isinstance(metadata, dict) and "slot_label" in metadata:
+            slot = plan.get("ns_slot") if isinstance(plan, dict) else None
+            try:
+                proposed = _lump_save_slot_label_document(metadata, slot)
+                current = {}
+                if os.path.exists(BOOT_CONFIG_PATH):
+                    with open(BOOT_CONFIG_PATH, encoding="utf-8") as stream:
+                        current = json.load(stream)
+                before = current.get("slotLabels", {}).get(str(slot))
+                label_review.append(
+                    f"NS[{slot}] slot label: {json.dumps(before)} \u2192 "
+                    f"{json.dumps(proposed['slotLabels'][str(slot)])}. "
+                    "Committed atomically with this LUMP; no separate label save.")
+            except (ValueError, OSError, AttributeError) as exc:
+                label_review.append(f"Slot label unavailable: {exc}. Do not confirm.")
+        return _describe_lump_save_plan(plan) + label_review + [
                 "Publication target: " + json.dumps(preview, sort_keys=True),
                 "Submitted binary words: " + str(len(words) if isinstance(words, list) else "server-plan bytes"),
                 "Confirm only if the existing Save LUMP plan shown in the IDE matches your intended destination and revision."]

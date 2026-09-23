@@ -16449,10 +16449,6 @@ method swap(p) = (snd p, fst p)</div>
 }
 
 function _persistNamespaceSlotLabel(slot, label) {
-    window.bootConfig = window.bootConfig || {};
-    window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
-    window.bootConfig.slotLabels[String(slot)] = label;
-
     const pending = fetch('/api/boot-config/slot-label', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -16460,17 +16456,32 @@ function _persistNamespaceSlotLabel(slot, label) {
     }).then(function(response) {
         return _actionableJsonResponse(response, 'Save the Namespace slot label', {
             dataChanged: null,
+            allowReviewCancellation: true,
             nextAction: 'Reload Namespace to verify the label before retrying.',
         });
+    }).then(function(result) {
+        window.bootConfig = window.bootConfig || {};
+        window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
+        window.bootConfig.slotLabels[String(result.slot)] = result.label;
+        return result;
     });
     window._nsLabelPersistPromises = window._nsLabelPersistPromises || [];
     window._nsLabelPersistPromises.push(pending);
     pending.catch(function(error) {
-        console.warn('[Namespace] slot-label persist failed:', error);
+        if (error.code !== 'change_rejected') {
+            console.warn('[Namespace] slot-label persist failed:', error);
+        }
     });
     return pending;
 }
 window._persistNamespaceSlotLabel = _persistNamespaceSlotLabel;
+
+function _acceptCommittedNamespaceSlotLabel(response, slot) {
+    if (response.committed !== true || typeof response.slot_label !== 'string') return;
+    window.bootConfig = window.bootConfig || {};
+    window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
+    window.bootConfig.slotLabels[String(slot)] = response.slot_label;
+}
 
 // The repository's committed .lump is the only binary that may update the
 // simulator after a save.  save-plan can remint a destination-local SELF row,
@@ -16950,6 +16961,7 @@ async function confirmSaveToNamespace() {
             binary: _svBinary,
             metadata: {
                 abstraction:  _svAbsName,
+                slot_label:   label,
                 content_type: 'code',
                 language:     _svLang,
                 ns_slot:      idx,
@@ -17171,7 +17183,9 @@ async function confirmSaveToNamespace() {
                 return;
             }
             try {
-                _persistNamespaceSlotLabel(idx, label);
+                // The reviewed repository transaction also committed the label.
+                // Never issue a second protected write after acknowledging Save.
+                _acceptCommittedNamespaceSlotLabel(resp, idx);
                 if (window.LumpRegistry) {
                     // A successful save makes the server's immutable binary the
                     // authority for this token.  Do not register _svWords here:

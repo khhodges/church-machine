@@ -80,7 +80,9 @@ async function _actionableJsonResponse(response, operation, options) {
             cancelled.code = 'change_rejected';
             throw cancelled;
         }
-        throw new Error(_formatActionableHttpError(operation, response.status, parsed, options));
+        var failureOptions = Object.assign({}, options);
+        if (parsed && parsed.committed === false) failureOptions.dataChanged = false;
+        throw new Error(_formatActionableHttpError(operation, response.status, parsed, failureOptions));
     }
     return parsed;
 }

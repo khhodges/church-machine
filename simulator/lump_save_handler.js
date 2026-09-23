@@ -288,6 +288,7 @@ function _lumpSaveDefaultOperationKey(payload) {
     }
     return ['save', metadata.abstraction || '',
         metadata.ns_slot == null ? 'dynamic' : metadata.ns_slot,
+        JSON.stringify(metadata.slot_label === undefined ? null : metadata.slot_label),
         metadata.version || metadata.issue_number || '', metadata.source_hash || '',
         words.length, fingerprint.toString(16)].join(':');
 }

@@ -5465,8 +5465,8 @@ window._nsTableSave = async function(btn) {
         // observe the occupied slot before its committed custom label.
         const labelWrites = (window._nsLabelPersistPromises || []).slice();
         if (labelWrites.length) {
-            await Promise.all(labelWrites);
             window._nsLabelPersistPromises = [];
+            await Promise.all(labelWrites);
         }
 
         // The boot image occupies exactly sim.NS_TABLE_BASE + sim.NS_TABLE_RESERVE
