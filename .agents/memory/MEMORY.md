@@ -150,3 +150,4 @@
 - [Namespace save layout versus identity](namespace-save-layout-identity.md) — regeneration may normalize descriptors without substituting artifacts; ordinary unchanged saves preserve layout
 - [Resident installation isolation](resident-install-execution-isolation.md) — background deployments must not splice a new c-list into running code; direct-run activation is explicit
 - [Programmer change consent](programmer-change-consent.md) — explain and confirm source, Namespace, and repository changes; browser/server differences never prove a copy was unsaved
+- [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
