@@ -15209,6 +15209,58 @@ def get_lump_words(token_hex):
     return jsonify(response)
 
 
+def _resolve_build_handoff_identity(payload):
+    """Resolve only exact immutable manifest evidence; never use latest or slots."""
+    from pathlib import Path
+    token = payload.get("token")
+    filename = payload.get("filename")
+    digest = payload.get("binary_hash")
+    if (not isinstance(token, str) or not re.fullmatch(r"[0-9a-f]{8}", token)
+            or not isinstance(filename, str) or os.path.basename(filename) != filename
+            or not filename.endswith(".lump")
+            or not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)):
+        raise ValueError("Exact token, filename and binary hash are required.")
+    rows = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+    matches = [row for row in rows if isinstance(row, dict)
+               and row.get("token") == token and row.get("filename") == filename]
+    if len(matches) != 1:
+        raise ValueError("Saved artifact is missing or ambiguous.")
+    row = matches[0]
+    version = row.get("lump_version")
+    if type(version) is not int or version < 1:
+        raise ValueError("Authoritative saved version is unavailable.")
+    path = Path(LUMPS_DIR) / filename
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("Exact saved artifact is unavailable; aliases are not accepted.")
+    snapshot = _validate_lump_snapshot(str(path), row)
+    if snapshot["binary_hash"] != digest:
+        raise ValueError("Saved binary identity changed; reopen the exact artifact.")
+    canonical = _check_lump_canonical_integrity(LUMPS_DIR, token, snapshot["raw_bytes"])
+    compiled_at = row.get("compiled_at")
+    date = None
+    if type(compiled_at) in (int, float):
+        try:
+            from datetime import datetime, timezone
+            date = datetime.fromtimestamp(compiled_at, timezone.utc).isoformat()
+        except (ValueError, OverflowError, OSError):
+            pass
+    return {
+        "token": token, "filename": filename, "binary_hash": digest,
+        "lump_version": version, "compiled_at": date,
+        "abstraction": row.get("abstraction"),
+        "eligible": bool(snapshot["valid"] and snapshot["approved"] and snapshot["trusted"]
+                         and canonical is True),
+    }
+
+
+try:
+    from build_handoff import install as _install_build_handoff
+except ImportError:
+    from server.build_handoff import install as _install_build_handoff
+_install_build_handoff(app, _resolve_build_handoff_identity,
+                       _namespace_commit_guard, _diagnostic_origin_is_same_site)
+
+
 def _validate_lump_snapshot(
         lump_path, manifest_entry=None, *, bootstrap_binding=None):
     """Validate one exact binary and report any hash-bound approval.

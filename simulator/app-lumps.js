@@ -1855,6 +1855,9 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken) {
         (_identityVerified ? 'Verified artifact identity' :
             'Artifact identity — provenance unverified') + '</div>' +
         _identityRows;
+    if (typeof window.renderBuildHandoff === 'function') {
+        window.renderBuildHandoff(panel, lump, lookupToken, _identityVerified);
+    }
 }
 
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection) {
@@ -7567,10 +7570,14 @@ async function openLumpInEditor(token, options) {
                 ? ('@ 0x' + baseLoc.toString(16).toUpperCase().padStart(4, '0') + '  ')
                 : '';
             var _lhFree2 = lhdr.lumpSize - 1 - lhdr.cw - lhdr.cc;
+            var _sourceSizeSummary = typeof LumpContentFrame !== 'undefined' &&
+                typeof LumpContentFrame.lumpSourceSizeSummary === 'function'
+                ? await LumpContentFrame.lumpSourceSizeSummary(serverWords)
+                : 'source unavailable';
             disasmLines = [
                 lumpName + '  ' + addrStr +
                 '(' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') +
-                ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free)',
+                ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free, ' + _sourceSizeSummary + ')',
                 '',
                 _formatLumpHeaderDisassembly(lhdrW),
                 ''

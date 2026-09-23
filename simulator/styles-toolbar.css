@@ -548,6 +548,16 @@
 .saved-lump-identity-row {
     display: contents;
 }
+.saved-lump-handoff {
+    display: contents;
+}
+.saved-lump-handoff > label {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.25rem;
+}
 .saved-lump-identity-row > span {
     color: var(--text-secondary);
 }

@@ -43,3 +43,14 @@ checks across all handoffs. Success is silent; a blocked action receives a clear
 actionable explanation. Builder configuration approval is a deliberate domain
 decision, not permission to bypass security. Do not hide failures or claim this
 behavior is implemented before verifying the complete flows.
+
+Programmer release-to-build handoff applies to one exact saved LUMP revision
+and binary identity; it is separate from Builder configuration approval.
+
+**Why:** The user requested a dated/versioned identity-panel checkbox to mark
+their handoff, not to allocate slots, change immutable LUMPs, or start builds.
+
+**How to apply:** Keep handoff decisions separate from immutable artifact content.
+Do not inherit release status across new revisions or treat it as permission to
+configure or flash. A specific UI implementation request permits that narrow
+code change, not unrelated changes to programmer artifacts.
