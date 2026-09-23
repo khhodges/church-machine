@@ -4497,7 +4497,14 @@ function _draftLsGet(token) {
     return null;
 }
 function _draftLsSet(token, v) { try { localStorage.setItem(_draftLsKey(token), v); } catch(_) {} }
-function _draftLsDel(token) { try { localStorage.removeItem(_draftLsKey(token)); } catch(_) {} }
+function _draftLsDel(token) {
+    try { localStorage.removeItem(_draftLsKey(token)); } catch(_) {}
+    // Explicit discard/save/revert must not resurrect an earlier navigation
+    // snapshot the next time this document is opened.
+    var owner = 'lump:' + _lumpTokenIdentity(token);
+    if (window._editorNavigationBuffers) delete window._editorNavigationBuffers[owner];
+    try { sessionStorage.removeItem('cm_editor_navigation:' + owner); } catch(_) {}
+}
 
 function _isRestoredSavedLumpOwner(token) {
     try {
@@ -7025,19 +7032,41 @@ function _scrollToLumpMethod(tk, methodName, _attempt) {
 // Content / Audit tabs) so the editor disassembly is always consistent with
 // every other view.  sim.memory is used only for structural location info
 // (baseLoc / nsIdx / crIdx) needed by the patch bar and c-list picker.
+function _preserveEditorNavigationBuffer() {
+    var editor = document.getElementById('asmEditor');
+    if (!editor) return;
+    var token = window._editorOpenLumpToken;
+    var owner = token ? 'lump:' + _lumpTokenIdentity(token) :
+        'document:' + (window._editorSourceFilePath || window._activeBuiltInKey ||
+            (typeof activeUserTabId !== 'undefined' && activeUserTabId) || 'scratch');
+    var snapshot = {
+        source: editor.value,
+        original: window._editorOriginalDisasm,
+        selectionStart: editor.selectionStart,
+        selectionEnd: editor.selectionEnd,
+        scrollTop: editor.scrollTop
+    };
+    // Unlike best-effort keystroke autosave, navigation must not swallow a
+    // storage failure and then destroy the only copy of the outgoing buffer.
+    var key = 'cm_editor_navigation:' + owner;
+    var serialized = JSON.stringify(snapshot);
+    sessionStorage.setItem(key, serialized);
+    if (sessionStorage.getItem(key) !== serialized) {
+        throw new Error('The outgoing editor buffer could not be preserved.');
+    }
+    if (token && editor.value !== window._editorOriginalDisasm) {
+        localStorage.setItem(_draftLsKey(token), editor.value);
+        if (localStorage.getItem(_draftLsKey(token)) !== editor.value) {
+            throw new Error('The outgoing LUMP draft could not be preserved.');
+        }
+    }
+    // Only documents actually visited in this page are resumed automatically.
+    // Older browser drafts still require the existing explicit Restore action.
+    window._editorNavigationBuffers = window._editorNavigationBuffers || {};
+    window._editorNavigationBuffers[owner] = snapshot;
+}
+
 async function openLumpInEditor(token, options) {
-    var _reviewEditor = document.getElementById('asmEditor');
-    var _reviewBefore = _reviewEditor ? _reviewEditor.value : '';
-    var _reviewEpoch = window._editorNavigationEpoch;
-    if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
-        title: 'Open saved LUMP source',
-        reason: 'Opening this artifact replaces the editor context and source with the selected saved LUMP. A different browser copy is not proof of unsaved work.',
-        changes: ['Selected artifact token: ' + token,
-            'Current editor source:\n' + _reviewBefore,
-            'The repository binary is not changed by opening it. Browser draft storage is retained.'],
-    })) return;
-    if ((_reviewEditor && _reviewEditor.value !== _reviewBefore) ||
-            window._editorNavigationEpoch !== _reviewEpoch) return;
     // Opening a LUMP is normally explicit navigation. Claim that authority
     // synchronously, before the artifact fetch, so the asynchronous startup
     // default cannot replace a Namespace/editor selection that is still
@@ -7360,6 +7389,16 @@ async function openLumpInEditor(token, options) {
     }
     if (window._savedLumpOpenRequestId !== _openRequestId ||
             !_openWriteGuard.accepts()) return;
+    try {
+        _preserveEditorNavigationBuffer();
+    } catch (error) {
+        if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast('Navigation cancelled',
+                'Your current editor text was kept. Browser storage could not preserve it: ' +
+                error.message, 'error', 8000);
+        }
+        return;
+    }
 
     // ── Inspect embedded content from the immutable binary ──────────────────
     var _serverFrameSource = _wordsResponse &&
@@ -7896,7 +7935,21 @@ async function openLumpInEditor(token, options) {
             }
         };
 
-        if (_hasDraft) {
+        var _navigationBuffer = window._editorNavigationBuffers &&
+            window._editorNavigationBuffers['lump:' + _lumpTokenIdentity(token)];
+        if (_navigationBuffer && _sourceRestored &&
+                _navigationBuffer.original === _recoveredSource) {
+            // Return to this page's own working document, not an unreviewed
+            // older draft. The binary pane remains the exact saved artifact.
+            _setSavedLumpEditorSource(_navigationBuffer.source);
+            asmEd.classList.toggle('cm-editor-draft',
+                _navigationBuffer.source !== _recoveredSource);
+            if (typeof asmEd.setSelectionRange === 'function') {
+                asmEd.setSelectionRange(_navigationBuffer.selectionStart || 0,
+                    _navigationBuffer.selectionEnd || 0);
+            }
+            asmEd.scrollTop = _navigationBuffer.scrollTop || 0;
+        } else if (_hasDraft) {
             // The immutable saved LUMP is the default editor authority. A
             // divergent browser draft may be older than that binary (for
             // example, when a later revision was saved in another session),
