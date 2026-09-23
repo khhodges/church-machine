@@ -21,15 +21,15 @@ function check(condition, message) {
 
 check(
   /sim\.on\('stateChange', \(\) => \{ updateDashboard\(\)/.test(shell) &&
-  /function updateDashboard\(\)[\s\S]{0,300}if \(selectedCR !== null\) updateCRDetail\(\)/.test(
+  /function updateDashboard\(\)[\s\S]{0,550}if \(selectedCR !== null && crDetailActive\)[\s\S]{0,100}updateCRDetail\(\)/.test(
     fs.readFileSync('simulator/app-tools.js', 'utf8')
   ),
   'stateChange refreshes the open dashboard CR detail through updateDashboard'
 );
 check(
-  /const _liveNIA = Number\.isInteger\(sim\.physicalPC\)/.test(memory) &&
-  /_liveNIA !== null[\s\S]{0,180}addr === _liveNIA/.test(memory),
-  'CR code highlighting follows physical NIA'
+  /const _liveNIA = _currentSimulatorInstructionAddress\(sim\)/.test(memory) &&
+  /_liveNIA !== null && addr === _liveNIA/.test(memory),
+  'CR code highlighting follows next fetch, not the retired instruction'
 );
 check(
   /const liveTarget = contentEl\.querySelector\('\.code-pc-row'\)[\s\S]{0,220}code-gate-row/.test(memory),

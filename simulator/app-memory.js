@@ -953,6 +953,17 @@ function _codeViewMethodEntries(codeWords, methods) {
     return entries;
 }
 
+// The trace's physicalPC is the instruction just fetched, not the next one.
+// In particular, RETURN leaves it pointing into the callee while restoring
+// CR14 + PC to the caller. Use the engine's breakpoint/fetch address authority,
+// never the inspected register's base or a hardware snapshot's NIA.
+function _currentSimulatorInstructionAddress(machine) {
+    if (!machine || !machine.bootComplete ||
+            typeof machine._nextPhysicalAddr !== 'function') return null;
+    const address = machine._nextPhysicalAddr();
+    return Number.isInteger(address) && address >= 0 ? address >>> 0 : null;
+}
+
 function updateCRDetail() {
     if (typeof window !== 'undefined') {
         window._currentCodeControlFlowAddresses = {
@@ -1075,8 +1086,8 @@ function updateCRDetail() {
     const hasW = parsedPerms.W;
     const crMbit = sim.cr[crIdx].m;
     const nsIdx = cr.gtIndex;
-    // Switch the editor's source context to this NS slot (saves outgoing,
-    // restores incoming from localStorage or sticky-patch src fallback).
+    // Track the inspected slot only; execution navigation must not transfer
+    // source ownership or restore another document into the editor.
     if (typeof _asmSrcSwitchContext === 'function') _asmSrcSwitchContext(nsIdx);
 
     const codeRegs = [7];
@@ -1417,16 +1428,8 @@ function updateCRDetail() {
                 continue;
             }
 
-            // physicalPC is the NIA used by the execution/trace path. Prefer
-            // it over the logical PC so the highlighted row remains correct
-            // across CR14 changes and call/return transitions.
-            const _liveNIA = Number.isInteger(sim.physicalPC)
-                ? (sim.physicalPC >>> 0) : null;
-            const isPC    = _liveNIA !== null
-                ? addr === _liveNIA
-                : (lumpHdr.valid
-                    ? (addr === baseLoc + 1 + sim.pc)
-                    : ((addr === (sim.programBaseAddr || 0) + sim.pc) || (addr === sim.pc)));
+            const _liveNIA = _currentSimulatorInstructionAddress(sim);
+            const isPC = _liveNIA !== null && addr === _liveNIA;
             const isGateHL = _crDetailHighlightPC !== null && (lumpHdr.valid
                 ? (addr === baseLoc + 1 + _crDetailHighlightPC)
                 : ((addr === (sim.programBaseAddr || 0) + _crDetailHighlightPC) || (addr === _crDetailHighlightPC)));
