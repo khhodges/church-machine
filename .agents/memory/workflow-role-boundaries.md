@@ -19,3 +19,15 @@ a LUMP must not implicitly approve a system configuration or initiate flashing.
 Configuration approval binds exact artifacts; flashing consumes an approved
 configuration and reports verified hardware outcome. Automatic security checks
 remain active at each boundary without becoming repetitive user prompts.
+
+Security must operate end to end invisibly during successful normal workflows,
+with explanations and audit evidence available when questioned.
+
+**Why:** The user explicitly requires automatic enforcement rather than exposing
+internal security checks as repeated approvals to any of the three roles.
+
+**How to apply:** Preserve authorization, identity, integrity, and validation
+checks across all handoffs. Success is silent; a blocked action receives a clear,
+actionable explanation. Builder configuration approval is a deliberate domain
+decision, not permission to bypass security. Do not hide failures or claim this
+behavior is implemented before verifying the complete flows.
