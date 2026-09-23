@@ -6,8 +6,13 @@ The programmer's goal is LUMP creation. The builder's goal is configuration,
 test, and approval. The system engineer's goal is a successful FPGA flash.
 Do not combine these into one implicit Save/Prepare/Run/Flash workflow.
 
+Only the Builder defines Namespace slots. Programmer LUMP creation/save must
+not assign, reassign, or redefine slots; the system engineer flashes the
+Builder-approved configuration without independently redefining them.
+
 **Why:** The user explicitly corrected the review plan after programmer actions
-triggered configuration-generation and approval steps belonging to other roles.
+triggered configuration-generation and approval steps belonging to other roles,
+and clarified that Namespace slot definition belongs exclusively to the Builder.
 
 **How to apply:** Classify each action by its goal and handoff. Creating or saving
 a LUMP must not implicitly approve a system configuration or initiate flashing.
