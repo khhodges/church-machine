@@ -44,3 +44,13 @@ cancelling it then misleadingly appeared to invalidate the already completed sav
 **How to apply:** Include all dependent persisted changes in the initial review
 and transaction. Standalone label edits remain separately protected; cancellation
 must not be presented as validation failure or an unknown commit outcome.
+
+Namespace build/save is one consent boundary, not one approval per internal
+configuration, image-generation, and Namespace-write request.
+
+**Why:** Repeated protected-change dialogs made one deliberate Builder operation
+appear to request unrelated source changes even after its first review.
+
+**How to apply:** Stage dependent effects before one complete review, retain
+request/session/state-bound validation at commit, and stop on unexpected changes.
+Never replace the repeated dialogs with a blanket security exemption.

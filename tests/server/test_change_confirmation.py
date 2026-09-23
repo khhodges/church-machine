@@ -214,6 +214,8 @@ def test_review_fingerprint_excludes_only_lease_registry(tmp_path, changed, allo
         "__file__": str(tmp_path / "server/app.py"),
         "LUMPS_DIR": str(lumps),
         "BOOT_CONFIG_PATH": str(lumps / "boot-config.json"),
+        "BOOT_IMAGE_PATH": str(lumps / "boot-image.bin"),
+        "BOOT_IMAGE_PROVENANCE_PATH": str(lumps / "boot-image.provenance.json"),
         "NS_STATE_PATH": str(lumps / "ns-state.json"),
         "LUMPS_MANIFEST_PATH": str(lumps / "manifest.json"),
         "_LUMP_LEASE_REGISTRY": ".lump-write-leases.json",

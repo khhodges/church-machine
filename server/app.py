@@ -6545,8 +6545,40 @@ def _validate_active_namespace_lumps(entries):
             raise ValueError(str(exc)) from exc
 
 
+def _stage_namespace_save_image(cfg, entries):
+    """Generate in private storage; never temporarily publish candidate rows.
+
+    Copy, do not hardlink: even a future generator writing an input must not
+    modify an immutable saved artifact. The review lock protects the snapshot.
+    """
+    import shutil
+    from pathlib import Path
+    with tempfile.TemporaryDirectory(prefix="namespace-save-") as directory:
+        stage = Path(directory) / "lumps"
+        shutil.copytree(LUMPS_DIR, stage)
+        rows = [dict(row) for row in entries]
+        (stage / "ns-state.json").write_text(
+            json.dumps({"abstractions": rows}), encoding="utf-8")
+        image = _boot_image_gen.generate_boot_image(
+            cfg, str(stage), boot_entry_slot=_validate_namespace_boot_marker(rows))
+        words = struct.unpack(f"<{len(image) // 4}I", image)
+        for row in rows:
+            base = len(words) - (row["slot"] + 1) * 4
+            if base < 0 or base + 3 >= len(words):
+                raise ValueError("Generated Namespace descriptor is outside image")
+            location, authority, seal, _ = words[base:base + 4]
+            if location == 0 and authority == 0:
+                continue
+            row.update(location=f"0x{location:08X}",
+                       limit=f"0x{authority & 0x1FFFFF:05X}",
+                       seq=(authority >> 21) & 0x1FF,
+                       g=(authority >> 30) & 1, f=(authority >> 31) & 1,
+                       seal=f"0x{seal:08X}")
+        return image, rows
+
+
 @app.route("/api/boot-image/save-ns", methods=["POST"])
-def boot_image_save_ns():
+def boot_image_save_ns(_review_only=False):
     """Single write path for NS table: writes boot-image.bin + ns-state.json atomically.
 
     Body JSON:
@@ -6587,25 +6619,33 @@ def boot_image_save_ns():
         "add_committed_projection": False,
         "started_monotonic": time.monotonic(),
     }
-    _save_lump_diagnostic_event(
-        stage="Capture", event="request_arrival", outcome="unknown")
-    if not _payload:
+    if not _review_only:
+        _save_lump_diagnostic_event(
+            stage="Capture", event="request_arrival", outcome="unknown")
+    if not isinstance(_payload, dict) or not _payload:
         return jsonify({"ok": False, "error": "Invalid JSON body"}), 400
 
     _data_b64 = _payload.get("data_b64")
     _ns_state  = _payload.get("ns_state") or {}
     _boot_config_candidate = _payload.get("boot_config")
+    if not isinstance(_ns_state, dict) or not isinstance(
+            _ns_state.get("abstractions"), list):
+        return jsonify(ok=False, error="ns_state.abstractions must be a list"), 400
 
-    if _data_b64 is None:
+    _generate = _payload.get("generate") is True
+    if _generate and _data_b64 is not None:
+        return jsonify(ok=False, error="Supply either image bytes or generation, not both"), 400
+    if _data_b64 is None and not _generate:
         return jsonify({"ok": False, "error": "Missing 'data_b64' field"}), 400
 
     try:
-        _img_bytes = _b64_sns.b64decode(_data_b64, validate=True)
+        _img_bytes = None if _generate else _b64_sns.b64decode(_data_b64, validate=True)
     except Exception:
         return jsonify({"ok": False, "error": "Invalid base64 data"}), 400
 
     try:
-        _validate_boot_image_bytes(_img_bytes)
+        if not _generate:
+            _validate_boot_image_bytes(_img_bytes)
     except ValueError as _exc:
         return jsonify({"ok": False, "error": str(_exc)}), 400
 
@@ -6723,6 +6763,13 @@ def boot_image_save_ns():
         if cfg_err:
             return jsonify({"ok": False, "error": cfg_err}), 400
     configured_words = int(cfg["step1"]["totalNamespaceWords"])
+    if _generate:
+        try:
+            _img_bytes, _ns_entries = _stage_namespace_save_image(cfg, _ns_entries)
+            _validate_boot_image_bytes(_img_bytes)
+        except (OSError, ValueError, TypeError) as _exc:
+            return jsonify(ok=False, error=f"Namespace generation rejected: {_exc}",
+                           dataChanged=False), 409
     try:
         _boot_image_gen.validate_boot_image(_img_bytes, configured_words)
         _saved_preparation = _boot_image_preparation_status(
@@ -6773,6 +6820,10 @@ def boot_image_save_ns():
             raise ValueError(
                 f"submitted image boot entry NS[{_submitted_image_slot}] does not "
                 f"match the Namespace boot marker NS[{_submitted_boot_slot}]")
+        if _review_only:
+            return {"rows": _ns_entries, "config": cfg,
+                    "image_sha256": hashlib.sha256(_img_bytes).hexdigest(),
+                    "generated": _generate}
         with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR):
             _current_rows, _current_fingerprint = _read_authoritative_namespace_rows()
             if _expected_namespace != _current_fingerprint:
@@ -25661,6 +25712,7 @@ def _release_lump_transition_request_locks(_exception=None):
 
 try:
     from change_confirmation import (
+        describe_namespace_save as _describe_namespace_save,
         describe_boot_image_generation as _describe_boot_image_generation,
         describe_boot_config_change as _describe_boot_config_change,
         describe_lump_save_plan as _describe_lump_save_plan,
@@ -25669,6 +25721,7 @@ try:
     )
 except ImportError:
     from server.change_confirmation import (
+        describe_namespace_save as _describe_namespace_save,
         describe_boot_image_generation as _describe_boot_image_generation,
         describe_boot_config_change as _describe_boot_config_change,
         describe_lump_save_plan as _describe_lump_save_plan,
@@ -25682,7 +25735,8 @@ def _change_confirmation_paths():
     # a stale source overwrite. Operational journals/drafts are not user artifacts.
     from pathlib import Path
     root = Path(__file__).resolve().parent.parent
-    paths = [BOOT_CONFIG_PATH, NS_STATE_PATH, LUMPS_MANIFEST_PATH]
+    paths = [BOOT_CONFIG_PATH, NS_STATE_PATH, LUMPS_MANIFEST_PATH,
+             BOOT_IMAGE_PATH, BOOT_IMAGE_PROVENANCE_PATH]
     for pattern in ("*.lump", "*.json", "*.bin"):
         # Lease heartbeats are coordination state, not reviewed artifacts.
         # Exclude only the registry; manifests and other JSON stay protected.
@@ -25704,6 +25758,39 @@ def _describe_protected_change(payload):
     if not isinstance(payload, dict):
         return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
     root = Path(__file__).resolve().parent.parent
+    if request.path == "/api/boot-image/save-ns":
+        # Execute the same validation as commit, stopping before any publication.
+        # No internal route request and no bypass token: one ordinary review
+        # binds the complete request plus all protected inputs under the lock.
+        candidate = boot_image_save_ns(_review_only=True)
+        g.pop("_lump_save_diagnostic", None)
+        if not isinstance(candidate, dict) or "rows" not in candidate:
+            response = app.make_response(candidate)
+            error = response.get_json(silent=True) or {}
+            raise ValueError(error.get("error") or "Namespace preflight failed")
+        try:
+            before, _ = _read_authoritative_namespace_rows()
+            with open(LUMPS_MANIFEST_PATH, encoding="utf-8") as stream:
+                manifest = json.load(stream)
+            def saved_binary_hash(record):
+                filename = record.get("filename")
+                if not isinstance(filename, str) or os.path.basename(filename) != filename:
+                    return None
+                path = Path(LUMPS_DIR) / filename
+                if path.is_symlink() or not path.is_file():
+                    return None
+                return hashlib.sha256(path.read_bytes()).hexdigest()
+            old = _resolve_saved_lump_versions(before, manifest, saved_binary_hash)
+            new = _resolve_saved_lump_versions(candidate["rows"], manifest, saved_binary_hash)
+            lines = _describe_namespace_save(old, new, candidate["generated"])
+            lines.extend(_describe_boot_config_change(
+                _load_existing_boot_config_unchecked(), candidate["config"],
+                candidate["rows"], manifest, binary_hash_for=saved_binary_hash,
+                namespace_save=True))
+            lines.append("Validated candidate image SHA-256: " + candidate["image_sha256"])
+            return lines
+        except (OSError, TypeError, KeyError) as exc:
+            raise ValueError("Namespace review evidence unavailable; no changes authorized") from exc
     if request.path == "/api/boot-config/slot-label":
         try:
             slot = payload.get("slot")
@@ -25813,15 +25900,6 @@ def _describe_protected_change(payload):
         if candidate.is_relative_to(root / "simulator") and candidate.suffix == ".cloomc":
             before = candidate.read_text(encoding="utf-8") if candidate.is_file() else ""
             after = str(payload.get("content", ""))
-    elif request.path == "/api/boot-image/save-ns":
-        saved = {}
-        if os.path.isfile(NS_STATE_PATH):
-            with open(NS_STATE_PATH, encoding="utf-8") as stream:
-                saved = json.load(stream)
-        before = json.dumps(saved.get("abstractions", []), indent=2, sort_keys=True)
-        proposed = payload.get("ns_state") or {}
-        if isinstance(proposed, dict):
-            after = json.dumps(proposed.get("abstractions", []), indent=2, sort_keys=True)
     if before is not None and after is not None:
         delta = "".join(difflib.unified_diff(
             before.splitlines(keepends=True), after.splitlines(keepends=True),

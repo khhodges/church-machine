@@ -118,7 +118,7 @@ async function waitForDialog(h) {
     }), {status: 409}), 'Save the Namespace', {allowReviewCancellation: true}),
     error => error.code !== 'change_rejected' && /failed \(HTTP 409\)/.test(error.message));
     assert(memory.includes("response, 'Save the Namespace build configuration', {\n                allowReviewCancellation: true"));
-    assert(memory.includes("_genResp, 'Generate the image for Namespace save', {\n                    allowReviewCancellation: true"));
+    assert(memory.includes("await window._ensureNamespaceBuildConfig(true)"));
     assert(memory.includes("resp, 'Save the Namespace', {\n            allowReviewCancellation: true"));
     const prefetchSource = memory.slice(
         memory.indexOf('    window._nsPrefetchSaveClick = async function(btn) {'),

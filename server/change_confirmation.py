@@ -56,6 +56,8 @@ def resolve_saved_lump_versions(rows, manifest, binary_hash_for=None):
     resolved = []
     for row in rows:
         item = dict(row) if isinstance(row, dict) else row
+        if isinstance(item, dict):
+            item.pop("_review_saved_version", None)
         if not isinstance(item, dict) or not item.get("filename"):
             resolved.append(item)
             continue
@@ -176,8 +178,37 @@ def describe_boot_image_generation(before_rows, after_rows, entry_slot,
     return lines
 
 
+def describe_namespace_save(before, after, generated=False):
+    """Human-readable row changes, separated from immutable saved revisions."""
+    lines = [
+        "Save Namespace configuration, bindings and image together.",
+        "Saved LUMP revisions remain unchanged; no saved revision is created or rewritten.",
+        ("Generate a new image and normalize descriptor layout."
+         if generated else "Preserve the submitted image; validate and couple its boot target."),
+    ]
+    old = {row["slot"]: row for row in before}
+    new = {row["slot"]: row for row in after}
+    for slot in sorted(old.keys() | new.keys()):
+        prior, proposed = old.get(slot, {}), new.get(slot, {})
+        def identity(row):
+            if not row:
+                return "(empty)"
+            return (f"{row.get('name', '(unnamed)')}; "
+                    f"{row.get('filename', '(no saved artifact)')}; saved version "
+                    f"{row.get('_review_saved_version', 'unresolved')}")
+        lines.append(f"NS[{slot}] {identity(prior)} → {identity(proposed)}")
+        for key in sorted(prior.keys() | proposed.keys()):
+            if key.startswith("_review_") or key in {"slot", "name", "filename", "lump_version"}:
+                continue
+            if prior.get(key) != proposed.get(key):
+                lines.append(f"NS[{slot}] {key}: "
+                             f"{json.dumps(prior.get(key), sort_keys=True)} → "
+                             f"{json.dumps(proposed.get(key), sort_keys=True)}")
+    return lines
+
+
 def describe_boot_config_change(before, after, rows, manifest, prepare=False,
-                                binary_hash_for=None):
+                                binary_hash_for=None, namespace_save=False):
     """Describe normalized config changes using exact saved catalogue evidence.
 
     No name-only/latest-revision lookup: stable tokens can identify many revisions.
@@ -185,7 +216,9 @@ def describe_boot_config_change(before, after, rows, manifest, prepare=False,
     """
     lines = ["Boot configuration review (saved → proposed).",
              "This changes configuration, not saved LUMP revisions; no new LUMP version is created."]
-    if prepare:
+    if namespace_save:
+        lines.append("Configuration and the validated Namespace image commit together.")
+    elif prepare:
         lines.append("Explicit Prepare: the committed boot image will also be prepared/patched for the Namespace boot target.")
     else:
         lines.append("No explicit Prepare requested. Existing boot-image inputs may become stale.")
@@ -466,7 +499,11 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
                 if key in payload:
                     target.append(f"{key}: {str(payload[key])[:256]}")
         if describe is not None:
-            target.extend(describe(payload))
+            try:
+                target.extend(describe(payload))
+            except ValueError as exc:
+                return jsonify(error="change_preflight_failed", committed=False,
+                               message=str(exc)), 409
         reason = "You requested a persisted change. It may update source, repository history, Namespace bindings or the generated boot image."
         if request.path == "/api/boot-config":
             reason = ("Review the boot configuration fields and affected pet names / saved LUMP versions below. "
@@ -475,7 +512,12 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
             reason = ("Publish the reviewed LUMP and related repository/Namespace state. "
                       "Existing admission checks still apply. Save processing may add a "
                       "required SELF C-list entry and padding; reject if you do not approve that transformation.")
-        if request.path == "/api/boot-image/generate":
+        if request.path == "/api/boot-image/save-ns":
+            reason = ("Review this complete Namespace save, including configuration "
+                      "and image effects. Confirm commits the operation once; "
+                      "cancel retains your staged edits.")
+            title = "Review Namespace save"
+        elif request.path == "/api/boot-image/generate":
             reason = ("Generate the reviewed Namespace image and replace the committed "
                       "boot image/provenance. Review the exact Namespace and selected "
                       "saved-revision effects below.")

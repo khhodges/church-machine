@@ -32,7 +32,7 @@ check('Namespace save explains layout normalization separately from artifact sel
 check('Namespace toolbar does not expose a separate policy-save button',
     !toolbar.includes('nsPrefetchSaveBtn') && !source.includes('id="nsPrefetchSaveBtn"'));
 
-const helperStart = source.indexOf('window._ensureNamespaceBuildConfig = async function()');
+const helperStart = source.indexOf('window._ensureNamespaceBuildConfig = async function(stageOnly = false)');
 const helperEnd = source.indexOf('window._nsPrefetchSave = async function()', helperStart);
 const helper = source.slice(helperStart, helperEnd);
 check('fresh projects load defaults before saving Namespace build settings',
@@ -72,23 +72,23 @@ check('unchanged Namespace preparation preserves the descriptor seal',
     sealWords[2] === expectedSeal);
 const saveRaw = save.indexOf("fetch('/api/boot-image/save-ns'");
 const clearDirty = save.indexOf('_setNsDirty(false)');
-check('single save submits Namespace bytes without a competing boot-config plan',
+check('single save includes staged configuration in the same Namespace transaction',
     saveRaw !== -1 &&
-    save.includes('boot_config: null') &&
+    save.includes('boot_config: stagedBuildConfig') &&
     save.includes('namespaceFingerprint,'));
 check('single save does not issue a separate post-commit config write',
-    save.lastIndexOf('await window._ensureNamespaceBuildConfig()') < saveRaw &&
+    save.indexOf('await window._ensureNamespaceBuildConfig(true)') < saveRaw &&
     save.includes('window._setActiveBootConfig('));
 check('single save clears the dirty indicator after transaction acknowledgement',
     clearDirty > saveRaw);
 
-check('Namespace save regenerates and validates a missing boot image before snapshotting',
-    save.indexOf("fetch('/api/boot-image/generate'") !== -1 &&
-    save.indexOf("sim.loadBootImage(_generated)") !== -1 &&
-    save.indexOf("fetch('/api/boot-image/generate'") < saveRaw);
+check('Namespace save requests missing-image generation in its single transaction',
+    !save.includes("fetch('/api/boot-image/generate'") &&
+    save.includes('generate: generateForSave') &&
+    helper.includes('if (stageOnly) return cfg;'));
 check('Namespace save preserves a validated live image after cache invalidation',
     save.includes('sim._bootImageLoaded === true') &&
-    save.includes('sim._bootImageLoaded !== true'));
+    save.includes('const generateForSave = !hasLiveBootImage'));
 check('Namespace save preserves resident artifact locators for unchanged rows',
     save.includes('_savedBySlot') &&
     save.includes('_nsApplyArtifactBindingForSave(') &&

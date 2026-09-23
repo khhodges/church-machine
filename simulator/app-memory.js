@@ -4053,7 +4053,7 @@ function updateNamespace() {
     // Build a complete config even on a fresh project.  The old UI required
     // opening Builder and saving Step 1 before Namespace policies could be
     // saved.  That was an implementation detail leaking into the user flow.
-    window._ensureNamespaceBuildConfig = async function() {
+    window._ensureNamespaceBuildConfig = async function(stageOnly = false) {
         const localCfg = (window.bootConfig && typeof window.bootConfig === 'object')
             ? window.bootConfig : {};
         let serverData = null;
@@ -4098,6 +4098,9 @@ function updateNamespace() {
         if (!cfg.step1) {
             throw new Error('The default build configuration is unavailable.');
         }
+        // Namespace Save includes this candidate in its single reviewed commit.
+        // Staging must not clear edits or invalidate the current image.
+        if (stageOnly) return cfg;
         const response = await fetch('/api/boot-config', {
             method: 'POST',
             headers: Object.assign({'Content-Type': 'application/json'},
@@ -5394,10 +5397,8 @@ window._nsTableSave = async function(btn) {
                 'No committed Namespace boot marker is selected; choose a Lightning Bolt target, then retry Save for next build.');
         }
 
-        // A Namespace save must never snapshot the simulator's fallback memory,
-        // but it can recover a missing/stale saved image safely.  Persist the
-        // selected build config first (which may invalidate the old image),
-        // then regenerate and validate the server image through loadBootImage.
+        // Missing images are generated privately by the single server save
+        // transaction, never published by an earlier dependent request.
         // A config POST can invalidate the cached browser buffer while the
         // simulator still holds the last validated image in live memory.
         // Preserve that image for this explicit Namespace save; regenerating
@@ -5428,38 +5429,10 @@ window._nsTableSave = async function(btn) {
                         'preparation failed'));
             }
         }
-        if ((!window.bootImage || !window.bootImageAvailable) && !hasLiveBootImage &&
-                !nsSavePreparedSelection) {
-            await window._ensureNamespaceBuildConfig();
-            if ((!window.bootImage || !window.bootImageAvailable) &&
-                    sim._bootImageLoaded !== true) {
-                const _genResp = await fetch('/api/boot-image/generate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    // Generation resolves the committed Namespace marker;
-                    // do not pass the UI projection as a second plan.
-                    body: JSON.stringify({}),
-                });
-                await _actionableJsonResponse(_genResp, 'Generate the image for Namespace save', {
-                    allowReviewCancellation: true,
-                    dataChanged: false,
-                    nextAction: 'Review the boot configuration, then click Save for next build again.',
-                });
-                const _generated = await _probeBootImage();
-                if (!_generated) {
-                    throw new Error('Generated boot image could not be loaded.');
-                }
-                if (sim.loadBootImage(_generated) !== true) {
-                    throw new Error(sim.lastBootImageError || 'Generated boot image was rejected.');
-                }
-                window.bootImage = _generated;
-                window.bootImageAvailable = true;
-                _applyBootEntryToSim();
-                if (typeof window._clearBootImageStickyPatches === 'function') {
-                    window._clearBootImageStickyPatches(sim.nsCount || 0);
-                }
-            }
-        }
+        const generateForSave = !hasLiveBootImage &&
+            (!window.bootImage || !window.bootImageAvailable) && !nsSavePreparedSelection;
+        const stagedBuildConfig = (generateForSave || window._nsPrefetchDirty)
+            ? await window._ensureNamespaceBuildConfig(true) : null;
 
         // Add/Save label writes and the binary commit form one canonical save.
         // Wait for every in-flight label update so a quick Save→reload cannot
@@ -5474,7 +5447,8 @@ window._nsTableSave = async function(btn) {
         // words, because the generator writes the NS table at the tail and the
         // format-tag scanner computes: NS_TABLE_BASE = tagIdx + 1, and
         // NS_TABLE_RESERVE = src.length - NS_TABLE_BASE  →  total = NS_TABLE_BASE + NS_TABLE_RESERVE.
-        const bootWordCount = (sim.NS_TABLE_BASE >>> 0) + (sim.NS_TABLE_RESERVE >>> 0);
+        const bootWordCount = generateForSave ? 8 :
+            (sim.NS_TABLE_BASE >>> 0) + (sim.NS_TABLE_RESERVE >>> 0);
         if (bootWordCount < 8 || bootWordCount > sim.memory.length) {
             throw new Error(`Unexpected boot image size: ${bootWordCount} words`);
         }
@@ -5598,20 +5572,19 @@ window._nsTableSave = async function(btn) {
             } catch (_) {}
         }
 
-        // POST to the single-write Namespace transaction. Boot configuration is
-        // deliberately omitted: Namespace state is the sole boot authority and
-        // the server reads policy/config projections without accepting a second
-        // boot-target decision.
+        // One protected operation includes staged configuration and any missing
+        // image generation. Namespace rows remain the sole boot-target authority.
         const resp = await fetch('/api/boot-image/save-ns', {
             method:  'POST',
             headers: Object.assign({'Content-Type': 'application/json'},
                 (window.BuildApprovalView && window.BuildApprovalView._authHeaders
                     ? window.BuildApprovalView._authHeaders() : {})),
             body:    JSON.stringify({
-                data_b64,
+                data_b64: generateForSave ? null : data_b64,
+                generate: generateForSave,
                 ns_state: nsState,
                 namespaceFingerprint,
-                boot_config: null,
+                boot_config: stagedBuildConfig,
                 // Non-authoritative correlation only; the server's Namespace
                 // state and atomic write identity do not include this field.
                 diagnostic_attempt_id: _nsSaveMetadata.diagnostic_attempt_id,
