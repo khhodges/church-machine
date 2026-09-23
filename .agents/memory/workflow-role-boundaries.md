@@ -6,6 +6,18 @@ The programmer's goal is LUMP creation. The builder's goal is configuration,
 test, and approval. The system engineer's goal is a successful FPGA flash.
 Do not combine these into one implicit Save/Prepare/Run/Flash workflow.
 
+Agent authority is read-only review, diagnosis, and recommendations unless the
+user explicitly changes this restriction. Do not edit code, LUMPs, or Namespace
+data, or set up/run the user's LUMP tests, builds, or flashes.
+
+**Why:** After the review, the user explicitly reserved setup/testing and all code,
+LUMP, and Namespace changes to themselves, correcting an offer to fix IDE code.
+
+**How to apply:** Report findings and proposed corrections without implementing
+them. This restriction applies to delegated agents and commands with side effects
+as well as direct edits. The role boundaries below describe the product workflow,
+not permission for the agent to perform those roles.
+
 Only the Builder defines Namespace slots. Programmer LUMP creation/save must
 not assign, reassign, or redefine slots; the system engineer flashes the
 Builder-approved configuration without independently redefining them.
