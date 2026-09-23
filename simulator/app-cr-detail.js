@@ -2361,7 +2361,41 @@ function _applyMethodCRNames(text, methodObj) {
     });
 }
 
-function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
+// Read annotations from the same loaded allocation as the displayed words.
+// Slot-keyed manifests and CR0's earlier pet name may describe another revision
+// or an earlier CALL; neither identifies an indexed CALL's C-list operand.
+function _codeViewCallContext(base, header) {
+    if (!header || !header.valid || !sim || !sim.memory ||
+            base < 0 || base + header.lumpSize > sim.memory.length) return null;
+    const words = sim.memory.slice(base, base + header.lumpSize);
+    const api = typeof lumpDecodeContentFrameApi === 'function'
+        ? lumpDecodeContentFrameApi(words) : null;
+    return {
+        words,
+        count: header.cc,
+        caps: api && Array.isArray(api.capabilities) ? api.capabilities : [],
+    };
+}
+
+function _indexedCallTarget(context, index) {
+    if (!context || index >= context.count) return 'unresolved C-list target';
+    const gt = context.words[context.words.length - context.count + index] >>> 0;
+    if (!gt) return 'unresolved C-list target';
+    const declared = context.caps[index];
+    const name = typeof declared === 'string' ? declared : declared && declared.name;
+    if (name && typeof CapabilityTokens !== 'undefined') {
+        const resolved = CapabilityTokens.resolveCapability(declared, {
+            sim,
+            lumps: typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache) ? _lumpsCache : [],
+        });
+        if (CapabilityTokens.validateToken(gt, resolved, { sim }).ok) return name;
+        return 'unresolved C-list target (metadata/GT mismatch)';
+    }
+    // Without verified metadata report the word, not a possibly stale pet name.
+    return `GT 0x${gt.toString(16).toUpperCase().padStart(8, '0')}`;
+}
+
+function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
     word = word >>> 0;
     if (word === 0) return null;
     const opcode = (word >>> 27) & 0x1F;
@@ -2406,6 +2440,10 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets) {
     }
 
     if (opcode === 2) {
+        if (crSrc === 6) {
+            const target = _indexedCallTarget(callContext, imm);
+            return { desc: _escDecomp(`call${cc} ${target} via CR6[0x${imm.toString(16).toUpperCase().padStart(4, '0')}]${ccDesc}`), compiler: false };
+        }
         if (crDst === 6) return { desc: _escDecomp(`recall${cc} self${ccDesc}`), compiler: false };
         const tag = _crTag(crDst, crPets);
         let methodStr = '';

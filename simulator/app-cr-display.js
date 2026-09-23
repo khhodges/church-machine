@@ -482,6 +482,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     // Empty slots (word=0) are shown dimmed; loaded instructions are bright.
                     const _clBase = (cc > 0) ? (loc + lumpSize - cc) : 0;
                     const _crPets1 = {};
+                    const _callContext1 = _codeViewCallContext(loc, sim.parseLumpHeader(sim.memory[loc] >>> 0));
                     const _cw1 = [];
                     for (let w = 0; w < cw; w++) {
                         const a = loc + 1 + w;
@@ -516,7 +517,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                         const isProgress = addr === lastExecutedAddr;
                         const isPC = addr === currentAddr;
                         const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
-                        const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1);
+                        const _dc = _decompileWord(word, addr, nsIdx, _clBase, _crPets1, _callContext1);
                         const _dcCls = _dc ? (_dc.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
                         const rowCls = [
                             isProgress ? 'code-progress-row' : '',

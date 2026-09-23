@@ -1331,6 +1331,7 @@ function updateCRDetail() {
         }
 
         const _crPets3 = {};
+        const _callContext = _codeViewCallContext(baseLoc, lumpHdr);
 
         // Use the pre-computed clobber analysis to highlight offending rows
         const _earlyClobberWarnings = (_sharedRefResult && _sharedRefResult.clobberWarnings)
@@ -1451,7 +1452,7 @@ function updateCRDetail() {
                 codeHtml += `<tr class="code-row-label"><td colspan="${_colspan}" class="code-label-line">${_lbl}:</td></tr>`;
             }
 
-            const decomp = _decompileWord(word, addr, nsIdx, _lumpClistBase, _crPets3);
+            const decomp = _decompileWord(word, addr, nsIdx, _lumpClistBase, _crPets3, _callContext);
             const isCompiler = decomp && decomp.compiler;
             const _opcode = (word >>> 27) & 0x1F;
             const _controlFlowName = _opcode === 2 ? 'CALL'
