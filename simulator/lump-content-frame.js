@@ -406,7 +406,7 @@ async function lumpInspectContentFrameSource(serverWords) {
         var _decoded = new TextDecoder().decode(new Uint8Array(_fBytes));
         return _decoded.trim().length > 0
             ? { status: 'source', source: _decoded }
-            : { status: 'absent', source: null, sourceByteLength: _fBytes.length };
+            : { status: 'absent', source: null };
     } catch (_e) {
         return {
             status: 'error',
@@ -421,36 +421,6 @@ async function lumpDecodeContentFrame(serverWords) {
     return result.status === 'source' ? result.source : null;
 }
 
-// Display decoded source size, never the mutable editor or a sidecar source.
-// These are UTF-8 bytes, not the compressed frame's allocation/occupancy.
-async function lumpSourceSizeSummary(serverWords) {
-    try {
-        if (!serverWords || !serverWords.length) return 'source unavailable';
-        var hdr = serverWords[0] >>> 0;
-        var cw = (hdr >>> 10) & 0x1FFF;
-        var cc = hdr & 0xFF;
-        var size = 64 << ((hdr >>> 23) & 0x0F);
-        var start = 1 + cw;
-        if ((hdr >>> 27) !== 0x1F || serverWords.length < size || start > size - cc) {
-            return 'source unavailable';
-        }
-        if (start < size - cc && ((serverWords[start] >>> 24) & 0xFF) === 0xAB) {
-            var flags = (serverWords[start] >>> 16) & 0xFF;
-            if (![0, 1, 3, 5, 7].includes(flags) ||
-                    !lumpDecodeContentFrameApi(serverWords)) return 'source unavailable';
-        }
-        var inspection = await lumpInspectContentFrameSource(serverWords);
-        if (inspection.status === 'error') return 'source unavailable';
-        var bytes = inspection.sourceByteLength !== undefined
-            ? inspection.sourceByteLength
-            : inspection.status === 'source'
-                ? new TextEncoder().encode(inspection.source).length : 0;
-        return 'source ' + bytes + ' UTF-8 bytes';
-    } catch (_) {
-        return 'source unavailable';
-    }
-}
-
 // ── Module export (Node.js) / browser global ──────────────────────────────────
 var _lcfExports = {
     lumpFrameUtf8Bytes:    lumpFrameUtf8Bytes,
@@ -463,7 +433,6 @@ var _lcfExports = {
     lumpInspectContentFrameSource: lumpInspectContentFrameSource,
     lumpDecodeContentFrameApi: lumpDecodeContentFrameApi,
     lumpDecodeContentFrame: lumpDecodeContentFrame,
-    lumpSourceSizeSummary: lumpSourceSizeSummary,
 };
 
 if (typeof module !== 'undefined' && module.exports) {

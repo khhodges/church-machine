@@ -617,8 +617,10 @@ window._showLatestCompilationPromotion = _showLatestCompilationPromotion;
 // deliberately exclude the one-word LUMP header so Code + API + Source + Empty
 // + C-List always describe the binary payload after its header.
 function _getLumpFieldSizeLayout(words) {
-    if (!Array.isArray(words) || words.length === 0) return null;
+    if ((!Array.isArray(words) && !ArrayBuffer.isView(words)) || words.length === 0) return null;
     const header = words[0] >>> 0;
+    // This layout describes Code LUMPs only, not Thread stack or Namespace data.
+    if ((header >>> 27) !== 0x1F || ((header >>> 8) & 3) !== 0) return null;
     const cw = (header >>> 10) & 0x1FFF;
     const cc = header & 0xFF;
     const nMinus6 = (header >>> 23) & 0x0F;
@@ -629,20 +631,40 @@ function _getLumpFieldSizeLayout(words) {
 
     let api = 0;
     let source = 0;
-    const frameHeader = words[freeStart] >>> 0;
+    const frameHeader = freeStart < freeEnd ? words[freeStart] >>> 0 : 0;
     if ((frameHeader >>> 24) === 0xAB) {
         const flags = (frameHeader >>> 16) & 0xFF;
         const apiBytes = frameHeader & 0xFFFF;
         const apiPayloadWords = Math.ceil(apiBytes / 4);
         const sourceLengthIndex = freeStart + 1 + apiPayloadWords;
-        api = Math.min(1 + apiPayloadWords, freeEnd - freeStart);
+        if (![0, 1, 3, 5, 7].includes(flags) || apiBytes === 0 ||
+                sourceLengthIndex > freeEnd) return null;
+        const apiPacked = new Uint8Array(apiPayloadWords * 4);
+        for (let i = 0; i < apiPayloadWords; i++) {
+            const word = words[freeStart + 1 + i] >>> 0;
+            apiPacked.set([word >>> 24, (word >>> 16) & 255,
+                (word >>> 8) & 255, word & 255], i * 4);
+        }
+        try {
+            const decoded = JSON.parse(new TextDecoder('utf-8', {fatal: true})
+                .decode(apiPacked.subarray(0, apiBytes)));
+            if (!decoded || typeof decoded !== 'object' || Array.isArray(decoded)) return null;
+        } catch (_) { return null; }
+        api = 1 + apiPayloadWords;
 
         // Source-bearing V1.3 frames reserve one word for the byte length,
         // followed by the packed (possibly compressed) source payload.
-        if ((flags & 0x01) !== 0 && sourceLengthIndex < freeEnd) {
+        if ((flags & 0x01) !== 0) {
+            if (sourceLengthIndex >= freeEnd) return null;
             const sourceBytes = words[sourceLengthIndex] >>> 0;
-            source = Math.min(1 + Math.ceil(sourceBytes / 4), freeEnd - freeStart - api);
+            source = 1 + Math.ceil(sourceBytes / 4);
+            if (source > freeEnd - freeStart - api) return null;
         }
+    }
+    // Unknown payload in the supposed unused span cannot be declared free.
+    // Used counts come from declared field spans, never nonzero-word counting.
+    for (let i = freeStart + api + source; i < freeEnd; i++) {
+        if ((words[i] >>> 0) !== 0) return null;
     }
 
     return {
@@ -652,6 +674,25 @@ function _getLumpFieldSizeLayout(words) {
         empty: Math.max(0, freeEnd - freeStart - api - source),
         clist: cc,
     };
+}
+
+async function _getSavedLumpWordUsageSummary(words) {
+    const layout = _getLumpFieldSizeLayout(words);
+    if (!layout) return 'word usage unavailable';
+    if (layout.source > 0) {
+        if (typeof LumpContentFrame === 'undefined' ||
+                typeof LumpContentFrame.lumpInspectContentFrameSource !== 'function') {
+            return 'word usage unavailable';
+        }
+        const inspected = await LumpContentFrame.lumpInspectContentFrameSource(words);
+        if (!inspected || inspected.status === 'error') return 'word usage unavailable';
+    }
+    const used = 1 + layout.code + layout.api + layout.source + layout.clist;
+    const total = used + layout.empty;
+    return total + ' words total, ' + used + ' used, ' + layout.empty +
+        ' unused; header=1, code=' + layout.code + ', API=' + layout.api +
+        ', source=' + layout.source + ', cc=' + layout.clist +
+        ' (stored words, including framing/padding)';
 }
 
 function _renderLumpFieldSizeSummary(layout) {
@@ -7569,15 +7610,10 @@ async function openLumpInEditor(token, options) {
             var addrStr = baseLoc !== null
                 ? ('@ 0x' + baseLoc.toString(16).toUpperCase().padStart(4, '0') + '  ')
                 : '';
-            var _lhFree2 = lhdr.lumpSize - 1 - lhdr.cw - lhdr.cc;
-            var _sourceSizeSummary = typeof LumpContentFrame !== 'undefined' &&
-                typeof LumpContentFrame.lumpSourceSizeSummary === 'function'
-                ? await LumpContentFrame.lumpSourceSizeSummary(serverWords)
-                : 'source unavailable';
+            var _wordUsageSummary = await _getSavedLumpWordUsageSummary(serverWords);
             disasmLines = [
                 lumpName + '  ' + addrStr +
-                '(' + codeLimit + ' word' + (codeLimit !== 1 ? 's' : '') +
-                ', cc=' + lhdr.cc + ', ' + _lhFree2 + ' free, ' + _sourceSizeSummary + ')',
+                '(' + _wordUsageSummary + ')',
                 '',
                 _formatLumpHeaderDisassembly(lhdrW),
                 ''
