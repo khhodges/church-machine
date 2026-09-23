@@ -1669,12 +1669,17 @@ function onRunBtnClick() {
     } else {
         _runClickTimer = setTimeout(() => {
             _runClickTimer = null;
-            prepareAndRunSavedArtifact();
+            // Run consumes the already prepared image, just like Step/Walk.
+            // Preparing newer saved artifacts is a separate explicit action;
+            // it may persist Namespace bindings and must not be hidden here.
+            if (window.IDEActions) window.IDEActions.run();
+            else runSimGo();
         }, 280);
     }
 }
 
 function prepareAndRunSavedArtifact(propagateError) {
+    // Explicit "Prepare latest & Run" only, never the ordinary Run button.
     const run = () => {
         if (window.IDEActions) window.IDEActions.run();
         else runSimGo();

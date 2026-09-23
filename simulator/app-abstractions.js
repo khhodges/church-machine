@@ -1080,8 +1080,8 @@ if (window._nsState && typeof window._applyNamespaceBootProjection === 'function
 }
 
 async function savePreparedBootEntry() {
-    // The toolbar action, idle reconciliation, and explicit Run all share this
-    // operation. The private recursive call owns the operation while public
+    // Explicit preparation actions share this operation; ordinary Run and idle
+    // observation never call it. The private recursive call owns it while public
     // callers receive the same promise and cannot publish in parallel.
     if (arguments[0] !== true) {
         if (window._prepareRunSaveInFlight) {
@@ -1291,9 +1291,9 @@ async function savePreparedBootEntry() {
 }
 window.savePreparedBootEntry = savePreparedBootEntry;
 
-// Run calls this before any boot instruction executes. The promise serializes
-// preparation and prevents a second click from swapping the selected body
-// while an execution batch is active.
+// Only explicit "Prepare latest & Run" calls this. Ordinary Run consumes the
+// committed image without preparation. Serialize explicit preparation and
+// prevent it from swapping the selected body during an execution batch.
 let _prepareSavedArtifactForRunInFlight = null;
 async function prepareSavedArtifactForRun() {
     if ((typeof _simRunActive !== 'undefined' && _simRunActive) ||

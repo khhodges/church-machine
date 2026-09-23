@@ -276,6 +276,84 @@ function makeReconciliationContext(options) {
 }
 
 (async () => {
+    // Actual toolbar single-click callback must consume prepared execution,
+    // never the persistent Prepare/Run transaction. Run's normal guard also
+    // covers keyboard/IDEActions entry and rejects missing/invalid images.
+    const toolbarStart = runSource.indexOf('function onRunBtnClick()');
+    const toolbarEnd = runSource.indexOf('function prepareAndRunSavedArtifact(', toolbarStart);
+    const guardStart = runSource.indexOf('function _requireCommittedImageForExecution(');
+    const guardEnd = runSource.indexOf('function instantBoot()', guardStart);
+    const imageStart = runSource.indexOf('function _bootHasCommittedImage()');
+    const imageEnd = runSource.indexOf('function _isInternalPreparationError(', imageStart);
+    for (const scenario of ['fresh', 'older-saved-revision', 'missing', 'invalid']) {
+        const calls = { executed: 0, blocked: 0, prepare: 0 };
+        let callback;
+        const toolbar = {
+            _runClickTimer: null,
+            window: {
+                bootImage: scenario === 'missing' ? null : new ArrayBuffer(16),
+                bootImageAvailable: scenario !== 'missing',
+                _nsState: { executionFreshness: {
+                    status: scenario === 'older-saved-revision' ? 'stale' : 'current',
+                } },
+                BootEntryUI: { get: () => ({
+                    status: scenario === 'invalid' ? 'stale-image' : 'prepared',
+                }) },
+                IDEActions: { run() {
+                    if (toolbar._requireCommittedImageForExecution('Run')) calls.executed++;
+                } },
+            },
+            sim: { _bootImageLoaded: scenario !== 'missing' },
+            setTimeout(fn) { callback = fn; return 1; },
+            clearTimeout() {},
+            showRunPopover() {},
+            prepareAndRunSavedArtifact() { calls.prepare++; },
+            fetch() { throw new Error('Toolbar must not submit a generation request'); },
+            _ensureCommittedImageForBoot() { calls.blocked++; },
+        };
+        vm.createContext(toolbar);
+        vm.runInContext(runSource.slice(toolbarStart, toolbarEnd) +
+            runSource.slice(imageStart, imageEnd) +
+            runSource.slice(guardStart, guardEnd), toolbar);
+        toolbar.onRunBtnClick();
+        callback();
+        assert.strictEqual(calls.prepare, 0, scenario + ': no implicit preparation');
+        assert.strictEqual(calls.executed,
+            ['fresh', 'older-saved-revision'].includes(scenario) ? 1 : 0);
+        assert.strictEqual(calls.blocked,
+            ['missing', 'invalid'].includes(scenario) ? 1 : 0);
+    }
+    const resetGuard = runSource.slice(
+        runSource.indexOf('function _ensureCommittedImageForBoot('), guardStart);
+    assert.doesNotMatch(resetGuard, /savePreparedBootEntry|prepareSavedArtifactForRun|boot-image\/generate/);
+    assert.match(resetGuard, /_refreshCommittedBootImageCache/);
+    assert.match(runSource, /Lightning Bolt target and click Prepare boot image/);
+    for (const scenario of ['fresh', 'missing', 'rejected-image']) {
+        const calls = { reads: 0, blocked: 0, resets: 0 };
+        const reset = {
+            _bootImageRefreshInFlight: null,
+            window: {
+                bootImageAvailable: scenario !== 'missing',
+                async _refreshCommittedBootImageCache() {
+                    calls.reads++;
+                    throw new Error('Committed image is unavailable; use explicit Prepare');
+                },
+            },
+            document: { getElementById() { return null; } },
+            _bootHasCommittedImage() { return scenario === 'fresh'; },
+            _blockBootForMissingCommittedImage() { calls.blocked++; return false; },
+            resetSim() { calls.resets++; },
+            fetch() { throw new Error('Reset may not generate an image'); },
+        };
+        vm.createContext(reset);
+        vm.runInContext(resetGuard, reset);
+        assert.strictEqual(reset._ensureCommittedImageForBoot('Reset'), scenario === 'fresh');
+        if (reset._bootImageRefreshInFlight) await reset._bootImageRefreshInFlight;
+        assert.strictEqual(calls.reads, scenario === 'rejected-image' ? 1 : 0);
+        assert.strictEqual(calls.blocked, scenario === 'fresh' ? 0 : 1);
+        assert.strictEqual(calls.resets, 0, 'failed image fetch must not reset into factory memory');
+    }
+
     // Execute the complete production preparation function. No test global or
     // helper supplies pendingArtifactPins: this catches its former scope bug.
     const success = makePrepareContext({ ok: true });
