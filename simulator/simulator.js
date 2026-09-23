@@ -7679,8 +7679,10 @@ class ChurchSimulator {
         }
         const priorFrame = this.callStack[this.callStack.length - 1];
         const returnPC = rootSentinel ? 0x7FFF : this.pc + 1;
+        const callerSZ = callThreadBase === null ? (priorFrame ? priorFrame.sz : 0)
+            : this._unpackProtectedIndicator(this.memory[callThreadBase + THREAD_STO_OFFSET] >>> 0).sz;
         const frameWord = this._packFrameWord(
-            returnPC, rootSentinel ? 1 : (priorFrame ? priorFrame.sz : 0), savedSTO);
+            returnPC, rootSentinel ? 1 : callerSZ, savedSTO);
         this.callStack.push({
             returnPC,
             savedCRs:   this.cr.map(c => ({...c})),
@@ -8217,7 +8219,10 @@ class ChurchSimulator {
         }
         const companion = frameSize === 1
             ? (this.memory[threadBase + frameAddress - 1] >>> 0) : 0;
-        const packed = this.memory[threadBase + frameAddress] >>> 0;
+        const cached = this.lambdaCachedFrame;
+        const packed = frameSize === 0 && cached &&
+                cached.threadBase === threadBase && cached.addr === frameAddress
+            ? cached.word >>> 0 : this.memory[threadBase + frameAddress] >>> 0;
         const frame = this._unpackFrameWord(packed);
         // CALL stores savedSTO at the exact address occupied by its frame.
         // This relation is what makes a corrupt previous-STO loop or a gap
@@ -8270,10 +8275,10 @@ class ChurchSimulator {
             this._activeThreadBase() === null
                 ? this.callStack[this.callStack.length - 1] : null);
         if (!protectedFrame.ok) return null;
-        // M-window writeback gate: must fire before frame pop and
-        // _resetAllMBits(), but only after the protected frame has passed all
-        // identity/permission checks above.
-        if (!this._mwinWriteback()) return null;
+        // The indicator describes the frame being popped; packed SZ describes
+        // the caller's previous frame and is restored into the indicator.
+        const activeFrameSZ = protectedFrame.indicator
+            ? protectedFrame.indicator.sz : protectedFrame.frame.sz;
         // Locate only the non-serialised caller snapshot by the protected
         // frame address.  The protected Thread image, not callStack ordering,
         // owns which frame RETURN is unwinding.
@@ -8284,7 +8289,7 @@ class ChurchSimulator {
                 candidate.frameAddress === protectedFrame.frameAddress &&
                 candidate.frameWord === protectedFrame.packed &&
                 candidate.savedSTO === protectedFrame.frame.savedSTO &&
-                candidate.sz === protectedFrame.frame.sz);
+                candidate.sz === activeFrameSZ);
         // callStack is a diagnostic shadow, never frame-selection authority.
         // A valid protected frame can outlive that shadow; raw NIA/FLAGS/SZ/
         // STO remain authoritative while missing snapshots scrub the caller
@@ -8307,6 +8312,34 @@ class ChurchSimulator {
             this.fault('STACK_UNDERFLOW', 'RETURN through sentinel frame (NIA=0x7FFF) — stack underflow: no caller above the root abstraction.');
             return null;
         }
+        // Validate the return destination before writeback, frame pop, or any
+        // register restoration, so faults retain the faulting callee snapshot.
+        if (protectedFrame.threadBase !== null) {
+            const entry = activeFrameSZ === 1
+                ? protectedFrame.companionCheck?.entry : null;
+            const codeBase = activeFrameSZ === 1
+                ? entry?.word0_location : this.cr[14]?.word1;
+            const codeGT = activeFrameSZ === 0 ? this.cr[14]?.word0 : null;
+            if (activeFrameSZ === 0) {
+                const check = this.mLoad(codeGT || 0, 'X', 14);
+                if (!check.ok) {
+                    this.fault(check.fault, `RETURN: lambda code context: ${check.message}`);
+                    return null;
+                }
+                if (!check.entry || check.entry.word0_location !== codeBase) {
+                    this.fault('STACK_CORRUPT', 'RETURN: lambda CR14 does not match its executable identity');
+                    return null;
+                }
+            }
+            const hdr = this.parseLumpHeader(this.memory[codeBase] >>> 0);
+            if (!Number.isInteger(codeBase) || !hdr.valid || hdr.typ !== 0 ||
+                    !Number.isInteger(frame.returnPC) || frame.returnPC < 0 ||
+                    frame.returnPC >= hdr.cw) {
+                this.fault('BOUNDS', `RETURN: NIA ${frame.returnPC} is outside the caller executable code extent`);
+                return null;
+            }
+        }
+        if (!this._mwinWriteback()) return null;
         if (runtimeFrame) {
             const runtimeIndex = this.callStack.lastIndexOf(runtimeFrame);
             this.callStack.splice(runtimeIndex, 1);
@@ -8409,8 +8442,8 @@ class ChurchSimulator {
                     tnBaseRet, this.sto, frame.sz, this.flags);
             }
         }
-        const frameTag = frame.sz === 0 ? 'LAMBDA' : 'CALL';
-        const isLeafLambda = frame.sz === 0;
+        const frameTag = activeFrameSZ === 0 ? 'LAMBDA' : 'CALL';
+        const isLeafLambda = activeFrameSZ === 0;
         if (isLeafLambda) {
             const cachedReturnPC = frame.returnPC;
             this.lambdaActive = false;
@@ -8432,13 +8465,14 @@ class ChurchSimulator {
             this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR14, _retCallerCR14GT);
             return { pc: cachedReturnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
         }
-        // Restore CR14 for cross-domain RETURN (sz=1 CALL frame): mirrors the
+        // Restore CR14 for cross-domain RETURN (active SZ=1 CALL frame): mirrors the
         // hardware cload that fires after RETURN to reload the caller's code
         // capability from its NS entry.  Without this _fetchInstruction computes
         // physicalPC from the callee's lump base (stale CR14.word1), so the next
         // step fetches from the wrong location.
-        // Lambda frames (sz=0) never overwrite CR14, so no restoration is needed.
-        if (frame.sz === 1 && protectedFrame.companionParsed &&
+        // Active LAMBDA frames never overwrite CR14. Packed frame.sz is the
+        // previous frame's SZ, not the kind of the frame being popped.
+        if (activeFrameSZ === 1 && protectedFrame.companionParsed &&
                 protectedFrame.companionCheck &&
                 protectedFrame.companionCheck.entry) {
             const callerIdentity = protectedFrame.companionParsed;
@@ -8454,7 +8488,7 @@ class ChurchSimulator {
             };
         }
         const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} preserved[${preservedCRs.join(',')||'none'}]` : '';
-        const desc = `RETURN (${frameTag}/SZ=${frame.sz}) PC→${frame.returnPC}${maskDesc}`;
+        const desc = `RETURN (${frameTag}/SZ=${activeFrameSZ}) PC→${frame.returnPC}${maskDesc}`;
         this.output += desc + '\n';
         this.pc = frame.returnPC;
         this._emitTrace(this.physicalPC, TRACE_EV_RETURN_POP,  0);
@@ -9200,8 +9234,10 @@ class ChurchSimulator {
             }
         }
         const priorFrame = this.callStack[this.callStack.length - 1];
+        const callerSZ = lambdaThreadBase === null ? (priorFrame ? priorFrame.sz : 0)
+            : this._unpackProtectedIndicator(this.memory[lambdaThreadBase + THREAD_STO_OFFSET] >>> 0).sz;
         const frameWord = this._packFrameWord(
-            this.pc + 1, priorFrame ? priorFrame.sz : 0, savedSTO);
+            this.pc + 1, callerSZ, savedSTO);
         this.callStack.push({
             returnPC:   this.pc + 1,
             savedCRs:   this.cr.map(c => ({...c})),
@@ -9458,8 +9494,10 @@ class ChurchSimulator {
             }
         }
         const priorFrame_ec = this.callStack[this.callStack.length - 1];
+        const callerSZ_ec = ecThreadBase === null ? (priorFrame_ec ? priorFrame_ec.sz : 0)
+            : this._unpackProtectedIndicator(this.memory[ecThreadBase + THREAD_STO_OFFSET] >>> 0).sz;
         const frameWord_ec = this._packFrameWord(
-            this.pc + 1, priorFrame_ec ? priorFrame_ec.sz : 0, savedSTO_ec);
+            this.pc + 1, callerSZ_ec, savedSTO_ec);
         const ecCompanion = this._deriveEnterCompanionGT(
             (this.cr[6] && this.cr[6].word0) ||
                 (ecThreadBase === null && this.cr[14] && this.cr[14].word0),
