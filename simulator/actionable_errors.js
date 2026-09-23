@@ -72,6 +72,14 @@ async function _actionableJsonResponse(response, operation, options) {
         );
     }
     if (!response.ok || (parsed && parsed.ok === false)) {
+        // Opt-in for save surfaces: an explicit review rejection is cancellation,
+        // not a failed server commit. Never classify invalid approvals this way.
+        if (options && options.allowReviewCancellation &&
+                parsed && parsed.error === 'change_rejected' && parsed.committed === false) {
+            var cancelled = new Error('Save cancelled — no changes applied.');
+            cancelled.code = 'change_rejected';
+            throw cancelled;
+        }
         throw new Error(_formatActionableHttpError(operation, response.status, parsed, options));
     }
     return parsed;

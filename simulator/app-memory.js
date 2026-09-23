@@ -555,8 +555,14 @@ function _nsApplyArtifactBindingForSave(rich, saved, explicit, symbolic) {
 // Cleared to false after both saves succeed.
 window._nsTableDirty = false;
 window._nsTableSaveError = null;
+window._nsTableSaveCancelled = false;
 
 function _nsTableSaveClick(btn) {
+    if (window._nsTableSaveCancelled) {
+        window._nsTableSaveCancelled = false;
+        _setNsDirty(window._nsTableDirty);
+        return;
+    }
     if (window._nsTableSaveError !== null) {
         window._nsTableSaveError = null;
         _setNsDirty(window._nsTableDirty);
@@ -572,6 +578,18 @@ function _setNsDirty(dirty) {
     const btn = document.getElementById('nsSaveBtn');
     if (!btn) return;
     const error = window._nsTableSaveError;
+    if (window._nsTableSaveCancelled) {
+        btn.textContent = 'Save cancelled — no changes applied.\nClick to dismiss';
+        btn.title = 'Dismiss cancellation notice';
+        btn.style.whiteSpace = 'pre-wrap';
+        btn.style.overflowWrap = 'anywhere';
+        btn.style.maxWidth = '100%';
+        btn.style.color = '#b9c6d8';
+        btn.style.borderColor = '#526078';
+        btn.style.background = '#172235';
+        btn.disabled = false;
+        return;
+    }
     btn.style.whiteSpace = error !== null ? 'pre-wrap' : 'nowrap';
     btn.style.overflowWrap = error !== null ? 'anywhere' : '';
     btn.style.maxWidth = '100%';
@@ -4101,6 +4119,7 @@ function updateNamespace() {
         });
         const body = await _actionableJsonResponse(
             response, 'Save the Namespace build configuration', {
+                allowReviewCancellation: true,
                 dataChanged: false,
                 nextAction: 'Review the Namespace policies, then click Save again.',
             });
@@ -4136,8 +4155,9 @@ function updateNamespace() {
         } catch (err) {
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = '⚠ ' + err.message;
-                btn.style.color = '#f87171';
+                btn.textContent = err.code === 'change_rejected'
+                    ? 'Save cancelled — no changes applied.' : '⚠ ' + err.message;
+                btn.style.color = err.code === 'change_rejected' ? '#b9c6d8' : '#f87171';
             }
         }
     };
@@ -5593,6 +5613,7 @@ window._nsTableSave = async function(btn) {
             }),
         });
         const data = await _actionableJsonResponse(resp, 'Save the Namespace', {
+            allowReviewCancellation: true,
             dataChanged: false,
             nextAction: 'Review the Namespace entries, then click Save for next build again.',
         });
@@ -5678,6 +5699,12 @@ window._nsTableSave = async function(btn) {
         }
         return true;
     } catch (err) {
+        if (err.code === 'change_rejected') {
+            window._nsTableSaveError = null;
+            window._nsTableSaveCancelled = true;
+            _setNsDirty(window._nsTableDirty);
+            return false;
+        }
         try {
             if (_nsSaveDiagnostics) {
                 _nsSaveDiagnostics.stageException(
