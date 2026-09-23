@@ -96,9 +96,9 @@
       "type": "Inform",
       "f": 0,
       "g": 0,
-      "limit": "0x0004A",
+      "limit": "0x003FC",
       "seq": 0,
-      "seal": "0xDEA476EF",
+      "seal": "0xDED2B6EF",
       "token": "4a000007",
       "filename": "WukongCallHome.1.7fe59019.lump",
       "issue_n": 1,
@@ -190,5 +190,6 @@
       "seal": "0x21523090"
     }
   ],
-  "generated_at": 1790156872.9598782
+  "generated_at": 1790172929.7870958,
+  "committed_raw_fingerprint": "5af0fc791970a9f911c532dc99e366831eab4fa4c7d1e93d2435350592d84ab1"
 }
