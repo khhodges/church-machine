@@ -551,6 +551,7 @@
                 </div>
                 <div id="toolbarGroupSim" class="toolbar-group">
                     <div class="toolbar-group-divider"></div>
+                    <button class="btn" id="downloadSimDiagnosticsBtn" onclick="window.SimulatorControlFlowDiagnostics.download()" title="Download simulator-control-flow.json without running or resetting. Contains code and capability details; share intentionally.">Download diagnostics</button>
                     <div class="sim-exec-btns">
                         <button class="btn btn-warning sim-icon-btn fault-idle" id="toolFaultBtn" onclick="faultRecall()" data-tooltip="Fault — Click to recall the fault report">&#x26A1;</button>
                         <button class="btn sim-icon-btn fault-panel-badge" id="faultPanelBadge" onclick="_faultBadgeClick()" style="display:none;" data-tooltip="Last Fault — A fault was recorded · click to view it in the editor">&#x26A0; Fault</button>
@@ -561,7 +562,10 @@
                                 <div class="step-settings-title">Step Settings <button class="step-settings-close" onclick="toggleStepSettingsPopover()" title="Close">&times;</button></div>
                                 <div class="step-settings-section">
                                     <div class="step-settings-label">Stepping</div>
+                                    <label class="break-at-entry-label step-settings-entry" title="No automatic step limit. Stop, breakpoints and faults still pause execution. Changes apply to the next Run; recent output is retained."><input type="checkbox" id="continuousRunChk" onchange="setContinuousRun(this.checked)"> Continuous run</label>
+                                    <div class="step-settings-label">Run mode changes apply to the next Run.</div>
                                     <label class="break-at-entry-label step-settings-entry" id="breakAtEntryLabel" data-tooltip="Break at entry — Pause automatically at the very first instruction after boot (one-shot; clears itself after firing)"><input type="checkbox" id="breakAtEntryChk"> Break at entry</label>
+                                    <label class="break-at-entry-label step-settings-entry" id="breakOnBootLoadCR15Label" data-tooltip="Pause Run and Walk before boot ROM B:00 LOAD CR15. Step or resume executes it once; every reset/reboot rearms it."><input type="checkbox" id="breakOnBootLoadCR15Chk" onchange="setBootLoadCR15Breakpoint(this.checked)" checked> Boot B:00 LOAD CR15</label>
                                     <div class="step-settings-label step-settings-universal-label">Universal Church breakpoints</div>
                                     <label class="break-at-entry-label universal-breakpoint-all-label" data-tooltip="Enable or disable every universal Church instruction breakpoint"><input type="checkbox" id="breakOnAllChurchChk" onchange="setAllUniversalBreakpoints(this.checked)"> All Church instructions</label>
                                     <div class="universal-breakpoint-grid" aria-label="Universal Church instruction breakpoints">

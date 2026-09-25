@@ -1543,6 +1543,24 @@ function _verifyServedSimulatorAsset() {
 
 function init() {
     sim = new ChurchSimulator();
+    // Observational provenance only. The UI identity is advisory; raw code and
+    // protected frame words in the simulator export remain separate evidence.
+    sim.setControlFlowDiagnosticContextProvider(() => ({
+        executionIdentity: _executionIdentityGet(),
+    }));
+    window.SimulatorControlFlowDiagnostics = {
+        get: () => sim.getControlFlowDiagnostics(),
+        download: () => {
+            const blob = new Blob([JSON.stringify(sim.getControlFlowDiagnostics(), null, 2)],
+                { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'simulator-control-flow.json';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        },
+    };
     _verifyServedSimulatorAsset();
     // Browser storage names a requested next-boot target, not boot authority.
     // The loaded image's reserved Thread home remains authoritative until an

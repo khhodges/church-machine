@@ -151,3 +151,4 @@
 - [Resident installation isolation](resident-install-execution-isolation.md) — background deployments must not splice a new c-list into running code; direct-run activation is explicit
 - [Programmer change consent](programmer-change-consent.md) — explain and confirm source, Namespace, and repository changes; browser/server differences never prove a copy was unsaved
 - [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
+- [RETURN incident evidence](return-incident-evidence.md) — distinguish reset, caller continuation, and trace mislabeling using protected frames and live identity, not post-stop flags

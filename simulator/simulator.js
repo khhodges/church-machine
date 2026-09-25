@@ -169,6 +169,11 @@ class ChurchSimulator {
         // A persistent breakpoint is skipped once when any execution mode
         // resumes from its pause address; the breakpoint remains installed.
         this._breakpointResumeAddr = null;
+        // Attempt-scoped resume token for the synthetic boot-ROM breakpoint.
+        // The UI may pause before B:00 LOAD CR15 without treating the ROM as
+        // mutable memory. A second Run/Walk invocation resumes that same boot
+        // attempt once; reset creates a new attempt and therefore rearms it.
+        this._bootBreakpointResumeAttemptId = null;
 
         // Which NS slot the three-instruction boot sequence enters through
         // Boot.Thread's prepared CR0 home.
@@ -184,7 +189,275 @@ class ChurchSimulator {
         // identity rather than the current UI selection.
         this._bootAbstrSlot = this.bootEntrySlot;
 
-        this.reset();
+        this.reset('constructor');
+    }
+
+    // ── Bounded control-flow diagnostics ────────────────────────────────────
+    // This recorder is deliberately observational: it reads raw words directly,
+    // never calls a validator, and isolates providers/sinks from execution.
+    _ensureControlFlowDiagnostics() {
+        if (!Array.isArray(this._controlFlowDiagnosticEvents)) {
+            this._controlFlowDiagnosticEvents = [];
+            this._controlFlowDiagnosticCode = [];
+            this._controlFlowDiagnosticSequence = 0;
+            this._controlFlowDiagnosticResetGeneration = 0;
+            this._controlFlowDiagnosticEnabled = true;
+            this._controlFlowDiagnosticLimit = 256;
+            this._controlFlowDiagnosticCodeLimit = 32;
+            this._controlFlowDiagnosticContextProvider = null;
+            this._controlFlowDiagnosticSink = null;
+        }
+    }
+
+    setControlFlowDiagnosticContextProvider(provider) {
+        this._ensureControlFlowDiagnostics();
+        this._controlFlowDiagnosticContextProvider =
+            typeof provider === 'function' ? provider : null;
+    }
+
+    setControlFlowDiagnosticSink(sink) {
+        this._ensureControlFlowDiagnostics();
+        this._controlFlowDiagnosticSink = typeof sink === 'function' ? sink : null;
+    }
+
+    setControlFlowDiagnosticsEnabled(enabled) {
+        this._ensureControlFlowDiagnostics();
+        this._controlFlowDiagnosticEnabled = enabled !== false;
+    }
+
+    recordControlFlowDiagnostic(kind, detail = null) {
+        const safeKind = typeof kind === 'string' && kind.trim()
+            ? kind.trim().slice(0, 48) : 'EXTERNAL';
+        this._recordControlFlowDiagnostic(safeKind, 'point', detail);
+    }
+
+    getControlFlowDiagnostics() {
+        this._ensureControlFlowDiagnostics();
+        // All stored values are JSON data. JSON cloning also prevents callers
+        // from retaining typed-array or live-register aliases.
+        return JSON.parse(JSON.stringify({
+            limit: this._controlFlowDiagnosticLimit,
+            resetGeneration: this._controlFlowDiagnosticResetGeneration,
+            events: this._controlFlowDiagnosticEvents,
+            codeEvidence: this._controlFlowDiagnosticCode,
+        }));
+    }
+
+    _diagnosticResetProvenance(explicitReason) {
+        if (typeof explicitReason === 'string' && explicitReason.trim()) {
+            return { reason: explicitReason.trim().slice(0, 96), callsite: null };
+        }
+        try {
+            const lines = String(new Error().stack || '').split('\n').slice(2, 8);
+            const names = lines.map(line => {
+                const match = line.match(/\bat\s+(?:new\s+)?([A-Za-z0-9_.$<>]+)/);
+                return match ? match[1].slice(0, 80) : null;
+            }).filter(Boolean);
+            return { reason: 'direct', callsite: names.length ? names : ['anonymous'] };
+        } catch (_) {
+            return { reason: 'direct', callsite: ['unavailable'] };
+        }
+    }
+
+    _controlFlowCodeEvidence() {
+        const cr14 = this.cr && this.cr[14];
+        const memory = this.memory;
+        if (!cr14 || !memory || !Number.isInteger(cr14.word1)) return null;
+        const base = cr14.word1 >>> 0;
+        if (base >= memory.length) return null;
+        const header = memory[base] >>> 0;
+        if (((header >>> 27) & 0x1F) !== 0x1F) return null;
+        const declaredCodeWords = (header >>> 10) & 0x1FFF;
+        const sizeShift = (header >>> 23) & 0xF;
+        const lumpWords = 1 << (sizeShift + 6);
+        const declaredCListWords = header & 0xFF;
+        const availableCodeWords = Math.max(0,
+            Math.min(declaredCodeWords, memory.length - base - 1));
+        const codeWords = Array.from(
+            memory.subarray(base + 1, base + 1 + availableCodeWords),
+            word => word >>> 0);
+        const cListBase = base + lumpWords - declaredCListWords;
+        const cListInBounds = cListBase >= 0 && cListBase <= memory.length;
+        const availableCListWords = cListInBounds
+            ? Math.max(0, Math.min(declaredCListWords, memory.length - cListBase))
+            : 0;
+        const cListWords = cListInBounds
+            ? Array.from(memory.subarray(
+                cListBase, cListBase + availableCListWords), word => word >>> 0)
+            : [];
+        // Deterministic, non-cryptographic FNV-1a fingerprint; exact words are
+        // retained and the fingerprint is only the bounded deduplication key.
+        let hash = 0x811C9DC5;
+        for (const word of [header, ...codeWords, ...cListWords]) {
+            hash ^= word;
+            hash = Math.imul(hash, 0x01000193) >>> 0;
+        }
+        return {
+            key: `fnv1a32:${hash.toString(16).padStart(8, '0')}`,
+            base, header, lumpWords,
+            declaredCodeWords,
+            codeWords,
+            codeTruncated: availableCodeWords !== declaredCodeWords,
+            cListBase: cListBase >>> 0,
+            declaredCListWords,
+            cListWords,
+            cListTruncated: availableCListWords !== declaredCListWords,
+            fingerprint: `fnv1a32:${hash.toString(16).padStart(8, '0')}`,
+        };
+    }
+
+    _recordControlFlowDiagnostic(kind, phase, detail = null) {
+        try {
+            this._ensureControlFlowDiagnostics();
+            if (!this._controlFlowDiagnosticEnabled) return;
+            const descriptor = index => {
+                const value = this.cr && this.cr[index];
+                return value ? {
+                    word0: value.word0 >>> 0, word1: value.word1 >>> 0,
+                    word2: value.word2 >>> 0, word3: value.word3 >>> 0,
+                    m: value.m ? 1 : 0,
+                } : null;
+            };
+            const rawMemory = this.memory;
+            const cr12 = descriptor(12);
+            const threadBase = cr12 && cr12.word0 !== 0 ? cr12.word1 : null;
+            const indicatorAddress = Number.isInteger(threadBase)
+                ? (threadBase + THREAD_STO_OFFSET) >>> 0 : null;
+            const indicatorWord = rawMemory && indicatorAddress !== null &&
+                    indicatorAddress < rawMemory.length
+                ? rawMemory[indicatorAddress] >>> 0 : null;
+            const indicator = indicatorWord === null ? null : {
+                // In the protected live-STO indicator these bits are reserved;
+                // only packed frame words assign them NIA semantics.
+                reservedUpper15: (indicatorWord >>> 13) & 0x7FFF,
+                sz: (indicatorWord >>> 12) & 1,
+                sto: indicatorWord & 0xFFF,
+                flags: (indicatorWord >>> 28) & 0xF,
+            };
+            const frameAddress = indicator && Number.isInteger(threadBase)
+                ? (threadBase + indicator.sto + (indicator.sz ? 2 : 1)) >>> 0
+                : null;
+            const companionAddress = indicator && indicator.sz &&
+                    frameAddress !== null ? (frameAddress - 1) >>> 0 : null;
+            const frameWord = rawMemory && frameAddress !== null &&
+                    frameAddress < rawMemory.length
+                ? rawMemory[frameAddress] >>> 0 : null;
+            const companionWord = rawMemory && companionAddress !== null &&
+                    companionAddress < rawMemory.length
+                ? rawMemory[companionAddress] >>> 0 : null;
+            const decodedFrame = frameWord === null ? null : {
+                nia: (frameWord >>> 13) & 0x7FFF,
+                sz: (frameWord >>> 12) & 1,
+                sto: frameWord & 0xFFF,
+                flags: (frameWord >>> 28) & 0xF,
+            };
+            const shadow = this.callStack && this.callStack.length
+                ? this.callStack[this.callStack.length - 1] : null;
+            const code = this._controlFlowCodeEvidence();
+            let codeIdentity = null;
+            if (code) {
+                const exactMatch = this._controlFlowDiagnosticCode.find(item =>
+                    item.header === code.header &&
+                    item.declaredCodeWords === code.declaredCodeWords &&
+                    item.declaredCListWords === code.declaredCListWords &&
+                    item.codeWords.length === code.codeWords.length &&
+                    item.cListWords.length === code.cListWords.length &&
+                    item.codeWords.every((word, index) =>
+                        word === code.codeWords[index]) &&
+                    item.cListWords.every((word, index) =>
+                        word === code.cListWords[index]));
+                if (exactMatch) {
+                    codeIdentity = exactMatch.key;
+                } else {
+                    // Fingerprints select candidates only. A collision gets a
+                    // distinct key after exact-word comparison.
+                    const collisionCount = this._controlFlowDiagnosticCode
+                        .filter(item => item.fingerprint === code.fingerprint).length;
+                    if (collisionCount) code.key += `:collision-${collisionCount}`;
+                    codeIdentity = code.key;
+                    this._controlFlowDiagnosticCode.push(code);
+                    while (this._controlFlowDiagnosticCode.length >
+                            this._controlFlowDiagnosticCodeLimit) {
+                        this._controlFlowDiagnosticCode.shift();
+                    }
+                }
+            }
+            let externalContext = null;
+            try {
+                if (this._controlFlowDiagnosticContextProvider) {
+                    const supplied = this._controlFlowDiagnosticContextProvider();
+                    externalContext = supplied == null
+                        ? null : JSON.parse(JSON.stringify(supplied));
+                }
+            } catch (_) {}
+            const physical = Number.isInteger(this.physicalPC)
+                ? this.physicalPC >>> 0 : null;
+            const instructionWord = rawMemory && physical !== null &&
+                    physical < rawMemory.length ? rawMemory[physical] >>> 0 : null;
+            const cr14 = descriptor(14);
+            const currentFetchAddress = cr14 && cr14.word0 !== 0 &&
+                    Number.isInteger(this.pc)
+                ? (cr14.word1 + 1 + this.pc) >>> 0 : null;
+            const currentFetchInstructionWord = rawMemory &&
+                    currentFetchAddress !== null &&
+                    currentFetchAddress < rawMemory.length
+                ? rawMemory[currentFetchAddress] >>> 0 : null;
+            const event = {
+                sequence: ++this._controlFlowDiagnosticSequence,
+                resetGeneration: this._controlFlowDiagnosticResetGeneration,
+                time: Date.now(),
+                kind, phase,
+                detail: detail ? JSON.parse(JSON.stringify(detail)) : null,
+                logicalPC: Number.isInteger(this.pc) ? this.pc >>> 0 : null,
+                physicalPC: physical,
+                instructionWord,
+                currentFetchAddress,
+                currentFetchInstructionWord,
+                bootComplete: !!this.bootComplete,
+                halted: !!this.halted,
+                faultCount: Array.isArray(this.faultLog) ? this.faultLog.length : 0,
+                lastFaultType: Array.isArray(this.faultLog) && this.faultLog.length
+                    ? this.faultLog[this.faultLog.length - 1].type : null,
+                stepCount: Number.isInteger(this.stepCount) ? this.stepCount : null,
+                descriptors: { cr6: descriptor(6), cr12, cr14 },
+                protectedThread: {
+                    active: threadBase !== null,
+                    base: threadBase,
+                    indicatorAddress, indicatorWord, indicator,
+                    companionAddress, companionWord,
+                    frameAddress, frameWord, decodedFrame,
+                },
+                diagnosticShadowFrame: shadow ? {
+                    returnPC: Number.isInteger(shadow.returnPC)
+                        ? shadow.returnPC >>> 0 : null,
+                    savedSTO: Number.isInteger(shadow.savedSTO)
+                        ? shadow.savedSTO >>> 0 : null,
+                    sz: Number.isInteger(shadow.sz) ? shadow.sz : null,
+                    frameAddress: Number.isInteger(shadow.frameAddress)
+                        ? shadow.frameAddress >>> 0 : null,
+                    frameWord: Number.isInteger(shadow.frameWord)
+                        ? shadow.frameWord >>> 0 : null,
+                    companionGT: Number.isInteger(shadow.companionGT)
+                        ? shadow.companionGT >>> 0 : null,
+                    sentinel: !!shadow.sentinel,
+                } : null,
+                codeIdentity,
+                externalContext,
+            };
+            this._controlFlowDiagnosticEvents.push(event);
+            while (this._controlFlowDiagnosticEvents.length >
+                    this._controlFlowDiagnosticLimit) {
+                this._controlFlowDiagnosticEvents.shift();
+            }
+            try {
+                if (this._controlFlowDiagnosticSink) {
+                    this._controlFlowDiagnosticSink(
+                        JSON.parse(JSON.stringify(event)));
+                }
+            } catch (_) {}
+        } catch (_) {
+            // Diagnostics must never alter execution outcome.
+        }
     }
 
     // ── Trace packet helpers ──────────────────────────────────────────────────
@@ -263,6 +536,32 @@ class ChurchSimulator {
     //     from window.bootConfig so empty slots remain addressable in
     //     the dashboard and through the runtime nsCount.
     loadBootImage(arrayBuffer) {
+        let accepted = false;
+        let thrown = null;
+        this._recordControlFlowDiagnostic('LOAD_BOOT_IMAGE', 'pre', {
+            byteLength: arrayBuffer && Number.isInteger(arrayBuffer.byteLength)
+                ? arrayBuffer.byteLength : null,
+        });
+        try {
+            accepted = this._loadBootImageCore(arrayBuffer);
+            return accepted;
+        } catch (error) {
+            thrown = error;
+            throw error;
+        } finally {
+            this._recordControlFlowDiagnostic('LOAD_BOOT_IMAGE', 'post', {
+                accepted: accepted === true,
+                failure: thrown ? {
+                    name: String(thrown.name || 'Error').slice(0, 64),
+                    message: String(thrown.message || thrown).slice(0, 256),
+                } : (accepted === true ? null : {
+                    message: String(this.lastBootImageError || 'rejected').slice(0, 256),
+                }),
+            });
+        }
+    }
+
+    _loadBootImageCore(arrayBuffer) {
         this.lastBootImageError = null;
         if (!arrayBuffer || arrayBuffer.byteLength < 4) {
             this.lastBootImageError = 'Boot image is empty or too small. Regenerate the saved image for the current memory configuration.';
@@ -932,7 +1231,11 @@ class ChurchSimulator {
         (this._listeners[event] || []).forEach(fn => fn(data));
     }
 
-    reset() {
+    reset(reason = null) {
+        this._ensureControlFlowDiagnostics();
+        this._recordControlFlowDiagnostic(
+            'RESET', 'before', this._diagnosticResetProvenance(reason));
+        this._controlFlowDiagnosticResetGeneration++;
         // A build-config save can invalidate the cached browser buffer while
         // the live simulator still contains the user's validated Namespace
         // image. Namespace Save uses this flag to avoid replacing that image
@@ -1150,7 +1453,14 @@ class ChurchSimulator {
         );
     }
 
-    _returnToBoot() {
+    _returnToBoot(reason = null) {
+        // Recovery reset is a reset boundary just like reset(): capture the
+        // still-live machine state before clearing it, then advance the
+        // generation so later events cannot be attributed to the old state.
+        this._ensureControlFlowDiagnostics();
+        this._recordControlFlowDiagnostic(
+            'RESET', 'before', this._diagnosticResetProvenance(reason));
+        this._controlFlowDiagnosticResetGeneration++;
         // Resetting the live register bank must not write NULL back through
         // CR12 into the prepared Boot.Thread homes.
         // Re-arm the dormant root frame as part of the reset transaction.
@@ -1278,7 +1588,7 @@ class ChurchSimulator {
             this.emit('faultSnapshot', _snap);
         }
 
-        this._returnToBoot();
+        this._returnToBoot(`_fastBoot(${reason})`);
     }
 
     /**
@@ -3166,6 +3476,29 @@ class ChurchSimulator {
     // The first has an architecturally special Namespace-root source, while
     // CHANGE and CALL deliberately reuse the regular instruction machinery.
     _bootStepThreeInstruction() {
+        let result;
+        let thrown = null;
+        const bootIndex = this.bootStep;
+        this._recordControlFlowDiagnostic('BOOT_STEP', 'pre', { bootIndex });
+        try {
+            result = this._bootStepThreeInstructionCore();
+            return result;
+        } catch (error) {
+            thrown = error;
+            throw error;
+        } finally {
+            this._recordControlFlowDiagnostic('BOOT_STEP', 'post', {
+                bootIndex, ok: result === true, halted: !!this.halted,
+                failure: thrown ? {
+                    name: String(thrown.name || 'Error').slice(0, 64),
+                    message: String(thrown.message || thrown).slice(0, 256),
+                } : (result === true ? null : { result: result === false
+                    ? 'false' : String(result) }),
+            });
+        }
+    }
+
+    _bootStepThreeInstructionCore() {
         if (this.bootComplete || this.halted) return false;
         this.executionStats.bootPhases++;
         const index = this.bootStep;
@@ -5294,6 +5627,27 @@ class ChurchSimulator {
     }
 
     _activatePreformattedBootThread(threadSlot = BOOT_NS_SLOT_THREAD) {
+        let result;
+        let thrown = null;
+        this._recordControlFlowDiagnostic('THREAD_ACTIVATE', 'pre', { threadSlot });
+        try {
+            result = this._activatePreformattedBootThreadCore(threadSlot);
+            return result;
+        } catch (error) {
+            thrown = error;
+            throw error;
+        } finally {
+            this._recordControlFlowDiagnostic('THREAD_ACTIVATE', 'post', {
+                threadSlot, ok: !!result,
+                failure: thrown ? {
+                    name: String(thrown.name || 'Error').slice(0, 64),
+                    message: String(thrown.message || thrown).slice(0, 256),
+                } : (!result ? { result: false } : null),
+            });
+        }
+    }
+
+    _activatePreformattedBootThreadCore(threadSlot = BOOT_NS_SLOT_THREAD) {
         if (this._activeThreadBase() !== null) return true;
         const priorState = {
             cr: this.cr.map(register => ({...register})),
@@ -6630,6 +6984,31 @@ class ChurchSimulator {
         return null;
     }
 
+    // Boot ROM is simulator/spec-known rather than stored in mutable memory,
+    // so its B:00 breakpoint cannot safely share address 0 with program-memory
+    // breakpoints. Return true exactly once per boot attempt before LOAD CR15,
+    // then permit one explicit resume. A reset increments bootAttemptId and
+    // automatically rearms the breakpoint.
+    checkBootLoadCR15BreakpointBeforeExecute(enabled) {
+        if (!enabled) {
+            this._bootBreakpointResumeAttemptId = null;
+            return false;
+        }
+        if (this.bootComplete || this.halted || this.bootStep !== 0) {
+            if (this.bootStep !== 0 || this.bootComplete || this.halted) {
+                this._bootBreakpointResumeAttemptId = null;
+            }
+            return false;
+        }
+        const attemptId = this.bootAttemptId;
+        if (this._bootBreakpointResumeAttemptId === attemptId) {
+            this._bootBreakpointResumeAttemptId = null;
+            return false;
+        }
+        this._bootBreakpointResumeAttemptId = attemptId;
+        return true;
+    }
+
     clearBreakpointResume(addr = null) {
         const expected = addr == null ? null : addr >>> 0;
         if (expected === null || this._breakpointResumeAddr === expected) {
@@ -7442,6 +7821,32 @@ class ChurchSimulator {
     }
 
     _execCall(d) {
+        let result;
+        let thrown = null;
+        this._recordControlFlowDiagnostic('CALL', 'pre', {
+            crDst: d && d.crDst, crSrc: d && d.crSrc,
+            imm: d && d.imm, indexedRow: d && d.indexedRow,
+        });
+        try {
+            result = this._execCallCore(d);
+            return result;
+        } catch (error) {
+            thrown = error;
+            throw error;
+        } finally {
+            this._recordControlFlowDiagnostic('CALL', 'post', {
+                ok: result !== null && result !== undefined,
+                halted: !!this.halted,
+                failure: thrown ? {
+                    name: String(thrown.name || 'Error').slice(0, 64),
+                    message: String(thrown.message || thrown).slice(0, 256),
+                } : ((result === null || result === undefined)
+                    ? { result: result === null ? 'null' : 'undefined' } : null),
+            });
+        }
+    }
+
+    _execCallCore(d) {
         const methodSelector = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
         // Establish the selector even when no target GT can be resolved.
         this._captureCallTarget(null, methodSelector);
@@ -8266,6 +8671,31 @@ class ChurchSimulator {
     }
 
     _execReturn(d) {
+        let result;
+        let thrown = null;
+        this._recordControlFlowDiagnostic('RETURN', 'pre', {
+            mask: d && Number.isInteger(d.imm) ? d.imm & 0xFFF : null,
+        });
+        try {
+            result = this._execReturnCore(d);
+            return result;
+        } catch (error) {
+            thrown = error;
+            throw error;
+        } finally {
+            this._recordControlFlowDiagnostic('RETURN', 'post', {
+                ok: result !== null && result !== undefined,
+                halted: !!this.halted,
+                failure: thrown ? {
+                    name: String(thrown.name || 'Error').slice(0, 64),
+                    message: String(thrown.message || thrown).slice(0, 256),
+                } : ((result === null || result === undefined)
+                    ? { result: result === null ? 'null' : 'undefined' } : null),
+            });
+        }
+    }
+
+    _execReturnCore(d) {
         if (this.callStack.length === 0 && this._activeThreadBase() === null) {
             this.fault('STACK_UNDERFLOW', 'RETURN with no call frames — stack is empty (no sentinel pushed). Nothing to return to.');
             return null;
@@ -8498,6 +8928,31 @@ class ChurchSimulator {
     }
 
     _execChange(d) {
+        let result;
+        let thrown = null;
+        this._recordControlFlowDiagnostic('CHANGE', 'pre', {
+            crDst: d && d.crDst, crSrc: d && d.crSrc, imm: d && d.imm,
+        });
+        try {
+            result = this._execChangeCore(d);
+            return result;
+        } catch (error) {
+            thrown = error;
+            throw error;
+        } finally {
+            this._recordControlFlowDiagnostic('CHANGE', 'post', {
+                ok: result !== null && result !== undefined,
+                halted: !!this.halted,
+                failure: thrown ? {
+                    name: String(thrown.name || 'Error').slice(0, 64),
+                    message: String(thrown.message || thrown).slice(0, 256),
+                } : ((result === null || result === undefined)
+                    ? { result: result === null ? 'null' : 'undefined' } : null),
+            });
+        }
+    }
+
+    _execChangeCore(d) {
         // CHANGE CRd, CRs[idx]
         //   CRd  (d.crDst) — destination: must be a privileged register CR12–CR15.
         //   CRs  (d.crSrc) — source capability used to access the NS entry.
@@ -11072,7 +11527,7 @@ class ChurchSimulator {
     }
 
     loadHardwareBinary(hwProgram, hwNamespace, hwClist, hwLabels, abstractions) {
-        this.reset();
+        this.reset('loadHardwareBinary');
 
         this.memory = new Uint32Array(this._namespaceMemoryWords());
         this.NS_TABLE_BASE = this.memory.length - this.NS_TABLE_RESERVE;
@@ -11236,7 +11691,7 @@ class ChurchSimulator {
     }
 
     loadImageFromBinary(nsWords, clistWords, bootProgram) {
-        this.reset();
+        this.reset('loadImageFromBinary');
 
         this.memory = new Uint32Array(this._namespaceMemoryWords());
         this.NS_TABLE_BASE = this.memory.length - this.NS_TABLE_RESERVE;

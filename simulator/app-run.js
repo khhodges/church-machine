@@ -916,6 +916,10 @@ function stepSim() {
         // and silently complete all boot phases so the user can step their code.
         if (_pendingSimLoad) {
             const ok = instantBoot();
+            // A boot breakpoint is a successful pause request, not a failed
+            // boot. instantBoot already reported the pause; do not overwrite
+            // that evidence with the legacy "machine halted" message.
+            const paused = !ok && !sim.halted && !sim.bootComplete;
             const con = document.getElementById('editorConsole');
             if (con) {
                 con.className = '';
@@ -926,7 +930,7 @@ function stepSim() {
                     const nMeth   = lastMethodTableSize || 0;
                     const mLabel  = nMeth === 1 ? 'method' : 'methods';
                     con.textContent = `Auto-booted \u2014 \u201c${name}\u201d loaded \u2014 ${nWords} words, ${nMeth} ${mLabel}`;
-                } else {
+                } else if (!paused) {
                     con.textContent = 'Auto-boot failed \u2014 machine halted during boot sequence';
                 }
             }
@@ -2190,6 +2194,37 @@ const _breakpointOperations = new Map();
 // Universal Church breakpoints pause before every instruction with one of these
 // opcodes. They are intentionally separate from physical address breakpoints.
 const simUniversalBreakpoints = new Set();
+const _BOOT_LOAD_CR15_BREAKPOINT_KEY = 'church.sim.breakpoint.bootLoadCR15';
+const _CONTINUOUS_RUN_KEY = 'church.sim.continuousRun';
+let continuousRun = (() => {
+    try {
+        return !!(window.localStorage &&
+            window.localStorage.getItem(_CONTINUOUS_RUN_KEY) === 'true');
+    } catch (e) {
+        return false;
+    }
+})();
+
+function setContinuousRun(enabled) {
+    continuousRun = !!enabled;
+    try {
+        if (window.localStorage) {
+            window.localStorage.setItem(_CONTINUOUS_RUN_KEY, String(continuousRun));
+        }
+    } catch (e) {}
+    const checkbox = document.getElementById('continuousRunChk');
+    if (checkbox) checkbox.checked = continuousRun;
+}
+
+let breakOnBootLoadCR15 = (() => {
+    try {
+        const stored = window.localStorage &&
+            window.localStorage.getItem(_BOOT_LOAD_CR15_BREAKPOINT_KEY);
+        return stored === null ? true : stored === 'true';
+    } catch (e) {
+        return true;
+    }
+})();
 const _universalBreakpointNames = new Map([
     [0, 'LOAD'],
     [1, 'SAVE'],
@@ -2225,6 +2260,43 @@ function _breakpointBeforeNextInstruction() {
     if (!sim || sim.halted ||
             typeof sim.checkBreakpointBeforeExecute !== 'function') return null;
     return sim.checkBreakpointBeforeExecute(simBreakpoints, simUniversalBreakpoints);
+}
+
+function _bootLoadCR15BreakpointBeforeNextInstruction() {
+    if (!sim || typeof sim.checkBootLoadCR15BreakpointBeforeExecute !== 'function') {
+        return false;
+    }
+    return sim.checkBootLoadCR15BreakpointBeforeExecute(breakOnBootLoadCR15);
+}
+
+function _reportBootLoadCR15BreakpointPause() {
+    const con = document.getElementById('editorConsole');
+    if (con) {
+        con.textContent += '\n[BP] Breakpoint at B:00 — LOAD CR15 (paused before execution)';
+        con.scrollTop = con.scrollHeight;
+    }
+    if (pipelineViz) {
+        pipelineViz.setNIA(_bootNIARows(sim.bootStep));
+        pipelineViz.render();
+    }
+}
+
+function setBootLoadCR15Breakpoint(enabled) {
+    breakOnBootLoadCR15 = !!enabled;
+    if (!breakOnBootLoadCR15 && sim &&
+            typeof sim.checkBootLoadCR15BreakpointBeforeExecute === 'function') {
+        sim.checkBootLoadCR15BreakpointBeforeExecute(false);
+    }
+    try {
+        if (window.localStorage) {
+            window.localStorage.setItem(
+                _BOOT_LOAD_CR15_BREAKPOINT_KEY, String(breakOnBootLoadCR15));
+        }
+    } catch (e) {}
+    const checkbox = document.getElementById('breakOnBootLoadCR15Chk');
+    if (checkbox) checkbox.checked = breakOnBootLoadCR15;
+    updateBreakpointBtn();
+    renderBreakList();
 }
 
 function _reportBreakpointPause(addr) {
@@ -2274,7 +2346,8 @@ function _setEntryBreakpoint() {
 function updateBreakpointBtn() {
     const btn = document.getElementById('toolBreakBtn');
     if (!btn) return;
-    const n = simBreakpoints.size + simUniversalBreakpoints.size;
+    const n = simBreakpoints.size + simUniversalBreakpoints.size +
+        (breakOnBootLoadCR15 ? 1 : 0);
     btn.textContent = n > 0 ? `\u25CF\u202F${n}` : '\u25CF';
     btn.classList.toggle('break-active', n > 0);
 }
@@ -2282,7 +2355,7 @@ function updateBreakpointBtn() {
 function renderBreakList() {
     const el = document.getElementById('breakList');
     if (!el) return;
-    if (simBreakpoints.size === 0) {
+    if (simBreakpoints.size === 0 && !breakOnBootLoadCR15) {
         el.innerHTML = '<div class="break-empty">No breakpoints set</div>';
         return;
     }
@@ -2301,7 +2374,16 @@ function renderBreakList() {
             <button class="btn break-remove-btn" onclick="removeBreakpoint(${addr})" aria-label="Remove breakpoint at ${addressText}${_escapeBreakpointLabel(accessibleOperation)}" title="Remove this breakpoint">&#x1F5D1;</button>
         </div>`;
     });
-    el.innerHTML = addressItems.join('');
+    const bootItem = breakOnBootLoadCR15
+        ? `<div class="break-item" data-breakpoint-address="B:00">
+            <span class="break-item-target">
+                <code class="break-addr-label">B:00</code>
+                <span class="break-operation-label">LOAD CR15</span>
+            </span>
+            <button class="btn break-remove-btn" onclick="setBootLoadCR15Breakpoint(false)" aria-label="Disable boot breakpoint at B:00 LOAD CR15" title="Disable this breakpoint">&#x1F5D1;</button>
+        </div>`
+        : '';
+    el.innerHTML = bootItem + addressItems.join('');
 }
 
 function _escapeBreakpointLabel(value) {
@@ -2336,6 +2418,10 @@ function updateUniversalBreakpointControls() {
         allCheckbox.checked = total > 0 && enabled === total;
         allCheckbox.indeterminate = enabled > 0 && enabled < total;
     }
+    const bootCheckbox = document.getElementById('breakOnBootLoadCR15Chk');
+    if (bootCheckbox) bootCheckbox.checked = breakOnBootLoadCR15;
+    const continuousCheckbox = document.getElementById('continuousRunChk');
+    if (continuousCheckbox) continuousCheckbox.checked = continuousRun;
 }
 
 function setUniversalBreakpoint(opcode, enabled) {
@@ -2493,6 +2579,7 @@ function clearAllBreakpoints() {
     simBreakpoints.clear();
     simUniversalBreakpoints.clear();
     _breakpointOperations.clear();
+    setBootLoadCR15Breakpoint(false);
     if (sim && typeof sim.clearBreakpointResume === 'function') {
         sim.clearBreakpointResume();
     }
@@ -3118,6 +3205,10 @@ function _ensureCommittedImageForBoot(context) {
 }
 
 function _requireCommittedImageForExecution(context) {
+    // A booted machine's live Thread/frames are execution authority. Image
+    // freshness gates the next boot, not resume: its refresh path overlays
+    // memory and resets, destroying a paused instruction before it can run.
+    if (sim && sim.bootComplete) return true;
     if (_bootHasCommittedImage() && sim && sim._bootImageLoaded === true) return true;
     _ensureCommittedImageForBoot(context);
     return false;
@@ -3135,6 +3226,11 @@ function instantBoot() {
     }
     _bootAuditAccum = [];
     sim.auditLog = [];
+    if (_bootLoadCR15BreakpointBeforeNextInstruction()) {
+        _reportBootLoadCR15BreakpointPause();
+        updateDashboard();
+        return false;
+    }
     let safety = 0;
     while (!sim.bootComplete && !sim.halted && safety++ < 30) {
         try {
@@ -3227,6 +3323,18 @@ function slowBoot() {
                         sim._bootPrefetchFailed = true;
                     });
                 }
+                return;
+            }
+            if (_bootLoadCR15BreakpointBeforeNextInstruction()) {
+                bootAnimating = false;
+                _bootAnimTimer = null;
+                if (walkRunning) finishWalk();
+                if (typeof _syncPullToRefreshGuard === 'function') {
+                    _syncPullToRefreshGuard();
+                }
+                _reportBootLoadCR15BreakpointPause();
+                updateDashboard();
+                switchView('dashboard');
                 return;
             }
             const _slowPhaseNum = sim.bootStep + 1;  // capture before _bootStep() — case 6 (COMPLETE) doesn't increment bootStep
@@ -3334,8 +3442,16 @@ async function _startBootLumpPrefetch() {
 
 function runSim(preserveView) {
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    // Settings changed between batches apply only to the next Run.
+    const runContinuously = continuousRun;
     // Boot is never redirected by the UI. The core executes only LOAD CR15,
     // CHANGE CR12, CALL CR0 against the image's already-prepared Thread home.
+    if (_bootLoadCR15BreakpointBeforeNextInstruction()) {
+        _reportBootLoadCR15BreakpointPause();
+        updateDashboard();
+        switchView('dashboard');
+        return;
+    }
     while (!sim.bootComplete && !sim.halted) {
         try {
             sim._bootStep();
@@ -3366,7 +3482,9 @@ function runSim(preserveView) {
     _autoLoadDefaultProgram();
 
     const MAX_STEPS   = 10000;
-    const BATCH_SIZE  = runBatchSize;
+    const BATCH_SIZE  = Number.isFinite(runBatchSize)
+        ? Math.max(1, Math.min(10000, Math.floor(runBatchSize))) : 500;
+    const runningLabel = runContinuously ? 'Running continuously…' : 'Running…';
     // A small delay after single-instruction batches guarantees the browser a
     // paint opportunity, so the progress line and instruction highlights move
     // together instead of collapsing into the final state.
@@ -3390,7 +3508,7 @@ function runSim(preserveView) {
     }
 
     if (con) {
-        con.textContent += '\nRunning…';
+        con.textContent += '\n' + runningLabel;
         con.scrollTop = con.scrollHeight;
     }
 
@@ -3401,14 +3519,19 @@ function runSim(preserveView) {
             finishRun('userStopped');
             return;
         }
-        if (!sim.bootComplete || sim.halted || totalSteps >= MAX_STEPS) {
+        if (!sim.bootComplete || sim.halted || (!runContinuously && totalSteps >= MAX_STEPS)) {
             finishRun('stopped');
             return;
         }
         try {
-            const batchMax = Math.min(BATCH_SIZE, MAX_STEPS - totalSteps);
+            const batchMax = runContinuously ? BATCH_SIZE : Math.min(BATCH_SIZE, MAX_STEPS - totalSteps);
             const result   = sim.run(batchMax, breakpoints, simUniversalBreakpoints);
             totalSteps += result.steps;
+            // Output is otherwise an unbounded string. Keep recent diagnostics
+            // for overnight runs; audit/packet buffers already reset each step.
+            if (runContinuously && sim.output && sim.output.length > 65536) {
+                sim.output = '[Continuous run: earlier output discarded]\n' + sim.output.slice(-65536);
+            }
 
             // Update the progress line live
             if (con) {
@@ -3416,7 +3539,7 @@ function runSim(preserveView) {
                 const phys = sim.physicalPC;
                 const pcHex = '0x' + (phys >>> 0).toString(16).toUpperCase().padStart(4, '0');
                 const lines  = con.textContent.split('\n');
-                lines[lines.length - 1] = `Running… ${totalSteps} steps  PC=${pcHex}`;
+                lines[lines.length - 1] = `${runningLabel} ${totalSteps} steps  PC=${pcHex}`;
                 con.textContent = lines.join('\n');
                 con.scrollTop = con.scrollHeight;
             }
@@ -3461,11 +3584,11 @@ function runSim(preserveView) {
             }
             if (result.stopReason !== 'maxSteps') {
                 finishRun(result.stopReason, result.breakpointAddr);
-            } else if (totalSteps >= MAX_STEPS) {
+            } else if (!runContinuously && totalSteps >= MAX_STEPS) {
                 finishRun('maxSteps');
             } else {
                 // Auto-pause when cumulative fault-free instruction count crosses 1,000
-                if (sim.faultLog.length === 0
+                if (!runContinuously && sim.faultLog.length === 0
                         && _faultFreeInstrTotal < 1000
                         && (_faultFreeInstrTotal + totalSteps) >= 1000) {
                     finishRun('faultFreeLimit');
@@ -3512,6 +3635,9 @@ function runSim(preserveView) {
         // toolbar control explicitly; updateDashboard() does not own it.
         updateThreadControl();
         console.log('[finishRun] stopReason=', stopReason, 'halted=', sim.halted, 'bootComplete=', sim.bootComplete, 'faultLog=', sim.faultLog.length, 'steps=', totalSteps);
+        if (typeof sim.recordControlFlowDiagnostic === 'function') {
+            sim.recordControlFlowDiagnostic('UI_STOP', { stopReason, breakpointAddr });
+        }
         if (sim.faultLog.length > 0) console.log('[finishRun] FAULTS:', JSON.stringify(sim.faultLog.map(f => f.type + ': ' + f.message)));
         const ranClean = ((stopReason === 'halted' || sim.halted) && sim.faultLog.length === 0)
             || stopReason === 'faultFreeLimit';
