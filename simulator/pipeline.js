@@ -424,41 +424,30 @@ class PipelineVisualizer {
     }
 
     buildSecurityTrace(operation, details) {
+        // REPL illustrations are not retirement packets. They describe the
+        // requested operation only; never report a fabricated gate pass or a
+        // subsequent LOAD/LAMBDA/RETURN as if it had been observed.
+        details = details || {};
         const trace = [];
         const opUpper = (operation || '').toUpperCase();
 
         switch (opUpper) {
             case 'CALL':
-                trace.push({ desc: `LOAD: Namespace lookup via CR${details.crSrc || 6}`, perm: 'L', status: 'pass', gt: details.gt || '' });
-                trace.push({ desc: `TPERM: Verify E permission on target`, perm: 'E', status: 'pass' });
-                trace.push({ desc: `CALL: Enter ${details.target || 'abstraction'}, save context` });
-                trace.push({ desc: `LOAD: C-List slot [1] = Access Code`, perm: 'L', status: 'pass' });
-                trace.push({ desc: `TPERM: Verify X on Access Code`, perm: 'X', status: 'pass' });
-                trace.push({ desc: `LAMBDA: Church reduction \u2192 ${details.result || 'compute'}` });
-                trace.push({ desc: `RETURN: Restore scope, result in DR0` });
+                trace.push({ desc: `Illustrative CALL ${details.target || 'target'}: check E permission, save caller context, enter target (not a hardware retirement trace)`, perm: 'E', status: 'info' });
                 break;
             case 'ELOADCALL':
-                trace.push({ desc: `ELOADCALL: LOAD + TPERM(E) + CALL \u2192 ${details.target || 'abstraction'}`, perm: 'L,E', status: 'pass' });
-                trace.push({ desc: `XLOADLAMBDA: LOAD + TPERM(X) + LAMBDA \u2192 ${details.result || 'compute'}`, perm: 'L,X', status: 'pass' });
-                trace.push({ desc: `RETURN: Restore scope, result in DR0` });
+                trace.push({ desc: `Illustrative ELOADCALL ${details.target || 'target'}: c-list lookup, E check, CALL (not a hardware retirement trace)`, perm: 'L,E', status: 'info' });
                 break;
             case 'CHAIN':
-                trace.push({ desc: `ELOADCALL: Enter ${details.target || 'abstraction'} (LOAD+TPERM+CALL)`, perm: 'L,E', status: 'pass' });
+                trace.push({ desc: `Illustrative chain via ${details.target || 'target'} (not a hardware retirement trace)`, status: 'info' });
                 if (details.methods) {
                     for (let i = 0; i < details.methods.length; i++) {
-                        trace.push({ desc: `XLOADLAMBDA: ${details.methods[i]}${details.intermediates && details.intermediates[i] ? ' \u2192 ' + details.intermediates[i] : ''}`, perm: 'X', status: 'pass' });
+                        trace.push({ desc: `Requested method: ${details.methods[i]}`, status: 'info' });
                     }
                 }
-                trace.push({ desc: `RETURN: Restore scope, result = ${details.result || '?'}` });
                 break;
             case 'LAMBDA':
-                trace.push({ desc: `LOAD: Read CR${details.crDst || 0} capability`, perm: 'L', status: 'pass' });
-                trace.push({ desc: `TPERM: Verify E permission`, perm: 'E', status: 'pass' });
-                trace.push({ desc: `CALL: Fast-path lambda entry` });
-                trace.push({ desc: `LOAD: C-List access code`, perm: 'L', status: 'pass' });
-                trace.push({ desc: `TPERM: Verify execution`, perm: 'X', status: 'pass' });
-                trace.push({ desc: `LAMBDA: ${details.desc || 'Church reduction'}` });
-                trace.push({ desc: `RETURN: Result \u2192 DR0 = ${details.result || '?'}` });
+                trace.push({ desc: `Illustrative LAMBDA: check X permission and enter reduction (not a hardware retirement trace; DR0 is hardwired zero)`, perm: 'X', status: 'info' });
                 break;
             default:
                 trace.push({ desc: `${opUpper}: ${details.desc || 'execute'}` });

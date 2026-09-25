@@ -2419,17 +2419,16 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
     if (opcode === 0 && crSrc === 6) {
         const pet = _resolveClistPetName(clistBase, imm, nsIdx);
         if (pet) {
-            if (crPets) crPets[crDst] = pet;
+            // An instruction in a listing may never execute (condition, branch,
+            // fault, or a different loop iteration). Do not propagate its alias.
             return { desc: _escDecomp(`load${cc} ${pet.toLowerCase()} \u2192 CR${crDst}${ccDesc}`), compiler: true, pet: pet };
         }
-        if (crPets) delete crPets[crDst];
         return { desc: _escDecomp(`load${cc} clist[${imm}] \u2192 CR${crDst}${ccDesc}`), compiler: true };
     }
 
     if (opcode === 0) {
         const dTag = _crTag(crDst, crPets);
         const sTag = _crTag(crSrc, crPets);
-        if (crPets && crPets[crSrc]) crPets[crDst] = crPets[crSrc];
         return { desc: _escDecomp(`load${cc} ${dTag} \u2190 ${sTag}[${imm}]${ccDesc}`), compiler: false };
     }
 
@@ -2441,52 +2440,22 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
 
     if (opcode === 2) {
         if (crSrc === 6) {
-            const target = _indexedCallTarget(callContext, imm);
-            return { desc: _escDecomp(`call${cc} ${target} via CR6[0x${imm.toString(16).toUpperCase().padStart(4, '0')}]${ccDesc}`), compiler: false };
+            const row = imm & 0x1F;
+            const method = (imm >>> 5) & 0x7F;
+            const target = _indexedCallTarget(callContext, row);
+            return { desc: _escDecomp(`call${cc} ${target} via CR6[0x${row.toString(16).toUpperCase().padStart(4, '0')}]${method ? `, method #${method - 1}` : ''}${ccDesc}`), compiler: false };
         }
         if (crDst === 6) return { desc: _escDecomp(`recall${cc} self${ccDesc}`), compiler: false };
         const tag = _crTag(crDst, crPets);
-        let methodStr = '';
-        const pet = crPets && crPets[crDst];
-        if (pet && typeof METHOD_REGISTER_CONVENTIONS !== 'undefined') {
-            const conv = METHOD_REGISTER_CONVENTIONS[pet];
-            if (conv) {
-                let dr3Val = null;
-                if (sim && sim.memory && addr > 0) {
-                    const prevW = sim.memory[addr - 1] >>> 0;
-                    const prevOp = (prevW >>> 27) & 0x1F;
-                    const prevDst = (prevW >>> 19) & 0xF;
-                    const prevImm = prevW & 0x7FFF;
-                    if (prevOp === 21 && prevDst === 3 && (prevImm & 0x4000)) {
-                        dr3Val = prevImm & 0x3FFF;
-                    }
-                    if (dr3Val === null) {
-                        const prev2W = addr > 1 ? (sim.memory[addr - 2] >>> 0) : 0;
-                        const p2Op = (prev2W >>> 27) & 0x1F;
-                        const p2Dst = (prev2W >>> 19) & 0xF;
-                        const p2Imm = prev2W & 0x7FFF;
-                        if (p2Op === 21 && p2Dst === 3 && (p2Imm & 0x4000)) {
-                            dr3Val = p2Imm & 0x3FFF;
-                        }
-                    }
-                }
-                if (dr3Val === null && sim && sim.dr) {
-                    dr3Val = sim.dr[3] >>> 0;
-                }
-                if (dr3Val !== null) {
-                    const mEntry = Object.entries(conv).find(([, v]) => v.index === dr3Val);
-                    if (mEntry) methodStr = `.${mEntry[0]}`;
-                }
-            }
-        }
-        return { desc: _escDecomp(`call${cc} ${tag}${methodStr}${ccDesc}`), compiler: false };
+        const method = imm && !(imm & 0x4000) ? `, method #${imm - 1}` : ' (fast path)';
+        return { desc: _escDecomp(`call${cc} ${tag}${method}${ccDesc}`), compiler: false };
     }
 
     if (opcode === 3) return { desc: _escDecomp(`return${cc}${ccDesc}`), compiler: false };
 
     if (opcode === 4) {
         const dTag = _crTag(crDst, crPets);
-        return { desc: _escDecomp(`change${cc} ${dTag}, ${imm}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`change${cc} ${dTag} via CR${crSrc}, NS[${imm}]${ccDesc}`), compiler: false };
     }
 
     if (opcode === 5) {
@@ -2496,7 +2465,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
 
     if (opcode === 6) {
         const dTag = _crTag(crDst, crPets);
-        const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
+        const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];
         const presetDescs = ['remove all perms','read only','read+write','execute only',
             'read+execute','read+write+execute','load only','store only','enter only','load+store'];
         const pidx = imm & 0xF;
@@ -2504,7 +2473,10 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
         const pName = presetNames[pidx] || `0x${pidx.toString(16)}`;
         const pDesc = presetDescs[pidx] || '';
         const bStr = bFlag ? 'B' : '';
-        const explain = pDesc ? ` [${pDesc}${bStr ? ', bounded' : ''}]` : '';
+        const explain = pidx === 13 ? ' [query return frame into Z flag]' :
+            pidx === 14 ? ` [assert identical GT to CR${crSrc}; faults on mismatch]` :
+            pidx >= 10 ? ' [reserved; faults if executed]' :
+            pDesc ? ` [${pDesc}${bStr ? ', bounded' : ''}]` : '';
         return { desc: _escDecomp(`tperm${cc} ${dTag} ${pName}${bStr}${explain}${ccDesc}`), compiler: false };
     }
 
@@ -2514,30 +2486,14 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
     }
 
     if (opcode === 8) {
-        const pet = _resolveClistPetName(clistBase, imm, nsIdx);
+        const row = imm & 0x1F;
+        const method = (imm >>> 5) & 0x7F;
+        const pet = crSrc === 6 ? _resolveClistPetName(clistBase, row, nsIdx) : null;
+        const methodText = method ? `, method #${method - 1}` : '';
         if (pet) {
-            if (crPets) crPets[crDst] = pet;
-            let eMethodStr = '';
-            if (typeof METHOD_REGISTER_CONVENTIONS !== 'undefined') {
-                const eConv = METHOD_REGISTER_CONVENTIONS[pet];
-                if (eConv) {
-                    let eDr3 = null;
-                    if (sim && sim.memory && addr > 0) {
-                        const ePrev = sim.memory[addr - 1] >>> 0;
-                        if (((ePrev >>> 27) & 0x1F) === 21 && ((ePrev >>> 19) & 0xF) === 3 && (ePrev & 0x4000)) {
-                            eDr3 = ePrev & 0x3FFF;
-                        }
-                    }
-                    if (eDr3 === null && sim && sim.dr) eDr3 = sim.dr[3] >>> 0;
-                    if (eDr3 !== null) {
-                        const eM = Object.entries(eConv).find(([, v]) => v.index === eDr3);
-                        if (eM) eMethodStr = `.${eM[0]}`;
-                    }
-                }
-            }
-            return { desc: _escDecomp(`eloadcall${cc} ${pet.toLowerCase()}${eMethodStr}(CR${crDst})${ccDesc}`), compiler: true, pet: pet };
+            return { desc: _escDecomp(`eloadcall${cc} ${pet.toLowerCase()} via CR6[${row}]${methodText} → CR${crDst}${ccDesc}`), compiler: true, pet: pet };
         }
-        return { desc: _escDecomp(`eloadcall${cc} clist[${imm}] \u2192 CR${crDst}${ccDesc}`), compiler: true };
+        return { desc: _escDecomp(`eloadcall${cc} ${_crTag(crSrc, crPets)}[${row}]${methodText} \u2192 CR${crDst}${ccDesc}`), compiler: true };
     }
 
     if (opcode === 9) {
@@ -2550,76 +2506,39 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
         const sTag = _crTag(crSrc, crPets);
         const verb = opcode === 16 ? 'read' : 'write';
         const pet = crPets && crPets[crSrc];
-        const effectiveImm = (imm & 0x4000) ? (imm & 0x3FFF) : imm;
-        const rn = _regName(pet, effectiveImm);
-        const offStr = rn ? `.${rn}` : `[${effectiveImm}]`;
-        const drV = sim && sim.dr ? (sim.dr[crDst] >>> 0) : null;
-        let valStr = '';
-        if (drV !== null) {
-            const nsCheckIdx = sim.cr && sim.cr[crSrc] ? sim.parseGT(sim.cr[crSrc].word0).index : -1;
-            const nsCheckLabel = sim.nsLabels && sim.nsLabels[nsCheckIdx]
-                ? String(sim.nsLabels[nsCheckIdx]).toUpperCase() : '';
-            if (nsCheckIdx === 12 || nsCheckLabel.includes('LED')) {
-                const ledNow = (opcode === 17 && sim.ledBits !== undefined && sim.ledMode === 'program') ? (sim.ledBits >> effectiveImm) & 1 : null;
-                if (ledNow !== null) {
-                    const willBe = drV & 1 ? 'ON' : 'OFF';
-                    const was = ledNow ? 'ON' : 'OFF';
-                    const transition = (ledNow & 1) === (drV & 1) ? `turns ${willBe}` : `${was} \u2192 ${willBe}`;
-                    valStr = ` (LED${effectiveImm}: ${transition})`;
-                } else {
-                    valStr = ` (=${drV} \u2192 LED${effectiveImm} ${drV & 1 ? 'ON' : 'OFF'})`;
-                }
-            } else if (nsCheckIdx === 11) {
-                const uartReg = effectiveImm === 0 ? 'TX' : effectiveImm === 1 ? 'STATUS' : 'RX';
-                valStr = ` (=${drV} → UART.${uartReg})`;
-            } else if (nsCheckIdx === 14) {
-                const tReg = ['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][effectiveImm] || 'reg';
-                valStr = ` (=${drV} → TIMER.${tReg})`;
-            } else {
-                valStr = ` (=${_fmtVal(drV)})`;
-            }
-        }
-        return { desc: _escDecomp(`${verb}${cc} ${_drTag(crDst)}, ${sTag}${offStr}${valStr}${ccDesc}`), compiler: false };
+        const immediate = !!(imm & 0x4000);
+        const offset = imm & 0x3FFF;
+        const offStr = immediate
+            ? (() => { const rn = _regName(pet, offset); return rn ? `.${rn}` : `[${offset}]`; })()
+            : `[${(imm >>> 4) & 0x3FF} + DR${imm & 0xF}]`;
+        return { desc: _escDecomp(`${verb}${cc} ${_drTag(crDst)}, ${sTag}${offStr}${ccDesc}`), compiler: false };
     }
 
     if (opcode === 18) {
         const pos = (imm >>> 5) & 0x1F;
         const width = imm & 0x1F;
-        const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
-        const valStr = srcV !== null ? ` (=${_fmtVal(srcV)})` : '';
-        return { desc: _escDecomp(`bfext${cc} ${_drTag(crDst)} \u2190 ${_drTag(crSrc)}[${pos}:${pos+width-1}]${valStr}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`bfext${cc} ${_drTag(crDst)} \u2190 ${_drTag(crSrc)}[${pos}:${pos+width-1}]${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}${ccDesc}`), compiler: false };
     }
 
     if (opcode === 19) {
         const pos = (imm >>> 5) & 0x1F;
         const width = imm & 0x1F;
-        const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
-        const valStr = srcV !== null ? ` (=${_fmtVal(srcV)})` : '';
-        return { desc: _escDecomp(`bfins${cc} ${_drTag(crDst)}[${pos}:${pos+width-1}] \u2190 ${_drTag(crSrc)}${valStr}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`bfins${cc} ${_drTag(crDst)}[${pos}:${pos+width-1}] \u2190 ${_drTag(crSrc)}${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}${ccDesc}`), compiler: false };
     }
 
     if (opcode === 20) {
-        const dV = sim && sim.dr ? (sim.dr[crDst] >>> 0) : null;
-        const sV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
-        const vals = (dV !== null && sV !== null) ? ` (${_fmtVal(dV)} vs ${_fmtVal(sV)})` : '';
-        return { desc: _escDecomp(`mcmp${cc} ${_drTag(crDst)}, ${_drTag(crSrc)}${vals}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`mcmp${cc} ${_drTag(crDst)}, ${_drTag(crSrc)} → flags${ccDesc}`), compiler: false };
     }
 
     if (opcode === 21 || opcode === 22) {
         const op = opcode === 21 ? '+' : '\u2212';
         const isImm = (imm & 0x4000) !== 0;
-        const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
         if (isImm) {
             const immVal = imm & 0x3FFF;
-            const res = opcode === 21 ? ((srcV + immVal) >>> 0) : ((srcV - immVal) >>> 0);
-            const valStr = srcV !== null ? ` (${_fmtVal(srcV)}${op}${immVal}=${_fmtVal(res)})` : '';
-            return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} #${immVal}${valStr}${ccDesc}`), compiler: false };
+            return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} #${immVal}${ccDesc}`), compiler: false };
         } else {
             const drOp = imm & 0xF;
-            const opV = sim && sim.dr ? (sim.dr[drOp] >>> 0) : null;
-            const res = opcode === 21 ? ((srcV + opV) >>> 0) : ((srcV - opV) >>> 0);
-            const valStr = (srcV !== null && opV !== null) ? ` (${_fmtVal(srcV)}${op}${_fmtVal(opV)}=${_fmtVal(res)})` : '';
-            return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} ${_drTag(drOp)}${valStr}${ccDesc}`), compiler: false };
+            return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} ${_drTag(drOp)}${ccDesc}`), compiler: false };
         }
     }
 
@@ -2632,20 +2551,14 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
 
     if (opcode === 24) {
         const shamt = imm & 0x1F;
-        const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
-        const res = (srcV << shamt) >>> 0;
-        const valStr = srcV !== null ? ` (${_fmtVal(srcV)}\u00AB${shamt}=${_fmtVal(res)})` : '';
-        return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} \u00AB ${shamt}${valStr}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} \u00AB ${shamt}${ccDesc}`), compiler: false };
     }
 
     if (opcode === 25) {
         const arith = (imm >>> 5) & 1;
         const shamt = imm & 0x1F;
-        const srcV = sim && sim.dr ? (sim.dr[crSrc] >>> 0) : null;
         const sym = arith ? '\u00BB\u00BB' : '\u00BB';
-        const res = arith ? (srcV >> shamt) : (srcV >>> shamt);
-        const valStr = srcV !== null ? ` (${_fmtVal(srcV)}${sym}${shamt}=${_fmtVal(res)})` : '';
-        return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${sym} ${shamt}${valStr}${ccDesc}`), compiler: false };
+        return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${sym} ${shamt}${arith ? ' (arithmetic)' : ' (logical)'}${ccDesc}`), compiler: false };
     }
 
     if (stored && stored[addr]) {

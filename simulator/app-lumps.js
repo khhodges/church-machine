@@ -5435,7 +5435,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
     // Uses the same priority as MyGoldenTokens rendering:
     //   1. lump manifest pet_names.CR[s]
     //   2. Abstract GT device-class derivation (LED0, UART0, … — canonical no-bracket form)
-    //   3. Inform/Outform GT: token lookup → sim.nsLabels[slot_id]
+    //   3. Inform/Outform GT: use exact token lookup, not mutable sim.nsLabels
     const clistSlotName = {};   // slot index (0-based) → human name
     const _crPetNamesForCode = {};
     const _abDevClsNames     = ['?','LED','UART','Button','Timer','Display'];
@@ -5461,10 +5461,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             else if (_abType === 1) clistSlotName[s] = 'M-Elevation';
             else                   clistSlotName[s] = `Abs[${_abType}]`;
         } else {  // Inform / Outform GT: [15:0]=slot_id
-            const _slotId   = wVal & 0xFFFF;
             const _tokName  = _clistName(wVal);
-            const _simNsNm  = (typeof sim !== 'undefined' && sim && sim.nsLabels) ? (sim.nsLabels[_slotId] || '') : '';
-            clistSlotName[s] = _tokName || _simNsNm || '';
+            clistSlotName[s] = _tokName || '';
         }
     }
 
@@ -5501,33 +5499,38 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
                 return `${condStr}CR${crDst} ← GT via ${crName(crSrc)}[${imm}]`;
             }
             case 1: {  // SAVE CRd, CRs[imm]
-                return `${condStr}store CR${crSrc} → GT space of ${crName(crDst)}[${imm}]`;
+                return `${condStr}store CR${crDst} → GT space of ${crName(crSrc)}[${imm}]`;
             }
             case 2: {  // CALL CRd[, sel]
-                const selSrc = crSrc ? `, method #${crSrc}` : '';
-                return `${condStr}invoke ${crName(crDst)}${selSrc}`;
+                if (crSrc === 6) {
+                    const row = imm & 0x1F;
+                    const method = (imm >>> 5) & 0x7F;
+                    return `${condStr}invoke "${_slotLabel(row)}" via CR6[${row}]${method ? `, method #${method - 1}` : ''}`;
+                }
+                const method = imm && !(imm & 0x4000) ? `, method #${imm - 1}` : ' (fast path)';
+                return `${condStr}invoke ${crName(crDst)}${method}`;
             }
             case 3: {  // RETURN [mask]
                 const retMask = imm & 0xFFF;
-                return retMask
+                return `${condStr}${retMask
                     ? `scrub regs 0b${retMask.toString(2).padStart(12,'0')} then return`
-                    : 'return to caller';
+                    : 'return to caller'}`;
             }
             case 4: {  // CHANGE CRd, CRs[imm]
-                if (crSrc === 6 && cc > 0) {
-                    return `${condStr}hot-swap CR${crDst} ← "${_slotLabel(imm)}"`;
-                }
-                return `${condStr}update CR${crDst} via ${crName(crSrc)}[${imm}]`;
+                return `${condStr}CHANGE CR${crDst} via ${crName(crSrc)}, NS[${imm}] (requires privileged destination)`;
             }
             case 5: {  // SWITCH CRd, CRs, row
                 if (crDst === 15 && crSrc === 15)
-                    return `${condStr}SWITCH CR15, CR15 (guarded Boot placeholder; no-op)`;
-                return `${condStr}SWITCH CR${crDst}, CR${crSrc}, #${imm} (isolated M-gated reload)`;
+                    return `${condStr}SWITCH CR15, CR15 (guarded Boot placeholder)`;
+                return `${condStr}SWITCH CR${crDst}, CR${crSrc}, #${imm} (requires M authorization)`;
             }
             case 6: {  // TPERM CRd, preset[B]
-                const presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
+                const presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];
                 const bFlag   = (imm >>> 4) & 1;
                 const preset  = presets[imm & 0xF] || 'RSV';
+                if ((imm & 0xF) === 13) return `${condStr}query return frame → Z flag`;
+                if ((imm & 0xF) === 14) return `${condStr}assert CR${crDst} GT identical to CR${crSrc} GT (fault on mismatch)`;
+                if ((imm & 0xF) >= 10) return `${condStr}${preset} reserved (faults if executed)`;
                 return `${condStr}attenuate CR${crDst} to ${preset}${bFlag ? '+B' : ''} permissions`;
             }
             case 7: {  // LAMBDA CRd
@@ -5535,8 +5538,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             }
             case 8: {  // ELOADCALL CRd, CRs[imm15]  imm15 = (methodIdx<<5)|row
                 const _elcRow  = imm & 0x1F;   // bits[4:0] = c-list row (0–31)
-                const _elcMeth = imm >>> 5;    // bits[11:5] = method index (0=fast-path)
-                const _methTag = _elcMeth > 0 ? ` method #${_elcMeth}` : '';
+                const _elcMeth = (imm >>> 5) & 0x7F; // 1-based encoded selector, 0=fast-path
+                const _methTag = _elcMeth > 0 ? ` method #${_elcMeth - 1}` : '';
                 if (crSrc === 6 && cc > 0) {
                     return `${condStr}fused load + call "${_slotLabel(_elcRow)}"${_methTag} → CR${crDst}`;
                 }
@@ -5549,28 +5552,22 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
                 return `${condStr}fused load + lambda ${crName(crSrc)}[${imm}] → CR${crDst}`;
             }
             case 16: {  // DREAD DRd, CRs[imm]
-                if (crAlias[crSrc] !== undefined) {
-                    const nm = clistSlotName[crAlias[crSrc]];
-                    if (nm) return `${condStr}DR${crDst} ← "${nm}"`;
-                }
-                return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${imm}]`;
+                const offset = (imm & 0x4000) ? `${imm & 0x3FFF}` : `${(imm >>> 4) & 0x3FF} + DR${imm & 0xF}`;
+                return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${offset}]`;
             }
             case 17: {  // DWRITE DRd, CRs[imm]
-                if (crAlias[crSrc] !== undefined) {
-                    const nm = clistSlotName[crAlias[crSrc]];
-                    if (nm) return `${condStr}"${nm}" ← DR${crDst}`;
-                }
-                return `${condStr}data[${crName(crSrc)}+${imm}] ← DR${crDst}`;
+                const offset = (imm & 0x4000) ? `${imm & 0x3FFF}` : `${(imm >>> 4) & 0x3FF} + DR${imm & 0xF}`;
+                return `${condStr}data[${crName(crSrc)}+${offset}] ← DR${crDst}`;
             }
             case 18: {  // BFEXT DRd, DRs, pos, w
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${condStr}DR${crDst} = bits[${pos}:${pos+width-1}] of DR${crSrc}`;
+                return `${condStr}DR${crDst} = bits[${pos}:${pos+width-1}] of DR${crSrc}${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}`;
             }
             case 19: {  // BFINS DRd, DRs, pos, w
                 const pos   = (imm >>> 5) & 0x1F;
                 const width = imm & 0x1F;
-                return `${condStr}insert ${width}b from DR${crSrc} at pos ${pos} into DR${crDst}`;
+                return `${condStr}insert ${width}b from DR${crSrc} at pos ${pos} into DR${crDst}${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}`;
             }
             case 20: {  // MCMP DRd, DRs
                 return `${condStr}compare DR${crDst} vs DR${crSrc} → flags`;
@@ -5829,28 +5826,18 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             const crSrc = (w >>> 15) & 0xF;
             const imm   = w & 0x7FFF;
 
-            // Track LOAD/CHANGE from CR6 (active c-list) into a capability register
-            if ((op === 0 || op === 4) && crSrc === 6 && cc > 0) {
-                crAlias[crDst] = imm;   // slot index
-            }
-            // SWITCH can swap aliases
-            if (op === 5) {
-                const swOther = imm & 0xF;
-                const tmp = crAlias[crSrc];
-                if (crAlias[swOther] !== undefined) crAlias[crSrc] = crAlias[swOther];
-                else delete crAlias[crSrc];
-                if (tmp !== undefined) crAlias[swOther] = tmp;
-                else delete crAlias[swOther];
-            }
+            // A listing is not a linear execution: LOAD may be skipped or fault,
+            // and a branch may bypass it. Never carry a speculative CR alias
+            // into later instruction annotations.
 
             // Build symbolic annotation (capability arrow shown next to mnemonic)
             let ann = '';
             const _nsOrClistName = idx => clistSlotName[idx] || null;
-            if ((op === 0 || op === 4) && crSrc === 6 && cc > 0) {
+            if (op === 0 && crSrc === 6 && cc > 0) {
                 const nm = _nsOrClistName(imm);
                 if (nm) ann = `<span class="lump-sym-ann">\u2190 ${e(nm)}</span>`;
-            } else if (op === 2 && crAlias[crDst] !== undefined && cc > 0) {
-                const nm = _nsOrClistName(crAlias[crDst]);
+            } else if (op === 2 && crSrc === 6 && cc > 0) {
+                const nm = _nsOrClistName(imm);
                 if (nm) ann = `<span class="lump-sym-ann">\u2192 ${e(nm)}</span>`;
             } else if ((op === 8 || op === 9) && crSrc === 6 && cc > 0) {
                 // ELOADCALL (op=8): imm15 = (methodIdx<<5)|row — slot is bits[4:0] only.

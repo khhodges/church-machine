@@ -8458,12 +8458,12 @@ class ChurchSimulator {
                 }
             }
             const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} preserved[${preservedCRs.join(',')||'none'}]` : '';
-            const desc = `RETURN (LAMBDA/SZ=0) PC→${cachedReturnPC} [leaf — NIA cache, no memory read]${maskDesc}`;
+            const desc = `RETURN (LAMBDA/SZ=0) PC→${cachedReturnPC} [leaf — cached continuation]${maskDesc}`;
             this.output += desc + '\n';
             this._emitTrace(this.physicalPC, TRACE_EV_RETURN_POP,  0);
             this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR6,  this.cr[6].word0  >>> 0);
             this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR14, _retCallerCR14GT);
-            return { pc: cachedReturnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
+            return { pc: cachedReturnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask, activeFrameSZ) };
         }
         // Restore CR14 for cross-domain RETURN (active SZ=1 CALL frame): mirrors the
         // hardware cload that fires after RETURN to reload the caller's code
@@ -8494,7 +8494,7 @@ class ChurchSimulator {
         this._emitTrace(this.physicalPC, TRACE_EV_RETURN_POP,  0);
         this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR6,  this.cr[6].word0  >>> 0);
         this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR14, _retCallerCR14GT);
-        return { pc: frame.returnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask) };
+        return { pc: frame.returnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask, activeFrameSZ) };
     }
 
     _execChange(d) {
@@ -8944,12 +8944,12 @@ class ChurchSimulator {
         // Actual Thread transitions are owned by CHANGE, which validates and
         // restores the complete Thread context.  Retain the accepted probe's
         // M consumption while preserving the live Thread authority.
+        let preservedActiveThread = false;
         if (d.crDst === 12) {
             const loadedBase = this.cr[12].word1;
             if (!this._threadLayoutAtBase(loadedBase)) {
                 this.cr[12] = { ...crBefore[12], m: 0 };
-                loadResult.desc =
-                    `SWITCH CR12, [CR${d.crSrc} + ${d.imm}] (non-Thread probe accepted; active Thread preserved; destination M consumed)`;
+                preservedActiveThread = true;
             }
         }
 
@@ -8957,7 +8957,7 @@ class ChurchSimulator {
         // _writeCR normally does this when mElevation is false; force the
         // architectural result so boot-only elevation cannot leak through.
         this.cr[d.crDst].m = 0;
-        const desc = `SWITCH CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] (destination M accepted and consumed)`;
+        const desc = `SWITCH CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] (${preservedActiveThread ? 'non-Thread probe accepted; active Thread preserved; ' : ''}destination M accepted and consumed)`;
         loadResult.desc = desc;
         loadResult.instr = d;
         return loadResult;
@@ -9796,7 +9796,7 @@ class ChurchSimulator {
                 this._writeDR(drIdx, value);
                 this._clearMWindow(crIdx);
                 const label = this._abstractLedLabel(ledIdx);
-                const desc  = `DREAD DR${drIdx} ← ${value} [${label} = ${value ? 'ON' : 'OFF'}]`;
+                const desc  = `DREAD DR${drIdx} ${drIdx === 0 ? 'write discarded (DR0 remains 0)' : `← ${value}`} [${label} = ${value ? 'ON' : 'OFF'}]`;
                 this.output += desc + '\n';
                 this.pc++;
                 return { pc: this.pc - 1, desc, pipeline: [
@@ -9815,7 +9815,7 @@ class ChurchSimulator {
                 this._writeDR(drIdx, value);
                 this._clearMWindow(crIdx);
                 const regName = ['TX', 'STATUS', 'RX'][regIdx];
-                const desc = `DREAD DR${drIdx} ← ${value} [UART.${regName}]`;
+                const desc = `DREAD DR${drIdx} ${drIdx === 0 ? 'write discarded (DR0 remains 0)' : `← ${value}`} [UART.${regName}]`;
                 this.output += desc + '\n';
                 this.pc++;
                 return { pc: this.pc - 1, desc, pipeline: [
@@ -9833,7 +9833,7 @@ class ChurchSimulator {
                 const value = this.buttonState >>> 0;
                 this._writeDR(drIdx, value);
                 this._clearMWindow(crIdx);
-                const desc = `DREAD DR${drIdx} ← 0x${value.toString(16).toUpperCase()} [Button.state]`;
+                const desc = `DREAD DR${drIdx} ${drIdx === 0 ? 'write discarded (DR0 remains 0)' : `← 0x${value.toString(16).toUpperCase()}`} [Button.state]`;
                 this.output += desc + '\n';
                 this.pc++;
                 return { pc: this.pc - 1, desc, pipeline: [
@@ -9852,7 +9852,7 @@ class ChurchSimulator {
                 this._writeDR(drIdx, value);
                 this._clearMWindow(crIdx);
                 const regName = ['TICKS_LO', 'TICKS_HI', 'TOD_EPOCH', 'ALARM_CMP', 'CTL'][regIdx];
-                const desc = `DREAD DR${drIdx} ← ${value} [Timer.${regName}]`;
+                const desc = `DREAD DR${drIdx} ${drIdx === 0 ? 'write discarded (DR0 remains 0)' : `← ${value}`} [Timer.${regName}]`;
                 this.output += desc + '\n';
                 this.pc++;
                 return { pc: this.pc - 1, desc, pipeline: [
@@ -10077,12 +10077,12 @@ class ChurchSimulator {
                       : devNsIdx === ARCH_BOOT.minimalSlots.BTN_DEV ? ` [BTN = ${value >>> 0}]`
                       : (devNsIdx === ARCH_BOOT.minimalSlots.TIMER_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.TIMER_DEV) ? ` [TIMER.${['TICKS_LO','TICKS_HI','TOD_EPOCH','ALARM_CMP','ALARM_CTL'][offset]||'reg'} = ${value >>> 0}]`
                       : '';
-        const desc = `DREAD DR${drIdx} ← ${value >>> 0} (0x${(value >>> 0).toString(16).toUpperCase()}) ← [CR${d.crSrc} + ${offset}] (${label})${readTag}`;
+        const desc = `DREAD DR${drIdx} ${drIdx === 0 ? '(write discarded; DR0 remains 0)' : `← ${value >>> 0} (0x${(value >>> 0).toString(16).toUpperCase()})`} ← [CR${d.crSrc} + ${offset}] (${label})${readTag}`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'DREAD', desc: `Read word ${offset} from ${label} into DR${drIdx}`, perm: 'R', status: 'pass' },
+            { stage: 'DREAD', desc: `Read word ${offset} from ${label}${drIdx === 0 ? '; discard write to DR0' : ` into DR${drIdx}`}`, perm: dreadPerm, status: 'pass' },
         ]};
     }
 
@@ -10254,12 +10254,12 @@ class ChurchSimulator {
         this.flags.Z = value === 0;
         this.flags.C = false;
         this.flags.V = false;
-        const desc = `BFEXT DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} -> 0x${value.toString(16).toUpperCase()} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=0 V=0]`;
+        const desc = `BFEXT DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} -> 0x${value.toString(16).toUpperCase()}${drIdx === 0 ? ' (write discarded; DR0 remains 0)' : ''} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=0 V=0]`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'BFEXT', desc: `Extract bits [${pos}:${pos+width-1}] from DR${d.crSrc} into DR${drIdx}`, perm: '-', status: 'pass' },
+            { stage: 'BFEXT', desc: `Extract bits [${pos+width-1}:${pos}] from DR${d.crSrc}${drIdx === 0 ? '; discard write to DR0' : ` into DR${drIdx}`}`, perm: '-', status: 'pass' },
         ]};
     }
 
@@ -10280,12 +10280,12 @@ class ChurchSimulator {
         this.flags.Z = newWord === 0;
         this.flags.C = false;
         this.flags.V = false;
-        const desc = `BFINS DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} <- 0x${(insertVal & ((1 << width) - 1)).toString(16).toUpperCase()} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=0 V=0]`;
+        const desc = `BFINS DR${drIdx}, DR${d.crSrc}, pos=${pos}, w=${width} <- 0x${(insertVal & ((1 << width) - 1)).toString(16).toUpperCase()} -> 0x${newWord.toString(16).toUpperCase()}${drIdx === 0 ? ' (write discarded; DR0 remains 0)' : ''} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=0 V=0]`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'BFINS', desc: `Insert bits [${pos}:${pos+width-1}] from DR${d.crSrc} into DR${drIdx}`, perm: '-', status: 'pass' },
+            { stage: 'BFINS', desc: `Insert bits [${pos+width-1}:${pos}] from pre-write DR${d.crSrc} into DR${drIdx}${drIdx === 0 ? ' (write discarded)' : ''}`, perm: '-', status: 'pass' },
         ]};
     }
 
@@ -10317,12 +10317,12 @@ class ChurchSimulator {
         const result = a + b;
         this._setAddFlags(a, b, result);
         this._writeDR(d.crDst, result);
-        const desc = `IADD DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} + ${b} = ${result >>> 0} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
+        const desc = `IADD DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} + ${b} = ${result >>> 0}${d.crDst === 0 ? ' (write discarded; DR0 remains 0)' : ''} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'IADD', desc: `DR${d.crDst} = DR${drA} + ${bDesc}`, status: 'pass' },
+            { stage: 'IADD', desc: `${d.crDst === 0 ? 'Discard write to DR0: ' : `DR${d.crDst} = `}pre-write DR${drA} (${a}) + ${bDesc} (${b}) = ${result >>> 0}`, status: 'pass' },
         ]};
     }
 
@@ -10341,12 +10341,12 @@ class ChurchSimulator {
         const result = a - b;
         this._setSubFlags(a, b, result);
         this._writeDR(d.crDst, result);
-        const desc = `ISUB DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} - ${b} = ${result >>> 0} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
+        const desc = `ISUB DR${d.crDst}, DR${drA}, ${bDesc} -> ${a} - ${b} = ${result >>> 0}${d.crDst === 0 ? ' (write discarded; DR0 remains 0)' : ''} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0} V=${this.flags.V?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'ISUB', desc: `DR${d.crDst} = DR${drA} - ${bDesc}`, status: 'pass' },
+            { stage: 'ISUB', desc: `${d.crDst === 0 ? 'Discard write to DR0: ' : `DR${d.crDst} = `}pre-write DR${drA} (${a}) - ${bDesc} (${b}) = ${result >>> 0}`, status: 'pass' },
         ]};
     }
 
@@ -10377,12 +10377,12 @@ class ChurchSimulator {
         this.flags.C = lastBitOut === 1;
         this.flags.V = false;
         this._writeDR(d.crDst, result);
-        const desc = `SHL DR${d.crDst}, DR${drSrc}, ${shamt} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
+        const desc = `SHL DR${d.crDst}, DR${drSrc}, ${shamt} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')}${d.crDst === 0 ? ' (write discarded; DR0 remains 0)' : ''} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'SHL', desc: `DR${d.crDst} = DR${drSrc} << ${shamt}`, status: 'pass' },
+            { stage: 'SHL', desc: `${d.crDst === 0 ? 'Discard write to DR0: ' : `DR${d.crDst} = `}pre-write DR${drSrc} (0x${value.toString(16).toUpperCase()}) << ${shamt}`, status: 'pass' },
         ]};
     }
 
@@ -10405,12 +10405,12 @@ class ChurchSimulator {
         this.flags.V = false;
         this._writeDR(d.crDst, result);
         const shType = arith ? 'ASR' : 'LSR';
-        const desc = `SHR DR${d.crDst}, DR${drSrc}, ${shamt} ${shType} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
+        const desc = `SHR DR${d.crDst}, DR${drSrc}, ${shamt} ${shType} -> 0x${result.toString(16).toUpperCase().padStart(8,'0')}${d.crDst === 0 ? ' (write discarded; DR0 remains 0)' : ''} [Z=${this.flags.Z?1:0} N=${this.flags.N?1:0} C=${this.flags.C?1:0}]`;
         this.output += desc + '\n';
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'SHR', desc: `DR${d.crDst} = DR${drSrc} ${shType} ${shamt}`, status: 'pass' },
+            { stage: 'SHR', desc: `${d.crDst === 0 ? 'Discard write to DR0: ' : `DR${d.crDst} = `}pre-write DR${drSrc} (0x${value.toString(16).toUpperCase()}) ${shType} ${shamt}`, status: 'pass' },
         ]};
     }
 
@@ -10457,14 +10457,13 @@ class ChurchSimulator {
         return stages;
     }
 
-    _returnPipeline(d, frame, mask) {
+    _returnPipeline(d, frame, mask, activeFrameSZ = frame.sz) {
         const stages = [];
         if (this._mwinWbFired) {
             stages.push({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
         }
-        const frameTag = frame.sz === 0 ? 'LAMBDA' : 'CALL';
-        stages.push({ stage: 'POP', desc: `Pop ${frame.sz === 0 ? '1-word LAMBDA' : '2-word CALL'} frame; restore FLAGS, STO←${frame.savedSTO}`, status: 'pass' });
-        if (frame.sz === 1) {
+        stages.push({ stage: 'POP', desc: `Pop ${activeFrameSZ === 0 ? '1-word LAMBDA' : '2-word CALL'} frame; restore FLAGS, STO←${frame.savedSTO}`, status: 'pass' });
+        if (activeFrameSZ === 1) {
             stages.push({ stage: 'E-GT', desc: 'Revalidate caller E-GT → re-derive CR6/CR14', perm: 'E', status: 'pass' });
         }
         stages.push({ stage: 'RETURN', desc: `PC→${frame.returnPC}${mask ? `, MASK=0b${mask.toString(2).padStart(12,'0')} (set=preserve)` : ''}`, status: 'pass' });
@@ -10477,13 +10476,13 @@ class ChurchSimulator {
             if (parsed.permissions[p]) permBits.push(p);
         }
         return [
-            { stage: 'TPERM', desc: `Check permissions [${permBits.join(',')}] -> ${hasAll ? 'PASS' : 'FAIL'}`, status: hasAll ? 'pass' : 'fail' },
+            { stage: 'TPERM', desc: `${(d.imm & 0xF) === 0 ? 'CLEAR existence check' : 'Exact permission preset assertion'} (target has [${permBits.join(',')}]) -> ${hasAll ? 'PASS' : 'FAIL'}`, status: hasAll ? 'pass' : 'fail' },
         ];
     }
 
     _lambdaPipeline(d, label) {
         return [
-            { stage: 'LOAD',   desc: `Read CR${d.crDst} GT`, perm: 'L', status: 'pass' },
+            { stage: 'LOAD',   desc: `Read CR${d.crDst} GT`, status: 'pass' },
             { stage: 'TPERM',  desc: `Verify X permission`, perm: 'X', status: 'pass' },
             { stage: 'PUSH',   desc: `Push 1-word frame (SZ=0): FLAGS|PC|SZ|STO`, status: 'pass' },
             { stage: 'LAMBDA', desc: `Church reduction via ${label}`, status: 'pass' },

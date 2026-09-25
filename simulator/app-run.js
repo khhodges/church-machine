@@ -4505,44 +4505,21 @@ function showFaultModal(f) {
           }).join('')
         : '';
 
-    // ── C-List pet name for the faulting instruction ───────────────────────
-    // When the faulting instruction is a LOAD or CALL that reads from CR6 (the
-    // C-List register), resolve the pet name of the referenced slot and surface
-    // it in the fault description.
+    // A fault record may outlive the loaded image. A current CR6 and current
+    // memory are not evidence of which GT was present at the faulting step.
     let _faultCListSlot = null;
     let _faultCListPetName = null;
-    let _faultCListGT = null;
     {
         const _op = (word >>> 27) & 0x1F;
         const _isLoadOrCall = (_op === 0 || _op === 2); // LOAD=0, CALL=2
         if (_isLoadOrCall) {
             const _crSrc = (word >>> 15) & 0xF;
-            if (_crSrc === 6 && sim.cr && sim.cr[6]) {
-                const _slotIdx = word & 0x7FFF;
-                const _clistBase = sim.cr[6].word1 >>> 0;
-                const _slotAddr = _clistBase + _slotIdx;
-                if (sim.memory && _slotAddr < sim.memory.length) {
-                    const _slotGT = sim.memory[_slotAddr] >>> 0;
-                    const _name = (typeof _resolveCListPetName === 'function') ? _resolveCListPetName(_slotGT) : null;
-                    if (_name) {
-                        _faultCListSlot = _slotIdx;
-                        _faultCListPetName = _name;
-                        _faultCListGT = _slotGT;
-                    }
-                }
-            }
+            if (_crSrc === 6 && word !== null) _faultCListSlot = word & 0x7FFF;
         }
     }
 
-    // ── C-List slot permissions badge (precomputed for template clarity) ─────
+    // No immutable slot GT/permissions were recorded with this fault.
     let _faultCListPermsHTML = '';
-    if (_faultCListGT !== null) {
-        try {
-            const _p = sim.parseGT(_faultCListGT);
-            const _perms = ['R','W','X','L','S','E'].filter(k => _p.permissions[k]).join('');
-            if (_perms) _faultCListPermsHTML = ' ' + _permsHTML(_perms);
-        } catch(e) {}
-    }
 
     // ── Capability register snapshot ──────────────────────────────────────
     const crSnap = f.crSnapshot || [];
@@ -4554,7 +4531,7 @@ function showFaultModal(f) {
             const typeChar = ['\u2014','I','O','A'][p.type] || '?';
             const perms = ['R','W','X','L','S','E'].filter(k => p.permissions[k]).join('') || '\u2014';
             const base  = c.word1 ? '0x'+((c.word1>>>0).toString(16).toUpperCase()) : '\u2014';
-            const crName = (typeof _resolveCListPetName === 'function') ? (_resolveCListPetName(c.word0) || '\u2014') : '\u2014';
+            const crName = (f.pet_names && f.pet_names[`CR${i}`]) || '\u2014';
             crTableRows += `<tr>
                 <td class="freg-name">CR${i}</td>
                 <td class="freg-type">${typeChar}</td>
@@ -4593,15 +4570,13 @@ function showFaultModal(f) {
             <div class="fault-flags-row">Flags: ${flagsStr}</div>
         </div>` : '';
 
-    // ── Pet name alias maps (number → name) for register annotation ──────────
-    // Seed from global lump pet names first, then layer in compiler aliases so
-    // source-compiled names win over lump metadata when both are present.
-    const _petCR = Object.assign({}, _petNameCRMap || {});
-    const _petDR = Object.assign({}, _petNameDRMap || {});
-    if (assembler) {
-        const _al = assembler.getAliases();
-        for (const [nm, num] of Object.entries(_al.cr || {})) _petCR[num] = nm;
-        for (const [nm, num] of Object.entries(_al.dr || {})) _petDR[num] = nm;
+    // Only register names captured with this fault are suitable for historical
+    // annotations; the currently selected editor/assembler may be another LUMP.
+    const _petCR = {};
+    const _petDR = {};
+    for (const [reg, name] of Object.entries(f.pet_names || {})) {
+        if (/^CR(?:[0-9]|1[0-5])$/.test(reg)) _petCR[Number(reg.slice(2))] = name;
+        if (/^DR(?:[0-9]|1[0-5])$/.test(reg)) _petDR[Number(reg.slice(2))] = name;
     }
     // Apply pet names and (optionally) highlight a specific offset bracket in a disasm string.
     // offsetToHighlight: string like "[0x0008]" to wrap in .itrace-offset-fault, or null.
@@ -4873,14 +4848,8 @@ function showFaultModal(f) {
             for (const regKey of snapKeys) {
                 const gtHex = snap[regKey];
                 let petName = pnames[regKey] || '';
-                if (!petName && typeof _resolveCListPetName === 'function') {
-                    try {
-                        const gtWord = typeof gtHex === 'string'
-                            ? Number.parseInt(gtHex, 16) >>> 0
-                            : Number(gtHex) >>> 0;
-                        if (Number.isFinite(gtWord)) petName = _resolveCListPetName(gtWord) || '';
-                    } catch (_) {}
-                }
+                // Missing historical name stays missing; live labels are not
+                // bound to this fault's artifact or execution occurrence.
                 snapRows += `<tr>
                     <td class="freg-name">${regKey}</td>
                     <td class="freg-base"><code>${gtHex}</code></td>
@@ -4921,23 +4890,6 @@ function showFaultModal(f) {
             const rawDisasm = assembler ? assembler.disassemble(h.raw) : `${h.opName} CR${h.crDst}, CR${h.crSrc}, ${h.imm}`;
             const isFault = (f.faultStep != null && h.step === f.faultStep);
             const instrHtml = _petDisasm(rawDisasm, isFault ? _scopeBadOffsetStr : null);
-            let clistAnnotation = '';
-            {
-                const _op = (h.raw >>> 27) & 0x1F;
-                const _isLoadOrCall = (_op === 0 || _op === 2);
-                if (_isLoadOrCall && h.crSrc === 6 && sim.cr && sim.cr[6]) {
-                    const _slotIdx = h.imm;
-                    const _clistBase = sim.cr[6].word1 >>> 0;
-                    const _slotAddr = _clistBase + _slotIdx;
-                    if (sim.memory && _slotAddr < sim.memory.length) {
-                        const _slotGT = sim.memory[_slotAddr] >>> 0;
-                        const _name = (typeof _resolveCListPetName === 'function') ? _resolveCListPetName(_slotGT) : null;
-                        if (_name) {
-                            clistAnnotation = ` <span class="fault-clist-petname">${_name}</span>`;
-                        }
-                    }
-                }
-            }
             const rowOnclick = isFault
                 ? (_editLineNum
                     ? ` onclick="faultModalOpenEditor(${_editLineNum})" title="Click to open editor at line ${_editLineNum}" style="cursor:pointer"`
@@ -4946,7 +4898,7 @@ function showFaultModal(f) {
                         : ''))
                 : '';
             const cls = isFault ? ' class="itrace-fault"' : '';
-            traceRows += `<tr${cls}${rowOnclick}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instrHtml}${clistAnnotation}</td></tr>`;
+            traceRows += `<tr${cls}${rowOnclick}><td class="itrace-step">${h.step}</td><td class="itrace-addr">${addr}</td><td class="itrace-raw">${rawHex}</td><td class="itrace-instr">${instrHtml}</td></tr>`;
         }
         traceTableHtml = `
                 <div class="fault-trace-scroll">
@@ -4984,9 +4936,9 @@ function showFaultModal(f) {
                             ${_instructionNavHint}
                         </span>
                     </div>
-                    ${_faultCListPetName != null ? `<div class="fault-detail-row">
+                    ${_faultCListSlot != null ? `<div class="fault-detail-row">
                         <span class="fault-detail-label">C-List</span>
-                        <span class="fault-detail-value"><code>clist[${_faultCListSlot}]</code> <span class="fault-clist-petname">${_faultCListPetName}</span>${_faultCListPermsHTML}</span>
+                        <span class="fault-detail-value"><code>clist[${_faultCListSlot}]</code> (historical GT unavailable)</span>
                     </div>` : ''}
                     <div class="fault-detail-row">
                         <span class="fault-detail-label">Location</span>

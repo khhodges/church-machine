@@ -11,6 +11,19 @@ still show word-derived disassembly, but it must remain visibly unlabelled; a
 conflict must discard the address label rather than imply that both facts
 describe one instruction.
 
+Generated instruction comments must distinguish static semantics from recorded
+execution. Never recompute a historical instruction using current registers.
+Use exact occurrence-bound operands when available; otherwise show symbolic
+semantics, not inferred values.
+
+**Why:** Re-evaluating an already executed in-place addition displayed
+4096+4096=8192 even though the actual instruction computed 0+4096=4096,
+misleading diagnosis of M-bit authorization.
+
+**How to apply:** Apply the same evidence rule to disassembly, fault history,
+pipeline explanations, and hardware views. Hardware comments must never borrow
+software simulator register values.
+
 **Why:** A stale address map paired a BRANCH label with a DWRITE word/effect,
 making the branch appear to write an LED.
 

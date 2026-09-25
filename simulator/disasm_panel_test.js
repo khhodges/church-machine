@@ -610,8 +610,8 @@ function runAutoComment(cc, slotNames, word) {
         comment.includes('c-list[0]') && !comment.includes('c-list[32]'),
         'comment=' + JSON.stringify(comment));
 
-    assert('ELC-1: comment mentions method #1',
-        comment.includes('method #1'),
+    assert('ELC-1: encoded selector 1 is source method #0',
+        comment.includes('method #0'),
         'comment=' + JSON.stringify(comment));
 }
 
@@ -626,8 +626,8 @@ function runAutoComment(cc, slotNames, word) {
         comment2.includes('c-list[1]') && !comment2.includes('c-list[65]'),
         'comment=' + JSON.stringify(comment2));
 
-    assert('ELC-2: comment mentions method #2',
-        comment2.includes('method #2'),
+    assert('ELC-2: encoded selector 2 is source method #1',
+        comment2.includes('method #1'),
         'comment=' + JSON.stringify(comment2));
 }
 
