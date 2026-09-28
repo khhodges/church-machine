@@ -10,25 +10,61 @@ import pytest
 from scripts.migrate_bootstrap_residents import _validate_stage, migrate
 
 
+@pytest.fixture
+def historical_catalog(tmp_path):
+    """A private, explicitly pre-migration Namespace with reviewed historical bodies.
+
+    The repository catalog is already migrated; its active bindings must not
+    determine the source state of this historical transition test.
+    """
+    root = Path(__file__).resolve().parents[2]
+    catalog = tmp_path / "lumps"
+    shutil.copytree(root / "server" / "lumps", catalog, symlinks=True)
+    shutil.copyfile(root / "server" / "boot-config.json", tmp_path / "boot-config.json")
+    state_path = catalog / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    current = next(row for row in state["abstractions"]
+                   if row.get("name") == "CapabilityTest" and row.get("slot") == 10)
+    state["abstractions"].remove(current)
+    state["abstractions"] = [
+        row for row in state["abstractions"] if row.get("slot") != 2
+    ]
+    source = dict(current)
+    source.update(slot=2, token="4a000002",
+                  filename="CapabilityTest.2.6fd9df21.lump",
+                  binary_hash="1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c",
+                  issue_n=2, lump_version=27, boot=True)
+    state["abstractions"].append(source)
+    state_path.write_text(json.dumps(state, indent=2))
+    manifest_path = catalog / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    for row in manifest:
+        if row.get("filename") in ("CapabilityTest.2.6fd9df21.lump",
+                                    "CapabilityTest.1.e2b69e5b.lump"):
+            row.pop("archived", None)
+    manifest_path.write_text(json.dumps(manifest, indent=2))
+    config_path = tmp_path / "boot-config.json"
+    config = json.loads(config_path.read_text())
+    config["bootEntrySlot"] = 2
+    config_path.write_text(json.dumps(config, indent=2))
+    return catalog
+
+
 def _snapshot(root):
     return {str(path.relative_to(root)): hashlib.sha256(path.read_bytes()).hexdigest()
             for path in root.rglob("*") if path.is_file() and not path.is_symlink()}
 
 
-def test_fault_before_swap_leaves_complete_catalog_unchanged(tmp_path):
-    source = Path(__file__).resolve().parents[2] / "server" / "lumps"
-    catalog = tmp_path / "lumps"
-    shutil.copytree(source, catalog, symlinks=True)
+def test_fault_before_swap_leaves_complete_catalog_unchanged(historical_catalog):
+    catalog = historical_catalog
     before = _snapshot(catalog)
     with pytest.raises(RuntimeError, match="injected"):
         migrate(catalog, fault_after_stage=True)
     assert _snapshot(catalog) == before
 
 
-def test_fault_during_atomic_exchange_rolls_back_without_missing_target(tmp_path):
-    source = Path(__file__).resolve().parents[2] / "server" / "lumps"
-    catalog = tmp_path / "lumps"
-    shutil.copytree(source, catalog, symlinks=True)
+def test_fault_during_atomic_exchange_rolls_back_without_missing_target(historical_catalog):
+    catalog = historical_catalog
     before = _snapshot(catalog)
     with pytest.raises(RuntimeError, match="publication"):
         migrate(catalog, fault_during_publication=True)
@@ -36,10 +72,8 @@ def test_fault_during_atomic_exchange_rolls_back_without_missing_target(tmp_path
     assert _snapshot(catalog) == before
 
 
-def test_duplicate_resident_row_is_rejected_before_atomic_exchange(tmp_path):
-    source = Path(__file__).resolve().parents[2] / "server" / "lumps"
-    catalog = tmp_path / "lumps"
-    shutil.copytree(source, catalog, symlinks=True)
+def test_duplicate_resident_row_is_rejected_before_atomic_exchange(historical_catalog):
+    catalog = historical_catalog
     state_path = catalog / "ns-state.json"
     state = json.loads(state_path.read_text())
     original = next(row for row in state["abstractions"]
@@ -94,9 +128,25 @@ def test_capability_rebuild_archives_displaced_bytes_and_approvals(tmp_path):
         hashlib.sha256(raw).hexdigest() for raw in before_bodies.values()
         if hashlib.sha256(raw).hexdigest() in before_approvals
     }
-    reviewed_alias = catalog / "CapabilityTest.2.e794a764.lump"
-    if reviewed_alias.is_symlink():
-        reviewed_alias.unlink()
+    # Simulate a stale alias only in this private catalog. A production rebuild
+    # must reject it rather than overwrite the conflicting historical locator.
+    colliding_alias = catalog / "CapabilityTest.2.35647a26.lump"
+    approved_bytes = colliding_alias.read_bytes()
+    assert hashlib.sha256(approved_bytes).hexdigest() == (
+        "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc"
+    )
+    colliding_alias.unlink()
+    colliding_alias.symlink_to("CapabilityTest.1.3f7e1c54.lump")
+    before_collision = _snapshot(catalog)
+    result = subprocess.run(
+        ["node", str(root / "scripts" / "build_capability_test_lump.js"),
+         "--out-dir", str(catalog)],
+        cwd=root, capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "content-id collision" in result.stderr
+    assert _snapshot(catalog) == before_collision
+    colliding_alias.unlink()
+    colliding_alias.write_bytes(approved_bytes)
     subprocess.run(["node", str(root / "scripts" / "build_capability_test_lump.js"),
                     "--out-dir", str(catalog)], cwd=root, check=True)
     after = json.loads((catalog / "manifest.json").read_text())
@@ -132,10 +182,10 @@ def test_wukong_rebuild_refuses_content_id_collision_without_data_loss(tmp_path)
 
 
 @pytest.mark.parametrize("target", ["code", "row0", "dependency"])
-def test_loaded_capability_body_drift_is_rejected_before_publication(tmp_path, target):
-    source = Path(__file__).resolve().parents[2] / "server" / "lumps"
-    catalog = tmp_path / "lumps"
-    shutil.copytree(source, catalog, symlinks=True)
+def test_loaded_capability_body_drift_is_rejected_before_publication(
+        historical_catalog, target):
+    catalog = historical_catalog
+    migrate(catalog)
     state = json.loads((catalog / "ns-state.json").read_text())
     row = next(entry for entry in state["abstractions"]
                if entry.get("name") == "CapabilityTest")

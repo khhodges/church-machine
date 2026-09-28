@@ -2,6 +2,16 @@
 name: Immutable LUMP history transitions
 description: Non-obvious rules for keeping save, WIP, and fork histories atomic across workers
 ---
+Archived canonical filenames must not become aliases to newer active artifacts.
+Repair a redirected historical filename only from bytes matching its exact
+saved approval, not from recompilation of current source.
+
+**Why:** A symlink can make history present a newer revision under an older
+approved identity even though the original bytes survive elsewhere.
+
+**How to apply:** Verify the archived filename's approval hash and the recovery
+copy before replacement, and confirm active artifact bytes remain unchanged.
+
 Treat archive creation, current binary/sidecar replacement, and manifest replacement as one staged transaction held under both an in-process lock and a cross-process advisory lock. Reserve archive pathnames with `lexists`, not `exists`, and revalidate the expected manifest generation after acquiring the lock.
 
 **Why:** A dangling archive symlink is still an occupied immutable pathname. Multiple server workers can otherwise reserve the same archive version, and a caller that read state before waiting for the lock can apply a stale fork/save decision after another transition commits.

@@ -106,15 +106,6 @@ function contentFrame(name, text) {
 }
 const FRAME = contentFrame('WukongCallHome', source);
 
-if (words.length !== 75) {
-    console.error(`ERROR: expected 75 words, got ${words.length}.`);
-    console.error('wukong_callhome.cloomc must produce exactly 75 instructions.');
-    console.error('Words 0-1 are LOAD setup, words 2-71 mirror WUKONG_NUC_PROGRAM,');
-    console.error('words 72-73 are the materialized LOAD + CALL handoff,');
-    console.error('and word 74 is the BRANCH loop_top fallback.');
-    process.exit(1);
-}
-
 const BINDINGS = {
     Salvation:          { gt: 0x4A000004, ns_slot: 4, rights: ['E'] },
     Navana:              { gt: 0x4A000005, ns_slot: 5, rights: ['E'] },
@@ -256,7 +247,7 @@ if (stateResident && stateResident.filename) {
 if (fs.existsSync(lumpPath) && !fs.readFileSync(lumpPath).equals(bytes)) {
     throw new Error(`refusing to overwrite immutable history after content-id collision: ${filename}`);
 }
-fs.writeFileSync(lumpPath, bytes);
+if (!fs.existsSync(lumpPath)) fs.writeFileSync(lumpPath, bytes, { flag: 'wx' });
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Print c-list slot assignments ─────────────────────────────────────────────

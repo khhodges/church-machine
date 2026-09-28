@@ -11,6 +11,7 @@ import pytest
 from flask import Flask
 
 from server.change_confirmation import (
+    AuditCapacityError,
     IntentStore,
     describe_boot_image_generation,
     describe_lump_save_plan,
@@ -18,6 +19,9 @@ from server.change_confirmation import (
     protected_request,
     resolve_saved_lump_versions,
 )
+import json
+import sqlite3
+import server.change_confirmation as change_confirmation
 
 
 def _consume_shared(args):
@@ -552,3 +556,240 @@ def test_review_confirm_reject_stale_body_session_replay(tmp_path):
     assert other.post("/api/source-file/save", json=body,
                       headers={"X-Change-Confirmation": token}).status_code == 409
     assert len(calls) == 1
+
+def test_rejection_audit_is_durable_session_bound_sanitized_and_revokes(tmp_path):
+    state = tmp_path / "protected"
+    state.write_text("before")
+    database = tmp_path / "reviews.sqlite"
+    app = Flask(__name__)
+    app.secret_key = "isolated-only"
+    install(
+        app, lambda: [state], nullcontext, store_path=database,
+        describe=lambda _payload: [
+            "LUMP: SafePet",
+            "Version: 2 → 3",
+            "--- current\n+++ proposed\n+credential=must-not-persist",
+        ])
+
+    @app.post("/api/boot-config")
+    def mutate():
+        state.write_text("after")
+        return {"ok": True}
+
+    owner = app.test_client()
+    issued = owner.post("/api/boot-config", json={
+        "source": "must-not-persist", "approval": "must-not-persist",
+    }).json["change_confirmation"]
+    assert isinstance(issued["review_id"], str)
+    assert isinstance(issued["expires_at"], int)
+
+    stranger = app.test_client()
+    assert stranger.post("/api/change-reviews/reject", json={
+        "review_id": issued["review_id"], "outcome": "rejected",
+    }).status_code == 403
+    rejected = owner.post("/api/change-reviews/reject", json={
+        "review_id": issued["review_id"], "outcome": "rejected",
+        "ignored_source": "must-not-persist",
+    })
+    assert rejected.status_code == 200
+    assert owner.post("/api/change-reviews/reject", json={
+        "review_id": issued["review_id"], "outcome": "rejected",
+    }).json["idempotent"] is True
+    assert owner.post("/api/boot-config", json={
+        "source": "must-not-persist", "approval": "must-not-persist",
+    }, headers={"X-Change-Confirmation": issued["id"]}).status_code == 409
+    assert state.read_text() == "before"
+
+    with sqlite3.connect(database) as db:
+        row = db.execute(
+            "SELECT outcome, proposed_changes, affected_artifacts "
+            "FROM change_reviews WHERE review_id = ?",
+            (issued["review_id"],)).fetchone()
+    assert row[0] == "rejected"
+    assert json.loads(row[1]) == [
+        "POST /api/boot-config", "LUMP: SafePet", "Version: 2 → 3"]
+    assert "must-not-persist" not in database.read_bytes().decode(
+        "utf-8", errors="ignore")
+
+def test_config_audit_allowlist_rejects_arbitrary_nested_keys():
+    proposed, _affected = change_confirmation._audit_descriptions([
+        "step1.threadCount: 1 → 2",
+        "step1.credentials.password: absent → hunter2",
+        "slotRules.7: Lazy → Resident",
+    ])
+    assert "step1.threadCount: 1 → 2" in proposed
+    assert "slotRules.7: Lazy → Resident" in proposed
+    assert "hunter2" not in str(proposed)
+
+def test_audit_quota_retains_terminal_rows_then_reuses_after_retention(tmp_path):
+    database = tmp_path / "bounded.sqlite"
+    retention = 100
+    store = IntentStore(
+        database, max_reviews=2, retention_seconds=retention,
+        max_metadata_bytes=1024)
+
+    def binding(number):
+        return ("session", "POST", "/api/boot-config?",
+                f"request-{number}", "state")
+
+    approved_token, approved_id, _ = store.issue_review(
+        binding(1), "POST", "/api/boot-config", ["change"], [], now=1)
+    assert store.consume_reason(
+        approved_token, binding(1), now=2) == "accepted"
+    _rejected_token, rejected_id, _ = store.issue_review(
+        binding(2), "POST", "/api/boot-config", ["change"], [], now=3)
+    assert store.reject(rejected_id, "session", "rejected", now=4) == "recorded"
+
+    with pytest.raises(AuditCapacityError):
+        store.issue_review(
+            binding(3), "POST", "/api/boot-config", ["change"], [], now=50)
+    with sqlite3.connect(database) as db:
+        rows = db.execute(
+            "SELECT review_id, outcome FROM change_reviews ORDER BY issued_at"
+        ).fetchall()
+    assert rows == [(approved_id, "approved"), (rejected_id, "rejected")]
+
+    # Both terminal records have completed their full retention period.
+    _token, replacement_id, _ = store.issue_review(
+        binding(3), "POST", "/api/boot-config", ["change"], [],
+        now=retention + 5)
+    with sqlite3.connect(database) as db:
+        rows = db.execute(
+            "SELECT review_id FROM change_reviews ORDER BY issued_at").fetchall()
+    assert rows == [(replacement_id,)]
+
+def test_review_expiry_swept_after_reopen(tmp_path):
+    database = tmp_path / "reviews.sqlite"
+    store = IntentStore(database)
+    issued_at = time.time() - 301
+    _token, review_id, _expires = store.issue_review(
+        ("session", "POST", "/api/boot-config?", "request", "state"),
+        "POST", "/api/boot-config", [], [], now=issued_at)
+    # Constructor performs the startup sweep, independently of client delivery.
+    IntentStore(database)
+    with sqlite3.connect(database) as db:
+        outcome = db.execute(
+            "SELECT outcome FROM change_reviews WHERE review_id = ?",
+            (review_id,)).fetchone()[0]
+    assert outcome == "expired"
+
+def test_audit_failure_fails_closed_before_protected_route(tmp_path, monkeypatch):
+    app = Flask(__name__)
+    app.secret_key = "isolated-only"
+    calls = []
+    database = tmp_path / "reviews.sqlite"
+    install(app, lambda: [], nullcontext, store_path=database)
+
+    @app.post("/api/boot-config")
+    def mutate():
+        calls.append(True)
+        return {"ok": True}
+
+    client = app.test_client()
+    issued = client.post("/api/boot-config", json={"value": 1})
+    assert issued.status_code == 428
+
+    def unavailable(*_args, **_kwargs):
+        raise sqlite3.OperationalError("audit unavailable")
+
+    monkeypatch.setattr(change_confirmation.sqlite3, "connect", unavailable)
+    response = client.post(
+        "/api/boot-config", json={"value": 1},
+        headers={"X-Change-Confirmation":
+                 issued.json["change_confirmation"]["id"]})
+    assert response.status_code == 503
+    assert response.json["error"] == "change_review_audit_unavailable"
+    assert not calls
+
+def test_server_records_validation_failure_and_reject_type_is_safe(tmp_path):
+    state = tmp_path / "state"
+    state.write_text("before")
+    database = tmp_path / "reviews.sqlite"
+    app = Flask(__name__)
+    app.secret_key = "isolated-only"
+    calls = []
+    install(app, lambda: [state], nullcontext, store_path=database)
+
+    @app.post("/api/boot-config")
+    def mutate():
+        calls.append(True)
+        return {"ok": True}
+
+    client = app.test_client()
+    confirmation = client.post(
+        "/api/boot-config", json={"value": 1}).json["change_confirmation"]
+    assert client.post("/api/change-reviews/reject", json={
+        "review_id": confirmation["review_id"], "outcome": [],
+    }).status_code == 400
+    state.write_text("concurrent")
+    response = client.post(
+        "/api/boot-config", json={"value": 1},
+        headers={"X-Change-Confirmation": confirmation["id"]})
+    assert response.status_code == 409
+    assert not calls
+    with sqlite3.connect(database) as db:
+        row = db.execute(
+            "SELECT outcome, failure_reason FROM change_reviews "
+            "WHERE review_id = ?", (confirmation["review_id"],)).fetchone()
+    assert row == ("validation_failed", "saved_state_changed")
+
+def test_namespace_audit_helper_uses_exact_selector_and_fixed_fields(tmp_path):
+    module = ast.parse((Path(__file__).parents[2] / "server/app.py").read_text())
+    function = next(
+        node for node in module.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_describe_namespace_review_changes")
+
+    class BootImage:
+        _MMIO_SLOT_SPECS = {}
+
+    scope = {
+        "re": __import__("re"),
+        "hashlib": __import__("hashlib"),
+        "LUMPS_DIR": str(tmp_path),
+        "_boot_image_gen": BootImage(),
+    }
+    exec(compile(ast.Module(body=[function], type_ignores=[]),
+                 "<isolated>", "exec"), scope)
+    before = [{
+        "slot": 9, "name": "Clock", "location": "0x100",
+        "token": "0x12", "filename": "clock-v4.lump",
+    }]
+    proposed = [{"slot": 9, "name": "Clock", "location": "0x120"}]
+    manifest = [
+        {"token": "0x12", "filename": "other.lump", "lump_version": 99},
+        {"token": "0x12", "filename": "clock-v4.lump", "lump_version": 4},
+    ]
+    lines = scope[function.name](before, proposed, manifest)
+    assert "NS[9] location: 0x100 → 0x120" in lines
+    assert "NS[9]: pet name Clock; saved version v4" in lines
+    assert "v99" not in str(lines)
+
+def test_full_audit_quota_returns_safe_503_without_route_invocation(tmp_path):
+    app = Flask(__name__)
+    app.secret_key = "isolated-only"
+    calls = []
+    install(
+        app, lambda: [], nullcontext,
+        store_path=tmp_path / "bounded.sqlite",
+        store_options={"max_reviews": 1, "retention_seconds": 1000})
+
+    @app.post("/api/boot-config")
+    def mutate():
+        calls.append(True)
+        return {"ok": True}
+
+    client = app.test_client()
+    first = client.post("/api/boot-config", json={"value": 1})
+    review = first.json["change_confirmation"]
+    assert client.post("/api/change-reviews/reject", json={
+        "review_id": review["review_id"], "outcome": "rejected",
+    }).status_code == 200
+    blocked = client.post("/api/boot-config", json={"value": 2})
+    assert blocked.status_code == 503
+    assert blocked.json == {
+        "committed": False,
+        "error": "change_review_busy",
+        "message": "Review audit capacity is unavailable; no change was authorized.",
+    }
+    assert not calls

@@ -25751,6 +25751,101 @@ def _change_confirmation_paths():
     return paths
 
 
+def _describe_namespace_review_changes(before_rows, proposed_rows, manifest):
+    """Describe fixed NS descriptor fields and exact catalogue identities."""
+    from pathlib import Path
+    fields = ("name", "location", "type", "f", "g", "limit", "seq",
+              "seal", "boot", "layout")
+    identity_fields = ("token", "filename", "binaryHash", "binary_hash")
+
+    def safe(value):
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, int) and not isinstance(value, bool):
+            return str(value)
+        if isinstance(value, str) and len(value) <= 80:
+            return re.sub(r"[^A-Za-z0-9 _.:/-]", "?", value)
+        return "(unresolved)"
+
+    def by_slot(rows):
+        return {row["slot"]: row for row in rows
+                if isinstance(row, dict)
+                and isinstance(row.get("slot"), int)
+                and not isinstance(row.get("slot"), bool)}
+
+    old, new = by_slot(before_rows), by_slot(proposed_rows)
+    changed = {slot for slot in old.keys() | new.keys()
+               if any((old.get(slot) or {}).get(key)
+                      != (new.get(slot) or {}).get(key)
+                      for key in fields + identity_fields)}
+    lines = []
+    for slot in sorted(changed):
+        prior, candidate = old.get(slot, {}), dict(new.get(slot, {}))
+        # The save route authoritatively inherits identity only for the same
+        # slot/petname. Mirror that read-only rule for review.
+        if prior and candidate.get("name") == prior.get("name"):
+            for key in ("token", "filename", "binaryHash", "binary_hash"):
+                if candidate.get(key) is None and prior.get(key) is not None:
+                    candidate[key] = prior[key]
+        for key in fields:
+            before, after = prior.get(key, "(absent)"), candidate.get(key, "(absent)")
+            if before != after:
+                lines.append(
+                    f"NS[{slot}] {key}: {safe(before)} → {safe(after)}")
+
+        petname = safe(candidate.get("name", prior.get("name", "(unresolved)")))
+        if candidate.get("symbolic") is True or slot in _boot_image_gen._MMIO_SLOT_SPECS:
+            lines.append(
+                f"NS[{slot}]: pet name {petname}; saved version not applicable")
+            continue
+        identity = candidate or prior
+        token = identity.get("token")
+        filename = identity.get("filename")
+        binary_hash = identity.get("binaryHash", identity.get("binary_hash"))
+
+        def normalized_token(value):
+            try:
+                return f"{int(str(value).removeprefix('0x'), 16):08x}"
+            except (TypeError, ValueError):
+                return None
+
+        def matches(record):
+            if normalized_token(token) is None or normalized_token(
+                    record.get("token")) != normalized_token(token):
+                return False
+            # Never resolve from token alone: it can identify many revisions.
+            if not filename and not binary_hash:
+                return False
+            if filename and record.get("filename") != filename:
+                return False
+            if binary_hash:
+                actual = record.get("binary_hash")
+                if actual is None and isinstance(record.get("filename"), str):
+                    path = Path(LUMPS_DIR) / record["filename"]
+                    if (path.name == record["filename"] and not path.is_symlink()
+                            and path.is_file()):
+                        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+                if actual != binary_hash:
+                    return False
+            return True
+
+        matches_found = [record for record in manifest
+                         if isinstance(record, dict) and matches(record)]
+        if len(matches_found) != 1:
+            why = "ambiguous exact selector" if len(matches_found) > 1 else "no exact saved record"
+            lines.append(
+                f"NS[{slot}]: pet name {petname}; saved version unresolved ({why})")
+            continue
+        version = matches_found[0].get("lump_version")
+        if isinstance(version, int) and not isinstance(version, bool) and version >= 0:
+            lines.append(
+                f"NS[{slot}]: pet name {petname}; saved version v{version}")
+        else:
+            lines.append(
+                f"NS[{slot}]: pet name {petname}; saved version unresolved")
+    return lines
+
+
 def _describe_protected_change(payload):
     """Show proposed text/Namespace deltas without leaking approval credentials."""
     import difflib
@@ -25904,8 +25999,20 @@ def _describe_protected_change(payload):
         delta = "".join(difflib.unified_diff(
             before.splitlines(keepends=True), after.splitlines(keepends=True),
             fromfile="current", tofile="proposed"))
-        return [delta or "No source/Namespace row differences in the submitted projection.",
-                "Derived boot-image layout may also be regenerated by the existing save validation."]
+        result = [delta or "No source/Namespace row differences in the submitted projection.",
+                  "Derived boot-image layout may also be regenerated by the existing save validation."]
+        if request.path == "/api/boot-image/save-ns":
+            try:
+                with open(LUMPS_MANIFEST_PATH, encoding="utf-8") as stream:
+                    manifest = json.load(stream)
+                if not isinstance(manifest, list):
+                    raise ValueError("Unexpected catalogue shape")
+                result.extend(_describe_namespace_review_changes(
+                    saved.get("abstractions", []),
+                    proposed.get("abstractions", []), manifest))
+            except (OSError, ValueError, TypeError, KeyError):
+                pass
+        return result
     if request.path == "/api/lumps/save":
         metadata = payload.get("metadata") or {}
         preview = {}
@@ -25945,12 +26052,65 @@ def _describe_protected_change(payload):
                 "Publication target: " + json.dumps(preview, sort_keys=True),
                 "Submitted binary words: " + str(len(words) if isinstance(words, list) else "server-plan bytes"),
                 "Confirm only if the existing Save LUMP plan shown in the IDE matches your intended destination and revision."]
+    if request.path.startswith("/api/namespace/"):
+        try:
+            slot = payload.get("slot") if isinstance(payload, dict) else None
+            if isinstance(slot, int) and not isinstance(slot, bool):
+                rows, _ = _read_authoritative_namespace_rows()
+                selected = [row for row in rows
+                            if isinstance(row, dict) and row.get("slot") == slot]
+                with open(LUMPS_MANIFEST_PATH, encoding="utf-8") as stream:
+                    manifest = json.load(stream)
+                if len(selected) == 1 and isinstance(manifest, list):
+                    return _describe_namespace_review_changes(
+                        [], selected, manifest)
+        except (OSError, ValueError, TypeError, KeyError):
+            pass
     return []
+
+
+def _describe_protected_change_audit(payload, _display_lines):
+    """Return bounded audit facts where the display intentionally contains diffs."""
+    from pathlib import Path
+    if request.path == "/api/source-file/save":
+        changes = ["Source file content update proposed; content omitted."]
+        identity = "Source file identity unresolved; content omitted."
+        if isinstance(payload, dict) and isinstance(payload.get("path"), str):
+            root = Path(__file__).resolve().parent.parent
+            candidate = (root / payload["path"]).resolve()
+            if (candidate.is_relative_to(root / "simulator")
+                    and candidate.suffix == ".cloomc"):
+                relative = candidate.relative_to(root).as_posix()
+                if re.fullmatch(r"[A-Za-z0-9_./ -]{1,256}", relative):
+                    identity = "Source file: " + relative
+        return changes, [identity]
+    if request.path == "/api/boot-image/save-ns":
+        has_identity = any(
+            isinstance(line, str) and line.startswith("NS[")
+            for line in _display_lines)
+        return (
+            ["Namespace abstraction projection update proposed; source/body omitted."],
+            [] if has_identity else [
+                "Affected Namespace pet names / saved versions unresolved from safe metadata."],
+        )
+    if request.path.startswith("/api/namespace/"):
+        has_identity = any(
+            isinstance(line, str) and line.startswith("NS[")
+            for line in _display_lines)
+        return (
+            ["Namespace persisted-state update proposed; request details omitted."],
+            [] if has_identity else [
+                "Affected Namespace pet names / saved versions unresolved from safe metadata."],
+        )
+    # Boot configuration and LUMP publication produce allowlisted field,
+    # pet-name, and saved-version lines in their authoritative descriptions.
+    return [], []
 
 
 _install_change_confirmation(
     app, _change_confirmation_paths, _namespace_commit_guard,
     describe=_describe_protected_change,
+    describe_audit=_describe_protected_change_audit,
     store_path=os.path.join(
         os.path.dirname(__file__), ".change-reviews",
         hashlib.sha256(os.path.realpath(LUMPS_DIR).encode()).hexdigest() + ".sqlite"),

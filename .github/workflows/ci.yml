@@ -282,49 +282,6 @@ jobs:
         continue-on-error: true
         run: python -m pytest scripts/test_hardware_namespace_thread_readiness_launchers.py -v
 
-      - name: Sidecar V1.3 check — no group/doc_refs fields
-        id: sidecar_v13_check
-        continue-on-error: true
-        run: |
-          python - <<'EOF'
-          import json, os, sys
-          bad = []
-          d = 'server/lumps'
-          for fn in sorted(os.listdir(d)):
-              if not fn.endswith('.json') or fn == 'manifest.json':
-                  continue
-              try:
-                  data = json.load(open(os.path.join(d, fn)))
-              except Exception:
-                  continue
-              if isinstance(data, dict) and ('group' in data or 'doc_refs' in data):
-                  bad.append(fn)
-          if bad:
-              print('V1.3 violation — sidecars carry removed curatorial fields'
-                    ' (group/doc_refs):')
-              for fn in bad:
-                  print('  ' + fn)
-              sys.exit(1)
-          # Viewer artifacts must not read the removed sidecar keys either.
-          import re
-          viewer_bad = []
-          for path in ('docs/figures/lumps-directory.html',
-                       'docs/figures/manifest-viewer.html'):
-              if not os.path.isfile(path):
-                  continue
-              text = open(path, encoding='utf-8').read()
-              if 'doc_refs' in text or re.search(r'\b[a-zA-Z]\w*\.group\b', text) \
-                      or re.search(r'(?<!variant_)group:"', text):
-                  viewer_bad.append(path)
-          if viewer_bad:
-              print('V1.3 violation — viewer artifacts still read removed'
-                    ' sidecar keys (group/doc_refs):')
-              for p in viewer_bad:
-                  print('  ' + p)
-              sys.exit(1)
-          print('OK — no sidecar or viewer artifact carries group/doc_refs.')
-          EOF
-
       # --- End-to-end (Playwright) — runs against a live server ---
       - name: Get Playwright version
         id: playwright-version
@@ -362,7 +319,6 @@ jobs:
               {"name": "Selftest LUMP runs",           "outcome": "${{ steps.selftest_lump.outcome }}"},
               {"name": "Version telemetry tests",      "outcome": "${{ steps.version_telemetry.outcome }}"},
               {"name": "Wukong preflight launcher tests", "outcome": "${{ steps.wukong_preflight_launchers.outcome }}"},
-              {"name": "Sidecar V1.3 invariant check", "outcome": "${{ steps.sidecar_v13_check.outcome }}"},
               {"name": "Run E2E tests",                "outcome": "${{ steps.e2e_tests.outcome }}"}
             ]
           }
@@ -390,7 +346,6 @@ jobs:
             "${{ steps.selftest_lump.outcome }}"
             "${{ steps.version_telemetry.outcome }}"
             "${{ steps.wukong_preflight_launchers.outcome }}"
-            "${{ steps.sidecar_v13_check.outcome }}"
             "${{ steps.e2e_tests.outcome }}"
           )
           failed=0

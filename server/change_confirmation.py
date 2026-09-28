@@ -9,13 +9,39 @@ import secrets
 import os
 import sqlite3
 import tempfile
+import re
 from contextlib import contextmanager
 import time
 from pathlib import Path
 
 from flask import g, jsonify, request, session
 
+AUDIT_RETENTION_SECONDS = 30 * 24 * 60 * 60
+AUDIT_MAX_ROWS = 10000
+AUDIT_MAX_METADATA_BYTES = 16384
 
+
+class AuditCapacityError(RuntimeError):
+    pass
+
+
+_AUDIT_LINE = re.compile(
+    r"^(?:LUMP:|Version:|Namespace boot target:|NS\[\d+\]:|"
+    r"Boot configuration review|This changes configuration|"
+    r"Explicit Prepare:|No explicit Prepare requested\.|"
+    r"No persisted configuration field changes\.|"
+    r"No affected slot identity could be resolved\.)"
+)
+_AUDIT_SAFE_CHAR = re.compile(r"[^A-Za-z0-9 _.,:;/()\[\]→+\-=]")
+_CONFIG_CHANGE_LINE = re.compile(
+    r"^(?:(?:targetBoard|bootEntrySlot|"
+    r"step1\.(?:totalNamespaceWords|namespaceLumpWords|threadLumpWords|"
+    r"nsSlotsMax|threadCount|threadStackWords)|"
+    r"step3\.emptySlotCount|slotRules\.[0-9]+|"
+    r"NS\[\d+\] placement\.(?:nsSlot|lumpToken|binaryHash|loadPolicy|resident)|"
+    r"NS\[\d+\] (?:name|location|type|f|g|limit|seq|seal|boot|layout))"
+    r"): .{1,384}$"
+)
 def describe_lump_save_plan(plan):
     """Return safe review lines from an authoritative, session-checked plan."""
     unavailable = "unavailable (authoritative save plan could not be resolved)"
@@ -252,7 +278,13 @@ def describe_boot_config_change(before, after, rows, manifest, prepare=False,
                                  f"NS[{slot}] placement"))
     for key in ("slotRules", "slotLabels"):
         old, new = before.get(key) or {}, after.get(key) or {}
-        changed_slots.update(str(s) for s in old.keys() | new.keys() if old.get(s) != new.get(s))
+        for raw_slot in old.keys() | new.keys():
+            if old.get(raw_slot, missing) != new.get(raw_slot, missing):
+                slot = str(raw_slot)
+                changed_slots.add(slot)
+                lines.extend(differences(
+                    old.get(raw_slot, missing), new.get(raw_slot, missing),
+                    f"{key}.{slot}"))
     authority = {str(r["slot"]): r for r in rows
                  if isinstance(r, dict) and "slot" in r}
     duplicate_slots = {s for s in authority if sum(
@@ -370,9 +402,20 @@ def state_digest(paths):
 
 
 class IntentStore:
-    def __init__(self, path=None):
+    def __init__(self, path=None, *, max_reviews=AUDIT_MAX_ROWS,
+                 retention_seconds=AUDIT_RETENTION_SECONDS,
+                 max_metadata_bytes=AUDIT_MAX_METADATA_BYTES):
         self._temporary = tempfile.TemporaryDirectory() if path is None else None
         self.path = Path(path or Path(self._temporary.name) / "intents.sqlite")
+        if (not isinstance(max_reviews, int) or max_reviews < 1
+                or not isinstance(retention_seconds, (int, float))
+                or retention_seconds < 0
+                or not isinstance(max_metadata_bytes, int)
+                or max_metadata_bytes < 256):
+            raise ValueError("Invalid change-review audit bounds")
+        self.max_reviews = max_reviews
+        self.retention_seconds = retention_seconds
+        self.max_metadata_bytes = max_metadata_bytes
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd = os.open(self.path, os.O_CREAT | os.O_RDWR, 0o600)
         os.close(fd)
@@ -385,6 +428,38 @@ class IntentStore:
                     # Another worker may have performed the same migration.
                     if "facets" not in {row[1] for row in db.execute("PRAGMA table_info(intents)")}:
                         raise
+            if "review_id" not in {row[1] for row in db.execute("PRAGMA table_info(intents)")}:
+                try:
+                    db.execute("ALTER TABLE intents ADD COLUMN review_id TEXT")
+                except sqlite3.OperationalError:
+                    if "review_id" not in {row[1] for row in db.execute("PRAGMA table_info(intents)")}:
+                        raise
+            db.execute("""
+                CREATE TABLE IF NOT EXISTS change_reviews (
+                    review_id TEXT PRIMARY KEY,
+                    session_hash TEXT NOT NULL,
+                    issued_at REAL NOT NULL,
+                    expires_at REAL NOT NULL,
+                    method TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    request_hash TEXT NOT NULL,
+                    state_hash TEXT NOT NULL,
+                    proposed_changes TEXT NOT NULL,
+                    affected_artifacts TEXT NOT NULL,
+                    outcome TEXT,
+                    outcome_at REAL,
+                    failure_reason TEXT
+                )
+            """)
+            db.execute("""
+                CREATE INDEX IF NOT EXISTS change_reviews_pending_expiry
+                    ON change_reviews(outcome, expires_at)
+            """)
+            db.execute("""
+                CREATE INDEX IF NOT EXISTS change_reviews_outcome_retention
+                    ON change_reviews(outcome_at)
+            """)
+            self._maintain_reviews(db, time.time())
 
     @contextmanager
     def _connect(self):
@@ -414,6 +489,93 @@ class IntentStore:
                        (self._hash(token), now + 300, self._hash(binding), json.dumps(facets)))
             return token
 
+    def issue_review(self, binding, method, path, proposed_changes,
+                     affected_artifacts, now=None):
+        """Atomically issue an approval capability and its non-capability audit id."""
+        now = time.time() if now is None else now
+        expires = int(now) + 300
+        token = secrets.token_urlsafe(32)
+        review_id = secrets.token_urlsafe(24)
+        facets = ([self._hash(value) for value in binding]
+                  if isinstance(binding, (tuple, list)) and len(binding) == 5 else None)
+        proposed_json = json.dumps(proposed_changes, ensure_ascii=True)
+        affected_json = json.dumps(affected_artifacts, ensure_ascii=True)
+        metadata_size = sum(len(value.encode("utf-8")) for value in (
+            str(method), str(path), binding[3], binding[4],
+            proposed_json, affected_json))
+        if metadata_size > self.max_metadata_bytes:
+            raise AuditCapacityError("Review audit metadata limit reached")
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._maintain_reviews(db, now)
+            db.execute("DELETE FROM intents WHERE expires <= ?", (now,))
+            if db.execute("SELECT count(*) FROM change_reviews").fetchone()[0] >= self.max_reviews:
+                raise AuditCapacityError("Review audit capacity reached")
+            if db.execute("SELECT count(*) FROM intents").fetchone()[0] >= 1024:
+                raise RuntimeError("Too many pending reviews; wait for expiry.")
+            # All persisted descriptive fields are constructed by this module,
+            # not copied from the request body.
+            db.execute("""
+                INSERT INTO change_reviews
+                    (review_id, session_hash, issued_at, expires_at, method, path,
+                     request_hash, state_hash, proposed_changes, affected_artifacts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (review_id, self._hash(binding[0]), now, expires, method, path,
+                  binding[3], binding[4], proposed_json, affected_json))
+            db.execute(
+                "INSERT INTO intents (token, expires, binding, facets, review_id) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (self._hash(token), expires, self._hash(binding),
+                 json.dumps(facets), review_id))
+        return token, review_id, expires
+
+    @staticmethod
+    def _expire_reviews(db, now):
+        db.execute("""
+            UPDATE change_reviews
+               SET outcome = 'expired', outcome_at = expires_at,
+                   failure_reason = 'expired'
+             WHERE outcome IS NULL AND expires_at <= ?
+        """, (now,))
+
+    def _maintain_reviews(self, db, now):
+        # A terminal record remains durable for the full retention period.
+        # Quota pressure never shortens that period.
+        self._expire_reviews(db, now)
+        db.execute("""
+            DELETE FROM change_reviews
+             WHERE outcome IS NOT NULL AND outcome_at <= ?
+        """, (now - self.retention_seconds,))
+
+    def reject(self, review_id, session_value, outcome, now=None):
+        """Set a user terminal outcome and revoke its approval capability."""
+        now = time.time() if now is None else now
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._maintain_reviews(db, now)
+            row = db.execute(
+                "SELECT session_hash, outcome FROM change_reviews WHERE review_id = ?",
+                (review_id,)).fetchone()
+            if row is None:
+                return "missing"
+            if not secrets.compare_digest(row[0], self._hash(session_value)):
+                return "forbidden"
+            if row[1] is not None:
+                return "idempotent" if row[1] == outcome else "terminal"
+            db.execute("""
+                UPDATE change_reviews SET outcome = ?, outcome_at = ?
+                 WHERE review_id = ? AND outcome IS NULL
+            """, (outcome, now, review_id))
+            db.execute("DELETE FROM intents WHERE review_id = ?", (review_id,))
+            return "recorded"
+
+    def sweep_expired(self, now=None):
+        now = time.time() if now is None else now
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            self._maintain_reviews(db, now)
+            db.execute("DELETE FROM intents WHERE expires <= ?", (now,))
+
     def consume(self, token, binding, now=None):
         return self.consume_reason(token, binding, now) == "accepted"
 
@@ -422,13 +584,18 @@ class IntentStore:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             key = self._hash(token)
-            intent = db.execute("SELECT expires, binding, facets FROM intents WHERE token = ?", (key,)).fetchone()
+            intent = db.execute(
+                "SELECT expires, binding, facets, review_id FROM intents WHERE token = ?",
+                (key,)).fetchone()
             db.execute("DELETE FROM intents WHERE token = ?", (key,))
             if not intent:
                 return "missing_or_used"
             if intent[0] <= now:
+                self._finish_review(db, intent[3], "expired", "expired",
+                                    intent[0])
                 return "expired"
             if intent[1] == self._hash(binding):
+                self._finish_review(db, intent[3], "approved", None, now)
                 return "accepted"
             facets = json.loads(intent[2]) if intent[2] else None
             if facets and isinstance(binding, (tuple, list)) and len(binding) == 5:
@@ -436,13 +603,29 @@ class IntentStore:
                                                "request_changed", "request_changed",
                                                "saved_state_changed")):
                     if facets[index] != self._hash(binding[index]):
+                        self._finish_review(db, intent[3], "validation_failed",
+                                            reason, now)
                         return reason
+            self._finish_review(db, intent[3], "validation_failed",
+                                "binding_changed", now)
             return "binding_changed"
 
+    @staticmethod
+    def _finish_review(db, review_id, outcome, reason, now):
+        if review_id:
+            db.execute("""
+                UPDATE change_reviews
+                   SET outcome = ?, outcome_at = ?, failure_reason = ?
+                 WHERE review_id = ? AND outcome IS NULL
+            """, (outcome, now, reason, review_id))
 
-def install(app, paths, commit_guard, describe=None, store_path=None, recovery_pending=None):
+
+def install(app, paths, commit_guard, describe=None, store_path=None,
+            recovery_pending=None, describe_audit=None, store_options=None):
     """Install ahead of other request hooks; hold commit lock through teardown."""
-    store = IntentStore(store_path or Path(app.instance_path) / "change-review" / "intents.sqlite")
+    store = IntentStore(
+        store_path or Path(app.instance_path) / "change-review" / "intents.sqlite",
+        **(store_options or {}))
 
     def review():
         # Health and static UI remain available; never serve an inconsistent
@@ -454,7 +637,8 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
             if recovery_pending():
                 return jsonify(error="recovery_approval_required", committed=False,
                                message="Interrupted artifact transaction retained unchanged. Catalogue access is blocked pending explicitly reviewed offline recovery; automatic recovery is disabled."), 503
-        if not protected_request(request.path, request.method):
+        is_protected = protected_request(request.path, request.method)
+        if not is_protected:
             # Lease coordination and plan preparation must not hold the global
             # lock for their entire response (some deliberately wait).
             if request.method not in {"GET", "HEAD"} or request.path.startswith(("/simulator/", "/static/", "/api/lumps/lease")) or request.path == "/":
@@ -476,7 +660,12 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
         )
         token = request.headers.get("X-Change-Confirmation")
         if token:
-            rejection_reason = store.consume_reason(token, binding)
+            try:
+                rejection_reason = store.consume_reason(token, binding)
+            except sqlite3.Error:
+                return jsonify(error="change_review_audit_unavailable",
+                               committed=False,
+                               message="Review audit could not be persisted; no change was authorized."), 503
             if rejection_reason == "accepted":
                 return None
             explanation = {
@@ -498,12 +687,19 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
             for key in ("path", "filename", "abstraction", "slot", "token", "lump_version"):
                 if key in payload:
                     target.append(f"{key}: {str(payload[key])[:256]}")
-        if describe is not None:
-            try:
-                target.extend(describe(payload))
-            except ValueError as exc:
-                return jsonify(error="change_preflight_failed", committed=False,
-                               message=str(exc)), 409
+        try:
+            authoritative = describe(payload) if describe is not None else []
+        except ValueError as exc:
+            return jsonify(error="change_preflight_failed", committed=False,
+                           message=str(exc)), 409
+        target.extend(authoritative)
+        audit_changes, affected = _audit_descriptions(authoritative)
+        if describe_audit is not None:
+            extra_changes, extra_affected = describe_audit(payload, authoritative)
+            extra_changes, extra_affected = _structured_audit_descriptions(
+                extra_changes, extra_affected)
+            audit_changes.extend(extra_changes)
+            affected.extend(extra_affected)
         reason = "You requested a persisted change. It may update source, repository history, Namespace bindings or the generated boot image."
         if request.path == "/api/boot-config":
             reason = ("Review the boot configuration fields and affected pet names / saved LUMP versions below. "
@@ -525,13 +721,25 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
         else:
             title = "Review protected change"
         try:
-            intent = store.issue(binding)
+            intent, review_id, expires_at = store.issue_review(
+                binding, request.method, request.path,
+                [f"{request.method} {request.path}"] + audit_changes, affected)
+        except AuditCapacityError:
+            return jsonify(
+                error="change_review_busy", committed=False,
+                message="Review audit capacity is unavailable; no change was authorized."), 503
         except RuntimeError as exc:
             return jsonify(error="change_review_busy", message=str(exc), committed=False), 503
+        except sqlite3.Error:
+            return jsonify(error="change_review_audit_unavailable",
+                           committed=False,
+                           message="Review audit could not be persisted; no change was authorized."), 503
         return jsonify(
             error="change_confirmation_required", committed=False,
             change_confirmation={
                 "id": intent, "title": title,
+                "review_id": review_id,
+                "expires_at": expires_at,
                 "reason": reason,
                 "changes": [f"{request.method} {request.path}"] + target + [
                     f"Exact request SHA-256: {body_hash}",
@@ -541,6 +749,39 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
             },
         ), 428
 
+    def reject_review():
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict):
+            return jsonify(error="invalid_change_review_outcome"), 400
+        review_id = payload.get("review_id")
+        outcome = payload.get("outcome")
+        if (not isinstance(review_id, str) or not review_id
+                or len(review_id) > 256
+                or not isinstance(outcome, str)
+                or outcome not in {"rejected", "dismissed"}):
+            return jsonify(error="invalid_change_review_outcome"), 400
+        session_value = session.get("_change_review_session")
+        if not isinstance(session_value, str):
+            return jsonify(error="change_review_forbidden"), 403
+        try:
+            result = store.reject(review_id, session_value, outcome)
+        except sqlite3.Error:
+            return jsonify(error="change_review_audit_unavailable",
+                           committed=False,
+                           message="Review outcome could not be persisted."), 503
+        if result == "missing":
+            return jsonify(error="change_review_not_found"), 404
+        if result == "forbidden":
+            return jsonify(error="change_review_forbidden"), 403
+        if result == "terminal":
+            return jsonify(error="change_review_already_final"), 409
+        return jsonify(ok=True, outcome=outcome,
+                       idempotent=result == "idempotent")
+
+    app.add_url_rule("/api/change-reviews/reject",
+                     endpoint="reject_change_review",
+                     view_func=reject_review, methods=["POST"])
+
     # Review must run before recovery or route code can mutate protected files.
     app.before_request_funcs.setdefault(None, []).insert(0, review)
 
@@ -549,3 +790,46 @@ def install(app, paths, commit_guard, describe=None, store_path=None, recovery_p
         guard = g.pop("_change_confirmation_guard", None)
         if guard is not None:
             guard.__exit__(None, None, None)
+
+def _audit_descriptions(lines):
+    """Allowlist small identity/version facts from authoritative descriptions."""
+    proposed = []
+    affected = []
+    for value in lines:
+        if not isinstance(value, str):
+            continue
+        # Diffs, JSON payload previews, source, binary and credentials are
+        # intentionally not eligible for persistence.
+        line = value.strip().replace("\r", " ").replace("\n", " ")
+        if len(line) > 512 or not (
+                _AUDIT_LINE.match(line) or _CONFIG_CHANGE_LINE.match(line)):
+            continue
+        line = _AUDIT_SAFE_CHAR.sub("?", line)
+        proposed.append(line)
+        if line.startswith(("LUMP:", "Version:", "NS[", "Namespace boot target:")):
+            affected.append(line)
+    return proposed, affected
+
+def _structured_audit_descriptions(changes, affected):
+    """Validate the small structured vocabulary supplied by the app callback."""
+    change_prefixes = (
+        "Source file content update proposed;",
+        "Namespace abstraction projection update proposed;",
+        "Namespace persisted-state update proposed;",
+    )
+    affected_prefixes = (
+        "Source file:",
+        "Source file identity unresolved;",
+        "Affected Namespace pet names / saved versions unresolved",
+    )
+
+    def clean(values, prefixes):
+        result = []
+        for value in values if isinstance(values, (list, tuple)) else ():
+            if (isinstance(value, str) and len(value) <= 384
+                    and value.startswith(prefixes)
+                    and "\n" not in value and "\r" not in value):
+                result.append(_AUDIT_SAFE_CHAR.sub("?", value))
+        return result
+
+    return clean(changes, change_prefixes), clean(affected, affected_prefixes)

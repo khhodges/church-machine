@@ -1,6 +1,26 @@
 (function () {
     'use strict';
     var queue = Promise.resolve();
+    // Audit delivery is independent of the mutation promise. Never retry the
+    // mutation (or approval) because this best-effort notification failed.
+    function reportRejection(details, outcome) {
+        if (!details.review_id) return; // Local source-only reviews have no server intent.
+        try {
+            var report = new Request(new URL('/api/change-reviews/reject', window.location.href), {
+                method: 'POST', credentials: 'same-origin', keepalive: true,
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({review_id: details.review_id, outcome: outcome}),
+            });
+            Promise.resolve(nativeFetch(report)).then(function (response) {
+                if (!response || !response.ok) throw new Error('Audit delivery failed');
+            }).catch(auditDeliveryFailed);
+        } catch (_) { auditDeliveryFailed(); }
+    }
+    function auditDeliveryFailed() {
+        // No request data, review credentials, or source text in diagnostics.
+        if (window.console) window.console.warn(
+            'Change remains cancelled. Its rejection audit could not be delivered. No mutation was retried.');
+    }
     function show(details) {
         return new Promise(function (resolve) {
             var previous = document.activeElement;
@@ -27,20 +47,24 @@
                 dialog.appendChild(button);
             });
             var settled = false;
-            function finish(value) {
+            function finish(value, outcome) {
                 if (settled) return;
                 settled = true;
+                if (window.removeEventListener) window.removeEventListener('pagehide', dismissed);
                 dialog.remove();
                 if (previous && previous.isConnected) previous.focus();
+                if (!value) reportRejection(details, outcome || 'dismissed');
                 resolve(value);
             }
-            reject.onclick = function () { finish(false); };
+            function dismissed() { finish(false, 'dismissed'); }
+            reject.onclick = function () { finish(false, 'rejected'); };
             confirm.onclick = function () { finish(true); };
             dialog.addEventListener('cancel', function (event) {
                 event.preventDefault();
                 finish(false);
             });
             dialog.addEventListener('close', function () { finish(false); });
+            if (window.addEventListener) window.addEventListener('pagehide', dismissed);
             document.body.appendChild(dialog);
             // Browsers without a modal dialog implementation must fail closed.
             if (typeof dialog.showModal !== 'function') { finish(false); return; }
@@ -105,6 +129,7 @@
         if (payload.error !== 'change_confirmation_required' || !payload.change_confirmation) return response;
         var approved = await window.confirmProtectedChange(payload.change_confirmation);
         if (!approved || request.signal.aborted) {
+            if (approved) reportRejection(payload.change_confirmation, 'dismissed');
             return new Response(JSON.stringify({
                 error: 'change_rejected', committed: false,
                 message: 'You rejected the change. Protected data was not changed.',

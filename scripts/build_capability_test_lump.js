@@ -342,7 +342,7 @@ const lumpPath    = path.join(LUMPS_DIR, filename);
 if (fs.existsSync(lumpPath) && !fs.readFileSync(lumpPath).equals(bytes)) {
     throw new Error(`refusing to overwrite immutable history after content-id collision: ${filename}`);
 }
-fs.writeFileSync(lumpPath, bytes);
+if (!fs.existsSync(lumpPath)) fs.writeFileSync(lumpPath, bytes, { flag: 'wx' });
 console.log(`Written: ${lumpPath} (${bytes.length} bytes)`);
 
 // ── Print c-list slot assignments ─────────────────────────────────────────────

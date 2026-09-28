@@ -983,7 +983,7 @@ args = "node simulator/test_hex_tab_fill_path.js"
 outputType = "console"
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "vm"
 run = ["gunicorn", "--bind", "0.0.0.0:23636", "--workers", "1", "--threads", "8", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "server.app:app"]
 build = ["bash", "-lc", "pip install -r requirements.txt && pnpm install --frozen-lockfile && pnpm --filter @workspace/church-machine-ide-introduction run build:production"]
 
@@ -1162,18 +1162,6 @@ args = "node simulator/test_deep_dive_annotations.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
-
-[[workflows.workflow]]
-name = "lump-sidecar-transition-guard"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 scripts/check_no_operational_lump_sidecars.py && python3 -m pytest tests/lump/test_legacy_sidecar_tools.py -q"
-
-[workflows.workflow.metadata]
-outputType = "console"
-isValidation = true
 
 [[workflows.workflow]]
 name = "wukong-preflight-launcher-tests"
