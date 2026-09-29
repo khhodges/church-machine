@@ -541,7 +541,9 @@ function assembleAndLoad(options) {
         assembler.setClistSlots(_nameToSlot);
     }
 
-    const result = assembler.assemble(source);
+    const indexedSource = window.ChurchIDX1IDE && window.ChurchIDX1IDE.requiresProfile(source);
+    const result = indexedSource
+        ? window.ChurchIDX1IDE.compile(assembler, source) : assembler.assemble(source);
 
     if (result.errors.length > 0) {
         const errText = result.errors.map(e => `Line ${e.line}: ${e.message}`).join('\n');
@@ -583,7 +585,9 @@ function assembleAndLoad(options) {
     const _rawName = _srcAbstrName || entryLabel || 'Assembly';
     const _asmTok = typeof window._computeLumpToken === 'function'
         ? window._computeLumpToken(_rawWords, _rawCaps) : null;
-    if (_asmTok) {
+    // IDX1 candidates stay in the immutable compiler snapshot, not the legacy
+    // code-only registry. That registry's export/delivery routes lose envelopes.
+    if (_asmTok && !indexedSource) {
         if (window.LumpRegistry) {
             window.LumpRegistry.registerMemory(_asmTok, _rawName, _rawWords, _rawCaps, {
                 sourceText: source,
@@ -593,12 +597,19 @@ function assembleAndLoad(options) {
             window._pendingLumpData = null;
         }
     }
+    if (indexedSource) {
+        if (window.LumpRegistry && typeof window.LumpRegistry.setCurrent === 'function')
+            window.LumpRegistry.setCurrent(null);
+        window._pendingLumpData = null;
+    }
     if (window.IDEActionState) {
         window.IDEActionState.recordCandidate({
             token: _asmTok, abstraction: _rawName, language: 'assembly',
             source, sourceSurface: _assembleOptions.sourceSurface || 'asmEditor',
             languageIdentity: (document.getElementById('langSelector') || {}).value || 'assembly',
             words: _rawWords, capabilities: _rawCaps,
+            isaProfile: indexedSource ? 'IDX1' : 'LEGACY',
+            executionLayout: indexedSource ? result.layout : null,
             labels: result.labels || {}, namedSlots: _rawNamedSlots, methodTableSize: 0,
         });
     }
@@ -623,7 +634,13 @@ function assembleAndLoad(options) {
     const _asmSlotNames = ChurchAssembler.buildSlotNames(result.capabilities || [],
         (typeof sim !== 'undefined' && sim) ? sim.nsLabels : null);
     let listing = `; Assembled ${result.words.length} instruction${result.words.length !== 1 ? 's' : ''}\n`;
+    if (indexedSource) listing += '; IDX1 simulator-only candidate; Save/export/hardware delivery unavailable.\n';
     for (let i = 0; i < result.words.length; i++) {
+        if (indexedSource) {
+            const mapping = result.sourceMap.find(entry => entry.startWord === i + 1);
+            if (mapping) listing += `${mapping.source.trim()} ; ${mapping.wordCount} word(s)\n`;
+            continue;
+        }
         const mnem = result.words[i] === 0 ? 'HALT' : assembler.disassemble(result.words[i], _asmSlotNames);
         const cmt  = _srcComments[i] || '';
         listing += cmt ? `${mnem.padEnd(40)}; ${cmt}\n` : `${mnem}\n`;
@@ -879,7 +896,8 @@ function _bootNIARows(bootStep) {
     };
 }
 
-function stepSim() {
+async function stepSim() {
+    if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Step')) return;
     // A configured boot prefetch is part of startup, not an ordinary lazy-load
@@ -1011,7 +1029,7 @@ function stepSim() {
     }
     // Apply any pending program load (e.g. from "Load into Sim" button) before
     // the first step so we execute the right code, not whatever was in memory.
-    _applyPendingSimLoad();
+    if (await _applyPendingSimLoad() === false) return;
     const breakpointAddr = _breakpointBeforeNextInstruction();
     if (breakpointAddr !== null) {
         _reportBreakpointPause(breakpointAddr);
@@ -1969,7 +1987,9 @@ function _injectClistNow(capabilitiesOverride, targetSlotOverride = null) {
     return true;
 }
 
-function _applyPendingSimLoad() {
+let _idx1AdmissionInFlight = false;
+async function _applyPendingSimLoad() {
+    if (typeof _idx1AdmissionInFlight !== 'undefined' && _idx1AdmissionInFlight) return false;
     const _aplPending = _pendingSimLoadSnapshot;
     const _aplToken = _aplPending
         ? _aplPending.token
@@ -2005,6 +2025,12 @@ function _applyPendingSimLoad() {
         const _aplName  = sim.programName || 'prog';
         _progSlot = sim.allocOrFindNsSlot(_aplToken || null, _aplName);
         if (_progSlot !== null) {
+            if (window.ChurchIDX1Runtime && window.ChurchIDX1Runtime.isInstalled(sim, _progSlot)) {
+                if (typeof appendOutput === 'function') appendOutput(
+                    'This IDX1 object is installed read-only. Reset the simulator before reinstalling it; Step/Run can continue the current installation.', 'warn');
+                _clearPendingSimLoad();
+                return false;
+            }
             sim.writeNsEntryForProgram(_progSlot, { words: _aplWords, caps: _aplCaps, label: _aplName });
             const _progEntry = sim.readNSEntry(_progSlot);
             const _progHeader = _progEntry
@@ -2014,7 +2040,7 @@ function _applyPendingSimLoad() {
                 sim.fault('BOUNDS',
                     'Compile+Run: dynamic program slot could not be installed safely');
                 _clearPendingSimLoad();
-                return;
+                return false;
             }
             _progGtSeq = sim.parseNSWord1(_progEntry.word1_limit).gtSeq;
         }
@@ -2023,7 +2049,7 @@ function _applyPendingSimLoad() {
         sim.fault('NS_FULL',
             'Compile+Run: no dynamic user Namespace slot is available; the prepared boot selection was not changed');
         _clearPendingSimLoad();
-        return;
+        return false;
     }
 
     // A formatted Thread image owns its root sentinel before execution. Direct
@@ -2033,7 +2059,7 @@ function _applyPendingSimLoad() {
     if (typeof sim._activatePreformattedBootThread === 'function' &&
             !sim._activatePreformattedBootThread()) {
         _clearPendingSimLoad();
-        return;
+        return false;
     }
     sim.loadProgram(_aplWords, 0, _progSlot);
     // Update CR14.word0 to a fresh R+X GT for the program slot so that
@@ -2065,7 +2091,7 @@ function _applyPendingSimLoad() {
         if (!threadLayout || !threadLayout.valid) {
             sim.fault('BOUNDS', 'Compile+Run: active Thread has invalid or unsupported geometry');
             _clearPendingSimLoad();
-            return;
+            return false;
         }
         const protectedRoot = typeof sim._readProtectedCallFrame === 'function'
             ? sim._readProtectedCallFrame() : null;
@@ -2076,7 +2102,7 @@ function _applyPendingSimLoad() {
                     'Compile+Run: active Thread root sentinel is missing or malformed');
             }
             _clearPendingSimLoad();
-            return;
+            return false;
         }
         sim.sto = protectedRoot.indicator.sto;
     }
@@ -2100,7 +2126,26 @@ function _applyPendingSimLoad() {
 
     if (_injectClistNow(_aplCaps, _runSlot) === false) {
         _clearPendingSimLoad();
-        return;
+        return false;
+    }
+    if (_aplPending && _aplPending.isaProfile === 'IDX1') {
+        _idx1AdmissionInFlight = true;
+        sim.halted = true; // No entry while hashing/installing the full envelope.
+        _clearPendingSimLoad();
+        try {
+            const executionEnvelope = await window.ChurchIDX1IDE.admitLocalCandidate(
+                sim, ChurchSimulator, _aplPending, _runSlot);
+            // Retain the whole artifact, not extracted inner code, for the
+            // installed snapshot. Save/deployment are explicitly unavailable.
+            window._installedIDX1Envelope = executionEnvelope;
+            sim.halted = false;
+        } catch (error) {
+            sim.fault(error.code || 'INVALID_OP', `IDX1 admission failed: ${error.message}`);
+            if (typeof appendOutput === 'function') appendOutput(`IDX1 admission failed: ${error.message}`, 'error');
+            return false;
+        } finally {
+            _idx1AdmissionInFlight = false;
+        }
     }
     _clearPendingSimLoad();
     if (window.ExecutionIdentity) window.ExecutionIdentity.markLive({
@@ -2125,7 +2170,8 @@ function _applyPendingSimLoad() {
     }
 }
 
-function runSimGo(preserveView, options) {
+async function runSimGo(preserveView, options) {
+    if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Run')) return;
     // Guard: if a run batch loop is already active (either mid-batch where
@@ -2149,8 +2195,9 @@ function runSimGo(preserveView, options) {
     if (sel) runBatchSize = parseInt(sel.value, 10) || 500;
     hideRunPopover();
     if (!options || options.applyPendingLoad !== false) {
-        _applyPendingSimLoad();
+        if (await _applyPendingSimLoad() === false) return;
     }
+    if (sim.running || _simRunActive || _idx1AdmissionInFlight) return;
     runSim(preserveView);
 }
 
@@ -2701,12 +2748,13 @@ function walkToggle() {
     walkNext();
 }
 
-function walkNext() {
+async function walkNext() {
+    if (_idx1AdmissionInFlight) return;
     if (!walkRunning || !sim.bootComplete) {
         finishWalk();
         return;
     }
-    _applyPendingSimLoad();
+    if (await _applyPendingSimLoad() === false) { finishWalk(); return; }
     if (sim.halted || !sim.bootComplete) {
         finishWalk();
         updateDashboard();
@@ -3450,6 +3498,7 @@ async function _startBootLumpPrefetch() {
 }
 
 function runSim(preserveView) {
+    if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // Settings changed between batches apply only to the next Run.
     const runContinuously = continuousRun;
@@ -13388,6 +13437,11 @@ function _recordEarlyLumpSaveValidationFailure(snapshot, label, message, binary)
 }
 
 function showSaveToNamespace() {
+    if (window.IDEActionState && window.IDEActionState.get &&
+            window.IDEActionState.get().candidate?.isaProfile === 'IDX1') {
+        if (typeof appendOutput === 'function') appendOutput(window.ChurchIDX1IDE.SAVE_MESSAGE, 'warn');
+        return;
+    }
     // Use LumpRegistry as the authoritative source — the compile path
     // (app-run.js ~L464) registers words there, NOT into lastAssembledWords.
     // lastAssembledWords is only written by app-absdetail.js and is always
@@ -16721,6 +16775,11 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
 }
 
 async function confirmSaveToNamespace() {
+    if (window.IDEActionState && window.IDEActionState.get &&
+            window.IDEActionState.get().candidate?.isaProfile === 'IDX1') {
+        _setSaveNSFeedback('error', window.ChurchIDX1IDE.SAVE_MESSAGE);
+        return;
+    }
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
     if (!label) {

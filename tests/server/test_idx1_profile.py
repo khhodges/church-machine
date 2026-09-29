@@ -58,6 +58,15 @@ def reject(payload, meta, text=None):
         parse_envelope(recode(payload, meta))
 
 
+@pytest.mark.parametrize("typ", [1, 2, 3])
+def test_inner_non_abstraction_type_rejected(typ):
+    payload, meta = fixture()
+    header = int.from_bytes(payload[:4], "big") | (typ << 8)
+    payload = header.to_bytes(4, "big") + payload[4:]
+    meta["payloadSha256"] = hashlib.sha256(payload).hexdigest()
+    reject(payload, meta, "typ=0")
+
+
 def test_roundtrip_identity_coordinates_and_typed_dispatch():
     payload, meta = fixture()
     raw = frame_envelope(payload, meta)

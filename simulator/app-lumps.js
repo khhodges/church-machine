@@ -8960,6 +8960,12 @@ window._selectFormatLumpProfile = _selectFormatLumpProfile;
 // history, then opens the single Save LUMP dialog. Stores the binary on
 // window._pendingLumpData for confirmSaveToNamespace().
 window.showFormatLump = async function() {
+    const activeCandidate = window.IDEActionState && window.IDEActionState.get().candidate;
+    if (activeCandidate && activeCandidate.isaProfile === 'IDX1') {
+        const error = window.ChurchIDX1IDE.SAVE_MESSAGE;
+        if (typeof appendOutput === 'function') appendOutput(error, 'warn');
+        return { ok: false, error };
+    }
     // Never leave an earlier reviewed binary available after a failed
     // preparation of a newer draft.
     window._pendingLumpData = null;

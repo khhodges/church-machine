@@ -1,10 +1,54 @@
 # IDX1 indexed instruction profile
 
-Status: **approved compact two/three-word design direction; detailed specification
-draft, not implementation or encoding/container freeze**. Profile, schema,
-container magic and handshake identifiers below are proposed assignments for
-review, not approved allocations. This document does not enable an opcode,
-amend a released LUMP, certify a compiler, or establish deployed IDX1 support.
+Status: **approved for coordinated implementation**, with the gated local
+simulator implementation described below. This is not a hardware release,
+compiler certification, or authorization to amend an existing LUMP, Namespace
+or boot image. Existing binaries retain their legacy interpretation.
+
+### Current software implementation (local simulator route)
+
+The raw-assembly IDE now selects an IDX1 **new compile candidate** when an
+indexed operand contains a DR expression. This does not relabel an existing
+binary or change the meaning of missing execution metadata.
+
+* Compile preserves capability declarations and source-derived packet/layout
+  coordinates. Unsupported operations produce explicit compile diagnostics.
+* **Run current compiled candidate** links those declared capabilities using
+  their live Namespace sequences, rechecks the compiler output, frames the
+  exact installed LUMP in the whole execution envelope, and admits that digest
+  through the simulator's protected object identity. Execution remains stopped
+  while the asynchronous hash/admission completes.
+* Implemented packet families: LOAD, DREAD, DWRITE, BRANCH, BFEXT and BFINS.
+  Any DR0–DR15 and a plus/minus 20-bit magnitude are represented at runtime.
+  Source authority precedes exact index arithmetic and protected range checks.
+  Direct one-word CALL uses typed IDX1 dispatch when entering an IDX1 object;
+  RETURN derives the caller profile from its canonical saved Enter identity.
+* Indexed CALL, SAVE, SWITCH and CHANGE are not enabled. IDX1 SAVE, SWITCH,
+  CHANGE and LAMBDA instructions, constants blocks, and lazy/Abstract LOAD
+  resolution remain unavailable; they are not silently downgraded.
+* Installed executable code, dispatch data, header/SELF and Namespace authority
+  are protected from memory aliases and bulk writes. GC's non-authority G-bit
+  remains mutable. Reinstallation/replacement of an installed IDX1 object
+  currently requires resetting the simulator.
+  Non-abstraction inner types and execution with `cc=0` are rejected; the
+  software runtime requires an exact installation-bound, E-only SELF row.
+  Namespace aliases cannot execute an installed object's bytes as legacy code.
+  Thread resume targets are boundary-checked before CHANGE commits either
+  Thread, and fresh IDX1 roots use the envelope's declared fast entry.
+* **Save, executable export, Prepare Boot and hardware delivery are unavailable
+  for these IDX1 candidates.** Candidates do not enter the legacy code-only
+  registry. The IDE reports this restriction rather than stripping the envelope.
+  No server-persisted or FPGA IDX1 execution support is claimed.
+
+`test_idx1_ide_flow.js` exercises the actual compile/candidate/C-list-link/install
+functions in a disposable simulator, including `IADD DR11, DR0, #2`,
+`LOAD CR1, CR6, DR11`, and `DREAD DR1, CR1, #0`. The existing root-context
+`RETURN` rule is unchanged: returning from a top-level Run with no caller faults
+at the canonical root sentinel; indexing does not create a caller frame.
+`test_idx1_runtime.js` exercises actual simulator execution, arithmetic faults,
+instruction interiors, mutation rejection, data/bit-field/branch packets and a
+legacy→IDX1→legacy CALL/RETURN. These focused checks are not full architectural,
+Thread-switch, device, or hardware conformance certification.
 
 ## 1. Scope and evidence
 

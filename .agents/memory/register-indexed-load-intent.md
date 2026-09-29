@@ -56,3 +56,17 @@ the larger full-32-bit-immediate proposal.
 **How to apply:** Complete the version, boundary, per-opcode, and containment
 contracts before implementing. Keep proposal/specification status distinct
 from implemented and verified support.
+
+Report indexed-instruction support separately for compilation, simulator
+execution, saved artifacts, and physical hardware. An isolated simulator
+fixture is not proof that the current IDE session can execute the program.
+
+**Why:** The IDE can compile a valid indexed candidate while an independently
+invalid committed boot image prevents establishing its execution context.
+This must not be misreported as successful browser execution or repaired by
+bypassing boot authority.
+
+**How to apply:** Preserve the committed-image guard and use disposable
+canonical fixtures for execution tests when live boot state is invalid.
+State the browser verification boundary explicitly; never modify the user's
+Namespace or boot image merely to demonstrate the ISA feature.

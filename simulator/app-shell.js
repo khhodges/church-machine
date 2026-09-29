@@ -154,6 +154,9 @@ function _setPendingSimLoad(snapshot) {
             ? snapshot.token : null,
         abstraction: snapshot.abstraction || 'prog',
         language: snapshot.language || '',
+        isaProfile: snapshot.isaProfile || 'LEGACY',
+        executionLayout: snapshot.executionLayout
+            ? window.ChurchIDX1IDE.freezeLayout(snapshot.executionLayout) : null,
         source: typeof snapshot.source === 'string' ? snapshot.source : '',
         binary: Array.isArray(snapshot.binary)
             ? Object.freeze(snapshot.binary.slice()) : null,

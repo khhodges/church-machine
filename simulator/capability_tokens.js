@@ -383,7 +383,10 @@
     function _createGT(nsIndex, perms, context) {
         const sim = context && context.sim;
         if (sim && typeof sim.createGT === 'function') {
-            return sim.createGT(0, nsIndex, perms, 1) >>> 0;
+            const entry = typeof sim.readNSEntry === 'function' ? sim.readNSEntry(nsIndex) : null;
+            const sequence = entry && typeof sim.parseNSWord1 === 'function'
+                ? sim.parseNSWord1(entry.word1_limit).gtSeq : 0;
+            return sim.createGT(sequence, nsIndex, perms, 1) >>> 0;
         }
         const church = perms.L || perms.S || perms.E;
         const dom = church ? 1 : 0;

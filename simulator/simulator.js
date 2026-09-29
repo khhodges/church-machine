@@ -12,6 +12,9 @@ if (typeof module !== 'undefined' && typeof AbstractGTManager === 'undefined') {
 const THREAD_DESIGN = typeof ThreadDesign !== 'undefined'
     ? ThreadDesign
     : require('./thread_design.js');
+const IDX1_RUNTIME = typeof ChurchIDX1Runtime !== 'undefined'
+    ? ChurchIDX1Runtime
+    : (typeof module !== 'undefined' && module.exports ? require('./idx1-runtime.js') : null);
 
 const ARCH_CONTRACTS = typeof ChurchArchitectureContracts !== 'undefined'
     ? ChurchArchitectureContracts
@@ -4767,9 +4770,14 @@ class ChurchSimulator {
     //     records this generation so a later re-register (slot reuse) invalidates
     //     any in-flight promotion.
     registerSlotIdentity(slot, meta, opts) {
+        if (IDX1_RUNTIME && IDX1_RUNTIME.isInstalled(this, slot))
+            throw new Error('Installed IDX1 identity is immutable until simulator reset');
         if (!this._slotIdentity) this._slotIdentity = new Map();
         meta = meta || {};
         opts = opts || {};
+        if (meta.executionDigest !== undefined && meta.executionDigest !== null &&
+                !this._is64Hex(meta.executionDigest))
+            throw new Error('IDX1 executionDigest must bind a complete SHA-256 execution envelope');
         const secure = (opts.secure !== false);   // secure by default
 
         const dotName      = (meta.dotName != null) ? String(meta.dotName) : '';
@@ -4823,6 +4831,7 @@ class ChurchSimulator {
             grants,
             capabilityType: Number.isInteger(capabilityType) ? capabilityType : null,
             authorized: meta.authorized === true,
+            executionDigest: this._is64Hex(meta.executionDigest) ? meta.executionDigest.toLowerCase() : null,
             outformWords: Array.isArray(meta.outformWords)
                 ? meta.outformWords.map(w => (w >>> 0))
                 : [0, 0, 0],
@@ -4879,6 +4888,8 @@ class ChurchSimulator {
     // clearSlotIdentity: remove trusted identity so the slot cannot be re-used by
     // a stale/replayed lump.  MUST be called from every slot clear/reset path.
     clearSlotIdentity(slot) {
+        if (IDX1_RUNTIME && IDX1_RUNTIME.isInstalled(this, slot))
+            throw new Error('Installed IDX1 identity is immutable until simulator reset');
         if (this._slotIdentity) this._slotIdentity.delete(slot);
     }
 
@@ -5115,6 +5126,18 @@ class ChurchSimulator {
                 `CHANGE Thread slot ${threadSlot}: CHURCH frame NIA ${frame.returnPC} exceeds code extent ${codeHeader.cw}`);
             return null;
         }
+        let resumePC = isRootSentinel ? 0 : frame.returnPC;
+        if (IDX1_RUNTIME) {
+            try {
+                const accepted = IDX1_RUNTIME.binding(this, checked.index);
+                if (accepted && isRootSentinel)
+                    resumePC = accepted.envelope.metadata.layout.fastEntry - 1;
+                IDX1_RUNTIME.entry(this, checked.index, resumePC);
+            } catch (error) {
+                this.fault(error.code || 'BOUNDS', `CHANGE resume rejected: ${error.message}`);
+                return null;
+            }
+        }
         // CR0 is an independently saved general capability register. It may
         // legitimately name a different abstraction from the code currently
         // executing (for example, LOAD can prepare the next CALL in CR0 while
@@ -5122,7 +5145,7 @@ class ChurchSimulator {
         // CHANGE therefore restores CR0–CR11 from their homes and restores
         // execution identity/NIA solely from this validated frame. Never force
         // CR0 to agree with the frame or use CR0 to redirect the resume.
-        return { enterGT, parsed, checked, codeHeader, frame };
+        return { enterGT, parsed, checked, codeHeader, frame, resumePC };
     }
 
     _activatePreformattedBootThread(threadSlot = BOOT_NS_SLOT_THREAD) {
@@ -5174,6 +5197,8 @@ class ChurchSimulator {
         this.mElevation = true;
         try {
             const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
+            const resume = this._readThreadResumeFrame(threadBase, layout, threadSlot);
+            if (!resume) return false;
             const threadGT = this.createGT(
                 seq, threadSlot, {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
             const check = this.mLoad(threadGT, null, 12, threadBase);
@@ -5184,9 +5209,6 @@ class ChurchSimulator {
                 }
                 return false;
             }
-            const resume = this._readThreadResumeFrame(
-                threadBase, layout, threadSlot);
-            if (!resume) return false;
             if (resume.frame.returnPC !== 0x7FFF) {
                 this.fault('STACK_CORRUPT',
                     'Compile+Run: Boot.Thread does not contain its canonical root sentinel');
@@ -5327,6 +5349,13 @@ class ChurchSimulator {
             this.fault('BOUNDS',
                 `CHANGE: outgoing Thread slot ${threadSlot} has invalid continuation NIA ${continuationPC}`);
             return false;
+        }
+        if (IDX1_RUNTIME) {
+            IDX1_RUNTIME.preflightMemoryWrite(this, threadBase + 1, threadBase + 18);
+            IDX1_RUNTIME.preflightMemoryWrite(this,
+                threadBase + layout.capsStart, threadBase + layout.capsEnd + 1);
+            IDX1_RUNTIME.preflightMemoryWrite(this,
+                threadBase + suspend.savedSTO - 1, threadBase + suspend.savedSTO + 1);
         }
         for (let i = 0; i < 16; i++) {
             this._writeRuntimeWord(threadBase + 1 + i, this.dr[i]);
@@ -5662,6 +5691,7 @@ class ChurchSimulator {
     }
 
     _writeDR(drIdx, value) {
+        if (IDX1_RUNTIME) IDX1_RUNTIME.preflightDRWrite(this, drIdx);
         if (this._executionAttempt) {
             this._executionAttempt.effects.push({
                 kind: 'register-write', register: drIdx, value: value >>> 0,
@@ -5671,13 +5701,14 @@ class ChurchSimulator {
                 discarded: drIdx === 0 && (value >>> 0) !== 0,
             });
         }
-        this.dr[drIdx] = value >>> 0;
+        const storedValue = drIdx === 0 ? 0 : value >>> 0;
+        this.dr[drIdx] = storedValue;
         if (drIdx < 16) {
             const threadBase = this._activeThreadBase();
             if (threadBase !== null) {
                 const homeAddr = (threadBase + 1 + drIdx) >>> 0;
                 if (homeAddr < this.memory.length) {
-                    this._writeRuntimeWord(homeAddr, value);
+                    this._writeRuntimeWord(homeAddr, storedValue);
                 }
             }
         }
@@ -6587,6 +6618,15 @@ class ChurchSimulator {
         if (!check.ok) {
             return { ok: false, fault: check.fault, message: `CR14 fetch: ${check.message}` };
         }
+        if (IDX1_RUNTIME) {
+            try {
+                const accepted = IDX1_RUNTIME.entry(this, check.index, this.pc);
+                if (accepted && accepted.base !== cr14.word1)
+                    return { ok: false, fault: 'SEAL', message: 'IDX1 CR14 base differs from its object binding' };
+            } catch (error) {
+                return { ok: false, fault: error.code || 'INVALID_OP', message: error.message };
+            }
+        }
         this.physicalPC = fetchAddr;
         return { ok: true, word: this.memory[fetchAddr], addr: fetchAddr };
     }
@@ -6605,6 +6645,18 @@ class ChurchSimulator {
             result = this._stepExecution();
             this._finishExecutionEvidence(result);
             return result;
+        } catch (error) {
+            if (error && error.code === 'IDX1_READ_ONLY') {
+                this.fault('PERMISSION', 'Write to installed IDX1 execution authority rejected');
+                this._finishExecutionEvidence(null);
+                return null;
+            }
+            if (error && error.idx1) {
+                this.fault(error.code || 'INVALID_OP', error.message);
+                this._finishExecutionEvidence(null);
+                return null;
+            }
+            throw error;
         } finally {
             this._executionAttempt = null;
         }
@@ -7290,6 +7342,17 @@ class ChurchSimulator {
             }
         }
 
+        let idx1TargetPC = null;
+        if (IDX1_RUNTIME) {
+            try {
+                idx1TargetPC = IDX1_RUNTIME.resolveSelector(this, check.index, d.imm || 0);
+                const callerSlot = this.parseGT(this.cr[14].word0).index;
+                IDX1_RUNTIME.entry(this, callerSlot, this.pc + 1);
+            } catch (error) {
+                this.fault(error.code || 'INVALID_OP', error.message);
+                return null;
+            }
+        }
         this._flushLambdaCache();
 
         const callThreadBase = this._activeThreadBase();
@@ -7468,7 +7531,9 @@ class ChurchSimulator {
         // a direct lump-relative PC (legacy bare-address format from pre-task-1134
         // LUMPs stored on disk).
         const methodIndex = (d.imm !== undefined) ? (d.imm & 0x7FFF) : 0;
-        if (methodIndex === 0) {
+        if (idx1TargetPC !== null) {
+            this.pc = idx1TargetPC;
+        } else if (methodIndex === 0) {
             // Single entry point: word 1 of the lump (lump_base is word-indexed in simulator).
             this.pc = 1;
         } else {
@@ -8045,6 +8110,16 @@ class ChurchSimulator {
                 return null;
             }
         }
+        if (IDX1_RUNTIME) {
+            try {
+                const callerSlot = activeFrameSZ === 1 && protectedFrame.companionParsed
+                    ? protectedFrame.companionParsed.index : this.parseGT(this.cr[14].word0).index;
+                IDX1_RUNTIME.entry(this, callerSlot, frame.returnPC);
+            } catch (error) {
+                this.fault(error.code || 'INVALID_OP', error.message);
+                return null;
+            }
+        }
         // Prepare CR6 before any destructive return work. Bit 6 never gates
         // caller-context reconstruction. LAMBDA shares the caller code identity.
         let returnCR6 = null;
@@ -8467,6 +8542,7 @@ class ChurchSimulator {
         }
         const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx);
         if (!resume) return null;
+        if (IDX1_RUNTIME) IDX1_RUNTIME.preflightMemoryWrite(this, tBase + 1, tBase + 17);
         const codeParsed = resume.parsed;
         const codeEntry = resume.checked.entry;
         const codeHeader = resume.codeHeader;
@@ -8529,7 +8605,7 @@ class ChurchSimulator {
         // fresh code at word zero and retain the root frame as the bottom of
         // the live stack, matching Boot.Thread and direct Compile+Run.
         const isRootSentinel = resume.frame.returnPC === 0x7FFF;
-        const resumePC = isRootSentinel ? 0 : resume.frame.returnPC;
+        const resumePC = resume.resumePC;
         const resumeSTO = isRootSentinel
             ? (resume.frame.savedSTO - 2) >>> 0
             : resume.frame.savedSTO;
@@ -9761,7 +9837,9 @@ class ChurchSimulator {
         const loc = srcCR.word1;
         // Decode mode bit: imm[14]=1 → immediate; imm[14]=0 → indexed
         let offset;
-        if (d.imm & 0x4000) {
+        if (Number.isInteger(d.idx1Offset)) {
+            offset = d.idx1Offset;
+        } else if (d.imm & 0x4000) {
             offset = d.imm & 0x3FFF;
         } else {
             const dreadBase = (d.imm >> 4) & 0x3FF;
@@ -9789,6 +9867,7 @@ class ChurchSimulator {
                 return null;
             }
         }
+        if (IDX1_RUNTIME) IDX1_RUNTIME.preflightDRWrite(this, drIdx);
         const devNsIdx = check.index;
         let value;
         if (ARCH_MMIO_SLOTS.has(devNsIdx)) {
@@ -9846,7 +9925,9 @@ class ChurchSimulator {
         const loc = srcCR.word1;
         // Decode mode bit: imm[14]=1 → immediate; imm[14]=0 → indexed
         let offset;
-        if (d.imm & 0x4000) {
+        if (Number.isInteger(d.idx1Offset)) {
+            offset = d.idx1Offset;
+        } else if (d.imm & 0x4000) {
             offset = d.imm & 0x3FFF;
         } else {
             const dwriteBase = (d.imm >> 4) & 0x3FF;
@@ -9894,6 +9975,10 @@ class ChurchSimulator {
             }
         }
         if (dwHomeAddr >= 0) {
+            if (IDX1_RUNTIME) {
+                IDX1_RUNTIME.preflightDRWrite(this, drIdx);
+                IDX1_RUNTIME.preflightMemoryWrite(this, absAddr, absAddr + 1);
+            }
             this._writeRuntimeWord(dwHomeAddr, value);
         }
 
@@ -12180,6 +12265,38 @@ class ChurchSimulator {
             return null;
         }
         const instrWord = fetch.word;
+        const executionSlot = this.cr[14] && this.cr[14].word0
+            ? this.parseGT(this.cr[14].word0).index : null;
+        const executionIdentity = executionSlot !== null ? this.getSlotIdentity(executionSlot) : null;
+        if (instrWord !== 0 && (instrWord >>> 27 === 10 ||
+                (executionIdentity && executionIdentity.executionDigest && IDX1_RUNTIME &&
+                    IDX1_RUNTIME.handles(instrWord >>> 27)))) {
+            try {
+                const slot = this.parseGT(this.cr[14].word0).index;
+                const accepted = IDX1_RUNTIME && IDX1_RUNTIME.entry(this, slot, this.pc);
+                if (!accepted) {
+                    this.fault('INVALID_OP', 'Opcode 10 requires an admitted IDX1 execution envelope');
+                    return null;
+                }
+                this.stepCount++;
+                const result = IDX1_RUNTIME.execute(this, accepted);
+                if (result) {
+                    if (!result.skipped) {
+                        this.executionStats.successful++;
+                        this._writeDR(0, 0);
+                    }
+                    result.auditPipeline = this._auditPipeline();
+                    result.tracePackets = this._tracePacketsBuf.slice();
+                    this._finishExecutionEvidence(result);
+                    this.emit('step', result);
+                    this.emit('stateChange', this.getState());
+                }
+                return result;
+            } catch (error) {
+                this.fault(error.code || 'INVALID_OP', error.message);
+                return null;
+            }
+        }
         if (this._executionAttempt) {
             this._executionAttempt.instruction = {
                 raw: instrWord >>> 0, physicalPC: fetch.addr,
@@ -12264,6 +12381,7 @@ class ChurchSimulator {
         // Freeze execution identity before CALL or any other instruction can
         // mutate CR14. Fault rendering must never infer the caller from the
         // post-boundary register bank or from editor/registry metadata.
+        if (IDX1_RUNTIME) IDX1_RUNTIME.preflightDRWrite(this, 0);
         this._captureFaultRoute(d);
 
         // ── Hardware privilege fence ──────────────────────────────────────────────
@@ -12488,10 +12606,13 @@ ChurchSimulator.pendingGTName = function (word) {
     return ChurchSimulator.PENDING_GT_NAMES[idx] || ('pending#' + idx);
 };
 
-// Deliberately NOT wired into fetch, CALL, RETURN, loaders, or an ISA toggle.
-// There is no protected, envelope-validated object binding in the JS runtime.
-// A codec or a caller's profile string cannot supply executable authority.
-ChurchSimulator.admitIDX1Execution = function () {
+// Explicit installation into an already-authorized object identity. A profile
+// string or packet codec alone still cannot supply executable authority.
+// The runtime rejects operations whose transactional implementation is pending;
+// an installed binding is immutable until reset, not an editable decoder toggle.
+ChurchSimulator.admitIDX1Execution = function (sim, bytes, slot) {
+    if (sim instanceof ChurchSimulator && IDX1_RUNTIME)
+        return IDX1_RUNTIME.install(sim, bytes, slot);
     const error = new Error('IDX1 runtime admission unsupported: protected execution-envelope binding and mutation/entry gates are not implemented');
     error.code = 'UNSUPPORTED_PROFILE';
     throw error;

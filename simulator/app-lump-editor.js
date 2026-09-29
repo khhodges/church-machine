@@ -2189,6 +2189,13 @@
     //         the candidate; cc=0 leaves the ambient boot c-list in use.
     // typ=0 — standard code lump, not a Thread or Namespace header.
     window.buildLumpFromAssembly = function (candidate) {
+        const activeCandidate = candidate || (window.IDEActionState &&
+            window.IDEActionState.get().candidate);
+        if (activeCandidate && activeCandidate.isaProfile === 'IDX1') {
+            const error = window.ChurchIDX1IDE.SAVE_MESSAGE;
+            if (typeof appendOutput === 'function') appendOutput(error, 'warn');
+            return { ok: false, error };
+        }
         // IDEActions passes its immutable candidate explicitly. The legacy
         // no-argument form remains for existing callers that export a loaded
         // assembly buffer.

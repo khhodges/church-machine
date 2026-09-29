@@ -22,6 +22,9 @@
             languageIdentity: value.languageIdentity || value.language || '',
             sourceSurface: value.sourceSurface || 'asmEditor',
             source: String(value.source == null ? '' : value.source),
+            isaProfile: value.isaProfile || 'LEGACY',
+            executionLayout: value.executionLayout
+                ? window.ChurchIDX1IDE.freezeLayout(value.executionLayout) : null,
             words: Object.freeze((value.words || []).map(word => word >>> 0)),
             capabilities: Object.freeze((value.capabilities || []).map(cloneCap)),
             labels: value.labels ? Object.freeze(Object.assign({}, value.labels)) : null,
@@ -96,6 +99,9 @@
             return { ok: true, reason: '' };
         }
         if (action === 'save' || action === 'export') {
+            if (candidate && candidate.isaProfile === 'IDX1') return {
+                ok: false, reason: window.ChurchIDX1IDE.SAVE_MESSAGE,
+            };
             if (fresh) return { ok: true, reason: '' };
             if (hasSource) {
                 return {
@@ -238,6 +244,8 @@
         if (!state.ok) return reportSaveFailure(reportUnavailable('save', sourceSurface));
         const built = await buildThen('save', options);
         if (!built || built.ok === false) return reportSaveFailure(built);
+        if (built.isaProfile === 'IDX1')
+            return reportSaveFailure({ ok: false, error: window.ChurchIDX1IDE.SAVE_MESSAGE });
         // Format/approval code consumes the registry snapshot. Restore this
         // candidate's selection if the programmer merely inspected another
         // LUMP while leaving the source draft unchanged.
@@ -275,6 +283,8 @@
         if (!state.ok) return reportUnavailable('export', sourceSurface);
         const built = await buildThen('export', options);
         if (!built || built.ok === false) return built;
+        if (built.isaProfile === 'IDX1')
+            return { ok: false, error: window.ChurchIDX1IDE.SAVE_MESSAGE };
         // Use the established canonical exporter. It owns the exact LUMP
         // layout and capability-slot representation; do not synthesize an
         // incomplete c-list in this shared command.
@@ -311,6 +321,8 @@
         }
     }
     function installCandidate(options) {
+        if (typeof _idx1AdmissionInFlight !== 'undefined' && _idx1AdmissionInFlight)
+            return { ok: false, error: 'IDX1 admission is still in progress.' };
         const sourceSurface = options && options.sourceSurface || 'asmEditor';
         const state = eligibility('run', undefined, sourceSurface);
         if (!state.ok) return reportUnavailable('run', sourceSurface);

@@ -1475,9 +1475,11 @@ class ChurchAssembler {
         return this._lastLineNums || [];
     }
 
-    // IDX1 is an inert assembly product. Its caller must provide the layout
-    // decisions that only the trusted compiler knows; this does not make a
-    // LUMP, execution envelope, or executable admission decision.
+    // IDX1 is an inert assembly product. Callers may supply an exact layout,
+    // or sourceLayout with explicit fast-entry/typed-dispatch decisions. In
+    // the latter case this compiler derives extents after packet relaxation;
+    // callers must not guess packet lengths before assembling. Neither form
+    // makes a LUMP, execution envelope, or executable admission decision.
     _assembleIDX1(source, options) {
         const codec = typeof module !== 'undefined' && module.exports
             ? require('./idx1.js') : globalThis.ChurchIDX1;
@@ -1492,16 +1494,19 @@ class ChurchAssembler {
         this._parsePetDirectives(this._rawLines);
         this._capBlockSlots = this._parseCapBlockSlots(this._rawLines);
         const statements = [];
+        const capabilityLines = [];
         let inCapBlock = false, inConstBlock = false;
         for (let n = 0; n < this._rawLines.length; n++) {
             const raw = this._rawLines[n];
             const text = raw.replace(/;.*$/, '').replace(/--.*$/, '').replace(/\/\/.*$/, '').trim();
             if (!text || /^\.pet\b/i.test(text) || /^\.header\b/i.test(text)) continue;
             if (/^capabilities\s*\{/i.test(text)) {
+                capabilityLines.push(raw);
                 inCapBlock = !text.includes('}');
                 continue;
             }
             if (inCapBlock) {
+                capabilityLines.push(raw);
                 if (text.includes('}')) inCapBlock = false;
                 continue;
             }
@@ -1583,7 +1588,56 @@ class ChurchAssembler {
             }
         }
         this._lastLineNums = lineNums.slice();
-        const layout = options.layout;
+        // Reuse the established capability declaration parser without
+        // reassembling or sampling any indexed instructions.
+        const capabilityResult = new ChurchAssembler().assemble(
+            capabilityLines.join('\n') + '\nRETURN');
+        this.errors.push(...capabilityResult.errors.map(error => ({
+            ...error, message: `IDX1 capabilities: ${error.message}`,
+        })));
+        let layout = options.layout;
+        if (options.sourceLayout !== undefined) {
+            if (layout !== undefined) {
+                this.errors.push({ line: 0, message: 'IDX1 accepts either layout or sourceLayout, not both' });
+            } else {
+                try {
+                    const declaration = options.sourceLayout;
+                    if (!declaration || !Array.isArray(declaration.dispatch) ||
+                            !Object.prototype.hasOwnProperty.call(declaration, 'fastEntry') ||
+                            Object.keys(declaration).some(key => !['dispatch', 'fastEntry'].includes(key)))
+                        throw new Error('IDX1 sourceLayout requires only fastEntry and typed dispatch');
+                    const coordinate = value => {
+                        if (typeof value === 'string') {
+                            if (!Object.prototype.hasOwnProperty.call(this.labels, value))
+                                throw new Error(`Unknown IDX1 layout label "${value}"`);
+                            return this.labels[value] + 1;
+                        }
+                        if (!Number.isSafeInteger(value) || value < 1 || value > words.length)
+                            throw new Error('IDX1 layout coordinates must be labels or positive LUMP-relative body words');
+                        return value;
+                    };
+                    const extents = [];
+                    for (const entry of kinds) {
+                        const last = extents[extents.length - 1];
+                        if (last && last.kind === entry.kind && last.endWord === entry.start + 1)
+                            last.endWord = entry.end + 1;
+                        else extents.push({ startWord: entry.start + 1,
+                            endWord: entry.end + 1, kind: entry.kind });
+                    }
+                    const dispatch = declaration.dispatch.map(entry => {
+                        if (!entry || !Object.prototype.hasOwnProperty.call(entry, 'word') ||
+                                Object.keys(entry).some(key => !['word', 'kind'].includes(key)) ||
+                                !['branch', 'offset', 'private'].includes(entry.kind))
+                            throw new Error('IDX1 source dispatch requires word and explicit kind');
+                        const word = coordinate(entry.word);
+                        return { selector: word, word, kind: entry.kind };
+                    });
+                    layout = { extents, dispatch, fastEntry: coordinate(declaration.fastEntry) };
+                } catch (error) {
+                    this.errors.push({ line: 0, message: error.message });
+                }
+            }
+        }
         if (!layout || !Array.isArray(layout.extents) || !Array.isArray(layout.dispatch) ||
                 !Number.isSafeInteger(layout.fastEntry)) {
             this.errors.push({ line: 0, message: 'IDX1 requires explicit layout.extents, layout.dispatch and layout.fastEntry options (LUMP-relative words)' });
@@ -1600,8 +1654,10 @@ class ChurchAssembler {
                 if (!extent || extent.startWord !== next ||
                         !Number.isSafeInteger(extent.endWord) || extent.endWord > 0x100000000 ||
                         extent.endWord <= next ||
-                        !['code', 'data'].includes(extent.kind))
+                        !['code', 'data'].includes(extent.kind)) {
                     this.errors.push({ line: 0, message: 'IDX1 extents must partition the body in increasing nonempty LUMP-relative ranges' });
+                    continue;
+                }
                 for (let w = Math.max(1, extent.startWord); w < extent.endWord && w <= words.length; w++) {
                     const entry = kinds.find(k => w - 1 >= k.start && w - 1 < k.end);
                     if (!entry || entry.kind !== extent.kind || (entry.start < extent.startWord - 1 && w === extent.startWord))
@@ -1634,7 +1690,10 @@ class ChurchAssembler {
                 }
             }
         }
-        return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
+        return { profile: 'IDX1', executable: false,
+            words, errors: this.errors, warnings: this.warnings, labels: this.labels,
+            capabilities: capabilityResult.capabilities || [],
+            namedSlots: capabilityResult.namedSlots || [],
             lineNums, sourceMap, instructionStarts, instructionBoundaries: sourceMap.map(m => ({
                 startWord: m.startWord, wordCount: m.wordCount, byteStart: m.byteStart, byteEnd: m.byteEnd })),
             layout: layout && !this.errors.length ? { codeWords: words.length,
@@ -1680,6 +1739,13 @@ class ChurchAssembler {
                 throw new Error(`Unsupported IDX1 instruction: ${line}`);
             return [word];
         }
+        const arities = { 0: [3], 1: [3], 2: [1, 2], 4: [2, 3], 5: [2, 3],
+            16: [3, 4], 17: [3, 4], 18: [4], 19: [4], 23: [1, 2] };
+        if (!arities[op].includes(args.length) || args.some(arg => !arg))
+            throw new Error(`Invalid IDX1 ${name} operand count`);
+        if (op === 23 && args.length === 2 &&
+                this.conditions[args[0].toUpperCase()] === undefined)
+            throw new Error('Two-operand IDX1 BRANCH requires an explicit condition first');
         const cr = token => {
             const m = /^CR(1[0-5]|[0-9])$/i.exec(token || '');
             if (!m) throw new Error(`Expected CR0..CR15, got "${token}"`);

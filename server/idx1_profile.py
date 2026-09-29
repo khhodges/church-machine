@@ -229,6 +229,8 @@ def parse_envelope(raw):
     if (header >> 27 != 31 or len(payload) != allocation * 4 or
             cw < 1 or 1 + cw + cc > allocation):
         _reject("invalid inner LUMP magic/allocation/geometry")
+    if (header >> 8) & 3:
+        _reject("IDX1 inner LUMP must have abstraction typ=0")
 
     layout = meta["layout"]
     _fields(layout, ("codeWords", "extents", "instructionStarts", "dispatch",
@@ -262,6 +264,12 @@ def parse_envelope(raw):
             if opcode == 10:
                 at += _packet(words, at, end)
             elif opcode in _SUPPORTED:
+                # IDX1 bit-field structure applies to one-word literals too,
+                # not just prefixed positions. Zero width is never an implicit
+                # width 32, even under a false predicate.
+                if opcode in (18, 19) and (
+                        words[at] & 0x7C00 or not words[at] & 31):
+                    _reject(f"invalid bit-field width/reserved bits at word {at}")
                 at += 1
             else:
                 _reject(f"unsupported executable opcode {opcode} at word {at}")
