@@ -120,8 +120,20 @@ def check_lump_canonical_integrity(lumps_dir, key8, lump_raw):
     if error:
         return error
     approval = approvals.get(hashlib.sha256(lump_raw).hexdigest())
+    from server.idx1_profile import validate_execution
+    try:
+        validate_execution(entry, lump_raw)
+    except ValueError as exc:
+        return f"IDX1 execution integrity failure: {exc}"
     if not isinstance(approval, dict):
         return None
+    try:
+        validate_execution(approval, lump_raw)
+        validate_execution(entry, lump_raw)
+        if approval.get("isa_profile") != entry.get("isa_profile"):
+            return "IDX1 manifest/approval execution profile mismatch."
+    except ValueError as exc:
+        return f"IDX1 execution integrity failure: {exc}"
     if approval.get("filename") != filename:
         return f"Integrity invariant violated: hash-bound approval filename disagrees for token {key8}."
     parsed = parse_canonical_filename(entry.get("filename", ""))

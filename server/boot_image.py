@@ -1713,6 +1713,10 @@ def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=
         digest = hashlib.sha256(raw).hexdigest()
         approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
         approval = approvals.get(digest)
+        from server.idx1_profile import validate_execution
+        execution = validate_execution(approval or {}, raw)
+        if execution is not None:
+            raise ValueError("IDX1 boot/hardware preparation is unsupported")
         filename = os.path.basename(path)
         parsed = parse_canonical_filename(filename)
         if approval is None:

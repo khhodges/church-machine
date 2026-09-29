@@ -634,7 +634,7 @@ function assembleAndLoad(options) {
     const _asmSlotNames = ChurchAssembler.buildSlotNames(result.capabilities || [],
         (typeof sim !== 'undefined' && sim) ? sim.nsLabels : null);
     let listing = `; Assembled ${result.words.length} instruction${result.words.length !== 1 ? 's' : ''}\n`;
-    if (indexedSource) listing += '; IDX1 simulator-only candidate; Save/export/hardware delivery unavailable.\n';
+    if (indexedSource) listing += '; IDX1 candidate: Save LUMP and protected simulator reload supported; boot/hardware export unavailable.\n';
     for (let i = 0; i < result.words.length; i++) {
         if (indexedSource) {
             const mapping = result.sourceMap.find(entry => entry.startWord === i + 1);
@@ -13279,10 +13279,12 @@ function _cloneLumpSaveCapabilities(capabilities) {
 // the registry selection. Neither is allowed to change what this save commits.
 function _captureLumpSaveSnapshot() {
     const registry = window.LumpRegistry;
-    const token = registry && typeof registry.getCurrent === 'function'
+    const candidate = window.IDEActionState && window.IDEActionState.get().candidate;
+    const indexedView = window.ChurchIDX1IDE && window.ChurchIDX1IDE.saveView(candidate);
+    const token = indexedView ? candidate.token : registry && typeof registry.getCurrent === 'function'
         ? registry.getCurrent() : null;
-    const entry = registry && typeof registry.resolve === 'function'
-        ? registry.resolve(token) : null;
+    const entry = indexedView || (registry && typeof registry.resolve === 'function'
+        ? registry.resolve(token) : null);
     const memory = entry && entry.sources && entry.sources.memory
         ? entry.sources.memory : null;
     const editor = document.getElementById('asmEditor');
@@ -13324,6 +13326,8 @@ function _captureLumpSaveSnapshot() {
         typeof window._editorOpenLumpBaseIdentity === 'object'
         ? Object.assign({}, window._editorOpenLumpBaseIdentity) : null;
     return {
+        isaProfile: indexedView ? 'IDX1' : 'LEGACY',
+        executionLayout: indexedView ? window.ChurchIDX1IDE.freezeLayout(candidate.executionLayout) : null,
         token: token || null,
         words: memory && Array.isArray(memory.words) ? memory.words.slice() : [],
         capabilities: _cloneLumpSaveCapabilities(memory && memory.capabilities),
@@ -13437,16 +13441,13 @@ function _recordEarlyLumpSaveValidationFailure(snapshot, label, message, binary)
 }
 
 function showSaveToNamespace() {
-    if (window.IDEActionState && window.IDEActionState.get &&
-            window.IDEActionState.get().candidate?.isaProfile === 'IDX1') {
-        if (typeof appendOutput === 'function') appendOutput(window.ChurchIDX1IDE.SAVE_MESSAGE, 'warn');
-        return;
-    }
     // Use LumpRegistry as the authoritative source — the compile path
     // (app-run.js ~L464) registers words there, NOT into lastAssembledWords.
     // lastAssembledWords is only written by app-absdetail.js and is always
     // null after a normal editor compile, so it must not be used as a gate.
-    const _guardMem = window.LumpRegistry
+    const indexedView = window.ChurchIDX1IDE && window.IDEActionState &&
+        window.ChurchIDX1IDE.saveView(window.IDEActionState.get().candidate);
+    const _guardMem = indexedView ? indexedView.sources.memory : window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())?.sources?.memory
         : null;
     if (!_guardMem || !(_guardMem.words && _guardMem.words.length)) {
@@ -13481,7 +13482,7 @@ function showSaveToNamespace() {
     document.getElementById('permS').checked = false;
     document.getElementById('permE').checked = true;
     const info = document.getElementById('saveNSInfo');
-    const _csWords = window.LumpRegistry?.resolve(window.LumpRegistry?.getCurrent())?.sources?.memory?.words;
+    const _csWords = window._saveNSPreparedSnapshot && window._saveNSPreparedSnapshot.words;
     const _csLen = _csWords ? _csWords.length : 0;
     info.textContent = `Code size: ${_csLen} words (${_csLen * 4} bytes)`;
     _setSaveNSFeedback('', '');
@@ -13580,6 +13581,7 @@ function _setSaveNSFeedback(kind, message, action) {
     }
     if (cancelButton) cancelButton.textContent = incident ? 'Close' : 'Cancel';
     if (!status) return;
+    status.dataset.feedbackKind = kind;
     if (!message) {
         status.style.display = 'none';
         status.textContent = '';
@@ -13789,7 +13791,8 @@ async function beginSaveToNamespace() {
     _setSaveNSFeedback('loading',
         'Preparing… Your private draft remains unchanged while the update is prepared.');
     const progressTimer = setTimeout(() => {
-        if (_saveNSRequestInFlight) {
+        const status = document.getElementById('saveNSStatus');
+        if (_saveNSRequestInFlight && status && status.dataset.feedbackKind === 'loading') {
             _setSaveNSFeedback('loading',
                 'Compiling and verifying… Your private draft remains unchanged.');
         }
@@ -16631,7 +16634,7 @@ function _acceptCommittedNamespaceSlotLabel(response, slot) {
 // simulator after a save.  save-plan can remint a destination-local SELF row,
 // so using the browser's preflight words here would make the simulator diverge
 // from the revision that was actually approved and committed.
-async function _reloadCommittedLumpArtifact(response, fallbackName) {
+async function _reloadCommittedLumpArtifact(response, fallbackName, savedMetadata) {
     const token = response && response.token;
     const nsSlot = response && (response.ns_slot !== undefined
         ? response.ns_slot : response.namespace_slot);
@@ -16662,6 +16665,18 @@ async function _reloadCommittedLumpArtifact(response, fallbackName) {
     }
     if (!Array.isArray(committedWords) || committedWords.length < 2) {
         throw new Error('saved artifact reload returned no complete LUMP binary');
+    }
+    if (response.isa_profile === 'IDX1' || savedMetadata?.isa_profile === 'IDX1') {
+        await window.ChurchIDX1IDE.validateSaved(committedWords, {
+            ...savedMetadata, ...response,
+            source: savedMetadata && savedMetadata.original_source,
+        });
+        // Save is retention, not consent to replace an executing context.
+        // The saved-LUMP Load into Sim action verifies and admits the complete
+        // linked envelope. Never install these bytes through the legacy loader.
+        if (typeof appendOutput === 'function') appendOutput(
+            'IDX1 LUMP saved. Use Load into Sim for protected admission; Prepare Boot and hardware delivery remain unavailable.', 'info');
+        return committedWords;
     }
     if (typeof sim === 'undefined' || !sim || !sim.loadLumpBinary ||
             !sim.loadLumpBinary(committedWords, Number(nsSlot))) {
@@ -16775,11 +16790,6 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
 }
 
 async function confirmSaveToNamespace() {
-    if (window.IDEActionState && window.IDEActionState.get &&
-            window.IDEActionState.get().candidate?.isaProfile === 'IDX1') {
-        _setSaveNSFeedback('error', window.ChurchIDX1IDE.SAVE_MESSAGE);
-        return;
-    }
     const slotSel = document.getElementById('saveNSSlot');
     const label = document.getElementById('saveNSLabel').value.trim();
     if (!label) {
@@ -16809,12 +16819,15 @@ async function confirmSaveToNamespace() {
         // the live registry identity before using the frozen
         // snapshot; otherwise its own registeredAt value would make the
         // pending-binary check appear fresh forever.
-        const _liveToken = window.LumpRegistry &&
+        const _liveCandidate = _saveSnapshot.isaProfile === 'IDX1' &&
+            window.IDEActionState && window.IDEActionState.get().candidate;
+        const _liveIndexedView = _liveCandidate && window.ChurchIDX1IDE.saveView(_liveCandidate);
+        const _liveToken = _liveIndexedView ? _liveCandidate.token : window.LumpRegistry &&
             typeof window.LumpRegistry.getCurrent === 'function'
             ? window.LumpRegistry.getCurrent() : null;
-        const _liveEntry = window.LumpRegistry &&
+        const _liveEntry = _liveIndexedView || (window.LumpRegistry &&
             typeof window.LumpRegistry.resolve === 'function'
-            ? window.LumpRegistry.resolve(_liveToken) : null;
+            ? window.LumpRegistry.resolve(_liveToken) : null);
         const _liveMemory = _liveEntry && _liveEntry.sources &&
             _liveEntry.sources.memory;
         if (_saveSnapshot.token && _liveToken !== _saveSnapshot.token) {
@@ -17026,6 +17039,20 @@ async function confirmSaveToNamespace() {
 
     // Validate the exact c-list bytes before either the live namespace or the
     // server repository can observe them.
+    const _svOriginalBinary = _svBinary && _svBinary.slice();
+    if (_svBinary && _saveSnapshot && _saveSnapshot.isaProfile === 'IDX1') {
+        try {
+            // The dialog name is explicit destination identity, not the
+            // compiler's inferred label ("Assembly" for unnamed source).
+            // Repack only that API field from the frozen source/profile;
+            // retain the original reviewed bytes as separate evidence.
+            _svBinary = await window.ChurchIDX1IDE.nameSavedCandidate(
+                _svBinary, _svAbsName, _saveSnapshot.sourceText);
+        } catch (error) {
+            _setSaveNSFeedback('error', error.message);
+            return;
+        }
+    }
     if (_svWords.length > 0 && _svBinary && _caps.length > 0) {
         if (typeof CapabilityTokens === 'undefined') {
             alert('Save blocked: capability token validator is unavailable.');
@@ -17113,6 +17140,8 @@ async function confirmSaveToNamespace() {
         var _svPayload = {
             binary: _svBinary,
             metadata: {
+                ...(_saveSnapshot && _saveSnapshot.isaProfile === 'IDX1'
+                    ? await window.ChurchIDX1IDE.savedFields(_svBinary, _saveSnapshot.executionLayout) : {}),
                 abstraction:  _svAbsName,
                 slot_label:   label,
                 content_type: 'code',
@@ -17133,7 +17162,7 @@ async function confirmSaveToNamespace() {
                     typeof _saveSnapshot.sourceText === 'string'
                     ? _saveSnapshot.sourceText : null,
                 original_compiled_words: _svWords.slice(),
-                original_binary: _svBinary.slice(),
+                original_binary: (_svOriginalBinary || _svBinary).slice(),
                 output_profile: (_snapshotPending &&
                     ['api', 'compact', 'full'].includes(_snapshotPending.selectedProfile))
                     ? _snapshotPending.selectedProfile
@@ -17251,6 +17280,8 @@ async function confirmSaveToNamespace() {
             // server-selected New Entry slot and reminted final bytes; never
             // send the browser's provisional binary after approving this plan.
             _svPayload.binary = _saveApproval.final_binary.slice();
+            if (_svPayload.metadata.isa_profile === 'IDX1')
+                await window.ChurchIDX1IDE.applySavedPlan(_svPayload.metadata, _saveApproval.plan);
             idx = _saveApproval.plan.ns_slot;
             if (!Number.isInteger(idx)) {
                 throw new Error('Save plan is missing an authoritative Namespace slot');
@@ -17300,6 +17331,8 @@ async function confirmSaveToNamespace() {
             _showFpgaToast('LUMP Save Plan Failed', err.message, 'error', 10000);
             return;
         }
+        _setSaveNSFeedback('info',
+            'Saving the approved snapshot. If a protected-change review opens, choose “Confirm this change” to commit, or “Reject — keep unchanged” to cancel.');
         return _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, async function(resp) {
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful
@@ -17316,7 +17349,7 @@ async function confirmSaveToNamespace() {
                     throw new Error('repository response omitted the committed Namespace slot');
                 }
                 idx = committedSlot;
-                await _reloadCommittedLumpArtifact(resp, label);
+                await _reloadCommittedLumpArtifact(resp, label, _svPayload.metadata);
                 await _refreshNamespaceAuthorityAfterLumpSave();
             } catch (err) {
                 try {
@@ -17438,6 +17471,8 @@ async function confirmSaveToNamespace() {
                 }
                 rebuilt.metadata.ns_slot = plan.ns_slot;
                 rebuilt.metadata.namespace_sequence = plan.namespace_sequence;
+                if (rebuilt.metadata.isa_profile === 'IDX1')
+                    await window.ChurchIDX1IDE.applySavedPlan(rebuilt.metadata, plan);
                 const intent = await window._requestLumpApprovalIntent(
                     rebuilt.binary, plan.action, rebuilt.metadata, plan);
                 rebuilt.metadata.approval_intent = intent.intent;

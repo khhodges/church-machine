@@ -8846,7 +8846,9 @@ function _renderFormatLumpCandidate(pending) {
             var sourceRequired = typeof pending.sourceText === 'string' &&
                 pending.sourceText.trim().length > 0;
             var disabled = !item || (profile === 'api' && sourceRequired);
-            var detail = disabled
+            var detail = pending.isaProfile === 'IDX1' && profile === 'api'
+                ? 'IDX1 protected reload requires compiler source; choose Full or Compact'
+                : disabled
                 ? (item && profile === 'api' && sourceRequired
                     ? 'Source retention requires an embedded source frame'
                     : 'Requires saved source')
@@ -8961,17 +8963,13 @@ window._selectFormatLumpProfile = _selectFormatLumpProfile;
 // window._pendingLumpData for confirmSaveToNamespace().
 window.showFormatLump = async function() {
     const activeCandidate = window.IDEActionState && window.IDEActionState.get().candidate;
-    if (activeCandidate && activeCandidate.isaProfile === 'IDX1') {
-        const error = window.ChurchIDX1IDE.SAVE_MESSAGE;
-        if (typeof appendOutput === 'function') appendOutput(error, 'warn');
-        return { ok: false, error };
-    }
+    const indexedView = window.ChurchIDX1IDE && window.ChurchIDX1IDE.saveView(activeCandidate);
     // Never leave an earlier reviewed binary available after a failed
     // preparation of a newer draft.
     window._pendingLumpData = null;
-    var _regEntry = window.LumpRegistry
+    var _regEntry = indexedView || (window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
-        : null;
+        : null);
     var _regMem = _regEntry ? _regEntry.sources : null;
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
@@ -8981,7 +8979,7 @@ window.showFormatLump = async function() {
         return { ok: false, error: _missingCandidate, reported: true };
     }
 
-    var _regToken = window.LumpRegistry
+    var _regToken = indexedView ? activeCandidate.token : window.LumpRegistry
         ? window.LumpRegistry.getCurrent()
         : null;
     var _svWords = _regMem.memory.words.slice();
@@ -9023,8 +9021,17 @@ window.showFormatLump = async function() {
         return Object.assign({}, cap, { name: 'SELF' });
     });
     var _apiObj = _formatLumpApiDefinition(_absName, _caps);
+    if (indexedView) {
+        _apiObj.isa_profile = 'IDX1';
+        _apiObj.language = activeCandidate.language || 'assembly';
+        // Raw IDX1 assembly currently emits no API method declarations.
+        // Never inherit the selected boot LUMP's stale method manifest.
+        _apiObj.methods = [];
+    }
     var _candidates = {};
-    var _profiles = ['api'];
+    // Source-less IDX1 reload is not an admitted route. Do not produce an
+    // API-only candidate or silently upgrade its chosen storage profile.
+    var _profiles = indexedView ? [] : ['api'];
     if (_srcText.trim().length > 0) _profiles.push('compact', 'full');
 
     for (var _profileIndex = 0; _profileIndex < _profiles.length; _profileIndex++) {
@@ -9102,7 +9109,11 @@ window.showFormatLump = async function() {
             };
         });
         var _manifest = { cw: _svCW, cc: _svCC, lump_size: _svLumpSize, capabilities: _normalizedCaps };
-        var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null, {}) : [];
+        // The envelope validator owns IDX1 instruction boundaries. Legacy ISA
+        // audits cannot interpret W1 or typed data as standalone instructions.
+        if (indexedView) await window.ChurchIDX1IDE.savedFields(_svBinary, activeCandidate.executionLayout);
+        var _auditResults = (typeof lumpAudit === 'function') ? lumpAudit(_svBinary, _manifest, null,
+            indexedView ? { isaProfile: 'IDX1' } : {}) : [];
         _candidates[_profile] = {
             profile: _profile,
             binary: _svBinary,
@@ -9122,8 +9133,9 @@ window.showFormatLump = async function() {
     // candidate under a different editor owner.
     if ((_srcEl && _srcEl.value !== _srcText) ||
             window._editorOpenLumpToken !== _openOwnershipToken ||
-            window.LumpRegistry.getCurrent() !== _regToken ||
-            window.LumpRegistry.resolve(_regToken) !== _regEntry) {
+            (indexedView ? window.IDEActionState.get().candidate !== activeCandidate :
+                (window.LumpRegistry.getCurrent() !== _regToken ||
+                 window.LumpRegistry.resolve(_regToken) !== _regEntry))) {
         var _changedDraft = 'Cannot review this LUMP: the editor draft or selected LUMP changed while preparing the save. Compile the current draft and click Save LUMP again.';
         alert(_changedDraft);
         return { ok: false, error: _changedDraft, reported: true };
@@ -9165,6 +9177,8 @@ window.showFormatLump = async function() {
     var _selectedCandidate = _candidates[_selectedProfile];
     _caps = _selectedCandidate.caps;
     window._pendingLumpData = {
+        isaProfile: indexedView ? 'IDX1' : 'LEGACY',
+        executionLayout: indexedView ? activeCandidate.executionLayout : null,
         binary:       _selectedCandidate.binary,
         words:        _svWords.slice(),
         caps:         _caps,
@@ -9646,6 +9660,8 @@ async function _requestLumpSavePlan(words, metadata) {
     try {
         const resp = await fetch('/api/lumps/save-plan', {
             method: 'POST',
+            signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+                ? AbortSignal.timeout(30000) : undefined,
             headers: Object.assign({ 'Content-Type': 'application/json' },
                 operationId ? { 'X-Lump-Save-Operation': operationId } : {}),
             body: JSON.stringify({ binary: words, metadata: metadata })
@@ -9692,6 +9708,9 @@ async function _requestLumpSavePlan(words, metadata) {
             ns_slot: finalSlot === null || finalSlot === undefined ? null : Number(finalSlot),
         });
     } catch (error) {
+        if (error && error.name === 'TimeoutError') {
+            error = new Error('Save planning timed out after 30 seconds. No LUMP commit was requested; your source and settings remain preserved.');
+        }
         if (_saveDiagnostics) {
             try {
                 _saveDiagnostics.stageException(metadata, 'prepare', error, {
@@ -10027,6 +10046,8 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     }
     let intent;
     try {
+        if (_metadataSnapshot.isa_profile === 'IDX1')
+            await window.ChurchIDX1IDE.applySavedPlan(_metadataSnapshot, plan);
         intent = await _requestLumpApprovalIntent(
             finalBinary, plan.action, _metadataSnapshot, plan);
     } catch (error) {
@@ -10124,13 +10145,18 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
     });
     return {
         approval: _lumpApprovalView(approved),
+        isa_profile: approved.isa_profile || wordsPayload.isa_profile || api.isa_profile || 'LEGACY',
+        execution_envelope: approved.execution_envelope || wordsPayload.execution_envelope,
+        execution_digest: approved.execution_digest || wordsPayload.execution_digest,
+        compiler_record: approved.compiler_record || wordsPayload.compiler_record,
         capabilities,
         methods: Array.isArray(api.methods) ? api.methods : [],
         apiDefinition: content.contentFrameValid ? content.apiDefinition : null,
         profile: content.contentFrameValid ? content.profile : null,
         language: content.contentFrameValid && typeof api.language === 'string'
             ? api.language : null,
-        source: content.contentFrameValid ? content.source : null,
+        source: content.contentFrameValid && content.source != null ? content.source :
+            (typeof approved.original_source === 'string' ? approved.original_source : null),
         identityHash: approved.identity_hash || null,
         binaryHash,
         portableBinding: approved.portable_binding || null,
@@ -10341,6 +10367,12 @@ function _validateLinkedPortableClist(linkedWords, header, bindings, simInstance
 // updated to match the chosen slot.  The assembler path (loadProgram) is unaffected.
 async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
     if (!token) return;
+    if (typeof _idx1AdmissionInFlight !== 'undefined' && _idx1AdmissionInFlight) {
+        if (typeof appendOutput === 'function') appendOutput('An executable admission is already in progress.', 'warn');
+        return;
+    }
+    let indexedAdmission = false;
+    let indexedSlot = null;
     if (btn) { btn.disabled = true; btn.textContent = 'Loading\u2026'; }
     try {
         const resp = await fetch(`/api/lump/${token}/words`, { cache: 'no-store' });
@@ -10358,6 +10390,13 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             throw new Error('Saved binary response does not match its inspected full content hash');
         }
         const _savedMetadata = await _loadSavedLumpCapabilities(token, data);
+        const indexedCandidate = window.ChurchIDX1IDE
+            ? await window.ChurchIDX1IDE.validateSaved(rawWords, _savedMetadata) : null;
+        if (!window.ChurchIDX1IDE && (_savedMetadata.isa_profile === 'IDX1' ||
+                _savedMetadata.execution_envelope ||
+                (rawWords[0] >>> 27 === 31 && ((rawWords[0] >>> 8) & 3) === 0 &&
+                 rawWords.slice(1, 1 + ((rawWords[0] >>> 10) & 8191)).some(word => word >>> 27 === 10))))
+            throw new Error('IDX1 saved execution validator is unavailable');
 
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
         const _runHeader = sim.parseLumpHeader(rawWords[0] >>> 0);
@@ -10388,7 +10427,22 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
                 identity_hash: _savedMetadata.identityHash, verified: true, approved: true,
             };
         }
-        const _savedCaps = _validateSavedLumpClist(rawWords, _runHeader, _savedMetadata, sim);
+        const installWords = rawWords.slice();
+        if (indexedCandidate) {
+            // A destination-finalized saved SELF refers to the repository's
+            // Namespace, not necessarily this simulator's current image.
+            // Only this compiler-owned relocation may be symbolized, after
+            // exact saved-envelope/source validation; never rewrite the file.
+            const row = _savedMetadata.capabilities[0];
+            const parsed = sim.parseGT(rawWords[rawWords.length - _runHeader.cc]);
+            if (!_runHeader.cc || !row || row.compiler_owned_self !== true ||
+                    !['SELF', '__SELF__'].includes(String(row.name).toUpperCase()) ||
+                    parsed.type !== 1 || parsed.permissions.E !== 1 ||
+                    ['R', 'W', 'X', 'L', 'S'].some(right => parsed.permissions[right]))
+                throw new Error('IDX1 saved SELF is not a canonical compiler-owned E capability');
+            installWords[installWords.length - _runHeader.cc] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+        }
+        const _savedCaps = _validateSavedLumpClist(installWords, _runHeader, _savedMetadata, sim);
         const _savedSelfName = String(_savedCaps[0] && _savedCaps[0].name || '').toUpperCase();
         const _compilerOwnedSelf = !!(_savedCaps[0] &&
             _savedCaps[0].compiler_owned_self === true &&
@@ -10441,13 +10495,23 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         // This button installs into volatile simulator memory only. Do not
         // request server deployment approval or mutate any saved artifact.
 
+        if (typeof _idx1AdmissionInFlight !== 'undefined' && _idx1AdmissionInFlight)
+            throw new Error('An executable admission is already in progress.');
         if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
+        if (indexedCandidate && !sim.bootComplete) {
+            throw new Error('IDX1 reload requires a valid prepared simulator context. No saved artifact or boot selection was changed.');
+        }
+        if (indexedCandidate) {
+            _idx1AdmissionInFlight = true;
+            indexedAdmission = true;
+            indexedSlot = _targetSlot;
+        }
 
         // A saved compiler LUMP contains its previous live self GT, not the
         // compiler placeholder. Preserve the durable sidecar provenance so the
         // loader remints row zero for this slot's current Namespace sequence.
         const loaded = sim.loadLumpBinary(
-            rawWords,
+            installWords,
             _targetSlot,
             {
                 // "Load into Sim" is an explicit direct-run action. Ordinary
@@ -10482,6 +10546,18 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         );
         if (!loaded) {
             throw new Error('loadLumpBinary rejected the binary — check the console output for details');
+        }
+        if (indexedCandidate) {
+            // Block legacy fetch while hashing the linked payload. The saved
+            // envelope was verified before load; only SELF/c-list localization
+            // may change, and fresh compiler evidence is rechecked below.
+            sim.registerSlotIdentity(_targetSlot, {
+                dotName: name || 'SavedIDX1', issueN: 1,
+                identityHash: indexedCandidate.executionDigest, binaryHash: actualHash,
+                executionDigest: indexedCandidate.executionDigest, authorized: true,
+            });
+            window._installedIDX1Envelope = await window.ChurchIDX1IDE.admitLocalCandidate(
+                sim, ChurchSimulator, indexedCandidate, _targetSlot);
         }
 
         // Update the NS-slot label so the Code-view panel title reflects the
@@ -10537,19 +10613,30 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         }
 
         if (btn) { btn.textContent = 'Loaded \u2713'; }
-        const con = document.getElementById('editorConsole');
+        const con = typeof document !== 'undefined' && document.getElementById('editorConsole');
         if (con) {
             con.className = '';
-            con.textContent = `Loaded LUMP \u201c${name || token}\u201d \u2014 cw=${wordCount}${hdr && hdr.valid ? ' cc=' + hdr.cc : ''} \u2014 click Step or Run. Use ⚡ Prepare separately to select it for a future boot.`;
+            con.textContent = `Loaded LUMP \u201c${name || token}\u201d \u2014 cw=${wordCount}${hdr && hdr.valid ? ' cc=' + hdr.cc : ''} \u2014 click Step or Run. ` +
+                (indexedCandidate ? 'IDX1 boot and hardware delivery remain unavailable.' :
+                    'Use ⚡ Prepare separately to select it for a future boot.');
         }
         switchView('dashboard');
     } catch (err) {
+        if (indexedAdmission) {
+            if (!window.ChurchIDX1Runtime.isInstalled(sim, indexedSlot)) {
+                const rejected = '0'.repeat(64);
+                sim.registerSlotIdentity(indexedSlot, { dotName: 'RejectedIDX1', issueN: 1,
+                    identityHash: rejected, binaryHash: rejected,
+                    executionDigest: rejected, authorized: false });
+            }
+            sim.fault(err.code || 'INVALID_OP', `IDX1 saved admission failed: ${err.message}`);
+        }
         if (btn) { btn.disabled = false; btn.textContent = 'Load into Sim \u25b6'; }
-        alert(/\bNo data was changed\b/.test(err.message) ? err.message :
-            _formatActionableNetworkError('Load the LUMP into the simulator', err, {
-                dataChanged: null,
-                nextAction: 'Reset the simulator, reload the LUMP, then retry.',
-            }));
+        if (typeof appendOutput === 'function') appendOutput(err.message, 'error');
+        const con = typeof document !== 'undefined' && document.getElementById('editorConsole');
+        if (con) { con.className = 'error'; con.textContent = err.message; }
+    } finally {
+        if (indexedAdmission) _idx1AdmissionInFlight = false;
     }
 }
 

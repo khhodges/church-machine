@@ -99,7 +99,7 @@
             return { ok: true, reason: '' };
         }
         if (action === 'save' || action === 'export') {
-            if (candidate && candidate.isaProfile === 'IDX1') return {
+            if (action === 'export' && candidate && candidate.isaProfile === 'IDX1') return {
                 ok: false, reason: window.ChurchIDX1IDE.SAVE_MESSAGE,
             };
             if (fresh) return { ok: true, reason: '' };
@@ -244,12 +244,10 @@
         if (!state.ok) return reportSaveFailure(reportUnavailable('save', sourceSurface));
         const built = await buildThen('save', options);
         if (!built || built.ok === false) return reportSaveFailure(built);
-        if (built.isaProfile === 'IDX1')
-            return reportSaveFailure({ ok: false, error: window.ChurchIDX1IDE.SAVE_MESSAGE });
         // Format/approval code consumes the registry snapshot. Restore this
         // candidate's selection if the programmer merely inspected another
         // LUMP while leaving the source draft unchanged.
-        if (window.LumpRegistry && typeof window.LumpRegistry.setCurrent === 'function') {
+        if (built.isaProfile !== 'IDX1' && window.LumpRegistry && typeof window.LumpRegistry.setCurrent === 'function') {
             window.LumpRegistry.setCurrent(built.token);
         }
         // showFormatLump builds the single review/destination dialog; this

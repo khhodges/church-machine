@@ -1,11 +1,11 @@
 # IDX1 indexed instruction profile
 
-Status: **approved for coordinated implementation**, with the gated local
-simulator implementation described below. This is not a hardware release,
+Status: **approved for coordinated implementation**, with durable Save LUMP
+and protected simulator execution/reload described below. This is not a hardware release,
 compiler certification, or authorization to amend an existing LUMP, Namespace
 or boot image. Existing binaries retain their legacy interpretation.
 
-### Current software implementation (local simulator route)
+### Current software implementation (Save LUMP and simulator routes)
 
 The raw-assembly IDE now selects an IDX1 **new compile candidate** when an
 indexed operand contains a DR expression. This does not relabel an existing
@@ -35,10 +35,28 @@ binary or change the meaning of missing execution metadata.
   Namespace aliases cannot execute an installed object's bytes as legacy code.
   Thread resume targets are boundary-checked before CHANGE commits either
   Thread, and fresh IDX1 roots use the envelope's declared fast entry.
-* **Save, executable export, Prepare Boot and hardware delivery are unavailable
-  for these IDX1 candidates.** Candidates do not enter the legacy code-only
-  registry. The IDE reports this restriction rather than stripping the envelope.
-  No server-persisted or FPGA IDX1 execution support is claimed.
+* **Save LUMP is implemented through the normal review/consent, lease and
+  compare-and-swap transaction.** The immutable browser snapshot retains the
+  compiler source, words, capabilities and typed layout together. The server
+  recompiles unsigned browser candidates before attesting their exact binary
+  and whole execution envelope. Destination finalization reframes the finalized
+  payload without changing compiler-owned layout. Current artifacts, immutable
+  history and metadata preserve `isa_profile`, `execution_envelope` and
+  `execution_digest`, bound to the compiler record. Missing or tampered
+  execution metadata is rejected rather than interpreted as legacy code.
+  IDX1 Save currently requires a source-bearing full or compact profile;
+  API-only Save is explicitly unavailable because protected reload rechecks
+  compiler source. Selecting API-only must not silently embed source instead.
+* **Saved-LUMP Load into Sim is implemented.** It verifies the saved bytes,
+  envelope, compiler record and source-derived layout before installation.
+  Compiler-owned SELF relocation affects only the volatile installation;
+  linked bytes receive the same whole-envelope protected admission as a local
+  candidate. Saving alone does not install through the legacy loader or select
+  a boot target. Candidates remain outside the legacy code-only registry.
+* **Executable/deployment export, Prepare Boot and hardware delivery remain
+  blocked for IDX1.** No FPGA IDX1 execution support is claimed. Simulator
+  execution still requires an independently valid prepared/booted context;
+  Save support does not bypass boot authority or repair an invalid Namespace.
 
 `test_idx1_ide_flow.js` exercises the actual compile/candidate/C-list-link/install
 functions in a disposable simulator, including `IADD DR11, DR0, #2`,
@@ -47,7 +65,11 @@ functions in a disposable simulator, including `IADD DR11, DR0, #2`,
 at the canonical root sentinel; indexing does not create a caller frame.
 `test_idx1_runtime.js` exercises actual simulator execution, arithmetic faults,
 instruction interiors, mutation rejection, data/bit-field/branch packets and a
-legacy→IDX1→legacy CALL/RETURN. These focused checks are not full architectural,
+legacy→IDX1→legacy CALL/RETURN. `test_idx1_saved_flow.js` exercises the real
+formatter, immutable snapshot, metadata-loss/tamper rejection and protected
+saved loader in disposable memory. `tests/server/test_idx1_save_endpoint.py`
+exercises compiler attestation, exact save/reload and immutable history using
+private directories. These focused checks are not full architectural,
 Thread-switch, device, or hardware conformance certification.
 
 ## 1. Scope and evidence

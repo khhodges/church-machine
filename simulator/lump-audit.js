@@ -119,6 +119,9 @@ function lumpAuditValidateContentFrame(words, fsStart, fsEnd) {
 
 function lumpAudit(words, manifest, lineNums, opts) {
     const results = [];
+    // IDX1 callers validate the whole typed execution envelope separately.
+    // These three legacy instruction scans have no packet/data boundaries.
+    const legacyInstructions = !opts || opts.isaProfile !== 'IDX1';
 
     if (!words || words.length === 0) {
         results.push({
@@ -604,7 +607,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // Skipped for Thread lumps (typ=10): words 1..sw are DR values (data registers),
     // not executable code; applying Church instruction checks to them is meaningless.
     // Skipped when binary size or bounds checks have already failed.
-    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && typ !== 2 && typ !== 1) {
+    if (legacyInstructions && actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && typ !== 2 && typ !== 1) {
         const _rciChurchOps = new Set([0, 1, 8, 9]);
         const _rciOpName    = { 0: 'LOAD', 1: 'SAVE', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
         const _rciBranchOp  = 23;  // v2.0 ISA: BRANCH is opcode 23 (opcode 17 = DWRITE)
@@ -748,7 +751,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 violations: _rncViolations,
             });
         }
-    } else if (typ !== 2 && typ !== 1 /* Thread/data lumps silently skip RCI; only warn for other failures */) {
+    } else if (legacyInstructions && typ !== 2 && typ !== 1 /* Thread/data lumps silently skip RCI; only warn for other failures */) {
         results.push({
             ruleId: 'RCI',
             severity: 'warn',
@@ -772,7 +775,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // Skipped for Thread lumps (typ=10): cc names persisted CR homes, not an
     // executable c-list slot count.
     // Skipped when cc=0 (no c-list) or when binary size/bounds failed.
-    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && cc > 0 &&
+    if (legacyInstructions && actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && cc > 0 &&
             typ !== 2 && typ !== 1 && manifest && typeof manifest === 'object') {
 
         // ── Step 1: build slot → best name map from all available sources ─────
@@ -890,7 +893,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
     // Skipped for Thread lumps (typ=10): words 1..sw are DR state, not executable code;
     // scanning them for RETURN opcodes would produce false stub-method warnings.
     // Skipped for data lumps (typ=01): body is programmer payload, not instructions.
-    if (actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && typ !== 2 && typ !== 1) {
+    if (legacyInstructions && actualWords === lumpSize && contentWords <= lumpSize && cw >= 1 && typ !== 2 && typ !== 1) {
         const _RETURN_OP = 3;
         const _rsmStubs = [];  // { name?, wordIndex }
 

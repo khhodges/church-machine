@@ -9,7 +9,7 @@ import pytest
 
 from server.idx1_profile import (
     FEATURES, IDX1Error, IDX1TargetError, MAGIC, frame_envelope,
-    parse_envelope,
+    parse_envelope, validate_execution,
 )
 
 
@@ -56,6 +56,20 @@ def recode(payload, meta):
 def reject(payload, meta, text=None):
     with pytest.raises(IDX1Error, match=text):
         parse_envelope(recode(payload, meta))
+
+
+@pytest.mark.parametrize("typ", [1, 2, 3])
+def test_legacy_non_code_prefix_shaped_payload_is_not_idx1(typ):
+    header = (31 << 27) | (1 << 10) | (typ << 8)
+    raw = struct.pack(">64I", header, 0x50000000, *([0] * 62))
+    assert validate_execution({}, raw) is None
+
+
+def test_legacy_code_prefix_without_execution_metadata_is_rejected():
+    raw = struct.pack(">64I", (31 << 27) | (1 << 10),
+                      0x50000000, *([0] * 62))
+    with pytest.raises(IDX1Error, match="no legacy downgrade"):
+        validate_execution({}, raw)
 
 
 @pytest.mark.parametrize("typ", [1, 2, 3])

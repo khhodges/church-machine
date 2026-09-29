@@ -244,6 +244,14 @@ def verify_gates(raw, *, token, expected_digest, authorization, requested, grant
     if not isinstance(raw, bytes) or len(raw) < 4 or len(raw) % 4:
         gates["gate0"] = _gate("rejected", "truncated or impossible file representation")
         raise AdmissionError("upload transport is invalid", gates)
+    from server.idx1_profile import validate_execution
+    try:
+        execution = validate_execution(authorization or {}, raw)
+        if execution is not None:
+            raise ValueError("IDX1 unknown-upload admission is unsupported; use trusted compiler Save")
+    except ValueError as exc:
+        gates["gate1"] = _gate("rejected", str(exc))
+        raise AdmissionError(str(exc), gates) from exc
     header = int.from_bytes(raw[:4], "big")
     magic = (header >> 27) & 0x1f
     n = ((header >> 23) & 0xf) + 6

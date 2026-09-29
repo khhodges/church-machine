@@ -6,6 +6,8 @@ compiler provenance, device support, object authority, or permission to execute.
 
 from dataclasses import dataclass
 import hashlib
+import base64
+import binascii
 import json
 import re
 import struct
@@ -342,3 +344,62 @@ def frame_envelope(payload, metadata):
     result += encoded + padding + payload
     parse_envelope(result)
     return result
+
+
+EXECUTION_FIELDS = ("isa_profile", "execution_envelope", "execution_digest")
+
+
+def validate_execution(metadata, payload):
+    """Validate durable execution metadata, including signed anti-stripping facts."""
+    if not isinstance(metadata, dict) or not isinstance(payload, bytes):
+        _reject("execution metadata must be an object and payload must be bytes")
+    record = metadata.get("compiler_record") or {}
+    if not isinstance(record, dict):
+        _reject("compiler_record must be an object")
+    profile = metadata.get("isa_profile")
+    signed_profile = record.get("isa_profile")
+    present = any(key in metadata for key in EXECUTION_FIELDS)
+    if not present and signed_profile is None:
+        # Never infer a decoder from the bytes. A reserved prefix in a naked
+        # code body is unsupported legacy input, not permission to use IDX1.
+        if len(payload) >= 4 and len(payload) % 4 == 0:
+            header = int.from_bytes(payload[:4], "big")
+            cw = (header >> 10) & 0x1FFF
+            if header >> 27 == 31 and ((header >> 8) & 3) == 0 and any(
+                    int.from_bytes(payload[i:i + 4], "big") >> 27 == 10
+                    for i in range(4, min(len(payload), (cw + 1) * 4), 4)):
+                _reject("reserved IDX1 prefix requires execution metadata; no legacy downgrade")
+        return None
+    if profile != "IDX1":
+        _reject("missing or unsupported execution profile")
+    if signed_profile is not None and signed_profile != profile:
+        _reject("compiler execution profile mismatch")
+    try:
+        raw = base64.b64decode(metadata["execution_envelope"], validate=True)
+    except (KeyError, TypeError, ValueError, binascii.Error) as exc:
+        raise IDX1Error("missing or invalid execution_envelope base64") from exc
+    envelope = parse_envelope(raw)
+    if envelope.payload != payload:
+        _reject("execution envelope differs from exact inner LUMP bytes")
+    if metadata.get("execution_digest") != envelope.execution_digest:
+        _reject("execution_digest mismatch")
+    if signed_profile is not None and record.get("execution_digest") != envelope.execution_digest:
+        _reject("compiler execution digest mismatch")
+    return envelope
+
+
+def execution_fields(metadata):
+    return {key: metadata[key] for key in EXECUTION_FIELDS if key in metadata}
+
+
+def reframe_execution(envelope, payload):
+    """Only payload/hash may change during destination finalization, never layout."""
+    code_end = (1 + envelope.code_words) * 4
+    if payload[4:code_end] != envelope.payload[4:code_end]:
+        _reject("destination finalization changed compiler-owned code words")
+    meta = json.loads(envelope.metadata_bytes)
+    meta["payloadSha256"] = hashlib.sha256(payload).hexdigest()
+    raw = frame_envelope(payload, meta)
+    return {"isa_profile": "IDX1",
+            "execution_envelope": base64.b64encode(raw).decode("ascii"),
+            "execution_digest": hashlib.sha256(raw).hexdigest()}

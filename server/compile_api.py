@@ -100,6 +100,7 @@ def _make_cache_key(payload: dict) -> str:
         'source':         payload.get('source', ''),
         'namespace_hint': payload.get('namespace_hint'),
         'tier':           payload.get('tier'),   # V1.3 self-definition tier
+        'isa_profile': payload.get('isa_profile'),
         'portable_binding': payload.get('portable_binding') or payload.get('portableBinding'),
         'call_api_authorities': payload.get('_resolved_call_api_authorities'),
     }

@@ -22,6 +22,14 @@ import contextvars
 import fcntl
 import requests as http_requests
 import html as _html
+try:
+    from server.idx1_profile import (
+        validate_execution, execution_fields, reframe_execution, IDX1Error,
+    )
+except ImportError:
+    from idx1_profile import (
+        validate_execution, execution_fields, reframe_execution, IDX1Error,
+    )
 
 # ── SSE device-event bus ──────────────────────────────────────────────────────
 _sse_clients     = []
@@ -9932,6 +9940,8 @@ def get_lump_save_operation_artifact(operation_id):
         approval = _matching_lump_approval(LUMPS_DIR, digest)
         if not isinstance(approval, dict) or approval.get("binary_hash") != digest:
             raise ValueError("operation artifact approval is unavailable")
+        validate_execution(approval, raw)
+        validate_execution(response, raw)
     except (TypeError, ValueError, _struct.error):
         return jsonify({"error": "committed operation artifact cannot be verified"}), 409
     return jsonify({
@@ -9940,6 +9950,7 @@ def get_lump_save_operation_artifact(operation_id):
         "ns_slot": response.get("ns_slot"),
         "candidate_id": response.get("candidate_id"),
         "final_binary": words,
+        **execution_fields(approval),
     })
 
 def _manifest_entry_identity(entry):
@@ -10283,6 +10294,10 @@ def _inspect_lump_binary(binary_or_path, *, allow_compact_fit=False):
     else:
         with open(binary_or_path, "rb") as fh:
             raw = fh.read()
+        sidecar_path = os.path.splitext(os.fspath(binary_or_path))[0] + ".json"
+        if os.path.isfile(sidecar_path):
+            with open(sidecar_path, encoding="utf-8") as fh:
+                validate_execution(json.load(fh), raw)
     if len(raw) < 4 or len(raw) % 4:
         raise ValueError("binary length is not a non-empty whole number of words")
     words = list(_struct.unpack(f">{len(raw) // 4}I", raw))
@@ -10387,6 +10402,14 @@ def _trusted_compile_metadata(metadata, binary_hash, words):
         return False
     raw = struct.pack(f">{len(words)}I", *[int(word) & 0xFFFFFFFF for word in words])
     digest = hashlib.sha256(raw).hexdigest()
+    try:
+        execution = validate_execution(metadata, raw)
+        if execution is not None and (
+                checked.get("isa_profile") != "IDX1" or
+                checked.get("execution_digest") != execution.execution_digest):
+            return False
+    except ValueError:
+        return False
     # The signed digest is the exact final serialized byte stream.  Keep this
     # check before any approval/authorization branching in save_lump().
     return (
@@ -10394,6 +10417,94 @@ def _trusted_compile_metadata(metadata, binary_hash, words):
         and checked.get("compiler_identity") == metadata.get("compiler_identity")
         and checked.get("compiler_version") == metadata.get("compiler_version")
     )
+
+
+def _attest_idx1_browser_candidate(metadata, words, execution):
+    """Reproduce compiler facts before attesting an exact browser content frame.
+
+    Browser packing/compression and destination C-list materialization are not
+    compiler authority. Code, typed layout, source and API declarations must
+    independently agree with a fresh server compile; normal Save then checks
+    destination capability authority and finalizes its own derivative.
+    """
+    from server.compile_api import run_compile
+    from server.lump_approvals import sign_compiler_record
+    source = metadata.get("original_source", metadata.get("submitted_source"))
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError("IDX1 browser candidate requires the immutable original source")
+    if len(source.encode("utf-8")) > 512 * 1024:
+        raise ValueError("IDX1 candidate source exceeds the compilation limit")
+    if metadata.get("language", "assembly") != "assembly":
+        raise ValueError("IDX1 browser candidate must be assembly")
+    compiled = run_compile({"source": source, "language": "assembly",
+                            "isa_profile": "IDX1", "tier": 2})
+    if not compiled.get("ok"):
+        raise ValueError("IDX1 compiler rejected candidate source: " +
+                         str(compiled.get("error", "unknown compile error")))
+    compiled_raw = struct.pack(f'>{len(compiled["words"])}I', *compiled["words"])
+    compiler_execution = validate_execution(compiled, compiled_raw)
+    if compiler_execution is None:
+        raise ValueError("IDX1 compiler did not produce an execution artifact")
+    compiler_layout = json.loads(compiler_execution.metadata_bytes)["layout"]
+    if json.loads(execution.metadata_bytes)["layout"] != compiler_layout:
+        raise ValueError("IDX1 candidate layout differs from fresh compiler output")
+    code_end = 1 + compiler_execution.code_words
+    if words[1:code_end] != compiled["words"][1:code_end]:
+        raise ValueError("IDX1 candidate code differs from fresh compiler output")
+    inspected = _inspect_lump_binary(execution.payload)
+    if inspected["content_frame_error"]:
+        raise ValueError("IDX1 candidate content frame: " + inspected["content_frame_error"])
+    profile = inspected["content_profile"]
+    compact = "\n".join(line for line in (
+        re.sub(r"//.*$", "", re.sub(r";.*$", "", line))
+        for line in source.split("\n")) if line.strip())
+    expected_source = {"full": source, "compact": compact, "api": None}.get(profile)
+    if profile not in ("full", "compact", "api") or inspected["source"] != expected_source:
+        raise ValueError("IDX1 candidate embedded source differs from compiler source/profile")
+    api = inspected["api_definition"]
+    if (not isinstance(api, dict) or api.get("name") != metadata.get("abstraction")
+            or api.get("language") != "assembly" or api.get("methods") != []
+            or api.get("isa_profile", "IDX1") != "IDX1"
+            or api.get("returnConvention") != {"register": "DR0", "description": "return value"}
+            or set(api) - {"name", "language", "methods", "capabilities",
+                           "returnConvention", "isa_profile"}):
+        raise ValueError("IDX1 candidate embedded API differs from compiler assembly interface")
+
+    def declarations(caps):
+        if not isinstance(caps, list):
+            raise ValueError("IDX1 candidate requires capability declarations")
+        result = []
+        for row, cap in enumerate(caps):
+            if not isinstance(cap, dict):
+                raise ValueError("IDX1 capability declaration must be an object")
+            name = cap.get("name")
+            if row == 0 and name in ("SELF", "__SELF__"):
+                name = "SELF"
+            rights = cap.get("rights")
+            if not isinstance(rights, list) or any(not isinstance(r, str) for r in rights):
+                raise ValueError("IDX1 capability rights must be strings")
+            result.append((name, sorted(set(rights)), {
+                key: cap[key] for key in ("N", "T", "token", "binary_hash",
+                                         "identity_hash", "identity_string") if key in cap
+            }))
+        return result
+
+    expected_caps = declarations(compiled["capabilities"])
+    if (inspected["cc"] != len(expected_caps)
+            or declarations(api.get("capabilities")) != expected_caps
+            or declarations(metadata.get("capabilities")) != expected_caps):
+        raise ValueError("IDX1 candidate capability declarations differ from compiler source")
+    record = sign_compiler_record({
+        "binary_hash": inspected["binary_hash"],
+        "source_hash": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+        "language": "assembly", "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1", "isa_profile": "IDX1",
+        "execution_digest": execution.execution_digest,
+        "capability_rows": compiled["capabilities"],
+    }, signing_key=_compiler_attestation_key())
+    return dict(metadata, compiler_record=record, trust_origin="trusted-home-ide",
+                compiler_identity=record["compiler_identity"],
+                compiler_version=record["compiler_version"])
 
 
 @app.route("/api/lumps/approval-intent", methods=["POST"])
@@ -11585,6 +11696,14 @@ def get_lump(token_hex):
         if not _gl_res.get("ok"):
             return jsonify({"error": _gl_res.get("error")}), 409
 
+    try:
+        _raw_execution = validate_execution(
+            _gl_approval or (_located_rows[0] if _located_rows else {}), data)
+        if _raw_execution is not None:
+            return jsonify({"error": "IDX1 raw hardware delivery is unsupported; use protected words/envelope retrieval"}), 409
+    except ValueError as exc:
+        return jsonify({"error": f"Raw delivery integrity failure: {exc}"}), 409
+
     payload = _lump_with_crc(data)
     _headers = {
         'Content-Length': str(len(payload)),
@@ -11620,6 +11739,14 @@ def get_lump_bundle():
         if os.path.isdir(lumps_dir):
             import glob as _glob
             for path in sorted(_glob.glob(os.path.join(lumps_dir, '*.lump'))):
+                try:
+                    inspected_export = _inspect_lump_binary(path)
+                    export_approval = _matching_lump_approval(
+                        lumps_dir, inspected_export["binary_hash"]) or {}
+                    if validate_execution(export_approval, inspected_export["raw_bytes"]) is not None:
+                        return jsonify({"error": "IDX1 offline/FPGA bundle export is unsupported"}), 409
+                except (OSError, ValueError) as exc:
+                    return jsonify({"error": f"Bundle integrity failure: {exc}"}), 409
                 arcname = os.path.basename(path)
                 zf.write(path, arcname)
                 n_lumps += 1
@@ -11634,6 +11761,10 @@ def get_lump_bundle():
                 indent=2)
             for token_key, lump_bytes in LAZY_LUMPS.items():
                 if len(token_key) == 8:
+                    try:
+                        validate_execution({}, lump_bytes)
+                    except ValueError as exc:
+                        return jsonify({"error": f"Bundle integrity failure: {exc}"}), 409
                     zf.writestr(f'{token_key}.lump', lump_bytes)
                     n_lumps += 1
             zf.writestr('manifest.json', inline_manifest)
@@ -11994,6 +12125,24 @@ def save_lump():
                 "error": "submitted binary does not equal the server-finalized save plan",
                 "plan_binary_mismatch": True, "committed": False,
             }), 409
+        if execution_fields(metadata) != execution_fields(_early_plan):
+            return jsonify({
+                "error": "submitted execution envelope does not equal the server-finalized save plan",
+                "plan_execution_mismatch": True, "committed": False,
+            }), 409
+        if _early_plan.get("isa_profile") == "IDX1":
+            _plan_evidence = _early_plan.get("compiler_record")
+            if not isinstance(_plan_evidence, dict):
+                return jsonify({"error": "IDX1 save plan lacks compiler evidence",
+                                "committed": False}), 409
+            if (metadata.get("compiler_record") is not None
+                    and metadata["compiler_record"] != _plan_evidence):
+                return jsonify({"error": "IDX1 compiler evidence differs from save plan",
+                                "committed": False}), 409
+            metadata = dict(metadata, compiler_record=_plan_evidence,
+                            trust_origin="trusted-home-ide",
+                            compiler_identity=_plan_evidence["compiler_identity"],
+                            compiler_version=_plan_evidence["compiler_version"])
         words = list(_planned_words)
         metadata = dict(metadata, ns_slot=_early_plan.get("ns_slot"),
                         token=_early_plan.get("token"))
@@ -12018,6 +12167,32 @@ def save_lump():
         return jsonify({"error": "Binary must contain at least a header and one code word"}), 400
     # Preserve the compiler's immutable input candidate before any generic
     # save canonicalisation (SELF/destination binding may rewrite it).
+    try:
+        _input_execution = validate_execution(
+            metadata, _struct.pack(f">{len(words)}I", *words))
+    except (ValueError, TypeError, struct.error) as exc:
+        return jsonify({"error": f"IDX1 execution metadata invalid: {exc}",
+                        "committed": False}), 400
+    if _input_execution is not None:
+        try:
+            _idx1_frame = _inspect_lump_binary(_input_execution.payload)
+            if (_idx1_frame["content_profile"] not in ("full", "compact")
+                    or not isinstance(_idx1_frame["source"], str)
+                    or not _idx1_frame["source"].strip()
+                    or _idx1_frame["content_frame_error"]):
+                raise ValueError(
+                    "IDX1 Save requires Full or Compact embedded source; "
+                    "API-only/source-free IDX1 reload is unsupported")
+        except ValueError as exc:
+            return jsonify({"error": str(exc), "committed": False}), 400
+    if (_input_execution is not None and _is_preflight
+            and not metadata.get("compiler_record")
+            and not metadata.get("trust_origin")):
+        try:
+            metadata = _attest_idx1_browser_candidate(metadata, words, _input_execution)
+        except (ValueError, TypeError, RuntimeError) as exc:
+            return jsonify({"error": f"IDX1 candidate attestation failed: {exc}",
+                            "compiler_evidence_invalid": True, "committed": False}), 403
     _trusted_input = False
     if (isinstance(metadata, dict)
             and metadata.get("trust_origin") == "trusted-home-ide"):
@@ -12822,6 +12997,15 @@ def save_lump():
     import hashlib as _hl_save
     lump_bytes   = _struct.pack(f'>{len(_sl_words)}I', *_sl_words)
     _binary_hash = _hl_save.sha256(lump_bytes).hexdigest()
+    if _input_execution is not None:
+        if not _trusted_input:
+            return jsonify({"error": "IDX1 Save requires exact trusted compiler evidence",
+                            "committed": False}), 403
+        try:
+            metadata = dict(metadata, **reframe_execution(_input_execution, lump_bytes))
+        except ValueError as exc:
+            return jsonify({"error": f"IDX1 finalization changed executable layout: {exc}",
+                            "committed": False}), 400
     # Authenticate compiler provenance immediately after final
     # canonicalisation, before destination, approval, or authorization
     # branching.  A client claiming trusted origin gets no untrusted fallback:
@@ -12844,6 +13028,8 @@ def save_lump():
             "language": _incoming_record.get("language"),
             "compiler_identity": _incoming_record.get("compiler_identity"),
             "compiler_version": _incoming_record.get("compiler_version"),
+            **{key: metadata[key] for key in ("isa_profile", "execution_digest")
+               if key in metadata},
         }
         metadata = dict(metadata)
         metadata["compiler_record"] = sign_compiler_record(
@@ -13438,6 +13624,7 @@ def save_lump():
         "filename":      lump_filename,
         "lump_version":  next_lump_version,
         "compiled_at":   _compiled_at,
+        **execution_fields(metadata),
         # Only binary locators and revision history belong in this index.
         # Intrinsics come from exact bytes, extrinsics from hash-bound approvals.
     }
@@ -13544,6 +13731,8 @@ def save_lump():
                     "language": _incoming.get("language"),
                     "compiler_identity": _incoming.get("compiler_identity"),
                     "compiler_version": _incoming.get("compiler_version"),
+                    **{key: metadata[key] for key in ("isa_profile", "execution_digest")
+                       if key in metadata},
                 }, signing_key=_compiler_attestation_key())
             _LUMP_SAVE_PLANS[plan_id] = {
                 "plan_id": plan_id,
@@ -13561,6 +13750,7 @@ def save_lump():
                 # commit endpoint accepts only these words, not a browser
                 # reconstruction that happened to share an earlier digest.
                 "final_binary": list(_sl_words),
+                **execution_fields(metadata),
                 "compiler_record": _preflight_compiler_record,
                 "ns_slot": ns_slot,
                 "new_entry": metadata.get("new_entry") is True,
@@ -13588,6 +13778,7 @@ def save_lump():
         return jsonify({
             "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
             "final_binary": list(_sl_words), "ns_slot": ns_slot,
+            **execution_fields(metadata),
             "candidate_id": _candidate_id,
             "action": _approval_action,
             "destination": lump_filename, "consequence": _plan_consequence,
@@ -13830,6 +14021,7 @@ def save_lump():
         # re-resolved through a token that a later revision may replace.
         "final_binary": list(_sl_words),
         "operation_id": _operation_id,
+        **execution_fields(metadata),
     }
     if _label_document is not None:
         _operation_response["slot_label"] = metadata["slot_label"]
@@ -13865,6 +14057,7 @@ def save_lump():
         "issue_n": _issue_n_save,
         "abstraction": abs_name, "filename": lump_filename,
         "compiled_at": _compiled_at,
+        **execution_fields(metadata),
     })
     # Compiler provenance is server-owned evidence, not approval-intent
     # metadata.  Copy it only after the user-controlled allowlist has been
@@ -14144,6 +14337,7 @@ def save_lump():
         "ns_slot":        ns_slot,
         "candidate_id":   _candidate_id,
         "final_binary":   list(_sl_words),
+        **execution_fields(metadata),
         # Seal is the server-issued artifact identity returned to promotion
         # clients; never derive it from browser metadata.
         "seal":           ((_bootstrap_identity or {}).get("bootstrap_runtime_gt")
@@ -15364,6 +15558,8 @@ def get_lump_words(token_hex):
     raw_tail_hex = ""
     try:
         inspected = _inspect_lump_binary(lump_path)
+    except IDX1Error as exc:
+        return jsonify({"error": f"IDX1 execution integrity failure: {exc}"}), 409
     except (OSError, ValueError) as exc:
         # Viewing is read-only. Return every byte that can be read even when
         # parsing or integrity validation fails; load, restore, and repair
@@ -15411,6 +15607,17 @@ def get_lump_words(token_hex):
     # Compute a fresh SHA-256 of the binary bytes so the caller can verify
     # the served content matches the hash recorded at compile time.
     _bh_live = inspected["binary_hash"]
+    try:
+        selected_execution = (archive_manifest_entry or exact_manifest_entry
+                              or namespace_selected_active_entry or {})
+        if not selected_execution:
+            selected_execution = next((
+                row for row in _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+                if isinstance(row, dict) and row.get("filename") == os.path.basename(lump_path)
+            ), {})
+        validate_execution(selected_execution, lump_raw)
+    except ValueError as exc:
+        return jsonify({"error": f"IDX1 execution integrity failure: {exc}"}), 409
     expected_binary_hash = request.args.get("binary_hash")
     if exact_filename is not None and expected_binary_hash is not None:
         if not _re_words.fullmatch(r"[0-9a-fA-F]{64}", expected_binary_hash):
@@ -15485,6 +15692,11 @@ def get_lump_words(token_hex):
         response["legacy_incompatible"] = bool(
             manifest_entry.get("archived") and not bootstrap_identity["valid"])
     if _approval_ret is not None:
+        try:
+            validate_execution(_approval_ret, lump_raw)
+        except ValueError as exc:
+            return jsonify({"error": f"IDX1 execution integrity failure: {exc}"}), 409
+        response.update(execution_fields(_approval_ret))
         for field in (
             "abstraction", "language", "ns_slot", "grants", "capability_type",
             "pet_name", "petname", "dot_name", "issue_n", "identity_hash",
@@ -16756,6 +16968,11 @@ def get_lump_version_words(token, version):
     snapshot = _validate_lump_snapshot(lump_path_v, _manifest_entry_v)
     approval = snapshot["approval"] or {}
     validation_errors = snapshot["errors"]
+    if snapshot["raw_bytes"] is not None:
+        try:
+            validate_execution(approval, snapshot["raw_bytes"])
+        except ValueError as exc:
+            return jsonify({"error": f"IDX1 execution integrity failure: {exc}"}), 409
     if snapshot["raw_bytes"] is None:
         return jsonify({
             "error": (
@@ -16799,6 +17016,7 @@ def get_lump_version_words(token, version):
         "token":         key8,
         "version":       version,
         "words":         snapshot["words"],
+        **execution_fields(approval),
         "count":         len(snapshot["words"]),
         "cw":            snapshot["cw"],
         "cc":            snapshot["cc"],
@@ -20388,6 +20606,10 @@ def api_compile():
         _compile_words = [int(word) & 0xFFFFFFFF for word in result["words"]]
         _compile_raw = struct.pack(f">{len(_compile_words)}I", *_compile_words)
         _compile_digest = hashlib.sha256(_compile_raw).hexdigest()
+        try:
+            validate_execution(result, _compile_raw)
+        except ValueError as exc:
+            return jsonify({"ok": False, "error": f"Invalid compiler IDX1 output: {exc}"}), 500
         _compile_record = {
             "schema": "church-compiler-output/v1",
             "signing_scheme": COMPILER_SIGNING_SCHEME,
@@ -20414,6 +20636,8 @@ def api_compile():
             ],
             "compiler_identity": "Trusted Home IDE compiler",
             "compiler_version": "server-compile-v1",
+            **{key: result[key] for key in ("isa_profile", "execution_digest")
+               if key in result},
         }
         _compile_record["attestation"] = hmac.new(
             attestation_key, _canonical_compiler_record(_compile_record),
@@ -20445,6 +20669,10 @@ def api_compile_attest():
         return jsonify({"error": "words must be uint32 values"}), 400
     digest = hashlib.sha256(raw).hexdigest()
     header = values[0] if values else 0
+    try:
+        validate_execution(dict(body, compiler_record=record), raw)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 403
     if not _verify_compiler_attestation(
             record, digest, values, (header >> 10) & 0x1FFF, header & 0xFF):
         return jsonify({"error": "compiler attestation does not match exact bytes"}), 403
@@ -25522,14 +25750,19 @@ def _commit_lump_history_transition(
                 while True:
                     archive_lump_name = f"{archive_stem}_v{archive_version}.lump"
                     archive_lump_dest = _destination(archive_lump_name)
+                    archive_json_dest = os.path.splitext(archive_lump_dest)[0] + ".json"
                     same_lump = os.path.abspath(archive_source) == os.path.abspath(archive_lump_dest)
                     if (archive_version not in history_versions and
-                            (not os.path.lexists(archive_lump_dest) or same_lump)):
+                            ((not os.path.lexists(archive_lump_dest)
+                              and not os.path.lexists(archive_json_dest)) or same_lump)):
                         break
                     archive_version += 1
 
                 if os.path.abspath(archive_source) != os.path.abspath(archive_lump_dest):
                     staged.append((archive_lump_dest, _stage_copy(archive_source, ".lump")))
+                    source_json = os.path.splitext(archive_source)[0] + ".json"
+                    if os.path.isfile(source_json):
+                        staged.append((archive_json_dest, _stage_copy(source_json, ".json")))
                 archive_info = {
                     "version": archive_version,
                     "lump": archive_lump_name,
@@ -25585,6 +25818,14 @@ def _commit_lump_history_transition(
                 approval_out = dict(approval)
                 if approval_out.get("binary_hash") != approval_hash:
                     raise ValueError("approval must be bound to approval_hash")
+                if binary_bytes is not None:
+                    validate_execution(approval_out, binary_bytes)
+                if approval_out.get("isa_profile") == "IDX1":
+                    sidecar = dict(approval_out, filename=binary_filename)
+                    staged.append((
+                        _destination(os.path.splitext(binary_filename)[0] + ".json"),
+                        _stage_json(sidecar),
+                    ))
                 # The endpoint derives this verified locator after all dynamic
                 # version/archive naming has settled. It is never accepted
                 # from an approval intent or client metadata.
@@ -25708,7 +25949,12 @@ def _commit_lump_history_transition(
             # A compatibility alias is installed only after the new canonical
             # pair has been staged.  It is included in the same rollback set.
             compat_dest = None
-            if compat_old_filename and compat_new_filename and compat_old_filename != compat_new_filename:
+            _idx1_history = any(
+                isinstance(row, dict) and row.get("isa_profile") == "IDX1"
+                and row.get("filename") == compat_old_filename
+                for row in locked_manifest)
+            if (compat_old_filename and compat_new_filename
+                    and compat_old_filename != compat_new_filename and not _idx1_history):
                 compat_dest = _destination(compat_old_filename)
 
             destinations = []

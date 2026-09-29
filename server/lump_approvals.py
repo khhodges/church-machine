@@ -20,6 +20,7 @@ RECORD_FIELDS = frozenset({
     "bootstrap_runtime_gt", "save_as_latest",
     "trust_origin", "compiler_identity", "compiler_version",
     "compiler_record", "integrity_record",
+    "isa_profile", "execution_envelope", "execution_digest",
 })
 INTRINSIC_FIELDS = frozenset({
     "cw", "cc", "typ", "lump_size", "source", "api_definition",
@@ -191,6 +192,13 @@ def is_trusted_compiler_record(record, *, binary=None, signing_key=None):
         if not isinstance(binary, (bytes, bytearray)):
             return False
         if hashlib.sha256(bytes(binary)).hexdigest() != record.get("binary_hash"):
+            return False
+        from server.idx1_profile import validate_execution
+        try:
+            execution = validate_execution(record, bytes(binary))
+            if execution is not None and inner.get("isa_profile") != "IDX1":
+                return False
+        except ValueError:
             return False
     if signing_key is None:
         return False

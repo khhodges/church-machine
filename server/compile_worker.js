@@ -151,9 +151,27 @@ if (isMainThread) {
     }
 
     let compileResult;
+    let executionLayout = null;
     try {
         const compiler = new CLOOMCCompiler();
-        compileResult  = dispatch(compiler, language, source);
+        const IDX1IDE = require(path.join(SIM_DIR, 'idx1-ide.js'));
+        if (payload.isa_profile && !['LEGACY', 'IDX1'].includes(payload.isa_profile))
+            throw new Error('Unsupported ISA profile');
+        if (payload.isa_profile === 'IDX1' ||
+                (language === 'assembly' && IDX1IDE.requiresProfile(source))) {
+            if (language !== 'assembly') throw new Error('IDX1 currently requires assembly');
+            const assembled = IDX1IDE.compile(new global.ChurchAssembler(), source);
+            executionLayout = assembled.layout;
+            compileResult = {
+                ...assembled, language, methods: [],
+                abstractionName: ((source.match(/^\s*;\s*@abstraction\s+(\S+)/m) || [])[1] || 'LocalIDX1'),
+                capabilities: [{ name: '__SELF__', rights: ['E'],
+                    compiler_owned_self: true, symbolic_self: true },
+                    ...(assembled.capabilities || []).filter(c => !['SELF', '__SELF__'].includes(c.name))],
+            };
+        } else {
+            compileResult = dispatch(compiler, language, source);
+        }
     } catch (err) {
         parentPort.postMessage({ ok: false, language, error: `Compiler threw an exception: ${err.message}` });
         return;
@@ -226,6 +244,16 @@ if (isMainThread) {
     let lumpResult;
     try {
         lumpResult = buildLump(compileResult, lumpOpts);
+        if (executionLayout) {
+            const cw = compileResult.words.length, cc = compileResult.capabilities.length;
+            if (cw > 0x1FFF || cc > 255) throw new Error('IDX1 LUMP geometry exceeds header limits');
+            let size = lumpResult.words.length;
+            while (size < 1 + cw + cc) size *= 2;
+            const words = new Array(size).fill(0);
+            words[0] = ((31 << 27) | ((Math.log2(size) - 6) << 23) | (cw << 10) | cc) >>> 0;
+            words.splice(1, cw, ...compileResult.words);
+            lumpResult = { words };
+        }
     } catch (err) {
         parentPort.postMessage({ ok: false, language, error: `LUMP packing failed: ${err.message}` });
         return;
@@ -242,6 +270,10 @@ if (isMainThread) {
         const api = buildApiDefinition(compileResult, words);
         words = embedSelfDefinition(words, api, source, tier);
     } catch (err) {
+        if (executionLayout) {
+            parentPort.postMessage({ ok: false, language, error: `IDX1 source embedding failed: ${err.message}` });
+            return;
+        }
         warnings.push({ message: `self-definition not embedded: ${err.message}` });
     }
 
@@ -254,6 +286,22 @@ if (isMainThread) {
     const binary_hash = crypto.createHash('sha256').update(buf).digest('hex');
     const source_hash = crypto.createHash('sha256').update(
         Buffer.from(source, 'utf8')).digest('hex');
+    let execution = {};
+    if (executionLayout) {
+        const meta = Buffer.from(JSON.stringify({
+            schema: 'cm.idx1.execution/1', isaProfile: 'IDX1',
+            requiredFeatures: ['idx1.boundaries.v1', 'idx1.compact20.v1', 'idx1.dispatch.v1'],
+            payloadSha256: binary_hash, layout: executionLayout,
+        }));
+        const framing = Buffer.alloc(24);
+        framing.write('CMIDX1\r\n');
+        framing.writeUInt32BE(1, 8);
+        framing.writeUInt32BE(meta.length, 12);
+        framing.writeUInt32BE(buf.length, 16);
+        const envelope = Buffer.concat([framing, meta, Buffer.alloc((-meta.length) & 3), buf]);
+        execution = { isa_profile: 'IDX1', execution_envelope: envelope.toString('base64'),
+            execution_digest: crypto.createHash('sha256').update(envelope).digest('hex') };
+    }
     // This record is the compiler's evidence for locally-created output.  It
     // is deliberately bound to the exact serialized bytes; consumers may
     // recompute binary_hash, but must never trust a client-supplied hash alone.
@@ -295,6 +343,7 @@ if (isMainThread) {
         capabilities,
         words:           Array.from(words),
         lump_binary,
+        ...execution,
         compiler_record,
         portable_binding: portableBinding,
         portable_status: portableBinding ? 'portable-pinned' : 'legacy-unpinned',

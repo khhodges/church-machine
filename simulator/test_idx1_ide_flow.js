@@ -87,8 +87,7 @@ async function main() {
     assert(Object.isFrozen(candidate.executionLayout.extents[0]));
     assert.equal(candidate.capabilities.length, 3);
     assert(candidate.executionLayout.instructionStarts.includes(3));
-    assert.equal(window.IDEActionState.eligibility('save').ok, false);
-    assert.match(window.IDEActionState.eligibility('save').reason, /simulator-only/);
+    assert.equal(window.IDEActionState.eligibility('save').ok, true);
     assert.equal(window.IDEActionState.eligibility('export').ok, false);
     assert(window.IDEActions.installCandidate().ok);
     assert.equal(context._pendingSimLoadSnapshot.isaProfile, 'IDX1');
@@ -107,6 +106,6 @@ async function main() {
     assert.equal(window.IDEActionState.get().installed.isaProfile, 'IDX1');
     assert(IDE.requiresProfile('CALL CR6[DR2 + 4], DR4 - 1'));
     assert(IDE.compile(new Assembler(), 'CALL CR6[DR2], DR3').errors.some(e => /not yet supported/.test(e.message)));
-    console.log('IDX1 normal IDE compile/candidate/load/admission/runtime/Save-block flow passed');
+    console.log('IDX1 normal IDE compile/candidate/load/admission/runtime/Save eligibility flow passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -49,3 +49,14 @@ save candidate on successful reload.  Bind `save_as_latest` into the
 server-issued save plan, one-time approval intent, and atomic commit; never
 remove `editor_base`, bypass binary/capability/Namespace/permission checks, or
 silently reload mutable editor text.
+
+Save integration fixtures must include unnamed browser-compiled source and an
+explicit New Entry destination, not just already-attested server compilations.
+
+**Why:** Server-compile fixtures skipped two real browser requirements:
+independently attesting an unsigned immutable candidate and reconciling the
+reviewed destination name with the embedded API without changing source/code.
+
+**How to apply:** Exercise the actual format and confirmation pipeline, then
+round-trip the committed artifact. Test fast planning too: delayed progress
+updates must never disable an approval control after review becomes ready.
