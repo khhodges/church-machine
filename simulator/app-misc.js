@@ -1187,7 +1187,20 @@ function initTabOverflow(container) {
         e.stopPropagation();
     });
 
+    var updating = false;
     function updateOverflow() {
+        // Our own tab/hamburger class changes are observed below. Keep the
+        // guard set until their MutationObserver microtask has been delivered;
+        // resetting it in a timer callback immediately causes a 20ms loop.
+        updating = true;
+        try {
+            renderOverflow();
+        } finally {
+            queueMicrotask(function() { updating = false; });
+        }
+    }
+
+    function renderOverflow() {
         var tabs = Array.from(container.querySelectorAll('.math-mode-tab, .sidebar-tab'));
         tabs.forEach(function(t) { t.classList.remove('overflow-hidden'); });
         hamburger.classList.remove('visible', 'has-active');
@@ -1265,15 +1278,13 @@ function initTabOverflow(container) {
     });
     observer.observe(container);
 
-    var updating = false;
     var mutObserver = new MutationObserver(function(mutations) {
         if (updating) return;
         var dominated = mutations.some(function(m) {
             return m.target.classList.contains('tab-overflow-btn') || m.target.classList.contains('tab-overflow-dropdown');
         });
         if (dominated) return;
-        updating = true;
-        setTimeout(function() { updateOverflow(); updating = false; }, 20);
+        setTimeout(updateOverflow, 20);
     });
     mutObserver.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
 
