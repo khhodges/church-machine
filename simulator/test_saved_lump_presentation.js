@@ -20,10 +20,13 @@ function extractFunction(source, name) {
 }
 
 const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+const memorySource = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
 const dom = new JSDOM(`<!doctype html><body><div id="editor">
   <div class="editor-layout">
+    <span id="editorCodeName"></span>
     <textarea id="asmEditor">method Run() { return(1) }</textarea>
     <section id="savedLumpDisassemblyPanel" style="display:none">
+      <span id="disassemblyPresentationStatus"></span>
       <pre id="savedLumpDisassembly"></pre>
       <details id="savedLumpBuildDetails" open></details>
     </section>
@@ -57,6 +60,10 @@ const context = vm.createContext({
     assembler: { disassemble: word => 'WORD_' + (word >>> 0).toString(16) },
     _renderSavedLumpIdentityPanel() {},
     _syncSavedLumpIdentityVisibility() {},
+    _updateEditorCodeName(name) {
+        dom.window._editorCodeNameValue = name;
+        dom.window.document.getElementById('editorCodeName').textContent = name;
+    },
 });
 dom.window._editorNavigationEpoch = 7;
 vm.runInContext([
@@ -72,6 +79,7 @@ vm.runInContext([
     extractFunction(source, '_showCanonicalSavedLumpBesideSource'),
     extractFunction(source, '_fetchAndPresentCommittedLump'),
     extractFunction(source, '_restoreSavedLumpBinaryPresentation'),
+    extractFunction(memorySource, '_showBootArtifactInspectionStatus'),
 ].join('\n'), context);
 
 // Private fixture matching the relevant entry bytes, not a live artifact.
@@ -217,6 +225,64 @@ assert(source.includes('trimmed.slice(_dispatchLines.length)'),
     assert.doesNotMatch(dom.window.document.getElementById('savedLumpDisassembly').textContent,
         /UNAVAILABLE/);
     assert.equal(dom.window._editorSavedBinaryReceipt.filename, receipt.filename);
+    // Restore the pet name from the exact response, not a token or live program.
+    dom.window._editorOpenLumpToken = 'shared-token';
+    context._updateEditorCodeName('shared-token');
+    fetchResult.json = async () => ({words: canonicalWords,
+        filename: receipt.filename, binary_hash: receipt.binary_hash,
+        abstraction: 'CapabilityTest', lump_version: 94});
+    assert.equal(await context._restoreSavedLumpBinaryPresentation(
+        'shared-token', receipt, dom.window.document.getElementById('asmEditor')), true);
+    assert.equal(dom.window.document.getElementById('editorCodeName').textContent, 'CapabilityTest');
+    assert.equal(dom.window._editorCodeNameValue, 'CapabilityTest');
+    assert.equal(dom.window._editorOpenLumpMeta.lump_version, 94);
+    assert.equal(dom.window.document.getElementById('asmEditor').value, restoredDraft);
+    // A rejected exact identity cannot rename the document.
+    fetchResult.json = async () => ({words: canonicalWords,
+        filename: 'wrong.lump', binary_hash: receipt.binary_hash, abstraction: 'Wrong'});
+    assert.equal(await context._restoreSavedLumpBinaryPresentation(
+        'shared-token', receipt, dom.window.document.getElementById('asmEditor')), false);
+    assert.equal(dom.window._editorCodeNameValue, 'CapabilityTest');
+    // Navigation while the request is pending cannot rename the new document.
+    fetchResult.json = async () => {
+        dom.window._editorNavigationEpoch++;
+        context._updateEditorCodeName('Other.Program');
+        return {words: canonicalWords, filename: receipt.filename,
+            binary_hash: receipt.binary_hash, abstraction: 'Late.Name'};
+    };
+    assert.equal(await context._restoreSavedLumpBinaryPresentation(
+        'shared-token', receipt, dom.window.document.getElementById('asmEditor')), false);
+    assert.equal(dom.window._editorCodeNameValue, 'Other.Program');
+    fetchResult.json = async () => ({words: canonicalWords,
+        filename: receipt.filename, binary_hash: receipt.binary_hash});
+    // A stale boot-image fetch is independent of the editor-owned SelfTest
+    // receipt: retain the draft and inspect that exact saved response.
+    const selfTestReceipt = Object.assign({}, receipt, { abstraction: 'SelfTest' });
+    dom.window._editorOpenLumpToken = 'shared-token';
+    dom.window._bootImageInspectionWarning = 'Boot image inputs changed after preparation';
+    assert.equal(await context._restoreSavedLumpBinaryPresentation(
+        'shared-token', selfTestReceipt, dom.window.document.getElementById('asmEditor')), true);
+    assert.equal(dom.window.document.getElementById('asmEditor').value, restoredDraft);
+    assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+        /SAVED BINARY — exact canonical server response/);
+    assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+        /Abstraction: SelfTest/);
+    assert.match(dom.window.document.getElementById('disassemblyPresentationStatus').textContent,
+        /Viewing: saved SelfTest.*shared-token.*not a live execution trace/);
+    const status = dom.window.document.getElementById('disassemblyPresentationStatus');
+    assert.match(status.textContent, /Running \/ loaded identity: unknown/);
+    assert.doesNotMatch(status.textContent, /stale\/rejected|not the executing image/);
+    dom.window._simulatorBootImageStale = true;
+    dom.window.ExecutionIdentity = {get: () => ({
+        token: '12345678', abstraction: 'Synthetic', liveMemoryKnown: true, runStatus: 'ready'
+    })};
+    context._showBootArtifactInspectionStatus();
+    assert.match(status.textContent, /Synthetic \(12345678\); state: ready/);
+    assert.match(status.textContent, /Simulator testing remains available/);
+    dom.window.ExecutionIdentity = {get: () => ({liveMemoryKnown: false, token: '12345678'})};
+    context._showBootArtifactInspectionStatus();
+    assert.match(status.textContent, /Running \/ loaded identity: unknown/);
+    assert.match(fetchedUrl, /exact_filename=saved\.lump&binary_hash=/);
     const runSource = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
     assert(extractFunction(runSource, 'loadEditorState')
         .includes('window._restoreSavedLumpBinaryPresentation('),

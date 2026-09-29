@@ -154,6 +154,48 @@ check(!!cap && cap.words === 1, 'Namespace receives one single-word M capability
 check(device.writeMBitWord(deviceSim, cap, 0xA55A, namespace).ok, 'exact Namespace M capability works');
 check(deviceSim.cr.every((cr, n) => cr.m === ((0xA55A >>> n) & 1)),
     'low 16 bits map directly to CR0.M through CR15.M');
+
+// A NULL decode does not erase the isolated register's stored words or hide M
+// from the register display.  It also must not turn R0's payload into authority.
+{
+    const nullSim = machine();
+    const rawNull = {
+        word0: 0x80001234,
+        word1: 0x89ABCDEF,
+        word2: 0x24613579,
+        word3: 0xDEADBEEF,
+        m: 0,
+    };
+    nullSim.cr[13] = { ...rawNull };
+    check(device.writeMBitWord(nullSim, cap, 0x2000, namespace).ok,
+        'M_BIT_DEV 0x2000 arms NULL CR13');
+    const armed = nullSim.getFormattedCR(13);
+    check(armed.isNull && armed.validationStatus === 'null' && armed.mBit === 1,
+        'NULL CR13 display exposes its armed M bit while retaining NULL decode');
+    check(armed.word0_gt === '80001234' &&
+          armed.word1_location === rawNull.word1 &&
+          armed.word2_limit_raw === rawNull.word2 &&
+          armed.word3_seals_raw === rawNull.word3,
+        'NULL CR13 display exposes its retained raw words');
+    check(armed.nsSlot === null && armed.perms === '-------',
+        'NULL CR13 payload grants no authority or Namespace slot');
+
+    nullSim._execLoad = d => {
+        nullSim.cr[d.crDst] = { ...rawNull, m: 1 };
+        nullSim.pc++;
+        return { pc: nullSim.pc - 1, instr: d, desc: 'load NULL row' };
+    };
+    check(!!nullSim._execSwitch({ crDst: 13, crSrc: 1, imm: 0 }),
+        'armed NULL CR13 authorizes a successful SWITCH');
+    const consumed = nullSim.getFormattedCR(13);
+    check(consumed.mBit === 0, 'successful SWITCH consumes displayed NULL CR13.M');
+    check(consumed.isNull && consumed.validationStatus === 'null' &&
+          consumed.word1_location === rawNull.word1 &&
+          consumed.word2_limit_raw === rawNull.word2 &&
+          consumed.word3_seals_raw === rawNull.word3,
+        'post-SWITCH NULL CR13 retains visible raw words without becoming valid');
+}
+
 for (const [candidate, value, owner] of [
     [{ ...cap }, 0, namespace],
     [cap, 0, { name: 'ordinary' }],

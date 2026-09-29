@@ -1,6 +1,9 @@
 var _crDetailHighlightPC = null;
 
 function _canonicalEditorTokenForSlot(nsIdx) {
+    // NS[0] is Namespace data describing Boot.NS, not a saved executable
+    // LUMP.  Its code-facing navigation is the hardwired ROM inspector below.
+    if (Number(nsIdx) === 0) return null;
     const savedRows = window._nsState && Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
     const saved = savedRows.find(function(row) {
@@ -21,6 +24,10 @@ window._canonicalEditorTokenForSlot = _canonicalEditorTokenForSlot;
 async function _openSimulatorInstructionSource(nsIdx, instrIdx) {
     if (!sim || !Number.isInteger(nsIdx) || !Number.isInteger(instrIdx) ||
             typeof _canonicalEditorTokenForSlot !== 'function') return false;
+    if (nsIdx === 0) {
+        _showBootROMInspector();
+        return true;
+    }
     const token = _canonicalEditorTokenForSlot(nsIdx);
     if (!token) return false;
     if (typeof _traceOpenExecutedSource === 'function') {
@@ -110,6 +117,102 @@ function _nsRenderAssignedLumpLabel(label, result) {
         '">\u26a0 older saved revision</span>';
 }
 window._nsRenderAssignedLumpLabel = _nsRenderAssignedLumpLabel;
+
+function _nsExactSavedVersionIdentity(assigned) {
+    if (!assigned || !Number.isInteger(assigned.slot) ||
+            !/^[0-9a-f]{8}$/i.test(String(assigned.token || '')) ||
+            !assigned.filename ||
+            !/^[0-9a-f]{64}$/i.test(String(assigned.binary_hash || '')) ||
+            !Number.isInteger(assigned.lump_version) ||
+            assigned.lump_version < 0) return null;
+    return {
+        slot: assigned.slot,
+        token: assigned.token,
+        filename: assigned.filename,
+        binary_hash: assigned.binary_hash,
+        lump_version: assigned.lump_version,
+        abstraction: assigned.name || assigned.abstraction || null,
+    };
+}
+window._nsExactSavedVersionIdentity = _nsExactSavedVersionIdentity;
+
+function _nsOpenSavedVersion(slot) {
+    // Slot zero has no ordinary saved-LUMP version.  Some legacy Namespace
+    // state contains token 00000000/version metadata; never turn that into a
+    // binary lookup or present it as artifact identity.
+    if (Number(slot) === 0) {
+        _showBootROMInspector();
+        return true;
+    }
+    const rows = window._nsState && Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions : [];
+    const assigned = rows.find(function(row) {
+        return row && Number(row.slot) === Number(slot);
+    });
+    const identity = _nsExactSavedVersionIdentity(assigned);
+    if (!identity || typeof window._openSavedLumpVersionDetails !== 'function') {
+        return false;
+    }
+    // This existing read-only navigation validates filename + binary hash and
+    // opens this exact committed revision; it never follows the token to latest.
+    window._openSavedLumpVersionDetails(identity);
+    return true;
+}
+window._nsOpenSavedVersion = _nsOpenSavedVersion;
+
+function _nsRenderSavedVersionCell(assigned, freshness, slot) {
+    const renderedSlot = Number.isInteger(Number(slot))
+        ? Number(slot) : (assigned ? Number(assigned.slot) : null);
+    if (renderedSlot === 0) {
+        return '<td class="ns-saved-version-cell ns-boot-rom-version" ' +
+            'style="color:#c89b3c;font-size:0.72rem;" ' +
+            'title="Hardwired boot ROM; not a saved LUMP version">' +
+            '<a class="ns-saved-version-link" href="#" style="color:inherit;" ' +
+            'onclick="event.preventDefault();event.stopPropagation();' +
+            '_showBootROMInspector()" aria-label="Inspect hardwired boot ROM">ROM</a></td>';
+    }
+    // lump_version on the committed Namespace row is the exact saved binding.
+    // Namespace W1 sequence numbers, live slots, tokens, and issue_n are not
+    // saved-version evidence and must not be used as fallbacks here.
+    const savedVersion = assigned && assigned.lump_version;
+    const hasSavedVersion = (typeof savedVersion === 'number' &&
+        Number.isInteger(savedVersion) && savedVersion >= 0);
+    if (!hasSavedVersion) {
+        return '<td class="ns-saved-version-cell ns-saved-version-unavailable" ' +
+            'style="color:#777;font-size:0.72rem;" title="Exact saved version is unavailable">' +
+            'NA</td>';
+    }
+
+    const selected = freshness && freshness.selected || {};
+    const latest = freshness && freshness.latest || {};
+    // Red means one narrowly-proven fact: the exact committed saved version is
+    // different from the latest eligible saved revision selected by the
+    // server freshness helper. Missing or contradictory metadata stays neutral.
+    const isDifferent = freshness && freshness.status === 'stale' &&
+        selected.version !== null && selected.version !== undefined &&
+        latest.version !== null && latest.version !== undefined &&
+        String(selected.version) === String(savedVersion) &&
+        String(latest.version) !== String(savedVersion);
+    const latestText = isDifferent ? 'v' + String(latest.version) : '';
+    const title = isDifferent
+        ? 'Committed saved version v' + String(savedVersion) +
+            ' differs from latest eligible saved revision ' + latestText
+        : 'Committed saved version v' + String(savedVersion);
+    const exactIdentity = _nsExactSavedVersionIdentity(assigned);
+    const versionText = 'v' + _escHtml(String(savedVersion));
+    const renderedVersion = exactIdentity
+        ? '<a class="ns-saved-version-link" href="#" style="color:inherit;" ' +
+            'onclick="event.preventDefault();event.stopPropagation();' +
+            '_nsOpenSavedVersion(' + String(exactIdentity.slot) + ')" ' +
+            'aria-label="Open exact committed saved version v' +
+            _escHtml(String(savedVersion)) + '">' + versionText + '</a>'
+        : versionText;
+    return '<td class="ns-saved-version-cell' +
+        (isDifferent ? ' ns-saved-version-stale' : '') + '" style="' +
+        (isDifferent ? 'color:#f87171;font-weight:600;' : 'color:#aaa;') +
+        '" title="' + _escHtml(title) + '">' + renderedVersion + '</td>';
+}
+window._nsRenderSavedVersionCell = _nsRenderSavedVersionCell;
 
 // Pending Prepare/Run pins are browser intent only until the atomic server CAS
 // succeeds. They never mutate the loaded simulator image or committed state.
@@ -1291,7 +1394,7 @@ function updateCRDetail() {
         let codeHtml = '<table class="cr-table code-view-table"><thead><tr>';
         codeHtml += '<th>Addr</th><th>Hex</th><th>Instruction</th>';
         if (_brArrows.hasBranches) codeHtml += '<th class="br-arrow-hdr"></th>';
-        codeHtml += '<th class="code-decompiled-hdr">Decompiled</th>';
+        codeHtml += '<th class="code-decompiled-hdr" title="Symbolic meaning, not recorded execution">Static meaning</th>';
         codeHtml += '</tr></thead><tbody>';
 
         // Show boot preamble rows only while boot is in progress or has faulted.
@@ -3513,6 +3616,8 @@ function _loadBootConfig() {
 function _reportBootImageRejection(message, resultEl) {
     const detail = message || (sim && sim.lastBootImageError) ||
         'Saved boot image was rejected. Regenerate it for the current memory configuration.';
+    window._bootImageInspectionWarning = detail;
+    _showBootArtifactInspectionStatus();
     if (window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
         window.BootEntryUI.noteImagePreparation({
             status: 'stale-image',
@@ -3526,6 +3631,31 @@ function _reportBootImageRejection(message, resultEl) {
     if (con && !con.textContent.includes(detail)) {
         con.textContent += (con.textContent ? '\n' : '') + '[BOOTIMG] ' + detail;
     }
+}
+
+// Inspection is not preparation: this label follows the selected immutable
+// artifact even when /api/boot-image/binary refuses to serve an executable.
+function _showBootArtifactInspectionStatus() {
+    if (!window._editorOpenedBootInspectionToken) return;
+    const status = document.getElementById('disassemblyPresentationStatus');
+    if (!status) return;
+    const receipt = window._editorSavedBinaryReceipt;
+    const identity = window.ExecutionIdentity && window.ExecutionIdentity.get();
+    const known = identity && identity.liveMemoryKnown && identity.token;
+    status.textContent = 'Viewing: saved ' +
+        (receipt && receipt.abstraction ? receipt.abstraction + ' ' : '') +
+        '(' + window._editorOpenedBootInspectionToken + ') — not a live execution trace.\n' +
+        'Running / loaded identity: ' + (known
+            ? (identity.dotName || identity.abstraction || 'artifact') + ' (' +
+                identity.token + '); state: ' + identity.runStatus
+            : 'unknown — no confirmed loaded-artifact identity available.') +
+        (window._editorOpenedBootInspectionKind === 'restored' &&
+                !window._editorRestoredBinaryReceiptVerified
+            ? '\nViewing identity: original selection has no exact filename/digest receipt; unverified.'
+            : '') +
+        (window._simulatorBootImageStale
+            ? '\nBoot inputs changed since image preparation. Simulator testing remains available.'
+            : '');
 }
 
 function _setActiveBootConfig(config, serverInvalidated, invalidatedImageWords) {
@@ -3559,9 +3689,12 @@ window._setActiveBootConfig = _setActiveBootConfig;
 // Task #217 — fetch the saved boot-image.bin (if any) without triggering
 // a 404 console error noise. Returns ArrayBuffer or null.
 function _probeBootImage() {
-    return fetch('/api/boot-image/binary', { cache: 'no-store' })
+    return fetch('/api/boot-image/binary?simulator=1', { cache: 'no-store' })
         .then(async r => {
-            if (r.ok) return r.arrayBuffer();
+            if (r.ok) {
+                window._simulatorBootImageStale = r.headers && r.headers.get('X-Simulator-Image-Stale') === 'true';
+                return r.arrayBuffer();
+            }
             let detail = '';
             try {
                 const body = await r.json();
@@ -3580,7 +3713,7 @@ function _probeBootImage() {
 async function _refreshCommittedBootImageCache() {
     let response;
     try {
-        response = await fetch('/api/boot-image/binary', { cache: 'no-store' });
+        response = await fetch('/api/boot-image/binary?simulator=1', { cache: 'no-store' });
     } catch (error) {
         throw new Error('could not fetch the committed boot image: ' +
             (error && error.message ? error.message : String(error)));
@@ -3599,6 +3732,8 @@ async function _refreshCommittedBootImageCache() {
     }
     window.bootImage = bytes;
     window.bootImageAvailable = true;
+    window._simulatorBootImageStale = response.headers &&
+        response.headers.get('X-Simulator-Image-Stale') === 'true';
     return bytes;
 }
 window._refreshCommittedBootImageCache = _refreshCommittedBootImageCache;
@@ -3623,6 +3758,10 @@ function _maybeApplyBootImage() {
         try {
             if (sim.loadBootImage(window.bootImage) === true) {
                 _applyBootEntryToSim(); _evictBootImgPatches();
+                if (window._simulatorBootImageStale) {
+                    const con = document.getElementById('editorConsole');
+                    if (con) con.textContent += '\n[BOOTIMG] Simulator is using existing committed image bytes; newer boot inputs differ. No image was regenerated.';
+                }
             } else {
                 _reportBootImageRejection(sim.lastBootImageError);
                 window.bootImage = null;
@@ -3883,7 +4022,7 @@ function updateNamespace() {
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
     html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save preserves the submitted layout. If a missing image must be regenerated, locations and limits are recalculated from build settings and LUMP sizes, and descriptor seals are recomputed. This does not select a different artifact revision or boot target. The rebuilt image takes effect on reset; live execution is not reset by saving.</div>';
-    html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Install a LUMP from the repository into the next free NS slot">+ Add LUMP</button>`;
+    html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
     // contents, or credential. It is a safe operational view only.
@@ -3904,7 +4043,7 @@ function updateNamespace() {
         }
     } catch (_) { /* Namespace rendering must not depend on Bank availability. */ }
     html += '<table class="ns-table"><thead><tr>';
-    html += '<th>Idx</th><th class="ns-label-col">Label</th>';
+    html += '<th>Idx</th><th class="ns-saved-version-col">v#</th><th class="ns-label-col">Label</th>';
     html += '<th>W0: Location</th>';
     html += '<th>W1: Type</th><th>W1: F</th><th>W1: G</th><th>W1: Limit</th>';
     html += '<th>W1: Seq</th><th>W2: Integrity32</th>';
@@ -4093,7 +4232,9 @@ function updateNamespace() {
             slotRules,
             step1: localCfg.step1 || baseCfg.step1,
             step2: { lumps: step2Rows },
-            step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 }
+            step3: localCfg.step3 || baseCfg.step3 || { emptySlotCount: 0 },
+            slotLabels: Object.assign({}, baseCfg.slotLabels || {},
+                localCfg.slotLabels || {})
         };
         if (!cfg.step1) {
             throw new Error('The default build configuration is unavailable.');
@@ -4171,9 +4312,20 @@ function updateNamespace() {
     for (let i = 0; i < _nsSnapshot.displayCount; i++) {
         const _snapshotRow = _nsSnapshot.slots[i];
         const e = _snapshotRow.entry;
+        const _assignedRows = window._nsState &&
+            Array.isArray(window._nsState.abstractions)
+            ? window._nsState.abstractions : [];
+        const _assignedRow = _assignedRows.find(function(row) {
+            return row && Number(row.slot) === Number(i);
+        }) || null;
+        const _assignedFreshness = _nsAssignedLumpFreshness(
+            i, _assignedRow, window._nsState);
+        const _savedVersionCell = _nsRenderSavedVersionCell(
+            _assignedRow, _assignedFreshness, i);
         if (!e) {
             html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.45;">`;
             html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
+            html += _savedVersionCell;
             const _gapLabel = (sim.nsLabels && sim.nsLabels[i] && sim.nsLabels[i] !== '(free)' && sim.nsLabels[i] !== '(reserved)') ? sim.nsLabels[i] : '';
             if (_snapshotRow.classification === 'garbage') {
                 html += `<td colspan="8" style="color:#875f5f;font-style:italic;font-size:0.8rem;">(cleared; generation ${_snapshotRow.clearedGeneration} retained for revocation)</td>`;
@@ -4191,8 +4343,9 @@ function updateNamespace() {
         if (privateBankSlot) {
             html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.78;">`;
             html += `<td class="ns-idx-cell"><span style="color:#8f7ac8;">◈</span></td>`;
+            html += _savedVersionCell;
             html += `<td class="ns-label ns-label-clickable" style="color:#c4a7ff;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open Bank private custody">Bank private custody</td>`;
-            html += `<td colspan="6" style="color:#777;font-size:0.78rem;">Lockbox ${privateBankSlot.lockboxId} — protected backing record</td>`;
+            html += `<td colspan="7" style="color:#777;font-size:0.78rem;">Lockbox ${privateBankSlot.lockboxId} — protected backing record</td>`;
             html += `<td class="ns-entry-actions"></td></tr>`;
             continue;
         }
@@ -4219,18 +4372,28 @@ function updateNamespace() {
         const _clearBtn = (i >= 2 && i !== bootEntrySlot)
             ? `<button class="btn btn-xs" onclick="event.stopPropagation();_nsTableClear(${i})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;" title="Clear slot — bumps the GT cycle count to revoke all existing tokens for this slot">Clear</button>`
             : '';
+        const _pendingBinding = !symbolic && i !== bootEntrySlot &&
+            window._nsExplicitArtifactBindings &&
+            window._nsExplicitArtifactBindings[String(i)];
+        const _keepDesignBtn = _pendingBinding &&
+                _pendingBinding.name === e.label &&
+                Number(_pendingBinding.seq) === ver
+            ? `<button class="btn btn-xs" onclick="event.stopPropagation();_nsKeepPendingAsPlacement(${i})" style="background:#3b2910;color:#f0a040;border:1px solid #f0a04066;margin-right:4px;font-size:0.65rem;padding:1px 5px;" title="Keep this unsaved artifact selection and slot, but revoke executable bytes and save a non-executable design placement">Keep as design</button>`
+            : '';
         html += `<tr id="ns-row-${i}" class="ns-row" data-ns-slot="${i}" style="${rowOpacity}">`;
-        html += `<td class="ns-idx-cell" style="white-space:nowrap;">${_clearBtn}<span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
-        const _assignedRows = window._nsState &&
-            Array.isArray(window._nsState.abstractions)
-            ? window._nsState.abstractions : [];
-        const _assignedRow = _assignedRows.find(function(row) {
-            return row && Number(row.slot) === Number(i);
-        }) || null;
-        const _assignedFreshness = _nsAssignedLumpFreshness(
-            i, _assignedRow, window._nsState);
+        html += `<td class="ns-idx-cell" style="white-space:nowrap;">${_keepDesignBtn}${_clearBtn}<span class="ns-boot-btn${isBootNS ? ' boot-entry-active' : ''}" onclick="event.stopPropagation();setBootEntrySlot(${i})" title="${isBootNS ? 'Current boot entry' : 'Set as boot entry'}">${isBootNS ? '\u26a1' : i}</span></td>`;
+        html += _savedVersionCell;
         let nsLabelInner = _nsRenderAssignedLumpLabel(e.label || '-', _assignedFreshness);
-        if (symbolic) nsLabelInner += ' <span data-testid="ns-symbolic-badge" style="color:#f0a040;font-size:0.68rem;border:1px solid #f0a04066;border-radius:8px;padding:1px 5px;text-decoration:none;" title="This Namespace binding has no installed implementation">symbolic · code missing</span>';
+        if (symbolic) {
+            const state = symbolic.selection && symbolic.selection.status;
+            const badge = state === 'invalid' ? 'invalid LUMP · non-executable'
+                : state === 'missing' ? 'missing abstraction · non-executable'
+                : state === 'unresolved' ? 'design placement · non-executable'
+                : 'symbolic · code missing';
+            const safe = s => String(s || '').replace(/&/g,'&amp;')
+                .replace(/</g,'&lt;').replace(/"/g,'&quot;');
+            nsLabelInner += ` <span data-testid="ns-symbolic-badge" style="color:#f0a040;font-size:0.68rem;border:1px solid #f0a04066;border-radius:8px;padding:1px 5px;text-decoration:none;" title="${safe(symbolic.selection && symbolic.selection.diagnostic || 'No installed implementation')}">${badge}</span>`;
+        }
         {
             const _reg = (abstractionRegistry && typeof abstractionRegistry.getAbstraction === 'function')
                 ? abstractionRegistry
@@ -4294,7 +4457,7 @@ function updateNamespace() {
                                 _hwCapRe.test(e.label || '') ||
                                 _residentIO;
             if (symbolic) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">implementation missing</span>${_identityBtn}${_pinControl}</td>`;
+                html += `<td class="ns-entry-actions"><span style="${warmStyle}">non-executable · click name for validation</span></td>`;
             } else if (codeNotResident) {
                 html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
             } else {
@@ -4367,6 +4530,10 @@ window._nsAddCurrentWords        = null;   // cached words[] from per-selection 
 window._nsAddCurrentToken        = null;   // token these cached words belong to
 window._nsAddCurrentInspection = null; // immutable-binary inspection for selected LUMP
 window._nsAddCurrentCatalogIndex = null; // exact picker record, including duplicate-token variants
+window._nsAddSavedDeclaration = null; // exact hash-bound saved c-list declaration
+window._nsAddExecutableReceipt = null; // exact /words provenance, never a picker hint
+window._nsAddInspectionError = null;
+window._nsAddInspectionPending = false;
 window._nsExplicitArtifactBindings = window._nsExplicitArtifactBindings || {};
 
 // Persistent token-keyed cache for ns_slot_policy / ns_slot choices made by the
@@ -4441,6 +4608,24 @@ function _nsMatchingApproval(wordsPayload, listedApproval, binaryHash) {
     return approvedHash === binaryHash && /^[0-9a-f]{64}$/.test(approvedHash)
         ? record : null;
 }
+
+// A private-data remint is declared by the exact saved artifact, never by
+// its display name or by merely finding a magic value in its c-list.
+function _nsDeclaredPrivateDataRows(words, hdr, inspection, savedDeclaration) {
+    if (!hdr || !hdr.valid || !Array.isArray(words)) return [];
+    const embedded = inspection && inspection.contentFrameValid &&
+        inspection.apiDefinition && inspection.apiDefinition.capabilities;
+    const caps = Array.isArray(embedded) ? embedded :
+        (savedDeclaration && Array.isArray(savedDeclaration.capabilities)
+            ? savedDeclaration.capabilities : []);
+    return caps.flatMap(function(cap, index) {
+        const row = cap && cap.row != null ? Number(cap.row) : index;
+        return cap && cap.role === 'private_data' && row === 1 &&
+            (words[hdr.lumpSize - hdr.cc + row] >>> 0) ===
+                (ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER >>> 0)
+            ? [row] : [];
+    });
+}
 /* ---- NS_SLOT_PERSIST_UNIT_TEST_EXPORT_END ---- */
 
 function _nsTableAdd() {
@@ -4453,6 +4638,10 @@ function _nsTableAdd() {
     window._nsAddCurrentToken         = null;
     window._nsAddCurrentInspection    = null;
     window._nsAddCurrentCatalogIndex  = null;
+    window._nsAddSavedDeclaration      = null;
+    window._nsAddExecutableReceipt     = null;
+    window._nsAddInspectionError       = null;
+    window._nsAddInspectionPending     = false;
 
     // Show loading overlay immediately
     const _overlay = document.createElement('div');
@@ -4464,7 +4653,8 @@ function _nsTableAdd() {
       <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;">
         <button id="_nsNewButton" data-testid="ns-new-button" onclick="_nsOpenNewAssembler()" class="btn" style="margin-right:auto;color:#c89b3c;border-color:#c89b3c;">NEW</button>
         <button onclick="document.getElementById('_nsAddModalOverlay').remove()" class="btn">Cancel</button>
-        <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" class="btn" disabled>Install</button>
+        <button id="_nsAddPlacementBtn" onclick="_nsAddPlacementConfirm()" class="btn" disabled title="Add this selection to the Namespace as a non-executable design placement">Add to Namespace (design)</button>
+        <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" class="btn" disabled title="Advanced: requires approved immutable executable bytes">Install executable…</button>
       </div>
     </div>`;
     _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
@@ -4479,59 +4669,142 @@ function _nsTableAdd() {
             return r.json();
         })
         .then(function(list) {
-            if (!Array.isArray(list) || list.length === 0) {
-                document.getElementById('_nsAddStatus').textContent = 'No LUMPs available on the server.';
-                return;
-            }
+            if (document.getElementById('_nsAddModalOverlay') !== _overlay) return;
+            if (!Array.isArray(list)) throw new Error('Saved LUMP list is malformed');
 
-            // Build set of tokens already in the NS table (by _tokenSlotMap or fixed ns_slot)
-            const _occupied = new Set();
-            if (sim._tokenSlotMap) {
-                for (const [tok] of sim._tokenSlotMap) _occupied.add(tok);
-            }
-            // Only exclude LUMPs whose token is already installed (occupied slot is not
-            // a pre-filter: the programmer can override the slot in the Install Options
-            // section, so the LUMP stays selectable even if its default ns_slot is taken).
-            const _available = list.filter(function(l) {
-                return !_occupied.has(l.token);
-            });
-
-            if (_available.length === 0) {
-                document.getElementById('_nsAddStatus').textContent = 'All server LUMPs are already installed in the namespace.';
-                return;
-            }
+            // The saved library is a picker, not an execution-validity filter.
+            // Keep even invalid entries visible for inspection; materialization
+            // remains subject to the normal identity and Namespace gates.
+            const _available = list;
 
             window._nsAddAvailableList = _available;
 
             // Render picker
             const inner = document.getElementById('_nsInstallPane');
-            let optHtml = '';
+            let optHtml = '<option value="" selected disabled>Pick an abstraction…</option>';
             for (const l of _available) {
-                const name = (l.abstraction || l.name || l.token).replace(/</g,'&lt;').replace(/>/g,'&gt;');
-                optHtml += `<option value="${l.token}">${name}</option>`;
+                const name = String(l.abstraction || l.name || l.token || 'Invalid saved entry')
+                    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                optHtml += `<option value="${String(l.token || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${name}${l.binary_valid === false ? ' · invalid' : ''}</option>`;
             }
             inner.innerHTML = `
                 <div style="margin-bottom:8px;color:#888;font-size:0.8rem;">${_available.length} LUMP${_available.length === 1 ? '' : 's'} available</div>
                 <select id="_nsAddSelect" style="width:100%;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;border-radius:4px;padding:6px 8px;font-size:0.85rem;margin-bottom:10px;">${optHtml}</select>
+                <label style="display:block;margin-bottom:8px;">Abstraction name (can be missing from library)
+                    <input id="_nsPlacementName" placeholder="Example.Service" oninput="_nsUpdatePlacementButton()" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
+                </label>
+                <label style="display:block;margin-bottom:8px;">Design-time slot (blank = first free)
+                    <input id="_nsPlacementSlot" type="number" min="${sim.firstUserNsSlot()}" max="${sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
+                </label>
+                <div style="font-size:0.74rem;color:#f0a040;margin-bottom:8px;">Add to Namespace saves the selection without executing or changing its saved bytes. Install executable is a separate advanced action requiring exact compiler-approved, unmodified binary bytes.</div>
                 <div id="_nsAddMeta" style="margin-bottom:8px;"></div>
                 <div id="_nsAddError" style="color:#f87171;font-size:0.78rem;min-height:1.2em;margin-bottom:8px;"></div>`;
 
             // Wire change event → populate metadata panel
             const sel = document.getElementById('_nsAddSelect');
             sel.addEventListener('change', function() {
-                _nsPopulateAddMeta(sel.value, sel.selectedIndex);
+                const record = _available[sel.selectedIndex - 1];
+                const input = document.getElementById('_nsPlacementName');
+                if (input && record) input.value = record.abstraction || record.name || '';
+                window._nsAddInspectionError = null;
+                window._nsAddExecutableReceipt = null;
+                _nsUpdatePlacementButton();
+                _nsPopulateAddMeta(sel.value, sel.selectedIndex - 1);
             });
-            // Populate for the initially selected LUMP immediately
-            _nsPopulateAddMeta(sel.value, sel.selectedIndex);
+            _nsUpdatePlacementButton();
+            // No implicit Boot selection or premature Install.
         })
         .catch(function(err) {
-            const st = document.getElementById('_nsAddStatus');
-            if (st) st.textContent = err && /\bNo data was changed\b/.test(err.message) ? err.message :
+            if (document.getElementById('_nsAddModalOverlay') !== _overlay) return;
+            const message = err && /\bNo data was changed\b/.test(err.message) ? err.message :
                 _formatActionableNetworkError('Load LUMPs for Namespace', err, {
                     dataChanged: false,
                     nextAction: 'Check the IDE connection, then reopen Add LUMP.',
                 });
+            const st = document.getElementById('_nsAddStatus');
+            if (st) {
+                const inner = document.getElementById('_nsInstallPane');
+                inner.textContent = '';
+                const warning = document.createElement('div');
+                warning.style.color = '#f87171';
+                warning.textContent = `Library unavailable: ${message}. You can still reserve a missing abstraction.`;
+                const name = document.createElement('input');
+                name.id = '_nsPlacementName';
+                name.placeholder = 'Example.Service (not in library)';
+                name.style.cssText = 'width:100%;box-sizing:border-box;margin:8px 0;';
+                name.oninput = _nsUpdatePlacementButton;
+                const slot = document.createElement('input');
+                slot.id = '_nsPlacementSlot';
+                slot.type = 'number';
+                slot.placeholder = 'Slot (blank = first free)';
+                slot.min = sim.firstUserNsSlot();
+                slot.max = sim.MAX_NS_ENTRIES - 1;
+                slot.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:8px;';
+                const error = document.createElement('div');
+                error.id = '_nsAddError';
+                error.style.color = '#f87171';
+                inner.append(warning, name, slot, error);
+            }
         });
+}
+
+function _nsUpdatePlacementButton() {
+    const btn = document.getElementById('_nsAddPlacementBtn');
+    const input = document.getElementById('_nsPlacementName');
+    if (btn) btn.disabled = !input || !input.value.trim() ||
+        window._nsAddInspectionPending === true;
+}
+
+async function _nsAddPlacementConfirm() {
+    const nameEl = document.getElementById('_nsPlacementName');
+    const slotEl = document.getElementById('_nsPlacementSlot');
+    const sel = document.getElementById('_nsAddSelect');
+    const errEl = document.getElementById('_nsAddError');
+    const btn = document.getElementById('_nsAddPlacementBtn');
+    if (!sim || !nameEl) return;
+    const index = sel && sel.selectedIndex > 0 ? sel.selectedIndex - 1 : -1;
+    const record = index >= 0 ? (window._nsAddAvailableList || [])[index] : null;
+    const slotText = slotEl ? slotEl.value.trim() : '';
+    try {
+        if (window._nsAddInspectionPending) {
+            throw new Error('Wait for the selected saved artifact inspection before placing it.');
+        }
+        if (slotText && !/^[0-9]+$/.test(slotText)) throw new Error('Slot must be an integer.');
+        const matchingInspection = record &&
+            window._nsAddCurrentCatalogIndex === index &&
+            window._nsAddCurrentToken === record.token;
+        const diagnostic = record
+            ? (window._nsAddInspectionError && matchingInspection
+                ? window._nsAddInspectionError
+                : record.binary_valid === false
+                    ? (record.validation_errors || []).join('; ') || 'Saved LUMP failed validation.'
+                    : 'Saved artifact is selected for design only; execution requires a validated Install.')
+            : 'No saved library artifact exists for this abstraction.';
+        const selection = {
+            status: record ? (record.binary_valid === false ||
+                (matchingInspection && window._nsAddInspectionError) ? 'invalid' : 'unresolved') : 'missing',
+            diagnostic: diagnostic.slice(0, 2048),
+        };
+        if (record && /^[0-9a-f]{8}$/i.test(record.token || '')) selection.token = record.token;
+        if (record && typeof record.filename === 'string' &&
+                /^[^/\\]+\.lump$/.test(record.filename)) selection.filename = record.filename;
+        if (record && /^[0-9a-f]{64}$/i.test(record.binary_hash || '')) {
+            selection.binaryHash = record.binary_hash;
+        }
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving placement…'; }
+        const result = sim.defineSymbolicAbstraction(nameEl.value,
+            slotText ? Number(slotText) : null, selection);
+        _setNsDirty(true);
+        updateNamespace();
+        const saved = await window._nsTableSave(document.getElementById('nsSaveBtn'));
+        if (!saved) throw new Error('Placement remains local; Save for next build to retry.');
+        const overlay = document.getElementById('_nsAddModalOverlay');
+        if (overlay) overlay.remove();
+        return result;
+    } catch (err) {
+        if (errEl) errEl.textContent = err.message || String(err);
+        if (btn) { btn.disabled = false; btn.textContent = 'Add to Namespace (design)'; }
+    }
 }
 
 async function _nsOpenNewAssembler() {
@@ -4622,6 +4895,8 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
     // Disable Install while metadata is loading so confirm cannot run with stale data.
     const _cfBtn = document.getElementById('_nsAddConfirmBtn');
     if (_cfBtn) { _cfBtn.disabled = true; _cfBtn.title = 'Waiting for LUMP metadata\u2026'; }
+    window._nsAddInspectionPending = true;
+    _nsUpdatePlacementButton();
 
     let approvedMetadata = null;
     let artifactDetail = window._nsAddCurrentInspection;
@@ -4641,8 +4916,9 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
 
             // Stale-guard: abort if user changed selection while fetching.
             const nowSel = document.getElementById('_nsAddSelect');
-            if (!nowSel || nowSel.value !== token ||
-                    nowSel.selectedIndex !== exactIndex) return;
+            if (document.getElementById('_nsAddMeta') !== container ||
+                    !nowSel || nowSel.value !== token ||
+                    nowSel.selectedIndex - 1 !== exactIndex) return;
 
             if (!wordsResp.ok) throw await _actionableResponseError(
                 wordsResp, 'Load LUMP metadata for Namespace', {
@@ -4657,25 +4933,60 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
                         : (wordsData && Array.isArray(wordsData.words) ? wordsData.words : null);
             if (!words || words.length === 0) throw new Error('Empty word list from /words');
 
-            window._nsAddCurrentWords = words;
-            window._nsAddCurrentToken = token;
-            window._nsAddCurrentCatalogIndex = exactIndex;
-
             const hdr = sim ? sim.parseLumpHeader(words[0] >>> 0) : null;
             if (hdr && hdr.valid) { binaryCw = hdr.cw; binaryCc = hdr.cc; }
             const inspect = typeof LumpContentFrame !== 'undefined' &&
                 LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
             if (!inspect) throw new Error('Binary content inspector is unavailable');
-            window._nsAddCurrentInspection = await inspect(words);
-            artifactDetail = window._nsAddCurrentInspection;
+            const inspected = await inspect(words);
             const actualBinaryHash = await _nsHashImmutableWords(words);
+            const selectedNow = document.getElementById('_nsAddSelect');
+            if (document.getElementById('_nsAddMeta') !== container ||
+                    !selectedNow || selectedNow.value !== token ||
+                    selectedNow.selectedIndex - 1 !== exactIndex) return;
+            window._nsAddCurrentWords = words;
+            window._nsAddCurrentToken = token;
+            window._nsAddCurrentCatalogIndex = exactIndex;
+            window._nsAddCurrentInspection = inspected;
+            artifactDetail = inspected;
+            window._nsAddExecutableReceipt = {
+                token, catalogIndex: exactIndex,
+                filename: wordsData && wordsData.filename,
+                binaryHash: actualBinaryHash,
+                approved: wordsData && wordsData.approved === true &&
+                    wordsData.trusted === true &&
+                    wordsData.binary_valid === true &&
+                    wordsData.binary_hash === actualBinaryHash &&
+                    wordsData.filename === approval.filename,
+            };
             approvedMetadata = _nsMatchingApproval(wordsData, approval, actualBinaryHash);
             window._nsAddCurrentApproval = approvedMetadata;
+            window._nsAddSavedDeclaration =
+                wordsData && wordsData.binary_hash === actualBinaryHash &&
+                wordsData.filename === approval.filename &&
+                wordsData.saved_clist_declaration || null;
+            window._nsAddInspectionError =
+                wordsData && Array.isArray(wordsData.validation_errors) &&
+                wordsData.validation_errors.length
+                    ? wordsData.validation_errors.join('; ')
+                    : approval.binary_valid === false
+                        ? inspected.error || 'Saved LUMP failed binary validation.'
+                        : null;
+            window._nsAddInspectionPending = false;
+            _nsUpdatePlacementButton();
 
         } catch (fetchErr) {
             const nowSel2 = document.getElementById('_nsAddSelect');
-            if (!nowSel2 || nowSel2.value !== token ||
-                    nowSel2.selectedIndex !== exactIndex) return;
+            if (document.getElementById('_nsAddMeta') !== container ||
+                    !nowSel2 || nowSel2.value !== token ||
+                    nowSel2.selectedIndex - 1 !== exactIndex) return;
+            window._nsAddCurrentWords = null;
+            window._nsAddCurrentToken = token;
+            window._nsAddCurrentCatalogIndex = exactIndex;
+            window._nsAddExecutableReceipt = null;
+            window._nsAddInspectionError = String(fetchErr.message || fetchErr);
+            window._nsAddInspectionPending = false;
+            _nsUpdatePlacementButton();
             const message = fetchErr && /\bNo data was changed\b/.test(fetchErr.message)
                 ? fetchErr.message
                 : _formatActionableNetworkError('Load LUMP metadata for Namespace', fetchErr, {
@@ -4750,6 +5061,9 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
     const ccDisplay = binaryCc != null ? binaryCc : '—';
 
     container.innerHTML = `
+        ${approval.binary_valid === false || window._nsAddInspectionError
+            ? `<div style="color:#f87171;padding:6px;border:1px solid #f8717155;margin-bottom:8px;">Non-executable selection: ${esc(window._nsAddInspectionError || (approval.validation_errors || []).join('; ') || 'Saved artifact is invalid.')}. Use Add placement, not Install.</div>`
+            : ''}
         <div style="${sCard}">
             <div style="${sGH}">INSTALL OPTIONS</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -4818,8 +5132,13 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
         </div>`;
 
     // Metadata fully loaded — re-enable Install.
+    window._nsAddInspectionPending = false;
+    _nsUpdatePlacementButton();
     const _cfBtn2 = document.getElementById('_nsAddConfirmBtn');
-    if (_cfBtn2) { _cfBtn2.disabled = false; _cfBtn2.title = ''; }
+    if (_cfBtn2) {
+        _cfBtn2.disabled = approval.binary_valid === false || !!window._nsAddInspectionError;
+        _cfBtn2.title = _cfBtn2.disabled ? 'Invalid library artifact cannot be installed' : '';
+    }
 }
 
 function _nsTableAddConfirm() {
@@ -4829,20 +5148,20 @@ function _nsTableAddConfirm() {
     if (!sel || !sim) return;
     const token = sel.value;
     const name = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : token;
-    const listed = (window._nsAddAvailableList || [])[sel.selectedIndex] || {};
+    if (!token) { if (errEl) errEl.textContent = 'Pick an abstraction first.'; return; }
+    const listed = (window._nsAddAvailableList || [])[sel.selectedIndex - 1] || {};
     if (listed.token !== token) {
         if (errEl) errEl.textContent =
             'The selected catalog row changed while installing. Reopen Add LUMP and select it again.';
         return;
     }
     const installCanonicalName = listed.dot_name || listed.dotName || listed.abstraction || listed.name || name;
-    if (!token) { if (errEl) errEl.textContent = 'Please select a LUMP.'; return; }
 
     // Guard: refuse to install until immutable binary inspection has completed.
     // _nsPopulateAddMeta keeps Install disabled while loading, but this catch handles
     // any race where confirm fires before the async fetch completes.
     if (!window._nsAddCurrentWords || window._nsAddCurrentToken !== token ||
-            window._nsAddCurrentCatalogIndex !== sel.selectedIndex) {
+            window._nsAddCurrentCatalogIndex !== sel.selectedIndex - 1) {
         if (errEl) errEl.textContent = 'LUMP metadata is still loading — please wait a moment and try again.';
         return;
     }
@@ -4873,7 +5192,9 @@ function _nsTableAddConfirm() {
         const occupiedSymbolic = typeof sim.symbolicEntryAt === 'function'
             ? sim.symbolicEntryAt(userSlot) : null;
         const replacesMatchingSymbolic = occupiedSymbolic &&
-            String(occupiedSymbolic.name).toLowerCase() === String(installCanonicalName).toLowerCase();
+            ((occupiedSymbolic.selection && occupiedSymbolic.selection.token === token) ||
+             (String(occupiedSymbolic.name).toLowerCase() === String(installCanonicalName).toLowerCase() &&
+              (!occupiedSymbolic.selection || !occupiedSymbolic.selection.token)));
         if (sim.isNSEntryValid(userSlot) && !replacesMatchingSymbolic) {
             if (errEl) errEl.textContent = `Slot ${userSlot} is already occupied. Choose a free slot.`;
             return;
@@ -4889,6 +5210,15 @@ function _nsTableAddConfirm() {
         if (!hdr.valid) return Promise.reject(new Error('Invalid LUMP header (magic mismatch)'));
         if (!artifactDetail) return Promise.reject(new Error('Immutable LUMP inspection is unavailable'));
         const actualBinaryHash = await _nsHashImmutableWords(words);
+        const receipt = window._nsAddExecutableReceipt;
+        if (!receipt || receipt.token !== token ||
+                receipt.catalogIndex !== sel.selectedIndex - 1 ||
+                receipt.filename !== listed.filename ||
+                receipt.binaryHash !== actualBinaryHash ||
+                receipt.approved !== true) {
+            throw new Error('This exact saved LUMP has no trusted executable approval. ' +
+                'Use Add to Namespace (design) to keep the selected slot without installing bytes.');
+        }
         const _canonicalHash = function(value) {
             if (value == null) return null;
             const hash = String(value).trim().replace(/^sha256:/i, '').toLowerCase();
@@ -4915,7 +5245,9 @@ function _nsTableAddConfirm() {
         if (sim._nsSymbolicEntries) {
             for (const key of Object.keys(sim._nsSymbolicEntries)) {
                 const candidate = sim._nsSymbolicEntries[key];
-                if (candidate && String(candidate.name).toLowerCase() === String(installCanonicalName).toLowerCase()) {
+                if (candidate && String(candidate.name).toLowerCase() === String(installCanonicalName).toLowerCase() &&
+                        (!candidate.selection || !candidate.selection.token ||
+                            candidate.selection.token === token)) {
                     matchingSymbolicSlot = Number(key);
                     break;
                 }
@@ -4928,20 +5260,27 @@ function _nsTableAddConfirm() {
             // identity and Outform preflight below can still reject the LUMP;
             // reserving early would make the picker hide a failed install as
             // though it were already present.
-            slot = sim.allocOrFindNsSlot(null, name);
+            slot = sim.allocOrFindNsSlot(null, name, 'ns-add:' + token);
         } else if (userSlot !== null) {
             slot = userSlot;
         } else {
-            slot = sim.allocOrFindNsSlot(null, name);
+            slot = sim.allocOrFindNsSlot(null, name, 'ns-add:' + token);
         }
         if (slot === null) return Promise.reject(new Error('Namespace table is full'));
 
-        // Copy lump words into this slot's extended DMEM region
-        const EXTENDED_BASE   = 0x0800;
-        const EXTENDED_STRIDE = 0x0100;
-        const PROG_SLOT       = sim.firstUserNsSlot();
-        const slotOffset      = Math.max(0, slot - PROG_SLOT);
-        const lumpBase        = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
+        // The Namespace slot number is not a physical address. Allocate the
+        // complete declared extent against resident and lazy body intervals,
+        // active Thread memory, and the descriptor-table boundary.
+        if (hdr.n_minus_6 > 9 || words.length < hdr.lumpSize ||
+                hdr.cw + hdr.cc >= hdr.lumpSize) {
+            return Promise.reject(new Error(
+                'LUMP size, body, or c-list bounds are malformed; nothing was installed.'));
+        }
+        const lumpBase = sim.findFreeLumpRange(hdr.lumpSize);
+        if (lumpBase === null) {
+            return Promise.reject(new Error(
+                `No non-overlapping ${hdr.lumpSize}-word LUMP allocation fits below the Namespace table; nothing was installed.`));
+        }
 
         // Ordinary code LUMPs are checked and minted on a private copy before
         // *any* simulator mutation.  This prevents a stale self GT, wrong
@@ -4985,12 +5324,19 @@ function _nsTableAddConfirm() {
             // at a currently valid Namespace entry with the same sequence.
             remintCompilerOwnedSelf: _compilerOwnedSelf && _sourceSelfValid,
             sourceSelfSlot: _sourceSelfSlot,
-            sourceSelfSeq: _sourceSelfSeq
+            sourceSelfSeq: _sourceSelfSeq,
+            privateDataRows: _nsDeclaredPrivateDataRows(
+                words, hdr, artifactDetail, window._nsAddSavedDeclaration)
         });
         if (!_identity.ok) {
             return Promise.reject(new Error(
                 `Namespace identity validation failed (${_identity.code}): ${_identity.message}`
             ));
+        }
+        if (await _nsHashImmutableWords(_identity.words) !== actualBinaryHash) {
+            throw new Error('Installation would remint the selected LUMP into different bytes ' +
+                'without a saved, compiler-approved artifact for that exact SHA-256. ' +
+                'Use Add to Namespace (design); no Namespace or saved-library bytes were changed.');
         }
         words = _identity.words;
 
@@ -5072,7 +5418,7 @@ function _nsTableAddConfirm() {
         if (isSecureOutform &&
             (cacheToken32 == null || !(Number.isInteger(issueN) && issueN > 0) ||
              !dotName || identityHash == null || binaryHash == null)) {
-            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
+            if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install executable…'; }
             return Promise.reject(new Error(
                 'Secure Outform requires trusted identity metadata (cache_token, positive issue_n, dot_name, 64-hex identity_hash and binary_hash) — refusing to create an unverifiable Outform.'));
         }
@@ -5112,8 +5458,7 @@ function _nsTableAddConfirm() {
         // All validation has now succeeded.  Only now may the LUMP body or
         // token map mutate, so a rejected install leaves no hidden picker entry
         // and no orphaned body in programmable memory.
-        const copyLen = Math.min(words.length, EXTENDED_STRIDE);
-        for (let wi = 0; wi < copyLen; wi++) {
+        for (let wi = 0; wi < hdr.lumpSize; wi++) {
             sim.writePersistentWord(lumpBase + wi, words[wi]);
         }
 
@@ -5142,16 +5487,11 @@ function _nsTableAddConfirm() {
                 boot_resident: loadPolicy === 'Resident',
             });
 
-        // Persist slot→label to boot-config so the label survives hard resets.
-        // Uses a lightweight PATCH endpoint that merges into the existing config
-        // without wiping step1/step2/step3 fields.
-        if (typeof window._persistNamespaceSlotLabel === 'function') {
-            window._persistNamespaceSlotLabel(slot, name);
-        } else {
-            window.bootConfig = window.bootConfig || {};
-            window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
-            window.bootConfig.slotLabels[String(slot)] = name;
-        }
+        // Stage the label in the one reviewed Namespace save. Never PATCH the
+        // live boot configuration before exact binary approval has committed.
+        window.bootConfig = window.bootConfig || {};
+        window.bootConfig.slotLabels = window.bootConfig.slotLabels || {};
+        window.bootConfig.slotLabels[String(slot)] = name;
 
         // Keep the programmer's Namespace placement choice in Namespace state.
         const { patchedPolicy: _patchedPolicy, patchedSlot: _patchedSlot } =
@@ -5263,7 +5603,7 @@ function _nsTableAddConfirm() {
                 dataChanged: null,
                 nextAction: 'Reload Namespace to verify the slot before retrying Install.',
             });
-        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install'; }
+        if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Install executable…'; }
     };
 
     // Re-use cached words from per-selection fetch when token matches.
@@ -5288,6 +5628,101 @@ function _nsTableAddConfirm() {
             })
             .catch(_onError);
     }
+}
+
+// Explicit recovery for an unsaved executable Add rejected by the build
+// approval boundary. This never claims the reminted body is approved, changes
+// an immutable library artifact, or silently changes what the programmer chose.
+async function _nsKeepPendingAsPlacement(slot) {
+    const binding = window._nsExplicitArtifactBindings &&
+        window._nsExplicitArtifactBindings[String(slot)];
+    const entry = sim && sim.readNSEntry(slot);
+    const committed = window._nsState && Array.isArray(window._nsState.abstractions)
+        ? window._nsState.abstractions.find(row => row && Number(row.slot) === slot)
+        : null;
+    if (!binding || !entry || slot === bootEntrySlot ||
+            binding.name !== entry.label ||
+            Number(binding.seq) !== sim.parseNSWord1(entry.word1_limit).gtSeq ||
+            (committed && committed.symbolic !== true &&
+             committed.name === binding.name &&
+             Number(committed.seq) === Number(binding.seq))) {
+        window.alert('Only an unsaved, exact pending executable Add may be kept as a design placement. The existing row was not changed.');
+        return false;
+    }
+    if (!window.confirm(
+        `Keep ${binding.name} in NS[${slot}] as a NON-EXECUTABLE design placement? ` +
+        'The pending executable slot is revoked. Saved LUMP bytes remain unchanged.')) return false;
+    if (typeof binding.name !== 'string' || !binding.name.trim() ||
+            binding.name.length > 128 || /[\u0000-\u001f\u007f]/.test(binding.name)) {
+        window.alert('This pending row has no valid design-time name. Nothing was changed.');
+        return false;
+    }
+    const bodyBase = entry.word0_location >>> 0;
+    const bodyHeader = bodyBase && sim.parseLumpHeader(sim.memory[bodyBase] >>> 0);
+    const lazy = sim.lazyManifest && sim.lazyManifest[slot];
+    const bodySize = bodyHeader && bodyHeader.valid
+        ? bodyHeader.lumpSize : lazy && (lazy.allocSize || lazy.size);
+    const bodyExclusive = Number.isInteger(bodySize) && bodyBase >= 0x0800 &&
+        bodyBase + bodySize <= sim.NS_TABLE_BASE &&
+        !Array.from({ length: sim.nsCount }, (_, index) => index).some(index => {
+            if (index === slot) return false;
+            const other = sim.readNSEntry(index);
+            const start = other && other.word0_location;
+            if (!start || start >= sim.NS_TABLE_BASE) return false;
+            const header = sim.parseLumpHeader(sim.memory[start] >>> 0);
+            const manifest = sim.lazyManifest && sim.lazyManifest[index];
+            const size = header.valid ? header.lumpSize :
+                manifest && (manifest.allocSize || manifest.size);
+            // Without a trustworthy extent, do not erase an unknown owner's
+            // allocation even if its first word precedes the pending body.
+            return !Number.isInteger(size) ||
+                (start < bodyBase + bodySize && start + size > bodyBase);
+        });
+    const diagnostic = (window._nsTableSaveError ||
+        'Executable installation has not passed exact hash-bound build approval.').slice(0, 2048);
+    const selection = {
+        status: 'unresolved',
+        diagnostic,
+    };
+    if (/^[0-9a-f]{8}$/i.test(binding.token || '')) selection.token = binding.token;
+    if (typeof binding.filename === 'string' &&
+            /^[^/\\]+\.lump$/.test(binding.filename)) selection.filename = binding.filename;
+    const hash = binding.binary_hash || binding.binaryHash;
+    if (/^[0-9a-f]{64}$/i.test(hash || '')) selection.binaryHash = hash;
+    sim.withNamespaceWrite('revoke pending executable Namespace Add', function() {
+        sim.clearNSEntry(slot);
+    });
+    // Erase only a provably exclusive local body. Never write the immutable
+    // saved LUMP file; if its extent cannot be proven, W0=0 still revokes all
+    // executable Namespace authority without guessing another owner's bytes.
+    if (bodyExclusive) {
+        for (let offset = 0; offset < bodySize; offset++) {
+            sim.writePersistentWord(bodyBase + offset, 0);
+        }
+    }
+    if (sim.lazyManifest) delete sim.lazyManifest[slot];
+    sim.defineSymbolicAbstraction(binding.name, slot, selection);
+    delete window._nsExplicitArtifactBindings[String(slot)];
+    // A previous committed symbolic version of this slot must not rehydrate
+    // over the newly retained generation before its replacement is saved.
+    if (window._nsState && Array.isArray(window._nsState.abstractions)) {
+        window._nsState = Object.assign({}, window._nsState, {
+            abstractions: window._nsState.abstractions.filter(
+                row => !row || Number(row.slot) !== slot)
+        });
+    }
+    if (window.bootConfig && window.bootConfig.step2 &&
+            Array.isArray(window.bootConfig.step2.lumps)) {
+        window.bootConfig.step2.lumps = window.bootConfig.step2.lumps.filter(
+            row => !row || Number(row.nsSlot) !== slot);
+    }
+    window._nsPrefetchDirty = true;
+    window._nsPrefetchDirtySlots = window._nsPrefetchDirtySlots || {};
+    window._nsPrefetchDirtySlots[String(slot)] = true;
+    window._nsTableSaveError = null; // explicit recovery acknowledges prior failure
+    _setNsDirty(true);
+    updateNamespace();
+    return window._nsTableSave(document.getElementById('nsSaveBtn'));
 }
 
 // ── NS table: Clear slot ──────────────────────────────────────────────────────
@@ -5538,6 +5973,7 @@ window._nsTableSave = async function(btn) {
                 _rich.symbolic = true;
                 _rich.implementationMissing = true;
                 _rich.resident = false;
+                if (_symbolic.selection) _rich.selection = { ..._symbolic.selection };
             }
             // Artifact identity is sidecar/catalog metadata, not part of the
             // four-word Namespace entry.  Preserve it when the same slot and
@@ -5693,6 +6129,14 @@ window._nsTableSave = async function(btn) {
         } catch (_) {}
         console.error('[_nsTableSave] Namespace save failed');
         window._nsTableSaveError = String(err.message || err);
+        if (/exact hash-bound approval|required.*SHA-256|resident bytes differ/i.test(
+                window._nsTableSaveError) &&
+                Object.keys(window._nsExplicitArtifactBindings || {}).length) {
+            window._nsTableSaveError +=
+                '\nThe pending executable row is still in this browser. ' +
+                'Click “Keep as design” beside its NS slot to retain the selected artifact ' +
+                'and slot without installing executable bytes. No data was changed.';
+        }
         _setNsDirty(window._nsTableDirty);
         return false;
     }
@@ -5703,6 +6147,13 @@ window._nsTableSave = async function(btn) {
 // implementation start the canonical assembler proforma under that name.
 function _nsLabelOpen(slotIdx) {
     if (!sim) return;
+    // This check deliberately precedes symbolic/catalog/source lookup.  NS[0]
+    // is Namespace-table data; the executable shown for it is the separate
+    // fixed boot ROM, which has no saved token-zero binary to fetch.
+    if (Number(slotIdx) === 0) {
+        _showBootROMInspector();
+        return;
+    }
     const e = sim.readNSEntry(slotIdx);
     const rawLabel = (e && e.label) ||
         (sim.nsLabels && sim.nsLabels[slotIdx]) ||
@@ -5711,6 +6162,9 @@ function _nsLabelOpen(slotIdx) {
         ? sim.symbolicEntryAt(slotIdx)
         : null;
     if (symbolic && symbolic.implementationMissing) {
+        if (symbolic.selection) {
+            return _nsOpenDesignSelection(symbolic, slotIdx);
+        }
         if (typeof newAbstraction === 'function') newAbstraction(symbolic.name || rawLabel);
         else if (typeof switchView === 'function') switchView('editor');
         return;
@@ -5733,6 +6187,51 @@ function _nsLabelOpen(slotIdx) {
     }
     if (typeof newAbstraction === 'function') newAbstraction(rawLabel);
     else if (typeof switchView === 'function') switchView('editor');
+}
+
+function _nsOpenDesignSelection(symbolic, slot) {
+    const selection = symbolic.selection;
+    const exact = selection &&
+        /^[0-9a-f]{8}$/i.test(selection.token || '') &&
+        typeof selection.filename === 'string' &&
+        /^[^/\\]+\.lump$/.test(selection.filename) &&
+        /^[0-9a-f]{64}$/i.test(selection.binaryHash || '');
+    if (exact && typeof openLumpInEditor === 'function') {
+        // The saved selection is a SOURCE navigation, not an Install request.
+        // Filename and digest pin the revision even when a token is reused.
+        return openLumpInEditor(selection.token, {
+            exactSavedArtifact: {
+                token: selection.token,
+                filename: selection.filename,
+                binary_hash: selection.binaryHash,
+                abstraction: symbolic.name,
+            },
+        });
+    }
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:#000b;z-index:10001;display:flex;align-items:center;justify-content:center;padding:16px;';
+    const panel = document.createElement('div');
+    panel.style.cssText = 'background:#12121f;color:#d0d0e8;max-width:540px;width:100%;padding:22px;border:1px solid #a55;border-radius:8px;overflow-wrap:anywhere;';
+    const heading = document.createElement('h3');
+    heading.textContent = `${symbolic.name} · NS[${slot}] · design placement`;
+    const detail = document.createElement('p');
+    detail.textContent = selection.filename
+        ? `The selected saved artifact ${selection.filename} has no complete filename/token/SHA-256 identity, so a different revision cannot safely be opened. ${selection.diagnostic}`
+        : `No saved artifact is bound. ${selection.diagnostic}`;
+    const create = document.createElement('button');
+    create.className = 'btn';
+    create.textContent = 'Create source in New editor';
+    create.onclick = async () => {
+        if (typeof newAbstraction === 'function' &&
+                await newAbstraction(symbolic.name)) overlay.remove();
+    };
+    const close = document.createElement('button');
+    close.className = 'btn';
+    close.textContent = 'Keep current editor';
+    close.onclick = () => overlay.remove();
+    panel.append(heading, detail, create, close);
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
 }
 
 // Dedicated read-only popup for a selected Thread instance.  It intentionally
@@ -5793,85 +6292,78 @@ window._nsSlotCycleMode = function(token, currentMode, slotIdx) {
     window.bootConfig.nsLoadModes[String(normalizedSlot)] = nextMode;
 };
 
+function _bootROMInspectionRows() {
+    // HW_BOOT_PROGRAM is the browser copy of hardware/boot_rom.py BOOT_PROGRAM.
+    // Keep words sourced from that single existing three-word definition.
+    const words = (typeof HW_BOOT_PROGRAM !== 'undefined' &&
+        Array.isArray(HW_BOOT_PROGRAM)) ? HW_BOOT_PROGRAM.slice(0, 3) : [];
+    const definitions = [
+        { op: 'LOAD', operands: 'AL, CR15, CR15[0]',
+          meaning: 'Refresh the Namespace capability from NS slot 0 into CR15.' },
+        { op: 'CHANGE', operands: 'AL, CR12, CR15, #1',
+          meaning: 'Restore Boot.Thread from NS slot 1, including its prepared CR0 home.' },
+        { op: 'CALL', operands: 'AL, CR0, CR0',
+          meaning: 'Consume the E-GT stored in Boot.Thread CR0.' },
+    ];
+    return definitions.map(function(definition, pc) {
+        return {
+            pc: pc,
+            word: words.length === 3 ? (words[pc] >>> 0) : null,
+            op: definition.op,
+            operands: definition.operands,
+            meaning: definition.meaning,
+        };
+    });
+}
+window._bootROMInspectionRows = _bootROMInspectionRows;
+
+function _showBootROMInspector() {
+    const existing = document.getElementById('_nsLumpModalOverlay');
+    if (existing) existing.remove();
+    const rows = _bootROMInspectionRows();
+    const td = 'style="padding:5px 8px;border-bottom:1px solid rgba(255,255,255,0.05);"';
+    const th = 'style="padding:4px 8px;border-bottom:1px solid rgba(200,155,60,0.2);color:#888;font-weight:500;text-align:left;"';
+    const programRows = rows.map(function(row) {
+        const word = row.word == null
+            ? '<span style="color:#f87171;">definition unavailable</span>'
+            : '<code>0x' + row.word.toString(16).toUpperCase().padStart(8, '0') + '</code>';
+        return `<tr data-boot-rom-pc="${row.pc}">
+            <td ${td} style="color:#888;">B:${String(row.pc).padStart(2, '0')}</td>
+            <td ${td}>${word}</td>
+            <td ${td} style="color:#dcdcaa;font-family:monospace;"><strong>${row.op}</strong> ${row.operands}</td>
+            <td ${td} style="color:#9ca3af;">${row.meaning}</td>
+        </tr>`;
+    }).join('');
+    const html = `<div id="_nsLumpModalOverlay" data-testid="boot-rom-inspector" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);" onclick="if(event.target===this)this.remove();">
+        <div style="background:#1e1e1e;border:1px solid rgba(200,155,60,0.35);border-radius:8px;padding:20px 24px;max-width:900px;width:94%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.7);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div><span style="color:#c89b3c;font-weight:700;font-size:1rem;">Boot ROM</span>
+                <span style="color:#6b7280;font-size:0.78rem;margin-left:8px;">hardwired three-word program · read-only</span></div>
+                <button onclick="document.getElementById('_nsLumpModalOverlay').remove()" aria-label="Close boot ROM inspector" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;padding:0 4px;">✕</button>
+            </div>
+            <div style="margin-bottom:14px;padding:8px 10px;background:rgba(200,155,60,0.08);border-left:3px solid rgba(200,155,60,0.4);border-radius:3px;color:#9ca3af;font-size:0.78rem;">
+                NS[0] is the Boot.NS Namespace-table entry (data). The program below is separate boot-ROM code. It is the simulator/spec definition, not a saved LUMP identity and not evidence of observed hardware execution.
+            </div>
+            <table style="border-collapse:collapse;width:100%;font-size:0.8rem;">
+                <thead><tr><th ${th}>PC</th><th ${th}>Word</th><th ${th}>Instruction</th><th ${th}>Static meaning</th></tr></thead>
+                <tbody>${programRows}</tbody>
+            </table>
+        </div>
+    </div>`;
+    document.body.insertAdjacentHTML('beforeend', html);
+    return true;
+}
+window._showBootROMInspector = _showBootROMInspector;
+
 // ── Lump detail modal — Inform entries only ───────────────────────────────────
 function _showNSLumpModal(slotIdx, nsEntry) {
     const _existingNsModal = document.getElementById('_nsLumpModalOverlay');
     if (_existingNsModal) _existingNsModal.remove();
 
-    // ── Boot.NS (slot 0) is hardware ROM, not a lazy-loaded lump ────────────
-    // Show the 3 boot ROM instructions and hardware c-list inline; no server
-    // fetch required or valid for this slot.
+    // NS slot 0 data is inspected through its separate fixed-ROM view.  In
+    // particular, do not continue into generic lazy binary retrieval.
     if (slotIdx === 0) {
-        const _nsMT = `style="border-collapse:collapse;width:100%;font-size:0.8rem;"`;
-        const _nsTD = `style="padding:3px 8px;border-bottom:1px solid rgba(255,255,255,0.05);"`;
-        const _nsTH = `style="padding:3px 8px;border-bottom:1px solid rgba(200,155,60,0.2);color:#888;font-weight:500;text-align:left;"`;
-
-        // 3 hardware boot ROM words (from hw_binary.js HW_BOOT_PROGRAM)
-        const _hwProg = [
-            { w: 0x077F8000, dis: 'LOAD   AL, CR15, CR15[0]   — refresh Namespace cap (slot 0 → CR15)' },
-            { w: 0x27678001, dis: 'CHANGE AL, CR12, CR15, #1  — load Boot.Thread (slot 1) → CR0–CR11' },
-            { w: 0x17000000, dis: 'CALL   AL, CR0,  CR0       — enter Thread.CR0 (Application LUMP)' },
-        ];
-        const _progRows = _hwProg.map((r, i) =>
-            `<tr>
-                <td ${_nsTD} style="color:#888;">${i}</td>
-                <td ${_nsTD}><code style="font-size:0.74rem;">0x${r.w.toString(16).toUpperCase().padStart(8,'0')}</code></td>
-                <td ${_nsTD} style="color:#dcdcaa;font-family:monospace;font-size:0.78rem;">${r.dis}</td>
-            </tr>`
-        ).join('');
-
-        // Simulator c-list; this is not an observation from an attached board.
-        const _clistSrc = (sim && sim.demoClistGTs && sim.demoClistGTs.length)
-            ? sim.demoClistGTs
-            : [0,0,0,0,0,0,0,0,0,0,0];
-        const _nsLbls = (sim && sim.nsLabels) || {};
-        const _clistRows = _clistSrc.map((gt, i) => {
-            const parsed = (sim && typeof sim.parseGT === 'function') ? sim.parseGT(gt >>> 0) : null;
-            let permStr = '—', nameStr = '—';
-            if (parsed && (gt >>> 0) !== 0) {
-                const p = parsed.permissions || {};
-                permStr = ['R','W','X','E','S','L'].filter(k => p[k]).join('') || '∅';
-                const lbl = (parsed.type !== 3 && _nsLbls) ? _nsLbls[parsed.index] : null;
-                nameStr = lbl || (parsed.type === 3 ? '(Abstract)' : `NS[${parsed.index}]`);
-            }
-            return `<tr>
-                <td ${_nsTD} style="color:#888;">${i}</td>
-                <td ${_nsTD}><code style="font-size:0.74rem;">0x${(gt>>>0).toString(16).toUpperCase().padStart(8,'0')}</code></td>
-                <td ${_nsTD} style="color:#4ec9b0;">${nameStr}</td>
-                <td ${_nsTD}><span class="ns-perm-chip" style="font-size:0.65rem;">${permStr}</span></td>
-            </tr>`;
-        }).join('');
-
-        const _hwModalHtml = `<div id="_nsLumpModalOverlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.72);" onclick="if(event.target===this)this.remove();">
-            <div style="background:#1e1e1e;border:1px solid rgba(200,155,60,0.35);border-radius:8px;padding:20px 24px;max-width:680px;width:92%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.7);">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-                    <div>
-                        <span style="color:#c89b3c;font-weight:700;font-size:1rem;">Boot.NS</span>
-                        <span style="color:#6b7280;font-size:0.78rem;margin-left:8px;">NS[0] — Boot program reference</span>
-                    </div>
-                    <button onclick="document.getElementById('_nsLumpModalOverlay').remove()" style="background:none;border:none;color:#888;font-size:1.2rem;cursor:pointer;padding:0 4px;">✕</button>
-                </div>
-                <div style="margin-bottom:10px;padding:6px 10px;background:rgba(200,155,60,0.08);border-left:3px solid rgba(200,155,60,0.4);border-radius:3px;color:#9ca3af;font-size:0.78rem;">
-                    These are the three simulator/spec-known boot instructions, not observed board execution. Boot-ROM instruction addresses are separate from NS[0] data addresses. Physical execution evidence is unavailable here.
-                </div>
-                <div style="margin-bottom:14px;">
-                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">BOOT ROM PROGRAM (3 words)</div>
-                    <table ${_nsMT}>
-                        <thead><tr><th ${_nsTH}>PC</th><th ${_nsTH}>Word</th><th ${_nsTH}>Instruction</th></tr></thead>
-                        <tbody>${_progRows}</tbody>
-                    </table>
-                </div>
-                <div style="margin-bottom:4px;">
-                    <div style="color:#c89b3c;font-size:0.75rem;font-weight:600;letter-spacing:0.06em;margin-bottom:6px;">HARDWARE BOOT C-LIST (${_clistSrc.length} entries)</div>
-                    <table ${_nsMT}>
-                        <thead><tr><th ${_nsTH}>#</th><th ${_nsTH}>GT word</th><th ${_nsTH}>Name</th><th ${_nsTH}>Perms</th></tr></thead>
-                        <tbody>${_clistRows}</tbody>
-                    </table>
-                </div>
-            </div>
-        </div>`;
-        document.body.insertAdjacentHTML('beforeend', _hwModalHtml);
-        return;
+        return _showBootROMInspector();
     }
     // ── End Boot.NS intercept ────────────────────────────────────────────────
 

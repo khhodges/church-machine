@@ -69,6 +69,13 @@ function harness(approved) {
     assert.equal(h.editor.value, 'private draft');
     assert.deepEqual(h.effects, []);
 
+    h.context.fetch = async () => ({ok: true, json: async () => ({source: ''})});
+    let missingSourceMessage;
+    h.context.alert = message => { missingSourceMessage = message; };
+    await h.context.importFromLibrary('test-only');
+    assert.match(missingSourceMessage, /Source is missing/);
+    assert.equal(h.editor.value, 'private draft', 'missing library source never replaces a draft');
+
     h = harness(false);
     h.context.setDeviceLabel = async () => false;
     h.context.document.getElementById = () => { throw new Error('optimistic label update'); };

@@ -30,6 +30,18 @@
         status.setAttribute('role', 'status');
         status.textContent = 'Saved artifact identity required. Not a Builder configuration approval.';
         section.append(status);
+        var retry = document.createElement('button');
+        retry.type = 'button';
+        retry.textContent = 'Check recorded status';
+        retry.hidden = true;
+        section.append(retry);
+        var details = document.createElement('details');
+        details.hidden = true;
+        var summary = document.createElement('summary');
+        summary.textContent = 'Technical details';
+        var diagnostic = document.createElement('pre');
+        details.append(summary, diagnostic);
+        section.append(details);
         panel.append(section);
         var live = function () {
             return section.isConnected && panel.contains(section) &&
@@ -70,7 +82,11 @@
             }
             date.textContent = data.identity.compiled_at || 'unavailable in saved metadata';
             checkbox.checked = data.handoff.released;
+            checkbox.indeterminate = false;
             checkbox.disabled = !csrf || (!data.identity.eligible && !data.handoff.released);
+            status.classList.remove('handoff-status-warning');
+            retry.hidden = true;
+            details.hidden = true;
             status.textContent = (data.handoff.released ? 'Released' : 'Not released') +
                 (data.handoff.updated_at ? ' — recorded ' + data.handoff.updated_at : '') +
                 '. Applies only to this saved version and binary seal, not unsaved edits. ' +
@@ -82,13 +98,39 @@
             if (!response.ok) throw new Error(data.error || 'Handoff request failed (HTTP ' + response.status + ').');
             return data;
         }
-        status.textContent = 'Loading saved version, date and handoff status…';
-        window.fetch('/api/build-handoff?' + new URLSearchParams(locator), {cache: 'no-store'})
-            .then(json).then(function (data) {
+        function unavailable(error, operation) {
+            checkbox.checked = false;
+            checkbox.indeterminate = true;
+            checkbox.disabled = true;
+            status.classList.add('handoff-status-warning');
+            status.textContent = 'Handoff status unknown. ' +
+                (operation === 'POST' ? 'The update could not be confirmed; the server may or may not have saved it. ' :
+                    'The recorded status could not be read. ') +
+                'Simulator testing is unaffected. Check recorded status to read the server record without repeating the update.';
+            retry.hidden = false;
+            details.hidden = false;
+            diagnostic.textContent = operation + ' /api/build-handoff\n' +
+                'Artifact: ' + locator.filename + '\nToken: ' + locator.token +
+                '\nBinary seal: ' + locator.binary_hash +
+                '\nTime (UTC): ' + new Date().toISOString() + '\nError: ' + error.message;
+        }
+        async function reload() {
+            if (!live() || retry.disabled) return;
+            retry.disabled = true;
+            checkbox.disabled = true;
+            status.textContent = 'Reading recorded handoff status… Simulator testing is unaffected.';
+            try {
+                var data = await json(await window.fetch('/api/build-handoff?' +
+                    new URLSearchParams(locator), {cache: 'no-store'}));
                 if (live()) present(data);
-            }).catch(function (error) {
-                if (live()) status.textContent = 'Handoff unavailable: ' + error.message;
-            });
+            } catch (error) {
+                if (live()) unavailable(error, 'GET');
+            } finally {
+                retry.disabled = false;
+            }
+        }
+        retry.addEventListener('click', reload);
+        reload();
         checkbox.addEventListener('change', async function () {
             if (!current || !live()) return;
             var desired = checkbox.checked;
@@ -112,11 +154,7 @@
             } catch (error) {
                 if (live()) {
                     // A lost response may follow a commit. Do not claim either outcome.
-                    checkbox.checked = false;
-                    checkbox.indeterminate = true;
-                    checkbox.disabled = true;
-                    status.textContent = 'Handoff status needs reloading: ' + error.message +
-                        ' Reopen this saved artifact to check the recorded status.';
+                    unavailable(error, 'POST');
                 }
             }
         });

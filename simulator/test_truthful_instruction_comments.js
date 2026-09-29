@@ -11,7 +11,7 @@ const run = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
 const sim = { dr: Array(16).fill(0), cr: [], memory: new Uint32Array(64), ledBits: 0 };
 const ctx = vm.createContext({
     sim, _lumpManifests: {}, _petNameDRMap: {}, _resolveClistPetName: () => null,
-    _regName: () => null,
+    _regName: () => null, _indexedCallTarget: () => 'unresolved C-list target',
 });
 vm.runInContext(detail.slice(detail.indexOf('function _decompileWord('),
     detail.indexOf('function _escDecomp(')) +
@@ -53,9 +53,10 @@ for (const w of [
     assert.strictEqual(describe(w), describe(w));
 }
 assert(describe(word(22, 0, 0, 0x7FFF)).includes('#16383'));
-assert(describe(word(23, 0, 0, 0x7FFF)).includes('-1'));
+// Signed 15-bit displacement 0x7FFF is -1 word relative to instruction PC.
+assert.match(describe(word(23, 0, 0, 0x7FFF)), /PC ← instruction PC − 1 words/);
 assert(describe(word(16, 1, 2, 0x20 | 3)).includes('2 + DR3'));
-assert(describe(word(19, 3, 2, 0)).includes('faults if executed'));
+assert(describe(word(19, 3, 2, 0)).includes('fault if executed'));
 assert(describe(word(25, 3, 2, 32 | 31)).includes('arithmetic'));
 assert(describe(word(21, 1, 1, 0x4001, 0)).includes('[if equal to zero]'));
 assert(!detail.slice(detail.indexOf('function _decompileWord('), detail.indexOf('function _fmtVal(')).includes('sim.dr'));
@@ -64,15 +65,18 @@ assert(!detail.slice(detail.indexOf('function _decompileWord('), detail.indexOf(
 const autoStart = lumps.indexOf('    const _autoComment = ');
 const autoEnd = lumps.indexOf('    // ── Method docstring renderer', autoStart);
 assert(autoStart !== -1 && autoEnd > autoStart);
-const listing = vm.createContext({cc: 3, clistSlotName: {1: 'Known'}, crAlias: {}});
+const listing = vm.createContext({
+    cc: 3, clistSlotName: {1: 'Known'}, crAlias: {}, _commentContext: null,
+    _decompileWord: ctx._decompileWord,
+});
 vm.runInContext(lumps.slice(autoStart, autoEnd).replace('const _autoComment = ', 'globalThis._autoComment = '), listing);
 const comment = w => listing._autoComment(w, (w >>> 27) & 31,
     (w >>> 19) & 15, (w >>> 15) & 15, w & 0x7FFF, (w >>> 23) & 15, {});
-assert(comment(word(1, 1, 2, 3)).includes('store CR1'));
-assert(comment(word(16, 1, 2, 0x4001)).includes('+1]'));
+assert(comment(word(1, 1, 2, 3)).includes('save CR1 → CR2[3]'));
+assert(comment(word(16, 1, 2, 0x4001)).includes('[#1]'));
 assert(comment(word(17, 1, 2, 0x20 | 3)).includes('2 + DR3'));
-assert(comment(word(8, 1, 6, (2 << 5) | 1)).includes('method #1'));
-assert(comment(word(2, 1, 6, (2 << 5) | 1)).includes('method #1'));
+assert(comment(word(8, 1, 6, (2 << 5) | 1)).includes('method #2'));
+assert(comment(word(2, 1, 6, (2 << 5) | 1)).includes('method #2'));
 assert(comment(word(21, 1, 1, 0x4000 | 4096)).includes('DR1 + #4096'));
 assert(!comment(word(5, 1, 2, 1)).includes('reload)'));
 assert(!run.slice(run.indexOf('function showFaultModal('),

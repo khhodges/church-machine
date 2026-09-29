@@ -24,11 +24,15 @@ from server.change_confirmation import (
 
 
 @pytest.fixture
-def isolated(tmp_path):
+def isolated(tmp_path, monkeypatch):
+    # Production-like authorization without disclosing a server secret to the
+    # browser. All saved artifacts below are synthetic and confined to tmp_path.
+    monkeypatch.setenv("REPORT_TOKEN", "isolated-server-only-token")
     root = Path(__file__).parents[2]
     tree = ast.parse((root / "server/app.py").read_text())
     names = {"boot_image_save_ns", "_stage_namespace_save_image",
-             "_describe_protected_change"}
+             "_validate_symbolic_namespace_image",
+             "_describe_protected_change", "_optional_report_token_check"}
     nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
     for node in nodes:
         node.decorator_list = []
@@ -75,7 +79,6 @@ def isolated(tmp_path):
         _validate_symbolic_namespace_entries=validate,
         _validate_active_namespace_lumps=validate,
         _validate_namespace_boot_marker=lambda rows: 0,
-        _optional_report_token_check=lambda: (True, None),
         _validated_boot_config_candidate=lambda candidate, **kw: (candidate, None),
         _read_saved_boot_config=lambda **kw: (config, None),
         _load_existing_boot_config_unchecked=lambda: config,
@@ -108,6 +111,36 @@ def isolated(tmp_path):
 
 def snapshot(paths):
     return {key: path.read_bytes() if path.exists() else None for key, path in paths.items()}
+
+
+@pytest.mark.parametrize("selection", [
+    {"status": "missing", "diagnostic": "No saved artifact"},
+    {"status": "invalid", "diagnostic": "Malformed LUMP header",
+     "token": "deadbeef", "filename": "Broken.deadbeef.lump"},
+    {"status": "unresolved", "diagnostic": "Valid library artifact; design only",
+     "token": "1234abcd", "filename": "Known.1234abcd.lump"},
+])
+def test_design_placement_uses_existing_namespace_save_and_reload(isolated, selection):
+    app, payload, paths, calls, scope, image = isolated
+    row = {"name": "Future.Service", "slot": 1, "seq": 0,
+           "location": "0x00000000", "symbolic": True,
+           "implementationMissing": True, "resident": False,
+           "selection": selection}
+    payload["ns_state"]["abstractions"].append(row)
+    client = app.test_client()
+    before = (paths["LUMPS_MANIFEST_PATH"].read_bytes(),
+              (paths["NS_STATE_PATH"].parent / "entry.lump").read_bytes())
+    review = client.post("/api/boot-image/save-ns", json=payload)
+    assert review.status_code == 428
+    token = review.json["change_confirmation"]["id"]
+    committed = client.post("/api/boot-image/save-ns", json=payload,
+                            headers={"X-Change-Confirmation": token})
+    assert committed.status_code == 200
+    restored = json.loads(paths["NS_STATE_PATH"].read_text())["abstractions"]
+    assert restored[1]["selection"] == selection
+    assert restored[1]["symbolic"] is True
+    assert (paths["LUMPS_MANIFEST_PATH"].read_bytes(),
+            (paths["NS_STATE_PATH"].parent / "entry.lump").read_bytes()) == before
 
 
 @pytest.mark.parametrize("generated", [True, False])
@@ -158,14 +191,14 @@ def test_rejects_mismatch_consumes_review_and_preserves_files(isolated, mismatch
         "rejection_reason"] == "missing_or_used"
 
 
-def test_failed_preflight_does_not_issue_approval_or_publish(isolated):
+def test_invalid_config_preflight_does_not_issue_approval_or_publish(isolated):
     app, payload, paths, calls, scope, image = isolated
-    scope["_optional_report_token_check"] = lambda: (
-        False, (jsonify(error="unauthorized"), 403))
+    scope["_validated_boot_config_candidate"] = lambda candidate, **kw: (
+        None, "invalid Namespace policy")
     before = snapshot(paths)
-    with app.app_context():
-        response = app.test_client().post("/api/boot-image/save-ns", json=payload)
+    response = app.test_client().post("/api/boot-image/save-ns", json=payload)
     assert response.status_code == 409
+    assert "invalid Namespace policy" in response.json["message"]
     assert "change_confirmation" not in response.json
     assert snapshot(paths) == before
 
@@ -184,18 +217,32 @@ def test_commit_failure_rolls_back_all_components(isolated):
     assert snapshot(paths) == before
 
 
-def test_commit_rechecks_route_authorization_after_review(isolated):
+def test_commit_rechecks_configuration_validation_after_review(isolated):
     app, payload, paths, calls, scope, image = isolated
     client = app.test_client()
     review = client.post("/api/boot-image/save-ns", json=payload)
     before = snapshot(paths)
-    scope["_optional_report_token_check"] = lambda: (
-        False, (jsonify(error="authorization no longer valid"), 403))
+    scope["_validated_boot_config_candidate"] = lambda candidate, **kw: (
+        None, "configuration no longer valid")
     headers = {"X-Change-Confirmation": review.json["change_confirmation"]["id"]}
     response = client.post("/api/boot-image/save-ns", json=payload, headers=headers)
-    assert response.status_code == 403
+    assert response.status_code == 400
+    assert response.json["error"] == "configuration no longer valid"
     assert snapshot(paths) == before
     assert client.post("/api/boot-image/save-ns", json=payload, headers=headers).status_code == 409
+
+
+def test_server_only_report_token_check_remains_enforced_outside_namespace(isolated):
+    app, payload, paths, calls, scope, image = isolated
+    with app.test_request_context("/hardware/wukong/halt-state", method="POST"):
+        allowed, error = scope["_optional_report_token_check"]()
+        assert not allowed
+        assert error[1] == 401
+    with app.test_request_context(
+            "/hardware/wukong/halt-state", method="POST",
+            headers={"Authorization": "Bearer isolated-server-only-token"}):
+        allowed, error = scope["_optional_report_token_check"]()
+        assert allowed and error is None
 
 
 def test_client_stages_dependencies_without_separate_protected_requests():

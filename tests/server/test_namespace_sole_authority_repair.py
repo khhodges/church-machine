@@ -9,6 +9,8 @@ import json
 import os
 import shutil
 import base64
+import subprocess
+import struct
 from pathlib import Path
 
 import pytest
@@ -80,6 +82,221 @@ def _endpoint_fixture(tmp_path, monkeypatch):
 def _report_headers():
     token = os.environ.get("REPORT_TOKEN")
     return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def _reviewed_save(client, payload):
+    response = client.post(
+        "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+    if response.status_code == 428:
+        headers = {**_report_headers(),
+                   "X-Change-Confirmation": response.json["change_confirmation"]["id"]}
+        response = client.post(
+            "/api/boot-image/save-ns", json=payload, headers=headers)
+    return response
+
+
+@pytest.mark.parametrize("status", ["unresolved", "invalid", "missing"])
+def test_alice_slot14_design_placement_saves_without_binary_approval(
+        tmp_path, monkeypatch, status):
+    app_module, lumps, paths, state, payload = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    source = next(row for row in json.loads(
+        paths["manifest"].read_text(encoding="utf-8"))
+        if row.get("filename", "").startswith("ide.Alice."))
+    selected_path = lumps / source["filename"]
+    original = selected_path.read_bytes()
+    if status == "invalid":
+        original = b"\x00\x00\x00\x00" + original[4:]
+        selected_path.write_bytes(original)  # private fixture only
+    digest = hashlib.sha256(original).hexdigest()
+    # A candidate can be selected even when its exact digest is not compiler
+    # admitted. The selected fixture bytes are not modified by design placement.
+    approvals = json.loads((lumps / "approvals.json").read_text())
+    assert digest not in approvals.get("approvals", {})
+    selection = {
+        "status": status,
+        "diagnostic": "No compiler admission record matches this exact SHA-256"
+        if status != "missing" else "No saved artifact for this pet name",
+    }
+    if status != "missing":
+        selection.update(token=source["token"], filename=source["filename"],
+                         binaryHash=digest)
+    name = "ide.Alice" if status != "missing" else "NotYet.Alice"
+    row = {"name": name, "slot": 14, "seq": 0, "type": "Inform",
+           "location": "0x00000000", "resident": False,
+           "symbolic": True, "implementationMissing": True,
+           "selection": selection}
+    payload["ns_state"]["abstractions"].append(row)
+    before = (paths["manifest"].read_bytes(), original)
+    with app_module.app.test_client() as client:
+        response = _reviewed_save(client, payload)
+    assert response.status_code == 200, response.get_data(as_text=True)
+    saved = json.loads(paths["state"].read_text())["abstractions"]
+    selected = next(item for item in saved if item.get("slot") == 14)
+    assert selected["selection"] == selection
+    assert selected["symbolic"] is True and selected.get("resident") is False
+    assert not any(key in selected for key in ("token", "filename", "binary_hash"))
+    assert (paths["manifest"].read_bytes(),
+            (lumps / source["filename"]).read_bytes()) == before
+    # Reload from canonical state, not a temporary draft table.
+    with app_module.app.test_client() as client:
+        refreshed = client.get("/api/boot-image/ns-state")
+    assert refreshed.status_code == 200
+    assert next(item for item in refreshed.json["abstractions"]
+                if item.get("slot") == 14)["selection"] == selection
+
+
+def test_alice_slot14_executable_candidate_remains_approval_blocked(
+        tmp_path, monkeypatch):
+    app_module, lumps, paths, _state, payload = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    source = next(row for row in json.loads(
+        paths["manifest"].read_text(encoding="utf-8"))
+        if row.get("filename", "").startswith("ide.Alice."))
+    raw = (lumps / source["filename"]).read_bytes()
+    payload["ns_state"]["abstractions"].append({
+        "name": "ide.Alice", "slot": 14, "seq": 0, "type": "Inform",
+        "location": "0x00000800", "resident": True,
+        "boot_resident": True, "load_policy": "Resident",
+        "token": source["token"], "filename": source["filename"],
+        "binary_hash": hashlib.sha256(raw).hexdigest(),
+    })
+    before = {name: path.read_bytes() for name, path in paths.items()}
+    with app_module.app.test_client() as client:
+        response = client.post("/api/boot-image/save-ns", json=payload,
+                               headers=_report_headers())
+    assert response.status_code == 409
+    assert "exact hash-bound approval required" in str(response.json)
+    assert {name: path.read_bytes() for name, path in paths.items()} == before
+
+
+@pytest.mark.parametrize("status", ["unresolved", "invalid", "missing"])
+def test_actual_browser_add_save_preflight_commit_reload_alice_slot14(
+        tmp_path, monkeypatch, status):
+    app_module, lumps, paths, state, initial = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    source = next(row for row in json.loads(
+        paths["manifest"].read_text(encoding="utf-8"))
+        if row.get("filename", "").startswith("ide.Alice."))
+    selected_path = lumps / source["filename"]
+    raw = selected_path.read_bytes()
+    if status == "invalid":
+        raw = b"\x00\x00\x00\x00" + raw[4:]
+        selected_path.write_bytes(raw)  # private fixture only
+    record = None if status == "missing" else {
+        "token": source["token"], "filename": source["filename"],
+        "abstraction": "ide.Alice", "binary_hash": hashlib.sha256(raw).hexdigest(),
+        "binary_valid": status != "invalid",
+        "validation_errors": ["untrusted saved artifact"] if status == "invalid" else [],
+    }
+    fixture = {
+        "image": initial["data_b64"], "state": state,
+        "config": initial["boot_config"],
+        "fingerprint": initial["namespaceFingerprint"],
+        "aliceWords": (list(struct.unpack(f">{len(raw) // 4}I", raw))
+                       if status == "unresolved" else None),
+        "selection": {
+            "name": "ide.Alice" if record else "Future.Alice",
+            "status": status, "record": record,
+        },
+    }
+    browser = subprocess.run(
+        ["node", str(ROOT / "simulator" / "test_ns_design_save_payload.js")],
+        input=json.dumps(fixture), text=True, capture_output=True, check=False,
+        cwd=ROOT, timeout=30)
+    assert browser.returncode == 0, browser.stderr
+    payload = json.loads(browser.stdout)
+    design = next(row for row in payload["ns_state"]["abstractions"]
+                  if row["slot"] == 14)
+    assert design["selection"]["status"] == status
+    assert design["symbolic"] is True
+    before = (paths["manifest"].read_bytes(), raw)
+    with app_module.app.test_client() as client:
+        response = _reviewed_save(client, payload)
+        assert response.status_code == 200, response.get_data(as_text=True)
+        refreshed = client.get("/api/boot-image/ns-state")
+    assert refreshed.status_code == 200
+    saved = next(row for row in refreshed.json["abstractions"]
+                 if row.get("slot") == 14)
+    assert saved["selection"] == design["selection"]
+    assert saved["symbolic"] is True and saved.get("resident") is False
+    assert (paths["manifest"].read_bytes(),
+            (lumps / source["filename"]).read_bytes()) == before
+
+
+def test_rejected_existing_browser_executable_keeps_choice_until_explicit_recovery(
+        tmp_path, monkeypatch):
+    app_module, lumps, paths, state, initial = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    source = next(row for row in json.loads(paths["manifest"].read_text())
+                  if row.get("filename", "").startswith("ide.Alice."))
+    raw = (lumps / source["filename"]).read_bytes()
+    record = {
+        "token": source["token"], "filename": source["filename"],
+        "abstraction": "ide.Alice", "binary_hash": hashlib.sha256(raw).hexdigest(),
+        "binary_valid": True,
+    }
+    fixture = {
+        "pending": True, "image": initial["data_b64"],
+        "state": state, "config": initial["boot_config"],
+        "fingerprint": initial["namespaceFingerprint"],
+        "aliceWords": list(struct.unpack(f">{len(raw) // 4}I", raw)),
+        "selection": {"name": "ide.Alice", "status": "unresolved", "record": record},
+    }
+    browser = subprocess.run(
+        ["node", str(ROOT / "simulator" / "test_ns_design_save_payload.js")],
+        input=json.dumps(fixture), text=True, capture_output=True, check=False,
+        cwd=ROOT, timeout=30)
+    assert browser.returncode == 0, browser.stderr
+    executable, design = json.loads(browser.stdout)
+    rejected = next(row for row in executable["ns_state"]["abstractions"]
+                    if row["slot"] == 14)
+    kept = next(row for row in design["ns_state"]["abstractions"]
+                if row["slot"] == 14)
+    assert rejected.get("symbolic") is not True
+    assert kept["symbolic"] is True
+    assert kept["selection"]["filename"] == source["filename"]
+    assert kept["selection"]["binaryHash"] == record["binary_hash"]
+    before = {name: path.read_bytes() for name, path in paths.items()}
+    with app_module.app.test_client() as client:
+        failed = client.post(
+            "/api/boot-image/save-ns", json=executable, headers=_report_headers())
+        assert failed.status_code == 409
+        assert "exact hash-bound approval required" in str(failed.json)
+        assert {name: path.read_bytes() for name, path in paths.items()} == before
+        succeeded = _reviewed_save(client, design)
+        assert succeeded.status_code == 200, succeeded.get_data(as_text=True)
+        refreshed = client.get("/api/boot-image/ns-state")
+    assert refreshed.status_code == 200
+    assert next(row for row in refreshed.json["abstractions"]
+                if row["slot"] == 14)["selection"] == kept["selection"]
+    assert (lumps / source["filename"]).read_bytes() == raw
+
+
+def test_new_resident_derivative_cannot_claim_original_selected_sha(
+        tmp_path, monkeypatch):
+    app_module, lumps, _paths, _state, initial = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    saved = next(path for path in lumps.iterdir()
+                 if path.name.startswith("ide.Alice.") and path.suffix == ".lump")
+    raw = saved.read_bytes()
+    original = struct.unpack(f">{len(raw) // 4}I", raw)
+    image = bytearray(base64.b64decode(initial["data_b64"]))
+    location = 0x0800
+    assert location + len(original) < len(image) // 4 - 256
+    struct.pack_into("<I", image, (len(image) // 4 - (14 + 1) * 4) * 4,
+                     location)
+    struct.pack_into(f"<{len(original)}I", image, location * 4, *original)
+    row = {"name": "ide.Alice", "slot": 14, "type": "Inform",
+           "resident": True, "boot_resident": True,
+           "load_policy": "Resident", "filename": saved.name,
+           "binary_hash": hashlib.sha256(raw).hexdigest()}
+    app_module._validate_new_namespace_resident_bytes([row], {}, bytes(image))
+    derivative = list(original)
+    derivative[-1] ^= 1  # changed c-list tail; still claims original SHA
+    struct.pack_into(f"<{len(derivative)}I", image, location * 4, *derivative)
+    with pytest.raises(ValueError, match="resident bytes differ"):
+        app_module._validate_new_namespace_resident_bytes([row], {}, bytes(image))
 
 
 @pytest.mark.parametrize("catalog_variant", [

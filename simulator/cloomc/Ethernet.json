@@ -1,0 +1,35 @@
+{
+  "abstraction": "Ethernet",
+  "description": "Editable first-pass raw MMIO draft. EthernetDevice is UNBOUND in the current boot Namespace.",
+  "status": "draft",
+  "language": "assembly",
+  "source_file": "simulator/cloomc/Ethernet.cloomc",
+  "recovered_from": "server/lumps/Ethernet.1.b169bba4.lump",
+  "recovered_binary_sha256": "a0f1e83804a613773d356c3743840f598f082d8da97e82e8524e44b3a50413db",
+  "ns_slot": null,
+  "ns_slot_policy": "dynamic",
+  "grants": ["E"],
+  "capabilities": [
+    {"slot": 0, "name": "SELF", "perm": "E", "compiler_owned_self": true},
+    {"slot": 1, "name": "EthernetDevice", "perm": "RW", "binding_status": "unbound", "target": null, "gt": null}
+  ],
+  "binding_notes": [
+    "Current ns-state.json and raw boot-image.bin contain no EthernetDevice capability. NS[9] is an abstraction, not a device.",
+    "Historical binary c-list 0x07800400 is not a valid current device binding.",
+    "No Tunnel calls or dependency in recovered bodies. No Tunnel draft publication assumed.",
+    "Raw MMIO methods require a separately verified device binding before execution; unbound calls fault."
+  ],
+  "historical_register_intent": {"STATUS": 1, "TX_LEN": 2, "RX_LEN": 3, "IP_ADDR": 4, "PORT": 5, "TX_DATA": 6, "RX_DATA": 7},
+  "methods": [
+    {"name": "Send", "index": 0, "inputs": ["DR1: reserved dataGT data word (unused)", "DR2: preloaded byte count"], "outputs": ["DR1: requested byte count"], "description": "Raw TX_LEN write only, not delivered bytes. No DMA, FIFO loading or delivery guarantee."},
+    {"name": "Receive", "index": 1, "inputs": [], "outputs": ["DR1: raw RX_LEN"], "description": "Single nonblocking register read. No buffer GT, draining, timeout or framing."},
+    {"name": "Connect", "index": 2, "inputs": ["DR1: packed IPv4 (unused)", "DR2: port (unused)"], "outputs": ["DR1: -1 NOT_IMPLEMENTED"], "description": "No I/O. UDP session establishment and PHY/link waiting are not implemented."},
+    {"name": "Status", "index": 3, "inputs": [], "outputs": ["DR1: raw STATUS"], "description": "Historical 0/1/2 down/up/negotiating intent is not verified against a current device."}
+  ],
+  "abi_notes": [
+    "DR0 is immutable zero. DR1 is the primary result. CR7 is scratch.",
+    "SELF occupies compiler-owned row 0; EthernetDevice RW is symbolic row 1.",
+    "RETURN uses the modern implicit continuation, not CR5 instance data.",
+    "No published binary, Namespace entry, privileged grant or device binding is created."
+  ]
+}

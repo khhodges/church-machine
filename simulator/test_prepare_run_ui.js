@@ -277,8 +277,8 @@ function makeReconciliationContext(options) {
 
 (async () => {
     // Actual toolbar single-click callback must consume prepared execution,
-    // never the persistent Prepare/Run transaction. Run's normal guard also
-    // covers keyboard/IDEActions entry and rejects missing/invalid images.
+    // never the persistent Prepare/Run transaction. Stale preparation state
+    // does not veto exact already-loaded bytes; missing bytes still do.
     const toolbarStart = runSource.indexOf('function onRunBtnClick()');
     const toolbarEnd = runSource.indexOf('function prepareAndRunSavedArtifact(', toolbarStart);
     const guardStart = runSource.indexOf('function _requireCommittedImageForExecution(');
@@ -319,9 +319,9 @@ function makeReconciliationContext(options) {
         callback();
         assert.strictEqual(calls.prepare, 0, scenario + ': no implicit preparation');
         assert.strictEqual(calls.executed,
-            ['fresh', 'older-saved-revision'].includes(scenario) ? 1 : 0);
+            scenario === 'missing' ? 0 : 1);
         assert.strictEqual(calls.blocked,
-            ['missing', 'invalid'].includes(scenario) ? 1 : 0);
+            scenario === 'missing' ? 1 : 0);
     }
     const resetGuard = runSource.slice(
         runSource.indexOf('function _ensureCommittedImageForBoot('), guardStart);
@@ -349,7 +349,7 @@ function makeReconciliationContext(options) {
         vm.runInContext(resetGuard, reset);
         assert.strictEqual(reset._ensureCommittedImageForBoot('Reset'), scenario === 'fresh');
         if (reset._bootImageRefreshInFlight) await reset._bootImageRefreshInFlight;
-        assert.strictEqual(calls.reads, scenario === 'rejected-image' ? 1 : 0);
+        assert.strictEqual(calls.reads, scenario === 'fresh' ? 0 : 1);
         assert.strictEqual(calls.blocked, scenario === 'fresh' ? 0 : 1);
         assert.strictEqual(calls.resets, 0, 'failed image fetch must not reset into factory memory');
     }

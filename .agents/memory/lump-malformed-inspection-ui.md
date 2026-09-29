@@ -15,3 +15,10 @@ execution authority. Missing bytes stay explicitly unavailable; never decode
 authentication-error JSON as binary or bypass access controls to retrieve
 private source. The user's confirmed preference is visible available data with
 a warning, not suppression of diagnostic inspection.
+
+Global boot-preparation staleness must not hide a selected saved LUMP's
+disassembly or replace an owned editor draft with the boot-entry selection.
+**Why:** Unrelated resident dependencies can invalidate preparation while the
+selected artifact remains available for debugging.
+**How to apply:** Inspect exact selected bytes independently of boot acceptance;
+label stale or unverified evidence without granting execution authority.

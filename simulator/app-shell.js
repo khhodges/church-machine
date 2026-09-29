@@ -308,6 +308,9 @@ function _executionIdentityRender() {
     _executionIdentityRenderOne('executionIdentityEditor');
     _executionIdentityRenderOne('executionIdentityTrace');
     _executionIdentityRenderOne('executionIdentityHwTrace');
+    if (typeof _showBootArtifactInspectionStatus === 'function') {
+        _showBootArtifactInspectionStatus();
+    }
     const announcement = [
         _executionIdentity.status,
         _executionIdentity.token,
@@ -569,6 +572,9 @@ async function deleteUserTab(id) {
     saveUserTabsToStorage();
     if (activeUserTabId === id) {
         window._advanceEditorNavigationEpoch('delete active personal tab');
+        if (typeof window.exitSavedLumpEditorMode === 'function') {
+            window.exitSavedLumpEditorMode();
+        }
         activeUserTabId = null;
         userTabDirty = false;
         _updateEditorCodeName('');
@@ -632,6 +638,9 @@ function _commitUserTabSelection(tab) {
     const outputEl = document.getElementById('assemblyOutput');
     if (outputEl) outputEl.innerHTML = '';
     if (typeof saveEditorState === 'function') saveEditorState();
+    if (typeof window._presentPersonalSavedBinary === 'function') {
+        void window._presentPersonalSavedBinary(tab);
+    }
 }
 
 function saveActiveUserTab() {
@@ -1713,6 +1722,10 @@ function init() {
                         _accepted = false;
                     }
                    if (_accepted) {
+                        window._bootImageInspectionWarning = null;
+                        if (typeof _showBootArtifactInspectionStatus === 'function') {
+                            _showBootArtifactInspectionStatus();
+                        }
                        // Cache before resetting: _maybeApplyBootImage(), the
                        // reset listener, uses this exact buffer to overlay the
                        // real descriptor synchronously.
@@ -1801,6 +1814,7 @@ function init() {
     renderUserTabs();
     initReplDivider();
     initEditorDivider();
+    initEditorHorizontalDivider();
     initConsoleAutoSwitch();
     // Debounced recalculation of error/warning underlines — called whenever the
     // editor dimensions change (browser zoom, future font-size setting, window resize).
@@ -2994,4 +3008,3 @@ document.addEventListener('DOMContentLoaded', function() {
         if (btn) btn.style.display = draft ? '' : 'none';
     } catch(e) {}
 });
-

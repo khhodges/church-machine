@@ -47,6 +47,6 @@ assert.equal(result.tabs[0].code, source);
 result = await run(null, '');
 assert.equal(result.tabs.length, 0);
 assert.ok(code.includes('class="btn lump-history-open-editor"'));
-assert.ok(code.includes('_openLumpHistorySourceInEditor(archivedSource, name, version)'));
+assert.ok(code.includes('_openLumpHistorySourceInEditor(\n                        editablePreviewSource, name, version, {'));
 console.log('PASS exact historical source, prior buffer preservation, personal tabs, empty source, and preview wiring');
 })().catch(error => { console.error(error); process.exitCode = 1; });

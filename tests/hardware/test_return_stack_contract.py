@@ -124,8 +124,19 @@ def test_return_root_poison_is_underflow_not_boot_rom_return():
     assert flag_events == []
 
 
-def test_return_rejects_invalid_companion_before_sto_update():
-    result, writes, nia_events, flag_events = _run(companion=0)
+def test_saved_pc_three_requires_ordinary_caller_validation():
+    # The frame unit supplies a saved PC. The core must validate/rebuild
+    # its caller through cLoad; word 3 grants no boot-ROM authority.
+    result, writes, nia_events, flag_events = _run(frame_pc=3)
+    assert result == {"complete": True}
+    assert writes == [(STO_ADDR, PREV_STO)]
+    assert nia_events == [0x0C]
+    assert flag_events
+
+
+@pytest.mark.parametrize("frame_pc", [3, 10])
+def test_return_rejects_invalid_companion_before_sto_update(frame_pc):
+    result, writes, nia_events, flag_events = _run(frame_pc=frame_pc, companion=0)
     assert result == {"fault": int(FaultType.STACK_CORRUPT)}
     assert writes == []
     assert nia_events == []
@@ -149,10 +160,11 @@ def test_return_rejects_non_inform_e_companions_without_architectural_mutation(
     assert flag_events == []
 
 
-def test_return_propagates_stale_companion_mload_validation_fault():
+@pytest.mark.parametrize("frame_pc", [3, 10])
+def test_return_propagates_stale_companion_mload_validation_fault(frame_pc):
     stale_inform_e = make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=0x123, gt_seq=7)
     result, writes, nia_events, flag_events = _run(
-        companion=stale_inform_e, validate_fault=True
+        frame_pc=frame_pc, companion=stale_inform_e, validate_fault=True
     )
     assert result == {"fault": int(FaultType.STACK_CORRUPT)}
     assert writes == []

@@ -145,9 +145,8 @@ context.window.IDEActions.compile().then(result => {
     const staleWorkspaceRun = context.window.IDEActions.run({
         sourceSurface: 'lumpSourceEditor',
     });
-    if (staleWorkspaceRun.ok || runCalls !== 0 ||
-            !/workspace source/.test(staleWorkspaceRun.error)) {
-        throw new Error('stale workspace Run fell back to the installed program');
+    if (!staleWorkspaceRun.ok || runCalls !== 1 || pendingInstalls !== 1) {
+        throw new Error('stale workspace Run did not preserve the live simulator bytes');
     }
     workspaceEditor.value = 'workspace source';
     // Restore a main-editor candidate to test every install guard without

@@ -61,14 +61,19 @@ function residentFixture() {
 }
 
 // The boot-image descriptor table, not generated API metadata, is the frozen
-// inventory authority.  The repository image intentionally predates the
-// correction, so repair only an in-memory test copy and prove all actual
-// executable resident descriptors are checked.
+// inventory authority. The repository image also contains an unrelated IDE
+// draft at NS[14] without an authenticated resident SELF/W3 binding. Exclude
+// that draft in this in-memory frozen-bootstrap-only fixture; do not change
+// the published image or relax validation of any selected resident.
 function correctedBootImage() {
     const bytes = fs.readFileSync(path.join(__dirname, '..', 'server', 'lumps', 'boot-image.bin'));
     const image = new Uint32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     const probe = new ChurchSimulator();
     const expectedSlots = [6, 7, 10];
+    const draftBase = image.length - (14 + 1) * probe.NS_ENTRY_WORDS;
+    assert.strictEqual(image[draftBase + 3] >>> 0, 0,
+        'unbound IDE draft is not an approved frozen bootstrap resident');
+    image.fill(0, draftBase, draftBase + probe.NS_ENTRY_WORDS);
     for (const slot of expectedSlots) {
         const nsBase = image.length - (slot + 1) * probe.NS_ENTRY_WORDS;
         const location = image[nsBase] >>> 0;

@@ -79,15 +79,10 @@
             // A workspace Run button is bound to its own editor surface. It
             // must never fall back to whichever program happens to be
             // installed when that workspace candidate is absent or stale.
-            if (surface !== 'asmEditor') {
-                if (!candidate || candidate.sourceSurface !== surface || !fresh) {
-                    return {
-                        ok: false,
-                        reason: 'Compile the current workspace source before running its candidate.'
-                    };
-                }
-                return { ok: true, reason: '' };
-            }
+            if (surface !== 'asmEditor' && !fresh) return {
+                ok: true,
+                reason: 'No current workspace build; Run continues the already loaded simulator bytes.'
+            };
             if (candidate && !fresh) {
                 return {
                     ok: true,
@@ -117,7 +112,11 @@
         const button = document.getElementById(id);
         if (!button) return;
         const state = eligibility(action);
-        button.disabled = !state.ok;
+        // A disabled Save button swallows clicks without reporting why (most
+        // confusing immediately after opening a saved source asynchronously).
+        // Keep it clickable so save() can give the precise prerequisite.
+        const interactive = state.ok || action === 'save';
+        button.disabled = !interactive;
         const base = button.dataset.actionBaseTooltip ||
             button.getAttribute('data-tooltip') || button.getAttribute('title') || button.textContent.trim();
         button.dataset.actionBaseTooltip = base;
@@ -126,11 +125,13 @@
             : ' — unavailable: ' + state.reason;
         button.setAttribute('data-tooltip', base.replace(/\s+—\s+(?:unavailable: )?.*$/, '') + suffix);
         button.title = state.ok ? state.reason : state.reason;
-        button.setAttribute('aria-disabled', state.ok ? 'false' : 'true');
+        button.setAttribute('aria-disabled', interactive ? 'false' : 'true');
     }
     function refresh() {
         applyButton('btnHamCompile', 'compile');
+        applyButton('btnToolbarCompile', 'compile');
         applyButton('btnHamSaveLump', 'save');
+        applyButton('btnToolbarSaveLump', 'save');
         applyButton('btnSaveNS', 'save');
         applyButton('btnExportLump', 'export');
         applyButton('btnRunSim', 'run');
@@ -151,6 +152,22 @@
             ok: false, action,
             error: `Cannot ${action}: ${activeOperation} is already in progress.`
         };
+    }
+    function reportSaveFailure(result) {
+        if (result && result.reported) return result;
+        const reason = String(result && result.error || 'The Save LUMP review could not be opened.')
+            .split(/[\r\n]/)[0]
+            .replace(/https?:\/\/\S+/gi, '[URL redacted]')
+            .replace(/(?:\/(?:home|private|Users|tmp)\/)\S+/g, '[path redacted]')
+            .replace(/\b(?:token|password|secret|api[_-]?key)=[^\s]+/gi, '[credential redacted]')
+            .slice(0, 240);
+        const message = 'Save LUMP did not open: ' + reason +
+            ' No LUMP was saved. Keep your draft, then retry Save LUMP after fixing this issue.';
+        if (typeof appendOutput === 'function') appendOutput(message, 'error');
+        const con = document.getElementById('editorConsole');
+        if (con) con.textContent = message;
+        window.alert(message);
+        return Object.assign({}, result, { ok: false, error: message, reported: true });
     }
     async function compileSnapshot(snapshot, options) {
         options = options || {};
@@ -213,14 +230,14 @@
         return candidate;
     }
     async function save(options) {
-        if (activeOperation) return operationBusy('save');
+        if (activeOperation) return reportSaveFailure(operationBusy('save'));
         activeOperation = 'save';
         try {
         const sourceSurface = options && options.sourceSurface || 'asmEditor';
         const state = eligibility('save', undefined, sourceSurface);
-        if (!state.ok) return reportUnavailable('save', sourceSurface);
+        if (!state.ok) return reportSaveFailure(reportUnavailable('save', sourceSurface));
         const built = await buildThen('save', options);
-        if (!built || built.ok === false) return built;
+        if (!built || built.ok === false) return reportSaveFailure(built);
         // Format/approval code consumes the registry snapshot. Restore this
         // candidate's selection if the programmer merely inspected another
         // LUMP while leaving the source draft unchanged.
@@ -230,10 +247,21 @@
         // showFormatLump builds the single review/destination dialog; this
         // command never calls Save-to-NS recursively.
         if (typeof showFormatLump !== 'function') {
-            return { ok: false, error: 'The Format LUMP dialog is unavailable.' };
+            return reportSaveFailure({ ok: false, error: 'The Format LUMP dialog is unavailable.' });
         }
-        await showFormatLump();
+        const review = await showFormatLump();
+        if (review && review.ok === false) return reportSaveFailure(review);
+        const dialog = document.getElementById('saveNSDialog');
+        if (!dialog || dialog.style.display === 'none') {
+            return reportSaveFailure({ ok: false,
+                error: 'The review dialog did not open. Build the current source and try again.' });
+        }
         return { ok: true, action: 'save', candidate: built.token };
+        } catch (error) {
+            console.error('Save LUMP review failed:', error);
+            return reportSaveFailure({ ok: false, error:
+                (error && error.name ? error.name + ': ' : '') +
+                (error && error.message ? error.message : 'An internal error interrupted review preparation.') });
         } finally {
             activeOperation = null;
         }
@@ -286,8 +314,7 @@
         const sourceSurface = options && options.sourceSurface || 'asmEditor';
         const state = eligibility('run', undefined, sourceSurface);
         if (!state.ok) return reportUnavailable('run', sourceSurface);
-        // A stale candidate is never silently installed.  A separate already
-        // installed program may still be resumed safely.
+        // Run is not Install: a stale candidate does not replace live bytes.
         if (!candidate || !candidateIsCurrent(sourceSurface)) return { ok: true, installed: false };
         if (activeOperation) return operationBusy('install');
         if ((typeof sim !== 'undefined' && sim && sim.running) ||
@@ -336,13 +363,24 @@
         return { ok: true, installed: true, token: candidate.token };
     }
     function run(options) {
-        const install = installCandidate(options);
-        if (!install.ok) return install;
         if (typeof runSimGo !== 'function') {
             return { ok: false, error: 'The run command is unavailable.' };
         }
+        // Plain Run/F5 resumes the exact loaded bytes. Building or merely
+        // viewing a newer candidate does not silently replace the target.
+        // Clear only the volatile install queue: otherwise the next Step/Walk
+        // would unexpectedly replace the bytes Run just chose. The compiled
+        // candidate itself remains available under the explicit menu action.
+        if (typeof _clearPendingSimLoad === 'function') _clearPendingSimLoad();
+        runSimGo(undefined, { applyPendingLoad: false });
+        return { ok: true, action: 'run', token: installed && installed.token };
+    }
+    function runCandidate(options) {
+        const install = installCandidate(options);
+        if (!install.ok || !install.installed) return install.installed
+            ? install : { ok: false, error: 'Build the current source before running its candidate.' };
         runSimGo();
-        return { ok: true, action: 'run', token: install.token || (installed && installed.token) };
+        return { ok: true, action: 'run', token: install.token };
     }
 
     window.IDEActionState = {
@@ -361,7 +399,7 @@
         eligibility,
         refresh,
     };
-    window.IDEActions = { compile, save, export: exportCandidate, installCandidate, run, refresh };
+    window.IDEActions = { compile, save, export: exportCandidate, installCandidate, run, runCandidate, refresh };
 
     document.addEventListener('input', event => {
         if (event.target && event.target.id === 'asmEditor') refresh();

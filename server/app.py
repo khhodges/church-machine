@@ -4273,7 +4273,8 @@ def _normalize_thread_config_policies(data, authority_rows):
     return normalized
 
 
-def _validated_boot_config_candidate(data, existing=None, authority_rows=None):
+def _validated_boot_config_candidate(data, existing=None, authority_rows=None,
+                                     allow_slot_labels=False):
     """Normalize a complete config candidate with the boot-config POST rules."""
     if not isinstance(data, dict):
         return None, "Invalid boot configuration body"
@@ -4378,6 +4379,18 @@ def _validated_boot_config_candidate(data, existing=None, authority_rows=None):
     # Boot Image Designer save that doesn't include them.
     if isinstance(existing.get("slotLabels"), dict):
         cfg["slotLabels"] = existing["slotLabels"]
+    if allow_slot_labels and "slotLabels" in data:
+        labels = data["slotLabels"]
+        if not isinstance(labels, dict) or len(labels) > 256:
+            return None, "Namespace slot labels must be an object with at most 256 entries"
+        for key, label in labels.items():
+            if (not isinstance(key, str) or re.fullmatch(r"0|[1-9][0-9]*", key) is None
+                    or int(key) >= 256 or not isinstance(label, str)
+                    or not label.strip() or label != label.strip()
+                    or len(label) > 128
+                    or any(ord(char) < 32 or ord(char) == 127 for char in label)):
+                return None, "Namespace slot label is malformed"
+        cfg["slotLabels"] = {**cfg.get("slotLabels", {}), **labels}
     # Next.GT is derived from the LightningBolt boot entry when generating an
     # image. A separately saved continuation target is obsolete and must not
     # survive a Boot Image Designer save.
@@ -5509,8 +5522,12 @@ def boot_image_binary():
     except ValueError as _e:
         logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
-    if (_origin != "imported"
-            and _boot_image_is_stale()):
+    # Simulator-only opt-in reads the existing committed bytes for a programmer's
+    # explicit test. This does not prepare, publish, download for hardware, or
+    # change the normal freshness gate on this endpoint.
+    simulator_read = request.args.get("simulator") == "1"
+    stale_inputs = _origin != "imported" and _boot_image_is_stale()
+    if stale_inputs and not simulator_read:
         # Serving must not quietly replace a valid prepared CR0 home with the
         # current server's default, revision, or load policy.  This is
         # especially important for imported images, whose source artifacts may
@@ -5528,7 +5545,8 @@ def boot_image_binary():
     with open(BOOT_IMAGE_PATH, "rb") as _f:
         _image_bytes = _f.read()
     try:
-        _boot_image_gen.validate_boot_image(_image_bytes, _configured_words)
+        _boot_image_gen.validate_boot_image(
+            _image_bytes, None if simulator_read else _configured_words)
         _preparation = _boot_image_preparation_status(
             _image_bytes, None if _cfg_err else _cfg)
     except ValueError as _e:
@@ -5539,6 +5557,8 @@ def boot_image_binary():
     resp.headers["Pragma"] = "no-cache"
     resp.headers["X-Boot-Preparation"] = _preparation["status"]
     resp.headers["X-Boot-Image-Origin"] = _origin or "unknown"
+    if simulator_read:
+        resp.headers["X-Simulator-Image-Stale"] = "true" if stale_inputs else "false"
     if _preparation["status"] != "prepared":
         resp.headers["X-Boot-Preparation-Reason"] = _preparation["reason"]
     return resp
@@ -6067,6 +6087,81 @@ def _boot_execution_freshness(state, lumps_dir):
     return result
 
 
+def _resolve_namespace_saved_artifacts(state, lumps_dir):
+    """Response-only exact saved-artifact metadata for committed NS rows.
+
+    Older committed rows can predate filename/hash/version persistence.  Resolve
+    them only when the catalogue proves one identity: exact saved selectors when
+    present, or one unique active catalogue record for the committed dot name.
+    No latest ordering and no issue/Namespace sequence fallback is permitted.
+    """
+    if not isinstance(state, dict):
+        return state
+    rows = state.get("abstractions")
+    manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
+    if not isinstance(rows, list) or not isinstance(manifest, list):
+        return state
+
+    catalog = []
+    for entry in manifest:
+        if not isinstance(entry, dict):
+            continue
+        filename = entry.get("filename")
+        version = entry.get("lump_version")
+        if (not isinstance(filename, str) or os.path.basename(filename) != filename
+                or isinstance(version, bool) or not isinstance(version, int)
+                or version < 0):
+            continue
+        path = os.path.join(lumps_dir, filename)
+        try:
+            digest = _file_sha256(path)
+        except OSError:
+            continue
+        item = dict(entry)
+        item["_exact_binary_hash"] = digest.lower()
+        catalog.append(item)
+
+    resolved_rows = []
+    for original in rows:
+        if not isinstance(original, dict):
+            resolved_rows.append(original)
+            continue
+        row = dict(original)
+        if row.get("symbolic") is True:
+            # A design-time selection is never a trusted executable binding.
+            resolved_rows.append(row)
+            continue
+        filename = row.get("filename")
+        token = str(row.get("token") or "").lower()
+        digest = str(row.get("binary_hash") or row.get("binaryHash") or "").lower()
+        has_exact_selector = bool(filename or token or digest)
+        matches = []
+        for item in catalog:
+            if filename and item.get("filename") != filename:
+                continue
+            if token and str(item.get("token") or "").lower() != token:
+                continue
+            if digest and item["_exact_binary_hash"] != digest:
+                continue
+            if not has_exact_selector:
+                if item.get("archived") is True:
+                    continue
+                if item.get("abstraction") != row.get("name"):
+                    continue
+            matches.append(item)
+        if len(matches) == 1:
+            exact = matches[0]
+            row["filename"] = exact["filename"]
+            row["token"] = exact.get("token")
+            row["binary_hash"] = exact["_exact_binary_hash"]
+            row["lump_version"] = exact["lump_version"]
+        resolved_rows.append(row)
+
+    result = dict(state)
+    result["abstractions"] = resolved_rows
+    return result
+
+
 def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
     """Resolve the exact saved artifact for the Prepare/Run boundary.
 
@@ -6459,6 +6554,9 @@ def boot_image_ns_state():
         _authoritative_fingerprint = _namespace_state_fingerprint(
             _state.get("abstractions") or [])
         _state = _project_effective_thread_policies(_state)
+        # Response-only compatibility enrichment for older committed rows. The
+        # persisted Namespace and its CAS fingerprint remain unchanged.
+        _state = _resolve_namespace_saved_artifacts(_state, LUMPS_DIR)
         # Attach the authoritative raw NS-table view (raw words + header
         # geometry straight from boot-image.bin) for the Namespace Design
         # Page drill-down.  Best-effort: absence just omits the block.
@@ -6499,14 +6597,105 @@ def _validate_symbolic_namespace_entries(entries):
     """Reject symbolic rows that claim an implementation or binary identity."""
     for entry in entries:
         if entry.get("symbolic") is not True:
+            if "selection" in entry:
+                raise ValueError(
+                    "Design-time selection belongs only to a non-executable symbolic row")
             continue
         if entry.get("implementationMissing") is not True:
             raise ValueError("Symbolic Namespace entries must be explicitly marked implementationMissing")
+        if entry.get("boot") is True:
+            raise ValueError("Non-executable Namespace placements cannot be boot targets")
         if any(entry.get(key) not in (None, "", False) for key in (
                 "token", "filename", "binaryHash", "binary_hash",
                 "identityHash", "identity_hash", "cacheToken", "cache_token",
                 "resident", "boot_resident")):
             raise ValueError("Symbolic Namespace entries cannot carry binary or resident metadata")
+        if entry.get("location") not in (None, "0x00000000", 0):
+            raise ValueError("Non-executable Namespace placements require a zero physical location")
+        selection = entry.get("selection")
+        if selection is None:
+            continue  # Historical code-free symbolic abstractions remain valid.
+        name = entry.get("name")
+        if (not isinstance(name, str) or not name.strip()
+                or name != name.strip() or len(name) > 128
+                or any(ord(char) < 32 or ord(char) == 127 for char in name)):
+            raise ValueError("Design-time placement requires a bounded pet name")
+        if not isinstance(selection, dict) or set(selection) - {
+                "status", "diagnostic", "token", "filename", "binaryHash"}:
+            raise ValueError("Invalid design-time Namespace selection fields")
+        if selection.get("status") not in ("missing", "invalid", "unresolved"):
+            raise ValueError("Design-time selection must be explicitly non-executable")
+        diagnostic = selection.get("diagnostic")
+        if not isinstance(diagnostic, str) or not diagnostic.strip() or len(diagnostic) > 2048:
+            raise ValueError("Design-time selection needs a bounded validation diagnostic")
+        token = selection.get("token")
+        if token is not None and (not isinstance(token, str)
+                                  or re.fullmatch(r"[0-9a-fA-F]{8}", token) is None):
+            raise ValueError("Design-time selection token is malformed")
+        filename = selection.get("filename")
+        if filename is not None and (not isinstance(filename, str)
+                                      or len(filename) > 255
+                                      or os.path.basename(filename) != filename
+                                      or not filename.endswith(".lump")):
+            raise ValueError("Design-time selection filename is malformed")
+        digest = selection.get("binaryHash")
+        if digest is not None and (not isinstance(digest, str)
+                                   or re.fullmatch(r"[0-9a-fA-F]{64}", digest) is None):
+            raise ValueError("Design-time selection hash is malformed")
+
+
+def _validate_symbolic_namespace_image(entries, image_bytes):
+    """A design-only row cannot smuggle a resident body through raw image words."""
+    import struct
+    if image_bytes is None or len(image_bytes) % 4:
+        raise ValueError("Namespace image is missing or unaligned")
+    n_words = len(image_bytes) // 4
+    for entry in entries:
+        if entry.get("symbolic") is not True:
+            continue
+        slot = entry["slot"]
+        offset = n_words - (slot + 1) * 4
+        if offset < 0 or struct.unpack_from("<I", image_bytes, offset * 4)[0] != 0:
+            raise ValueError(
+                f"Non-executable Namespace placement NS[{slot}] must have W0=0")
+
+
+def _validate_new_namespace_resident_bytes(entries, previous_by_slot, image_bytes):
+    """A newly selected resident cannot claim one approved hash for reminted bytes."""
+    if image_bytes is None:
+        return
+    for row in entries:
+        if (row.get("symbolic") is True or row.get("resident") is not True
+                or row.get("boot_resident") is not True
+                or row.get("load_policy", row.get("loadPolicy")) != "Resident"
+                or row.get("type") not in ("Inform", "Resident")):
+            continue
+        old = previous_by_slot.get(row["slot"])
+        if old and (old.get("filename") == row.get("filename")
+                    and (old.get("binary_hash") or old.get("binaryHash"))
+                    == (row.get("binary_hash") or row.get("binaryHash"))):
+            continue
+        filename = row.get("filename")
+        if not isinstance(filename, str) or os.path.basename(filename) != filename:
+            continue  # The exact-binding validator reports missing locators.
+        with open(os.path.join(LUMPS_DIR, filename), "rb") as source:
+            raw = source.read()
+        if len(raw) < 4 or len(raw) % 4:
+            raise ValueError(
+                f"Namespace slot {row['slot']} selected artifact is not whole words")
+        words = struct.unpack(f">{len(raw) // 4}I", raw)
+        count = len(image_bytes) // 4
+        offset = count - (row["slot"] + 1) * 4
+        if offset < 0:
+            raise ValueError(f"Namespace slot {row['slot']} is outside the candidate image")
+        location = struct.unpack_from("<I", image_bytes, offset * 4)[0]
+        if (location <= 0 or location + len(words) > count
+                or struct.unpack_from(
+                    f"<{len(words)}I", image_bytes, location * 4) != words):
+            raise ValueError(
+                f"Namespace slot {row['slot']} resident bytes differ from the exact "
+                "saved approved LUMP. Reminted bytes require their own saved, "
+                "compiler-approved artifact; use a non-executable design placement instead.")
 
 
 def _validate_active_namespace_lumps(entries):
@@ -6702,6 +6891,8 @@ def boot_image_save_ns(_review_only=False):
             and isinstance(_a.get("slot"), int)
         ]
         _validate_symbolic_namespace_entries(_ns_entries)
+        if _img_bytes is not None:
+            _validate_symbolic_namespace_image(_ns_entries, _img_bytes)
         if os.path.isfile(NS_STATE_PATH):
             with open(NS_STATE_PATH, encoding="utf-8") as _old_state_fh:
                 _old_state = json.load(_old_state_fh)
@@ -6727,6 +6918,7 @@ def boot_image_save_ns(_review_only=False):
                 if _entry.get(_key) is None and _old_entry.get(_key) is not None:
                     _entry[_key] = _old_entry[_key]
         _validate_active_namespace_lumps(_ns_entries)
+        _validate_new_namespace_resident_bytes(_ns_entries, _old_by_slot, _img_bytes)
         _validate_namespace_boot_marker(_ns_entries)
         _submitted_boot_row = next(
             row for row in _ns_entries if row.get("boot") is True)
@@ -6750,12 +6942,12 @@ def boot_image_save_ns(_review_only=False):
         # A Namespace drag can change both the serialized image selection and
         # next-build config.  Validate the supplied complete candidate with
         # the exact same normalization/validation routine as /boot-config,
-        # then commit it only with this image and decoded state.
-        ok, auth_error = _optional_report_token_check()
-        if not ok:
-            return auth_error
+        # then commit it only with this image and decoded state. This is an
+        # ordinary IDE configuration write, not a privileged deployment or
+        # hardware operation; its review and commit must not need REPORT_TOKEN.
         cfg, cfg_err = _validated_boot_config_candidate(
-            _boot_config_candidate, authority_rows=_ns_entries)
+            _boot_config_candidate, authority_rows=_ns_entries,
+            allow_slot_labels=True)
         if cfg_err:
             return jsonify({"ok": False, "error": cfg_err}), 400
     else:
@@ -6766,6 +6958,7 @@ def boot_image_save_ns(_review_only=False):
     if _generate:
         try:
             _img_bytes, _ns_entries = _stage_namespace_save_image(cfg, _ns_entries)
+            _validate_symbolic_namespace_image(_ns_entries, _img_bytes)
             _validate_boot_image_bytes(_img_bytes)
         except (OSError, ValueError, TypeError) as _exc:
             return jsonify(ok=False, error=f"Namespace generation rejected: {_exc}",
@@ -9804,7 +9997,10 @@ def _authoritative_lump_library_generation(
             slots = {slot for slot in dependency_slots if isinstance(slot, int)}
             if isinstance(ns_slot, int):
                 slots.add(ns_slot)
-            rows, _ = _read_authoritative_namespace_rows()
+            # A library-only destination with purely symbolic dependencies has
+            # no Namespace generation dependency. Do not require an unrelated
+            # live boot/Namespace binding merely to preserve source bytes.
+            rows = _read_authoritative_namespace_rows()[0] if slots else []
             relevant_rows = []
             for row in rows:
                 if not isinstance(row, dict):
@@ -10028,6 +10224,52 @@ def _content_frame_extent_error(words):
             f"allocation ends at {end - 1})"
         )
     return None
+
+
+def _symbolic_declared_clist_rows(words, capabilities):
+    """Recognize symbolic rows exclusively from the existing embedded API.
+
+    This is structural validation only; signature, approval and lease checks
+    still govern the exact bytes by the same rules as resolved artifacts.
+    """
+    frame = _parse_intrinsic_lump_content(words)
+    api = (frame or {}).get("api_definition")
+    embedded = api.get("capabilities") if isinstance(api, dict) else None
+    cc = words[0] & 0xff
+    if (not isinstance(embedded, list) or len(embedded) != cc
+            or len(capabilities) != cc):
+        return set()
+    size = 1 << (((words[0] >> 23) & 0xf) + 6)
+    if len(words) < size:
+        return set()
+    rows = set()
+    for row, (declared, intrinsic) in enumerate(zip(capabilities, embedded)):
+        if not isinstance(declared, dict) or not isinstance(intrinsic, dict):
+            continue
+        name, inner_name = declared.get("name"), intrinsic.get("name")
+        self_row = row == 0 and declared.get("compiler_owned_self") is True
+        if self_row and name in ("SELF", "__SELF__") and inner_name in ("SELF", "__SELF__"):
+            name = inner_name = "SELF"
+        if (not isinstance(name, str) or name != inner_name
+                or not re.fullmatch(r"(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})", name)):
+            continue
+        if any(declared.get(key) != intrinsic.get(key) for key in (
+                "N", "T", "binary_hash", "identity_hash", "identity_string", "token")):
+            continue
+        rights, inner_rights = declared.get("rights"), intrinsic.get("rights")
+        if (not isinstance(rights, list) or not rights
+                or not isinstance(inner_rights, list)
+                or any(not isinstance(right, str) or right not in "RWXLSE" or len(right) != 1
+                       for right in rights + inner_rights)
+                or set(rights) != set(inner_rights)):
+            continue
+        word = words[size - cc + row] & 0xffffffff
+        if self_row:
+            if rights == ["E"] and word in (0, 0xFEED5E1F):
+                rows.add(row)
+        elif word == 0 or (word >> 16 == 0xFEED and word not in (0xFEED5E1F, 0xFEEDDA7A)):
+            rows.add(row)
+    return rows
 
 
 def _inspect_lump_binary(binary_or_path, *, allow_compact_fit=False):
@@ -12075,12 +12317,12 @@ def save_lump():
         _sl_words.extend([0] * (_sl_lsz - len(_sl_words)))
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
+    _symbolic_cap_rows = _symbolic_declared_clist_rows(_sl_words, _declared_caps_raw)
     if (_compiler_self_row and ns_slot is None
-            and _portable_binding is None):
-        # A compiler-owned SELF row is only an intermediate representation.
-        # It may be accepted by preparation when the caller selected a
-        # Namespace destination, but it must never be persisted as an
-        # unresolved artifact with no authoritative sequence/slot.
+            and _portable_binding is None and 0 not in _symbolic_cap_rows):
+        # A bare SELF claim without its embedded declaration is insufficient
+        # for a destination-independent save. Existing selected-destination
+        # preparation continues to validate and mint its local identity.
         return jsonify({
             "error": (
                 "Namespace identity validation failed: compiler-owned "
@@ -12113,7 +12355,8 @@ def save_lump():
             _is_preflight or _early_plan is not None or
             _is_bootstrap_canonical
         )
-        if _submitted_self_word == _SELF_CAPABILITY_PLACEHOLDER:
+        if (_submitted_self_word == _SELF_CAPABILITY_PLACEHOLDER
+                or (_submitted_self_word == 0 and 0 in _symbolic_cap_rows)):
             if not (_compiler_self_provenance or _is_bootstrap_canonical):
                 return jsonify({
                     "error": (
@@ -12144,6 +12387,7 @@ def save_lump():
         _misplaced_self_rows = [
             _row for _row in range(1, _sl_cc2)
             if ((_sl_words[_clist_row0_idx + _row] & 0xFFFFFFFF) >> 16) == 0xFEED
+            and _row not in _symbolic_cap_rows
         ]
         if _misplaced_self_rows:
             _misplaced_row = _misplaced_self_rows[0]
@@ -12289,6 +12533,7 @@ def save_lump():
     _unresolved_self_rows = [] if _portable_binding is not None else [
         _row for _row in range(_sl_cc2)
         if ((_sl_words[_clist_row0_idx + _row] & 0xFFFFFFFF) >> 16) == 0xFEED
+        and _row not in _symbolic_cap_rows
     ]
     if _unresolved_self_rows:
         _unresolved_row = _unresolved_self_rows[0]
@@ -12471,6 +12716,12 @@ def save_lump():
                 return _cap_reject(
                     f"permissions {''.join(_cap_rights)} violate the single-Church-permission rule."
                 )
+
+            if _cap_row in _symbolic_cap_rows:
+                _cap_obj.update(name=_cap_name, rights=_cap_rights,
+                                nsIndex=None, pending=True)
+                _validated_declared_caps.append(_cap_obj)
+                continue
 
             try:
                 if isinstance(_cap_target_raw, bool):
@@ -13187,20 +13438,8 @@ def save_lump():
         "filename":      lump_filename,
         "lump_version":  next_lump_version,
         "compiled_at":   _compiled_at,
-        # Intrinsic content facts and user identity metadata are retained in
-        # the manifest alongside the binary. The binary remains authoritative
-        # for words/source/profile; these fields make repository recovery and
-        # diagnostics complete without trusting them for validation.
-        "dot_name":      _dot_name_save,
-        "issue_n":       _issue_n_save,
-        "petname":       _petname,
-        "content_profile": (
-            _intrinsic_content.get("tier")
-            if isinstance(_intrinsic_content, dict) else None),
-        "output_profile": (
-            _intrinsic_content.get("tier")
-            if isinstance(_intrinsic_content, dict) else None),
-        "capabilities":  list(_validated_declared_caps),
+        # Only binary locators and revision history belong in this index.
+        # Intrinsics come from exact bytes, extrinsics from hash-bound approvals.
     }
     if not _is_preflight:
         # This marker is not a client authority.  It lets crash recovery prove
@@ -14885,6 +15124,40 @@ def _namespace_selected_archived_lump(key8, manifest=None):
     }
 
 
+def _attach_unverified_exact_source(response, lump_path, catalog_record=None):
+    """Attach read-only source associated with this exact binary filename.
+
+    `source` remains exclusively binary-intrinsic.  This helper never searches
+    by abstraction name, so a current catalog entry cannot be relabelled as
+    source for historical bytes.
+    """
+    if response.get("source"):
+        return response
+    fallback_source = None
+    fallback_provenance = None
+    sidecar_path = os.path.splitext(lump_path)[0] + ".json"
+    if os.path.isfile(sidecar_path):
+        try:
+            with open(sidecar_path, encoding="utf-8") as sidecar_file:
+                sidecar_record = json.load(sidecar_file)
+            candidate = sidecar_record.get("source") if isinstance(
+                sidecar_record, dict) else None
+            if isinstance(candidate, str) and candidate:
+                fallback_source = candidate
+                fallback_provenance = "legacy sidecar for exact filename"
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+    if fallback_source is None and isinstance(catalog_record, dict):
+        candidate = catalog_record.get("source")
+        if isinstance(candidate, str) and candidate:
+            fallback_source = candidate
+            fallback_provenance = "catalog record for exact filename"
+    if fallback_source is not None:
+        response["unverified_source"] = fallback_source
+        response["unverified_source_provenance"] = fallback_provenance
+    return response
+
+
 @app.route("/api/lump/<token_hex>/words")
 def get_lump_words(token_hex):
     """Return the raw uint32 word array of a saved lump as JSON."""
@@ -15176,6 +15449,24 @@ def get_lump_words(token_hex):
         "content_profile": inspected.get("content_profile"),
         "source": inspected.get("source") or "",
     }
+    # An older saved LUMP may declare its private c-list row in its exact
+    # sidecar rather than the embedded API frame (which can contain methods
+    # only). Return that declaration only when both the saved locator and
+    # full binary digest agree. This is inspection metadata, not approval to
+    # execute; the browser's identity mint still verifies the actual row.
+    sidecar_path = os.path.splitext(lump_path)[0] + ".json"
+    if os.path.isfile(sidecar_path) and not os.path.islink(sidecar_path):
+        try:
+            with open(sidecar_path, encoding="utf-8") as sidecar_file:
+                sidecar = json.load(sidecar_file)
+            if (isinstance(sidecar, dict)
+                    and sidecar.get("filename") == os.path.basename(lump_path)
+                    and sidecar.get("binary_hash") == _bh_live
+                    and isinstance(sidecar.get("capabilities"), list)):
+                response["saved_clist_declaration"] = {
+                    "capabilities": sidecar["capabilities"]}
+        except (OSError, ValueError):
+            pass  # Missing declaration leaves the strict mint gate in place.
     try:
         manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
     except ValueError:
@@ -15186,6 +15477,7 @@ def get_lump_words(token_hex):
          and row.get("archived") is not True
          and str(row.get("token") or "").lower() == key8),
         archive_manifest_entry)
+    _attach_unverified_exact_source(response, lump_path, manifest_entry)
     bootstrap_identity = _bootstrap_snapshot_identity(
         LUMPS_DIR, manifest_entry, inspected)
     if bootstrap_identity is not None:
@@ -16503,7 +16795,7 @@ def get_lump_version_words(token, version):
         approval_store_unavailable=_version_approval_store_unavailable,
     )
 
-    return jsonify({
+    response = {
         "token":         key8,
         "version":       version,
         "words":         snapshot["words"],
@@ -16539,7 +16831,9 @@ def get_lump_version_words(token, version):
             historical=True, restore_enabled=False,
             activation_eligibility=_version_activation),
         "archive_provenance": _version_archive_provenance,
-    })
+    }
+    _attach_unverified_exact_source(response, lump_path_v, _manifest_entry_v)
+    return jsonify(response)
 
 
 @app.route("/api/lump-source/<name>")

@@ -768,7 +768,7 @@ function _applyNamespaceBootProjection(state, message) {
         ? 'Namespace boot marker matches the loaded image.'
         : status === 'stale-image'
             ? `Namespace boot marker committed at NS[${slot}]. The loaded image targets ` +
-                `NS[${evidenceSlot == null ? '?' : evidenceSlot}]; generate the committed image before reset.`
+                `NS[${evidenceSlot == null ? '?' : evidenceSlot}]; simulator testing uses the loaded image bytes. Prepare only to change the next boot image.`
             : `Namespace boot marker committed at NS[${slot}]. Generate the committed image before reset.`);
     _setBootEntryPreparation(slot, status, detail,
         Object.assign({}, marker || {}, evidence || {}));

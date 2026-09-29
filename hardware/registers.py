@@ -125,6 +125,10 @@ class ChurchRegisters(Elaboratable):
         # RETURN commit replaces boundary M state with the caller's c-list
         # authority: CR6.M=1 and every other CR M bit cleared.
         self.m_return_commit_en = Signal()
+        # Successful RETURN only. Ones retain the current callee value, not a
+        # caller snapshot. CR5/6 and CR12-15 are outside this reset operation.
+        self.return_commit_en = Signal()
+        self.return_mask = Signal(12)
 
     def elaborate(self, platform):
         m = Module()
@@ -205,6 +209,12 @@ class ChurchRegisters(Elaboratable):
                     m.d.sync += cr_view.word0_gt.b_flag.eq(0)
 
             # Normal DR write (lower priority than m_set_en for DR11-DR13)
+            # RETURN reset wins every ordinary descriptor write on this edge;
+            # a concurrent caller CR6 reconstruction remains unaffected.
+            for i in (*range(5), *range(7, 12)):
+                with m.If(self.return_commit_en & ~self.return_mask[i]):
+                    m.d.sync += cap_regs[i].eq(0)
+
             with m.If(self.dr_wr_en & (self.dr_wr_addr != 0)):
                 m.d.sync += data_regs[self.dr_wr_addr].eq(self.dr_wr_data)
 

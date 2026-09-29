@@ -14,3 +14,9 @@ Thread lifecycle labels describe architectural ownership, not browser animation:
 **Why:** The machine has a live HALT latch but no persisted per-object HALT history. Inventing dormant Halted states from UI history would introduce a second authority.
 
 **How to apply:** Keep inspection selection separate from execution ownership. Only explicit resume may perform CHANGE; controls must identify and act on the inspected Thread.
+
+Thread suspension has one continuation rule: save the next unexecuted NIA, supplied by the execution boundary, rather than separate manual and instruction-driven CHANGE semantics.
+
+**Why:** The user explicitly confirmed that both paths must obey the same rule. Saving the instruction being consumed repeats CHANGE; advancing a between-instruction suspension skips pending work.
+
+**How to apply:** Keep the shared frame writer independent of execution mode. Callers supply their actual continuation; never compensate during resume or infer it from UI state.

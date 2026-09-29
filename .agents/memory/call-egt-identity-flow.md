@@ -23,6 +23,23 @@ violates the ISA. The saved Enter E-GT is the sole return authority.
 RETURN must explicitly set CR6.M after rebuilding the caller's CR6. M is
 boundary microcode state, not ordinary register state to restore from a frame.
 
+**Explicit user decision (RETURN keep mask):** The user corrected the earlier
+snapshot proposal: a set mask bit **prevents clearing**, not restores a caller
+snapshot. In low instruction bits [11:0], bits 0–4 and 7–11 keep the current
+descriptor when 1 and directly zero it when 0. Bits 5/6 are ignored. CR5 thread
+descriptor words never change on CALL/RETURN; CR6 is reconstructed from saved
+caller context regardless of mask. All M bits still reset, including CR5.M,
+then CR6.M is rearmed. No CLEAR bit, extra saved snapshots, or stack/Thread ABI
+extension. This is a user architectural choice, not an inference from code.
+Old mask-ignored immutable artifacts are not automatically compatible.
+Hardware lambda-fast RETURN now derives accepted CR14 Inform/X identity,
+revalidates cLoad and code location before mask clearing, and reconstructs
+CR6. Its legacy `lambda_pc` return-address state still differs from canonical
+SZ=0 frames. Only the synthetic boot-ROM guard (`savedPC=3`, no active lambda)
+still bypasses cLoad, lacking canonical namespace/c-list identity and guaranteed
+CR6 reconstruction. This remains an unresolved implementation limit, not a
+user-approved architectural exemption.
+
 CR6 restoration must rebuild the caller's c-list view: `word1` is the caller
 LUMP base plus `lumpSize - cc`, not the caller LUMP header base. CR14 uses the
 header base; CR6 and CR14 must not be reconstructed with the same address.

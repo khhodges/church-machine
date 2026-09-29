@@ -11,14 +11,21 @@ const shellSource = fs.readFileSync('simulator/app-shell.js', 'utf8');
 const compileSource = fs.readFileSync('simulator/app-compile.js', 'utf8');
 
 function extractFunction(name, fileSource = source) {
-    const start = fileSource.indexOf(`function ${name}(`);
-    assert(start >= 0, `${name} exists`);
-    const brace = fileSource.indexOf('{', start);
-    let depth = 0;
-    for (let i = brace; i < fileSource.length; i++) {
-        if (fileSource[i] === '{') depth++;
-        if (fileSource[i] === '}' && --depth === 0) {
-            return fileSource.slice(start, i + 1);
+    const match = new RegExp(`^(?:async )?function ${name}\\(`, 'm').exec(fileSource);
+    assert(match, `${name} exists`);
+    // Source examples embed assembly template literals with bare braces.
+    // Only accept a column-zero closing brace if the JavaScript parser sees
+    // the whole isolated function as complete, without evaluating it.
+    const closing = /^}/gm;
+    closing.lastIndex = match.index;
+    let end;
+    while ((end = closing.exec(fileSource))) {
+        const candidate = fileSource.slice(match.index, end.index + 1);
+        try {
+            new vm.Script(candidate);
+            return candidate;
+        } catch (error) {
+            if (!(error instanceof SyntaxError)) throw error;
         }
     }
     throw new Error(`Could not extract ${name}`);
@@ -47,6 +54,7 @@ async function explicitTransitionDuringStartup(transitionName, transition) {
         _editorOpenLumpToken: null,
         _pseudoEditContext: null,
         currentView: 'editor',
+        sim: {},
         activeUserTabId: null,
         userTabDirty: false,
         userTabs: [{
@@ -100,6 +108,7 @@ async function explicitTransitionDuringStartup(transitionName, transition) {
         },
         closeOpenFileDialog() {},
         saveActiveUserTab() {},
+        confirmSourceReplacement: () => Promise.resolve(true),
         renderUserTabs() {},
         updateSaveUserTabBtn() {},
         updateSavePseudoBtn() {},
@@ -137,15 +146,20 @@ async function explicitTransitionDuringStartup(transitionName, transition) {
         extractFunction('_configuredBootLumpToken') + '\n' +
         extractFunction('_openConfiguredBootLumpInDefaultEditor') + '\n' +
         extractFunction('_beginBuiltInEditorTransition', shellSource) + '\n' +
+        extractFunction('_commitUserTabSelection', shellSource) + '\n' +
         extractFunction('selectUserTab', shellSource) + '\n' +
         extractFunction('openSourceFile', shellSource) + '\n' +
         extractFunction('loadExample') + '\n' +
         extractFunction('loadCLOOMCExample', compileSource),
         race
     );
+    vm.runInContext('const _TURING_DR_TEST_SOURCE = "";', race);
 
     const defaultOpen = race._openConfiguredBootLumpInDefaultEditor();
     transition(race);
+    // Let an approved personal-tab confirmation commit; do not await a source
+    // fetch deliberately left pending to exercise navigation-intent ownership.
+    await Promise.resolve();
     releaseStartupCatalog();
     assert.equal(await defaultOpen, false,
         `${transitionName} invalidates the pending startup default`);
@@ -179,6 +193,7 @@ const context = {
         getElementById: id => id === 'asmEditor' ? { value: '' } : null,
     },
     currentView: 'editor',
+    sim: {},
     activeUserTabId: null,
     openLumpInEditor: (token, options) => {
         if (!(options && options.startupDefault === true)) {
@@ -221,6 +236,10 @@ vm.runInContext(
     windowObject._editorRestoredDocumentPresent = true;
     assert.equal(await context._openConfiguredBootLumpInDefaultEditor(), false);
     assert.deepEqual(opened, []);
+    windowObject._editorOpenLumpToken = 'selected-selftest';
+    assert.equal(await context._openConfiguredBootLumpInDefaultEditor(), false,
+        'restored SelfTest selection is never replaced by startup boot entry');
+    windowObject._editorOpenLumpToken = null;
     windowObject._editorRestoredDocumentPresent = false;
 
     const defaultOpen = context._openConfiguredBootLumpInDefaultEditor();
@@ -237,14 +256,7 @@ vm.runInContext(
     await explicitTransitionDuringStartup('source-file selection',
         race => race.openSourceFile('private-source.cloomc'));
     await explicitTransitionDuringStartup('built-in selection',
-        race => {
-            // loadExample claims built-in ownership before consulting the
-            // editor or constructing its large inline source catalog.
-            const getElementById = race.document.getElementById;
-            race.document.getElementById = () => null;
-            race.loadExample('private_fixture_absent');
-            race.document.getElementById = getElementById;
-        });
+        race => race.loadExample('ada_note_g'));
     await explicitTransitionDuringStartup('CLOOMC example selection',
         race => race.loadCLOOMCExample('private_fixture'));
     console.log('PASS explicit editor transitions outrank delayed default editor open');

@@ -770,7 +770,11 @@ class ChurchAssembler {
         return ChurchAssembler._withNormalizedNameAliases(slots);
     }
 
-    assemble(source) {
+    assemble(source, options) {
+        // Deliberately not selected by syntax, opcode, or a missing profile.
+        if (options !== undefined && options.profile !== undefined && options.profile !== 'LEGACY' && options.profile !== 'IDX1')
+            throw new Error(`Unsupported assembly profile: ${options.profile}`);
+        if (options && options.profile === 'IDX1') return this._assembleIDX1(source, options);
         this.labels = {};
         this.errors = [];
         this.warnings = [];
@@ -1471,6 +1475,333 @@ class ChurchAssembler {
         return this._lastLineNums || [];
     }
 
+    // IDX1 is an inert assembly product. Its caller must provide the layout
+    // decisions that only the trusted compiler knows; this does not make a
+    // LUMP, execution envelope, or executable admission decision.
+    _assembleIDX1(source, options) {
+        const codec = typeof module !== 'undefined' && module.exports
+            ? require('./idx1.js') : globalThis.ChurchIDX1;
+        if (!codec) throw new Error('IDX1 codec is unavailable');
+        this.labels = {};
+        this.errors = [];
+        this.warnings = [];
+        this.nsLoaded = {};
+        this._rawLines = source.split('\n');
+        this._drAliases = Object.assign({}, ChurchAssembler._sharedDrAliases || {});
+        this._crAliases = Object.assign({}, ChurchAssembler._sharedCrAliases || {});
+        this._parsePetDirectives(this._rawLines);
+        this._capBlockSlots = this._parseCapBlockSlots(this._rawLines);
+        const statements = [];
+        let inCapBlock = false, inConstBlock = false;
+        for (let n = 0; n < this._rawLines.length; n++) {
+            const raw = this._rawLines[n];
+            const text = raw.replace(/;.*$/, '').replace(/--.*$/, '').replace(/\/\/.*$/, '').trim();
+            if (!text || /^\.pet\b/i.test(text) || /^\.header\b/i.test(text)) continue;
+            if (/^capabilities\s*\{/i.test(text)) {
+                inCapBlock = !text.includes('}');
+                continue;
+            }
+            if (inCapBlock) {
+                if (text.includes('}')) inCapBlock = false;
+                continue;
+            }
+            if (/^constants\s*\{/i.test(text)) {
+                inConstBlock = !text.includes('}');
+                continue;
+            }
+            if (inConstBlock) {
+                if (text.includes('}')) inConstBlock = false;
+                continue;
+            }
+            if (/^[A-Za-z_][\w.]*:$/.test(text)) {
+                statements.push({ label: text.slice(0, -1), lineNum: n + 1 });
+            } else {
+                statements.push({ text, lineNum: n + 1, size: 1 });
+            }
+        }
+        // Branch relaxation is monotone: growing an earlier packet can only
+        // increase the distance to a forward/backward label.
+        let changed = true;
+        for (let pass = 0; changed && pass <= statements.length; pass++) {
+            changed = false;
+            let pc = 0;
+            for (const s of statements) {
+                s.pc = pc;
+                if (s.label) {
+                    if (Object.prototype.hasOwnProperty.call(this.labels, s.label) &&
+                            pass === 0)
+                        this.errors.push({ line: s.lineNum, message: `Duplicate label "${s.label}"` });
+                    this.labels[s.label] = pc;
+                } else pc += s.size;
+            }
+            for (const s of statements) {
+                if (s.label) continue;
+                try {
+                    const emitted = this._idx1Line(s.text, s.lineNum, s.pc, codec, true);
+                    if (emitted.length > s.size) {
+                        s.size = emitted.length;
+                        changed = true;
+                    }
+                } catch (_) { /* final encoding below reports diagnostics */ }
+            }
+        }
+        // Recompute label coordinates after the final relaxation pass.
+        let pc = 0;
+        for (const s of statements) {
+            s.pc = pc;
+            if (s.label) this.labels[s.label] = pc;
+            else pc += s.size;
+        }
+        const words = [], lineNums = [], instructionStarts = [], sourceMap = [];
+        const kinds = [];
+        for (const s of statements) {
+            if (s.label) continue;
+            this._currentLineText = this._rawLines[s.lineNum - 1];
+            try {
+                const before = this.errors.length;
+                const emitted = this._idx1Line(s.text, s.lineNum, s.pc, codec, false);
+                if (this.errors.length !== before || emitted.length !== s.size)
+                    throw new Error('IDX1 instruction could not be encoded at its planned size');
+                const start = words.length;
+                words.push(...emitted);
+                lineNums.push(...emitted.map(() => s.lineNum));
+                const data = /^\.word\b|^WORD\b/i.test(s.text);
+                kinds.push({ start, end: words.length, kind: data ? 'data' : 'code' });
+                if (!data) instructionStarts.push(start + 1);
+                let cursor = this._rawLines[s.lineNum - 1].indexOf(s.text) + s.text.indexOf(' ');
+                const operands = s.text.replace(/^\S+\s*/, '').split(',').map(token => {
+                    const trimmed = token.trim();
+                    const colStart = trimmed ? this._rawLines[s.lineNum - 1].indexOf(trimmed, cursor) : -1;
+                    if (colStart >= 0) cursor = colStart + trimmed.length;
+                    return { text: trimmed, colStart, colEnd: colStart + trimmed.length };
+                });
+                sourceMap.push({ startWord: start + 1, wordCount: emitted.length,
+                    byteStart: (start + 1) * 4, byteEnd: (words.length + 1) * 4,
+                    line: s.lineNum, source: this._rawLines[s.lineNum - 1], operands });
+            } catch (error) {
+                this.errors.push({ line: s.lineNum, message: error.message });
+            }
+        }
+        this._lastLineNums = lineNums.slice();
+        const layout = options.layout;
+        if (!layout || !Array.isArray(layout.extents) || !Array.isArray(layout.dispatch) ||
+                !Number.isSafeInteger(layout.fastEntry)) {
+            this.errors.push({ line: 0, message: 'IDX1 requires explicit layout.extents, layout.dispatch and layout.fastEntry options (LUMP-relative words)' });
+        } else if (!this.errors.length) {
+            if (layout.codeWords !== undefined && layout.codeWords !== words.length)
+                this.errors.push({ line: 0, message: 'IDX1 declared codeWords differs from assembled word count' });
+            if (layout.instructionStarts !== undefined &&
+                    (!Array.isArray(layout.instructionStarts) ||
+                    layout.instructionStarts.length !== instructionStarts.length ||
+                    layout.instructionStarts.some((w, i) => w !== instructionStarts[i])))
+                this.errors.push({ line: 0, message: 'IDX1 declared instructionStarts differs from assembled boundaries' });
+            let next = 1;
+            for (const extent of layout.extents) {
+                if (!extent || extent.startWord !== next ||
+                        !Number.isSafeInteger(extent.endWord) || extent.endWord > 0x100000000 ||
+                        extent.endWord <= next ||
+                        !['code', 'data'].includes(extent.kind))
+                    this.errors.push({ line: 0, message: 'IDX1 extents must partition the body in increasing nonempty LUMP-relative ranges' });
+                for (let w = Math.max(1, extent.startWord); w < extent.endWord && w <= words.length; w++) {
+                    const entry = kinds.find(k => w - 1 >= k.start && w - 1 < k.end);
+                    if (!entry || entry.kind !== extent.kind || (entry.start < extent.startWord - 1 && w === extent.startWord))
+                        this.errors.push({ line: 0, message: `IDX1 extent cuts an instruction or misclassifies word ${w}` });
+                }
+                next = extent.endWord;
+            }
+            if (next !== words.length + 1)
+                this.errors.push({ line: 0, message: 'IDX1 extents must cover exactly all body words' });
+            if (!instructionStarts.includes(layout.fastEntry))
+                this.errors.push({ line: 0, message: 'IDX1 fastEntry must name an instruction start' });
+            const seen = new Set();
+            let previous = 0;
+            for (const d of layout.dispatch) {
+                if (!d || !Number.isSafeInteger(d.selector) || d.selector <= 0 ||
+                        d.selector !== d.word || d.selector <= previous || seen.has(d.selector) ||
+                        !['branch', 'offset', 'private'].includes(d.kind) ||
+                        d.word < 1 || d.word > words.length)
+                    this.errors.push({ line: 0, message: 'Invalid IDX1 typed dispatch entry' });
+                else {
+                    seen.add(d.selector);
+                    previous = d.selector;
+                    const word = words[d.word - 1];
+                    const start = instructionStarts.includes(d.word);
+                    if ((d.kind === 'branch' && (!start || (word >>> 27) !== 23 ||
+                            ((word >>> 23) & 15) !== 14)) ||
+                            (d.kind !== 'branch' && (start || (d.kind === 'private' && word !== 0) ||
+                            (d.kind === 'offset' && word === 0))))
+                        this.errors.push({ line: 0, message: `IDX1 dispatch selector ${d.selector} has incorrect word/kind` });
+                }
+            }
+        }
+        return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
+            lineNums, sourceMap, instructionStarts, instructionBoundaries: sourceMap.map(m => ({
+                startWord: m.startWord, wordCount: m.wordCount, byteStart: m.byteStart, byteEnd: m.byteEnd })),
+            layout: layout && !this.errors.length ? { codeWords: words.length,
+                extents: layout.extents.map(e => ({ ...e })),
+                instructionStarts: instructionStarts.slice(),
+                dispatch: layout.dispatch.map(d => ({ ...d })), fastEntry: layout.fastEntry } : null };
+    }
+
+    _idx1Line(line, lineNum, pc, codec, sizing) {
+        if (/^\.word\s+/i.test(line)) {
+            const text = line.replace(/^\.word\s+/i, '').trim();
+            if (!/^-?(?:\d+|0x[0-9a-f]+|0b[01]+|0o[0-7]+)$/i.test(text))
+                throw new Error('Invalid IDX1 .word literal');
+            const value = Number(text);
+            if (!Number.isSafeInteger(value) || value < -0x80000000 || value > 0xFFFFFFFF)
+                throw new Error('Invalid IDX1 .word value');
+            return [value >>> 0];
+        }
+        const match = /^([A-Za-z]+)(?:\s+(.*))?$/.exec(line);
+        if (!match) throw new Error(`Invalid IDX1 statement: ${line}`);
+        const mnemonic = match[1].toUpperCase();
+        let name = mnemonic, cond = 14;
+        for (const op of Object.keys(this.opcodes).sort((a, b) => b.length - a.length)) {
+            if (mnemonic === op || (mnemonic.startsWith(op) &&
+                    this.conditions[mnemonic.slice(op.length)] !== undefined)) {
+                name = op;
+                if (mnemonic !== op) cond = this.conditions[mnemonic.slice(op.length)];
+                break;
+            }
+        }
+        if (name === 'ELOADCALL' || name === 'XLOADLAMBDA')
+            throw new Error(`${name} is retired in IDX1`);
+        if (name === 'WORD') {
+            const result = this._assembleLine(line, lineNum, pc);
+            return result === null ? [] : [result];
+        }
+        const args = (match[2] || '').split(',').map(x => x.trim());
+        const op = this.opcodes[name];
+        const supported = [0, 1, 2, 4, 5, 16, 17, 18, 19, 23].includes(op);
+        if (!supported) {
+            const word = this._assembleLine(line, lineNum, pc);
+            if (word === null || [8, 9, 10, 30, 31].includes(word >>> 27))
+                throw new Error(`Unsupported IDX1 instruction: ${line}`);
+            return [word];
+        }
+        const cr = token => {
+            const m = /^CR(1[0-5]|[0-9])$/i.exec(token || '');
+            if (!m) throw new Error(`Expected CR0..CR15, got "${token}"`);
+            return Number(m[1]);
+        };
+        const dr = token => {
+            const m = /^DR(1[0-5]|[0-9])$/i.exec(token || '');
+            if (!m) throw new Error(`Expected DR0..DR15, got "${token}"`);
+            return Number(m[1]);
+        };
+        const literal = token => {
+            const text = (token || '').replace(/^#\s*/, '');
+            if (!/^(?:\d+|0x[0-9a-f]+|0b[01]+|0o[0-7]+)$/i.test(text))
+                throw new Error(`Invalid IDX1 literal "${token}"`);
+            const value = Number(text);
+            if (!Number.isSafeInteger(value)) throw new Error(`Invalid IDX1 literal "${token}"`);
+            return value;
+        };
+        const index = token => {
+            if (Object.prototype.hasOwnProperty.call(this.labels, token))
+                return codec.parseExpression(String(this.labels[token]));
+            const named = this._resolveCListName(token);
+            if (named !== null) return { register: 0, magnitude: named.slot, subtract: false };
+            return codec.parseExpression(token);
+        };
+        const choose = (desc, max) => desc.register !== 0 || desc.subtract || desc.magnitude > max;
+        let a = 0, b = 0, imm = 0, role0, role1;
+        if (op === 23) {
+            let target = args[0];
+            if (this.conditions[(target || '').toUpperCase()] !== undefined) {
+                cond = this.conditions[target.toUpperCase()];
+                target = args[1];
+            }
+            if (!target) target = '0';
+            if (/^[A-Za-z_][\w.]*$/.test(target) && !/^DR/i.test(target)) {
+                if (this.labels[target] === undefined) {
+                    if (!sizing) throw new Error(`Undefined IDX1 branch label "${target}"`);
+                    imm = 0;
+                } else imm = this.labels[target] - pc;
+            } else if (/^DR/i.test(target)) role0 = index(target);
+            else {
+                const text = target.replace(/^#/, '');
+                if (!/^-?(?:\d+|0x[0-9a-f]+|0b[01]+|0o[0-7]+)$/i.test(text))
+                    throw new Error(`Invalid IDX1 branch displacement "${target}"`);
+                imm = Number(text);
+            }
+            if (!role0 && (imm < -16384 || imm > 16383)) {
+                if (Math.abs(imm) > codec.MAX_MAGNITUDE)
+                    throw new Error('IDX1 branch displacement exceeds 20-bit magnitude');
+                role0 = { register: 0, magnitude: Math.abs(imm), subtract: imm < 0 };
+            }
+        } else if (op === 2) {
+            const bracket = /^CR6\s*\[\s*(.*?)\s*\]$/i.exec(args[0] || '');
+            if (bracket) {
+                b = 6;
+                const row = index(bracket[1]);
+                if (choose(row, 31)) role0 = row;
+                else imm = row.magnitude;
+            } else a = cr(args[0]);
+            if (args[1]) {
+                const token = args[1];
+                if (/^selector\s*\(/i.test(token) || /^DR/i.test(token))
+                    role1 = codec.parseSelector(token);
+                else if (bracket && this._parseSelectorLiteral(token) === null) {
+                    const entry = this._methodEntryFor(this._methodConventionsFor(bracket[1]), token);
+                    if (!entry) throw new Error(`Unknown IDX1 method "${token}"`);
+                    role1 = codec.parseExpression(String(
+                        (typeof entry.entry === 'object' ? entry.entry.index : entry.entry) + 1));
+                } else {
+                    const ordinal = literal(token);
+                    if (ordinal < 0) throw new Error('Negative IDX1 method ordinal');
+                    role1 = codec.parseExpression(String(ordinal + 1));
+                }
+                if (role1 && role1.register === 0 && !role1.subtract &&
+                        role1.magnitude <= (bracket ? 127 : 32767)) {
+                    imm |= role1.magnitude << (bracket ? 5 : 0);
+                    role1 = undefined;
+                }
+            }
+        } else {
+            if (op === 5 && args.length === 2 && /^CR15$/i.test(args[0]) &&
+                    /^CR15$/i.test(args[1]))
+                return [this._assembleLine(line, lineNum, pc)];
+            if (op === 4 && args.length < 3)
+                return [this._assembleLine(line, lineNum, pc)];
+            a = (op === 16 || op === 17 || op === 18 || op === 19) ? dr(args[0]) : cr(args[0]);
+            b = (op === 18 || op === 19) ? dr(args[1]) : cr(args[1]);
+            if (op === 5 && (a < 12 || b > 11)) throw new Error('IDX1 SWITCH requires isolated destination and ordinary source');
+            if (op === 4 && a < 12) throw new Error('IDX1 CHANGE requires CR12..CR15');
+            if (op === 16 || op === 17) {
+                if (args.length === 4) {
+                    const word = this._assembleLine(line, lineNum, pc);
+                    return word === null ? [] : [word];
+                }
+                imm = 0x4000;
+            }
+            if (op === 18 || op === 19) {
+                const width = literal(args[3]);
+                if (width < 1 || width > 31) throw new Error('IDX1 bit-field width must be 1..31');
+                imm = width;
+            }
+            const expr = index(args[2] === undefined ? '0' : args[2]);
+            const maximum = op === 18 || op === 19 ? 31 :
+                op === 16 || op === 17 ? 16383 : 32767;
+            if (choose(expr, maximum)) role0 = expr;
+            else imm |= (op === 18 || op === 19 ? expr.magnitude << 5 : expr.magnitude);
+            if ((op === 18 || op === 19) && !role0 && expr.magnitude + imm > 32)
+                throw new Error('IDX1 bit-field position + width exceeds 32');
+        }
+        if (role0 || role1) {
+            if (op === 2) {
+                if (role0) imm &= ~31;
+                if (role1) imm &= ~0xFE0;
+            }
+            const w1 = ((op << 27) | (cond << 23) | (a << 19) | (b << 15) | imm) >>> 0;
+            return codec.encodePacket({ w1, role0, role1 });
+        }
+        if (op === 23 && (imm < -16384 || imm > 16383))
+            throw new Error('IDX1 branch displacement out of range');
+        return [((op << 27) | (cond << 23) | (a << 19) | (b << 15) | (imm & 0x7FFF)) >>> 0];
+    }
+
     _assembleLine(line, lineNum, addr) {
         this._currentLineText = (this._rawLines && this._rawLines[lineNum - 1]) || line;
         const parts = line.replace(/,/g, ' ').replace(/\[/g, ' ').replace(/\]/g, ' ').split(/\s+/).filter(Boolean);
@@ -1534,7 +1865,7 @@ class ChurchAssembler {
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'LOAD', lineNum);
-                    imm   = this._parseImm(parts[3], lineNum);
+                    imm   = this._parseImm(parts[3], lineNum, 'LOAD');
                     if (imm < 0 || imm > 0x7FFF) {
                         this.errors.push({
                             line: lineNum,
@@ -1897,7 +2228,14 @@ class ChurchAssembler {
             }
             case 3: {
                 if (parts.length > 1) {
-                    imm = this._parseImm(parts[1], lineNum) & 0xFFF;
+                    imm = this._parseImm(parts[1], lineNum);
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 0xFFF) {
+                        this.errors.push({ line: lineNum, message: 'RETURN keep mask must be an integer in range 0–4095 (12 bits).' });
+                        imm = 0;
+                    }
+                }
+                if (parts.length > 2) {
+                    this.errors.push({ line: lineNum, message: 'RETURN accepts only one optional 12-bit keep mask.' });
                 }
                 break;
             }
@@ -2634,12 +2972,21 @@ class ChurchAssembler {
         return 0;
     }
 
-    _parseImm(token, lineNum) {
+    _parseImm(token, lineNum, context) {
         if (!token) return 0;
         token = token.replace(/,/g, '').trim();
 
         if (token.startsWith('#')) token = token.substring(1);
         if (token.startsWith('+')) token = token.substring(1);
+
+        if (context === 'LOAD' && /^DR\d+$/i.test(token)) {
+            this.errors.push({
+                line: lineNum,
+                ...this._tokenCols(this._currentLineText, token),
+                message: `"${token}" names a data register, not a c-list row. LOAD CRd, CRs, #row encodes a fixed 15-bit row (0–32767); it does not read the value in ${token} at runtime. This ISA has no register-indexed LOAD.`
+            });
+            return 0;
+        }
 
         if (this.labels[token] !== undefined) {
             return this.labels[token] & 0xFFFF;
@@ -2733,7 +3080,11 @@ class ChurchAssembler {
         if (/^NULL$/i.test(name) && tokens.length === 1) {
             return { name: 'NULL', rights: [], null_row: true };
         }
-        if (!/^[A-Za-z][A-Za-z0-9_]*(?:[.#][A-Za-z0-9_]+)*$/.test(name)) return null;
+        // __SELF__ is the one reserved symbolic row-zero capability. It is
+        // present in saved assembly such as Alice's; silently dropping it
+        // shifts every subsequent C-list row and makes a rebuilt LUMP invalid.
+        if (name !== '__SELF__' &&
+                !/^[A-Za-z][A-Za-z0-9_]*(?:[.#][A-Za-z0-9_]+)*$/.test(name)) return null;
         const rights = [];
         for (const t of tokens.slice(1)) {
             if (/^[RWXErwxe]+$/.test(t)) {
@@ -2742,7 +3093,10 @@ class ChurchAssembler {
                 }
             }
         }
-        return { name, rights };
+        return name === '__SELF__'
+            ? { name, rights, symbolic_self: true, compiler_owned_self: true,
+                placeholder: true, identity_contract: 'dynamic-local' }
+            : { name, rights };
     }
 
     // Parse one comma-delimited chunk, recovering when declarations were
@@ -2961,7 +3315,7 @@ class ChurchAssembler {
                 if (resolvedMethod !== null) return `${mnemonic}  CR${crDst}, ${resolvedMethod}`;
                 return `${mnemonic}  CR${crDst}, sel=${sel}`;
             }
-            // RETURN [mask]  — unwind call frame, optional register scrub
+            // RETURN [mask] — keep set-bit working CRs, zero clear-bit CRs (except CR5/CR6)
             case 3: {
                 const retMask = imm & 0xFFF;
                 return retMask ? `${mnemonic}  0b${retMask.toString(2).padStart(12, '0')}` : mnemonic;

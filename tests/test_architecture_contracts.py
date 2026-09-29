@@ -211,3 +211,42 @@ def test_core_docs_name_the_authority_and_target_scope():
             (ROOT / relative).read_text(encoding="utf-8")
             for relative in required
         )
+
+
+def test_return_keep_mask_contract_and_normative_docs():
+    contract = json.loads(
+        (ROOT / "shared/architecture_contracts.json").read_text(encoding="utf-8")
+    )["isa"]["returnMask"]
+    assert contract["fieldBits"] == [0, 11]
+    assert contract["controlledRegisters"] == [0, 1, 2, 3, 4, 7, 8, 9, 10, 11]
+    assert contract["ignoredBits"] == [5, 6]
+    assert contract["defaultMask"] == 0
+    assert contract["clearInstructionBit"] is False
+    assert contract["extendsStackFrame"] is False
+    assert "keep current descriptor" in contract["setBit"]
+    assert "without capability resolution" in contract["clearBit"]
+    assert "unchanged" in contract["cr5"]
+    assert "regardless of mask" in contract["cr6"]
+    assert "reset all" in contract["mBits"]
+    assert "before mask clear" in contract["hardwareLambdaReturn"]
+    assert "reconstruct CR6" in contract["hardwareLambdaReturn"]
+    limits = "\n".join(contract["hardwareDeviations"])
+    assert "lambda_pc" in limits
+    assert "savedPC=3" not in limits
+    assert "no ROM authority or cLoad bypass" in contract["hardwareBootReturn"]
+    assert "STACK_UNDERFLOW" in contract["hardwareBootReturn"]
+    assert "lambda-fast RETURN bypasses cLoad" not in limits
+    for relative in (
+        "docs/instruction-set.md", "docs/isa_reference.md",
+        "docs/call-stack.md", "docs/church-instructions.md",
+    ):
+        text = (ROOT / relative).read_text(encoding="utf-8")
+        assert "keep mask" in text or "keep literal" in text
+        for stale in (
+            "mask is not implemented",
+            "mask field is reserved for future implementation",
+            "mask=0 is the no-op default",
+            "Bit 6 is reserved",
+            "12-bit RETURN mask is not implemented",
+        ):
+            assert stale not in text, f"{relative}: stale RETURN rule: {stale}"

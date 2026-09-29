@@ -1,8 +1,10 @@
+import ast
 import json
 import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 AUDIT = ROOT / "scripts" / "audit_legacy_lump_sidecars.py"
@@ -282,6 +284,7 @@ def test_guard_accepts_locator_and_history_only_manifest(tmp_path):
         "forked": False,
         "variant_group": "compiled_example",
         "pre_embedded_content": True,
+        "operation_id": "save-operation-1234",
     }]))
     result = _run(GUARD, "--root", tmp_path)
     assert result.returncode == 0, result.stderr
@@ -336,3 +339,52 @@ def test_guard_accepts_extrinsic_hash_bound_approval_allowlist(tmp_path):
     )
     result = _run(GUARD, "--root", tmp_path)
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("value", [
+    {"authorized": True}, ["source"], "../outside.json", "", "x" * 129,
+])
+def test_guard_rejects_non_identifier_operation_history(tmp_path, value):
+    directory = tmp_path / "server" / "lumps"
+    directory.mkdir(parents=True)
+    (directory / "manifest.json").write_text(json.dumps([{"operation_id": value}]))
+    result = _run(GUARD, "--root", tmp_path)
+    assert result.returncode != 0
+    assert "bounded save-recovery identifier" in result.stderr
+
+
+@pytest.mark.parametrize("mutation", [
+    None, "authority", "write", "rename", "nested", "other_file",
+    "broader_lookup", "decorator",
+])
+def test_guard_only_allows_reviewed_exact_file_source_inspection(tmp_path, mutation):
+    directory = tmp_path / "server" / "lumps"
+    directory.mkdir(parents=True)
+    (directory / "manifest.json").write_text("[]")
+    tree = ast.parse((ROOT / "server" / "app.py").read_text())
+    helper = next(node for node in tree.body if isinstance(node, ast.FunctionDef)
+                  and node.name == "_attach_unverified_exact_source")
+    source = ast.unparse(helper) + "\n"
+    if mutation == "authority":
+        source = source.replace("response['unverified_source']",
+                                "response['source']")
+    elif mutation == "write":
+        source = source.replace("open(sidecar_path, encoding=",
+                                "open(sidecar_path, 'w', encoding=")
+    elif mutation == "rename":
+        source = source.replace("_attach_unverified_exact_source", "runtime")
+    elif mutation == "nested":
+        source = "class Runtime:\n" + "".join(
+            "    " + line + "\n" for line in source.splitlines())
+    elif mutation == "broader_lookup":
+        source = source.replace("os.path.splitext(lump_path)[0]", "'current'")
+    elif mutation == "decorator":
+        source = "@runtime\n" + source
+    filename = "other.py" if mutation == "other_file" else "app.py"
+    (tmp_path / "server" / filename).write_text(source)
+    result = _run(GUARD, "--root", tmp_path)
+    if mutation is None:
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode != 0
+        assert "operational sidecar reference" in result.stderr

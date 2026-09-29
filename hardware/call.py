@@ -697,8 +697,10 @@ class ChurchCall(Elaboratable):
                 #   mask bit=0 (b_clear)   → preserve register, clear only b_flag (bit 31 of GT)
                 # Both stack bounds are derived from the active Thread header.
                 m.d.comb += [
-                    self.cr_null_mask.eq(mask_latched[:THREAD_CAP_WORDS]),
-                    self.cr_b_clear_mask.eq(~mask_latched[:THREAD_CAP_WORDS]),
+                    # CR5 is thread state, including its B bit, not an
+                    # argument register subject to CALL domain cleanup.
+                    self.cr_null_mask.eq(mask_latched[:THREAD_CAP_WORDS] & ~(1 << 5)),
+                    self.cr_b_clear_mask.eq(~mask_latched[:THREAD_CAP_WORDS] & ~(1 << 5)),
                 ]
                 m.next = "CHECK_CR5_CR12"
 

@@ -145,25 +145,27 @@ const loadNamespaceStateSource = extractTopLevelFunction(appRunSource, 'loadName
 {
     const sim = new ChurchSimulator();
     sim.bootComplete = true;
+    const available = Array.from({ length: sim.MAX_NS_ENTRIES }, (_, slot) => slot)
+        .filter(slot => slot >= sim.firstUserNsSlot() && !sim.isNSEntryValid(slot));
     const first = sim.allocOrFindNsSlot('program-a', 'ProgramA');
     sim.writeNsEntryForProgram(first, { words: [1], caps: [], label: 'ProgramA' });
     const second = sim.allocOrFindNsSlot('program-b', 'ProgramB');
     sim.writeNsEntryForProgram(second, { words: [2], caps: [], label: 'ProgramB' });
-    check('sequential program allocation starts at slots 11 and 12',
-        first === 11 && second === 12, `first=${first}, second=${second}`);
+    check('sequential program allocation consumes eligible free slots',
+        first === available[0] && second === available[1], `first=${first}, second=${second}`);
 
     const registry = new AbstractionRegistry();
     new SystemAbstractions(registry);
     sim.abstractionRegistry = registry;
     const removed = registry.dispatchMethod(5, 'REMOVE', sim, { index: first });
-    check('Navana.Remove opens a scoped write and frees slot 11',
+    check('Navana.Remove opens a scoped write and frees the issued slot',
         removed && removed.ok && !sim.isNSEntryValid(first));
     check('Navana.Remove preserves the bumped generation for reissue',
         sim._nsFreeSequences[first] === 1,
         `remembered=${sim._nsFreeSequences[first]}`);
 
     const reused = sim.allocOrFindNsSlot('program-c', 'ProgramC');
-    check('allocator reuses freed slot 11', reused === 11, `reused=${reused}`);
+    check('allocator reuses the released head', reused === first, `reused=${reused}`);
 
     const navana = registry.dispatchMethod(5, 'ADD', sim, {
         location: 0x2200,
@@ -172,7 +174,7 @@ const loadNamespaceStateSource = extractTopLevelFunction(appRunSource, 'loadName
         label: 'Minted'
     });
     check('Navana.ADD uses the first free slot rather than slot 45',
-        navana && navana.ok && navana.result.nsIndex === 11,
+        navana && navana.ok && navana.result.nsIndex === first,
         navana && navana.result ? `slot=${navana.result.nsIndex}` : JSON.stringify(navana));
     check('Navana.ADD reissues the remembered generation',
         navana && navana.ok && navana.result.version === 1,
@@ -187,37 +189,37 @@ const loadNamespaceStateSource = extractTopLevelFunction(appRunSource, 'loadName
         rejectedRemove && rejectedRemove.ok === false &&
         builtinAfter.every((word, index) => word === builtinBefore[index]));
 
-    const revoked = registry.dispatchMethod(6, 'Revoke', sim, { nsIndex: 11 });
+    const revoked = registry.dispatchMethod(6, 'Revoke', sim, { nsIndex: first });
     const revokedSeq = sim.parseNSWord1(
-        sim.memory[sim._nsSlotBase(11) + 1] >>> 0).gtSeq;
+        sim.memory[sim._nsSlotBase(first) + 1] >>> 0).gtSeq;
     check('Mint.Revoke uses the scoped writer and bumps W1 gt_seq',
         revoked && revoked.ok && revoked.result === 2 && revokedSeq === 2,
         `result=${revoked && revoked.result}, seq=${revokedSeq}`);
 
     const staleGenerationTwoGT = sim.createGT(
-        2, 11, { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1);
-    const removedAgain = registry.dispatchMethod(5, 'REMOVE', sim, { index: 11 });
+        2, first, { R: 0, W: 0, X: 1, L: 0, S: 0, E: 0 }, 1);
+    const removedAgain = registry.dispatchMethod(5, 'REMOVE', sim, { index: first });
     const savedSlot = sim.saveToNamespace('SavedAfterClear', [0x18000000], null, 1, []);
     const savedSeq = sim.parseNSWord1(
         sim.memory[sim._nsSlotBase(savedSlot) + 1] >>> 0).gtSeq;
     const staleCheck = sim.mLoad(staleGenerationTwoGT, 'X', 0);
     check('Save to Namespace consumes the retained generation after slot reuse',
-        removedAgain && removedAgain.ok && savedSlot === 11 && savedSeq === 3,
+        removedAgain && removedAgain.ok && savedSlot === first && savedSeq === 3,
         `slot=${savedSlot}, seq=${savedSeq}`);
     check('a capability from before clear remains stale after normal Save reuse',
         staleCheck && staleCheck.ok === false && staleCheck.fault === 'VERSION',
         JSON.stringify(staleCheck));
 
-    registry.dispatchMethod(5, 'REMOVE', sim, { index: 11 });
-    sim.writeNsEntryForProgram(11, { words: [0x18000000], caps: [], label: 'CompiledAfterClear' });
+    registry.dispatchMethod(5, 'REMOVE', sim, { index: first });
+    sim.writeNsEntryForProgram(first, { words: [0x18000000], caps: [], label: 'CompiledAfterClear' });
     const compiledSeq = sim.parseNSWord1(
-        sim.memory[sim._nsSlotBase(11) + 1] >>> 0).gtSeq;
+        sim.memory[sim._nsSlotBase(first) + 1] >>> 0).gtSeq;
     check('compiled-program reuse also consumes the retained generation',
         compiledSeq === 4, `seq=${compiledSeq}`);
 
     // Dynamic self-data aliases must use that same issued generation in both
     // their Namespace authority and the c-list GT that consumers LOAD through.
-    const dataAliasSlot = 13;
+    const dataAliasSlot = sim.allocOrFindNsSlot(null, 'AliasParent.data');
     sim._nsFreeSequences[dataAliasSlot] = 5;
     sim.withNamespaceWrite('test lazy parent setup', () => {
         sim.writeNSEntry(20, 0x1000, 63, 0, 0, 1, 0, 1, 0);
@@ -250,20 +252,26 @@ const loadNamespaceStateSource = extractTopLevelFunction(appRunSource, 'loadName
         JSON.stringify(aliasLoad));
 }
 
-// Explicit static placement remains available, but built-in slots are protected.
+// Explicit programmer-authorized Save supports occupied slots too. This is
+// distinct from unprivileged/scoped runtime writes tested below.
 {
     const sim = new ChurchSimulator();
     sim.bootComplete = true;
     const slot = sim.saveToNamespaceAt(15, 'StaticProgram', [0x12345678], null, 1, []);
     check('explicit programmer-selected static slot remains supported',
         slot === 15 && sim.isNSEntryValid(15) && sim.nsLabels[15] === 'StaticProgram');
+    const selected = sim.saveToNamespaceAt(10, 'SelectedReplacement', [1], null, 1, []);
+    check('explicit Save may replace the programmer-selected built-in slot',
+        selected === 10 && sim.nsLabels[10] === 'SelectedReplacement');
     let rejected = false;
+    const before = Array.from(sim.memory);
     try {
-        sim.saveToNamespaceAt(10, 'BuiltInOverwrite', [1], null, 1, []);
+        sim.saveToNamespaceAt(sim.MAX_NS_ENTRIES, 'OutOfBounds', [1], null, 1, []);
     } catch (_error) {
         rejected = true;
     }
-    check('explicit placement cannot overwrite built-in slots 0–10', rejected);
+    check('out-of-bounds explicit placement fails without mutation',
+        rejected && before.every((word, index) => word === sim.memory[index]));
 }
 
 // The hardened gate blocks unauthorized runtime writes and preserves memory.
@@ -315,32 +323,36 @@ const loadNamespaceStateSource = extractTopLevelFunction(appRunSource, 'loadName
 // Custom labels survive through the canonical bootConfig + occupied boot-image
 // path, without browser localStorage.
 {
-    const bootConfig = JSON.parse(fs.readFileSync(
-        path.join(__dirname, '..', 'server', 'boot-config.json'), 'utf8'));
-    bootConfig.slotLabels = Object.assign({}, bootConfig.slotLabels, {
-        11: 'CanonicalCustomLabel'
-    });
+    const bootConfig = { slotLabels: {} };
     global.window = { bootConfig };
 
-    const raw = fs.readFileSync(
-        path.join(__dirname, '..', 'server', 'lumps', 'boot-image.bin'));
-    const imageBuffer = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);
-    const words = new Uint32Array(imageBuffer);
     const sim = new ChurchSimulator();
-    const base = sim._nsSlotBase(11);
+    const customSlot = sim.allocOrFindNsSlot(null, 'CanonicalCustomLabel');
+    bootConfig.slotLabels[customSlot] = 'CanonicalCustomLabel';
+    // Synthetic complete V2 image: seal the fallback executable's row-zero
+    // identity, without depending on or rewriting the saved production image.
+    const words = new Uint32Array(sim.memory);
+    const entrySlot = sim.bootEntrySlot;
+    const entry = sim.readNSEntry(entrySlot);
+    const header = sim.parseLumpHeader(words[entry.word0_location]);
+    const self = sim.createGT(entry.gtSeq, entrySlot, { E: 1 }, 1);
+    words[entry.word0_location] |= 1;
+    words[entry.word0_location + header.lumpSize - 1] = self;
+    words[sim._nsSlotBase(entrySlot) + 3] = self;
+    const base = sim._nsSlotBase(customSlot);
     const word1 = sim.packNSWord1(63, 0, 0, 0);
     words[base] = 0x0800;
     words[base + 1] = word1;
     words[base + 2] = sim._integrity32(words[base], word1);
     words[base + 3] = 0x1234ABCD;
     sim.reset();
-    const loaded = sim.loadBootImage(imageBuffer);
+    const loaded = sim.loadBootImage(words.buffer);
 
     check('canonical occupied custom slot loads from boot image',
-        loaded && sim.isNSEntryValid(11));
+        loaded && sim.isNSEntryValid(customSlot), sim.lastBootImageError);
     check('canonical custom label loads from bootConfig.slotLabels',
-        sim.nsLabels[11] === 'CanonicalCustomLabel',
-        `label=${sim.nsLabels[11]}`);
+        sim.nsLabels[customSlot] === 'CanonicalCustomLabel',
+        `label=${sim.nsLabels[customSlot]}`);
     delete global.window;
 }
 

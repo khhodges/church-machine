@@ -37,7 +37,11 @@ window.CListViewer = {
 };
 
 const src = fs.readFileSync('simulator/asm-instruction-picker.js', 'utf8');
+const index = fs.readFileSync('simulator/index.html', 'utf8');
 vm.runInContext(src, dom.getInternalVMContext(), { filename: 'asm-instruction-picker.js' });
+
+check('editor help advertises double-click popup activation',
+    index.includes('title="Double-click assembly code for Instructions, or a capabilities block for Golden Tokens.'));
 
 const editor = window.document.getElementById('asmEditor');
 editor.value =
@@ -52,34 +56,55 @@ window.AsmInstructionPicker.attach(editor);
 const capPos = editor.value.indexOf('Boot.Thread') + 2;
 editor.setSelectionRange(capPos, capPos);
 editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-check('capabilities click opens C-List', clistShows === 1, 'shows=' + clistShows);
-check('capabilities click does not open Instructions',
+check('capabilities single click does not open C-List', clistShows === 0, 'shows=' + clistShows);
+check('capabilities single click does not open Instructions',
+    !window.AsmInstructionPicker.isVisible());
+editor.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+check('capabilities double click opens C-List', clistShows === 1, 'shows=' + clistShows);
+check('capabilities double click does not open Instructions',
     !window.AsmInstructionPicker.isVisible());
 
 const instrPos = editor.value.indexOf('SWITCH');
 editor.setSelectionRange(instrPos, instrPos);
 editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-check('instruction click closes C-List', clistHides === 1, 'hides=' + clistHides);
-check('instruction click opens Instructions', window.AsmInstructionPicker.isVisible());
+check('instruction single click does not close C-List', clistHides === 0, 'hides=' + clistHides);
+check('instruction single click does not open Instructions', !window.AsmInstructionPicker.isVisible());
+editor.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+check('instruction double click closes C-List', clistHides === 1, 'hides=' + clistHides);
+check('instruction double click opens Instructions', window.AsmInstructionPicker.isVisible());
 
 const commentPos = editor.value.indexOf('; capabilities') + '; capabilities'.length;
 editor.setSelectionRange(commentPos, commentPos);
 editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-check('semicolon comment click closes Instructions', !window.AsmInstructionPicker.isVisible());
+check('semicolon comment single click leaves Instructions open',
+    window.AsmInstructionPicker.isVisible());
+editor.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+check('semicolon comment double click closes Instructions', !window.AsmInstructionPicker.isVisible());
 check('semicolon comment click opens no C-List', clistShows === 1);
 
 window.AsmInstructionPicker.hide();
 editor.setSelectionRange(instrPos, instrPos + 6);
 editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-check('selected text does not open either popup',
+check('single click with selected text does not open either popup',
     !window.AsmInstructionPicker.isVisible() && clistShows === 1);
 
 window.AsmInstructionPicker.hide();
 editor.readOnly = true;
 editor.setSelectionRange(instrPos, instrPos);
-editor.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
-check('read-only editor does not open either popup',
+editor.dispatchEvent(new window.MouseEvent('dblclick', { bubbles: true }));
+check('read-only editor double click does not open either popup',
     !window.AsmInstructionPicker.isVisible() && clistShows === 1);
+
+editor.readOnly = false;
+editor.dispatchEvent(new window.KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'Space',
+    key: ' ',
+    ctrlKey: true,
+}));
+check('keyboard shortcut still opens Instructions',
+    window.AsmInstructionPicker.isVisible());
 
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed) process.exit(1);

@@ -1565,7 +1565,15 @@ class CLOOMCCompiler {
         }
         const universal = /^([A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*)#([1-9][0-9]*)$/;
         const universalMatch = name.match(universal);
-        if (!universalMatch && !/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
+        if (/^0x[0-9a-fA-F]{8,}$/.test(name)) {
+            const rights = [...new Set(tokens.slice(1).join('').toUpperCase().split(''))];
+            if (!rights.length || rights.some(right => !'RWXLSE'.includes(right))) {
+                return { name, rights: [], portable_error: true };
+            }
+            return { name, token: name, rights };
+        }
+        if (!universalMatch &&
+            !/^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/.test(name)) {
             // Preserve the bad item so @portable can fail closed rather than
             // silently dropping a malformed dependency.
             return { name, rights: [], portable_error: true };

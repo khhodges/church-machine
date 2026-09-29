@@ -1,0 +1,59 @@
+Source for Ethernet  (dot.name)
+
+; Editable FIRST PASS, not source attestation for the released binary.
+; Recovered order/bodies: server/lumps/Ethernet.1.b169bba4.lump and exact sidecar.
+; UNBOUND: current ns-state.json and raw boot-image.bin have no EthernetDevice.
+; NS[9] is the Ethernet abstraction, NOT its device. Never use it for MMIO.
+; The saved c-list word 0x07800400 is not a current device binding.
+; No Tunnel dependency exists in the recovered bodies; no Tunnel draft is
+; assumed published. No GT is minted and no installation is performed.
+; SELF is compiler-owned row 0; symbolic EthernetDevice RW is row 1.
+; RW is Turing device permission, not Church L/E. Binding requires a separately
+; verified device capability before execution; raw methods will fault unbound.
+; DR0 is immutable zero; DR1 is the primary result; CR7 is device scratch.
+; Modern RETURN uses the implicit continuation, never CR5 instance data.
+; Historical MMIO intent (NOT verified against a current Ethernet device):
+; STATUS=1, TX_LEN=2, RX_LEN=3, IP_ADDR=4, PORT=5, TX_DATA=6, RX_DATA=7.
+; No DMA, FIFO loading/draining, framing, timeout or delivery guarantee.
+
+abstraction Ethernet {
+    capabilities {
+        SELF E
+        EthernetDevice RW
+    }
+
+    ; DR1 reserved dataGT (unused data word), DR2 preloaded byte count.
+    ; Retain raw TX_LEN write. DR1 returns requested count, NOT delivered bytes.
+    ; Caller must preload the TX FIFO separately; no buffer capability is used.
+    method Send {
+        LOAD CR7, EthernetDevice
+        DWRITE DR2, CR7, #2
+        IADD DR1, DR2, DR0
+        RETURN
+    }
+
+    ; No inputs -> DR1 raw RX_LEN. Nonblocking register read only.
+    ; Does not return a buffer GT, drain bytes, or implement a timeout.
+    method Receive {
+        LOAD CR7, EthernetDevice
+        DREAD DR1, CR7, #3
+        RETURN
+    }
+
+    ; DR1 packed IPv4, DR2 port -> DR1=-1 NOT_IMPLEMENTED; no I/O.
+    ; Recovered body wrote DR1 to #4 and DR2 to #5 via CR7 then RETURN.
+    ; Those writes do not establish a UDP session or wait for a PHY/link.
+    ; Retain their intent here rather than claiming a working connection.
+    method Connect {
+        ISUB DR1, DR0, #1
+        RETURN
+    }
+
+    ; No inputs -> DR1 raw STATUS. Historical intent: 0 down, 1 up,
+    ; 2 negotiating; these meanings are not verified on a current device.
+    method Status {
+        LOAD CR7, EthernetDevice
+        DREAD DR1, CR7, #1
+        RETURN
+    }
+}

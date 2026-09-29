@@ -629,25 +629,9 @@ class ChurchSimulator {
             this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
             return false;
         }
-        // A browser may inspect arbitrary image bytes, but it must never use
-        // those bytes to override the persisted Namespace boot plan.  Runtime
-        // entrypoints load the plan before calling this method; this additional
-        // gate also protects direct image imports after that plan is known.
-        try {
-            const namespacePlan = typeof window !== 'undefined' && window.NamespacePlan;
-            if (namespacePlan && typeof namespacePlan.assertImageSlot === 'function' &&
-                    !namespacePlan.assertImageSlot(discoveredBootEntrySlot)) {
-                this.lastBootImageError =
-                    `Saved image prepares NS[${discoveredBootEntrySlot}], but the persisted Namespace plan selects a different row. Generate an image from the saved plan.`;
-                this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
-                return false;
-            }
-        } catch (_) {
-            this.lastBootImageError =
-                'Persisted Namespace boot plan could not validate this image. Reload Namespace and choose one boot row.';
-            this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected before changing simulator state.\n`;
-            return false;
-        }
+        // The image's own header and stored Thread home determine what this
+        // simulator executes. A newer Namespace plan cannot veto an explicit
+        // test of these existing bytes; it also cannot retarget this image.
 
         // Stale-trampoline guard — checked against src BEFORE any mutation of
         // simulator state or memory.  Any boot image from before direct-dispatch
@@ -1236,6 +1220,10 @@ class ChurchSimulator {
         this._recordControlFlowDiagnostic(
             'RESET', 'before', this._diagnosticResetProvenance(reason));
         this._controlFlowDiagnosticResetGeneration++;
+        this._evidenceEpoch = (this._evidenceEpoch || 0) + 1;
+        this._evidenceSequence = 0;
+        this._executionAttempt = null;
+        this.lastStepEvidence = null;
         // A build-config save can invalidate the cached browser buffer while
         // the live simulator still contains the user's validated Namespace
         // image. Namespace Save uses this flag to avoid replacing that image
@@ -1327,6 +1315,9 @@ class ChurchSimulator {
         // A free slot must be four zero words so first-free allocation can reuse
         // it. Keep the bumped generation out-of-band until the slot is reissued.
         this._nsFreeSequences = {};
+        this._nsFreeList = null;
+        this._nsSymbolicEntries = {};
+        this._nsIdentitySlots = new Map();
         // Installation provenance is runtime-only. Reset must not preserve a
         // revoked slot's immutable-self guard; trusted loaders re-establish it.
         this._compilerOwnedSelfSlots = {};
@@ -1434,12 +1425,8 @@ class ChurchSimulator {
     }
 
     /**
-     * Centralised signed-return capture. Any CALL path that adopts the
-     * signed-return convention (currently LED.Set/Clear/Toggle/State and the
-     * LED driver handler) must funnel through this helper. It writes DR1,
-     * and records `lastSignedReturn` for the live readout in the Abstractions
-     * detail panel. DR0 remains hardwired zero; no bypass is needed.
-     *
+     * Centralised signed-return capture. Writes DR1 and records the live
+     * signed result without bypassing the hardwired-zero DR0.
      * @param {number} absIndex   Namespace index of the dispatched abstraction.
      * @param {string} methodName Method name dispatched.
      * @param {number} signed     Signed result to write to DR1.
@@ -1518,19 +1505,7 @@ class ChurchSimulator {
     }
 
     /*
-     * _fastBoot(reason)
-     *
-     * PP250-style instant re-boot on fault.  On real hardware the boot FSM
-     * runs reset and the three boot-ROM instructions in 240 ns —
-     * the programmer never sees the delay.  In the simulator this translates
-     * to calling _returnToBoot() (which clears CRs/DRs and resets bootStep=0)
-     * and then letting the normal _bootStep() loop retire LOAD, CHANGE, and
-     * CALL. Reset capture and CALL_HOME remain separate events, with the
-     * latter reading faultLog and setting boot_reason=2 when appropriate.
-     *
-     * reason — 0 = cold boot  2 = fault-recovery re-boot (matches firmware
-     *          boot_reason field and simulator Tunnel.Register DR1 convention)
-     *
+     * _fastBoot(reason) handles PP250 fault-recovery reboot.
      * Called by _tier3Recovery() on double-fault escalation.
      */
     _fastBoot(reason) {
@@ -1591,21 +1566,8 @@ class ChurchSimulator {
         this._returnToBoot(`_fastBoot(${reason})`);
     }
 
-    /**
-     * _tier3Recovery(faultInfo)
-     *
-     * Double-fault escalation path: called when a fault fires while the
-     * machine is already in a faulted/recovery state, making a normal
-     * fault() halt inappropriate.  Instead of halting, immediately trigger
-     * a fault-recovery reboot (reason=2) so the boot sequence restarts
-     * cleanly without the machine staying permanently halted.
-     *
-     * Contract (enforced by sim_selftest_reboot_midrun.js):
-     *   • bootComplete === false after return  (set by _returnToBoot inside _fastBoot)
-     *   • halted       === false after return  (set by _returnToBoot inside _fastBoot)
-     *   • No entry added to faultLog           (caller may already have logged the fault)
-     *
-     * faultInfo — { type, message } — informational only; not persisted here.
+    /*
+     * Tier-three recovery. faultInfo is informational; it is not persisted here.
      */
     _tier3Recovery(faultInfo) {
         this._fastBoot(2);
@@ -1664,6 +1626,7 @@ class ChurchSimulator {
     //   W3 table offset (words); W4 boot-entry byte; W5 seal boundary (=6);
     //   W6..W15 reserved, all zero until a future seal is defined.
     static get NAMESPACE_HEADER_V2_WORDS() { return 16; }
+
     static get NAMESPACE_HEADER_V2_FORMAT() { return 0x4E534832; } // ASCII "NSH2"
 
     packNamespaceHeaderV2(totalWords, slotCount, tableOffset, bootEntryWord = 0) {
@@ -1987,7 +1950,9 @@ class ChurchSimulator {
     // Outforms, hardware entries, and callers that pass { architectural: true }.
     // Those layouts are owned by their respective boot/hardware contracts.
     static get SELF_CAPABILITY_PLACEHOLDER() { return 0xFEED5E1F; }
+
     static get PRIVATE_DATA_CAPABILITY_PLACEHOLDER() { return 0xFEEDDA7A; }
+
     static formatRuntimeGT(word) {
         return `0x${(word >>> 0).toString(16).toUpperCase().padStart(8, '0')}`;
     }
@@ -2153,7 +2118,29 @@ class ChurchSimulator {
             ? this.createGT(sourceSeq, sourceSlot,
                 { R: 1, W: 1, X: 0, L: 0, S: 0, E: 0 }, 1) >>> 0
             : null;
-        if (supplied !== placeholder && supplied !== expectedSelf) {
+        let embeddedCompilerSelf = false;
+        if (supplied === 0 && compilerOwnedSelf) {
+            const frame = 1 + hdr.cw;
+            const frameWord = copy[frame] >>> 0;
+            const length = frameWord & 0xffff;
+            if ((frameWord >>> 24) === 0xAB && length &&
+                    frame + 1 + Math.ceil(length / 4) <= row0) {
+                try {
+                    const bytes = new Uint8Array(length);
+                    for (let offset = 0; offset < length; offset++) {
+                        bytes[offset] = (copy[frame + 1 + (offset >>> 2)] >>>
+                            (24 - 8 * (offset & 3))) & 255;
+                    }
+                    const api = JSON.parse(new TextDecoder().decode(bytes));
+                    const self = api.capabilities && api.capabilities[0];
+                    embeddedCompilerSelf = Array.isArray(api.capabilities) &&
+                        api.capabilities.length === hdr.cc && self &&
+                        ['SELF', '__SELF__'].includes(self.name) &&
+                        JSON.stringify(self.rights) === '["E"]';
+                } catch (_) { /* malformed frames do not confer SELF provenance */ }
+            }
+        }
+        if (supplied !== placeholder && supplied !== expectedSelf && !embeddedCompilerSelf) {
             // A saved, already-installed compiler LUMP may carry its previous
             // live self GT. Remint it only when the caller proves that exact
             // source slot+sequence; this is never a general "overwrite row 0"
@@ -2374,27 +2361,41 @@ class ChurchSimulator {
         return this._nsSymbolicEntries && this._nsSymbolicEntries[idx] || null;
     }
 
-    defineSymbolicAbstraction(name, requestedSlot) {
+    defineSymbolicAbstraction(name, requestedSlot, selection = null) {
         const canonical = String(name || '').trim();
-        if (!/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/.test(canonical)) {
-            throw new Error('Use a canonical dotted name such as Example.Service.');
+        if (selection ? (!canonical || canonical.length > 128 ||
+                /[\u0000-\u001f\u007f]/.test(canonical))
+                : !/^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/.test(canonical)) {
+            throw new Error(selection
+                ? 'Use a nonempty pet name (up to 128 characters, no control characters).'
+                : 'Use a canonical dotted name such as Example.Service.');
         }
         for (let i = 0; i < this.MAX_NS_ENTRIES; i++) {
             const symbolic = this.symbolicEntryAt(i);
             const label = symbolic ? symbolic.name : (this.isNSEntryValid(i) && this.nsLabels[i]);
-            if (label && String(label).toLowerCase() === canonical.toLowerCase()) {
+            if (!selection && label && String(label).toLowerCase() === canonical.toLowerCase()) {
                 throw new Error(`"${canonical}" is already defined in Namespace slot ${i}.`);
             }
         }
         let slot = requestedSlot;
         if (slot === null || slot === undefined || slot === '') {
-            slot = this.allocOrFindNsSlot(null, canonical);
+            // A design placement must allocate a new free slot even when the
+            // same pet name already labels a binary or another symbolic row.
+            slot = this.allocOrFindNsSlot(null, canonical,
+                selection ? 'ns-design-placement' : undefined);
         }
         if (!Number.isInteger(slot) || slot < this.firstUserNsSlot() || slot >= this.MAX_NS_ENTRIES) {
             throw new Error(`Slot must be between ${this.firstUserNsSlot()} and ${this.MAX_NS_ENTRIES - 1}.`);
         }
         if (this.isNSEntryValid(slot)) {
             throw new Error(`Slot ${slot} is already occupied. Choose a free slot.`);
+        }
+        if (selection !== null && (typeof selection !== 'object' ||
+                Array.isArray(selection) ||
+                !['invalid', 'missing', 'unresolved'].includes(selection.status) ||
+                typeof selection.diagnostic !== 'string' ||
+                !selection.diagnostic.trim())) {
+            throw new Error('Non-executable selection requires an explicit validation diagnostic.');
         }
         const seq = this._nsSequenceForWrite(slot);
         this.withNamespaceWrite('define symbolic Namespace abstraction', () => {
@@ -2403,7 +2404,8 @@ class ChurchSimulator {
         if (!this._nsSymbolicEntries) this._nsSymbolicEntries = {};
         this._nsSymbolicEntries[slot] = {
             name: canonical, slot, seq, type: 'Inform',
-            symbolic: true, implementationMissing: true
+            symbolic: true, implementationMissing: true,
+            ...(selection ? { selection: { ...selection } } : {})
         };
         this.nsLabels[slot] = canonical;
         return {
@@ -2480,6 +2482,8 @@ class ChurchSimulator {
             this.memory[base + 0], this.memory[base + 1]);
         this.memory[base + 3] = (cacheToken32 || 0) >>> 0;   // W3 = cache token (T)
         if (this._nsFreeSequences) delete this._nsFreeSequences[idx];
+        if (this._nsFreeList) this._nsFreeList = this._nsFreeList.filter(slot => slot !== idx);
+        if (location && this._nsSymbolicEntries) delete this._nsSymbolicEntries[idx];
         if (idx >= this.nsCount) this.nsCount = idx + 1;
     }
 
@@ -2506,6 +2510,13 @@ class ChurchSimulator {
             }
         }
         if (typeof this.clearSlotIdentity === 'function') this.clearSlotIdentity(idx);
+        if (this._nsIdentitySlots) {
+            for (const [identity, slot] of this._nsIdentitySlots) {
+                if (slot === idx) this._nsIdentitySlots.delete(identity);
+            }
+        }
+        if (!this._nsFreeList) this._rebuildNamespaceFreeList();
+        this._nsFreeList = [idx, ...this._nsFreeList.filter(slot => slot !== idx)];
         if (idx === this.nsCount - 1) {
             while (this.nsCount > 0 && !this.isNSEntryValid(this.nsCount - 1)) {
                 this.nsCount--;
@@ -2518,15 +2529,35 @@ class ChurchSimulator {
     // Returns the NS slot index to use for a compiled program identified by
     // `token`.  Resolution order:
     //   1. Token→slot map: if the same token was allocated before, reuse it.
-    //   2. Scan from slot 11 for the first NS slot with no valid entry.
-    //      Slots 0–10 are the complete built-in catalog.  Higher slots are
-    //      user space even when a legacy token/label map still mentions them.
+    //   2. Reuse a matching symbolic identity; otherwise select the free-list
+    //      head. Initial order follows firstUserNsSlot(); released slots are
+    //      pushed onto the head with their advanced generation retained.
     //
     // All slot-number decisions are centralised here.  Callers (including
     // _applyPendingSimLoad) never reference a raw slot integer for user
     // programs — they go through this function.
-    allocOrFindNsSlot(token, name) {
+    _rebuildNamespaceFreeList() {
+        this._nsFreeList = [];
+        for (let slot = this.firstUserNsSlot(); slot < this.MAX_NS_ENTRIES; slot++) {
+            if (!this.isNSEntryValid(slot)) this._nsFreeList.push(slot);
+        }
+    }
+
+    allocOrFindNsSlot(token, name, identityKey) {
         if (!this._tokenSlotMap) this._tokenSlotMap = new Map();
+        if (identityKey && this._nsIdentitySlots && this._nsIdentitySlots.has(identityKey)) {
+            return this._nsIdentitySlots.get(identityKey);
+        }
+        if (name && !identityKey) {
+            for (let slot = 0; slot < this.MAX_NS_ENTRIES; slot++) {
+                if (this.symbolicEntryAt(slot) &&
+                    !this.symbolicEntryAt(slot).targetIdentity &&
+                    String(this.nsLabels[slot] || '').toLowerCase() === String(name).toLowerCase()) {
+                    if (token) this._tokenSlotMap.set(token, slot);
+                    return slot;
+                }
+            }
+        }
 
         // 1. Token→slot reuse: if this exact binary was previously allocated a
         //    slot, return the same slot — the NS entry is already correct.
@@ -2535,14 +2566,15 @@ class ChurchSimulator {
             if (reuse >= 0 && reuse < this.MAX_NS_ENTRIES) return reuse;
         }
 
-        // 2. Scan user space.  Do not consult legacy _bitstreamSlots here:
-        //    those entries were an old mechanism for reserving private slots
-        //    and must not hide capacity from the user allocator.
-        for (let s = this.firstUserNsSlot(); s < this.MAX_NS_ENTRIES; s++) {
-            if (!this.isNSEntryValid(s)) {
-                if (token) this._tokenSlotMap.set(token, s);
-                return s;
-            }
+        // Selecting a head does not consume it; registration does.
+        if (!this._nsFreeList) this._rebuildNamespaceFreeList();
+        while (this._nsFreeList.length && this.isNSEntryValid(this._nsFreeList[0])) {
+            this._nsFreeList.shift();
+        }
+        if (this._nsFreeList.length) {
+            const slot = this._nsFreeList[0];
+            if (token) this._tokenSlotMap.set(token, slot);
+            return slot;
         }
 
         // 4. Namespace table is full.
@@ -2679,6 +2711,121 @@ class ChurchSimulator {
     // NULL GT (0x00000000) that triggered a lazy-suspend (Task #1519).
     //
     // Returns { ok: true, gt: <word> } on success, or { ok: false, error: <msg> }.
+    resolveCapabilityName(name, rights, targetIdentity) {
+        if (typeof name !== 'string' ||
+            !/^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})$/.test(name)) {
+            return { ok: false, error: 'Lazy Resolve requires a symbolic dot-name.' };
+        }
+        if (!Array.isArray(rights) || !rights.length ||
+            rights.some(right => !['R', 'W', 'X', 'L', 'S', 'E'].includes(right)) ||
+            (rights.some(right => 'RWX'.includes(right)) && rights.some(right => 'LSE'.includes(right))) ||
+            new Set(rights.filter(right => 'LSE'.includes(right))).size > 1) {
+            return { ok: false, error: `Lazy Resolve "${name}" requires valid declared rights.` };
+        }
+        let slot = -1;
+        // Preserve the complete declared identity. A cache-token prefix is
+        // neither a slot nor evidence of a full content identity.
+        const identity = {};
+        for (const key of ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']) {
+            if (targetIdentity && targetIdentity[key] != null) {
+                if (typeof targetIdentity[key] !== 'string' || !targetIdentity[key].length) {
+                    return { ok: false, error: `Lazy Resolve "${name}": identity ${key} must be a lossless string.` };
+                }
+                identity[key] = targetIdentity[key];
+            }
+        }
+        if (/^0x[0-9a-fA-F]{8,}$/.test(name)) {
+            if (identity.token && identity.token !== name) {
+                return { ok: false, error: 'Lazy Resolve: token identity does not match the declared reference.' };
+            }
+            identity.token = name;
+        }
+        const identityKey = Object.keys(identity).length ? JSON.stringify(identity) : null;
+        if (identityKey && this._nsIdentitySlots && this._nsIdentitySlots.has(identityKey)) {
+            slot = this._nsIdentitySlots.get(identityKey);
+        }
+        for (let index = 0; !identityKey && index < this.MAX_NS_ENTRIES; index++) {
+            if (this.isNSEntryValid(index) &&
+                String(this.nsLabels[index] || '').toLowerCase() === name.toLowerCase()) {
+                slot = index;
+                break;
+            }
+        }
+        if (slot < 0) {
+            const registry = this.abstractionRegistry;
+            if (!registry || typeof registry.dispatchMethod !== 'function') {
+                return { ok: false, error: `Lazy Resolve "${name}": Navana registration is unavailable.` };
+            }
+            const registered = registry.dispatchMethod(5, 'Add', this, {
+                label: name, symbolic: true, location: 0, limit: 0, gtType: 1,
+                targetIdentity: identity, identityKey,
+            });
+            if (!registered || !registered.ok) {
+                return { ok: false, error: registered && (registered.error || registered.message) ||
+                    `Lazy Resolve "${name}": Namespace free list exhausted.` };
+            }
+            slot = registered.result.nsIndex;
+        }
+        const perms = Object.fromEntries(rights.map(right => [right, 1]));
+        return { ok: true, nsIndex: slot,
+            gt: this.createGT(this._nsSequenceForWrite(slot), slot, perms, 1) >>> 0 };
+    }
+
+    _resolveDeclaredSlot(word, row, address, instruction) {
+        if (!ChurchSimulator.isPendingGT(word) && !ChurchSimulator.isNullGT(word)) return word;
+        let declaration = this.programCapabilities && this.programCapabilities[row];
+        // Reload and nested CALL must use the owning binary's row metadata,
+        // never the editor's last program or the process-local FEED name index.
+        const clistBase = address - row;
+        for (let slot = 0; slot < this.nsCount; slot++) {
+            const entry = this.readNSEntry(slot);
+            const base = entry && entry.word0_location;
+            if (!base || base >= this.memory.length) continue;
+            const header = this.parseLumpHeader(this.memory[base]);
+            if (!header.valid || base + header.lumpSize - header.cc !== clistBase) continue;
+            const frame = base + 1 + header.cw;
+            const frameHeader = this.memory[frame] >>> 0;
+            if ((frameHeader >>> 24) !== 0xAB) break;
+            try {
+                const length = frameHeader & 0xffff;
+                if (!length || frame + 1 + Math.ceil(length / 4) > clistBase) {
+                    throw new Error('embedded API exceeds its allocation');
+                }
+                const bytes = new Uint8Array(length);
+                for (let offset = 0; offset < length; offset++) {
+                    bytes[offset] = (this.memory[frame + 1 + (offset >>> 2)] >>>
+                        (24 - 8 * (offset & 3))) & 255;
+                }
+                const api = JSON.parse(new TextDecoder().decode(bytes));
+                if (!Array.isArray(api.capabilities) || api.capabilities.length !== header.cc) {
+                    throw new Error('embedded API C-list geometry differs');
+                }
+                declaration = api.capabilities[row];
+            } catch (error) {
+                this.fault('LAZY_RESOLVE_PENDING', `${instruction}: ${error.message}`);
+                return null;
+            }
+            break;
+        }
+        if (!declaration || typeof declaration !== 'object' || !declaration.name) {
+            if (ChurchSimulator.isPendingGT(word) || typeof declaration === 'string') {
+                this.fault('LAZY_RESOLVE_PENDING',
+                    `${instruction}: c-list row ${row} has no embedded declaration with requested rights.`);
+                return null;
+            }
+            return word;
+        }
+        const result = this.resolveCapabilityName(
+            declaration.name, declaration.rights || declaration.grants, declaration);
+        if (!result.ok) {
+            this.fault('LAZY_RESOLVE_PENDING', `${instruction}: ${result.error}`,
+                { petName: declaration.name, slot: row });
+            return null;
+        }
+        this._writeRuntimeWord(address, result.gt);
+        return result.gt;
+    }
+
     resolvePendingSlot(slotIdx, nsIdx) {
         if (!this.bootComplete) return { ok: false, error: 'Simulator not booted' };
         if (nsIdx < 0 || !this.isNSEntryValid(nsIdx)) {
@@ -2725,9 +2872,22 @@ class ChurchSimulator {
         const pendingName = ChurchSimulator.isPendingGT(existing)
             ? ChurchSimulator.pendingGTName(existing)
             : (hasLazyEntry ? this._pendingResolves.get(slotIdx).petName : `slot${slotIdx}`);
-        const newGT = this.createGT(
-            this._nsSequenceForWrite(nsIdx), nsIdx,
-            { R:0, W:0, X:0, L:0, S:0, E:1 }, 1);
+        const declaration = this.programCapabilities && this.programCapabilities[slotIdx];
+        const rights = declaration && (declaration.rights || declaration.grants);
+        if (!Array.isArray(rights) || !rights.length) {
+            return { ok: false, error: `Slot ${slotIdx} has no declared capability rights` };
+        }
+        let newGT;
+        try {
+            if (rights.some(right => !['R', 'W', 'X', 'L', 'S', 'E'].includes(right))) {
+                throw new Error('invalid declared rights');
+            }
+            newGT = this.createGT(
+                this._nsSequenceForWrite(nsIdx), nsIdx,
+                Object.fromEntries(rights.map(right => [right, 1])), 1);
+        } catch (error) {
+            return { ok: false, error: `Slot ${slotIdx}: ${error.message}` };
+        }
         this._writeRuntimeWord(addr, newGT);
         this.output += `[RESOLVE] CR${slotIdx} "${pendingName}" \u2192 NS[${nsIdx}] introduced interactively.\n`;
 
@@ -3412,7 +3572,7 @@ class ChurchSimulator {
             this.faultViolationData = null;
         }
         if (this._liveThreadOwned &&
-                !this._suspendLiveThread(this._currentThreadSlot)) return false;
+                !this._suspendLiveThread(this._currentThreadSlot, null, this.pc)) return false;
         this._liveThreadOwned = false;
         this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
         // This is a reset-bank wipe, not an architectural CR writeback. In
@@ -3537,7 +3697,7 @@ class ChurchSimulator {
             const result = this._execChange({
                 opcode: 4, cond: 14, crDst: 12, crSrc: 15, imm: BOOT_NS_SLOT_THREAD,
                 mnemonic: 'CHANGE',
-            });
+            }, this.pc);
             if (!result || this.halted) {
                 return this._bootFailInstruction(index, 'CHANGE CR12 was rejected.');
             }
@@ -3594,658 +3754,8 @@ class ChurchSimulator {
     }
 
     /*
-     * Retired pre-three-instruction boot FSM, kept as source history only.
-     * It has no callable method or executable synthetic writer path.
-     *
-        // All boot CRs are Inform-type (type=1) GTs — they name concrete NS slots that have
-        // physical lumps.  Abstract GTs (type=3) are only minted at runtime by Navana.Abstraction.Add
-        // and Navana.MintPassKey; the boot ROM never creates them.
-        // Cross-reference: hardware/core.py BootState cases (LOAD_NS/INIT_THRD/LOAD_NUC)
-        // and docs/architecture.md "Boot Sequence" implement the same three-lump sequence.
-        if (this.bootComplete) return false;   // nothing to do once boot has finished
-        if (this.halted) return false;         // stop re-entering after a boot fault (prevents infinite loop in runSim)
-        this.executionStats.bootPhases++;
-        // _tracePacketsBuf is NOT cleared here — boot packets accumulate across all _bootStep() calls
-        // so that after the full loop callers see all 8 packets (2+3+3) at once.
-        // The buffer is cleared by reset() and at the top of step() for post-boot instructions.
-
-        switch (this.bootStep) {
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:00  FAULT_RST
-            // Hardware power-on reset: wipe all architectural state before any
-            // capability is loaded.  This is the only phase that runs unconditionally
-            // at every cold or warm reset.
-            // ════════════════════════════════════════════════════════════════════
-            case 0: {
-                // ── Capture fault-violation context BEFORE clearing CRs ──────────────
-                // If a fault caused this reset, snapshot the violation address while
-                // the CRs still hold Namespace / Thread / Abstraction context.
-                // This data is forwarded to CALL_HOME (B:04) in the boot packet.
-                if (this.faultLog && this.faultLog.length > 0) {
-                    const _lfe = this.faultLog[this.faultLog.length - 1];
-                    const _snap = _lfe.crSnapshot || [];
-                    // Extract NS slot index from a CR's GT word (bits [15:0])
-                    const _crSlot  = cr => (cr && cr.word0) ? (cr.word0 & 0xFFFF) : null;
-                    const _crLabel = slot => {
-                        if (slot === null) return '—';
-                        return (this.nsLabels && this.nsLabels[slot]) ? this.nsLabels[slot] : `NS[${slot}]`;
-                    };
-                    const _nsSlot  = _crSlot(_snap[15]);   // Namespace  (CR15)
-                    const _thrSlot = _crSlot(_snap[12]);   // Thread     (CR12)
-                    const _absSlot = _crSlot(_snap[14]);   // Abstraction (CR14)
-                    // Method / instruction from the last entry in instrHistory
-                    const _hist    = _lfe.instrHistory || [];
-                    const _lastI   = _hist.length > 0 ? _hist[_hist.length - 1] : null;
-                    const _methodStr = _lastI
-                        ? `${_lastI.opName}(CR${_lastI.crDst},CR${_lastI.crSrc},imm=${_lastI.imm})`
-                        : '—';
-                    // Offset = physicalPC within the abstraction lump
-                    // Abstraction lump base is CR14.word1 (physical base address)
-                    const _absBase = (_snap[14] && _snap[14].word1 !== undefined) ? (_snap[14].word1 >>> 0) : 0;
-                    const _faultPC = (_lfe.physicalPC || 0) >>> 0;
-                    const _offset  = _faultPC - (_absBase + 1);
-                    this.faultViolationData = {
-                        namespace:   { nsSlot: _nsSlot,  label: _crLabel(_nsSlot) },
-                        thread:      { nsSlot: _thrSlot, label: _crLabel(_thrSlot) },
-                        abstraction: { nsSlot: _absSlot, label: _crLabel(_absSlot) },
-                        method:      _methodStr,
-                        instruction: _lastI
-                            ? { physicalPC: _lastI.physicalPC, opName: _lastI.opName,
-                                crDst: _lastI.crDst, crSrc: _lastI.crSrc, imm: _lastI.imm }
-                            : null,
-                        offset:      _offset,
-                        pc:          _lfe.pc      || 0,
-                        physicalPC:  _faultPC,
-                        faultType:   _lfe.type    || '?',
-                        faultMsg:    _lfe.message || '?',
-                    };
-                    // [BOOT] FAULT_RST captured fault context — replaced by per-event trace packets
-                } else {
-                    this.faultViolationData = null;  // cold boot — no prior fault
-                }
-                // A manual pre-boot selection owns the live banks even though
-                // bootComplete is false. Preserve it before FAULT_RST wipes the
-                // banks, then synchronize selection with the Thread boot installs.
-                if (this._liveThreadOwned &&
-                        !this._suspendLiveThread(this._currentThreadSlot)) {
-                    return false;
-                }
-                this._liveThreadOwned = false;
-                this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
-                // ── Now wipe all architectural state ─────────────────────────────────
-                for (let i = 0; i < 16; i++) {   // iterate CR0–CR15 (all 16 capability registers)
-                    this._clearCR(i);             // set each CR to NULL (word0=0, word1=0, …)
-                }
-                this.dr.fill(0);                  // zero all 16 data registers (DR0–DR15)
-                this.mElevation = true;           // enable M-elevation: mLoad bypasses R/W/X/L perms during boot
-                // [BOOT] FAULT_RST — replaced by per-event trace packets
-                // Synthetic audit entry — registers the CR/DR wipe in the TSB Audit trail
-                this.auditLog.push({
-                    gate: 'RST',
-                    desc: 'CR0–CR15 → NULL  ·  DR0–DR15 → 0  ·  M-elevation ON',
-                    label: 'All CRs / DRs cleared',
-                    nsIndex: null,
-                    requiredPerm: null,
-                    checks: {},
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'FAULT_RST',
-                });
-                this.bootStep++;                  // advance state machine → B:01
-                this.ledBits = 0b000001;          // LED bit 0 ON = FAULT_RST complete
-                this.ledMode = 'boot';            // set LED display to boot-progress mode
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:01  LOAD_NS
-            // Load the Namespace descriptor (NS Slot 0) into CR15.
-            // CR15 is the privileged "namespace root": from here the hardware can
-            // locate every NS entry and therefore every lump in the system.
-            // Zero permissions — the NS slot is never directly read/written through
-            // CR15; it is only used internally by mLoad for bounds/version checks.
-            // ════════════════════════════════════════════════════════════════════
-            case 1: {
-                const _nsEntry0 = this.readNSEntry(BOOT_NS_SLOT_HEADER);
-                const _seq0 = _nsEntry0
-                    ? this.parseNSWord1(_nsEntry0.word1_limit).gtSeq : 0;
-                const gt15 = this.createGT(_seq0, BOOT_NS_SLOT_HEADER, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 0 (the namespace table itself)
-                const check = this.mLoad(gt15, null, undefined);                   // mLoad with M-elevation; reads NS word0/word1 for Slot 0
-                if (!check.ok) {
-                    this.fault('BOOT', `LOAD_NS mLoad(CR15) failed: ${check.message}`);  // NS entry missing or corrupted — unrecoverable
-                    return false;
-                }
-                this._writeCR(15, gt15, check.entry);                              // write validated GT + NS entry into CR15
-                // Boot ROM instruction [0]: LOAD CR15, CR15[0] — 2 trace packets (hardware NIA=0)
-                this._emitTrace(0, TRACE_EV_LOAD_SHADOW, 0);               // CR15 was NULL before boot
-                this._emitTrace(0, TRACE_EV_LOAD_NEW, this.cr[15].word0 >>> 0);
-                this.auditLog.push({
-                    gate: 'CR_WR',
-                    desc: `CR15(NS) ← Namespace descriptor  · base=0x0000, size=${this.memory.length} words, NS entries=${this.nsCount}`,
-                    label: (this.nsLabels && this.nsLabels[BOOT_NS_SLOT_HEADER]) || 'Namespace',
-                    nsIndex: BOOT_NS_SLOT_HEADER,
-                    requiredPerm: 'NS',
-                    checks: { install: { pass: true } },
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'LOAD_NS CR15',
-                });
-                this.bootStep++;                  // advance state machine → B:02
-                this.ledBits = 0b000011;          // LED bit 1 ON = LOAD_NS complete
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:02  INIT_THRD
-            // Load the thread stack GT (NS Slot 1) into CR12.
-            // CR12 is the thread stack register: its NS entry encodes the lump
-            // base address and total size, from which the hardware derives the stack
-            // ceiling (sp_max = lumpSize − caps − 1) and heap floor.
-            // Zero permissions — the hardware reads CR12 internally; programs never
-            // issue mLoad/mSave through CR12 directly.
-            // ════════════════════════════════════════════════════════════════════
-            case 2: {
-                const _nsEntry1 = this.readNSEntry(BOOT_NS_SLOT_THREAD);
-                const _seq1 = _nsEntry1
-                    ? this.parseNSWord1(_nsEntry1.word1_limit).gtSeq : 0;
-                const gt12 = this.createGT(_seq1, BOOT_NS_SLOT_THREAD, {R:0,W:0,X:0,L:0,S:0,E:0}, 1); // zero-perm Inform GT for NS Slot 1 (thread lump)
-                const check12 = this.mLoad(gt12, null, undefined);                 // M-elevation mLoad; reads thread lump NS entry
-                if (!check12.ok) {
-                    this.fault('BOOT', `INIT_THRD mLoad(CR12, Thread) failed: ${check12.message}`);
-                    return false;
-                }
-                this._writeCR(12, gt12, check12.entry);                            // CR12 ← thread stack token (encodes lump base + size)
-                // [BOOT] INIT_THRD — replaced by per-event trace packets (CR12 captured in B:03 CHANGE_CR12)
-                this.auditLog.push({
-                    gate: 'CR_WR',
-                    desc: `CR12(E) ← Thread stack GT  · NS slot ${BOOT_NS_SLOT_THREAD}, zero perms (Inform), M-elevation`,
-                    label: (this.nsLabels && this.nsLabels[BOOT_NS_SLOT_THREAD]) || 'Boot.Thread',
-                    nsIndex: BOOT_NS_SLOT_THREAD,
-                    requiredPerm: 'E',
-                    checks: { install: { pass: true } },
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'INIT_THRD CR12',
-                });
-                // Stash the thread NS entry for use in B:03 INIT_HEAP (case 3)
-                this._initThrdEntry = check12.entry;
-                this.bootStep++;                  // advance state machine → B:03
-                this.ledBits = 0b000011;          // LED bit 1 still on; bit 2 reserved for INIT_HEAP
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:03  INIT_HEAP  (case 3)
-            // Establish CR5 (Heap) as an RW capability over the thread lump.
-            // Consistent with CHANGE CR12 hardware behaviour which synthesizes CR5
-            // from the incoming thread's lump header at the same time it sets CR12.
-            // ════════════════════════════════════════════════════════════════════
-            case 3: {
-                const _initThrdEntry = this._initThrdEntry;
-                if (!_initThrdEntry) {
-                    this.fault('BOOT', 'INIT_HEAP: missing thread NS entry from B:02 INIT_THRD');
-                    return false;
-                }
-                const _threadBase12   = _initThrdEntry.word0_location;
-                const _threadHdrWord12 = this.memory[_threadBase12] >>> 0;
-                const _threadHdr12    = this.parseLumpHeader(_threadHdrWord12);
-                const _threadLayout12 = (_threadHdr12.valid && _threadHdr12.typ === 2 &&
-                    _threadHdr12.cc === THREAD_DESIGN.capabilityHomes.words)
-                    ? THREAD_DESIGN.layout(_threadHdr12.lumpSize, _threadHdr12.cw)
-                    : null;
-                if (!_threadLayout12 || !_threadLayout12.valid) {
-                    this.fault('BOOT', 'INIT_HEAP: invalid Thread size-derived geometry');
-                    return false;
-                }
-                const _heapStart12    = _threadLayout12.heapStart;
-                const _heapEnd12      = _threadLayout12.heapEnd;
-                const _seq1h = this.parseNSWord1(_initThrdEntry.word1_limit).gtSeq;
-                const gt5 = this.createGT(_seq1h, BOOT_NS_SLOT_THREAD, {R:1,W:1,X:0,L:0,S:0,E:0}, 1);  // RW Inform GT for the thread lump (Slot 1)
-                this.cr[5] = {
-                    word0: gt5 >>> 0,
-                    word1: (_threadBase12 + THREAD_HEAP_OFFSET) >>> 0,
-                    word2: (_threadLayout12.heapWords - 1) >>> 0,
-                    word3: 0,
-                    m: 0,
-                };
-                // Boot ROM instruction [1]: CHANGE CR12, CR15[1] — 3 trace packets (hardware NIA=1)
-                this._emitTrace(1, TRACE_EV_CHANGE_PUSH, 0);
-                this._emitTrace(1, TRACE_EV_CHANGE_CR12, this.cr[12].word0 >>> 0);
-                this._emitTrace(1, TRACE_EV_CHANGE_CR5,  this.cr[5].word0  >>> 0);
-                // Synthetic audit entry so the TSB Audit panel shows the CR5 heap
-                // synthesis as an explicit capability gate (not an mLoad — the GT is
-                // created directly by the boot state machine, CHANGE-consistent).
-                this.auditLog.push({
-                    gate: 'HEAP',
-                    desc: `CR5(RW) ← thread heap · base=0x${this.cr[5].word1.toString(16).toUpperCase()}, heap=[+${_heapStart12}..+${_heapEnd12}] (protected STO remains outside CR5 at +${THREAD_STO_OFFSET})`,
-                    label: this.nsLabels[BOOT_NS_SLOT_THREAD] || 'Boot.Thread',
-                    nsIndex: BOOT_NS_SLOT_THREAD,
-                    requiredPerm: null,
-                    checks: {
-                        version: { pass: true },
-                        seal:    { pass: true },
-                        perm:    { pass: true, perm: null },
-                    },
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'INIT_HEAP CR5←heap',
-                });
-                this.bootStep++;                  // advance state machine → B:04
-                this.ledBits = 0b000111;          // LED bit 2 ON = INIT_HEAP complete
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:04  CALL_HOME  (case 4)
-            // Send the Tunnel.Register identification packet and await ACK.
-            // Offline-safe: always advances bootStep regardless of ACK result.
-            // When the abstraction registry is available, dispatches via
-            // Tunnel.Register; otherwise simulates the UART interaction directly
-            // (write boot_reason/last_fault/fault_NIA to uartRegs[0], read ACK
-            // from uartRegs[1]).
-            // ════════════════════════════════════════════════════════════════════
-            case 4: {
-                const _bootReason = (this.faultLog && this.faultLog.length > 0) ? 2 : 0; // 0=cold, 2=fault-recovery
-                const _lastFault  = (this.faultLog && this.faultLog.length > 0)
-                    ? (this.faultLog[this.faultLog.length - 1].type || 0) : 0;
-                const _faultNIA   = (this.faultLog && this.faultLog.length > 0)
-                    ? (this.faultLog[this.faultLog.length - 1].pc || 0) : 0;
-
-                let _ack = 0;
-                let _callHomeMode = 'offline';
-
-                if (this.abstractionRegistry) {
-                    const _chResult = this.abstractionRegistry.dispatchMethod(
-                        this._slotByPetName('Tunnel', 8), 'Register', this,
-                        { dr1: _bootReason, dr2: _lastFault, dr3: _faultNIA }
-                    );
-                    if (_chResult && _chResult.ok !== false) {
-                        _ack = (_chResult.dr0 !== undefined) ? (_chResult.dr0 | 0) : 0;
-                        _callHomeMode = _ack > 0 ? 'online' : 'offline';
-                    }
-                } else if (this.uartRegs) {
-                    this.uartRegs[0] = _bootReason;
-                    this.uartRegs[0] = _lastFault;
-                    this.uartRegs[0] = _faultNIA;
-                    _ack = this.uartRegs[1] | 0;
-                    _callHomeMode = _ack > 0 ? 'online' : 'offline';
-                }
-
-                // [BOOT] CALL_HOME — replaced by per-event trace packets
-                // (CALL_HOME is a firmware-level service call, not a hardware-ISA instruction)
-                this.callHomeStatus = _callHomeMode;
-                this.callHomeTimestamp = Date.now();
-                // Synthetic audit entry — shows the CALL_HOME registration in the TSB Audit trail
-                const _fvSuffix = this.faultViolationData
-                    ? ` · Fault: ${this.faultViolationData.namespace.label}.${this.faultViolationData.thread.label}.${this.faultViolationData.abstraction.label}.${this.faultViolationData.method}`
-                    : '';
-                this.auditLog.push({
-                    gate: 'CALL_HOME',
-                    desc: `Tunnel.Register(reason=${_bootReason}, fault_NIA=0x${_faultNIA.toString(16).toUpperCase()}) ACK=${_ack} [${_callHomeMode}]${_fvSuffix}`,
-                    label: `Tunnel.Register ACK=${_ack}`,
-                    nsIndex: null,
-                    requiredPerm: null,
-                    checks: {},
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'CALL_HOME',
-                });
-                this.bootStep++;                  // advance state machine → B:05  (offline-safe: always advance)
-                this.ledBits = 0b001111;          // LED bit 3 ON = CALL_HOME complete
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:05  INIT_ABSTR  (case 5)
-            // Load Boot.Abstr (NS Slot 6 = SelfTest) into CR6 with E-perm.
-            // The E-type GT written here is snapshotted as oldCR6GT in B:06 and
-            // saved to the sentinel call frame in the thread stack.
-            // ════════════════════════════════════════════════════════════════════
-            case 5: {
-                // Namespace entries can be reissued while retaining their slot.
-                // Mint the boot credential from the entry's *live* sequence;
-                // a hardcoded zero creates a stale GT and traps before the
-                // selected LUMP executes.
-                const _b5Entry = this.readNSEntry(this.bootEntrySlot);
-                const _b5Seq = _b5Entry
-                    ? this.parseNSWord1(_b5Entry.word1_limit).gtSeq : 0;
-                const gt6 = this.createGT(_b5Seq, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1);  // E-perm GT for boot entry
-                const check6 = this.mLoad(gt6, null, undefined);                                    // M-elevation mLoad; validates boot entry NS entry
-                const _b3Label = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
-                if (!check6.ok) {
-                    this.fault('BOOT', `INIT_ABSTR mLoad(CR6, ${_b3Label}) failed: ${check6.message}`);
-                    return false;
-                }
-                const _b3ActualNSType     = check6.entry.gtType;
-                const _GT_TYPE_NAMES_B3   = ['NULL', 'Inform', 'Outform', 'Abstract'];
-                const _b3ActualNSTypeName = _GT_TYPE_NAMES_B3[_b3ActualNSType & 3] || 'Unknown';
-                const _b3NSTypePass       = _b3ActualNSType === 1;
-                this._auditNSType(this.bootEntrySlot, _b3Label, _b3ActualNSType, _b3ActualNSTypeName, 'INIT_ABSTR');
-                if (!_b3NSTypePass) {
-                    this.fault('TYPE', `INIT_ABSTR: ${_b3Label} type is ${_b3ActualNSTypeName}, must be Inform`);
-                    return false;
-                }
-                this._writeCR(6, gt6, check6.entry);                                               // CR6 ← E-type token for boot entry (saved to sentinel frame in B:06)
-                // [BOOT] INIT_ABSTR CR6 — replaced by per-event trace packets
-                this.auditLog.push({
-                    gate: 'CR_WR',
-                    desc: `CR6(E) ← Boot entry E-GT  · NS slot ${this.bootEntrySlot} (${_b3Label}), M-elevation; snapshotted to sentinel frame in B:06`,
-                    label: _b3Label,
-                    nsIndex: this.bootEntrySlot,
-                    requiredPerm: 'E',
-                    checks: { install: { pass: true } },
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'INIT_ABSTR CR6',
-                });
-
-                // Write the boot-entry E-GT into Thread.caps[0] (Zone ① CR0 home slot,
-                // thread offset +244).  This is the boot-construction write: B:07 NUC_CODE
-                // reads it as the sole authority for CR0 at machine start.  Written
-                // unconditionally so a stale value from a previous session or from
-                // _initNamespaceTable() running with a different bootEntrySlot is always
-                // overridden by the canonical hardware boot abstraction.
-                const _b5ThreadEntry = this.readNSEntry(BOOT_NS_SLOT_THREAD);
-                if (_b5ThreadEntry && typeof _b5ThreadEntry.word0_location === 'number') {
-                    // word0_location may be 0 (Thread lump lives at address 0 in the
-                    // simulator), so the old falsy guard `&& _b5ThreadEntry.word0_location`
-                    // silently skipped the write.  Use a typeof check instead.
-                    const _b5ThreadBase = _b5ThreadEntry.word0_location >>> 0;
-                    const _b5ThreadLayout = this._threadLayoutAtBase(_b5ThreadBase);
-                    if (!_b5ThreadLayout) {
-                        this.fault('BOOT', 'INIT_ABSTR: invalid Thread geometry');
-                        return false;
-                    }
-                    const _b5CR0Addr = _b5ThreadBase + _b5ThreadLayout.capsStart;
-                    this._writeRuntimeWord(_b5CR0Addr, gt6);
-                    // [BOOT] INIT_ABSTR Thread.caps[0] — replaced by per-event trace packets
-                }
-
-                this.bootStep++;                  // advance state machine → B:06
-                this.ledBits = 0b011111;          // LED bit 4 ON = INIT_ABSTR complete
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:06  NUC_CLIST  (case 6)
-            // First half of nucleus load: validate Boot.Abstr NS entry, read the
-            // lump header, push the sentinel CALL frame, and derive CR6 (c-list, E)
-            // from the lump header.  Stashes base/layout data for NUC_CODE (B:07).
-            //
-            //   1. E-perm mLoad on Boot.Abstr (BOOT_ABSTR_NS_SLOT=3): validates
-            //      the NS entry and checks F-bit and GT type.
-            //   2. Read Boot.Abstr lump header (word 0) to extract cc and lumpSize.
-            //   3. Push a sentinel CALL frame into thread lump memory so that any
-            //      eventual RETURN from the root abstraction reboots the machine.
-            //   4. Derive CR6 (c-list, E) from the lump header.
-            //   5. Stash layout data for B:07 NUC_CODE.
-            // ════════════════════════════════════════════════════════════════════
-            case 6: {
-                // ── Step 1: Direct E-perm mLoad of boot entry abstraction ────────────
-                const _b4Label    = (this.nsLabels && this.nsLabels[this.bootEntrySlot]) || `Slot ${this.bootEntrySlot}`;
-                const _b6Entry = this.readNSEntry(this.bootEntrySlot);
-                const _b6Seq = _b6Entry
-                    ? this.parseNSWord1(_b6Entry.word1_limit).gtSeq : 0;
-                const bootEntryGT = this.createGT(_b6Seq, this.bootEntrySlot, {R:0,W:0,X:0,L:0,S:0,E:1}, 1); // E-GT for boot entry
-                const entryCheck  = this.mLoad(bootEntryGT, 'E', undefined);                              // E-perm mLoad: validates NS entry
-                if (!entryCheck.ok) {
-                    this.fault('BOOT', `NUC_CLIST mLoad(CR6, ${_b4Label}) failed: ${entryCheck.message}`);
-                    return false;
-                }
-                const _actualNSType     = entryCheck.entry.gtType;
-                const _GT_TYPE_NAMES    = ['NULL', 'Inform', 'Outform', 'Abstract'];
-                const _actualNSTypeName = _GT_TYPE_NAMES[_actualNSType & 3] || 'Unknown';
-                const _nsTypePass = _actualNSType === 1;
-                this._auditNSType(this.bootEntrySlot, _b4Label, _actualNSType, _actualNSTypeName, 'NUC_CLIST');
-                if (!_nsTypePass) {                                                                         // must be Inform (type=1)
-                    this.fault('TYPE', `NUC_CLIST: ${_b4Label} type is ${_actualNSTypeName}, must be Inform`);
-                    return false;
-                }
-                const entryNSEntry  = entryCheck.entry;                             // NS entry for boot entry abstraction
-                if (this.parseNSWord1(entryNSEntry.word1_limit).f === 1) {
-                    this.fault('F_BIT', `NUC_CLIST: ${_b4Label} has F-bit set (Far)`);
-                    return false;
-                }
-                const bootEntrySlot = this.bootEntrySlot;
-
-                // ── Step 2: Read Boot.Abstr lump header (word 0) ──────────────────────
-                const base     = entryNSEntry.word0_location;                       // physical base of Boot.Abstr lump
-                let hdrWord  = this.memory[base] >>> 0;                             // raw 32-bit lump header word
-                let hdr      = this.parseLumpHeader(hdrWord);                       // decode {magic, cc, cw, lumpSize, valid}
-
-                // ── Audit: record lump-header check in Gate Log ────────────────────────
-                this._auditLumpHeader(this.bootEntrySlot, _b4Label, hdr);
-
-                if (!hdr.valid) {
-                    // Lump may be warm (zeroed by initLazyManifest). Try lazy-restore
-                    // before faulting — warm slots have their code evicted at init but
-                    // their bootUpload data is still in the manifest.
-                    if (this.lazyLoad(bootEntrySlot)) {
-                        hdrWord = this.memory[base] >>> 0;
-                        hdr     = this.parseLumpHeader(hdrWord);
-                        this._auditLumpHeader(bootEntrySlot, _b4Label, hdr);
-                    }
-                    if (!hdr.valid) {
-                        this.fault('LUMP_MAGIC', `NUC_CLIST: ${_b4Label} lump header magic=0x${hdr.magic.toString(16)} (expected 0x1F) — lump not installed or memory zeroed`);
-                        return false;
-                    }
-                }
-                const cw         = hdr.cw;                                          // code-word count
-                const cc         = hdr.cc;                                          // c-list word count
-                const lumpSz     = hdr.lumpSize;                                    // total lump size in 32-bit words
-                const clistStart = lumpSz - cc;                                     // c-list begins at physical end of lump
-
-                // ── Step 3: Push sentinel CALL frame ──────────────────────────────────
-                // Sentinel saves oldCR6GT (E-GT for Boot.Abstr written by B:05 INIT_ABSTR)
-                // as the "saved caller CR6". returnPC=0x7FFF is a poison value; RETURN
-                // detects it and raises STACK_UNDERFLOW instead of jumping to garbage.
-                const threadBase = this._activeThreadBase();
-                const threadLayout = this._threadLayoutAtBase(threadBase);
-                if (!threadLayout) {
-                    this.fault('BOUNDS', 'NUC_CLIST: active Thread header has invalid private-memory geometry');
-                    return false;
-                }
-                const sp_max = threadLayout.stackEnd;
-                const oldCR6GT = this.cr[6].word0 >>> 0;                            // snapshot E-GT for Boot.Abstr written by B:05 INIT_ABSTR
-                const sentinelFrameWord = this._packFrameWordRaw(0x7FFF, 1, sp_max);
-                this.callStack.push({
-                    sentinel: true,
-                    returnPC: 0x7FFF,
-                    savedCRs: this.cr.map(c => ({...c})),
-                    savedDRs: [...this.dr],
-                    savedFlags: {...this.flags},
-                    savedSTO: sp_max,
-                    sz: 1,
-                    frameWord: sentinelFrameWord,
-                    frameAddress: sp_max,
-                });
-                if (threadBase !== null) {
-                    this._writeRuntimeWord(threadBase + sp_max, sentinelFrameWord);
-                    this._writeRuntimeWord(threadBase + sp_max - 1, oldCR6GT);
-                    this._writeProtectedSto(threadBase, sp_max - 2, 1, this.flags);
-                }
-                this.sto = sp_max - 2;
-
-                // ── Step 4: cc=0 (direct dispatch) vs cc>0 (saved-lump c-list) ──────────
-                // cc=0: direct dispatch — no c-list. The tail-relative CR0 home holds the boot-entry E-GT
-                //       written by the boot image or setBootEntrySlot(); NUC_CODE installs it
-                //       directly into CR0.  No CHANGE/TPERM/CALL trampoline.
-                // cc>0: derive CR6 (c-list, E) from lump header (saved-lump path).
-                if (cc === 0) {
-                    // Direct dispatch path: no c-list in Boot.Abstr.
-                    // The Thread's tail-relative CR0 home holds the boot-entry E-GT.
-                    // NUC_CODE (B:07) reads it and installs it directly into CR0 — no CHANGE/TPERM/CALL.
-                    // CR6 was written by B:05 INIT_ABSTR with the Boot.Abstr E-GT; that GT is already
-                    // snapshotted into the sentinel frame above.  Since cc=0 means there is no c-list,
-                    // CR6 must be cleared to NULL so machine state is consistent.
-                    this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
-                    // [BOOT] NUC_CLIST cc=0 + SENTINEL — replaced by per-event trace packets
-                    this.auditLog.push({
-                        gate: 'SENTINEL',
-                        desc: `Boot.Abstr cc=0 (no c-list, direct dispatch) — sentinel pushed @ +${sp_max}; thread[+${threadLayout.capsStart}] holds boot entry E-GT`,
-                        label: _b4Label + ' (no c-list)',
-                        nsIndex: bootEntrySlot,
-                        requiredPerm: null,
-                        checks: { install: { pass: true } },
-                        b: 0, f: 0,
-                        result: 'pass',
-                        stepCtx: 'NUC_CLIST sentinel-only',
-                    });
-                } else {
-                    // CALL ISA microcode (INIT_CLIST): CR6 ← L-perm c-list token via mLoad-validated
-                    // NS entry.  Only LOAD_NS (CR15) and INIT_THRD (CR12) are permitted raw writes;
-                    // every other CR must go through _writeCR using the mLoad-returned NS entry.
-                    // Synthesise a clist-entry whose word0_location points to the c-list start
-                    // (base + clistStart) so _writeCR sets CR6.word1 correctly.
-                    const _b6EntrySeq = this.parseNSWord1(entryNSEntry.word1_limit).gtSeq;
-                    const cr6GT = this.createGT(_b6EntrySeq, bootEntrySlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);   // L-perm c-list token
-                    const _clistEntry = Object.assign({}, entryNSEntry, { word0_location: (base + clistStart) >>> 0 });
-                    this._writeCR(6, cr6GT, _clistEntry);
-                    this.cr[6].m = 1;   // CALL is always M-elevated (matches CALL ISA call.py: mload_m_elevated=1)
-                    // [BOOT] NUC_CLIST INIT_CLIST + SENTINEL — replaced by per-event trace packets
-                    this.auditLog.push({
-                        gate: 'CR_WR',
-                        desc: `CR6(L) ← mLoad INIT_CLIST · ${_b4Label} c-list  · base=0x${(base+clistStart).toString(16).toUpperCase()}, cc=${cc}, sentinel pushed`,
-                        label: _b4Label + ' c-list',
-                        nsIndex: bootEntrySlot,
-                        requiredPerm: 'L',
-                        checks: { install: { pass: true } },
-                        b: 0, f: 0,
-                        result: 'pass',
-                        stepCtx: 'NUC_CLIST INIT_CLIST CR6',
-                    });
-                }
-
-                // ── Step 5: Stash layout data for B:07 NUC_CODE ───────────────────────
-                this._nucLumpData = { base, hdrWord, cw, cc, lumpSz, clistStart, bootEntrySlot, label: _b4Label, entryNSEntry };
-
-                this.bootStep++;                  // advance state machine → B:07 (NUC_CODE)
-                this.ledBits = 0b011111;          // 5 LEDs on = NUC_CLIST complete
-                break;
-            }
-
-            // ════════════════════════════════════════════════════════════════════
-            // B:07  NUC_CODE  (case 7)
-            // Second half of nucleus load: derive CR14 (code, R+X) from the lump
-            // layout stashed by B:06 NUC_CLIST, then set PC = 0.
-            // ════════════════════════════════════════════════════════════════════
-            case 7: {
-                const nd = this._nucLumpData;
-                if (!nd) {
-                    this.fault('BOOT', 'NUC_CODE: _nucLumpData is null (NUC_CLIST did not run)');
-                    return false;
-                }
-                const { base, hdrWord, cw, cc, lumpSz, clistStart, bootEntrySlot, label: _b4Label, entryNSEntry } = nd;
-
-                // ── Derive CR14 (code, R+X) via mLoad-validated NS entry (CALL ISA) ──────
-                // CALL ISA rule: only LOAD_NS (CR15) and INIT_THRD (CR12) are permitted raw
-                // writes.  CR14 must be installed through _writeCR using the NS entry
-                // returned by the E-perm mLoad in NUC_CLIST (B:06).
-                // _writeCR sets CR14.word1 = entryNSEntry.word0_location = lump base ✓
-                const _b7EntrySeq = this.parseNSWord1(entryNSEntry.word1_limit).gtSeq;
-                const cr14GT = this.createGT(_b7EntrySeq, bootEntrySlot, {R:1,W:0,X:1,L:0,S:0,E:0}, 1);  // R+X code token
-                this._writeCR(14, cr14GT, entryNSEntry);
-                // Boot ROM instruction [2]: CALL CR0, CR0 — 3 trace packets (hardware NIA=2)
-                this._emitTrace(2, TRACE_EV_CALL_CR6,  this.cr[6].word0  >>> 0);
-                this._emitTrace(2, TRACE_EV_CALL_CR14, this.cr[14].word0 >>> 0);
-                this._emitTrace(2, TRACE_EV_CALL_PUSH, 0);
-
-                // ── Read CR0 from Thread.caps[0] — Thread is the authority ───────────────
-                // The Thread's tail-relative CR0 home holds the
-                // boot-entry E-GT written during construction by _initNamespaceTable().
-                // B:07 reads it directly — it must NOT synthesise a new GT from
-                // bootEntrySlot.  The Thread itself carries the boot-entry credential.
-                const _threadBase = this.cr[12].word1 >>> 0;  // B:02 _writeCR → word1 = entry.word0_location
-                const _threadLayout = this._threadLayoutAtBase(_threadBase);
-                const _cr0EGT = _threadLayout
-                    ? (this.memory[_threadBase + _threadLayout.capsStart] >>> 0) : 0;
-                if (_cr0EGT === 0) {
-                    this.fault('BOOT', 'NUC_CODE: Thread.caps[0] is NULL — boot-entry E-GT was not written into the Thread lump during construction');
-                    return false;
-                }
-                // Consistency check: slot encoded in Thread.caps[0] must match the
-                // NS entry mLoaded and validated by B:05 INIT_ABSTR / B:06 NUC_CLIST.
-                const _cr0Slot = _cr0EGT & 0xFFFF;
-                if (_cr0Slot !== bootEntrySlot) {
-                    this.fault('BOOT', `NUC_CODE: Thread.caps[0] encodes slot ${_cr0Slot} but B:05/B:06 validated slot ${bootEntrySlot} — boot-entry mismatch`);
-                    return false;
-                }
-                this.cr[0] = { word0: _cr0EGT, word1: 0, word2: 0, word3: 0, m: 0 };
-
-                // ── Set PC = 0 ────────────────────────────────────────────────────────
-                this.pc = 0;
-                this._nucLumpData = null;                                            // clear stash
-
-                // [BOOT] NUC_CODE — replaced by per-event trace packets (CALL_CR6/CALL_CR14/CALL_PUSH emitted above)
-                this.auditLog.push({
-                    gate: 'CR_WR',
-                    desc: `CR14(R+X) ← ${_b4Label} code lump  · base=0x${base.toString(16).toUpperCase()}, cw=${cw}, PC←0; CR0 ← boot-entry E-GT (direct dispatch)`,
-                    label: _b4Label + ' code',
-                    nsIndex: bootEntrySlot,
-                    requiredPerm: 'R+X',
-                    checks: { install: { pass: true } },
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'NUC_CODE CR14',
-                });
-
-                // B:07 is the final boot step. CR0 now holds the boot-entry E-GT
-                // (direct dispatch — no Startup.Config intermediary or trampoline needed).
-                this.mElevation = false;            // drop M-elevation: normal capability checks now apply
-                this._resetAllMBits();              // clear M-bits set on CRs during boot init;
-                                                    // prevents stale m=1 from triggering writeback gate
-                                                    // on the first CALL after boot completes.
-
-                // ── Navana.Init (NS slot 5) ────────────────────────────────────────
-                // Called exactly once at boot completion, after M-elevation is off and
-                // all boot NS entries are in place.  Navana performs Stage-1 memory
-                // allocation (SlideRule/Constants code regions, scheduler/stack/flag
-                // buffers), discovers devices, mints LED PassKey, and wires Keystone.
-                // A failure here is logged as a warning — the boot does not abort.
-                if (this.abstractionRegistry) {
-                    const navaInit = this.abstractionRegistry.dispatchMethod(5, 'Init', this, {});
-                    const navaOk   = !!(navaInit && navaInit.ok);
-                    // [BOOT] Navana.Init — replaced by per-event trace packets
-                    this.auditLog.push({
-                        gate: 'Navana.Init',
-                        desc: navaOk
-                            ? `Navana.Init complete — ${navaInit.message || 'OK'}`
-                            : `Navana.Init warning — ${(navaInit && navaInit.error) || 'no response'}`,
-                        label: 'Navana',
-                        nsIndex: 5,
-                        requiredPerm: null,
-                        checks: { init: { pass: navaOk } },
-                        b: 0, f: 0,
-                        result: navaOk ? 'pass' : 'warn',
-                        stepCtx: 'NAVANA_INIT',
-                    });
-                }
-
-                this.bootComplete = true;           // signal the step-loop to start dispatching instructions
-                // Boot has installed the selected Thread into the live banks.
-                this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
-                this._liveThreadOwned = true;
-                this.ledBits = 0b111111;            // all 6 LEDs on = boot complete
-                this.ledMode = 'boot';              // LED display stays in boot-progress mode until first user toggle
-                // [BOOT] COMPLETE — replaced by per-event trace packets
-                this.auditLog.push({
-                    gate: 'CMPL',
-                    desc: 'bootComplete ← true  ·  M-elevation OFF  ·  CR0 = boot-entry E-GT (direct dispatch)',
-                    label: 'Boot complete',
-                    nsIndex: null,
-                    requiredPerm: null,
-                    checks: {},
-                    b: 0, f: 0,
-                    result: 'pass',
-                    stepCtx: 'COMPLETE',
-                });
-                break;
-            }
-        }
-        this.emit('stateChange', this.getState());  // notify UI that machine state has changed (triggers register/memory panel refresh)
-        return true;                                 // return true = a boot step was executed; false = already complete or faulted
-    */
+     * Boot-step execution delegates to the three-instruction ROM path.
+     */
 
     parseGT(gt32) {
         // v2.0 GT layout: [31]=b_flag [30:28]=perm[2:0] [27]=dom
@@ -4344,19 +3854,6 @@ class ChurchSimulator {
         return (p | t | s | i) >>> 0;
     }
 
-    // Abstract GT helpers (Task #406) ─────────────────────────────────────────
-    // v2.0 layout: [31:27]=ab_type  ★[26:25]=gt_type=0b11  [24]=R  [23]=W  [22:16]=gt_seq  [15:0]=ab_data
-    // ab_data for ab_type=0x00 I/O: [15:8]=device_class  [7:0]=device_data
-    static AB_TYPE_IO          = 0x00;   // I/O device (LED, UART, Button, Timer, Display)
-    static AB_TYPE_M_ELEVATION = 0x01;   // M Abstraction — sets CRn(M=1)
-
-    static DEVICE_CLASS_LED       = 0x01;
-    static DEVICE_CLASS_UART      = 0x02;
-    static DEVICE_CLASS_BUTTON    = 0x03;
-    static DEVICE_CLASS_TIMER     = 0x04;
-    static DEVICE_CLASS_DISPLAY   = 0x05;
-    static DEVICE_CLASS_CHURCHHW  = 0x06;   // Church HW control (PetNameMemory write port)
-
     createAbstractGT(ab_type, perms, gt_seq, ab_data) {
         // Only R and W are valid perm bits for Abstract GTs (X/L/S/E/B are repurposed as ab_type).
         // Layout: bit[26]=R, bit[25]=W  (R is the higher bit per spec)
@@ -4391,6 +3888,7 @@ class ChurchSimulator {
         const device_data  = ab_data & 0xFF;
         return { ab_type, R, W, type, gt_seq, ab_data, device_class, device_data };
     }
+
     // ──────────────────────────────────────────────────────────────────────────
 
     getPermBits(permsObj) {
@@ -5212,7 +4710,6 @@ class ChurchSimulator {
         };
     }
 
-
     // ── Absent-lump helpers (shared by LOAD, ELOADCALL, XLOADLAMBDA) ───────────
     // _outformToken96: build the 96-bit IDE token from the Outform NS entry
     // (Task #2862).  The token is serialized EXACTLY as W1||W2||W3 — the three
@@ -5248,6 +4745,7 @@ class ChurchSimulator {
     _is64Hex(s) {
         return typeof s === 'string' && /^[0-9a-fA-F]{64}$/.test(s);
     }
+
     _normHash(s) {
         return (typeof s === 'string') ? s.toLowerCase() : null;
     }
@@ -5474,6 +4972,7 @@ class ChurchSimulator {
         this.output += `\u27F3 Fetching lump: Slot ${targetIdx} (${label}) [${instrName}] — token=0x${token} (T=0x${cacheToken.toString(16).padStart(8,'0')})\n`;
         return { absent: true, nsIndex: targetIdx, token, cacheToken, label };
     }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     // Return the active Thread LUMP base, including the architecturally valid
@@ -5759,7 +5258,15 @@ class ChurchSimulator {
         }
     }
 
-    _prepareThreadSuspendFrame(threadBase, layout, threadSlot) {
+    _prepareThreadSuspendFrame(threadBase, layout, threadSlot, continuationPC) {
+        // The caller supplies the next unexecuted NIA: step() has consumed its
+        // CHANGE instruction, while an IDE switch has not consumed this.pc.
+        if (!Number.isInteger(continuationPC) ||
+                continuationPC < 0 || continuationPC >= 0x7FFF) {
+            this.fault('BOUNDS',
+                `CHANGE: outgoing Thread slot ${threadSlot} has invalid continuation NIA ${continuationPC}`);
+            return null;
+        }
         const savedSTO = this.sto >>> 0;
         if (savedSTO < layout.stackStart + 1 || savedSTO > layout.stackEnd) {
             this.fault('BOUNDS',
@@ -5796,7 +5303,7 @@ class ChurchSimulator {
         return { savedSTO, enterGT };
     }
 
-    _suspendLiveThread(threadSlot = this._currentThreadSlot, prepared = null) {
+    _suspendLiveThread(threadSlot, prepared, continuationPC) {
         if (!this._liveThreadOwned || !Number.isInteger(threadSlot)) return true;
         let { threadBase, layout, suspend } = prepared || {};
         if (!prepared) {
@@ -5812,8 +5319,14 @@ class ChurchSimulator {
                 return false;
             }
             suspend = this._prepareThreadSuspendFrame(
-                threadBase, layout, threadSlot);
+                threadBase, layout, threadSlot, continuationPC);
             if (!suspend) return false;
+        }
+        if (!Number.isInteger(continuationPC) ||
+                continuationPC < 0 || continuationPC >= 0x7FFF) {
+            this.fault('BOUNDS',
+                `CHANGE: outgoing Thread slot ${threadSlot} has invalid continuation NIA ${continuationPC}`);
+            return false;
         }
         for (let i = 0; i < 16; i++) {
             this._writeRuntimeWord(threadBase + 1 + i, this.dr[i]);
@@ -5824,7 +5337,7 @@ class ChurchSimulator {
                 this.cr[i].word0);
         }
         const frameWord = this._packFrameWord(
-            this.pc, 1, suspend.savedSTO);
+            continuationPC, 1, suspend.savedSTO);
         this._writeRuntimeWord(
             threadBase + suspend.savedSTO - 1, suspend.enterGT);
         this._writeRuntimeWord(
@@ -6126,7 +5639,7 @@ class ChurchSimulator {
 
         const result = this._execChange({
             crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE',
-        });
+        }, this.pc);
         if (!result) return { ok: false, reason: 'Thread switch was rejected' };
         // A successful manual CHANGE selects a runnable stopped context.  HALT
         // is an execution latch, not part of the saved Thread image, so carrying
@@ -6149,6 +5662,15 @@ class ChurchSimulator {
     }
 
     _writeDR(drIdx, value) {
+        if (this._executionAttempt) {
+            this._executionAttempt.effects.push({
+                kind: 'register-write', register: drIdx, value: value >>> 0,
+                previousValue: this.dr[drIdx] >>> 0,
+                // DR0 is hardwired to zero at retirement; the calculated
+                // value is evidence of the computation, not a lasting write.
+                discarded: drIdx === 0 && (value >>> 0) !== 0,
+            });
+        }
         this.dr[drIdx] = value >>> 0;
         if (drIdx < 16) {
             const threadBase = this._activeThreadBase();
@@ -6283,6 +5805,7 @@ class ChurchSimulator {
         // CALL and RETURN boundaries reset CRn(M) on every CR.
         for (let i = 0; i < 16; i++) this.cr[i].m = 0;
     }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     checkCondition(condCode) {
@@ -6380,6 +5903,10 @@ class ChurchSimulator {
         if (!Number.isInteger(absAddr) || absAddr < 0 || absAddr >= this.memory.length) {
             throw new RangeError(`runtime word address ${absAddr} is outside memory`);
         }
+        if (this._executionAttempt) this._executionAttempt.effects.push({
+            kind: 'memory-write', address: absAddr,
+            previousValue: this.memory[absAddr] >>> 0, value: value >>> 0,
+        });
         if (!this._runtimeWordOriginals) this._runtimeWordOriginals = new Map();
         if (!this._runtimeWordOriginals.has(absAddr)) {
             this._runtimeWordOriginals.set(absAddr, this.memory[absAddr] >>> 0);
@@ -6592,6 +6119,7 @@ class ChurchSimulator {
     }
 
     fault(type, message, meta = null) {
+        if (this._executionAttempt) this._executionAttempt.fault = { type, message };
         if (this.executionStats) this.executionStats.faults++;
         const lastH = this._instrHistory && this._instrHistory.length > 0
             ? this._instrHistory[this._instrHistory.length - 1] : null;
@@ -7064,275 +6592,22 @@ class ChurchSimulator {
     }
 
     step() {
-        // If we are suspended waiting for an absent-lump fetch, don't execute
-        // anything — return a suspended sentinel.  app.js drives the async fetch
-        // and calls receiveLump() to resume, so this should rarely be hit.
-        if (this.awaitingLump) {
-            this.executionStats.suspensions++;
-            return { suspended: true, awaitingLump: this.awaitingLump };
-        }
-        // Lazy-Resolve: thread suspended waiting for IDE to supply a GT (Task #1519).
-        // Return a sentinel so the IDE can display the Pending Capabilities panel.
-        // Execution resumes when resolvePendingSlot() or escalateLazyResolve() is called.
-        if (this._lazySuspended) {
-            this.executionStats.suspensions++;
-            return {
-                lazySuspended: true,
-                pendingResolves: [...this._pendingResolves.entries()].map(([slot, e]) => ({
-                    slot, petName: e.petName, instrName: e.instrName, kind: e.kind,
-                })),
-            };
-        }
-        if (this.halted) return null;
-        // Start each attempt with fresh non-transfer identity so fetch/decode
-        // faults cannot inherit the preceding instruction's CALL destination.
-        this._captureFaultRoute(null);
-        this.auditLog = [];
-        this._tracePacketsBuf = [];  // clear per-instruction trace packet buffer
-
-        // ── Scheduler timer interrupt check (Task #1077) ──────────────────────
-        // Before fetching the next instruction: if the hardware alarm has fired
-        // and Scheduler.IRQ is not already active, inject a hidden Scheduler.IRQ
-        // (equivalent to an ELOADCALL Scheduler.IRQ before the normal instruction).
-        // The timer is masked while irqActive to prevent nested interrupts.
-        if (this.bootComplete && this.irqState &&
-            this.irqState.timerArmed && !this.irqState.irqActive &&
-            this.stepCount >= this.irqState.timerDeadline) {
-            this.irqState.timerArmed = false;
-            this.output += `[Timer] ALARM fired at step ${this.stepCount} (deadline=${this.irqState.timerDeadline}) \u2014 injecting Scheduler.IRQ\n`;
-            this._fireSchedulerIRQ('TIMER', null);
-            const timerResult = {
-                pc: this.pc, physicalPC: this.physicalPC, instr: null,
-                desc: `Timer IRQ: Scheduler.IRQ injected at step ${this.stepCount} (hidden ELOADCALL)`,
-                timerIRQ: true,
-                tracePackets: [],  // timer-IRQ is a hidden ELOADCALL — no trace packets visible to IDE
-            };
-            timerResult.physicalPC = this.physicalPC;
-            timerResult.auditPipeline = this._auditPipeline ? this._auditPipeline() : [];
-            this.emit('step', timerResult);
-            this.emit('stateChange', this.getState());
-            return timerResult;
-        }
-
-        const fetch = this._fetchInstruction();
-        if (!fetch.ok) {
-            this.fault(fetch.fault, fetch.message, fetch.meta || null);
-            return null;
-        }
-        const instrWord = fetch.word;
-        // HALT is the all-zero pseudo-instruction emitted by both assemblers.
-        // Before boot it remains the PP250 return sentinel. After boot it is a
-        // terminal instruction: it never pops a frame, advances PC, or fetches
-        // a caller continuation.
-        if (instrWord === 0) {
-            if (!this.bootComplete) {
-                this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
-                this._returnToBoot();
-                return { pc: this.pc, physicalPC: this.physicalPC, instr: null, opName: 'HALT', desc: 'PP250: zero instruction -> reboot' };
-            }
-            const haltPC = this.pc;
-            this.stepCount++;
-            this._instrHistory.push({
-                step: this.stepCount,
-                pc: haltPC,
-                physicalPC: fetch.addr,
-                raw: 0,
-                opName: 'HALT',
-                cond: 'AL',
-                crDst: 0,
-                crSrc: 0,
-                imm: 0,
-            });
-            if (this._instrHistory.length > 5) this._instrHistory.shift();
-            this.halted = true;
-            this.running = false;
-            this.executionStats.successful++;
-            const result = {
-                pc: haltPC,
-                physicalPC: fetch.addr,
-                instr: null,
-                opName: 'HALT',
-                tracePackets: [],
-                desc: `HALT at 0x${fetch.addr.toString(16).toUpperCase().padStart(4, '0')}`,
-                auditPipeline: [],
-            };
-            this.output += result.desc + '\n';
-            this.emit('step', result);
-            this.emit('stateChange', this.getState());
-            return result;
-        }
-
-        const d = this.decodeInstruction(instrWord);
-        this.stepCount++;
-
-        this._instrHistory.push({
-            step: this.stepCount,
-            pc: this.pc,
-            physicalPC: fetch.addr,
-            raw: instrWord,
-            opName: this.opName(d.opcode),
-            cond: this.condName(d.cond),
-            crDst: d.crDst,
-            crSrc: d.crSrc,
-            imm: d.imm,
-        });
-        if (this._instrHistory.length > 5) this._instrHistory.shift();
-
-        if (!this.checkCondition(d.cond)) {
-            const result = {
-                pc: this.pc,
-                physicalPC: this.physicalPC,
-                instr: d,
-                skipped: true,
-                tracePackets: [],  // skipped instructions retire no state changes → no trace packets
-                desc: `${this.opName(d.opcode)}${this.condName(d.cond)} skipped (condition false)`,
-            };
-            this.pc++;
-            this.emit('step', result);
-            this.emit('stateChange', this.getState());
-            return result;
-        }
-
-        // Freeze execution identity before CALL or any other instruction can
-        // mutate CR14. Fault rendering must never infer the caller from the
-        // post-boundary register bank or from editor/registry metadata.
-        this._captureFaultRoute(d);
-
-        // ── Hardware privilege fence ──────────────────────────────────────────────
-        // CR12–CR15 are hardware-privileged; normal instructions may not name them.
-        // Rule: fault = (reg >= 12) AND NOT (opcode ∈ {DREAD,DWRITE} AND reg == 14)
-        //   CHANGE (opcode 4): fully exempt from the decode fence — crDst is checked
-        //     inside _execChange (must be 12–15). crSrc is also unrestricted: the boot
-        //     sequence uses `CHANGE CR12, CR12, 1` where crSrc==12 (the only instruction
-        //     that may reach into the privileged bank as a source is CHANGE itself).
-        //   DREAD (opcode 16) / DWRITE (opcode 17): may use CR14 as the source
-        //     capability field to access read-only data packed after HALT in the
-        //     code lump (`DREAD DR, CR14, offset` pattern).
-        if (d.opcode !== 1 && d.opcode !== 4 && d.opcode !== 5) {
-            // crDst encodes a CR index only for Church opcodes (0–9).
-            // Turing opcodes (16–25) put a DR index in the same bit field — do not fence them.
-            const isChurchOp = (d.opcode <= 9);
-            if (isChurchOp && d.crDst >= 12 && !this.mElevation) {
-                this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crDst} is privileged — only CHANGE may write CR12–CR15`);
-                return null;
-            }
-            // crSrc is a true CR index only for specific opcodes; exclude the rest:
-            //   0 (LOAD), 1 (SAVE)           — crSrc is the c-list CR ✓
-            //   2 (CALL)                      — crSrc is a METHOD SELECTOR (0–15), NOT a CR ✗
-            //   3 (RETURN)                    — crSrc is in the zero/mask field (always 0) ✓
-            //   5 (SWITCH)                    — crSrc is the register to swap ✓
-            //   6 (TPERM), 7 (LAMBDA)         — crSrc unused (stays 0, no false fault) ✓
-            //   8 (ELOADCALL), 9 (XLOADLAMBDA)— crSrc is the c-list CR ✓
-            //   16 (DREAD), 17 (DWRITE)       — crSrc is a CR (with CR14 exception)
-            //   18–25 (other Turing)          — crSrc is a DR index, not a CR ✗
-            const isDreadDwrite = (d.opcode === 16 || d.opcode === 17);
-            // Opcodes where crSrc genuinely carries a CR index (privilege fence applies):
-            const crSrcIsCapReg = [0, 1, 5, 8, 9, 16, 17].includes(d.opcode);
-            if (crSrcIsCapReg && d.crSrc >= 12 && !(isDreadDwrite && d.crSrc === 14)) {
-                this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crSrc} is privileged — DREAD/DWRITE may use CR14 as source; all other instructions must use CR0–CR11`);
-                return null;
-            }
-        }
-
-        // Capture current instruction context so mLoad/mSave audit entries can
-        // include a "location" row (Step#, PC, decoded instruction) for fault display.
-        this._currentInstrLabel = {
-            pc:         this.pc,
-            physicalPC: this.physicalPC,
-            step:       this.stepCount,
-            opName:     this.opName(d.opcode),
-            crDst:      d.crDst,
-            crSrc:      d.crSrc,
-            imm:        d.imm,
-            instrWord:  d.raw,
+        // Idle sentinels do not constitute instruction occurrences.
+        if (this.halted || this.awaitingLump || this._lazySuspended) return this._stepExecution();
+        this._executionAttempt = {
+            epoch: this._evidenceEpoch,
+            occurrenceId: `${this._evidenceEpoch}:${++this._evidenceSequence}`,
+            pre: this._executionEvidenceState(),
+            effects: [],
         };
-
-        let result = null;
-        switch (d.opcode) {
-            case 0: result = this._execLoad(d); break;
-            case 1: result = this._execSave(d); break;
-            case 2: result = d.crSrc === 6 ? this._execIndexedCall(d) : this._execCall(d); break;
-            case 3: result = this._execReturn(d); break;
-            case 4: result = this._execChange(d); break;
-            case 5: result = this._execSwitch(d); break;
-            case 6: result = this._execTperm(d); break;
-            case 7: result = this._execLambda(d); break;
-            case 8: result = this._execEloadcall(d); break;
-            case 9: result = this._execXloadlambda(d); break;
-            // opcodes 10–15: unassigned in v2.0 ISA → FAULT
-            case 10: case 11: case 12: case 13: case 14: case 15:
-                this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 10–15) in v2.0 ISA`);
-                return null;
-            // opcodes 16–25: Turing data-register instructions
-            case 16: result = this._execDread(d); break;
-            case 17: result = this._execDwrite(d); break;
-            case 18: result = this._execBfext(d); break;
-            case 19: result = this._execBfins(d); break;
-            case 20: result = this._execMcmp(d); break;
-            case 21: result = this._execIadd(d); break;
-            case 22: result = this._execIsub(d); break;
-            case 23: result = this._execBranch(d); break;
-            case 24: result = this._execShl(d); break;
-            case 25: result = this._execShr(d); break;
-            // opcodes 26–29: unassigned in v2.0 ISA → FAULT
-            case 26: case 27: case 28: case 29:
-                this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 26–29) in v2.0 ISA`);
-                return null;
-            case 0x1E:
-                this.fault('INVALID_OP', `WORD (opcode 0x1E) is an inline data constant and cannot be executed — check your RETURN placement`);
-                return null;
-            default:
-                this.fault('INVALID_OP', `Unknown opcode ${d.opcode}`);
-                return null;
+        let result;
+        try {
+            result = this._stepExecution();
+            this._finishExecutionEvidence(result);
+            return result;
+        } finally {
+            this._executionAttempt = null;
         }
-
-        if (result) {
-            // This is the sole successful-instruction retirement boundary.  A
-            // result returned by an instruction is a retirement; faulted and
-            // suspended paths return before here and are never counted.
-            if (result.absent) this.executionStats.lazyLoadWaits++;
-            else if (result.suspended || result.lazySuspended) this.executionStats.suspensions++;
-            else if (result.rejected) this.executionStats.rejected++;
-            else if (!result.timerIRQ) this.executionStats.successful++;
-            // DR0 is the hardwired zero register — zeroed unconditionally after every
-            // instruction. Signed results from device CALL paths are returned in DR1.
-            this._writeDR(0, 0);
-            result.physicalPC = this.physicalPC;
-            // A stable, per-retirement location record lets trace consumers
-            // resolve CALL/RETURN by the instruction that retired, rather than
-            // consulting the now-mutated CR14 or most recent frame.
-            if (result.instr && (result.instr.opcode === 2 || result.instr.opcode === 3 ||
-                result.instr.opcode === 8 || result.instr.opcode === 9)) {
-                const labelEntries = Object.entries(this.programLabels || {})
-                    .filter(([, offset]) => Number.isFinite(offset) && offset <= this.pc)
-                    .sort((a, b) => b[1] - a[1]);
-                result.eventLocation = {
-                    kind: (result.instr.opcode === 3) ? 'RETURN' : 'CALL',
-                    pc: result.pc,
-                    physicalPC: result.physicalPC,
-                    instrWord,
-                    opName: this.opName(result.instr.opcode),
-                    lump: this.programName || null,
-                    method: labelEntries.length ? labelEntries[0][0] : null,
-                    offset: this.pc,
-                    callDepth: this.callStack.length,
-                };
-            }
-            result.auditPipeline = this._auditPipeline();
-            result.tracePackets = this._tracePacketsBuf.slice();
-            this.emit('step', result);
-            this.emit('stateChange', this.getState());
-        }
-        if (!result && !this.halted && !this.awaitingLump && !this._lazySuspended) {
-            // Null means that execution aborted. If no explicit fault or
-            // suspension explains it, promote the silent abort to a terminal
-            // fault instead of letting sim.run() mislabel it as a boot exit.
-            this.fault(
-                'EXECUTION_ABORT',
-                `${this.opName(d.opcode)} stopped without retiring or reporting a fault at PC ${this.pc}`
-            );
-        }
-        return result;
     }
 
     _execLoad(d) {
@@ -7368,6 +6643,8 @@ class ChurchSimulator {
             return null;
         }
         let slotGT = this.memory[clistLoc + d.imm] || 0;
+        slotGT = this._resolveDeclaredSlot(slotGT, d.imm, clistLoc + d.imm, 'LOAD');
+        if (slotGT === null) return null;
         if (ChurchSimulator.isNullGT(slotGT)) {
             const _pc = this.programCapabilities;
             const _pce = _pc && _pc[d.imm];
@@ -8722,14 +7999,13 @@ class ChurchSimulator {
                 candidate.sz === activeFrameSZ);
         // callStack is a diagnostic shadow, never frame-selection authority.
         // A valid protected frame can outlive that shadow; raw NIA/FLAGS/SZ/
-        // STO remain authoritative while missing snapshots scrub the caller
-        // bank.
+        // STO remain authoritative; working CRs never restore snapshots.
         const snapshot = runtimeFrame || {
             savedCRs: null, savedDRs: null, savedFlags: null, sentinel: false,
         };
         const frame = protectedFrame.frame || snapshot;
         // Protected words own control state; the runtime record only carries
-        // register snapshots needed by RETURN MASK.
+        // existing diagnostic/legacy context and DR snapshots, not MASK state.
         frame.savedCRs = snapshot.savedCRs;
         frame.savedDRs = snapshot.savedDRs;
         frame.savedFlags = snapshot.savedFlags;
@@ -8769,6 +8045,30 @@ class ChurchSimulator {
                 return null;
             }
         }
+        // Prepare CR6 before any destructive return work. Bit 6 never gates
+        // caller-context reconstruction. LAMBDA shares the caller code identity.
+        let returnCR6 = null;
+        if (protectedFrame.threadBase === null && frame.savedCRs?.[6]) {
+            returnCR6 = {...frame.savedCRs[6], m: 1};
+        } else if (protectedFrame.threadBase !== null) {
+            const identity = activeFrameSZ === 1
+                ? protectedFrame.companionParsed : this.parseGT(this.cr[14].word0);
+            const entry = activeFrameSZ === 1
+                ? protectedFrame.companionCheck.entry : this.readNSEntry(identity.index);
+            const base = entry.word0_location >>> 0;
+            const hdr = this.parseLumpHeader(this.memory[base] >>> 0);
+            if (!hdr.valid) {
+                this.fault('STACK_CORRUPT', 'RETURN: caller has no valid LUMP header for CR6 restoration');
+                return null;
+            }
+            returnCR6 = {
+                word0: this.createGT(identity.gt_seq, identity.index, {L: 1}, 1) >>> 0,
+                word1: (base + hdr.lumpSize - hdr.cc) >>> 0,
+                word2: entry.word1_limit >>> 0,
+                word3: entry.word2_seals >>> 0,
+                m: 1,
+            };
+        }
         if (!this._mwinWriteback()) return null;
         if (runtimeFrame) {
             const runtimeIndex = this.callStack.lastIndexOf(runtimeFrame);
@@ -8787,25 +8087,18 @@ class ChurchSimulator {
             : ((frame.savedCRs && frame.savedCRs[14])
                 ? (frame.savedCRs[14].word0 >>> 0) : 0);
 
-        // Mask semantics: set bit = PRESERVE callee's CR (return value); clear bit = restore caller's.
-        // One combined pass ensures callee internal GTs are never visible to the caller
-        // unless explicitly preserved as return values.
+        // MASK prevents clearing: never restore working CRs from savedCRs.
+        // CR5 is thread state (descriptor unchanged); CR6 is caller context.
         const tnBaseRet = this._activeThreadBase();
         const clearedCRs = [];
         const preservedCRs = [];
         for (let i = 0; i < 12; i++) {
+            if (i === 5 || i === 6) continue;
             if (mask & (1 << i)) {
                 // Preserve callee's CR_i — it carries a return value to the caller
                 preservedCRs.push(`CR${i}`);
-            } else if (frame.savedCRs && frame.savedCRs[i] !== undefined) {
-                // Not a return value — restore the caller's saved state
-                this.cr[i] = {...frame.savedCRs[i]};
-                if (i !== 6 && tnBaseRet !== null) {
-                    const retLayout = this._threadLayoutAtBase(tnBaseRet);
-                    if (retLayout) this._threadWrite(tnBaseRet + retLayout.capsStart + i, this.cr[i].word0 >>> 0, `RETURN CR${i}-restore`);
-                }
             } else {
-                // Not a return value and caller had nothing saved — scrub
+                // Zero bit unconditionally scrubs, even with a saved snapshot.
                 this._clearCR(i);
                 clearedCRs.push(`CR${i}`);
             }
@@ -8813,36 +8106,7 @@ class ChurchSimulator {
         // The protected Enter companion is the caller identity authority.
         // Reconstruct the normalized L CR6 from its E identity rather than
         // trusting a diagnostic snapshot's permission bits.
-        if (!(mask & (1 << 6)) && protectedFrame.companionParsed &&
-                protectedFrame.companionCheck &&
-                protectedFrame.companionCheck.entry) {
-            const callerIdentity = protectedFrame.companionParsed;
-            const callerEntry = protectedFrame.companionCheck.entry;
-            if (protectedFrame.threadBase === null && frame.savedCRs && frame.savedCRs[6]) {
-                // Lump-only fixtures have no protected Thread from which to
-                // reconstruct context. Their captured caller descriptor is the
-                // complete authority available to RETURN.
-                this.cr[6] = {...frame.savedCRs[6], m: 1};
-            } else {
-                const callerBase = callerEntry.word0_location >>> 0;
-                const callerHdr = this.parseLumpHeader(this.memory[callerBase] >>> 0);
-                if (!callerHdr.valid) {
-                    this.fault('STACK_CORRUPT',
-                        `RETURN: caller ${this.nsLabels[callerIdentity.index] || `NS[${callerIdentity.index}]`} has no valid LUMP header for CR6 restoration`);
-                    return null;
-                }
-                const callerCListBase = (callerBase + callerHdr.lumpSize - callerHdr.cc) >>> 0;
-                const callerL = this.createGT(
-                    callerIdentity.gt_seq, callerIdentity.index, {L: 1}, 1);
-                this.cr[6] = {
-                    word0: callerL >>> 0,
-                    word1: callerCListBase,
-                    word2: callerEntry.word1_limit >>> 0,
-                    word3: callerEntry.word2_seals >>> 0,
-                    m: 1,
-                };
-            }
-        }
+        if (returnCR6) this.cr[6] = returnCR6;
         // RETURN microcode establishes the caller's c-list as the one
         // isolated-register authority carried across the domain boundary.
         // M is not ordinary saved-register state: the boundary reset above
@@ -8927,14 +8191,14 @@ class ChurchSimulator {
         return { pc: frame.returnPC, instr: d, desc, pipeline: this._returnPipeline(d, frame, mask, activeFrameSZ) };
     }
 
-    _execChange(d) {
+    _execChange(d, continuationPC) {
         let result;
         let thrown = null;
         this._recordControlFlowDiagnostic('CHANGE', 'pre', {
             crDst: d && d.crDst, crSrc: d && d.crSrc, imm: d && d.imm,
         });
         try {
-            result = this._execChangeCore(d);
+            result = this._execChangeCore(d, continuationPC);
             return result;
         } catch (error) {
             thrown = error;
@@ -8952,7 +8216,7 @@ class ChurchSimulator {
         }
     }
 
-    _execChangeCore(d) {
+    _execChangeCore(d, continuationPC) {
         // CHANGE CRd, CRs[idx]
         //   CRd  (d.crDst) — destination: must be a privileged register CR12–CR15.
         //   CRs  (d.crSrc) — source capability used to access the NS entry.
@@ -9224,7 +8488,7 @@ class ChurchSimulator {
                 return null;
             }
             const suspend = this._prepareThreadSuspendFrame(
-                outBase, outLayout, outSlot);
+                outBase, outLayout, outSlot, continuationPC);
             if (!suspend) return null;
             outgoingPrepared = {
                 threadBase: outBase, layout: outLayout, suspend,
@@ -9237,7 +8501,7 @@ class ChurchSimulator {
         // Reset-bank state preceding boot is not a Thread context and is never
         // serialized.  This is an architectural boot-state rule.
         if (threadSwitch && this._liveThreadOwned && outSlot !== null) {
-            if (!this._suspendLiveThread(outSlot, outgoingPrepared)) return null;
+            if (!this._suspendLiveThread(outSlot, outgoingPrepared, continuationPC)) return null;
         }
 
         // CHANGE makes the incoming Thread the active CR12 context before any
@@ -9366,6 +8630,9 @@ class ChurchSimulator {
         const slotIdentityBefore = new Map(this._slotIdentity);
         const tokenSlotBefore = new Map(this._tokenSlotMap);
         const nsFreeSequencesBefore = { ...this._nsFreeSequences };
+        const nsFreeListBefore = this._nsFreeList && this._nsFreeList.slice();
+        const nsSymbolsBefore = { ...this._nsSymbolicEntries };
+        const nsIdentitiesBefore = new Map(this._nsIdentitySlots);
         const compilerOwnedBefore = { ...this._compilerOwnedSelfSlots };
         const lazyManifestBefore = Object.fromEntries(Object.entries(this.lazyManifest || {})
             .map(([slot, entry]) => [slot,
@@ -9373,9 +8640,14 @@ class ChurchSimulator {
         const pendingBefore = new Map(this._pendingResolves);
         const suspendedBefore = this._lazySuspended;
         const petNamesBefore = new Set(this.petNameMemory);
+        const effectsBefore = this._executionAttempt
+            ? this._executionAttempt.effects.length : 0;
         const loadResult = this._execLoad(d);
 
         if (loadResult === null || (loadResult && loadResult.lazySuspended)) {
+            // The isolated transaction rolled back its stores. Keep the fault
+            // but do not publish writes that never survived the transaction.
+            if (this._executionAttempt) this._executionAttempt.effects.length = effectsBefore;
             this.cr = crBefore;
             this.memory.set(memoryBefore);
             this.nsCount = nsCountBefore;
@@ -9385,6 +8657,9 @@ class ChurchSimulator {
             this._slotIdentity = slotIdentityBefore;
             this._tokenSlotMap = tokenSlotBefore;
             this._nsFreeSequences = nsFreeSequencesBefore;
+            this._nsFreeList = nsFreeListBefore;
+            this._nsSymbolicEntries = nsSymbolsBefore;
+            this._nsIdentitySlots = nsIdentitiesBefore;
             this._compilerOwnedSelfSlots = compilerOwnedBefore;
             this.lazyManifest = lazyManifestBefore;
             this._pendingResolves = pendingBefore;
@@ -9405,6 +8680,8 @@ class ChurchSimulator {
             if (!this._threadLayoutAtBase(loadedBase)) {
                 this.cr[12] = { ...crBefore[12], m: 0 };
                 preservedActiveThread = true;
+                loadResult.desc =
+                    `SWITCH CR12, [CR${d.crSrc} + ${d.imm}] (non-Thread probe accepted; active Thread preserved; destination M consumed)`;
             }
         }
 
@@ -9412,7 +8689,9 @@ class ChurchSimulator {
         // _writeCR normally does this when mElevation is false; force the
         // architectural result so boot-only elevation cannot leak through.
         this.cr[d.crDst].m = 0;
-        const desc = `SWITCH CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] (${preservedActiveThread ? 'non-Thread probe accepted; active Thread preserved; ' : ''}destination M accepted and consumed)`;
+        const desc = preservedActiveThread
+            ? loadResult.desc
+            : `SWITCH CR${d.crDst}, [CR${d.crSrc} + ${d.imm}] (destination M accepted and consumed)`;
         loadResult.desc = desc;
         loadResult.instr = d;
         return loadResult;
@@ -9753,6 +9032,8 @@ class ChurchSimulator {
         }
 
         let slotGT = this.memory[srcLoc + ecRow] || 0;
+        slotGT = this._resolveDeclaredSlot(slotGT, ecRow, srcLoc + ecRow, 'ELOADCALL');
+        if (slotGT === null) return null;
         if (ChurchSimulator.isNullGT(slotGT)) {
             const _pc = this.programCapabilities;
             const _pce = _pc && _pc[ecRow];
@@ -10089,6 +9370,8 @@ class ChurchSimulator {
         }
 
         let slotGT = this.memory[srcLoc + d.imm] || 0;
+        slotGT = this._resolveDeclaredSlot(slotGT, d.imm, srcLoc + d.imm, 'XLOADLAMBDA');
+        if (slotGT === null) return null;
         if (slotGT === 0) {
             const _pc = this.programCapabilities;
             const _pce = _pc && _pc[d.imm];
@@ -10459,6 +9742,7 @@ class ChurchSimulator {
         this.fault('INVALID_OP', `CALL: Abstract GT (ab_type=0x${abTypeHex} device_class=0x${dcHex}) has no CALL methods — use DREAD/DWRITE`);
         return null;
     }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     _execDread(d) {
@@ -10525,6 +9809,11 @@ class ChurchSimulator {
         } else {
             value = this.memory[loc + offset];
         }
+        if (this._executionAttempt) this._executionAttempt.effects.push({
+            kind: 'data-read', address: absAddr, offset,
+            capability: d.crSrc, value: value >>> 0,
+            device: ARCH_MMIO_SLOTS.has(devNsIdx),
+        });
         this._writeDR(drIdx, value);
         const label = this.nsLabels[check.index] || 'data';
         const readTag = (devNsIdx === ARCH_BOOT.minimalSlots.LED_DEV || devNsIdx === LEGACY_SIM_DEVICE_SLOTS.LED_DEV) ? ` [LED${offset} = ${value & 1 ? 'ON' : 'OFF'}]`
@@ -10627,6 +9916,13 @@ class ChurchSimulator {
 
         // Route device writes to simulated hardware peripherals
         const devNsIdx = check.index;
+        if (this._executionAttempt) this._executionAttempt.effects.push({
+            kind: 'data-write', address: absAddr, offset,
+            capability: d.crSrc, value: value >>> 0,
+            device: ARCH_MMIO_SLOTS.has(devNsIdx),
+            previousMemoryWord: ARCH_MMIO_SLOTS.has(devNsIdx)
+                ? null : this.memory[loc + offset] >>> 0,
+        });
         if (!ARCH_MMIO_SLOTS.has(devNsIdx)) {
             this._writeRuntimeWord(loc + offset, value);
         }
@@ -10714,7 +10010,7 @@ class ChurchSimulator {
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'BFEXT', desc: `Extract bits [${pos+width-1}:${pos}] from DR${d.crSrc}${drIdx === 0 ? '; discard write to DR0' : ` into DR${drIdx}`}`, perm: '-', status: 'pass' },
+            { stage: 'BFEXT', desc: `Extract bits [${pos+width-1}:${pos}] (LSB=0) from DR${d.crSrc}${drIdx === 0 ? '; discard write to DR0' : ` into DR${drIdx}`}`, perm: '-', status: 'pass' },
         ]};
     }
 
@@ -10740,7 +10036,7 @@ class ChurchSimulator {
         this.pc++;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
         return { pc: this.pc - 1, instr: d, desc, pipeline: [
-            { stage: 'BFINS', desc: `Insert bits [${pos+width-1}:${pos}] from pre-write DR${d.crSrc} into DR${drIdx}${drIdx === 0 ? ' (write discarded)' : ''}`, perm: '-', status: 'pass' },
+            { stage: 'BFINS', desc: `Insert low ${width} bits from pre-write DR${d.crSrc} into DR${drIdx}[${pos+width-1}:${pos}] (LSB=0)${drIdx === 0 ? '; discard write to DR0' : ''}`, perm: '-', status: 'pass' },
         ]};
     }
 
@@ -10921,7 +10217,7 @@ class ChurchSimulator {
         if (activeFrameSZ === 1) {
             stages.push({ stage: 'E-GT', desc: 'Revalidate caller E-GT → re-derive CR6/CR14', perm: 'E', status: 'pass' });
         }
-        stages.push({ stage: 'RETURN', desc: `PC→${frame.returnPC}${mask ? `, MASK=0b${mask.toString(2).padStart(12,'0')} (set=preserve)` : ''}`, status: 'pass' });
+        stages.push({ stage: 'RETURN', desc: `PC→${frame.returnPC}, MASK=0b${mask.toString(2).padStart(12,'0')} (CR0–4/7–11: 1 prevents clearing, 0 zeros; CR5 unchanged; CR6 reconstructed; M boundary reset)`, status: 'pass' });
         return stages;
     }
 
@@ -12190,6 +11486,61 @@ class ChurchSimulator {
         const aligned = (highWater + mask) & ~mask;
         return aligned >>> 0;
     }
+
+    // First-fit physical allocation for IDE Namespace Add. Slot indices do
+    // not imply physical addresses: resident bodies and Thread contexts have
+    // variable sizes, and a lazy header may have been zeroed after allocation.
+    // This is a read-only preflight; callers publish only after mint succeeds.
+    findFreeLumpRange(lumpSize, minimum = 0x0800) {
+        if (!Number.isInteger(lumpSize) || lumpSize < 64 ||
+                lumpSize > 32768 || (lumpSize & (lumpSize - 1)) !== 0 ||
+                !Number.isInteger(minimum) || minimum < 16 ||
+                this.NS_TABLE_BASE > this.memory.length) {
+            throw new Error('Invalid LUMP allocation bounds');
+        }
+        const intervals = [];
+        for (let slot = 1; slot < this.nsCount; slot++) {
+            const entry = this.readNSEntry(slot);
+            if (!entry) continue;
+            const base = entry.word0_location;
+            if (!base || base >= this.NS_TABLE_BASE) continue; // MMIO is not RAM
+            const hdr = this.parseLumpHeader(this.memory[base] >>> 0);
+            const manifest = this.lazyManifest && this.lazyManifest[slot];
+            const size = hdr.valid ? hdr.lumpSize :
+                manifest && (manifest.allocSize || manifest.size);
+            // Legacy boot stubs can have no header yet; all storage below the
+            // programmable floor is reserved regardless of their layout.
+            if (base < minimum && !size) {
+                intervals.push({ start: base, end: minimum });
+                continue;
+            }
+            if (!Number.isInteger(size) || size < 1 ||
+                    base + size > this.NS_TABLE_BASE) {
+                throw new Error(`NS[${slot}] at 0x${base.toString(16)} has no trustworthy allocation size`);
+            }
+            intervals.push({ start: base, end: base + size });
+        }
+        const threadBase = this._activeThreadBase();
+        if (threadBase !== null) {
+            const layout = this._threadLayoutAtBase(threadBase);
+            if (!layout || !Number.isInteger(layout.lumpSize) ||
+                    threadBase + layout.lumpSize > this.NS_TABLE_BASE) {
+                throw new Error('Active Thread allocation is not measurable');
+            }
+            intervals.push({ start: threadBase, end: threadBase + layout.lumpSize });
+        }
+        intervals.sort((a, b) => a.start - b.start);
+        const align = n => Math.ceil(n / lumpSize) * lumpSize;
+        let candidate = align(minimum);
+        for (const interval of intervals) {
+            if (candidate + lumpSize <= interval.start) return candidate;
+            if (candidate < interval.end && candidate + lumpSize > interval.start) {
+                candidate = align(interval.end);
+            }
+        }
+        return candidate + lumpSize <= this.NS_TABLE_BASE ? candidate : null;
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
 
     // resetNamedSlots() — resets petNameMemory to the hardware boot defaults.
@@ -12252,7 +11603,6 @@ class ChurchSimulator {
 
     /**
      * Atomically apply a validated physical-Wukong snapshot for display.
-     *
      * This deliberately does not call step(), run(), boot(), or mutate any
      * simulator breakpoint collection.  The suspended-thread fields remain
      * under hardwareSnapshot because they are not the live simulator CR12.
@@ -12426,14 +11776,26 @@ class ChurchSimulator {
         const cr = this.cr[idx];
         const isEmpty = !cr || ChurchSimulator.isNullGT(cr.word0 >>> 0);
         if (isEmpty) {
+            // NULL is a decode of R0's type field, not an erased CR.  In
+            // particular, isolated registers may retain their other words and
+            // have M armed while R0 decodes as NULL.  Expose those stored bits
+            // for inspection without interpreting the NULL GT as authority.
+            const raw = cr || { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
+            const rawWord0 = raw.word0 >>> 0;
+            const rawWord2 = raw.word2 >>> 0;
+            const lim = this.parseNSWord1(rawWord2);
             return {
-                index: idx, isNull: true, mBit: 0,
-                word0_gt: '00000000', perms: '-------', gtSeq: 0, gtIndex: 0, gtType: 'NULL', gtTypeName: 'NULL',
+                index: idx, isNull: true, mBit: raw.m ? 1 : 0,
+                word0_gt: rawWord0.toString(16).toUpperCase().padStart(8, '0'),
+                perms: '-------', gtSeq: 0, gtIndex: 0, gtType: 'NULL', gtTypeName: 'NULL',
                 nsSlot: null, nsLabel: '', nsVersion: null, versionMatch: null,
                 validationStatus: 'null', validationMessage: 'NULL capability',
-                word1_location: 0,
-                word2_limit_raw: 0, limitB: 0, limitF: 0, limit17: 0,
-                word3_seals_raw: 0, sealGtSeq: 0, sealCRC: 0,
+                word1_location: raw.word1 >>> 0,
+                word2_limit_raw: rawWord2,
+                limitB: (rawWord0 >>> 31) & 1,
+                limitF: lim.f, limit17: lim.limit,
+                word3_seals_raw: raw.word3 >>> 0,
+                sealGtSeq: lim.gtSeq, sealCRC: raw.word3 >>> 0,
             };
         }
         const parsed = this.parseGT(cr.word0);
@@ -12702,6 +12064,350 @@ class ChurchSimulator {
         }
         return dump;
     }
+
+    // Evidence is deliberately independent of mutable editor metadata and trace
+    // rendering. Copy only observational state; never use it to execute an op.
+    _freezeExecutionEvidence(value) {
+        if (value === null || typeof value !== 'object') return value;
+        const copy = Array.isArray(value) || ArrayBuffer.isView(value)
+            ? Array.from(value, v => this._freezeExecutionEvidence(v))
+            : Object.fromEntries(Object.entries(value).map(([k, v]) =>
+                [k, this._freezeExecutionEvidence(v)]));
+        return Object.freeze(copy);
+    }
+
+    _executionEvidenceState() {
+        const code = this.cr[14];
+        const slot = code && code.word0 ? this.parseGT(code.word0 >>> 0).index : null;
+        const identity = slot !== null && this._slotIdentity
+            ? this._slotIdentity.get(slot) : null;
+        return this._freezeExecutionEvidence({
+            pc: this.pc, physicalPC: this.physicalPC, stepCount: this.stepCount,
+            dr: this.dr, cr: this.cr, flags: this.flags,
+            callDepth: this.callStack.length, sto: this.sto,
+            halted: this.halted, programName: this.programName || null,
+            programLabels: this.programLabels || {},
+            artifact: {
+                slot, identity: identity || null,
+                label: slot === null ? null : (this.nsLabels[slot] || null),
+                codeCapability: code || null,
+                headerWord: code && code.word1 < this.memory.length
+                    ? this.memory[code.word1] >>> 0 : null,
+            },
+        });
+    }
+
+    _finishExecutionEvidence(result) {
+        const attempt = this._executionAttempt;
+        if (!attempt) return;
+        if (!attempt.evidence) {
+            const outcome = attempt.fault ? 'fault'
+                : result && result.skipped ? 'skipped'
+                : result && result.timerIRQ ? 'interrupt'
+                : this.awaitingLump || this._lazySuspended ||
+                    (result && (result.suspended || result.lazySuspended || result.absent)) ? 'suspended'
+                : result && result.rejected ? 'rejected'
+                : result ? 'retired' : 'aborted';
+            attempt.evidence = this._freezeExecutionEvidence({
+                version: 1, epoch: attempt.epoch, occurrenceId: attempt.occurrenceId,
+                instruction: attempt.instruction || null,
+                pre: attempt.pre, post: this._executionEvidenceState(),
+                outcome, fault: attempt.fault || null,
+                effects: attempt.effects,
+                description: attempt.fault ? `${attempt.fault.type}: ${attempt.fault.message}`
+                    : result ? result.desc || null : null,
+            });
+        }
+        this.lastStepEvidence = attempt.evidence;
+        if (result) result.executionEvidence = attempt.evidence;
+    }
+
+    _stepExecution() {
+        // If we are suspended waiting for an absent-lump fetch, don't execute
+        // anything — return a suspended sentinel.  app.js drives the async fetch
+        // and calls receiveLump() to resume, so this should rarely be hit.
+        if (this.awaitingLump) {
+            this.executionStats.suspensions++;
+            return { suspended: true, awaitingLump: this.awaitingLump };
+        }
+        // Lazy-Resolve: thread suspended waiting for IDE to supply a GT (Task #1519).
+        // Return a sentinel so the IDE can display the Pending Capabilities panel.
+        // Execution resumes when resolvePendingSlot() or escalateLazyResolve() is called.
+        if (this._lazySuspended) {
+            this.executionStats.suspensions++;
+            return {
+                lazySuspended: true,
+                pendingResolves: [...this._pendingResolves.entries()].map(([slot, e]) => ({
+                    slot, petName: e.petName, instrName: e.instrName, kind: e.kind,
+                })),
+            };
+        }
+        if (this.halted) return null;
+        // Start each attempt with fresh non-transfer identity so fetch/decode
+        // faults cannot inherit the preceding instruction's CALL destination.
+        this._captureFaultRoute(null);
+        this.auditLog = [];
+        this._tracePacketsBuf = [];  // clear per-instruction trace packet buffer
+
+        // ── Scheduler timer interrupt check (Task #1077) ──────────────────────
+        // Before fetching the next instruction: if the hardware alarm has fired
+        // and Scheduler.IRQ is not already active, inject a hidden Scheduler.IRQ
+        // (equivalent to an ELOADCALL Scheduler.IRQ before the normal instruction).
+        // The timer is masked while irqActive to prevent nested interrupts.
+        if (this.bootComplete && this.irqState &&
+            this.irqState.timerArmed && !this.irqState.irqActive &&
+            this.stepCount >= this.irqState.timerDeadline) {
+            this.irqState.timerArmed = false;
+            this.output += `[Timer] ALARM fired at step ${this.stepCount} (deadline=${this.irqState.timerDeadline}) \u2014 injecting Scheduler.IRQ\n`;
+            this._fireSchedulerIRQ('TIMER', null);
+            const timerResult = {
+                pc: this.pc, physicalPC: this.physicalPC, instr: null,
+                desc: `Timer IRQ: Scheduler.IRQ injected at step ${this.stepCount} (hidden ELOADCALL)`,
+                timerIRQ: true,
+                tracePackets: [],  // timer-IRQ is a hidden ELOADCALL — no trace packets visible to IDE
+            };
+            timerResult.physicalPC = this.physicalPC;
+            timerResult.auditPipeline = this._auditPipeline ? this._auditPipeline() : [];
+            this._finishExecutionEvidence(timerResult);
+            this.emit('step', timerResult);
+            this.emit('stateChange', this.getState());
+            return timerResult;
+        }
+
+        const fetch = this._fetchInstruction();
+        if (!fetch.ok) {
+            this.fault(fetch.fault, fetch.message, fetch.meta || null);
+            return null;
+        }
+        const instrWord = fetch.word;
+        if (this._executionAttempt) {
+            this._executionAttempt.instruction = {
+                raw: instrWord >>> 0, physicalPC: fetch.addr,
+                decoded: instrWord === 0 ? null : this.decodeInstruction(instrWord),
+            };
+        }
+        // HALT is the all-zero pseudo-instruction emitted by both assemblers.
+        // Before boot it remains the PP250 return sentinel. After boot it is a
+        // terminal instruction: it never pops a frame, advances PC, or fetches
+        // a caller continuation.
+        if (instrWord === 0) {
+            if (!this.bootComplete) {
+                this.output += `[PP250] Zero instruction at PC=${this.pc} (addr=0x${fetch.addr.toString(16)}) — pre-boot zero, returning to boot sequence\n`;
+                this._returnToBoot();
+                return { pc: this.pc, physicalPC: this.physicalPC, instr: null, opName: 'HALT', desc: 'PP250: zero instruction -> reboot' };
+            }
+            const haltPC = this.pc;
+            this.stepCount++;
+            this._instrHistory.push({
+                step: this.stepCount,
+                pc: haltPC,
+                physicalPC: fetch.addr,
+                raw: 0,
+                opName: 'HALT',
+                cond: 'AL',
+                crDst: 0,
+                crSrc: 0,
+                imm: 0,
+            });
+            if (this._instrHistory.length > 5) this._instrHistory.shift();
+            this.halted = true;
+            this.running = false;
+            this.executionStats.successful++;
+            const result = {
+                pc: haltPC,
+                physicalPC: fetch.addr,
+                instr: null,
+                opName: 'HALT',
+                tracePackets: [],
+                desc: `HALT at 0x${fetch.addr.toString(16).toUpperCase().padStart(4, '0')}`,
+                auditPipeline: [],
+            };
+            this.output += result.desc + '\n';
+            this._finishExecutionEvidence(result);
+            this.emit('step', result);
+            this.emit('stateChange', this.getState());
+            return result;
+        }
+
+        const d = this.decodeInstruction(instrWord);
+        this.stepCount++;
+
+        this._instrHistory.push({
+            step: this.stepCount,
+            pc: this.pc,
+            physicalPC: fetch.addr,
+            raw: instrWord,
+            opName: this.opName(d.opcode),
+            cond: this.condName(d.cond),
+            crDst: d.crDst,
+            crSrc: d.crSrc,
+            imm: d.imm,
+        });
+        if (this._instrHistory.length > 5) this._instrHistory.shift();
+
+        if (!this.checkCondition(d.cond)) {
+            const result = {
+                pc: this.pc,
+                physicalPC: this.physicalPC,
+                instr: d,
+                skipped: true,
+                tracePackets: [],  // skipped instructions retire no state changes → no trace packets
+                desc: `${this.opName(d.opcode)}${this.condName(d.cond)} skipped (condition false)`,
+            };
+            this.pc++;
+            this._finishExecutionEvidence(result);
+            this.emit('step', result);
+            this.emit('stateChange', this.getState());
+            return result;
+        }
+
+        // Freeze execution identity before CALL or any other instruction can
+        // mutate CR14. Fault rendering must never infer the caller from the
+        // post-boundary register bank or from editor/registry metadata.
+        this._captureFaultRoute(d);
+
+        // ── Hardware privilege fence ──────────────────────────────────────────────
+        // CR12–CR15 are hardware-privileged; normal instructions may not name them.
+        // Rule: fault = (reg >= 12) AND NOT (opcode ∈ {DREAD,DWRITE} AND reg == 14)
+        //   CHANGE (opcode 4): fully exempt from the decode fence — crDst is checked
+        //     inside _execChange (must be 12–15). crSrc is also unrestricted: the boot
+        //     sequence uses `CHANGE CR12, CR12, 1` where crSrc==12 (the only instruction
+        //     that may reach into the privileged bank as a source is CHANGE itself).
+        //   DREAD (opcode 16) / DWRITE (opcode 17): may use CR14 as the source
+        //     capability field to access read-only data packed after HALT in the
+        //     code lump (`DREAD DR, CR14, offset` pattern).
+        if (d.opcode !== 1 && d.opcode !== 4 && d.opcode !== 5) {
+            // crDst encodes a CR index only for Church opcodes (0–9).
+            // Turing opcodes (16–25) put a DR index in the same bit field — do not fence them.
+            const isChurchOp = (d.opcode <= 9);
+            if (isChurchOp && d.crDst >= 12 && !this.mElevation) {
+                this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crDst} is privileged — only CHANGE may write CR12–CR15`);
+                return null;
+            }
+            // crSrc is a true CR index only for specific opcodes; exclude the rest:
+            //   0 (LOAD), 1 (SAVE)           — crSrc is the c-list CR ✓
+            //   2 (CALL)                      — crSrc is a METHOD SELECTOR (0–15), NOT a CR ✗
+            //   3 (RETURN)                    — crSrc is in the zero/mask field (always 0) ✓
+            //   5 (SWITCH)                    — crSrc is the register to swap ✓
+            //   6 (TPERM), 7 (LAMBDA)         — crSrc unused (stays 0, no false fault) ✓
+            //   8 (ELOADCALL), 9 (XLOADLAMBDA)— crSrc is the c-list CR ✓
+            //   16 (DREAD), 17 (DWRITE)       — crSrc is a CR (with CR14 exception)
+            //   18–25 (other Turing)          — crSrc is a DR index, not a CR ✗
+            const isDreadDwrite = (d.opcode === 16 || d.opcode === 17);
+            // Opcodes where crSrc genuinely carries a CR index (privilege fence applies):
+            const crSrcIsCapReg = [0, 1, 5, 8, 9, 16, 17].includes(d.opcode);
+            if (crSrcIsCapReg && d.crSrc >= 12 && !(isDreadDwrite && d.crSrc === 14)) {
+                this.fault('PRIV_REG', `${this.opName(d.opcode)}: CR${d.crSrc} is privileged — DREAD/DWRITE may use CR14 as source; all other instructions must use CR0–CR11`);
+                return null;
+            }
+        }
+
+        // Capture current instruction context so mLoad/mSave audit entries can
+        // include a "location" row (Step#, PC, decoded instruction) for fault display.
+        this._currentInstrLabel = {
+            pc:         this.pc,
+            physicalPC: this.physicalPC,
+            step:       this.stepCount,
+            opName:     this.opName(d.opcode),
+            crDst:      d.crDst,
+            crSrc:      d.crSrc,
+            imm:        d.imm,
+            instrWord:  d.raw,
+        };
+
+        let result = null;
+        switch (d.opcode) {
+            case 0: result = this._execLoad(d); break;
+            case 1: result = this._execSave(d); break;
+            case 2: result = d.crSrc === 6 ? this._execIndexedCall(d) : this._execCall(d); break;
+            case 3: result = this._execReturn(d); break;
+            case 4: result = this._execChange(d, this.pc + 1); break;
+            case 5: result = this._execSwitch(d); break;
+            case 6: result = this._execTperm(d); break;
+            case 7: result = this._execLambda(d); break;
+            case 8: result = this._execEloadcall(d); break;
+            case 9: result = this._execXloadlambda(d); break;
+            // opcodes 10–15: unassigned in v2.0 ISA → FAULT
+            case 10: case 11: case 12: case 13: case 14: case 15:
+                this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 10–15) in v2.0 ISA`);
+                return null;
+            // opcodes 16–25: Turing data-register instructions
+            case 16: result = this._execDread(d); break;
+            case 17: result = this._execDwrite(d); break;
+            case 18: result = this._execBfext(d); break;
+            case 19: result = this._execBfins(d); break;
+            case 20: result = this._execMcmp(d); break;
+            case 21: result = this._execIadd(d); break;
+            case 22: result = this._execIsub(d); break;
+            case 23: result = this._execBranch(d); break;
+            case 24: result = this._execShl(d); break;
+            case 25: result = this._execShr(d); break;
+            // opcodes 26–29: unassigned in v2.0 ISA → FAULT
+            case 26: case 27: case 28: case 29:
+                this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 26–29) in v2.0 ISA`);
+                return null;
+            case 0x1E:
+                this.fault('INVALID_OP', `WORD (opcode 0x1E) is an inline data constant and cannot be executed — check your RETURN placement`);
+                return null;
+            default:
+                this.fault('INVALID_OP', `Unknown opcode ${d.opcode}`);
+                return null;
+        }
+
+        if (result) {
+            // This is the sole successful-instruction retirement boundary.  A
+            // result returned by an instruction is a retirement; faulted and
+            // suspended paths return before here and are never counted.
+            if (result.absent) this.executionStats.lazyLoadWaits++;
+            else if (result.suspended || result.lazySuspended) this.executionStats.suspensions++;
+            else if (result.rejected) this.executionStats.rejected++;
+            else if (!result.timerIRQ) this.executionStats.successful++;
+            // DR0 is the hardwired zero register — zeroed unconditionally after every
+            // instruction. Signed results from device CALL paths are returned in DR1.
+            this._writeDR(0, 0);
+            result.physicalPC = this.physicalPC;
+            // A stable, per-retirement location record lets trace consumers
+            // resolve CALL/RETURN by the instruction that retired, rather than
+            // consulting the now-mutated CR14 or most recent frame.
+            if (result.instr && (result.instr.opcode === 2 || result.instr.opcode === 3 ||
+                result.instr.opcode === 8 || result.instr.opcode === 9)) {
+                const origin = this._executionAttempt && this._executionAttempt.pre;
+                const originPC = origin ? origin.pc : result.pc;
+                const labelEntries = Object.entries(origin ? origin.programLabels : (this.programLabels || {}))
+                    .filter(([, offset]) => Number.isFinite(offset) && offset <= originPC)
+                    .sort((a, b) => b[1] - a[1]);
+                result.eventLocation = {
+                    kind: (result.instr.opcode === 3) ? 'RETURN' : 'CALL',
+                    pc: originPC,
+                    physicalPC: fetch.addr,
+                    instrWord,
+                    opName: this.opName(result.instr.opcode),
+                    lump: origin ? origin.programName : (this.programName || null),
+                    method: labelEntries.length ? labelEntries[0][0] : null,
+                    offset: originPC,
+                    callDepth: origin ? origin.callDepth : this.callStack.length,
+                };
+            }
+            result.auditPipeline = this._auditPipeline();
+            result.tracePackets = this._tracePacketsBuf.slice();
+            if (d.crDst === 0 && [16, 18, 19, 21, 22, 24, 25].includes(d.opcode)) {
+                result.desc += ' (DR0 destination discarded at retirement; DR0=0; flags reflect computed result)';
+            }
+            this._finishExecutionEvidence(result);
+            this.emit('step', result);
+            this.emit('stateChange', this.getState());
+        }
+        if (!result && !this.halted && !this.awaitingLump && !this._lazySuspended) {
+            // Null means that execution aborted. If no explicit fault or
+            // suspension explains it, promote the silent abort to a terminal
+            // fault instead of letting sim.run() mislabel it as a boot exit.
+            this.fault(
+                'EXECUTION_ABORT',
+                `${this.opName(d.opcode)} stopped without retiring or reporting a fault at PC ${this.pc}`
+            );
+        }
+        return result;
+    }
 }
 
 ChurchSimulator.SIMULATOR_ASSET_ID = CHURCH_SIMULATOR_ASSET_ID;
@@ -12780,6 +12486,174 @@ ChurchSimulator.makePendingGT = function (petName) {
 ChurchSimulator.pendingGTName = function (word) {
     const idx = (word >>> 0) & 0xFFFF;
     return ChurchSimulator.PENDING_GT_NAMES[idx] || ('pending#' + idx);
+};
+
+// Deliberately NOT wired into fetch, CALL, RETURN, loaders, or an ISA toggle.
+// There is no protected, envelope-validated object binding in the JS runtime.
+// A codec or a caller's profile string cannot supply executable authority.
+ChurchSimulator.admitIDX1Execution = function () {
+    const error = new Error('IDX1 runtime admission unsupported: protected execution-envelope binding and mutation/entry gates are not implemented');
+    error.code = 'UNSUPPORTED_PROFILE';
+    throw error;
+};
+
+// Isolated synthetic reference sequencer, NOT an admission API. The injected
+// adapter is trusted test machinery: it supplies atomic snapshots, authority
+// proofs, authorized metadata and a single atomic semantic commit. No adapter
+// supplied here is ever installed on a ChurchSimulator instance.
+// All coordinates are physical WORD addresses, including CALL continuations.
+// CALL/RETURN frame construction is intentionally unavailable: a CALL plan can
+// be inspected, but cannot commit until canonical object-bound handoff exists.
+ChurchSimulator.createIDX1ReferenceHarness = function (codec, adapter) {
+    function fail(code, message) {
+        const error = new Error(message);
+        error.code = code;
+        throw error;
+    }
+    function uint(value, name, max = 0xFFFFFFFF) {
+        if (!Number.isSafeInteger(value) || value < 0 || value > max)
+            fail('CONTAINMENT', `Invalid ${name}`);
+        return value;
+    }
+    function freeze(value) {
+        if (value && typeof value === 'object') {
+            Object.values(value).forEach(freeze);
+            Object.freeze(value);
+        }
+        return value;
+    }
+    function snapshot(value) {
+        // Plain synthetic data only; no live capability objects or getters are
+        // retained across authorization callbacks.
+        return freeze(structuredClone(value));
+    }
+    function requireProof(name, ...args) {
+        if (typeof adapter[name] !== 'function' || adapter[name](...args) !== true)
+            fail('AUTHORITY', `IDX1 reference ${name} denied`);
+    }
+    function boundary(binding, pc) {
+        uint(pc, 'PC', Number.MAX_SAFE_INTEGER);
+        if (!binding.starts.includes(pc) ||
+                !binding.extents.some(e => pc >= e.start && pc < e.end))
+            fail('CONTAINMENT', 'Not an instruction start in the authorized code view');
+    }
+    function range(index, limit) {
+        uint(limit, 'authorized limit', 0x100000000);
+        if (index < 0 || index >= limit) fail('CONTAINMENT', 'Outside authorized view');
+    }
+    function plan() {
+        // Binding is obtained from the accepted code authority, never from a
+        // profile toggle or an opcode probe. The adapter proves synthetic code
+        // authority before any protected layout/word is requested.
+        const state = snapshot(adapter.capture());
+        requireProof('authorizeCode', state);
+        const binding = snapshot(adapter.codeMetadata(state));
+        if (binding.profile !== 'IDX1' || !Array.isArray(binding.extents) ||
+                !Array.isArray(binding.starts))
+            fail('STRUCTURE', 'Missing synthetic IDX1 code metadata');
+        let previousEnd = -1;
+        for (const extent of binding.extents) {
+            uint(extent.start, 'extent start', Number.MAX_SAFE_INTEGER);
+            uint(extent.end, 'extent end', Number.MAX_SAFE_INTEGER);
+            if (extent.start >= extent.end || extent.start < previousEnd)
+                fail('STRUCTURE', 'Invalid executable extents');
+            previousEnd = extent.end;
+        }
+        let previousStart = -1;
+        for (const start of binding.starts) {
+            if (start <= previousStart) fail('STRUCTURE', 'Invalid instruction start ordering');
+            boundary(binding, start);
+            previousStart = start;
+        }
+        const pc = state.pc;
+        boundary(binding, pc);
+        const extent = binding.extents.find(e => pc >= e.start && pc < e.end);
+        const w0 = uint(adapter.fetchWord(pc, state), 'W0');
+        if (w0 >>> 27 !== 10) fail('STRUCTURE', 'Reference harness expects an IDX1 packet');
+        const length = ((w0 >>> 25) & 3) === 3 ? 3 : 2;
+        const continuation = uint(pc + length, 'continuation', Number.MAX_SAFE_INTEGER);
+        if (continuation > extent.end) fail('FETCH', 'Packet crosses executable extent');
+        for (let i = 1; i < length; i++) {
+            if (binding.starts.includes(pc + i))
+                fail('STRUCTURE', 'Packet interior declared as a start');
+        }
+        const words = [w0];
+        for (let i = 1; i < length; i++) words.push(adapter.fetchWord(pc + i, state));
+        const packet = freeze(codec.decodePacket(words));
+        if (!codec.conditionPasses(packet.condition, state.flags))
+            return freeze({ executed: false, packet, nextPC: continuation, retirements: 1 });
+
+        const op = packet.opcode;
+        const indexedCall = op === 2 && packet.b === 6;
+        const role = op === 4 ? (packet.a < 14 ? 'source-word' : 'namespace-ordinal') :
+            op === 16 || op === 17 ? 'data-word' :
+            op === 18 || op === 19 ? 'bit-position' :
+            op === 23 ? 'branch' : op === 2 && !indexedCall ? 'method' : 'clist-row';
+        // authorizeSource must establish the ENTIRE legacy authority predicate:
+        // null/class/M, rights, GT version/integrity/seal, SAVE S+B/delegation,
+        // CHANGE privilege/source/Namespace and direct CALL E. It must not read
+        // selected payload or expose a protected count. Never use legacy exec*
+        // helpers here: several perform transactions before these IDX1 gates.
+        requireProof('authorizeSource', state, packet, role);
+        const values = {};
+        if (packet.role0) values.role0 = codec.evaluateDescriptor(packet.role0, state.dr, op === 23);
+        if (packet.role1) values.role1 = codec.evaluateDescriptor(packet.role1, state.dr);
+        if (indexedCall) {
+            if (!packet.role0) values.role0 = packet.immediate & 31;
+            if (!packet.role1) values.role1 = (packet.immediate >>> 5) & 127;
+        }
+        if (op === 1 && values.role0 === 0)
+            fail('IMMUTABLE_SELF_CAP', 'SAVE cannot replace SELF');
+        const metadata = snapshot(adapter.sourceMetadata(state, packet, role));
+        let nextPC = continuation;
+        if (role === 'bit-position') {
+            range(values.role0, 32);
+            if (values.role0 + (packet.immediate & 31) > 32)
+                fail('CONTAINMENT', 'Bit field exceeds DR width');
+        } else if (role === 'branch') {
+            nextPC = pc + values.role0;
+            boundary(binding, nextPC);
+        } else if (role !== 'method') {
+            range(values.role0, metadata.limit);
+            const stride = role === 'namespace-ordinal' ? 4 : 1;
+            const address = uint(metadata.base + values.role0 * stride, 'selected word address');
+            uint(address + stride - 1, 'complete selected access');
+            values.address = address;
+        }
+        if (op === 2) {
+            // Both arithmetic checks and row bounds precede this selected GT
+            // validation; callee E authority precedes dispatch metadata access.
+            requireProof('authorizeCallee', state, packet, freeze(values));
+            const callee = snapshot(adapter.calleeMetadata(state, packet, values));
+            if (values.role1 === 0) nextPC = callee.fastEntry;
+            else {
+                const entry = callee.dispatch.find(e => e.selector === values.role1);
+                if (!entry) fail('CONTAINMENT', 'Selector absent from authorized dispatch');
+                if (entry.kind === 'private') fail('PRIVATE_METHOD', 'Private selector');
+                if (entry.kind !== 'branch' && entry.kind !== 'offset')
+                    fail('STRUCTURE', 'Untyped dispatch');
+                // Adapter supplies the validated typed destination, never an
+                // opcode-based guess over an arbitrary fetched table word.
+                nextPC = entry.target;
+            }
+            boundary(callee, nextPC);
+            boundary(binding, continuation);
+        }
+        requireProof('authorizeSelected', state, packet, values);
+        return freeze({ executed: true, packet, values, nextPC, continuation, retirements: 1 });
+    }
+    return Object.freeze({
+        plan,
+        step() {
+            const result = plan();
+            if (result.executed && result.packet.opcode === 2)
+                fail('UNSUPPORTED_PROFILE', 'CALL commit requires canonical frame and protected callee binding');
+            // Exactly one commit carries semantic full-width indices. There is
+            // no repacking into W1, no legacy executor call and no second retire.
+            adapter.commit(result);
+            return result;
+        },
+    });
 };
 
 if (typeof module !== 'undefined' && module.exports) {

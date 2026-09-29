@@ -43,7 +43,7 @@ This document maps each instruction across all implementation layers for verific
 - [ ] LOAD: Verify L permission check, bounds check, MAC validation
 - [ ] SAVE: Verify S permission check, B-bit on source, bounds check
 - [ ] CALL: Verify E permission, DR/CR mask handling, DR8-15 auto-clear
-- [ ] RETURN: Verify stack pop, context restore (mask field not implemented — skip mask handling)
+- [ ] RETURN: Verify stack pop, caller CR6 reconstruction, keep-mask 1=keep current/0=zero for CR0–CR4 and CR7–CR11, ignored bits 5/6, unchanged CR5 descriptor, all-M reset then CR6 rearm; no snapshot restoration
 - [ ] CHANGE: Verify thread switch, monitor clearing
 - [ ] SWITCH: Verify destination-M-gated isolated LOAD
 - [x] TPERM: Flag model Z=1=pass/Z=0=fail confirmed. Valid presets 0-9 (CLEAR through LS). Codes 10-12 unconditionally reserved (RSV3/RSV4/RSV5, FAULT `TPERM_RSV`); code 13 = FRAME (call-stack query: Z=1 if real return frame present; no GT read); code 14 = EXACT (bit-exact identity check: Z=1 iff CRd.word0 == CRs.word0); code 15 = RSV1 (FAULT `TPERM_RSV`). Assembler now rejects reserved presets 10/11/12/15 (and B-variants 26/27/28/31) at compile time with a named error. Conditional execution (EQ/NE etc.) works via standard condition-check gate before dispatch. B-modifier (bit 4 of preset) recognised by assembler and simulator; hardware decoder currently reads only 4 bits — B-modifier clears GT B-bit in software only until the field is widened to silicon. Named B-variants: RB, RWB, XB, RXB, RWXB, LB, SB, EB, LSB.

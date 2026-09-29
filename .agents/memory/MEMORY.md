@@ -1,4 +1,5 @@
 - [Save diagnostic evidence](save-diagnostic-evidence.md) — shared safe error codes and occurrence times must survive ingestion; missing logs never prove rejection
+- [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
@@ -57,6 +58,7 @@
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
+- [Fault recovery boot precedence](fault-boot-selftest-order.md) — boot wins after faults; three Boot steps enter the prepared lightning-bolt target, not an implicit SelfTest
 - [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit
 - [Wukong release-host staging](wukong-release-host-staging.md) — Build each candidate in a fresh commit-pinned vendor checkout; never reuse stale or dirty historical build directories
 - [Verified binary merge survival](verified-binary-merge-survival.md) — provenance is not a release unless its ignored binary is explicitly tracked and CI verifies the complete bundle
@@ -153,3 +155,5 @@
 - [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
 - [RETURN incident evidence](return-incident-evidence.md) — distinguish reset, caller continuation, and trace mislabeling using protected frames and live identity, not post-stop flags
 - [Protected review audit boundary](protected-review-audit-boundary.md) — cancellation telemetry is not approval; persist safe server evidence, never source diffs or credentials
+- [Instruction commentary evidence](instruction-commentary-evidence.md) — static meaning stays symbolic; historical effects need exact immutable occurrence evidence, never live-register recomputation
+- [Uniform indexed operand intent](register-indexed-load-intent.md) — all indexed instructions should support runtime DR value plus immediate; parser limitations are not intended semantics.

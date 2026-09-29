@@ -11,6 +11,9 @@ from .thread_design import THREAD_STO_OFFSET
 class ChurchReturn(Elaboratable):
     def __init__(self):
         self.return_start = Signal()
+        # Accepted instruction's low imm12; held through the later cLoad commit.
+        self.return_mask = Signal(12)
+        self.return_mask_latched = Signal(12)
         self.busy = Signal()
         self.complete = Signal()
         self.fault_valid = Signal()
@@ -23,10 +26,8 @@ class ChurchReturn(Elaboratable):
 
         self.nia_set = Signal()
         self.nia_value = Signal(32)
-        # Legacy ELOADCALL retains its boot-ROM guard marker (word 3).  Root
-        # CALL uses the distinct 0x7FFF poison and is handled as
-        # STACK_UNDERFLOW in VALIDATE_FRAME, never as a boot-ROM return.
-        self.boot_rom_return = Signal()
+        # Every saved PC requires validated caller context, never a ROM
+        # authority marker. Root CALL's 0x7FFF poison faults below.
 
         self.mload_start = Signal()
         self.mload_cr_src = Signal(4)
@@ -46,6 +47,11 @@ class ChurchReturn(Elaboratable):
         self.lambda_clear = Signal()
 
         self.cr5_heap   = Signal(CAP_REG_LAYOUT)
+        self.cr14_code = Signal(CAP_REG_LAYOUT)
+        # LAMBDA shares the caller's executable identity; this is an accepted
+        # operand latch, not a CALL-time descriptor snapshot.
+        self.cload_same_code = Signal()
+        self.cload_code_location = Signal(32)
         self.cr12_thread = Signal(CAP_REG_LAYOUT)
         self.thread_base = Signal(32)
         # Cached by CHANGE on activation.  RETURN uses it to validate the
@@ -88,6 +94,19 @@ class ChurchReturn(Elaboratable):
 
         cr12_view = View(CAP_REG_LAYOUT, cr12_thread_latched)
         cr12_gt   = View(GT_LAYOUT, cr12_view.word0_gt)
+        code_view = View(CAP_REG_LAYOUT, self.cr14_code)
+        code_gt = View(GT_LAYOUT, code_view.word0_gt)
+        lambda_code_valid = Signal()
+        lambda_egt = Signal(GT_LAYOUT)
+        m.d.comb += [
+            lambda_egt.slot_id.eq(code_gt.slot_id),
+            lambda_egt.gt_seq.eq(code_gt.gt_seq),
+            lambda_egt.gt_type.eq(code_gt.gt_type),
+            lambda_egt.dom.eq(1),
+            lambda_egt.perm.eq(0b100),
+            lambda_egt.b_flag.eq(code_gt.b_flag),
+            self.cload_same_code.eq(lambda_active_latched),
+        ]
         cr12_null = Signal()
         m.d.comb += cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL)
 
@@ -165,7 +184,6 @@ class ChurchReturn(Elaboratable):
                 callee_egt_view.dom & callee_egt_view.perm[2]
             ),
         ]
-        m.d.comb += self.boot_rom_return.eq(return_pc_latched == 3)
         m.d.comb += [
             self.flags_restore_en.eq(0),
             self.flags_restore_data.eq(prev_flags_latched),
@@ -192,14 +210,22 @@ class ChurchReturn(Elaboratable):
                 ]
                 with m.If(self.return_start):
                     m.d.sync += [
+                        self.return_mask_latched.eq(self.return_mask),
                         cr5_heap_latched.eq(self.cr5_heap),
                         cr12_thread_latched.eq(self.cr12_thread),
                         thread_base_latched.eq(self.thread_base),
                         thread_hdr_latched.eq(self.thread_hdr),
                         lambda_active_latched.eq(self.lambda_active),
                         lambda_pc_latched.eq(self.lambda_pc),
+                        lambda_code_valid.eq(
+                            (code_gt.gt_type == GT_TYPE_INFORM) &
+                            ~code_gt.dom & code_gt.perm[PERM_X]),
+                        self.cload_code_location.eq(code_view.word1_location),
                     ]
                     with m.If(self.lambda_active):
+                        # CR6 may have changed in the lambda body; derive the
+                        # reconstruction identity from the still-current CR14.
+                        m.d.sync += callee_egt_latched.eq(lambda_egt.as_value())
                         m.next = "LAMBDA_FAST"
                     with m.Else():
                         # RETURN has no CR source operand. Its authority is the
@@ -207,12 +233,21 @@ class ChurchReturn(Elaboratable):
                         m.next = "CHECK_CR5_CR12"
 
             with m.State("LAMBDA_FAST"):
-                m.d.comb += [
-                    self.nia_set.eq(1),
-                    self.nia_value.eq(lambda_pc_latched),
-                    self.lambda_clear.eq(1),
-                ]
-                m.next = "COMPLETE"
+                with m.If(~lambda_code_valid):
+                    m.d.sync += [
+                        fault_flag.eq(1),
+                        fault_latched.eq(FaultType.PERM_X),
+                    ]
+                    m.next = "FAULT"
+                with m.Else():
+                    # No frame pop on the legacy hardware leaf path, but the
+                    # core must still run cLoad before committing the RETURN.
+                    m.d.comb += [
+                        self.nia_set.eq(1),
+                        self.nia_value.eq(lambda_pc_latched),
+                        self.lambda_clear.eq(1),
+                    ]
+                    m.next = "COMPLETE"
 
             with m.State("CHECK_CR5_CR12"):
                 m.d.sync += [

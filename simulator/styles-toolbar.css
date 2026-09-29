@@ -441,12 +441,21 @@
 
 .editor-layout.saved-lump-editor-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, var(--editor-diagnostics-top, 60fr)) 10px minmax(0, var(--editor-diagnostics-bottom, 40fr));
     gap: 0.5rem;
 }
 
-.editor-layout.saved-lump-editor-layout > .editor-divider,
-.editor-layout.saved-lump-editor-layout > .console-panel {
+.editor-layout.saved-lump-editor-layout > .editor-divider {
     display: none;
+}
+.editor-layout.saved-lump-editor-layout > .editor-panel:not(.console-panel) {
+    grid-column: 1;
+    grid-row: 1 / 4;
+}
+.editor-layout.saved-lump-editor-layout > .editor-horizontal-divider {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
 }
 
 .editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
@@ -461,8 +470,8 @@
     padding: 0;
 }
 
-/* Success prioritizes source and exact binary disassembly. Diagnostics remain
-   available through the compact disclosure, not a competing third column. */
+/* Successful builds and saved binaries share the source / disassembly / console
+   split, keeping diagnostics visible without replacing the exact binary. */
 .editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
@@ -475,27 +484,39 @@
 }
 
 #editor .editor-layout.saved-lump-editor-layout > .console-panel {
-    display: none;
+    display: flex;
+    grid-column: 2;
+    grid-row: 3;
 }
 
 /* A failed build has diagnostics, not replacement machine words. Keep the
    last exact disassembly above those diagnostics instead of hiding it. */
 #editor .editor-layout.disassembly-diagnostics-layout {
-    grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+    grid-template-rows: minmax(0, var(--editor-diagnostics-top, 60fr)) 10px minmax(0, var(--editor-diagnostics-bottom, 40fr));
 }
 #editor .editor-layout.disassembly-diagnostics-layout > .editor-panel:not(.console-panel) {
     grid-column: 1;
-    grid-row: 1 / 3;
+    grid-row: 1 / 4;
+}
+#editor .editor-layout.disassembly-diagnostics-layout > .editor-horizontal-divider {
+    display: block;
+    grid-column: 2;
+    grid-row: 2;
 }
 #editor .editor-layout.disassembly-diagnostics-layout > .console-panel {
     display: flex;
     grid-column: 2;
-    grid-row: 2;
+    grid-row: 3;
 }
 .disassembly-presentation-status {
     flex: 0 0 auto;
     padding: 0.25rem 0.65rem;
     font-size: 0.78rem;
+    color: var(--text-secondary, #aab5c4);
+    white-space: pre-line;
+}
+
+.saved-lump-handoff .handoff-status-warning {
     color: var(--church-gold);
 }
 
@@ -592,6 +613,9 @@
 }
 
 @media (max-width: 768px) {
+    #editor .editor-layout.disassembly-diagnostics-layout > .editor-horizontal-divider {
+        display: none;
+    }
     #editor .editor-layout.disassembly-diagnostics-layout {
         grid-template-rows: minmax(10rem, 2fr) minmax(8rem, 2fr) minmax(6rem, 1fr);
         overflow: auto;
@@ -611,11 +635,23 @@
     .editor-layout.saved-lump-editor-layout,
     .editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
         grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: minmax(16rem, 1fr) minmax(16rem, 1fr);
+        grid-template-rows: minmax(16rem, 1fr) minmax(16rem, 1fr) minmax(8rem, 1fr);
+        overflow: auto;
+    }
+    .editor-layout.saved-lump-editor-layout > .editor-panel:not(.console-panel) {
+        grid-column: 1;
+        grid-row: 1;
+    }
+    .editor-layout.saved-lump-editor-layout > .editor-horizontal-divider {
+        display: none;
     }
     .editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
         grid-column: 1;
         grid-row: 2;
+    }
+    #editor .editor-layout.saved-lump-editor-layout > .console-panel {
+        grid-column: 1;
+        grid-row: 3;
     }
     .saved-lump-identity-panel {
         grid-template-columns: 1fr;
@@ -1729,6 +1765,20 @@
     background: var(--church-gold);
 }
 
+.editor-horizontal-divider {
+    display: none;
+    min-width: 0;
+    background: var(--border);
+    border-radius: 3px;
+    cursor: row-resize;
+    touch-action: none;
+}
+.editor-horizontal-divider:hover,
+.editor-horizontal-divider:focus-visible,
+.editor-horizontal-divider.dragging {
+    background: var(--church-gold);
+}
+
 .editor-panel {
     display: flex;
     flex-direction: column;
@@ -1831,6 +1881,13 @@
 }
 .lang-selector:focus {
     outline: 1px solid var(--church-gold);
+}
+.editor-build-btn {
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+.editor-save-lump-btn {
+    color: #7dd3a8;
 }
 
 /* ── Discoverable editor view switcher ─────────────────────────────────── */

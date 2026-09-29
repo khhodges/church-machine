@@ -79,7 +79,7 @@ async function delayedInlineSaveRace() {
     const openStart = source.indexOf('async function openLumpInEditor(token, options)');
     const openBody = source.slice(openStart);
     const capture = openBody.indexOf('var _openWriteGuard = window._captureEditorWriteGuard');
-    const fetchPoint = openBody.indexOf("await fetch('/api/lump/' + token + '/words'");
+    const fetchPoint = openBody.indexOf("await fetch(_wordsUrl");
     const finalGuard = openBody.indexOf('!_openWriteGuard.accepts()', fetchPoint);
     const ownershipExit = openBody.indexOf(
         'if (window._savedLumpEditorMode) exitSavedLumpEditorMode();');

@@ -105,10 +105,10 @@
     <link rel="icon" type="image/svg+xml" sizes="16x16" href="favicon.svg">
     <link rel="stylesheet" href="styles-base.css?v=20260905-bitstream-source-version1">
     <link rel="stylesheet" href="styles-landing.css?v=20260820-card-dnd2">
-    <link rel="stylesheet" href="styles-toolbar.css?v=sha256-a56340508c3e">
+    <link rel="stylesheet" href="styles-toolbar.css?v=sha256-f5009d2f8d13">
     <link rel="stylesheet" href="styles-editor.css?v=sha256-b8ca7a206aa7">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
-    <link rel="stylesheet" href="styles-lumps.css?v=sha256-a6fd46e997a9">
+    <link rel="stylesheet" href="styles-lumps.css?v=sha256-23d70e2791ff">
     <link rel="stylesheet" href="styles-gatelog.css?v=sha256-4c4361f1c960">
     <link rel="stylesheet" href="styles-fault.css?v=sha256-9e328a519f73">
     <link rel="stylesheet" href="styles-tools.css?v=20260831-wukong-download-layout1">
@@ -448,6 +448,7 @@
                                 <div class="ham-group" id="ham-grp-builder">
                                     <button class="ham-item" id="hamItem-ti60-connect" onclick="switchView('builder');switchBuilderViewTab('ti60-connect');closeHamburger()">&#x1F50C; Connect Wukong</button>
                                     <button class="ham-item" id="hamItem-builder" onclick="switchView('builder');closeHamburger()">Builder<kbd class="ham-kbd">C+B</kbd></button>
+                                    <a class="ham-item" href="/simulator/alice-mallory-lab.html" target="_blank" rel="noopener" style="display:block;text-decoration:none;">Alice / Mallory Test Lab ↗</a>
                                     <button class="ham-item" id="hamItem-buildlog" onclick="switchView('builder');switchBuilderViewTab('buildlog');closeHamburger()">Build Log</button>
                                     <button class="ham-item" id="hamItem-lump-thread" onclick="switchView('builder');switchBuilderViewTab('lump-thread');closeHamburger()">Thread LUMP</button>
                                     <button class="ham-item" id="hamItem-lump-ns" onclick="switchView('builder');switchBuilderViewTab('lump-ns');closeHamburger()">Namespace LUMP</button>
@@ -603,7 +604,7 @@
                               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openActiveThreadContextModal(this)}"
                               data-tooltip="Active configured Thread — open controls">Thread.1 · 1/1 · running</span>
                         <div class="run-wrap" id="runWrap">
-                            <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Prepare/Run — use the latest validated saved artifact unless an exact older revision is pinned · double-click for options">&#x1F3C3;</button>
+                            <button class="btn btn-success sim-icon-btn" id="btnRunSim" onclick="onRunBtnClick()" data-tooltip="Run current simulator bytes without preparing or changing saved artifacts · double-click for options">&#x1F3C3;</button>
                             <button class="btn btn-danger sim-icon-btn" id="btnStopSim" onclick="stopSim()" style="display:none;" data-tooltip="Stop — Halt execution immediately">&#x23F9;</button>
                             <div class="run-popover" id="runPopover" style="display:none;">
                                 <div class="run-popover-title">Run Settings <button class="run-close-btn" onclick="hideRunPopover()" title="Close">&times;</button></div>
@@ -617,6 +618,7 @@
                                     <option value="1000">1000</option>
                                 </select>
                                 <button class="btn btn-sm btn-success run-go-btn" onclick="prepareAndRunSavedArtifact()">Prepare &amp; Go</button>
+                                <button class="btn btn-sm btn-success run-go-btn" onclick="if(window.IDEActions)window.IDEActions.runCandidate()">Run current compiled candidate</button>
                             </div>
                         </div>
                         <span id="faultFreeCounter" class="fault-free-badge ff-zero" data-tooltip="Fault-Free Instructions — accumulates across clean runs; reach 1,000 to unlock LUMP save">0&#x202F;/&#x202F;1K</span>
@@ -939,6 +941,12 @@
                             <option value="abstraction">Abstraction</option>
                             <option value="personal">My Programs</option>
                         </select>
+                         <button type="button" class="btn btn-sm editor-build-btn" id="btnToolbarCompile"
+                                 onclick="document.getElementById('btnHamCompile').click()"
+                                 data-tooltip="Compile — Build a candidate with auto-detected or selected source language">Compile</button>
+                         <button type="button" class="btn btn-sm editor-build-btn editor-save-lump-btn" id="btnToolbarSaveLump"
+                                 onclick="document.getElementById('btnHamSaveLump').click()"
+                                 data-tooltip="Save LUMP — Review the current candidate or build a frozen source snapshot">Save LUMP</button>
                         <div id="editorViewSwitcherPanel" class="editor-view-switcher-panel" role="region"
                              aria-labelledby="editorViewSwitcherToggle" hidden>
                             <div class="editor-view-switcher-heading">
@@ -1085,7 +1093,7 @@
                     <div class="line-numbers" id="lineNumbers"></div>
                     <div id="asmErrorOverlay" class="asm-error-overlay" aria-hidden="true"></div>
                     <div id="asmWarningOverlay" class="asm-warning-overlay" aria-hidden="true"></div>
-                    <textarea id="asmEditor" spellcheck="false" wrap="off"></textarea>
+                    <textarea id="asmEditor" spellcheck="false" wrap="off" title="Double-click assembly code for Instructions, or a capabilities block for Golden Tokens. Keyboard shortcuts and the Actions menu are also available."></textarea>
                 </div>
             </div>
               <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" aria-label="Complete saved LUMP workspace">
@@ -1097,8 +1105,13 @@
                      <pre id="savedLumpBuildDetailsText" tabindex="0"></pre>
                  </details>
              </section>
+             <div id="editorHorizontalDivider" class="editor-horizontal-divider" role="separator"
+                  aria-label="Resize disassembly and console" aria-orientation="horizontal"
+                  aria-controls="savedLumpDisassemblyPanel editorConsolePanel" aria-valuemin="0"
+                  aria-valuemax="100" aria-valuenow="60" tabindex="0"
+                  title="Drag or use arrow keys to resize disassembly and console"></div>
             <div class="editor-divider" id="editorDivider"></div>
-            <div class="editor-panel console-panel">
+             <div class="editor-panel console-panel" id="editorConsolePanel">
                 <div class="sidebar-tabs" id="codeSidebarTabs">
                     <button class="sidebar-tab active" id="codeTabConsole" onclick="switchCodeTab('console')" data-tooltip="Console Output — View assembler output and execution results">Console Output</button>
                     <button class="sidebar-tab" id="codeTabSyntax" onclick="switchCodeTab('syntax')" data-tooltip="Syntax — Quick reference for instruction syntax">Syntax</button>
@@ -3540,7 +3553,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="abstractions.js?v=sha256-bb1d4424f271"></script>
     <script src="bank_lump_binding.js?v=sha256-b2a57ba721d9"></script>
     <script src="bank_lump_identity.js?v=sha256-f211d602a4a3"></script>
-    <script src="system_abstractions.js?v=sha256-da5c8d099b0d"></script>
+    <script src="system_abstractions.js?v=sha256-fb67cd078411"></script>
     <script src="device_abstractions.js"></script>
     <script async src="boot_uploads.js?v=sha256-c232b699367a"></script>
     <script src="actionable_errors.js?v=sha256-5757d1259702"></script>
@@ -3548,7 +3561,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="hw_binary.js?v=sha256-040e3857ba8c"></script>
     <script src="abstract_gt_manager.js"></script>
     <script src="thread_design.js?v=sha256-6c9b749e878a"></script>
-    <script src="architecture_contracts.js?v=sha256-1d50622f8024"></script>
+    <script src="architecture_contracts.js?v=sha256-f6a72a239d20"></script>
     <script>
     // Must match the identity embedded in simulator.js.  A stale cached
     // simulator asset is a correctness issue, not merely a cosmetic version
@@ -3556,15 +3569,15 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     window.__CHURCH_EXPECTED_SIMULATOR_ASSET_ID__ = 'simulator-three-instruction-boot-v1';
     window.__CHURCH_EXPECTED_BOOT_PATH_VERSION__ = 'three-instruction-v1';
     </script>
-    <script src="simulator.js?v=sha256-3cceb9c60fa5"></script>
-    <script src="capability_tokens.js?v=sha256-e16abaa57111"></script>
+    <script src="simulator.js?v=sha256-5e139dbacda7"></script>
+    <script src="capability_tokens.js?v=sha256-a11b4f8015c4"></script>
     <script src="portable_lump_binding.js?v=sha256-a6c0ffbfcc29"></script>
-    <script src="assembler.js?v=sha256-4f8c4ecbef8d"></script>
+    <script src="assembler.js?v=sha256-14f147d9527e"></script>
     <script src="pipeline.js?v=sha256-d87c8a71488c"></script>
     <script src="repl.js"></script>
     <script src="hp35.js"></script>
     <script async src="history.js"></script>
-    <script src="cloomc_compiler.js?v=sha256-a5ab6d942018"></script>
+    <script src="cloomc_compiler.js?v=sha256-6285a4fb8d1b"></script>
 
     <script async src="abacus.js"></script>
     <script async src="sliderule.js"></script>
@@ -3573,7 +3586,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script async src="cloomc_tutorial.js?v=sha256-4bee27899408"></script>
     <script async src="security_tutorial.js"></script>
     <script async src="thread_tutorial.js?v=sha256-8a23cd546ca5"></script>
-    <script async src="abstraction_tutorial.js?v=sha256-9ef36e181f8c"></script>
+    <script async src="abstraction_tutorial.js?v=sha256-6e3314210364"></script>
     <script async src="namespace_tutorial.js?v=sha256-77944b701a76"></script>
     <script async src="secure_boot_tutorial.js"></script>
     <script async src="english_loops_tutorial.js"></script>
@@ -3585,43 +3598,43 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script defer src="app-startup-wizard.js?v=sha256-501bb88367f8"></script>
     <script src="lump-registry.js?v=sha256-3088c8f7a525"></script>
     <script src="target-state.js?v=sha256-cc7981e52e84"></script>
-    <script src="app-shell.js?v=sha256-bd15524e84ba"></script>
-    <script src="app-tools.js?v=sha256-46944326bbbe"></script>
+    <script src="app-shell.js?v=sha256-e0e68f8a2239"></script>
+    <script src="app-tools.js?v=sha256-51daf085db3f"></script>
     <script src="thread-frame-decoder.js?v=sha256-923870b179d9"></script>
-    <script src="app-cr-display.js?v=sha256-6b8b972b14db"></script>
-    <script src="app-cr-detail.js?v=sha256-9114bfd65345"></script>
+    <script src="app-cr-display.js?v=sha256-c050526aa495"></script>
+    <script src="app-cr-detail.js?v=sha256-65a99bcbd027"></script>
     <script src="tab-correction.js?v=sha256-c8d226d6edc8"></script>
     <script src="pet_name_audit.js"></script>
-    <script src="save_diagnostics.js?v=sha256-25fc1bbccd1e"></script>
-    <script src="app-memory.js?v=sha256-db198fec3b4c"></script>
+    <script src="save_diagnostics.js?v=sha256-30ae2f8ff63e"></script>
+    <script src="app-memory.js?v=sha256-ccd28bca4c8a"></script>
     <script src="lump_admission.js?v=sha256-15ac2cd84941"></script>
-    <script src="app-abstractions.js?v=sha256-a1c04dbe7186"></script>
+    <script src="app-abstractions.js?v=sha256-52dbfcb4e2ea"></script>
     <script src="app-ns-dna.js"></script>
     <script src="lump-content-frame.js?v=sha256-a21808c93061"></script>
-    <script src="lump-audit.js?v=sha256-380ac57c6846"></script>
+    <script src="lump-audit.js?v=sha256-edf34e821411"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
-    <script src="build-handoff.js?v=sha256-cc1342a748406"></script>
-    <script src="app-lumps.js?v=sha256-e37c1a5add00"></script>
-    <script src="app-absdetail.js?v=sha256-71642fe87f63"></script>
+    <script src="build-handoff.js?v=sha256-cc1342a74840"></script>
+    <script src="app-lumps.js?v=sha256-da04c8ebe137"></script>
+    <script src="app-absdetail.js?v=sha256-e4335577f58a"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
-    <script src="app-compile.js?v=sha256-a4537a16799d"></script>
+    <script src="app-compile.js?v=sha256-3faeae238c6c"></script>
     <script src="app-lump-editor.js?v=sha256-e0d488d1253d"></script>
     <script src="app-editor-find.js?v=sha256-aeb1fa51e855"></script>
     <script src="lump_save_handler.js?v=sha256-ec3eda592cae"></script>
     <script src="lump_lease_ui.js?v=sha256-622b3d8a575c"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-ab005825a3df"></script>
-    <script src="app-actions.js?v=sha256-3ded5ef0589c"></script>
+    <script src="app-run.js?v=sha256-3166a5d7fc4d"></script>
+    <script src="app-actions.js?v=sha256-01d0046560bf"></script>
     <script src="app-build-approval.js?v=sha256-42930bcc2957"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
     <script src="app-editor-view-switcher.js?v=sha256-0890f98dcbf5"></script>
     <script src="app-invoke.js?v=sha256-376a499e341a"></script>
-    <script src="app-misc.js?v=sha256-e4a422fc49cd"></script>
+    <script src="app-misc.js?v=sha256-89f8b74dd6f3"></script>
     <script src="app-popup-lifecycle.js?v=sha256-8777e6faeabb"></script>
-    <script src="asm-instruction-picker.js?v=sha256-15576b29f3e7"></script>
+    <script src="asm-instruction-picker.js?v=sha256-2912f4ecf536"></script>
     <script src="asm-method-popup.js?v=sha256-48ab5c1c34d7"></script>
-    <script src="clist-viewer.js?v=sha256-7203dafa708b"></script>
+    <script src="clist-viewer.js?v=sha256-9e54e2749ff2"></script>
     <script src="app-gt-view.js?v=sha256-388813aceac6"></script>
     <!-- API quick-reference data (must load before app-api-popup) -->
     <script src="api-data.js?v=sha256-2790677649ba"></script>

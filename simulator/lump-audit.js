@@ -661,7 +661,10 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 const _slotNameHint = _capName
                     ? ` \u2014 "${_capName}" is referenced but not declared in this lump\u2019s c-list`
                     : '';
-                const _fixHint = ` Increase cc to at least ${slot + 1} to add slot [${slot}].`;
+                // An out-of-range access can be an intentional NO_CAPABILITY
+                // test. Increasing cc would change its semantics and grant a
+                // new row; never present that as an automatic repair.
+                const _fixHint = ' Executing this access would fault NO_CAPABILITY. If this was not intentional, check the source operand and declared C-list layout.';
                 const _rciMsg = `Instruction ${wi} (${_rciOpName[op]}) tries to access capability slot ${slot}` +
                     `, but this lump only has ${cc} capability slot${cc !== 1 ? 's' : ''}${_slotNameHint}.${_fixHint}`;
                 const _rciSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;

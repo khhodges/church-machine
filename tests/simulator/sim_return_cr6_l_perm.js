@@ -43,11 +43,8 @@
 //     restored.  Asserts the restored CR6 is the caller's original L-GT word
 //     (same slot_id and L-perm, not E-perm).
 //
-//   PHASE 3 — CALL→RETURN round-trip, mask bit 6 SET (CR6 preserved):
-//     When mask bit 6 is set, RETURN preserves the callee's CR6 (the L-GT
-//     for the callee) rather than restoring the caller's.  The callee's CR6
-//     is also an L-GT (CALL always writes L-perm).  This phase confirms that
-//     even in the preserve path, CR6 still carries L-perm.
+//   PHASE 3 — CALL→RETURN round-trip, mask bit 6 SET:
+//     CR6 always reconstructs caller context, irrespective of bit 6.
 //
 //   PHASE E2E — full fetch/decode/execute via sim.step():
 //     Places a CALL word then a RETURN word in memory, steps twice, and
@@ -309,13 +306,10 @@ console.log('\n--- PHASE 2: real CALL→RETURN round-trip (cc>0, mask=0) ---');
     }
 }
 
-// ── PHASE 3: CALL→RETURN with mask bit 6 SET (CR6 preserved) ─────────────────
+// ── PHASE 3: CALL→RETURN with mask bit 6 SET (caller CR6 reconstructed) ─────
 //
-// When mask bit 6 is set, RETURN keeps the callee's CR6 rather than restoring
-// the caller's.  The callee's CR6 is also L-perm (CALL always writes L-perm).
-// This phase asserts that even the preserve path doesn't accidentally produce
-// an E-GT.
-console.log('\n--- PHASE 3: CALL→RETURN with mask bit 6 SET (CR6 preserved) ---');
+// Bit 6 never retains callee authority; reconstructed caller CR6 has L, not E.
+console.log('\n--- PHASE 3: CALL→RETURN with mask bit 6 SET (caller CR6) ---');
 {
     const CALLEE_BASE  = 0x0600;
     const CALLEE_SLOT  = 15;
@@ -353,7 +347,7 @@ console.log('\n--- PHASE 3: CALL→RETURN with mask bit 6 SET (CR6 preserved) --
 
         faults.length = 0;
 
-        // RETURN with mask bit 6 = 1 → preserve callee's CR6.
+        // Bit 6 cannot prevent caller CR6 reconstruction.
         const MASK_BIT6 = 1 << 6;
         const returnResult = sim._execReturn({ imm: MASK_BIT6, crDst: 0, crSrc: 0, raw: 0 });
 
@@ -364,9 +358,9 @@ console.log('\n--- PHASE 3: CALL→RETURN with mask bit 6 SET (CR6 preserved) --
         const cr6w0 = sim.cr[6].word0 >>> 0;
         const perm  = cr6w0 & PERM_MASK;
 
-        assert('P3-PRESERVED: CR6 is the callee\'s GT (mask bit 6 kept it)',
-            cr6w0 === calleeCR6GT,
-            `got 0x${cr6w0.toString(16).toUpperCase()}, expected 0x${calleeCR6GT.toString(16).toUpperCase()}`);
+        assert('P3-RESTORED: CR6 is the caller\'s GT regardless of bit 6',
+            cr6w0 === sim.createGT(0, 4, {L:1}, 1),
+            `got 0x${cr6w0.toString(16).toUpperCase()}`);
 
         assert('P3-L: preserved CR6 has L-perm (not E)',
             perm === L_PERM,

@@ -123,9 +123,10 @@ console.log('\n--- Thread base zero: frame and capability persistence ---');
         sim.memory[240] === sim.callStack[0]?.savedCRs[6].word0);
 
     const returned = sim._execReturn({ imm: 0 });
-    check('TBZ-11: RETURN restores capability homes at Thread base zero',
+    check('TBZ-11: RETURN zero mask clears capability homes at Thread base zero',
         returned !== null && !sim.halted &&
-        sim.memory[THREAD_CAPS_OFFSET] === calleeGT, sim.faultLog.at(-1)?.message);
+        sim.memory[THREAD_CAPS_OFFSET] === 0 &&
+        sim.cr[0].word0 === 0, sim.faultLog.at(-1)?.message);
 }
 
 console.log('\n--- Thread base zero: deferred LAMBDA frame ---');

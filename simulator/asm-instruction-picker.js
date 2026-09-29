@@ -772,8 +772,12 @@
         if (!textarea || textarea._asmPickerAttached) return;
         textarea._asmPickerAttached = true;
 
-        textarea.addEventListener('click', function () {
-            if (textarea.readOnly || textarea.selectionStart !== textarea.selectionEnd) return;
+        // Pointer activation is deliberately double-click only. A single click
+        // must remain available for ordinary caret placement and selection.
+        // Do not require a collapsed selection here: browsers select the word
+        // under the pointer before dispatching dblclick.
+        textarea.addEventListener('dblclick', function () {
+            if (textarea.readOnly) return;
             if (caretIsInSemicolonComment(textarea)) {
                 hidePicker();
                 if (window.CListViewer && window.CListViewer.hide) {

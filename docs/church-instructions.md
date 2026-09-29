@@ -108,7 +108,7 @@ All Church instructions that access the namespace route through the **mLoad mast
 | **Method index n > 0** | NIA = memory[lump_base + n×4]; zero entry → PRIVATE_METHOD FAULT |
 | **PC = 0** | Always FAULTs — lump header (word 0) is never a valid entry point |
 | **New Context** | CR6 = callee c-list (E-only), CR14 = callee code (RX, privileged) |
-| **Unchanged** | DR0–DR15, CR0–CR5, CR7–CR13, CR15 — callee inherits all from caller |
+| **Unchanged** | DR0–DR15 values and CR0–CR5/CR7–CR13/CR15 descriptor words — callee inherits from caller; all M bits reset, then CR6 is rearmed |
 
 ---
 
@@ -126,24 +126,24 @@ All Church instructions that access the namespace route through the **mLoad mast
 3. mLoad the caller's E-GT: version check + MAC + G-bit reset → FAULT on failure
 4. Re-run NS split on caller's NS entry → re-derive CR6 (caller c-list) and CR14 (caller code)
 5. Restore PC from NIA (Word 1); restore machine indicators from Word 1
-6. Apply mask[11:0]: all CRs with mask bit set written to NULL in one parallel clock edge
+6. Apply mask[11:0] to CR0–CR4 and CR7–CR11: set bits keep current descriptor words; zero bits zero them directly without capability resolution. Never restore pre-call snapshots. Bits 5/6 are ignored.
 
-**Mnemonic**: `RETURN [mask]` — mask is a 12-bit literal in instruction bits [11:0]; mask=0 is the no-op default (`RETURN` with no argument)
+**Mnemonic**: `RETURN [mask]` — mask is a 12-bit keep literal in instruction bits [11:0]; mask=0 is the clearing default (`RETURN` with no argument).
 
 | Aspect | Detail |
 |--------|--------|
 | **Permission Check** | None |
 | **E-GT Revalidation** | mLoad on caller's E-GT: version, MAC, G-bit reset (FAULT on failure) |
 | **CR6 / CR14 Restore** | Re-derived from caller's NS entry via NS split — not stored directly in frame |
-| **CR5** | Thread register — installed by CHANGE from Zone ④ bounds; not touched by CALL/RETURN |
+| **CR5** | Thread register — installed by CHANGE from Zone ④ bounds; descriptor words unchanged by CALL/RETURN; M still resets |
 | **PC Restore** | NIA from Word 1 |
 | **Machine Indicators** | Restored from Word 1 (LAMBDA-active, flags, stackSpace, etc.) |
-| **Mask** | bits [11:0] — **not implemented in current hardware**; all bits ignored. Bit 6 reserved (must be 0 — CR6 always re-derived from E-GT). Assembler warns if any bit is set. Use bare `RETURN` (mask=0). |
-| **Unchanged** | DR0–DR15 and non-masked CRs retain callee values |
+| **Mask** | bits [11:0] — 1 prevents clearing, 0 zeros CR0–CR4/CR7–CR11; bits 5/6 ignored. CR6 always reconstructed from saved caller context. |
+| **Unchanged** | DR0–DR15, CR5/CR12/CR13/CR15 descriptor words, and set-bit controlled CR descriptors retain current values |
 | **Stack Underflow** | FAULT: no saved context |
 | **Stack Indicators** | stackFrames and stackSpace updated |
 
-**Mask field status**: The mask field is reserved for future implementation. It is not enforced by current hardware — encoding a non-zero mask produces an assembler warning but the clearing does not occur. Always use bare `RETURN` (mask=0) in current programs.
+**Boundary state and compatibility**: All M bits reset on CALL/RETURN, then CR6 is rearmed; keeping a descriptor does not preserve M. No CLEAR bit or saved-register/frame extension exists. The encoding is unchanged but old mask-ignored binaries/bitstreams are not behaviorally compatible by default. Hardware lambda-fast RETURN revalidates accepted CR14 Inform/X identity and code location through cLoad before mask clearing and reconstructs CR6, but retains legacy `lambda_pc` rather than canonical SZ=0 frame state. Only the synthetic boot-ROM guard (`savedPC=3`, no active lambda) still bypasses cLoad, lacking canonical namespace/c-list identity and guaranteed CR6 reconstruction. This is an unresolved implementation limit, not a user-approved exemption; see `HARDWARE-DEVIATIONS.md`.
 
 ---
 

@@ -341,6 +341,18 @@
     function resolveCapabilities(caps, context) {
         return (Array.isArray(caps) ? caps : []).map((cap, index) => {
             const resolved = resolveCapability(cap, context);
+            const identityKeys = ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token'];
+            const hasFullIdentity = identityKeys.some(key => cap && typeof cap[key] === 'string' &&
+                (key !== 'token' || !Number.isInteger(cap.nsIndex) ||
+                 cap[key].replace(/^0x/i, '').length > 8));
+            for (const key of identityKeys) {
+                if (cap && typeof cap[key] === 'string') resolved[key] = cap[key];
+            }
+            if (hasFullIdentity && !resolved.symbolic_self && !resolved.error) {
+                // A name-only local match cannot prove an explicit content identity.
+                resolved.nsIndex = -1;
+                resolved.pending = true;
+            }
             if (resolved.symbolic_self === true && index !== 0) {
                 return {
                     ...resolved,
@@ -393,9 +405,9 @@
                 : { ok: false, error: `C-list NULL row contains nonzero word 0x${word.toString(16).padStart(8, '0')}.`, parsed };
         }
         if (cap.error) return { ok: false, error: cap.error, parsed: null };
-        // Pending pet-name sentinels are useful while compiling, but they are
-        // never valid in a saved or runnable c-list.  materialize() opts into
-        // the intermediate exception explicitly below.
+        // A named pending declaration carries no GT authority. Save formatting
+        // may preserve it alongside its embedded API name/rights; an ISA
+        // operation resolves it through Navana when the row is actually used.
         if ((word >>> 16) === 0xFEED && cap.pending === true &&
                 context && context.allowPendingPlaceholders === true) {
             return { ok: true, error: null, parsed: null, pending: true };
@@ -458,7 +470,8 @@
             // candidate preparation. It is intentionally narrow: exact compiler
             // provenance and exact c-list row zero. Server compiler artifacts
             // serialize that row as zero; older browser artifacts use the SELF
-            // marker. Final validation omits allowCompilerSelfPlaceholder.
+            // marker. Save validation enables this only with an embedded SELF
+            // declaration; installation mints the destination-local SELF.
             const allowSelfPlaceholder =
                 context.allowCompilerSelfPlaceholder === true &&
                 i === 0 &&
@@ -467,18 +480,31 @@
             const declaredPending = pendingRows.find(row =>
                 row && row.pending_symbolic === true &&
                 Number(row.relocation_row) === i);
+            const embedded = context.embeddedApi &&
+                Array.isArray(context.embeddedApi.capabilities) &&
+                context.embeddedApi.capabilities.length === resolvedCaps.length
+                ? context.embeddedApi.capabilities[i] : null;
             const capName = String(resolvedCaps[i] && resolvedCaps[i].name || '');
-            const capRights = normalizeRights(
-                resolvedCaps[i] && (resolvedCaps[i].rights || resolvedCaps[i].grants));
-            const declaredRights = normalizeRights(
-                declaredPending && declaredPending.rights);
+            const capRights = normalizeRights(resolvedCaps[i]);
+            const declaredRights = normalizeRights(declaredPending);
             const allowAuthenticatedPending =
                 word === 0 &&
                 i > 0 &&
+                !resolvedCaps[i].error &&
                 declaredPending &&
                 String(declaredPending.name || '').toUpperCase() === capName.toUpperCase() &&
                 declaredRights.join('') === capRights.join('');
-            const check = (allowSelfPlaceholder || allowAuthenticatedPending)
+            const allowEmbeddedSymbol =
+                i > 0 && !resolvedCaps[i].error && embedded && typeof embedded.name === 'string' &&
+                /^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})$/.test(embedded.name) &&
+                embedded.name === capName &&
+                ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                    .every(key => embedded[key] === resolvedCaps[i][key]) &&
+                normalizeRights(embedded).join('') === capRights.join('') &&
+                capRights.length > 0 &&
+                (word === 0 || ((word >>> 16) === 0xFEED &&
+                    word !== 0xFEED5E1F && word !== 0xFEEDDA7A));
+            const check = (allowSelfPlaceholder || allowAuthenticatedPending || allowEmbeddedSymbol)
                 ? {
                     ok: true, error: null, parsed: null,
                     ...(allowSelfPlaceholder ? { compiler_owned_self: true } :

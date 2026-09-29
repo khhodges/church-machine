@@ -785,6 +785,63 @@
       "compiled_at": 1790156872.8307664,
       "bootstrap_t": "4a000007",
       "bootstrap_runtime_gt": 1241513991
+    },
+    "094fd4de8634a5d6255b4d066f6a7378b8c4255110fc4fc0a3b5eb5043ce0ec7": {
+      "abstraction": "CapabilityTest",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "094fd4de8634a5d6255b4d066f6a7378b8c4255110fc4fc0a3b5eb5043ce0ec7",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.39f77d6e.lump",
+      "compiled_at": 1790248382.438412,
+      "bootstrap_t": "4a00000a",
+      "bootstrap_runtime_gt": 1241513994
+    },
+    "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5": {
+      "abstraction": "Tunnel",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5",
+      "dot_name": "Tunnel",
+      "issue_n": 1,
+      "filename": "Tunnel.1.9381d362.lump",
+      "compiled_at": 1790279943.7405238,
+      "identity_hash": "8162f1943f1bd0e346a6789646e63b914745e79e8e8e8e106a5733453c933b5b"
+    },
+    "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb": {
+      "abstraction": "Ethernet",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb",
+      "dot_name": "Ethernet",
+      "issue_n": 1,
+      "filename": "Ethernet.1.fc72b0e3.lump",
+      "compiled_at": 1790283251.1792533,
+      "identity_hash": "594f8b6d430099c641ba53036dc39d768437d24b2f5d99d12a4ac5acef7de364"
+    },
+    "c36f5d774a07b4d37230b68164484e41989f1c7a8ebba3fc16cb815b7e59b16f": {
+      "abstraction": "ide.Alice",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "c36f5d774a07b4d37230b68164484e41989f1c7a8ebba3fc16cb815b7e59b16f",
+      "dot_name": "ide.Alice",
+      "issue_n": 1,
+      "filename": "ide.Alice.1.1e49ecb5.lump",
+      "compiled_at": 1790506439.9806974,
+      "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843"
     }
   }
 }

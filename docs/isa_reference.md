@@ -79,7 +79,8 @@ which is verified inline and discarded.
 
 | Range    | Name                 | Notes                                          |
 |----------|----------------------|------------------------------------------------|
-| CR0–CR5  | User CRs             | General-purpose; caller context preserved by CALL |
+| CR0–CR4  | User CRs             | General-purpose; descriptor words unchanged by CALL |
+| CR5      | Thread settings      | Descriptor words unchanged by CALL/RETURN; M resets at boundaries |
 | CR6      | C-list root          | L-permission token for current abstraction's c-list; re-synthesised by CALL/RETURN |
 | CR7–CR11 | User CRs             | General-purpose; caller context preserved by CALL |
 | CR12     | Thread stack         | Isolated; system-wide; SWITCH requires its latched M bit |
@@ -611,6 +612,27 @@ Flag-writing summary across all 20 instructions:
 
 ### LOAD — Load Capability (opcode 0, 0x00)
 
+**Lazy Resolve and Lazy Load are distinct operations.** A symbolic capability
+declaration may name a dot-name or a full LUMP identity/token without an existing
+target body or local Namespace slot. Saving that declaration preserves its exact
+row, requested rights and full identity in the embedded API; saving does not
+resolve or allocate its dependency.
+
+When an operation needs the capability, **Lazy Resolve** reuses its existing
+named/identity binding or obtains the empty slot at the **head of the Namespace
+free list**, through Navana's registration path. The current slot generation is
+used, and the declaration's requested rights are retained. The target body need
+not exist yet. Exhaustion is a resolution failure, not a source-save failure.
+An identity wider than the GT slot field is retained losslessly and mapped to a
+local slot; neither truncation nor a short cache-token alias proves a full target
+identity.
+
+**Lazy Load** requires an actual matching target LUMP and defers loading its body.
+A missing target fails at the attempted load/access; an unrelated instruction
+does not fail merely because another declared dependency remains unresolved.
+Later installation retains the reserved local identity and must still pass the
+existing target-integrity and admission checks.
+
 ```
 Syntax:  LOAD CRd, CRs, #row
          LOAD CRd, Name          (two-operand shorthand: CRs = CR6, row = NS slot — see A.16)
@@ -700,7 +722,7 @@ Encoding: op[4:0]=0x02 | cond[4] | CRs[4] | 0[4] | method[15]
 4. CR6 ← callee c-list GT (L-only, synthesised by CALL FSM from callee lump header). CR14 ← callee code GT (X-only, privileged).
 5. PC ← NIA (lump_base + method entry, or lump_base + 4 for fast path).
 
-Callee inherits DR0–DR15, CR0–CR5, CR7–CR11 from the caller. CR12 and CR13 are system-wide (unchanged). CR15 is per-thread (unchanged by CALL itself — restored by RETURN).
+Callee inherits DR0–DR15, CR0–CR5, CR7–CR11 from the caller. CR12 and CR13 are system-wide. CR15 is per-thread; its descriptor words are unchanged by CALL/RETURN, not restored from a snapshot. CALL/RETURN reset all M bits, then rearm CR6.
 
 **Flags:** N — Z — C — V (no flag writes)
 
@@ -728,13 +750,16 @@ CALL AL, CR1             ; imm=0 → NIA = lump_base + 4
 
 ```
 Syntax:  RETURN [#mask]
-Encoding: op[4:0]=0x03 | cond[4] | 0[4] | 0[4] | mask[12] | 0[3]
+Encoding: opcode[5]=00011 | cond[4] | 0[11] | mask[12]
 ```
 
-`mask` is a reserved 12-bit field in `imm15[11:0]`. It is not implemented by
-current hardware or the simulator; nonzero values are ignored and the
-assembler warns. Bit 6 is reserved because CR6 is always reconstructed from
-the saved Enter GT. Use bare `RETURN` (`mask = 0`).
+`mask` is a 12-bit keep mask in instruction bits [11:0]. For CR0–CR4 and
+CR7–CR11, bit N=1 prevents clearing: keep the current descriptor, including
+any callee changes. Bit N=0 zeros that descriptor directly, without capability
+resolution. It never restores a pre-call snapshot. Bits 5 and 6 are ignored:
+CR5's descriptor words are unchanged by CALL/RETURN; CR6 is reconstructed
+from the saved caller Enter GT regardless of the mask. Bare `RETURN` uses
+mask=0 and clears all ten controlled CRs. There is no separate CLEAR bit.
 
 **Semantics** (see A.12, A.13):
 1. M-window writeback fires; faults `INVALID_OP` if writeback fails.
@@ -744,11 +769,33 @@ the saved Enter GT. Use bare `RETURN` (`mask = 0`).
 5. Caller's FLAGS and STO are restored from the packed frame word.
 6. PC ← returnPC.
    - **SZ = 0 (LAMBDA frame):** PC is restored from `lambdaReturnPC` cache without a memory read (O(1) fast path). `lambdaActive` is cleared.
+7. Apply the keep mask to CR0–CR4 and CR7–CR11. M-bit reset is independent
+   of descriptor preservation: all M bits reset, including CR5.M and kept
+   registers' M bits, then CR6.M is rearmed.
 
 No CR0–CR5, CR7–CR13, CR15, or DR snapshot exists in the architectural
-two-word frame. Those registers retain the values left by the callee. A
+two-word frame. Only set-bit controlled CRs retain the descriptor values left
+by the callee; clear-bit controlled CRs become zero. CR5, CR12, CR13, CR15
+descriptor words and DRs are not cleared by the mask. A
 simulator inspection snapshot is not architectural state and cannot affect
 RETURN.
+
+The canonical frame and Thread private ABI are unchanged; no snapshots are
+added. Hardware lambda-fast RETURN now derives identity from accepted CR14
+Inform/X, revalidates cLoad and code location, and reconstructs CR6; invalid
+identity/location faults before mask clearing. Its legacy `lambda_pc`
+return-address state still differs from the canonical SZ=0 frame path.
+There is no special boot-ROM RETURN bypass for `savedPC=3`. Every successful
+standard or LAMBDA RETURN validates caller context through cLoad and
+reconstructs CR6 before committing the keep-mask clearing. A forged or invalid
+caller companion faults without clearing the controlled descriptors.
+The three-instruction boot establishes the poison-root return PC `0x7FFF`;
+returning through that root faults `STACK_UNDERFLOW`, rather than returning
+to ROM or reconstructing an invented caller capability.
+Existing immutable binaries/bitstreams built for mask-ignored RETURN retain
+their historical behavior; unchanged encoding does not imply behavioral
+compatibility. In particular, old bare RETURN code may require explicit
+keep masks when rebuilt. Do not relabel old artifacts as implementing this revision.
 
 **Flags:** N — Z — C — V (no flag writes; caller's flags are restored from the saved snapshot)
 
@@ -760,7 +807,7 @@ RETURN.
 
 **Example:**
 ```
-RETURN AL                 ; mask=0; other CRs and DRs retain callee values
+RETURN AL                 ; mask=0; zero CR0–CR4 and CR7–CR11, retain DRs
                           ; encoding: 0x1F000000
 ```
 
@@ -1468,7 +1515,7 @@ SHR AL, DR1, DR2, #3, ASR   ; ASR, mode=1; imm = (1 << 5) | 3 = 0x23
 | 0   | 0x00 | LOAD        | Church  | CRd    | CRs    | c-list row (0–32767)                   | —             | NULL, PERM, BOUNDS, SEAL | —        |
 | 1   | 0x01 | SAVE        | Church  | CRd(S) | CRs(B) | c-list row (0–32767)                   | —             | NULL, PERM, BOUNDS, SEAL | —        |
 | 2   | 0x02 | CALL        | Church  | CRs    | 0      | method index (0=fast, N+1=user N)      | —             | NULL, PERM, SEAL, PRIVATE_METHOD, STACK_OVERFLOW | — |
-| 3   | 0x03 | RETURN      | Church  | 0      | 0      | mask[11:0] — CRs to NULL on return     | —             | STACK_UNDERFLOW       | —           |
+| 3   | 0x03 | RETURN      | Church  | 0      | 0      | mask[11:0] — 1 keeps current CR, 0 zeros; bits 5/6 ignored | — | STACK_UNDERFLOW | — |
 | 4   | 0x04 | CHANGE      | Church  | CRd    | CRs    | NS index (0–32767)                     | —             | PRIV_REG, PERM, NULL  | —           |
 | 5   | 0x05 | SWITCH      | Church  | CR12–15 | CRs  | c-list row[14:0]                        | —             | PRIV_REG, INVALID_OP, LOAD faults | — |
 | 6   | 0x06 | TPERM       | Church  | CRd    | 0      | preset[4:0] (bit4=B-mod, [3:0]=code)   | N=!Z Z C=0 V=0 | TPERM_RSV            | D-3 (reserved presets) |
@@ -1530,7 +1577,7 @@ These questions are now resolved. Recorded here to prevent the decisions from be
 | ID | Instruction | Decision |
 |----|-------------|----------|
 | E-1 | IADD / ISUB | Immediate is unsigned 0–16383. `#-1` cannot be encoded directly; use `ISUB DRd, DR0, #1`. **Closed.** |
-| E-2 | RETURN mask | The entire 12-bit mask field is not implemented in current hardware — all bits ignored. Bit 6 is reserved and must be zero (CR6 always re-derived unconditionally by cload). Assembler warns on any non-zero mask (Task #888). Use bare `RETURN`. **Closed — D-2 updated.** |
+| E-2 | RETURN mask | Explicit keep-current semantics: bits 0–4/7–11 prevent clearing when set; zero bits directly zero descriptors. Bits 5/6 ignored; CR5 descriptor unchanged, CR6 reconstructed. No saved snapshot, frame extension, or boot-ROM cLoad bypass. |
 | E-3 | DREAD CR14 | X-in-place-of-R is CR14-specific only. No broader X→R substitution applies. **Closed.** |
 | E-4 | CHANGE operand restriction | Assembler convention only, not an ISA rule. Hardware `change.py` accepts any CR12–CR15 destination. The assembler restriction is a toolchain safety guard. **Closed.** |
 

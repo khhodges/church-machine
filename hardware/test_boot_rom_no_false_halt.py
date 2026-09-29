@@ -199,13 +199,15 @@ class BootRomHarness(Elaboratable):
     assert it never fires during the 3-instruction boot.
     """
 
-    def __init__(self, dmem_init):
+    def __init__(self, dmem_init, write_overrides=None):
         # Public ChurchCore instance — testbench reads retire signals from here.
         self.core = ChurchCore()
 
         self.boot_complete      = Signal()
         self.fault_halt         = Signal()  # combinatorial: retire_valid & retire_fault_valid
         self._dmem_init         = dmem_init
+        # Fault injection for stack-validation simulations, not production IO.
+        self._write_overrides = write_overrides or {}
 
     def elaborate(self, platform):
         m = Module()
@@ -276,6 +278,9 @@ class BootRomHarness(Elaboratable):
             dmem_wr.data.eq(cpu_wr_data),
             dmem_wr.en.eq(cpu_wr_en),
         ]
+        for byte_addr, value in self._write_overrides.items():
+            with m.If(core.dmem_wr_en & (core.dmem_addr == byte_addr)):
+                m.d.comb += dmem_wr.data.eq(value)
 
         # ── CM control: free-run (no step_mode, no TraceUnit stall) ──────────
         # Fetch-settle bubble: the DMEM/IMEM BRAM is sync-read, so the cycle
@@ -1130,6 +1135,7 @@ def test_nested_call_return_without_boot_special_case():
                     "nia": ctx.get(dut.core.retire_nia),
                     "instr": ctx.get(dut.core.retire_instr),
                     "fault": bool(ctx.get(dut.core.retire_fault_valid)),
+                    "fault_code": ctx.get(dut.core.fault),
                 })
                 if len(results["retires"]) == 12:
                     break
@@ -1232,6 +1238,73 @@ def test_nested_call_return_without_boot_special_case():
 
 
 # ── Test 5: repeated 'f' reboots stay clean (FAULT_RST wipes unit state) ──────
+
+@pytest.mark.parametrize("invalid_companion", [False, True])
+def test_saved_pc_three_never_bypasses_core_cload(invalid_companion):
+    """An injected legacy marker cannot commit via the obsolete ROM path."""
+    dmem, fixture = _build_nested_call_dmem()
+    base = WUKONG_THREAD_BASE_WORD * 4
+    overrides = {base + 239 * 4: (3 << 13) | (1 << 12) | 239}
+    if invalid_companion:
+        overrides[base + 238 * 4] = 0
+    dut = BootRomHarness(dmem, write_overrides=overrides)
+
+    async def bench(ctx):
+        assert await _wait_boot_complete(ctx, dut)
+        cload_seen = False
+        commit_seen = False
+        for _ in range(1600):
+            if ctx.get(dut.core.retire_trace_return_cr14_valid):
+                cload_seen = True
+                assert not invalid_companion
+            if ctx.get(dut.core.dbg_return_m_commit):
+                assert cload_seen, "mask committed without validated caller cLoad"
+                commit_seen = True
+            if ctx.get(dut.core.fault_valid):
+                if invalid_companion:
+                    assert ctx.get(dut.core.fault) == FaultType.STACK_CORRUPT
+                    assert not cload_seen and not commit_seen
+                else:
+                    # The companion is valid, but PC=0x0C is outside its code.
+                    # Rebuilding the code fence must reject it, not run ROM.
+                    assert ctx.get(dut.core.fault) == FaultType.BOUNDS
+                    assert cload_seen and commit_seen
+                return
+            await ctx.tick()
+        pytest.fail("malformed savedPC=3 did not fault")
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+
+
+def test_three_instruction_boot_root_return_is_underflow():
+    dmem = list(_DMEM_INIT)
+    dmem[WUKONG_SELFTEST_BASE_WORD + 1] = encode_church(
+        ChurchOpcode.RETURN, CondCode.AL, imm=0xFFF)
+    dut = BootRomHarness(dmem)
+
+    async def bench(ctx):
+        assert await _wait_boot_complete(ctx, dut)
+        boot_retires = []
+        for _ in range(1000):
+            assert not ctx.get(dut.core.dbg_return_m_commit)
+            assert not ctx.get(dut.core.retire_trace_return_cr14_valid)
+            if ctx.get(dut.core.retire_valid) and ctx.get(dut.core.retire_nia) < 12:
+                boot_retires.append(ctx.get(dut.core.retire_nia))
+            if ctx.get(dut.core.fault_valid):
+                assert ctx.get(dut.core.fault) == FaultType.STACK_UNDERFLOW
+                assert boot_retires == [0, 4, 8]
+                return
+            await ctx.tick()
+        pytest.fail("root RETURN did not reject the poison return PC")
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(bench)
+    sim.run()
+
 
 def test_repeated_reboots_stay_clean():
     """Pulse reboot_req mid-run twice; each pass must re-boot cleanly into SelfTest."""

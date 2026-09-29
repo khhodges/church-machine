@@ -47,7 +47,51 @@ assert.strictEqual(second.rawWord, 0x18000000);
 
 const sourceLess = sandbox.resolve({ kind: 'RETURN', nia: 2 }, {});
 assert.strictEqual(sourceLess.physicalAddress, 2);
-assert.strictEqual(sourceLess.rawWord, 0x10000000);
-assert.strictEqual(sourceLess.lump, 'Nested.Abs');
+assert.strictEqual(sourceLess.rawWord, null);
+assert.strictEqual(sourceLess.lump, null);
+assert.strictEqual(sourceLess.method, null);
+assert.strictEqual(sourceLess.callDepth, null);
+assert.strictEqual(sourceLess.offset, null);
+assert.strictEqual(sourceLess.operands, null);
+
+// Recorded fields, including zero values, win over all unrelated live state.
+const recorded = {
+    kind: 'RETURN', physicalPC: 41, instrWord: 0x18000000,
+    lump: 'Recorded.Abs', method: 'exit', offset: 0, callDepth: 0,
+    cr14: 0, cr12: 0
+};
+const historical = sandbox.resolve(recorded, recorded);
+assert.strictEqual(historical.physicalAddress, 41);
+assert.strictEqual(historical.rawWord, 0x18000000);
+assert.strictEqual(historical.lump, 'Recorded.Abs');
+assert.strictEqual(historical.method, 'exit');
+assert.strictEqual(historical.offset, 0);
+assert.strictEqual(historical.callDepth, 0);
+assert.strictEqual(historical.cr14, 0);
+assert.strictEqual(historical.cr12, 0);
+sandbox.sim = new Proxy({}, { get() { throw new Error('live simulator read'); } });
+sandbox._nsOwnerOf = () => { throw new Error('live ownership read'); };
+assert.strictEqual(sandbox.resolve(recorded, recorded).physicalAddress, 41);
+assert.strictEqual(sandbox.resolve({ kind: 'RETURN', nia: 2 }).rawWord, null);
+
+// A hardware push carries no CR GT. Poll-level latest CRs and a later
+// simulator snapshot are not operands of the historical retirement.
+const hwPush = sandbox.resolve({
+    kind: 'CALL', ev_type: 8, nia: 3, instr: null,
+    cr14_gt: 0xDEADBEEF, cr12_gt: 0xCAFEBABE,
+    call_depth: 2, disasm: 'CALL CR6, #0',
+}, {cr14: 0x1234, instrWord: 0x18000000});
+assert.strictEqual(hwPush.rawWord, null);
+assert.strictEqual(hwPush.cr14, null);
+assert.strictEqual(hwPush.cr12, null);
+assert.strictEqual(hwPush.callDepth, 2);
+assert.strictEqual(hwPush.operands, 'CALL CR6, #0'); // symbolic decode only
+const hwCr14 = sandbox.resolve({
+    kind: 'RETURN', ev_type: 11, nia: 3,
+    payload_gt: 0, cr14_gt: 0xDEADBEEF, instr: 0x18000000
+});
+assert.strictEqual(hwCr14.rawWord, 0x18000000);
+assert.strictEqual(hwCr14.cr14, 0);
+assert.strictEqual(hwCr14.cr12, null);
 
 console.log('CALL/RETURN drill-down resolver tests passed');

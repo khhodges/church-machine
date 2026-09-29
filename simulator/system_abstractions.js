@@ -1339,10 +1339,15 @@ class SystemAbstractions {
 
         this.registry.bindMethod(5, 'ADD', function(sim, args) {
             const location = args.location;
-            const limit = args.limit || 0xFF;
+            const limit = args.symbolic === true ? 0 : (args.limit || 0xFF);
             const clistCount = args.clistCount || 0;
             const gtType = args.gtType || 1;
             const label = args.label || 'unnamed';
+            if (args.symbolic === true &&
+                (location !== 0 || gtType !== 1 ||
+                 !/^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})$/.test(label))) {
+                return { ok: false, error: 'Navana.Add: invalid symbolic declaration' };
+            }
             const proposedEnd = (location >>> 0) + (limit >>> 0);
             const overlapsPrivateCustody = (sim._bankPrivateRanges || []).some(range =>
                 (location >>> 0) <= range.end && proposedEnd >= range.start);
@@ -1354,7 +1359,17 @@ class SystemAbstractions {
                 };
             }
 
-            const freeSlot = sim.allocOrFindNsSlot(null, label);
+            const identity = {};
+            for (const key of ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']) {
+                if (args.targetIdentity && args.targetIdentity[key] != null) {
+                    if (typeof args.targetIdentity[key] !== 'string' || !args.targetIdentity[key].length) {
+                        return { ok: false, error: `Navana.Add: invalid full identity ${key}` };
+                    }
+                    identity[key] = args.targetIdentity[key];
+                }
+            }
+            const identityKey = Object.keys(identity).length ? JSON.stringify(identity) : null;
+            const freeSlot = sim.allocOrFindNsSlot(null, label, identityKey);
             if (freeSlot === null) {
                 return { ok: false, fault: 'NS_FULL', message: 'Navana.Add: no free NS slots' };
             }
@@ -1376,6 +1391,18 @@ class SystemAbstractions {
                 );
             });
             sim.nsLabels[freeSlot] = label;
+            if (args.symbolic === true) {
+                if (!sim._nsSymbolicEntries) sim._nsSymbolicEntries = {};
+                sim._nsSymbolicEntries[freeSlot] = {
+                    name: label, slot: freeSlot, seq: newVersion,
+                    type: 'Inform', symbolic: true, implementationMissing: true,
+                    targetIdentity: identityKey ? identity : null,
+                };
+                if (identityKey) {
+                    if (!sim._nsIdentitySlots) sim._nsIdentitySlots = new Map();
+                    sim._nsIdentitySlots.set(identityKey, freeSlot);
+                }
+            }
 
             navanaState.managedAbstractions.push({ index: freeSlot, name: label, layer: -1 });
 

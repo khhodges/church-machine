@@ -29,6 +29,43 @@
     ]
   },
   "isa": {
+    "returnMask": {
+      "semanticRevision": "keep-current-cr-v1",
+      "fieldBits": [
+        0,
+        11
+      ],
+      "controlledRegisters": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "setBit": "keep current descriptor; never restore a pre-call snapshot",
+      "clearBit": "zero descriptor directly without capability resolution",
+      "ignoredBits": [
+        5,
+        6
+      ],
+      "cr5": "descriptor words unchanged by CALL and RETURN",
+      "cr6": "reconstruct caller c-list from saved Enter GT regardless of mask",
+      "mBits": "reset all on CALL and RETURN, then rearm CR6",
+      "defaultMask": 0,
+      "clearInstructionBit": false,
+      "extendsStackFrame": false,
+      "compatibility": "instruction and frame layouts unchanged; old mask-ignored binaries are not behaviorally compatible by default",
+      "hardwareLambdaReturn": "derive identity from accepted CR14 Inform/X descriptor; revalidate cLoad and code location before mask clear; reconstruct CR6",
+      "hardwareBootReturn": "savedPC=3 grants no ROM authority or cLoad bypass; validate companion and caller bounds; poison-root 0x7FFF faults STACK_UNDERFLOW",
+      "hardwareDeviations": [
+        "legacy lambda_pc return-address state differs from canonical SZ=0 frame"
+      ]
+    },
     "gtWord0": {
       "widthBits": 32,
       "fields": {

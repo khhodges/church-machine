@@ -439,7 +439,6 @@ class ChurchCore(Elaboratable):
 
         any_unit_busy = Signal()
         cross_domain_ret = Signal()
-        boot_rom_return = Signal()
         cload_pending   = Signal()
         # Keep decode suppressed for one full IDLE cycle after RETURN changes
         # NIA. The external synchronous instruction memories and their
@@ -447,7 +446,6 @@ class ChurchCore(Elaboratable):
         # when the return FSM drops busy, causing the same RETURN to execute a
         # second time and pop the next (empty) frame.
         return_fetch_settle = Signal()
-        m.d.comb += boot_rom_return.eq(u_return.boot_rom_return)
 
         # Early declarations for M-window FSM — CR15 M-flag latch + DR11-DR13 shadow
         mwin_busy              = Signal()
@@ -612,7 +610,11 @@ class ChurchCore(Elaboratable):
             u_perm.check_valid.eq(
                 cond_exec_enable & is_church_op & ~any_unit_busy &
                 ~boot_microcode_active &
-                (church_op != ChurchOpcode.CHANGE)
+                (church_op != ChurchOpcode.CHANGE) &
+                # RETURN has no CR source operand. Its frame companion (or
+                # LAMBDA code identity) supplies authority, not decoded CR0,
+                # which a preceding RETURN MASK 0 correctly clears.
+                (church_op != ChurchOpcode.RETURN)
             ),
             u_perm.check_domain_purity.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM)
@@ -891,6 +893,11 @@ class ChurchCore(Elaboratable):
             # At that exact write, clear all boundary M state and grant CR6.M.
             u_regs.m_return_commit_en.eq(
                 u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            # Normal RETURN may still fault in cLoad after the frame FSM
+            # completes. Reset descriptors only at its validated CR6 write.
+            u_regs.return_commit_en.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            u_regs.return_mask.eq(u_return.return_mask_latched),
             self.dbg_return_m_commit.eq(
                 u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
             # Expose M-flag and shadow DR reads
@@ -1046,17 +1053,12 @@ class ChurchCore(Elaboratable):
         #
         # Priority (highest first):
         #   1. Reboot / global reset: clear fence + cancel any pending transition.
-        #   2. Boot-ROM RETURN: no namespace-backed caller capability exists;
-        #      clear the SelfTest fence so the ROM guard at NIA 0x0C can retire.
-        #   3. Cross-domain RETURN: set fence_pending to stall fetch until cload restores
-        #      CR14.  The callee's fence is KEPT (not cleared) so that the BOUNDS check
+        #   3. RETURN: set fence_pending to stall fetch until cload restores
+        #      caller context. The callee's fence is KEPT so that the BOUNDS check
         #      cannot fire during the stall (any_unit_busy already blocks decode, but
         #      keeping the old fence avoids an inactive-fence window entirely).
-        #   4. Lambda-fast RETURN (~cross_domain_ret): no cload follows, fence goes
-        #      inactive immediately (caller's context had no fence at lambda entry).
-        #   5. cload writes CR14: fence_pending cleared, new fence established from the
-        #      restored caller code cap.  This is the exclusive path to re-activate the
-        #      fence after a cross-domain RETURN.
+        #   4. cload writes CR14 (or CR6 for in-scope LAMBDA): fence_pending
+        #      clears and the fence is established from the caller code cap.
         #   6. LAMBDA / ELOADCALL / XLOADLAMBDA: entering unknown code, fence suspended.
         #   7. CALL completing: establish callee fence from CALL unit outputs.
         with m.If(u_return.reboot_request | clear_all):
@@ -1067,29 +1069,12 @@ class ChurchCore(Elaboratable):
                 fence_pending_reg.eq(0),
             ]
         with m.Elif(
-            u_return.nia_set & (u_return.nia_value == 0x0C)
+            u_return.complete & cross_domain_ret
         ):
-            # The reset ROM is not represented by an NS E-GT, so it cannot be
-            # reconstructed by cLoad. Returning to its fixed guard address is
-            # the one cross-domain return that intentionally has no code fence.
-            # Clear on the SET_NIA pulse, not COMPLETE one cycle later: once
-            # NIA becomes 0x0C the old SelfTest fence would otherwise raise a
-            # combinatorial bounds fault during RETURN's COMPLETE cycle.
-            m.d.sync += [
-                code_lo_reg.eq(0),
-                code_hi_reg.eq(0),
-                fence_pending_reg.eq(0),
-            ]
-        with m.Elif(
-            u_return.complete & cross_domain_ret & ~boot_rom_return
-        ):
-            # Cross-domain RETURN: stall instruction execution until cload restores CR14.
+            # Stall instruction execution until cLoad validates caller context.
             # Old fence (callee's bounds) is intentionally kept; fetch is blocked by
             # fence_pending_reg contribution to any_unit_busy, so no false BOUNDS fault.
             m.d.sync += fence_pending_reg.eq(1)
-        with m.Elif(u_return.complete & ~cross_domain_ret):
-            # Lambda-fast RETURN: no cload follows — fence goes inactive.
-            m.d.sync += [code_lo_reg.eq(0), code_hi_reg.eq(0)]
         if not self.iot_profile:
             with m.Elif(u_change.cr_wr_en &
                         (u_change.cr_wr_addr == CR_CLOOMC)):
@@ -1107,10 +1092,13 @@ class ChurchCore(Elaboratable):
                         ((change_cr14_w2.limit_offset + 1) << 2)
                     ),
                 ]
-        with m.Elif(u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLOOMC)):
-            # cload (triggered by cross-domain RETURN) restores the caller's code cap
-            # into CR14.  Re-establish the fence and release the stall.
-            cr14_cload_view = View(CAP_REG_LAYOUT, u_cload.cr_wr_data)
+        with m.Elif(u_cload.cr_wr_en &
+                    ((u_cload.cr_wr_addr == CR_CLOOMC) |
+                     (u_return.cload_same_code & (u_cload.cr_wr_addr == CR_CLIST)))):
+            # Normal RETURN restores CR14; in-scope LAMBDA retains CR14
+            # verbatim and reaches this point at its validated CR6 commit.
+            cr14_cload_view = View(CAP_REG_LAYOUT, Mux(
+                u_return.cload_same_code, u_regs.cr14_code, u_cload.cr_wr_data))
             cr14_cload_w2   = View(WORD2_LAYOUT,   cr14_cload_view.word2_w2)
             m.d.sync += [
                 fence_pending_reg.eq(0),
@@ -1365,9 +1353,11 @@ class ChurchCore(Elaboratable):
         )
         m.d.comb += [
             u_return.return_start.eq(ret_start_sig),
+            u_return.return_mask.eq(u_decoder.return_mask),
             u_return.lambda_active.eq(lambda_active_reg),
             u_return.lambda_pc.eq(lambda_pc_reg),
             u_return.cr5_heap.eq(u_regs.cr5_heap),
+            u_return.cr14_code.eq(u_regs.cr14_code),
             u_return.cr12_thread.eq(u_regs.cr12_thread),
             u_return.thread_base.eq(self.active_thread_base),
             u_return.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
@@ -1376,7 +1366,9 @@ class ChurchCore(Elaboratable):
         ]
 
         with m.If(ret_start_sig):
-            m.d.sync += cross_domain_ret.eq(~lambda_active_reg)
+            # Even in-scope LAMBDA RETURN reconstructs CR6 from its accepted
+            # CR14 executable identity and validates it through cLoad.
+            m.d.sync += cross_domain_ret.eq(1)
 
         with m.If(u_return.nia_set):
             m.d.sync += return_fetch_settle.eq(1)
@@ -1385,7 +1377,7 @@ class ChurchCore(Elaboratable):
 
         with m.If(
             u_return.complete & ~u_return.fault_valid &
-            ~u_return.reboot_request & cross_domain_ret & ~boot_rom_return
+            ~u_return.reboot_request & cross_domain_ret
         ):
             m.d.sync += cload_pending.eq(1)
         with m.Elif(cload_pending):
@@ -1394,6 +1386,8 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             u_cload.cload_start.eq(cload_pending),
             u_cload.e_gt.eq(u_return.cload_e_gt),
+            u_cload.same_code.eq(u_return.cload_same_code),
+            u_cload.code_location.eq(u_return.cload_code_location),
             u_cload.cr15_namespace.eq(u_regs.cr15_namespace),
             u_cload.mem_rd_data.eq(self.dmem_rd_data),
             u_cload.mem_rd_valid.eq(self.dmem_rd_valid),

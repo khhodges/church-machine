@@ -2097,34 +2097,11 @@ function _storeLumpManifest(nsIdx, baseLoc, methods, manifest, capabilities) {
 }
 
 function _resolveClistPetName(clistBase, imm, nsIdx) {
-    const stored = _lumpManifests[nsIdx];
-    const caps = stored && stored._caps;
-    const declared = caps && imm >= 0 && imm < caps.length ? caps[imm] : null;
-    const declaredName = typeof declared === 'string'
-        ? declared
-        : (declared && declared.name ? declared.name : null);
-
-    if (clistBase > 0 && sim && (clistBase + imm) < sim.memory.length) {
-        const gtWord = sim.memory[clistBase + imm] >>> 0;
-        if (declaredName && typeof CapabilityTokens !== 'undefined') {
-            const resolved = CapabilityTokens.resolveCapability(declared, {
-                sim,
-                lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
-            });
-            const checked = CapabilityTokens.validateToken(gtWord, resolved, { sim });
-            if (checked.ok) return declaredName;
-            return `Invalid ${declaredName} GT`;
-        }
-        if (gtWord !== 0) {
-            const parsed = sim.parseGT(gtWord);
-            if (parsed.type === 1 && !parsed.malformed) {
-                return (sim.nsLabels && sim.nsLabels[parsed.index]) || `NS[${parsed.index}]`;
-            }
-            return 'Invalid c-list GT';
-        }
-    }
-    if (declaredName) return `Unresolved ${declaredName}`;
-    return null;
+    if (!Number.isInteger(clistBase) || clistBase <= 0 ||
+            !Number.isInteger(imm) || imm < 0 || !sim || !sim.memory ||
+            clistBase + imm >= sim.memory.length) return null;
+    const gt = sim.memory[clistBase + imm] >>> 0;
+    return gt ? `GT 0x${gt.toString(16).toUpperCase().padStart(8, '0')}` : null;
 }
 
 const _brColors = ['#e94560','#4ecdc4','#f7b731','#a55eea','#26de81','#fd9644','#45aaf2','#fc5c65'];
@@ -2268,8 +2245,8 @@ function _wrapCListHover(html, clistBase, cc) {
  * _wrapRegHover so that pet-name substitution of CR6 (e.g. "NS(CR6)") does
  * not push the bracket away from the CR6 token and break the pattern.
  *
- * CR6 == "My List" — slot names come from _resolveClistPetName which reads
- * the actual runtime c-list and sim.nsLabels, NOT abstractionRegistry.
+ * CR6 == "My List" — the tooltip reports the C-list word itself, never
+ * an identity inferred from mutable Namespace state.
  */
 function _annotateRawClistSlot(text, clistBase, nsIdx) {
     if (!text) return text;
@@ -2362,39 +2339,33 @@ function _applyMethodCRNames(text, methodObj) {
 }
 
 // Read annotations from the same loaded allocation as the displayed words.
-// Slot-keyed manifests and CR0's earlier pet name may describe another revision
-// or an earlier CALL; neither identifies an indexed CALL's C-list operand.
+// A GT is a capability word, not proof of an abstraction's name: resolving it
+// against mutable Namespace state would mislabel old allocations after rebinding.
 function _codeViewCallContext(base, header) {
     if (!header || !header.valid || !sim || !sim.memory ||
-            base < 0 || base + header.lumpSize > sim.memory.length) return null;
+            !Number.isInteger(base) || !Number.isInteger(header.lumpSize) ||
+            !Number.isInteger(header.cc) || header.cc < 0 ||
+            header.lumpSize < header.cc || base < 0 ||
+            base + header.lumpSize > sim.memory.length) return null;
     const words = sim.memory.slice(base, base + header.lumpSize);
-    const api = typeof lumpDecodeContentFrameApi === 'function'
-        ? lumpDecodeContentFrameApi(words) : null;
-    return {
-        words,
-        count: header.cc,
-        caps: api && Array.isArray(api.capabilities) ? api.capabilities : [],
-    };
+    return { words, count: header.cc };
 }
 
+// index is a decoded C-list row, not CALL's packed immediate.
 function _indexedCallTarget(context, index) {
-    if (!context || index >= context.count) return 'unresolved C-list target';
+    if (!context || !Number.isInteger(index) || index < 0 ||
+            !Number.isInteger(context.count) || !context.words ||
+            context.count > context.words.length || index >= context.count)
+        return 'unresolved C-list target';
     const gt = context.words[context.words.length - context.count + index] >>> 0;
     if (!gt) return 'unresolved C-list target';
-    const declared = context.caps[index];
-    const name = typeof declared === 'string' ? declared : declared && declared.name;
-    if (name && typeof CapabilityTokens !== 'undefined') {
-        const resolved = CapabilityTokens.resolveCapability(declared, {
-            sim,
-            lumps: typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache) ? _lumpsCache : [],
-        });
-        if (CapabilityTokens.validateToken(gt, resolved, { sim }).ok) return name;
-        return 'unresolved C-list target (metadata/GT mismatch)';
-    }
-    // Without verified metadata report the word, not a possibly stale pet name.
+    // Even a declared name in this artifact is not proof that this word
+    // currently resolves to that named abstraction.
     return `GT 0x${gt.toString(16).toUpperCase().padStart(8, '0')}`;
 }
 
+// Static meaning only. Never sample live operands (including neighbouring code)
+// to explain a listing as if it were a recorded execution occurrence.
 function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
     word = word >>> 0;
     if (word === 0) return null;
@@ -2414,159 +2385,72 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
     const cc = cond === 14 ? '' : _condNames[cond];
     const ccDesc = cond === 14 ? '' : ` [${_condDescs[cond]}]`;
 
-    const stored = _lumpManifests[nsIdx];
+    const dr = n => n === 0 ? 'DR0(0)' : _drTag(n);
+    const resultNote = crDst === 0 ? ' [DR0 write discarded]' : '';
+    const out = desc => ({desc: _escDecomp(desc + ccDesc), compiler: false, kind: 'static'});
 
-    if (opcode === 0 && crSrc === 6) {
-        const pet = _resolveClistPetName(clistBase, imm, nsIdx);
-        if (pet) {
-            // An instruction in a listing may never execute (condition, branch,
-            // fault, or a different loop iteration). Do not propagate its alias.
-            return { desc: _escDecomp(`load${cc} ${pet.toLowerCase()} \u2192 CR${crDst}${ccDesc}`), compiler: true, pet: pet };
-        }
-        return { desc: _escDecomp(`load${cc} clist[${imm}] \u2192 CR${crDst}${ccDesc}`), compiler: true };
+    // Data instructions have no capability-name dependency.
+    if (opcode === 16 || opcode === 17) {
+        const offset = (imm & 0x4000) ? `#${imm & 0x3FFF}`
+            : `#${(imm >>> 4) & 0x3FF} + ${dr(imm & 15)}`;
+        return out(opcode === 16
+            ? `read${cc} ${dr(crDst)} ← CR${crSrc}[${offset}] if authorized${resultNote}`
+            : `write${cc} ${dr(crDst)} → CR${crSrc}[${offset}] if authorized`);
+    }
+    if (opcode === 18 || opcode === 19) {
+        const pos = (imm >>> 5) & 31, width = imm & 31;
+        if (!width || pos + width > 32)
+            return out(`${opcode === 18 ? 'bfext' : 'bfins'}${cc} pos=${pos}, width=${width} [BOUNDS fault if executed]`);
+        return out(opcode === 18
+            ? `bfext${cc} ${dr(crDst)} ← zero-extend ${dr(crSrc)}[${pos + width - 1}:${pos}]${resultNote} [N,Z=result; C,V=0]`
+            : `bfins${cc} ${dr(crDst)}[${pos + width - 1}:${pos}] ← low ${width} bits of ${dr(crSrc)}; preserve other bits${resultNote} [N,Z=result; C,V=0]`);
+    }
+    if (opcode === 20) return out(`mcmp${cc} flags ← ${dr(crDst)} − ${dr(crSrc)}; no register write`);
+    if (opcode === 21 || opcode === 22) {
+        const rhs = imm & 0x4000 ? `#${imm & 0x3FFF}` : dr(imm & 15);
+        return out(`${dr(crDst)} = ${dr(crSrc)} ${opcode === 21 ? '+' : '−'} ${rhs} (mod 2^32)${resultNote} [NZCV from arithmetic]`);
+    }
+    if (opcode === 23) {
+        const offset = imm & 0x4000 ? imm - 0x8000 : imm;
+        return out(`branch${cc} PC ← instruction PC ${offset < 0 ? '−' : '+'} ${Math.abs(offset)} words`);
+    }
+    if (opcode === 24 || opcode === 25) {
+        const mode = opcode === 24 ? 'left' : imm & 32 ? 'arithmetic right (sign-fill)' : 'logical right (zero-fill)';
+        return out(`${dr(crDst)} ← ${dr(crSrc)} shifted ${mode} by ${imm & 31}${resultNote} [N,Z=result; C=last bit out (0 for shift 0); V=0]`);
     }
 
-    if (opcode === 0) {
-        const dTag = _crTag(crDst, crPets);
-        const sTag = _crTag(crSrc, crPets);
-        return { desc: _escDecomp(`load${cc} ${dTag} \u2190 ${sTag}[${imm}]${ccDesc}`), compiler: false };
+    // CR names are display aliases, not evidence of the current capability.
+    // Indexed CALL names retain the exact-allocation validation contract.
+    if (opcode === 0 || opcode === 1 || opcode === 5 || opcode === 8 || opcode === 9) {
+        const verb = {0:'load', 1:'save', 5:'switch', 8:'eloadcall', 9:'xloadlambda'}[opcode];
+        const row = opcode === 8 ? imm & 31 : imm;
+        const meaning = opcode === 1 ? `CR${crDst} → CR${crSrc}[${row}]`
+            : `CR${crDst} ← CR${crSrc}[${row}]`;
+        // Never mutate the caller's aliases while rendering a static listing.
+        const target = crSrc === 6 && (opcode === 0 || opcode === 8 || opcode === 9)
+            ? ` (${_indexedCallTarget(callContext, row)})` : '';
+        const method = (imm >>> 5) & 127;
+        return out(`${verb}${cc} ${meaning}${target} if authorized${opcode === 5 ? '; destination M required and consumed on success' : ''}${opcode === 8 ? (method ? `; then call method #${method}` : '; then call fast path') : ''}${opcode === 9 ? '; then lambda' : ''}`);
     }
-
-    if (opcode === 1) {
-        const dTag = _crTag(crDst, crPets);
-        const sTag = _crTag(crSrc, crPets);
-        return { desc: _escDecomp(`save${cc} ${dTag} \u2192 ${sTag}[${imm}]${ccDesc}`), compiler: false };
-    }
-
     if (opcode === 2) {
         if (crSrc === 6) {
-            const row = imm & 0x1F;
-            const method = (imm >>> 5) & 0x7F;
-            const target = _indexedCallTarget(callContext, row);
-            return { desc: _escDecomp(`call${cc} ${target} via CR6[0x${row.toString(16).toUpperCase().padStart(4, '0')}]${method ? `, method #${method - 1}` : ''}${ccDesc}`), compiler: false };
+            const row = imm & 31, method = (imm >>> 5) & 127;
+            return out(`call${cc} ${_indexedCallTarget(callContext, row)} via CR6[0x${row.toString(16).toUpperCase().padStart(4, '0')}]${method ? `, method #${method}` : ''}`);
         }
-        if (crDst === 6) return { desc: _escDecomp(`recall${cc} self${ccDesc}`), compiler: false };
-        const tag = _crTag(crDst, crPets);
-        const method = imm && !(imm & 0x4000) ? `, method #${imm - 1}` : ' (fast path)';
-        return { desc: _escDecomp(`call${cc} ${tag}${method}${ccDesc}`), compiler: false };
+        return out(`${crDst === 6 ? `recall${cc} self` : `call${cc} CR${crDst}`}, method #${imm}`);
     }
-
-    if (opcode === 3) return { desc: _escDecomp(`return${cc}${ccDesc}`), compiler: false };
-
-    if (opcode === 4) {
-        const dTag = _crTag(crDst, crPets);
-        return { desc: _escDecomp(`change${cc} ${dTag} via CR${crSrc}, NS[${imm}]${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 5) {
-        const sTag = _crTag(crSrc, crPets);
-        return { desc: _escDecomp(`switch${cc} CR${crDst}, ${sTag}, #${imm}${ccDesc}`), compiler: false };
-    }
-
+    if (opcode === 3) return out(`return${cc} with mask 0x${(imm & 0xFFF).toString(16).toUpperCase()} (CR0–CR11: set bits keep callee values; clear bits restore caller values)`);
+    if (opcode === 4) return out(`change${cc} CR${crDst}, CR${crSrc}[${imm}] if authorized${crDst < 12 ? ' [PRIV_REG fault if executed]' : crDst >= 14 ? '; Thread-context switch' : '; system capability load'}`);
+    if (opcode === 7) return out(`lambda${cc} enter reduction using CR${crDst} if authorized; CR${crDst} is not overwritten`);
     if (opcode === 6) {
-        const dTag = _crTag(crDst, crPets);
-        const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];
-        const presetDescs = ['remove all perms','read only','read+write','execute only',
-            'read+execute','read+write+execute','load only','store only','enter only','load+store'];
-        const pidx = imm & 0xF;
-        const bFlag = (imm >>> 4) & 1;
-        const pName = presetNames[pidx] || `0x${pidx.toString(16)}`;
-        const pDesc = presetDescs[pidx] || '';
-        const bStr = bFlag ? 'B' : '';
-        const explain = pidx === 13 ? ' [query return frame into Z flag]' :
-            pidx === 14 ? ` [assert identical GT to CR${crSrc}; faults on mismatch]` :
-            pidx >= 10 ? ' [reserved; faults if executed]' :
-            pDesc ? ` [${pDesc}${bStr ? ', bounded' : ''}]` : '';
-        return { desc: _escDecomp(`tperm${cc} ${dTag} ${pName}${bStr}${explain}${ccDesc}`), compiler: false };
+        if (imm === 0x7FFF) return out(`tperm${cc} attenuate CR${crDst} to permissions in CR${crSrc} if subset; no expansion [Z=success, N=!Z; C,V=0]`);
+        const presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
+        const p = imm & 15;
+        if (p === 13) return out(`tperm${cc} FRAME: query return frame`);
+        if (p === 14) return out(`tperm${cc} EXACT: assert CR${crDst}.GT = CR${crSrc}.GT; mismatch faults BIND`);
+        return out(`tperm${cc} CR${crDst} ${presets[p] || 'reserved preset (fault if executed)'}${p === 0 ? ': validate non-NULL capability (not permission removal)' : p < 10 ? ': test exact permissions' : ''}${imm & 16 ? '; clear B on successful test' : ''}`);
     }
-
-    if (opcode === 7) {
-        const dTag = _crTag(crDst, crPets);
-        return { desc: _escDecomp(`lambda${cc} \u2192 ${dTag}${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 8) {
-        const row = imm & 0x1F;
-        const method = (imm >>> 5) & 0x7F;
-        const pet = crSrc === 6 ? _resolveClistPetName(clistBase, row, nsIdx) : null;
-        const methodText = method ? `, method #${method - 1}` : '';
-        if (pet) {
-            return { desc: _escDecomp(`eloadcall${cc} ${pet.toLowerCase()} via CR6[${row}]${methodText} → CR${crDst}${ccDesc}`), compiler: true, pet: pet };
-        }
-        return { desc: _escDecomp(`eloadcall${cc} ${_crTag(crSrc, crPets)}[${row}]${methodText} \u2192 CR${crDst}${ccDesc}`), compiler: true };
-    }
-
-    if (opcode === 9) {
-        const dTag = _crTag(crDst, crPets);
-        const sTag = _crTag(crSrc, crPets);
-        return { desc: _escDecomp(`xloadlambda${cc} ${dTag} \u2190 ${sTag}[${imm}]${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 16 || opcode === 17) {
-        const sTag = _crTag(crSrc, crPets);
-        const verb = opcode === 16 ? 'read' : 'write';
-        const pet = crPets && crPets[crSrc];
-        const immediate = !!(imm & 0x4000);
-        const offset = imm & 0x3FFF;
-        const offStr = immediate
-            ? (() => { const rn = _regName(pet, offset); return rn ? `.${rn}` : `[${offset}]`; })()
-            : `[${(imm >>> 4) & 0x3FF} + DR${imm & 0xF}]`;
-        return { desc: _escDecomp(`${verb}${cc} ${_drTag(crDst)}, ${sTag}${offStr}${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 18) {
-        const pos = (imm >>> 5) & 0x1F;
-        const width = imm & 0x1F;
-        return { desc: _escDecomp(`bfext${cc} ${_drTag(crDst)} \u2190 ${_drTag(crSrc)}[${pos}:${pos+width-1}]${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 19) {
-        const pos = (imm >>> 5) & 0x1F;
-        const width = imm & 0x1F;
-        return { desc: _escDecomp(`bfins${cc} ${_drTag(crDst)}[${pos}:${pos+width-1}] \u2190 ${_drTag(crSrc)}${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 20) {
-        return { desc: _escDecomp(`mcmp${cc} ${_drTag(crDst)}, ${_drTag(crSrc)} → flags${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 21 || opcode === 22) {
-        const op = opcode === 21 ? '+' : '\u2212';
-        const isImm = (imm & 0x4000) !== 0;
-        if (isImm) {
-            const immVal = imm & 0x3FFF;
-            return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} #${immVal}${ccDesc}`), compiler: false };
-        } else {
-            const drOp = imm & 0xF;
-            return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${op} ${_drTag(drOp)}${ccDesc}`), compiler: false };
-        }
-    }
-
-    if (opcode === 23) {
-        const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
-        const condLabel = cc || 'AL';
-        const condExplain = cond === 14 ? ' [always]' : ` [${_condDescs[cond]}]`;
-        return { desc: _escDecomp(`branch${cc} ${soff > 0 ? '+' : ''}${soff}${condExplain}`), compiler: false };
-    }
-
-    if (opcode === 24) {
-        const shamt = imm & 0x1F;
-        return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} \u00AB ${shamt}${ccDesc}`), compiler: false };
-    }
-
-    if (opcode === 25) {
-        const arith = (imm >>> 5) & 1;
-        const shamt = imm & 0x1F;
-        const sym = arith ? '\u00BB\u00BB' : '\u00BB';
-        return { desc: _escDecomp(`${_drTag(crDst)}= ${_drTag(crSrc)} ${sym} ${shamt}${arith ? ' (arithmetic)' : ' (logical)'}${ccDesc}`), compiler: false };
-    }
-
-    if (stored && stored[addr]) {
-        const s = stored[addr];
-        return { desc: _escDecomp(s.desc), compiler: s.compiler };
-    }
-
-    return null;
+    return out(`reserved opcode ${opcode} (fault if executed)`);
 }
 
 function _fmtVal(v) {
@@ -2578,4 +2462,3 @@ function _fmtVal(v) {
 function _escDecomp(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-

@@ -30,6 +30,7 @@
 
 const fs   = require('fs');
 const path = require('path');
+const vm   = require('vm');
 
 // ── Counters ──────────────────────────────────────────────────────────────────
 let pass = 0;
@@ -68,14 +69,46 @@ if (startIdx === -1 || endIdx === -1) {
 const block = src.slice(startIdx, endIdx + MARKER_END.length + ' ---- */'.length);
 
 // Instantiate the two pure helpers.
-let _nsSlotPolicyResolve, _nsSlotPersistRecord;
+let _nsSlotPolicyResolve, _nsSlotPersistRecord, _nsDeclaredPrivateDataRows;
 try {
-    const mod = new Function(block + '\nreturn { _nsSlotPolicyResolve, _nsSlotPersistRecord };')();
+    const mod = new Function('ChurchSimulator', block +
+        '\nreturn { _nsSlotPolicyResolve, _nsSlotPersistRecord, _nsDeclaredPrivateDataRows };')(
+        { PRIVATE_DATA_CAPABILITY_PLACEHOLDER: 0xFEEDDA7A });
     _nsSlotPolicyResolve = mod._nsSlotPolicyResolve;
     _nsSlotPersistRecord = mod._nsSlotPersistRecord;
+    _nsDeclaredPrivateDataRows = mod._nsDeclaredPrivateDataRows;
 } catch (e) {
     console.error('FATAL: failed to load helpers from marker block:', e.message);
     process.exit(1);
+}
+
+// The exact saved sidecar is used only when the embedded API does not declare
+// capabilities. Neither a name nor a sentinel by itself authorizes a remint.
+{
+    const hdr = { valid: true, lumpSize: 64, cc: 2 };
+    const words = new Array(64).fill(0);
+    words[63] = 0xFEEDDA7A;
+    const alice = { capabilities: [{ row: 0, role: 'identity' },
+        { row: 1, role: 'private_data' }] };
+    check('private row 1 declared by saved artifact', JSON.stringify(
+        _nsDeclaredPrivateDataRows(words, hdr, { contentFrameValid: true,
+            apiDefinition: { name: 'ide.Alice' } }, alice)) === '[1]');
+    check('placeholder alone does not grant private-data remint',
+        _nsDeclaredPrivateDataRows(words, hdr, null, null).length === 0);
+    check('wrong row declaration cannot grant row 1',
+        _nsDeclaredPrivateDataRows(words, hdr, null,
+            { capabilities: [{ row: 2, role: 'private_data' }] }).length === 0);
+    words[63] = 42;
+    check('non-placeholder word cannot be reminted by declaration',
+        _nsDeclaredPrivateDataRows(words, hdr, null, alice).length === 0);
+    check('placeholder picker is explicit, install waits for selection',
+        src.includes('<option value="" selected disabled>Pick an abstraction…</option>') &&
+        src.includes('sel.selectedIndex - 1') &&
+        src.includes('privateDataRows: _nsDeclaredPrivateDataRows('));
+    check('Add LUMP copies the full allocated body, including 512-word c-list tail',
+        src.includes('sim.findFreeLumpRange(hdr.lumpSize)') &&
+        src.includes('wi < hdr.lumpSize; wi++') &&
+        !src.includes('Math.min(words.length, EXTENDED_STRIDE)'));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -210,6 +243,85 @@ check('T13b all cycle-mode buttons pass their data-slot value',
     (src.match(/_nsSlotCycleMode\(this\.dataset\.token,this\.dataset\.mode,this\.dataset\.slot\)/g) || []).length === 3 &&
     (src.match(/data-slot="\$\{slotIdx\}"/g) || []).length === 3);
 
-// ── Summary ───────────────────────────────────────────────────────────────────
-console.log('\n' + pass + ' passed, ' + fail + ' failed out of ' + (pass + fail) + ' checks');
-process.exit(fail > 0 ? 1 : 0);
+// A modal can close/change while /words is still in flight. Late responses
+// must never cache or enable Install for a different catalog selection.
+async function testStaleFetch() {
+    const begin = src.indexOf('async function _nsPopulateAddMeta(');
+    const end = src.indexOf('\nfunction _nsTableAddConfirm()', begin);
+    const container = { innerHTML: '' };
+    const picker = { value: 'abcdef12', selectedIndex: 1 };
+    const confirm = { disabled: true, title: '' };
+    let resolveFetch;
+    const sandbox = {
+        window: { _nsAddAvailableList: [{ token: 'abcdef12' }] },
+        sim: { parseLumpHeader: () => ({ valid: false }) },
+        _nsUpdatePlacementButton: () => {},
+        document: { getElementById: id => ({
+            _nsAddMeta: container, _nsAddSelect: picker, _nsAddConfirmBtn: confirm
+        })[id] || null },
+        fetch: () => new Promise(resolve => { resolveFetch = resolve; }),
+    };
+    vm.createContext(sandbox);
+    vm.runInContext(src.slice(begin, end), sandbox);
+    const pending = vm.runInContext("_nsPopulateAddMeta('abcdef12', 0)", sandbox);
+    picker.value = '12345678';
+    picker.selectedIndex = 2;
+    resolveFetch({ ok: true, json: async () => ({ words: [0] }) });
+    await pending;
+    check('late /words response cannot bind previous selection to new picker',
+        sandbox.window._nsAddCurrentWords == null && confirm.disabled === true);
+}
+
+async function testPlacementAction() {
+    const begin = src.indexOf('async function _nsAddPlacementConfirm()');
+    const end = src.indexOf('\nasync function _nsOpenNewAssembler()', begin);
+    for (const [record, expected] of [
+        [null, 'missing'],
+        [{ abstraction: 'Future.Bad', token: 'deadbeef',
+            filename: 'Future.Bad.deadbeef.lump', binary_valid: false,
+            validation_errors: ['Invalid LUMP header'] }, 'invalid'],
+        [{ abstraction: 'Future.Good', token: '1234abcd',
+            filename: 'Future.Good.1234abcd.lump', binary_valid: true }, 'unresolved'],
+    ]) {
+        let submitted = null;
+        let saves = 0;
+        const name = { value: record ? record.abstraction : 'Future.Absent' };
+        const slot = { value: '24' };
+        const select = { selectedIndex: record ? 1 : 0 };
+        const button = { disabled: false, textContent: 'Add placement' };
+        const error = { textContent: '' };
+        const overlay = { remove() {} };
+        const elements = {
+            _nsPlacementName: name, _nsPlacementSlot: slot, _nsAddSelect: select,
+            _nsAddPlacementBtn: button, _nsAddError: error,
+            _nsAddModalOverlay: overlay,
+        };
+        const sandbox = {
+            window: {
+                _nsAddAvailableList: record ? [record] : [],
+                _nsAddInspectionPending: false,
+                _nsTableSave: async () => { saves++; return true; }
+            },
+            document: { getElementById: key => elements[key] || null },
+            sim: { defineSymbolicAbstraction: (...args) => {
+                submitted = args; return { slot: args[1] };
+            } },
+            _setNsDirty: () => {}, updateNamespace: () => {},
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(src.slice(begin, end), sandbox);
+        await vm.runInContext('_nsAddPlacementConfirm()', sandbox);
+        check(`Add placement ${expected}: exact design row uses existing Save without install`,
+            submitted && submitted[1] === 24 &&
+            submitted[2].status === expected && saves === 1 &&
+            !error.textContent);
+    }
+}
+
+testStaleFetch().then(testPlacementAction).then(() => {
+    console.log('\n' + pass + ' passed, ' + fail + ' failed out of ' + (pass + fail) + ' checks');
+    process.exit(fail > 0 ? 1 : 0);
+}, err => {
+    console.error(err);
+    process.exit(1);
+});

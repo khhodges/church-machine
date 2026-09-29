@@ -1504,22 +1504,17 @@ async function _populateLumpSourceTab(lump, targetId) {
 
     el.innerHTML = `<div class="lump-source-status">Loading source\u2026</div>`;
 
-    const _showBinaryOnly = (reason) => {
-        const displayName = absName || lump.token || 'This lump';
-        el.innerHTML = `<div class="lump-source-binary-only">
-            <div class="lump-source-binary-only-icon">&#128190;</div>
-            <div class="lump-source-binary-only-title">Binary-only &mdash; no functional source available</div>
-            <div class="lump-source-binary-only-desc">
-                <strong>${e(displayName)}</strong> ${reason}<br><br>
-                To add functional source, explicitly import and approve source to create
-                a new immutable artifact. Same-name workspace files are never substituted
-                for bytes missing from this LUMP.
-            </div>
-        </div>`;
-    };
-
     try {
-        const resp = await fetch(`/api/lump/${lump.token}/words`, { cache: 'no-store' });
+        let sourceUrl = `/api/lump/${lump.token}/words`;
+        const expectedFilename = typeof lump.filename === 'string' && lump.filename
+            ? lump.filename : '';
+        const expectedHash = /^[0-9a-f]{64}$/i.test(String(lump.binary_hash || ''))
+            ? lump.binary_hash : '';
+        if (expectedFilename && expectedHash) {
+            sourceUrl += `?exact_filename=${encodeURIComponent(expectedFilename)}` +
+                `&binary_hash=${encodeURIComponent(expectedHash)}`;
+        }
+        const resp = await fetch(sourceUrl, { cache: 'no-store' });
 
         if (!resp.ok) {
             const error = await _actionableResponseError(resp, 'Open embedded LUMP source', {
@@ -1530,13 +1525,22 @@ async function _populateLumpSourceTab(lump, targetId) {
             return;
         }
         const data = await resp.json();
+        if (expectedFilename && expectedHash &&
+                (data.filename !== expectedFilename || data.binary_hash !== expectedHash)) {
+            throw new Error('Exact saved artifact identity does not match the Source tab request');
+        }
         const inspector = typeof LumpContentFrame !== 'undefined' &&
             LumpContentFrame && LumpContentFrame.lumpInspectContentFrame;
-        if (!inspector) throw new Error('Binary content inspector is unavailable');
-        const inspection = await inspector(data.words || []);
+        const inspection = inspector ? await inspector(data.words || []) : null;
+        const selectedCode = _selectSavedLumpCodeDisplay(
+            data, inspection, data.words || [], {
+                abstraction: absName,
+                token: lump.token,
+                rawTailHex: data.raw_tail_hex || ''
+            });
 
-        if (inspection.contentFrameValid && inspection.sourceEmbedded && inspection.source) {
-            const src = inspection.source;
+        if (selectedCode.kind === 'embedded') {
+            const src = selectedCode.text;
             if (_isRawISASource(src)) {
                 // Source exists but is raw ISA / Church Machine Assembly — show it
                 // read-only with an Assembly badge rather than hiding it entirely.
@@ -1673,12 +1677,21 @@ async function _populateLumpSourceTab(lump, targetId) {
                     _textarea.addEventListener('input', _onFirstEdit);
                 }
             }
-        } else if (inspection.contentFrameValid && inspection.profile === 'api') {
-            _showBinaryOnly('was saved as API only. Its exact binary contains no source to display.');
-        } else if (!inspection.contentFramePresent) {
-            _showBinaryOnly('is a legacy LUMP with no embedded source. Sidecar and catalog source are not used as substitutes; import and explicitly approve source to create a new artifact.');
         } else {
-            _showBinaryOnly('has unavailable or malformed embedded source. Sidecar and catalog source are not used as substitutes.');
+            const language = selectedCode.kind === 'unverified-source' &&
+                !_isRawISASource(selectedCode.text) ? 'cloomc' : 'assembly';
+            const label = selectedCode.kind === 'unverified-source'
+                ? (language === 'assembly' ? 'Unverified Assembly' : 'Unverified Source')
+                : (selectedCode.kind === 'reconstructed-source'
+                    ? 'Reconstructed Assembly' : 'Unavailable');
+            el.innerHTML =
+                `<div class="lump-source-toolbar">` +
+                `<span class="lump-source-lang-badge">${e(label)}</span>` +
+                `<span class="lump-source-unverified-warning" role="status">${e(selectedCode.warning)}</span>` +
+                `</div>` +
+                (selectedCode.text
+                    ? `<pre class="lump-stored-src-pre lump-stored-src-pre-full" aria-readonly="true">${e(selectedCode.text)}</pre>`
+                    : `<div class="lump-source-status err">${e(selectedCode.warning)}</div>`);
         }
     } catch (err) {
         el.innerHTML = `<div class="lump-source-status err">Error loading source: ${e(err.message)}</div>`;
@@ -1935,16 +1948,17 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
     var layout = document.querySelector('#editor .editor-layout');
     var panel = document.getElementById('savedLumpDisassemblyPanel');
     var text = document.getElementById('savedLumpDisassembly');
-    if (tabs) tabs.style.display = 'none';
+    if (tabs) tabs.style.display = '';
     if (layout) layout.classList.add('saved-lump-editor-layout');
     if (layout) layout.classList.remove('disassembly-diagnostics-layout', 'compiled-candidate-editor-layout');
     _setDisassemblyPresentationStatus('Exact saved binary — source edits and restored drafts do not change these bytes.');
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
-    ['codeConsoleContent', 'codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
+    ['codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
         'asmWarningPanel'].forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
+    if (typeof switchCodeTab === 'function') switchCodeTab('console');
     if (typeof _renderSavedLumpIdentityPanel === 'function') {
         _renderSavedLumpIdentityPanel(lump, lookupToken, savedWords);
     }
@@ -2032,6 +2046,35 @@ function _lumpDispatchAnnotation(words, index, methodCount) {
     return '';
 }
 
+function _savedLumpMethodLabel(method, index) {
+    if (typeof method === 'string' && method.trim()) return method;
+    if (method && typeof method === 'object') {
+        for (var key of ['name', 'petName', 'pet_name']) {
+            if (typeof method[key] === 'string' && method[key].trim()) return method[key];
+        }
+    }
+    return 'Method' + (index + 1);
+}
+
+function _savedLumpRejectionReason(response) {
+    if (!response) return '';
+    var reasons = Array.isArray(response.validation_errors)
+        ? response.validation_errors.filter(function(reason) {
+            return typeof reason === 'string' && reason.trim();
+        }).map(function(reason) { return reason.trim(); })
+        : [];
+    if (!reasons.length && response.approved === false) {
+        reasons.push('Approval was not established for this saved artifact; no further reason was supplied.');
+    }
+    if (!reasons.length && response.binary_valid === false) {
+        reasons.push('The saved binary failed validation; no further reason was supplied.');
+    }
+    if (!reasons.length && response.trusted === false) {
+        reasons.push('The saved binary is not trusted; no further reason was supplied.');
+    }
+    return reasons.join(' ');
+}
+
 function _formatLumpHeaderDisassembly(word) {
     word = word >>> 0;
     var magic = word >>> 27;
@@ -2098,6 +2141,9 @@ function _showCompiledCandidateBesideSource(words, details) {
         layout.classList.add('compiled-candidate-editor-layout');
         layout.classList.remove('disassembly-diagnostics-layout');
     }
+    var tabs = document.getElementById('codeSidebarTabs');
+    if (tabs) tabs.style.display = '';
+    if (typeof switchCodeTab === 'function') switchCodeTab('console');
     _setDisassemblyPresentationStatus('Successful compile — UNSAVED authenticated candidate. Not a saved LUMP; later source edits do not change these bytes.');
     window._compiledCandidateEditorMode = true;
     return true;
@@ -2149,6 +2195,44 @@ function _formatCanonicalSavedLumpWords(words, details) {
     return lines.join('\n');
 }
 
+function _reconstructSavedLumpInstructionSource(words, details) {
+    if (!_isExactSavedLumpWordArray(words) || words.length === 0) return '';
+    details = details || {};
+    var header = words[0] >>> 0;
+    if ((header >>> 27) !== 0x1F) return '';
+    var cw = Math.min((header >>> 10) & 0x1FFF, words.length - 1);
+    var dispatchCount = Math.max(0, Math.min(Number(details.methodCount) || 0, cw));
+    if (!dispatchCount) {
+        for (var di = 1; di <= cw; di++) {
+            var entry = words[di] >>> 0;
+            var isBranchEntry = (entry >>> 27) === 23;
+            var isLegacyEntry = entry > di && entry <= cw;
+            if (!isBranchEntry && !isLegacyEntry) break;
+            dispatchCount++;
+        }
+    }
+    var codeWords = words.slice(1 + dispatchCount, 1 + cw)
+        .map(function(word) { return word >>> 0; });
+    while (codeWords.length > 0 && codeWords[codeWords.length - 1] === 0) {
+        codeWords.pop();
+    }
+    if (!codeWords.length) return '';
+    var lines = [];
+    if (typeof ChurchAssembler !== 'undefined' && ChurchAssembler &&
+            typeof ChurchAssembler.decompileWords === 'function') {
+        try { lines = ChurchAssembler.decompileWords(codeWords); } catch (_error) {}
+    }
+    if (!Array.isArray(lines) || !lines.length) {
+        lines = codeWords.map(function(word) {
+            if (typeof assembler !== 'undefined' && assembler &&
+                    typeof assembler.disassemble === 'function') {
+                try { return assembler.disassemble(word); } catch (_error) {}
+            }
+            return '0x' + word.toString(16).padStart(8, '0').toUpperCase();
+        });
+    }
+    return lines.join('\n');
+}
 function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
     var panel = document.getElementById('savedLumpDisassemblyPanel');
     var output = document.getElementById('savedLumpDisassembly');
@@ -2164,6 +2248,9 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
         layout.classList.remove('disassembly-diagnostics-layout');
         layout.classList.add('saved-lump-editor-layout');
     }
+    var tabs = document.getElementById('codeSidebarTabs');
+    if (tabs) tabs.style.display = '';
+    if (typeof switchCodeTab === 'function') switchCodeTab('console');
     _setDisassemblyPresentationStatus(unavailable ? 'Saved binary unavailable — see details below.' :
         'Exact saved binary — source edits and restored drafts do not change these bytes.');
     var details = document.getElementById('savedLumpBuildDetails');
@@ -2238,6 +2325,15 @@ async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {
         if (!exactText) throw new Error('the canonical saved words could not be rendered');
         _showCanonicalSavedLumpBesideSource(
             exactText, Object.assign({}, descriptor, data), false);
+        // Session restore initially knows only the owner token. Once this
+        // exact response arrives, restore its display name without reopening
+        // source or borrowing a name from the currently executing program.
+        if (descriptor.restoring && window._editorOpenLumpToken === resp.token &&
+                typeof data.abstraction === 'string' && data.abstraction.trim() &&
+                typeof _updateEditorCodeName === 'function') {
+            window._editorOpenLumpMeta = Object.assign({}, descriptor, data);
+            _updateEditorCodeName(data.abstraction.trim());
+        }
         return true;
     } catch (error) {
         if (!_savedLumpPresentationStillOwnsSource(frozen)) return false;
@@ -2262,10 +2358,144 @@ function _restoreSavedLumpBinaryPresentation(token, receipt, editor) {
     return _fetchAndPresentCommittedLump({ token: token }, descriptor, {
         source: editor.value,
         epoch: window._editorNavigationEpoch || 0
+    }).then(function(shown) {
+        if (shown && window._editorOpenLumpToken === token &&
+                document.getElementById('asmEditor') === editor) {
+            window._editorOpenedBootInspectionToken = token;
+            window._editorOpenedBootInspectionKind = 'restored';
+            window._editorRestoredBinaryReceiptVerified = !!(receipt &&
+                receipt.filename && receipt.binary_hash);
+            if (typeof _showBootArtifactInspectionStatus === 'function') {
+                _showBootArtifactInspectionStatus();
+            }
+        }
+        return shown;
     });
 }
-window._restoreSavedLumpBinaryPresentation = _restoreSavedLumpBinaryPresentation;
 
+async function _presentPersonalSavedBinary(tab) {
+    var editor = document.getElementById('asmEditor');
+    if (!tab || !editor) return false;
+    var epoch = window._editorNavigationEpoch || 0;
+    var owns = function() {
+        return document.getElementById('asmEditor') === editor &&
+            (window._editorNavigationEpoch || 0) === epoch &&
+            typeof activeUserTabId !== 'undefined' && activeUserTabId === tab.id &&
+            !window._editorOpenLumpToken;
+    };
+    var panel = document.getElementById('savedLumpDisassemblyPanel');
+    var output = document.getElementById('savedLumpDisassembly');
+    var status = document.getElementById('disassemblyPresentationStatus');
+    var layout = document.querySelector('#editor .editor-layout');
+    var paint = function(message, words, descriptor, sourceRelation) {
+        if (!owns()) return false;
+        window._personalSavedBinaryPresentation = true;
+        // No LUMP owner, execution identity, or saved-LUMP receipt is installed.
+        window._savedLumpEditorMode = false;
+        if (panel) {
+            panel.style.display = 'flex';
+            panel.setAttribute('aria-label', words ? 'Personal program saved binary inspection' :
+                'Personal program saved binary unavailable');
+        }
+        if (layout) layout.classList.add('saved-lump-editor-layout');
+        if (status) status.textContent = message;
+        if (output) output.textContent = words
+            ? '; PERSONAL PROGRAM — read-only saved binary inspection\n' +
+              '; ' + message + '\n' + sourceRelation + '\n' +
+              _formatCanonicalSavedLumpWords(words, descriptor)
+            : '; SAVED BINARY UNAVAILABLE\n; ' + message;
+        var identity = document.getElementById('savedLumpIdentityPanel');
+        if (identity) {
+            identity.innerHTML = '';
+            identity.style.display = 'none';
+        }
+        var identityToggle = document.getElementById('savedLumpIdentityToggle');
+        if (identityToggle) identityToggle.style.display = 'none';
+        return !!words;
+    };
+    // Clear stale BOOTIMG or previous-tab output synchronously, before IO.
+    paint('Finding a saved version for this personal program…', null);
+    try {
+        var receipt = tab.savedBinary;
+        var chosen = null;
+        var requestedRevision = Number.isInteger(tab.sourceRevision) ? tab.sourceRevision : null;
+        if (receipt && receipt.token && receipt.filename && receipt.binary_hash) {
+            chosen = receipt;
+        } else {
+            var listing = await fetch('/api/lumps/list', { cache: 'no-store' });
+            if (!listing.ok) throw new Error('catalog returned HTTP ' + listing.status);
+            var rows = await listing.json();
+            if (!owns()) return false;
+            if (!Array.isArray(rows)) throw new Error('catalog returned invalid records');
+            // An explicitly named source tab may have a " Source" suffix.
+            // Require an exact abstraction label; never use boot token, fuzzy
+            // substring or an unrelated row as a fallback.
+            var name = String(tab.name || '').replace(/ Source$/, '');
+            var matches = rows.filter(function(row) {
+                return row && row.archived !== true && row.current !== false &&
+                    row.abstraction === name && row.token && row.filename &&
+                    row.binary_hash && Number.isInteger(row.lump_version);
+            });
+            if (requestedRevision !== null) {
+                matches = matches.filter(function(row) {
+                    return row.lump_version === requestedRevision;
+                });
+            } else {
+                var newest = Math.max.apply(null, matches.map(function(row) {
+                    return row.lump_version;
+                }));
+                matches = matches.filter(function(row) {
+                    return row.lump_version === newest;
+                });
+            }
+            if (matches.length !== 1) throw new Error(
+                requestedRevision !== null
+                    ? 'no unique exact saved Source v' + requestedRevision +
+                      ' for ' + name + ' in the active catalog'
+                    : 'no unique saved version for ' + name + ' in the active catalog');
+            chosen = matches[0];
+        }
+        var url = '/api/lump/' + encodeURIComponent(chosen.token) +
+            '/words?exact_filename=' + encodeURIComponent(chosen.filename) +
+            '&binary_hash=' + encodeURIComponent(chosen.binary_hash);
+        var response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error('exact saved words returned HTTP ' + response.status);
+        var data = await response.json();
+        if (!owns()) return false;
+        if (data.filename !== chosen.filename ||
+                String(data.binary_hash || '').toLowerCase() !==
+                    String(chosen.binary_hash).toLowerCase() ||
+                !_isExactSavedLumpWordArray(data.words) || !data.words.length) {
+            throw new Error('exact saved binary identity or words did not match the selected record');
+        }
+        var tail = _readSavedLumpExactTail(data, data.words);
+        if ((data.raw_tail_hex || data.byte_count != null) && !tail) {
+            throw new Error('invalid exact saved trailing-byte record');
+        }
+        var revision = Number.isInteger(chosen.lump_version)
+            ? chosen.lump_version : requestedRevision;
+        var label = 'Saved ' + (revision !== null ? 'v' + revision : 'version unknown') +
+            ' — exact saved binary (' + chosen.filename + ').';
+        var embedded = data.source;
+        var relation = typeof embedded === 'string' && embedded.length > 0
+            ? (embedded === editor.value
+                ? '; Embedded artifact source matches the current editor text.'
+                : '; Embedded artifact source differs from the current editor draft.')
+            : '; Source match unknown — no verified embedded source comparison.';
+        if (requestedRevision !== null && revision !== requestedRevision) {
+            relation += '\n; Selected saved version differs from Source v' + requestedRevision + '.';
+        }
+        return paint(label, data.words, {
+            abstraction: chosen.abstraction, token: chosen.token,
+            rawTailHex: tail ? tail.rawTailHex : '',
+            methodCount: data.api_definition && Array.isArray(data.api_definition.methods)
+                ? data.api_definition.methods.length : 0
+        }, relation);
+    } catch (error) {
+        return paint(String(error && error.message || error) +
+            '. No unrelated or boot binary is displayed.', null);
+    }
+}
 function exitSavedLumpEditorMode() {
     // Also invalidate an open that is still awaiting binary/source fetches.
     window._savedLumpOpenRequestId = (window._savedLumpOpenRequestId || 0) + 1;
@@ -2282,7 +2512,9 @@ function exitSavedLumpEditorMode() {
     var layout = document.querySelector('#editor .editor-layout');
     if (layout) layout.classList.remove('saved-lump-editor-layout');
     if (layout) layout.classList.remove('disassembly-diagnostics-layout', 'compiled-candidate-editor-layout');
-    var hadBinaryPresentation = window._savedLumpEditorMode || window._compiledCandidateEditorMode;
+    var hadBinaryPresentation = window._savedLumpEditorMode ||
+        window._compiledCandidateEditorMode || window._personalSavedBinaryPresentation;
+    window._personalSavedBinaryPresentation = false;
     window._compiledCandidateEditorMode = false;
     if (!hadBinaryPresentation) return;
     window._savedLumpEditorMode = false;
@@ -2315,6 +2547,8 @@ function exitSavedLumpEditorMode() {
     window._editorOpenLumpMeta = null;
     window._editorOpenLumpBaseIdentity = null;
     window._editorSavedBinaryReceipt = null;
+    window._editorOpenedBootInspectionToken = null;
+    window._editorOpenedBootInspectionKind = null;
     var discardBtn = document.getElementById('btnDiscardLumpEdit');
     if (discardBtn) discardBtn.remove();
     if (typeof switchCodeTab === 'function') switchCodeTab('console');
@@ -2436,7 +2670,7 @@ function _formatSavedLumpInspectionSource(sources) {
     return lines.join('\n');
 }
 
-function _resolveSavedLumpEditorSource(serverSource, browserSource, browserDecodeConfirmed) {
+function _resolveSavedLumpEditorSource(serverSource, browserSource, browserDecodeConfirmed, unverifiedSource, unverifiedProvenance) {
     var hasServerSource = typeof serverSource === 'string' && serverSource.length > 0;
     var hasBrowserSource = typeof browserSource === 'string' && browserSource.length > 0;
     if (hasServerSource && hasBrowserSource && serverSource !== browserSource) {
@@ -2469,6 +2703,15 @@ function _resolveSavedLumpEditorSource(serverSource, browserSource, browserDecod
             inspectionSources: []
         };
     }
+    if (typeof unverifiedSource === 'string' && unverifiedSource.length > 0) {
+        return {
+            source: unverifiedSource,
+            restored: false,
+            origin: 'unverified-fallback',
+            unverifiedProvenance: unverifiedProvenance || 'legacy or catalog record',
+            inspectionSources: []
+        };
+    }
     if (browserDecodeConfirmed === false) {
         return {
             source: '',
@@ -2481,13 +2724,11 @@ function _resolveSavedLumpEditorSource(serverSource, browserSource, browserDecod
         };
     }
     return {
-        source:
-            '; Embedded source is unavailable for this LUMP.\n' +
-            '; Legacy sidecar and catalog source are not trusted as artifact content.\n' +
-            '; The read-only Compiled Disassembly panel shows what this binary executes.\n' +
-            '; Import, write, or paste source and explicitly approve a new version.\n',
+        source: '',
         restored: false,
         origin: 'missing',
+        provenanceWarning:
+            'Embedded source is unavailable and no exact-file source record was found.',
         inspectionSources: []
     };
 }
@@ -4140,7 +4381,7 @@ async function _confirmLumpBootstrapRepairs(repairId, currentToken, version, arc
     }
 }
 
-async function _openLumpHistorySourceInEditor(source, name, version) {
+async function _openLumpHistorySourceInEditor(source, name, version, savedBinary) {
     if (typeof source !== 'string' || !source.trim()) return;
     const editor = document.getElementById('asmEditor');
     if (!editor || typeof createUserTab !== 'function') {
@@ -4154,7 +4395,22 @@ async function _openLumpHistorySourceInEditor(source, name, version) {
         previousSource && previousSource.trim();
     const language = typeof _isRawISASource === 'function' && _isRawISASource(source)
         ? 'assembly' : 'cloomc';
-    if (!await createUserTab(name, language, source, Number(version))) return;
+    const newTab = await createUserTab(name, language, source, Number(version));
+    if (!newTab) return;
+    // Keep the exact preview locator with the personal draft. A history token
+    // alone is not an artifact identity and may subsequently point elsewhere.
+    if (savedBinary && savedBinary.token && savedBinary.filename &&
+            savedBinary.binary_hash) {
+        newTab.savedBinary = {
+            token: savedBinary.token, filename: savedBinary.filename,
+            binary_hash: savedBinary.binary_hash,
+            abstraction: savedBinary.abstraction, lump_version: Number(version)
+        };
+        saveUserTabsToStorage();
+        if (typeof window._presentPersonalSavedBinary === 'function') {
+            void window._presentPersonalSavedBinary(newTab);
+        }
+    }
     if (needsBackup) {
         userTabs.push({id: generateTabId(), name: 'Previous editor draft',
             lang: previousLanguage || 'assembly', code: previousSource});
@@ -4172,7 +4428,7 @@ async function _openLumpHistorySourceInEditor(source, name, version) {
 window._openSavedLumpVersionDetails = function (identity) {
     if (!identity || !/^[0-9a-f]{8}$/i.test(identity.token || '') ||
             !identity.filename || !/^[0-9a-f]{64}$/i.test(identity.binary_hash || '') ||
-            !Number.isInteger(identity.lump_version) || identity.lump_version < 1) return;
+            !Number.isInteger(identity.lump_version) || identity.lump_version < 0) return;
     return _lumpHistoryPreview(identity.token, identity.lump_version, null, null,
         null, '', true, identity.token, identity.filename, true,
         Object.assign({}, identity));
@@ -4251,31 +4507,52 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         // of making the programmer reverse-engineer the binary from the hex
         // diff. Keep the diff below it because it is still useful when
         // comparing the revision with the current artifact.
-        const archivedSource = (typeof data.source === 'string' && data.source.trim())
-            ? data.source
-            : (inspection && typeof inspection.source === 'string' && inspection.source.trim()
-                ? inspection.source : '');
+        const selectedCode = _selectSavedLumpCodeDisplay(
+            data, inspection, words, {
+                abstraction: data.abstraction || (exactIdentity && exactIdentity.abstraction) || token,
+                token: data.token || token,
+                rawTailHex: rawTailHex,
+                methodCount: inspection && inspection.api_definition &&
+                    Array.isArray(inspection.api_definition.methods)
+                    ? inspection.api_definition.methods.length : 0
+            });
+        // Editing a separate draft does not approve or mutate this artifact.
+        const editablePreviewSource =
+            selectedCode.kind !== 'unavailable' ? selectedCode.text : '';
         let sourcePreview = '';
-        if (archivedSource) {
-            const sourceIsAssembly = typeof _isRawISASource === 'function' &&
-                _isRawISASource(archivedSource);
+        if (selectedCode.kind !== 'unavailable') {
+            const displayedCode = selectedCode.text;
+            const sourceIsAssembly = selectedCode.kind === 'reconstructed-source' ||
+                (typeof _isRawISASource === 'function' && _isRawISASource(displayedCode));
             const sourceLanguage = sourceIsAssembly ? 'assembly' : 'cloomc';
-            const sourceLabel = sourceIsAssembly ? 'Assembly' : 'CLOOMC++';
+            const sourceLabel = selectedCode.kind === 'reconstructed-source'
+                ? 'Reconstructed Assembly'
+                : (selectedCode.kind === 'unverified-source'
+                    ? (sourceIsAssembly ? 'Unverified Assembly' : 'Unverified Source')
+                    : (sourceIsAssembly ? 'Assembly' : 'CLOOMC++'));
             sourcePreview =
                 `<div class="lump-detail-section lump-history-source-section">` +
-                `<div class="lump-section-title">Source \u2014 v${version}</div>` +
+                `<div class="lump-section-title">Code \u2014 v${version}</div>` +
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${sourceLabel}</span>` +
-                `<span class="lump-stored-src-ts">Embedded in the ${exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} binary</span>` +
-                (exactIdentity ? '' : `<button type="button" class="btn lump-history-open-editor" title="Open this exact revision's source as a new editable draft. The active LUMP and boot selection are unchanged.">Open in Editor</button>`) +
+                (selectedCode.kind === 'embedded'
+                    ? `<span class="lump-stored-src-ts">Embedded in the ${exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} binary</span>`
+                    : `<span class="lump-source-unverified-warning" role="status">${e(selectedCode.warning)}</span>`) +
+                (editablePreviewSource
+                    ? `<button type="button" class="btn lump-history-open-editor" title="Open this preview text as a new editable draft. The immutable LUMP and boot selection are unchanged.">Open in Editor</button>`
+                    : '') +
                 `</div>` +
-                `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre">${_highlightCLOOMCSource(archivedSource, sourceLanguage)}</pre>` +
+                `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre" aria-readonly="${selectedCode.readOnly ? 'true' : 'false'}">${
+                    selectedCode.kind === 'reconstructed-source'
+                        ? e(displayedCode)
+                        : _highlightCLOOMCSource(displayedCode, sourceLanguage)
+                }</pre>` +
                 `</div>`;
         } else {
             sourcePreview =
                 `<div class="lump-detail-section lump-history-source-section">` +
-                `<div class="lump-section-title">Source \u2014 v${version}</div>` +
-                `<div class="lump-stored-src-empty">No source is embedded in this ${exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} revision.</div>` +
+                `<div class="lump-section-title">Code \u2014 v${version}</div>` +
+                `<div class="lump-stored-src-empty">${e(selectedCode.warning)}</div>` +
                 `</div>`;
         }
 
@@ -4375,14 +4652,21 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
         const openEditorButton = document.querySelector(
             '#lumpHistoryPreviewModal .lump-history-open-editor');
-        if (openEditorButton && archivedSource) {
+        if (openEditorButton && editablePreviewSource) {
             const record = _lumpsCache.find(item => item.token === (currentToken || token));
             const name = (record && record.abstraction) || token;
             // Capture the exact preview response, never resolve a token again:
             // normal opening may redirect it to a different current revision.
             openEditorButton.addEventListener('click', () => {
                 try {
-                    _openLumpHistorySourceInEditor(archivedSource, name, version);
+                    _openLumpHistorySourceInEditor(
+                        editablePreviewSource, name, version, {
+                            token: (exactIdentity && exactIdentity.token) ||
+                                data.token || (isCurrent ? currentToken : token),
+                            filename: data.filename || archiveFilename,
+                            binary_hash: data.binary_hash,
+                            abstraction: data.abstraction || name
+                        });
                 } catch (error) {
                     alert(error.message);
                 }
@@ -5420,183 +5704,24 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
         return `0x${(w >>> 0).toString(16).padStart(8, '0').toUpperCase()}`;
     };
 
-    // C-list token → known abstraction name lookup
-    const _clistName = tok => {
-        if (!_lumpsCache || !_lumpsCache.length) return '';
-        const h = tok.toString(16).padStart(8, '0');
-        const lm = _lumpsCache.find(l => {
-            const t = (l.token || '').toLowerCase();
-            return t === h || t.replace(/^0+/, '') === h.replace(/^0+/, '');
-        });
-        return lm ? (lm.abstraction || '') : '';
-    };
-
-    // Pre-parse c-list slots — resolve human pet names for use during disassembly.
-    // Uses the same priority as MyGoldenTokens rendering:
-    //   1. lump manifest pet_names.CR[s]
-    //   2. Abstract GT device-class derivation (LED0, UART0, … — canonical no-bracket form)
-    //   3. Inform/Outform GT: use exact token lookup, not mutable sim.nsLabels
-    const clistSlotName = {};   // slot index (0-based) → human name
-    const _crPetNamesForCode = {};
-    const _abDevClsNames     = ['?','LED','UART','Button','Timer','Display'];
+    // Show exact C-list words, not identities inferred from mutable Namespace
+    // state. Authored method comments remain untouched.
+    const clistSlotName = {};   // slot index (0-based) → GT or unresolved target
+    const _commentContext = { words, count: cc };
     const clistStart = lumpSize - cc;
     for (let s = 0; s < cc; s++) {
-        const wIdx = clistStart + s;
-        const wVal = wIdx < words.length ? (words[wIdx] >>> 0) : 0;
-        if (!wVal) {
-            const _capMeta = null;
-            const _capName = _capMeta ? (_capMeta.name || (typeof _capMeta === 'string' ? _capMeta : '')) : '';
-            clistSlotName[s] = _capName || '(empty)';
-            continue;
-        }
-        const _mfstName = _crPetNamesForCode[s] || _crPetNamesForCode[String(s)] || '';
-        if (_mfstName) { clistSlotName[s] = _mfstName; continue; }
-        const _gtType = (wVal >>> 23) & 0x3;
-        if (_gtType === 3) {  // Abstract GT: [31:27]=ab_type [26]=R [25]=W [15:0]=ab_data
-            const _abType  = (wVal >>> 27) & 0x1F;
-            const _abData  = wVal & 0xFFFF;
-            const _devCls  = (_abData >>> 8) & 0xFF;
-            const _devDat  = _abData & 0xFF;
-            if (_abType === 0)      clistSlotName[s] = `${_abDevClsNames[_devCls] || `Dev${_devCls}`}${_devDat}`;
-            else if (_abType === 1) clistSlotName[s] = 'M-Elevation';
-            else                   clistSlotName[s] = `Abs[${_abType}]`;
-        } else {  // Inform / Outform GT: [15:0]=slot_id
-            const _tokName  = _clistName(wVal);
-            clistSlotName[s] = _tokName || '';
-        }
+        clistSlotName[s] = _indexedCallTarget(_commentContext, s);
     }
 
     // ── Auto-comment engine ──────────────────────────────────────────────
     // Generates a human-readable semantic comment for one instruction.
-    // Uses the already-maintained crAlias + clistSlotName context.
+    // Uses the displayed artifact, never live register contents or aliases.
     const _autoComment = (w, op, crDst, crSrc, imm, cond, crAlias) => {
         if (w === 0) return 'end of method / padding';
-
-        const condNames = ['EQ','NE','CS','CC','MI','PL','VS','VC','HI','LS','GE','LT','GT','LE','','NV'];
-        const condStr   = cond === 14 ? '' : `if ${condNames[cond]} `;
-
-        // crName: returns pet name in quotes when CRn carries a known c-list alias,
-        // otherwise returns the structural register label. This gives the logical view.
-        const crName = n => {
-            if (crAlias[n] !== undefined) {
-                const nm = clistSlotName[crAlias[n]];
-                if (nm) return `"${nm}"`;
-            }
-            if (n === 6 && cc > 0) return 'c-list';
-            if (n === 14) return 'CR14(code)';
-            if (n === 13) return 'CR13(int)';
-            if (n === 15) return 'CR15(priv)';
-            return `CR${n}`;
-        };
-        // Helper: pet name for a c-list slot, falling back to slot index label
-        const _slotLabel = idx => clistSlotName[idx] || `c-list[${idx}]`;
-
-        switch (op) {
-            case 0: {  // LOAD CRd, CRs[imm]
-                if (crSrc === 6 && cc > 0) {
-                    return `${condStr}CR${crDst} ← "${_slotLabel(imm)}"`;
-                }
-                return `${condStr}CR${crDst} ← GT via ${crName(crSrc)}[${imm}]`;
-            }
-            case 1: {  // SAVE CRd, CRs[imm]
-                return `${condStr}store CR${crDst} → GT space of ${crName(crSrc)}[${imm}]`;
-            }
-            case 2: {  // CALL CRd[, sel]
-                if (crSrc === 6) {
-                    const row = imm & 0x1F;
-                    const method = (imm >>> 5) & 0x7F;
-                    return `${condStr}invoke "${_slotLabel(row)}" via CR6[${row}]${method ? `, method #${method - 1}` : ''}`;
-                }
-                const method = imm && !(imm & 0x4000) ? `, method #${imm - 1}` : ' (fast path)';
-                return `${condStr}invoke ${crName(crDst)}${method}`;
-            }
-            case 3: {  // RETURN [mask]
-                const retMask = imm & 0xFFF;
-                return `${condStr}${retMask
-                    ? `scrub regs 0b${retMask.toString(2).padStart(12,'0')} then return`
-                    : 'return to caller'}`;
-            }
-            case 4: {  // CHANGE CRd, CRs[imm]
-                return `${condStr}CHANGE CR${crDst} via ${crName(crSrc)}, NS[${imm}] (requires privileged destination)`;
-            }
-            case 5: {  // SWITCH CRd, CRs, row
-                if (crDst === 15 && crSrc === 15)
-                    return `${condStr}SWITCH CR15, CR15 (guarded Boot placeholder)`;
-                return `${condStr}SWITCH CR${crDst}, CR${crSrc}, #${imm} (requires M authorization)`;
-            }
-            case 6: {  // TPERM CRd, preset[B]
-                const presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];
-                const bFlag   = (imm >>> 4) & 1;
-                const preset  = presets[imm & 0xF] || 'RSV';
-                if ((imm & 0xF) === 13) return `${condStr}query return frame → Z flag`;
-                if ((imm & 0xF) === 14) return `${condStr}assert CR${crDst} GT identical to CR${crSrc} GT (fault on mismatch)`;
-                if ((imm & 0xF) >= 10) return `${condStr}${preset} reserved (faults if executed)`;
-                return `${condStr}attenuate CR${crDst} to ${preset}${bFlag ? '+B' : ''} permissions`;
-            }
-            case 7: {  // LAMBDA CRd
-                return `${condStr}create lambda closure → CR${crDst}`;
-            }
-            case 8: {  // ELOADCALL CRd, CRs[imm15]  imm15 = (methodIdx<<5)|row
-                const _elcRow  = imm & 0x1F;   // bits[4:0] = c-list row (0–31)
-                const _elcMeth = (imm >>> 5) & 0x7F; // 1-based encoded selector, 0=fast-path
-                const _methTag = _elcMeth > 0 ? ` method #${_elcMeth - 1}` : '';
-                if (crSrc === 6 && cc > 0) {
-                    return `${condStr}fused load + call "${_slotLabel(_elcRow)}"${_methTag} → CR${crDst}`;
-                }
-                return `${condStr}fused load + call ${crName(crSrc)}[${_elcRow}]${_methTag} → CR${crDst}`;
-            }
-            case 9: {  // XLOADLAMBDA CRd, CRs[imm]
-                if (crSrc === 6 && cc > 0) {
-                    return `${condStr}fused load + lambda "${_slotLabel(imm)}" → CR${crDst}`;
-                }
-                return `${condStr}fused load + lambda ${crName(crSrc)}[${imm}] → CR${crDst}`;
-            }
-            case 16: {  // DREAD DRd, CRs[imm]
-                const offset = (imm & 0x4000) ? `${imm & 0x3FFF}` : `${(imm >>> 4) & 0x3FF} + DR${imm & 0xF}`;
-                return `${condStr}DR${crDst} ← data[${crName(crSrc)}+${offset}]`;
-            }
-            case 17: {  // DWRITE DRd, CRs[imm]
-                const offset = (imm & 0x4000) ? `${imm & 0x3FFF}` : `${(imm >>> 4) & 0x3FF} + DR${imm & 0xF}`;
-                return `${condStr}data[${crName(crSrc)}+${offset}] ← DR${crDst}`;
-            }
-            case 18: {  // BFEXT DRd, DRs, pos, w
-                const pos   = (imm >>> 5) & 0x1F;
-                const width = imm & 0x1F;
-                return `${condStr}DR${crDst} = bits[${pos}:${pos+width-1}] of DR${crSrc}${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}`;
-            }
-            case 19: {  // BFINS DRd, DRs, pos, w
-                const pos   = (imm >>> 5) & 0x1F;
-                const width = imm & 0x1F;
-                return `${condStr}insert ${width}b from DR${crSrc} at pos ${pos} into DR${crDst}${width === 0 || pos + width > 32 ? ' (invalid field; faults if executed)' : ''}`;
-            }
-            case 20: {  // MCMP DRd, DRs
-                return `${condStr}compare DR${crDst} vs DR${crSrc} → flags`;
-            }
-            case 21: {  // IADD DRd, DRs, DRm | #imm
-                const isImm = (imm & 0x4000) !== 0;
-                const rhs   = isImm ? `#${imm & 0x3FFF}` : `DR${imm & 0xF}`;
-                return `${condStr}DR${crDst} = DR${crSrc} + ${rhs}`;
-            }
-            case 22: {  // ISUB DRd, DRs, DRm | #imm
-                const isImm = (imm & 0x4000) !== 0;
-                const rhs   = isImm ? `#${imm & 0x3FFF}` : `DR${imm & 0xF}`;
-                return `${condStr}DR${crDst} = DR${crSrc} − ${rhs}`;
-            }
-            case 23: {  // BRANCH soff
-                const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
-                return `${condStr}branch → PC${soff >= 0 ? '+' : ''}${soff}`;
-            }
-            case 24: {  // SHL DRd, DRs, shamt
-                return `${condStr}DR${crDst} = DR${crSrc} << ${imm & 0x1F}`;
-            }
-            case 25: {  // SHR DRd, DRs, shamt [ASR]
-                const arith = (imm >>> 5) & 1;
-                const shamt = imm & 0x1F;
-                return `${condStr}DR${crDst} = DR${crSrc} >> ${shamt} (${arith ? 'arithmetic' : 'logical'})`;
-            }
-            default:
-                return 'unknown opcode';
-        }
+        // One symbolic decoder for both loaded-code and immutable-artifact views.
+        // Supply only the displayed artifact's bytes and embedded capabilities.
+        const decoded = _decompileWord(w, 0, null, 0, null, _commentContext);
+        return decoded ? decoded.desc.replace(/&quot;/g, '"').replace(/&gt;/g, '>').replace(/&lt;/g, '<').replace(/&amp;/g, '&') : '';
     };
 
     // ── Method docstring renderer ────────────────────────────────────────
@@ -5650,7 +5775,7 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
     const _lumpBrTargetSet = new Set();
     for (let _ci = 0; _ci < _lumpCodeWords.length; _ci++) {
         const _cw2 = _lumpCodeWords[_ci];
-        if (((_cw2 >>> 27) & 0x1F) !== 17) continue;
+        if (((_cw2 >>> 27) & 0x1F) !== 23) continue;
         const _rawImm = _cw2 & 0x7FFF;
         const _soff   = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
         const _tgt    = _ci + _soff;
@@ -5826,19 +5951,12 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             const crSrc = (w >>> 15) & 0xF;
             const imm   = w & 0x7FFF;
 
-            // A listing is not a linear execution: LOAD may be skipped or fault,
-            // and a branch may bypass it. Never carry a speculative CR alias
-            // into later instruction annotations.
-
             // Build symbolic annotation (capability arrow shown next to mnemonic)
             let ann = '';
-            const _nsOrClistName = idx => clistSlotName[idx] || null;
+            const _nsOrClistName = idx => _indexedCallTarget(_commentContext, idx);
             if (op === 0 && crSrc === 6 && cc > 0) {
                 const nm = _nsOrClistName(imm);
                 if (nm) ann = `<span class="lump-sym-ann">\u2190 ${e(nm)}</span>`;
-            } else if (op === 2 && crSrc === 6 && cc > 0) {
-                const nm = _nsOrClistName(imm);
-                if (nm) ann = `<span class="lump-sym-ann">\u2192 ${e(nm)}</span>`;
             } else if ((op === 8 || op === 9) && crSrc === 6 && cc > 0) {
                 // ELOADCALL (op=8): imm15 = (methodIdx<<5)|row — slot is bits[4:0] only.
                 // XLOADLAMBDA (op=9): imm15 is the full slot index.
@@ -7156,6 +7274,16 @@ function _preserveEditorNavigationBuffer() {
 }
 
 async function openLumpInEditor(token, options) {
+    var _exactSelection = options && options.exactSavedArtifact;
+    if (_exactSelection) {
+        if (!/^[0-9a-f]{8}$/i.test(String(token || '')) ||
+                String(_exactSelection.token).toLowerCase() !== String(token).toLowerCase() ||
+                typeof _exactSelection.filename !== 'string' ||
+                !/^[^/\\]+\.lump$/.test(_exactSelection.filename) ||
+                !/^[0-9a-f]{64}$/i.test(_exactSelection.binary_hash || '')) {
+            throw new Error('The selected design artifact lacks a complete exact saved identity.');
+        }
+    }
     // Opening a LUMP is normally explicit navigation. Claim that authority
     // synchronously, before the artifact fetch, so the asynchronous startup
     // default cannot replace a Namespace/editor selection that is still
@@ -7169,41 +7297,15 @@ async function openLumpInEditor(token, options) {
         'open saved LUMP: ' + token);
     var _openRequestId = (window._savedLumpOpenRequestId || 0) + 1;
     window._savedLumpOpenRequestId = _openRequestId;
-    var lump = window.LumpRegistry ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
+    var lump = _exactSelection ? {
+        token: token, filename: _exactSelection.filename,
+        binary_hash: _exactSelection.binary_hash,
+        abstraction: _exactSelection.abstraction || token, ns_slot: null,
+    } : window.LumpRegistry
+        ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 
-    // An immutable-history row may still be the most recently compiled saved
-    // revision (notably
-    // when a fixed boot-resident binary remains installed). Redirect only when
-    // this token is older than another saved revision of the same abstraction.
-    if (lump && lump.archived === true && window.LumpRegistry) {
-        var _archiveAbs = lump.abstraction || null;
-        var _primaryCandidates = window.LumpRegistry.list().filter(function(entry) {
-            var server = entry && entry.sources && entry.sources.server;
-            return server && server.abstraction === _archiveAbs;
-        });
-        _primaryCandidates.sort(function(a, b) {
-            var as = a.sources.server;
-            var bs = b.sources.server;
-            var _compiledTime = function(server) {
-                var raw = server && server.compiled_at;
-                if (raw === null || raw === undefined || raw === '') return 0;
-                var numeric = Number(raw);
-                if (Number.isFinite(numeric)) return numeric;
-                var parsed = Date.parse(String(raw));
-                return Number.isFinite(parsed) ? parsed / 1000 : 0;
-            };
-            var compiledOrder = _compiledTime(bs) - _compiledTime(as);
-            if (compiledOrder) return compiledOrder;
-            return (parseInt(bs.lump_version) || 0) -
-                (parseInt(as.lump_version) || 0);
-        });
-        if (_primaryCandidates.length > 0 &&
-                _primaryCandidates[0].token !== token) {
-            token = _primaryCandidates[0].token;
-            lump = _primaryCandidates[0].sources.server;
-            window.LumpRegistry.setCurrent(token);
-        }
-    }
+    // Historical selections retain their exact token; a newer artifact must
+    // not silently replace the source the programmer chose to edit.
 
     // ── Fresh-compilation redirect (dot.name.hash protocol) ───────────────
     // This is now a comparison only; it must never silently redirect.
@@ -7227,7 +7329,7 @@ async function openLumpInEditor(token, options) {
     // list not yet fetched) but the server binary is actually the most
     // recent known-good artefact — without the guard any new compilation
     // (registeredAt > 0) would beat fetchedAt=0 and incorrectly win.
-    if (window.LumpRegistry) {
+    if (!_exactSelection && window.LumpRegistry) {
         var _savedEntry = window.LumpRegistry.resolve(token);
         var _absName = (_savedEntry?.sources?.server?.abstraction)
                     || (_savedEntry?.abstraction)
@@ -7264,7 +7366,8 @@ async function openLumpInEditor(token, options) {
     // saved), check the registry's memory source.  If it matches, build a
     // synthetic lump descriptor so the rest of this function proceeds identically.
     var _inMemoryLump = false;
-    var _regMemData = window.LumpRegistry ? window.LumpRegistry.resolve(token)?.sources?.memory : null;
+    var _regMemData = !_exactSelection && window.LumpRegistry
+        ? window.LumpRegistry.resolve(token)?.sources?.memory : null;
     if (!lump && _regMemData && _regMemData.words && _regMemData.words.length > 0) {
         _inMemoryLump = true;
         var _memName = _regMemData.abstraction || ((typeof sim !== 'undefined' && sim && sim.programName)
@@ -7358,6 +7461,7 @@ async function openLumpInEditor(token, options) {
     var _binaryAuthDenied = false;
     var _binaryResponseRawTailHex = '';
     var _binaryResponseByteCount = null;
+    var _exactOpenFailure = null;
     if (_inMemoryLump && _regMemData && _regMemData.words && _regMemData.words.length > 0) {
         var _memCaps2 = _regMemData.capabilities || [];
         var _memCw = _regMemData.words.length;
@@ -7370,7 +7474,13 @@ async function openLumpInEditor(token, options) {
         serverWords = [_memHdr >>> 0].concat(_regMemData.words.map(function(w) { return w >>> 0; }));
     } else {
         try {
-            var _wr = await fetch('/api/lump/' + token + '/words', { cache: 'no-store' });
+            var _wordsUrl = '/api/lump/' + encodeURIComponent(token) + '/words';
+            if (_exactSelection) {
+                _wordsUrl += '?exact_filename=' +
+                    encodeURIComponent(_exactSelection.filename) +
+                    '&binary_hash=' + encodeURIComponent(_exactSelection.binary_hash);
+            }
+            var _wr = await fetch(_wordsUrl, { cache: 'no-store' });
             if (_wr.ok) {
                 var _wj = null;
                 try {
@@ -7378,6 +7488,14 @@ async function openLumpInEditor(token, options) {
                 } catch (_jsonError) {
                     _binaryInspectionError =
                         'The exact saved-binary response was not valid JSON; no bytes were decoded.';
+                }
+                if (_exactSelection && (!_wj ||
+                        _wj.filename !== _exactSelection.filename ||
+                        String(_wj.binary_hash || '').toLowerCase() !==
+                            _exactSelection.binary_hash.toLowerCase())) {
+                    _exactOpenFailure =
+                        'The exact saved filename or SHA-256 does not match this Namespace selection.';
+                    throw new Error(_exactOpenFailure);
                 }
                 // Only a numeric uint32 word array is binary inspection data.
                 // In particular, an HTTP 200 JSON auth/error envelope must not
@@ -7419,7 +7537,7 @@ async function openLumpInEditor(token, options) {
                     // banner can be used. Preserve these exact immutable words
                     // for synchronous pet-name resolution during compilation,
                     // including the pre-Run state where CR6 is not live.
-                    if (typeof _cacheLumpWords === 'function') {
+                    if (!_exactSelection && typeof _cacheLumpWords === 'function') {
                         _cacheLumpWords(token, _wj);
                     }
                     _wordsResponse = _wj;
@@ -7439,7 +7557,18 @@ async function openLumpInEditor(token, options) {
                         'The exact saved-binary response did not contain an inspectable word array ' +
                         'or a validated trailing-byte record.';
                 }
+                if (_exactSelection && !_hasExactWordArray) {
+                    _exactOpenFailure = _binaryInspectionError ||
+                        'The selected saved artifact has no inspectable exact bytes.';
+                    throw new Error(_exactOpenFailure);
+                }
             } else {
+                if (_exactSelection) {
+                    _exactOpenFailure =
+                        'The exact saved artifact is unavailable (HTTP ' + _wr.status +
+                        '). The current editor and its draft were not replaced.';
+                    throw new Error(_exactOpenFailure);
+                }
                 _binaryAuthDenied = _wr.status === 401 || _wr.status === 403;
                 if ((_wr.status === 404 || _wr.status === 410) &&
                         _clearOrphanedSavedLumpOwner(
@@ -7472,9 +7601,21 @@ async function openLumpInEditor(token, options) {
                 }
             }
         } catch (_fe) {
+            if (_exactSelection) {
+                _exactOpenFailure = 'Could not read the exact selected artifact: ' +
+                    String(_fe && _fe.message || _fe);
+            }
             _binaryInspectionError =
                 'Exact saved-binary inspection is unavailable; no binary response was received.';
         }
+    }
+    if (_exactSelection && _exactOpenFailure) {
+        if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast('Saved LUMP unavailable', _exactOpenFailure, 'error', 8000);
+        } else if (typeof window.alert === 'function') {
+            window.alert(_exactOpenFailure);
+        }
+        return false;
     }
     if (window._savedLumpOpenRequestId !== _openRequestId ||
             !_openWriteGuard.accepts()) return;
@@ -7550,10 +7691,32 @@ async function openLumpInEditor(token, options) {
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
 
     if (window._savedLumpOpenRequestId !== _openRequestId) return;
+    var _sharedCodeSelection = _selectSavedLumpCodeDisplay(
+        _wordsResponse || {},
+        _browserFrameSource ? { source: _browserFrameSource } : null,
+        serverWords || [], {
+            abstraction: lumpName,
+            token: token,
+            rawTailHex: _binaryResponseRawTailHex,
+            methodCount: _binaryFrameApi && Array.isArray(_binaryFrameApi.methods)
+                ? _binaryFrameApi.methods.length : 0
+        });
     var _sourceResolution = _diagnosticSource !== null
         ? _resolveSavedLumpEditorSource(_diagnosticSource, null)
         : _resolveSavedLumpEditorSource(
-            _serverFrameSource, _browserFrameSource, _browserFrameDecodeConfirmed);
+            _serverFrameSource, _browserFrameSource, _browserFrameDecodeConfirmed,
+            _wordsResponse && _wordsResponse.unverified_source,
+            _wordsResponse && _wordsResponse.unverified_source_provenance);
+    if (_sourceResolution.origin === 'missing' &&
+            _sharedCodeSelection.kind === 'reconstructed-source') {
+        _sourceResolution = {
+            source: _sharedCodeSelection.text,
+            restored: false,
+            origin: 'reconstructed-source',
+            provenanceWarning: _sharedCodeSelection.warning,
+            inspectionSources: []
+        };
+    }
     if (!serverWords && _binaryInspectionError && !_diagnosticOnlySource) {
         _sourceResolution = {
             source: '',
@@ -7566,9 +7729,8 @@ async function openLumpInEditor(token, options) {
         };
     }
     if (_diagnosticOnlySource) {
-        // Diagnostic-source is explicitly untrusted and is useful only for
-        // read-only repair inspection.  Do not let it become editable source
-        // merely because the binary endpoint was unavailable.
+        // Diagnostic source does not authorize the binary. Its exact text can
+        // still be recovered below as an editable repair draft.
         _sourceResolution = {
             source: '',
             restored: false,
@@ -7587,19 +7749,30 @@ async function openLumpInEditor(token, options) {
         _wordsResponse.binary_valid === false ||
         (Array.isArray(_wordsResponse.validation_errors) &&
             _wordsResponse.validation_errors.length > 0));
-    if (_binaryTrustFailure && _sourceResolution.restored) {
+    if (_binaryTrustFailure && typeof _sourceResolution.source === 'string' &&
+            _sourceResolution.source.length > 0) {
+        var _savedRejectionReason = _savedLumpRejectionReason(_wordsResponse);
         _sourceResolution = {
             source: '',
             restored: false,
             origin: 'unverified-binary',
             inspectionSources: [
-                { label: 'Source from unverified exact response', source:
+                { label: 'Code from rejected exact response', source:
                     _sourceResolution.source }
             ],
             integrityError:
-                'Embedded source is available, but the exact saved binary failed ' +
-                'an approval or integrity check; the source is shown only for read-only inspection.'
+                'Saved artifact rejection: ' + (_savedRejectionReason ||
+                    'The exact saved binary failed an approval or integrity check; no reason was supplied.') +
+                ' Editing source does not authorize this binary.'
         };
+    }
+    if (_binaryTrustFailure && _sourceResolution.integrityError &&
+            _sourceResolution.origin !== 'unverified-binary') {
+        var _additionalRejection = _savedLumpRejectionReason(_wordsResponse);
+        if (_additionalRejection) {
+            _sourceResolution.integrityError +=
+                ' Saved artifact rejection: ' + _additionalRejection;
+        }
     }
 
     // Identity displayed beside the disassembly must describe the same exact
@@ -7716,7 +7889,7 @@ async function openLumpInEditor(token, options) {
                         var _sTrim  = _slice.length;
                         while (_sTrim > 0 && _slice[_sTrim - 1] === 0) _sTrim--;
                         var _body   = _slice.slice(0, _sTrim);
-                        var _mName  = _m.name || ('Method' + (mi + 1));
+                        var _mName  = _savedLumpMethodLabel(_m, mi);
                         disasmLines.push('method ' + _mName + ' {  ; selector #' + (mi + 1));
                         if (_body.length === 0) {
                             disasmLines.push('  ; (empty)');
@@ -7768,7 +7941,7 @@ async function openLumpInEditor(token, options) {
                             var _sliceTrim = _slice.length;
                             while (_sliceTrim > 0 && _slice[_sliceTrim - 1] === 0) _sliceTrim--;
                             var _body = _slice.slice(0, _sliceTrim);
-                            var _mName = (_methods[mi] && (_methods[mi].name || _methods[mi])) || ('Method' + (mi + 1));
+                            var _mName = _savedLumpMethodLabel(_methods[mi], mi);
 
                             disasmLines.push('method ' + _mName + ' {' +
                                              '  ; selector #' + (mi + 1));
@@ -8002,7 +8175,17 @@ async function openLumpInEditor(token, options) {
 
         // Restore only source embedded in the selected immutable binary.
         var _recoveredSource = _sourceResolution.source;
+        // Trust controls binary use, not access to recoverable source. Retain
+        // the rejection and inspection metadata while editing a separate draft.
+        if (!_recoveredSource && Array.isArray(_sourceResolution.inspectionSources)) {
+            var _draftSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
+                return item && typeof item.source === 'string' && item.source.length > 0;
+            });
+            if (_draftSourceRecord) _recoveredSource = _draftSourceRecord.source;
+        }
         var _sourceRestored = _sourceResolution.restored;
+        var _editableSourceAvailable = typeof _recoveredSource === 'string' &&
+            _recoveredSource.length > 0;
 
         // Keep the legacy name for compatibility with draft/discard paths;
         // its value is now the original source buffer, not disassembly.
@@ -8011,7 +8194,7 @@ async function openLumpInEditor(token, options) {
 
         // ── Check for a saved draft from a previous session ───────────────
         var _savedDraft = _draftLsGet(token);
-        var _hasDraft   = _sourceRestored && _savedDraft !== null &&
+        var _hasDraft   = _editableSourceAvailable && _savedDraft !== null &&
             _savedDraft.trim() !== '' && _savedDraft !== _recoveredSource;
         // Saved-LUMP source changes are programmatic, so they do not emit the
         // native input event used by the normal editor freshness watcher.
@@ -8025,7 +8208,7 @@ async function openLumpInEditor(token, options) {
 
         var _navigationBuffer = window._editorNavigationBuffers &&
             window._editorNavigationBuffers['lump:' + _lumpTokenIdentity(token)];
-        if (_navigationBuffer && _sourceRestored &&
+        if (_navigationBuffer && _editableSourceAvailable &&
                 _navigationBuffer.original === _recoveredSource) {
             // Return to this page's own working document, not an unreviewed
             // older draft. The binary pane remains the exact saved artifact.
@@ -8114,7 +8297,8 @@ async function openLumpInEditor(token, options) {
                     (_savedArtifactFailed ? ' is-failed' : '');
                 _srcBanner.setAttribute('role', _savedArtifactFailed ? 'alert' : 'status');
                 _srcBanner.setAttribute('aria-label', _savedArtifactFailed
-                    ? 'Saved artifact failed approval or integrity checks'
+                    ? 'Saved artifact failed approval or integrity checks: ' +
+                        _sourceResolution.integrityError
                     : 'Source restored from saved LUMP');
                 _srcBanner.title = _srcBanner.getAttribute('aria-label');
                 _srcBanner.innerHTML = _savedArtifactFailed
@@ -8131,25 +8315,15 @@ async function openLumpInEditor(token, options) {
         }
 
         if (_sourceResolution.integrityError) {
-            var _sealedInspectionSource = '';
-            if (Array.isArray(_sourceResolution.inspectionSources)) {
-                var _sealedSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
-                    return item && typeof item.source === 'string' && item.source.length > 0;
-                });
-                if (_sealedSourceRecord) {
-                    _sealedInspectionSource = _sealedSourceRecord.source;
-                }
-            }
-            _setSavedLumpEditorSource(_sealedInspectionSource);
-            asmEd.readOnly = true;
-            asmEd.classList.add('cm-editor-sealed');
+            asmEd.readOnly = !_editableSourceAvailable;
+            asmEd.classList.toggle('cm-editor-sealed', !_editableSourceAvailable);
             var _sourceIntegrityBanner = document.createElement('div');
             _sourceIntegrityBanner.id = '_lumpSourceIntegrityBanner';
             _sourceIntegrityBanner.className = 'lump-malformed-banner';
             _sourceIntegrityBanner.textContent = _sourceResolution.integrityError +
-                (serverWords
-                    ? ' The source pane is sealed and shows the exact response read-only.'
-                    : ' The source pane is sealed; exact binary inspection is unavailable.');
+                (_editableSourceAvailable
+                    ? ' Source is available as an editable draft. Editing does not approve, install, or change the immutable binary.'
+                    : ' Source is missing; the source pane is sealed and empty.');
             var _sourceIntegrityParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceIntegrityParent) {
                 _sourceIntegrityParent.insertBefore(_sourceIntegrityBanner, asmEd.parentNode);
@@ -8157,21 +8331,44 @@ async function openLumpInEditor(token, options) {
                 asmEd.parentNode.insertBefore(_sourceIntegrityBanner, asmEd);
             }
         } else if (!_sourceRestored) {
-            // A binary-only artifact is not an editable source document. Do
-            // not present a blank textarea as if it were recovered source.
-            _setSavedLumpEditorSource('');
-            asmEd.readOnly = true;
-            asmEd.classList.add('cm-editor-sealed');
+            var _hasUnverifiedFallback =
+                _sourceResolution.origin === 'unverified-fallback';
+            var _hasReconstructedSource =
+                _sourceResolution.origin === 'reconstructed-source';
+            asmEd.readOnly = !_editableSourceAvailable;
+            asmEd.classList.toggle('cm-editor-sealed', !_editableSourceAvailable);
             var _sourceMissingBanner = document.createElement('div');
             _sourceMissingBanner.id = '_lumpSourceMissingBanner';
             _sourceMissingBanner.className = 'lump-malformed-banner';
             _sourceMissingBanner.textContent =
-                _binaryFrameIsApiOnly
-                    ? 'Binary-only LUMP: no source is embedded. The source pane is intentionally unavailable; compiled disassembly is shown on the right.'
-                    : 'Embedded source is unavailable. Legacy sidecar and catalog source are not trusted as artifact content. The source pane is intentionally unavailable; compiled disassembly is shown on the right.';
+                _hasUnverifiedFallback
+                    ? 'Unverified source shown from ' +
+                        _sourceResolution.unverifiedProvenance +
+                        '. This is an editable draft, not embedded artifact source, and is not proven to match this binary.'
+                    : (_hasReconstructedSource
+                        ? _sourceResolution.provenanceWarning
+                        : 'No authorized source or reconstructable exact code bytes are available. The source editor is sealed and empty.');
             var _sourceMissingParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceMissingParent) _sourceMissingParent.insertBefore(_sourceMissingBanner, asmEd.parentNode);
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
+        }
+        if (_exactSelection && !_editableSourceAvailable) {
+            var _noSourceBanner = document.getElementById('_lumpSourceIntegrityBanner') ||
+                document.getElementById('_lumpSourceMissingBanner');
+            if (_noSourceBanner) {
+                _noSourceBanner.appendChild(document.createTextNode(
+                    ' The exact saved artifact has no editable source. You can create ' +
+                    'a separate new source without installing or modifying these bytes. '));
+                var _newSourceButton = document.createElement('button');
+                _newSourceButton.className = 'btn btn-sm';
+                _newSourceButton.textContent = 'Create source in New editor';
+                _newSourceButton.onclick = function() {
+                    if (typeof newAbstraction === 'function') {
+                        return newAbstraction(_exactSelection.abstraction || lumpName);
+                    }
+                };
+                _noSourceBanner.appendChild(_newSourceButton);
+            }
         }
 
         _enterSavedLumpEditorMode(
@@ -8182,6 +8379,14 @@ async function openLumpInEditor(token, options) {
                     !!(_exactResponseLump &&
                         _exactResponseLump._identityProvenance === 'unverified')
             }, _inMemoryLump ? null : serverWords);
+        window._editorOpenedBootInspectionToken =
+            options && options.bootInspection ? token : null;
+        window._editorOpenedBootInspectionKind =
+            window._editorOpenedBootInspectionToken ? 'boot-entry' : null;
+        if (window._editorOpenedBootInspectionToken &&
+                typeof _showBootArtifactInspectionStatus === 'function') {
+            _showBootArtifactInspectionStatus();
+        }
 
         if (typeof updateLineNumbers === 'function') updateLineNumbers();
         // Title must always follow the code module name without exception.
@@ -8457,9 +8662,7 @@ window.editorSaveLump = function() {
         }
     };
 
-    var _regEntry = window.LumpRegistry &&
-        typeof window.LumpRegistry.resolve === 'function' &&
-        typeof window.LumpRegistry.getCurrent === 'function'
+    var _regEntry = window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
         : null;
     var _regMem = _regEntry ? _regEntry.sources : null;
@@ -8585,6 +8788,8 @@ function _formatLumpApiDefinition(absName, caps) {
             return {
                 name: (cap && cap.name) || '',
                 rights: (cap && Array.isArray(cap.rights)) ? cap.rights.slice() : [],
+                ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                    .filter(key => cap && typeof cap[key] === 'string').map(key => [key, cap[key]])),
                 grants: (cap && Array.isArray(cap.grants)) ? cap.grants.slice() : []
             };
         })
@@ -8701,7 +8906,16 @@ function _renderFormatLumpCandidate(pending) {
         if (_proceedNote) {
             _proceedNote.style.display = '';
             _proceedNote.style.color = '#e07070';
-            _proceedNote.textContent = '\u2717 Fix errors above before saving';
+            var _intentionalFault = _auditResults.some(function(result) {
+                return result.ruleId === 'RCI' && result.severity === 'error' &&
+                    Array.isArray(result.violations) &&
+                    result.violations.some(function(violation) {
+                        return Number.isInteger(violation.slot);
+                    });
+            });
+            _proceedNote.textContent = _intentionalFault
+                ? '\u2717 Executable Save LUMP is blocked by the static audit. An out-of-range access may intentionally fault NO_CAPABILITY; keep the draft unchanged rather than adding a capability to silence this check.'
+                : '\u2717 Static audit blocks executable Save LUMP; review errors above before saving';
         }
     } else if (_hasWarnings) {
         _proceedBtn.disabled = false;
@@ -8746,6 +8960,9 @@ window._selectFormatLumpProfile = _selectFormatLumpProfile;
 // history, then opens the single Save LUMP dialog. Stores the binary on
 // window._pendingLumpData for confirmSaveToNamespace().
 window.showFormatLump = async function() {
+    // Never leave an earlier reviewed binary available after a failed
+    // preparation of a newer draft.
+    window._pendingLumpData = null;
     var _regEntry = window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
         : null;
@@ -8753,8 +8970,9 @@ window.showFormatLump = async function() {
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
     if (!_hasCompiledWords) {
-        alert('A current build candidate is required before formatting. Use Save LUMP to explicitly Build and Save the current source.');
-        return;
+        var _missingCandidate = 'A current build candidate is required before formatting. Use Save LUMP to explicitly Build and Save the current source.';
+        alert(_missingCandidate);
+        return { ok: false, error: _missingCandidate, reported: true };
     }
 
     var _regToken = window.LumpRegistry
@@ -8768,23 +8986,27 @@ window.showFormatLump = async function() {
     var _svCC = _caps.length;
     var _svCW = _svWords.length;
     if (typeof CapabilityTokens === 'undefined') {
-        alert('Cannot format this LUMP: capability token validator is unavailable.');
-        return;
+        var _missingValidator = 'Cannot format this LUMP: capability token validator is unavailable.';
+        alert(_missingValidator);
+        return { ok: false, error: _missingValidator, reported: true };
     }
     var _lcf = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
     if (!_lcf) {
-        alert('Cannot format this LUMP: the embedded content-frame builder is unavailable.');
-        return;
+        var _missingFrame = 'Cannot format this LUMP: the embedded content-frame builder is unavailable.';
+        alert(_missingFrame);
+        return { ok: false, error: _missingFrame, reported: true };
     }
     var _srcEl = document.getElementById('asmEditor');
     var _srcText = _srcEl ? (_srcEl.value || '') : '';
+    var _openOwnershipToken = window._editorOpenLumpToken;
     // Do not package an editor buffer that was changed after the compiled
     // words were produced. Requiring one fresh compile here is safer than
     // saving a source frame that describes a different program.
     if (_regMem.memory && typeof _regMem.memory.sourceText === 'string' &&
             _regMem.memory.sourceText !== _srcText) {
-        alert('Cannot format this LUMP: the editor changed after compilation. Compile the current source before saving.');
-        return;
+        var _staleSource = 'Cannot format this LUMP: the editor changed after compilation. Compile the current source before saving.';
+        alert(_staleSource);
+        return { ok: false, error: _staleSource, reported: true };
     }
     // SELF is the one canonical row-zero owner capability. Normalize the
     // historical internal spelling before it reaches the review UI or the
@@ -8829,12 +9051,11 @@ window.showFormatLump = async function() {
                 _capMaterialized.errors.map(function(message) { return '\u2022 ' + message; }).join('\n');
             if (typeof appendOutput === 'function') appendOutput(_capFailure, 'error');
             alert(_capFailure);
-            return;
+            return { ok: false, error: _capFailure, reported: true };
         }
-        // Formatting is an intermediate save stage: only compiler-owned
-        // SELF at row zero may still be the exact placeholder.  Named
-        // unresolved capabilities (and misplaced/non-SELF placeholders) are
-        // rejected here rather than being carried into Step 2.
+        // Keep named declarations for lazy resolution. Their exact row,
+        // name and rights are stored in the embedded API; no target or
+        // Namespace slot is invented while formatting the artifact.
         var _candidateValidation = CapabilityTokens.validateClist(
             _svBinary,
             _svLumpSize - _svCC,
@@ -8844,6 +9065,7 @@ window.showFormatLump = async function() {
                 lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
                     ? _lumpsCache : [],
                 allowCompilerSelfPlaceholder: true,
+                allowPendingPlaceholders: true,
             }
         );
         if (!_candidateValidation.ok) {
@@ -8853,10 +9075,12 @@ window.showFormatLump = async function() {
                 }).join('\n');
             if (typeof appendOutput === 'function') appendOutput(_candidateFailure, 'error');
             alert(_candidateFailure);
-            return;
+            return { ok: false, error: _candidateFailure, reported: true };
         }
         var _normalizedCaps = _capMaterialized.resolvedCaps.map(function(cap) {
             return {
+                ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                    .filter(key => typeof cap[key] === 'string').map(key => [key, cap[key]])),
                 name: cap.name,
                 rights: cap.rights.slice(),
                 grants: cap.grants.slice(),
@@ -8886,6 +9110,17 @@ window.showFormatLump = async function() {
             hasErrors: (typeof lumpAuditHasErrors === 'function') ? lumpAuditHasErrors(_auditResults) : false,
             hasWarnings: (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false
         };
+    }
+    // Content-frame encoding yields to the event loop. Reject navigation or
+    // edits that occurred during that wait rather than reviewing an old
+    // candidate under a different editor owner.
+    if ((_srcEl && _srcEl.value !== _srcText) ||
+            window._editorOpenLumpToken !== _openOwnershipToken ||
+            window.LumpRegistry.getCurrent() !== _regToken ||
+            window.LumpRegistry.resolve(_regToken) !== _regEntry) {
+        var _changedDraft = 'Cannot review this LUMP: the editor draft or selected LUMP changed while preparing the save. Compile the current draft and click Save LUMP again.';
+        alert(_changedDraft);
+        return { ok: false, error: _changedDraft, reported: true };
     }
 
     // Store immutable candidates for Step 2; confirmSaveToNamespace retains its
@@ -9039,7 +9274,7 @@ window.showFormatLump = async function() {
                 if (_capStatus === 'pending') {
                     _capsHtml += '<div class="fmt-caps-row">' +
                         '<span class="fmt-caps-slot">[' + _ci + ']</span>' +
-                        '<span class="fmt-caps-name fmt-caps-pending">\u29d6 ' + _fmtEscape(_capName) + ' (pending)</span>' +
+                        '<span class="fmt-caps-name fmt-caps-pending" title="The declaration is saved without allocating its target. Lazy Resolve binds a local slot on use; loading still requires a matching target LUMP.">\u29d6 ' + _fmtEscape(_capName) + ' (lazy resolve on use)</span>' +
                         _capLocation +
                         '<span class="fmt-caps-status">unresolved</span>' +
                         '</div>';
@@ -9069,6 +9304,7 @@ window.showFormatLump = async function() {
 
     // Format/audit and Namespace choices share one confirmation surface.
     showSaveToNamespace();
+    return { ok: true };
 };
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────
@@ -9833,12 +10069,14 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
         throw new Error('binary inspection fields are unavailable');
     }
     const binaryHash = inspection.binary_hash || wordsPayload.binary_hash;
+    // An approval is required to publish/deploy, not to test existing bytes
+    // locally. Unapproved descriptive metadata must never be trusted as GTs.
+    let approved = {};
     const detailResp = await fetch(`/api/lumps/${token}/detail`, { cache: 'no-store' });
-    if (!detailResp.ok) {
-        throw new Error(`could not load hash-bound approval metadata (server returned ${detailResp.status})`);
+    if (detailResp.ok) {
+        const detail = await detailResp.json();
+        try { approved = _hashBoundLumpApproval(detail, binaryHash); } catch (_) {}
     }
-    const detail = await detailResp.json();
-    const approved = _hashBoundLumpApproval(detail, binaryHash);
     const inspectContent = typeof LumpContentFrame !== 'undefined' && LumpContentFrame &&
         LumpContentFrame.lumpInspectContentFrame;
     if (!inspectContent) throw new Error('binary content-frame inspector is unavailable');
@@ -9933,7 +10171,11 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
                 throw new Error('compiler-owned self capability requires c-list row 0');
             }
             const selfWord = (rawWords[clistStart] || 0) >>> 0;
-            const isPlaceholder = selfWord === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+            const isPlaceholder = selfWord === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER ||
+                (selfWord === 0 && savedMetadata.apiDefinition &&
+                 savedMetadata.apiDefinition.capabilities &&
+                 savedMetadata.apiDefinition.capabilities[0] &&
+                 ['SELF', '__SELF__'].includes(savedMetadata.apiDefinition.capabilities[0].name));
             const parsedSelf = !isPlaceholder && simInstance &&
                 typeof simInstance.parseGT === 'function'
                 ? simInstance.parseGT(selfWord) : null;
@@ -10032,6 +10274,18 @@ function _validateSavedLumpClist(rawWords, header, savedMetadata, simInstance) {
         // no approval/catalog capability array may reinterpret these words.
         for (let row = validationStart; row < clistStart + header.cc; row++) {
             const word = rawWords[row] >>> 0;
+            const cap = savedCaps[row - clistStart];
+            const embedded = savedMetadata.apiDefinition &&
+                Array.isArray(savedMetadata.apiDefinition.capabilities) &&
+                savedMetadata.apiDefinition.capabilities[row - clistStart];
+            if ((word === 0 || ((word >>> 16) === 0xFEED &&
+                    word !== ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER &&
+                    word !== ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER)) &&
+                cap && embedded && cap.name === embedded.name &&
+                Array.isArray(embedded.rights) && embedded.rights.length &&
+                JSON.stringify(cap.rights) === JSON.stringify(embedded.rights)) {
+                continue;
+            }
             if (word === 0 ||
                 word === ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER ||
                 word === ChurchSimulator.PRIVATE_DATA_CAPABILITY_PLACEHOLDER) {
@@ -10091,6 +10345,12 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
         const data = await resp.json();
         const rawWords = data.words || [];
         if (!rawWords.length) throw new Error('Empty LUMP \u2014 no words returned');
+        const actualHash = await _executionIdentityHashWords(rawWords);
+        const inspection = _lumpBinaryInspection(data);
+        if (!inspection || !/^[0-9a-f]{64}$/i.test(actualHash || '') ||
+                actualHash.toLowerCase() !== String(inspection.binary_hash || '').toLowerCase()) {
+            throw new Error('Saved binary response does not match its inspected full content hash');
+        }
         const _savedMetadata = await _loadSavedLumpCapabilities(token, data);
 
         if (typeof sim === 'undefined' || !sim) throw new Error('Simulator not ready');
@@ -10158,7 +10418,11 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             }
         }
         if (!Number.isInteger(_targetSlot)) {
-            throw new Error('No target Namespace slot was supplied or found for this immutable LUMP. Select a destination explicitly before deployment.');
+            _targetSlot = typeof sim.allocOrFindNsSlot === 'function'
+                ? sim.allocOrFindNsSlot(token, name) : null;
+            if (!Number.isInteger(_targetSlot)) {
+                throw new Error('No free simulator Namespace slot is available for this saved LUMP.');
+            }
         }
         // API/approval metadata is advisory for old saved artifacts.  The
         // loaded boot image is authoritative about which objects are frozen
@@ -10168,21 +10432,8 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
                 sim._bootstrapResidentSlots[_targetSlot] === true) {
             _identityContract = 'bootstrap-resident';
         }
-        if (!confirm(`Deploy "${name || token}" to the simulator?\n\n` +
-            'Authorize this exact immutable binary for one deployment.')) {
-            return;
-        }
-        const _deployIntent = await _requestLumpApprovalIntent(rawWords, 'deploy',
-            _savedMetadata.approval);
-        const _deployAuth = await fetch('/api/lumps/deploy-authorize', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token, approval_intent: _deployIntent.intent })
-        });
-        await _actionableJsonResponse(_deployAuth, 'Authorize LUMP deployment', {
-            dataChanged: false,
-            nextAction: 'Reapprove the exact saved binary, then click Load into Sim again.',
-        });
+        // This button installs into volatile simulator memory only. Do not
+        // request server deployment approval or mutate any saved artifact.
 
         if (!sim.bootComplete && typeof instantBoot === 'function') instantBoot();
 
@@ -10746,3 +10997,44 @@ function _gtLiveDisplayName(slot, capMeta, petName, nsLabel) {
 /* ---- GT_DECODE_UNIT_TEST_EXPORT_END ---- */
 
 if (typeof window !== 'undefined') window.showLumpDetail = showLumpDetail;
+
+function _selectSavedLumpCodeDisplay(payload, inspection, words, details) {
+    payload = payload && typeof payload === 'object' ? payload : {};
+    details = details || {};
+    var embedded = typeof payload.source === 'string' && payload.source.length > 0
+        ? payload.source
+        : (inspection && typeof inspection.source === 'string' &&
+            inspection.source.length > 0 ? inspection.source : '');
+    if (embedded) {
+        return { kind: 'embedded', text: embedded, warning: '', readOnly: false };
+    }
+    if (typeof payload.unverified_source === 'string' &&
+            payload.unverified_source.length > 0) {
+        var provenance = payload.unverified_source_provenance ||
+            'legacy or catalog record for this exact file';
+        return {
+            kind: 'unverified-source',
+            text: payload.unverified_source,
+            provenance: provenance,
+            warning: 'Unverified source shown from ' + provenance +
+                '. It is not embedded artifact source and is not proven to match this binary.',
+            readOnly: true
+        };
+    }
+    var reconstruction = _reconstructSavedLumpInstructionSource(words, details);
+    if (reconstruction) {
+        return {
+            kind: 'reconstructed-source',
+            text: reconstruction,
+            warning: 'Reconstructed instruction assembly from this exact saved binary. ' +
+                'It is not the original source and recompilation is not guaranteed to reproduce the artifact.',
+            readOnly: false
+        };
+    }
+    return {
+        kind: 'unavailable',
+        text: '',
+        warning: 'Code is unavailable because exact saved bytes could not be fetched.',
+        readOnly: true
+    };
+}

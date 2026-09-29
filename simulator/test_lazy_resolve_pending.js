@@ -16,6 +16,8 @@ const fs   = require('fs');
 const path = require('path');
 
 const ChurchSimulator = require('./simulator.js');
+const Registry = require('./abstractions.js');
+const System = require('./system_abstractions.js');
 
 function writeTestNsEntry(sim, ...args) {
     const bootComplete = sim.bootComplete;
@@ -27,17 +29,26 @@ function writeTestNsEntry(sim, ...args) {
     }
 }
 const CapabilityTokens = require('./capability_tokens.js');
+function installTarget(sim, name) {
+    const slot = sim.allocOrFindNsSlot(null, name);
+    writeTestNsEntry(sim, slot, 0x0900, 63, 0, 0, 1, 0, 0, 0);
+    sim.nsLabels[slot] = name;
+    return slot;
+}
 
 // bootSim() from tests/gates/sim_helpers is fine; setupCR6 there uses the
 // wrong argument order for packNSWord1 in this codebase (7-arg call hits a
 // 5-arg signature, leaving clistCount=0).  We define a corrected version here.
 function bootSim() {
     const sim = new ChurchSimulator();
+    const registry = new Registry();
+    sim.initAbstractions(registry, new System(registry), null);
     let steps = 0;
     while (!sim.bootComplete && !sim.halted && steps < 300) {
         sim._bootStep();
         steps++;
     }
+    if (!sim.bootComplete) throw new Error('Synthetic boot fixture did not complete');
     return sim;
 }
 
@@ -136,18 +147,13 @@ console.log('\n--- T002: _execLoad instant resolution ---');
     if (!sim.bootComplete) {
         console.log('SKIP T002: boot did not complete');
     } else {
-        // Install a valid NS entry at slot 5 so isNSEntryValid(5) === true.
-        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
-        const NS5_BASE = sim._nsSlotBase(5);
-        sim.memory[NS5_BASE]     = 0x00000001 >>> 0;  // non-zero word0 (lump base)
-        sim.memory[NS5_BASE + 1] = 0x00000041 >>> 0;  // non-zero word1 (limit field)
-        if (sim.nsCount < 6) sim.nsCount = 6;
-        sim.nsLabels[5] = 'TestAbstr';
+        const targetSlot = installTarget(sim, 'TestAbstr');
 
         // Place a pending sentinel for 'TestAbstr' in c-list slot 0 (address 500).
         setupCR6(sim);
         const pendingWord = ChurchSimulator.makePendingGT('TestAbstr');
         sim.memory[500] = pendingWord >>> 0;
+        sim.programCapabilities = [{ name: 'TestAbstr', rights: ['R'] }];
 
         // Encode LOAD CR1, [CR6+0] (imm=0 → c-list offset 0) at PC=0.
         const instr = sim.encodeInstruction(0, 0xE, 1, 6, 0);
@@ -172,26 +178,22 @@ console.log('\n--- T002: _execLoad instant resolution ---');
         check('T002c: c-list slot was updated to a non-zero real GT',
             slotAfter !== 0);
 
-        check('T002d: simulator output contains the [LAZY-RESOLVE] marker',
-            sim.output.includes('[LAZY-RESOLVE]'));
+        check('T002d: requested R is retained without default E',
+            sim.parseGT(slotAfter).permissions.R && !sim.parseGT(slotAfter).permissions.E);
 
-        // The simulator may subsequently halt when validating the resolved GT's
-        // lump bounds (NS slot 5 has a stub entry, not a full lump).  What matters
-        // is that the halt was NOT caused by LAZY_RESOLVE_PENDING — resolution
-        // succeeded and the fault (if any) is unrelated to the pending path.
-        check('T002e: any subsequent halt was NOT caused by LAZY_RESOLVE_PENDING',
-            !newFaults.some(f => f.type === 'LAZY_RESOLVE_PENDING'));
+        check('T002e: capability LOAD raises no fault',
+            newFaults.length === 0 && !sim.halted);
 
         // The resolved GT encodes the target NS slot in its lower 16 bits.
         const resolvedNsIdx = slotAfter & 0xFFFF;
-        check('T002f: resolved GT points to NS slot 5',
-            resolvedNsIdx === 5);
+        check('T002f: resolved GT points to the installed target',
+            resolvedNsIdx === targetSlot);
     }
 }
 
 // ── T003: _execLoad unresolvable path ────────────────────────────────────────
-// A pending slot whose pet name has no matching nsLabel must fire a structured
-// LAZY_RESOLVE_PENDING fault carrying petName and slot in the fault record.
+// If Navana registration is unavailable, resolution must fail explicitly and
+// atomically, with the declared pet name and row retained for diagnostics.
 console.log('\n--- T003: _execLoad unresolvable → LAZY_RESOLVE_PENDING fault ---');
 {
     resetPendingRegistry();
@@ -204,6 +206,10 @@ console.log('\n--- T003: _execLoad unresolvable → LAZY_RESOLVE_PENDING fault -
         setupCR6(sim);
         const pendingWord = ChurchSimulator.makePendingGT('UnknownService');
         sim.memory[500] = pendingWord >>> 0;
+        sim.programCapabilities = [{ name: 'UnknownService', rights: ['R'] }];
+        // A missing body is resolvable; an unavailable registration service is not.
+        sim.abstractionRegistry = null;
+        const namespaceBefore = Array.from(sim.memory.slice(sim.NS_TABLE_BASE));
 
         const instr = sim.encodeInstruction(0, 0xE, 1, 6, 0);
         const cr14  = sim.cr[14];
@@ -231,6 +237,17 @@ console.log('\n--- T003: _execLoad unresolvable → LAZY_RESOLVE_PENDING fault -
 
         check('T003d: fault entry carries slot = 0 (c-list offset 0)',
             lpFault ? lpFault.slot === 0 : false);
+        check('T003e: unavailable resolver leaves the pending row unchanged',
+            sim.memory[500] === pendingWord);
+        // Fetching the source c-list sets that descriptor's architectural G
+        // access bit. No allocation, generation, identity or other word changes.
+        const sourceAuthority = sim._nsSlotBase(CR6_DESC_SLOT) + 1;
+        check('T003f: failed resolution changes no Namespace authority or binding',
+            namespaceBefore.every((word, index) => {
+                const address = sim.NS_TABLE_BASE + index;
+                return sim.memory[address] === (address === sourceAuthority
+                    ? (word | 0x40000000) >>> 0 : word);
+            }));
     }
 }
 
@@ -451,11 +468,8 @@ console.log('\n--- T005: lump-audit RPN — pending sentinel prevents unnamed-sl
     }
 }
 
-// ── T006: NULL GT in named c-list slot → lazy suspend (LOAD) ─────────────────
-// When _execLoad encounters a NULL (0x00000000) GT in a named c-list slot, it
-// must suspend the thread (_lazySuspended=true) without firing a fault, and
-// emit lazyResolvePending.
-console.log('\n--- T006: NULL GT named slot → lazy-suspend via LOAD ---');
+// NULL declarations resolve through Navana without needing a body.
+console.log('\n--- T006: NULL GT named slot → free-list reservation via LOAD ---');
 {
     resetPendingRegistry();
 
@@ -463,8 +477,7 @@ console.log('\n--- T006: NULL GT named slot → lazy-suspend via LOAD ---');
     if (!sim.bootComplete) {
         console.log('SKIP T006: boot did not complete');
     } else {
-        // 'NavanaService' is NOT in nsLabels — instant-resolve will fail,
-        // forcing the suspend path.
+        // 'NavanaService' is absent: reserve the free-list head.
 
         setupCR6(sim);
         // Write NULL GT (0) to c-list slot 0.
@@ -472,6 +485,7 @@ console.log('\n--- T006: NULL GT named slot → lazy-suspend via LOAD ---');
 
         // Populate programCapabilities so _execLoad sees the pet name.
         sim.programCapabilities = [{ name: 'NavanaService', rights: ['E'] }];
+        const expectedHead = sim.allocOrFindNsSlot(null, 'NavanaService');
 
         // Encode LOAD CR1, [CR6+0] at PC=0.
         const instr = sim.encodeInstruction(0, 0xE, 1, 6, 0);
@@ -489,42 +503,44 @@ console.log('\n--- T006: NULL GT named slot → lazy-suspend via LOAD ---');
         check('T006a: step() returns a truthy result (not null)',
             result !== null && result !== undefined);
 
-        check('T006b: result.lazySuspended === true',
-            result && result.lazySuspended === true);
+        check('T006b: resolution does not suspend',
+            result && result.lazySuspended !== true);
 
-        check('T006c: sim._lazySuspended flag is set',
-            sim._lazySuspended === true);
+        check('T006c: thread remains runnable',
+            sim._lazySuspended === false);
 
-        check('T006d: no fault was logged (transparent suspension)',
+        check('T006d: no fault was logged during capability resolution',
             sim.faultLog.length === faultCountBefore);
 
-        check('T006e: result carries the pet name "NavanaService"',
-            result && result.petName === 'NavanaService');
+        const resolved = sim.parseGT(sim.memory[500]);
+        check('T006e: reservation retains its pet name',
+            sim.nsLabels[resolved.index] === 'NavanaService');
 
-        check('T006f: result carries slot index 0',
-            result && result.slot === 0);
+        check('T006f: reservation uses free-list head',
+            resolved.index === expectedHead);
 
-        check('T006g: _pendingResolves Map has one entry for slot 0',
-            sim._pendingResolves.size === 1 && sim._pendingResolves.has(0));
+        check('T006g: no interactive pending request is created',
+            sim._pendingResolves.size === 0);
 
-        check('T006h: lazyResolvePending event was emitted',
-            lazyEvent !== null);
+        check('T006h: no lazyResolvePending event is emitted',
+            lazyEvent === null);
 
-        check('T006i: event carries petName "NavanaService"',
-            lazyEvent && lazyEvent.petName === 'NavanaService');
+        check('T006i: declaration requests E explicitly',
+            resolved.permissions.E && !resolved.permissions.R);
 
-        check('T006j: sim.output contains [LAZY-RESOLVE] marker',
-            sim.output.includes('[LAZY-RESOLVE]'));
+        check('T006j: target body remains absent until load',
+            sim.mLoad(sim.memory[500], 'E').fault === 'CODE_NOT_RESIDENT');
 
-        // Subsequent step() must be a no-op while suspended.
+        // An unrelated instruction must remain runnable despite the absent body.
+        sim.memory[cr14.word1 + 2] = sim.encodeInstruction(0, 0xE, 2, 6, 0);
         const result2 = sim.step();
-        check('T006k: second step() returns lazySuspended sentinel (thread still waiting)',
-            result2 && result2.lazySuspended === true);
+        check('T006k: subsequent capability LOAD does not load the absent body',
+            result2 && !result2.lazySuspended && !sim.halted);
     }
 }
 
-// ── T007: NULL GT named slot → lazy suspend (ELOADCALL) ──────────────────────
-console.log('\n--- T007: NULL GT named slot → lazy-suspend via ELOADCALL ---');
+// ELOADCALL resolves the name, then requires the actual body.
+console.log('\n--- T007: ELOADCALL resolves but fails to load absent body ---');
 {
     resetPendingRegistry();
 
@@ -532,7 +548,7 @@ console.log('\n--- T007: NULL GT named slot → lazy-suspend via ELOADCALL ---')
     if (!sim.bootComplete) {
         console.log('SKIP T007: boot did not complete');
     } else {
-        // 'AlphaService' is NOT in nsLabels — instant-resolve fails → suspend path.
+        // 'AlphaService' has neither a local binding nor a body.
 
         setupCR6(sim);
         sim.memory[500] = 0;
@@ -551,16 +567,16 @@ console.log('\n--- T007: NULL GT named slot → lazy-suspend via ELOADCALL ---')
         const faultCountBefore = sim.faultLog.length;
         const result = sim.step();
 
-        check('T007a: result is truthy',
-            result !== null && result !== undefined);
+        check('T007a: ELOADCALL fails when the actual target body is absent',
+            result === null);
 
-        check('T007b: result.lazySuspended === true or no fault on NULL slot',
-            (result && result.lazySuspended === true) || sim.faultLog.length === faultCountBefore);
+        check('T007b: the attempted target call faults CODE_NOT_RESIDENT',
+            sim.faultLog.slice(faultCountBefore).some(f => f.type === 'CODE_NOT_RESIDENT'));
 
-        check('T007c: sim output mentions ELOADCALL lazy suspend or LAZY-RESOLVE',
-            sim.output.includes('[LAZY-RESOLVE]') || (result && result.lazySuspended));
+        check('T007c: resolution reserved a slot before the attempted load',
+            sim.symbolicEntryAt(sim.parseGT(sim.memory[500]).index) !== null);
 
-        check('T007d: no NULL_CAP fault was raised (transparent suspension)',
+        check('T007d: a declared target is not mistaken for NULL authority',
             !sim.faultLog.slice(faultCountBefore).some(f => f.type === 'NULL_CAP'));
     }
 }
@@ -619,17 +635,12 @@ console.log('\n--- T009: resolvePendingSlot — NULL slot (Task #1519 path) ---'
     if (!sim.bootComplete) {
         console.log('SKIP T009: boot did not complete');
     } else {
-        // Seed a valid NS entry at slot 6.
-        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
-        const NS6_BASE = sim._nsSlotBase(6);
-        sim.memory[NS6_BASE]     = 0x00000001 >>> 0;
-        sim.memory[NS6_BASE + 1] = 0x00000041 >>> 0;
-        if (sim.nsCount < 7) sim.nsCount = 7;
-        sim.nsLabels[6] = 'BetaService';
+        const targetSlot = installTarget(sim, 'BetaService');
 
         setupCR6(sim);
         // Plant a NULL GT and manually inject the lazy resolve entry.
         sim.memory[500] = 0;
+        sim.programCapabilities = [{ name: 'BetaService', rights: ['R'] }];
         sim._pendingResolves.set(0, {
             petName: 'BetaService', slot: 0, instrName: 'LOAD', kind: 'NULL_GT',
             pc: 0,
@@ -640,7 +651,16 @@ console.log('\n--- T009: resolvePendingSlot — NULL slot (Task #1519 path) ---'
         });
         sim._lazySuspended = true;
 
-        const res = sim.resolvePendingSlot(0, 6);
+        sim.programCapabilities[0].rights = [];
+        const beforeDenied = Array.from(sim.memory);
+        const denied = sim.resolvePendingSlot(0, targetSlot);
+        check('T009 denied: absent requested rights cannot silently grant E',
+            !denied.ok && sim._lazySuspended && sim._pendingResolves.has(0) &&
+            beforeDenied.every((word, index) => word === sim.memory[index]));
+        sim.programCapabilities[0].rights = ['R'];
+        const res = sim.resolvePendingSlot(0, targetSlot);
+        check('T009 rights: interactive resolution retains R without granting E',
+            sim.parseGT(sim.memory[500]).permissions.R && !sim.parseGT(sim.memory[500]).permissions.E);
 
         check('T009a: resolvePendingSlot returns ok=true for NULL slot',
             res && res.ok === true);
@@ -674,7 +694,7 @@ console.log('\n--- T010: escalateLazyResolve — fires NULL_CAP fault ---');
     if (!sim.bootComplete) {
         console.log('SKIP T010: boot did not complete');
     } else {
-        // 'GammaService' is NOT in nsLabels — instant-resolve fails → suspend path.
+        // Retain coverage of explicit escalation for legacy interactive requests.
 
         setupCR6(sim);
         sim.memory[500] = 0;
@@ -686,10 +706,15 @@ console.log('\n--- T010: escalateLazyResolve — fires NULL_CAP fault ---');
         sim.pc     = 0;
         sim.halted = false;
 
-        const result = sim.step();
-        if (!result || !result.lazySuspended) {
-            console.log('SKIP T010: did not suspend on NULL GT');
-        } else {
+        // Exercise escalation of a legacy interactive suspension explicitly;
+        // named declarations now resolve immediately instead of entering it.
+        sim._pendingResolves.set(0, {
+            petName: 'GammaService', instrName: 'LOAD', pc: sim.pc,
+            savedDRs: [...sim.dr], savedCRs: sim.cr.map(cr => ({ ...cr })),
+            savedFlags: { ...sim.flags }, savedSto: sim.sto,
+        });
+        sim._lazySuspended = true;
+        {
             const faultCountBefore = sim.faultLog.length;
             sim.escalateLazyResolve(0);
 
@@ -721,13 +746,7 @@ console.log('\n--- T011: NULL GT instant inline resolution when NS label is vali
     if (!sim.bootComplete) {
         console.log('SKIP T011: boot did not complete');
     } else {
-        // Seed a fully valid NS entry at slot 9.
-        // NS table is TOP-DOWN: use _nsSlotBase() not the ascending formula.
-        const NS9_BASE = sim._nsSlotBase(9);
-        sim.memory[NS9_BASE]     = 0x00000001 >>> 0;
-        sim.memory[NS9_BASE + 1] = 0x00000041 >>> 0;
-        if (sim.nsCount < 10) sim.nsCount = 10;
-        sim.nsLabels[9] = 'DeltaService';
+        const targetSlot = installTarget(sim, 'DeltaService');
 
         setupCR6(sim);
         sim.memory[500] = 0;
@@ -749,8 +768,8 @@ console.log('\n--- T011: NULL GT instant inline resolution when NS label is vali
             (sim.memory[500] >>> 0) !== 0 &&
             !ChurchSimulator.isPendingGT(sim.memory[500] >>> 0));
 
-        check('T011c: sim.output contains [LAZY-RESOLVE] inline marker',
-            sim.output.includes('[LAZY-RESOLVE]'));
+        check('T011c: existing binding is reused with declared E rights',
+            sim.parseGT(sim.memory[500]).index === targetSlot && sim.parseGT(sim.memory[500]).permissions.E);
 
         check('T011d: no NULL_CAP or LAZY_RESOLVE_PENDING fault was logged',
             !sim.faultLog.slice(faultCountBefore).some(

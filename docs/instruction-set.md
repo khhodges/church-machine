@@ -114,21 +114,30 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+`mask` is a 12-bit keep mask in bits [11:0]. For CR0–CR4 and CR7–CR11,
+bit N=1 keeps the current descriptor; bit N=0 zeros it directly without
+capability resolution. Bits 5/6 are ignored: CR5 descriptor words are unchanged
+by CALL/RETURN, and CR6 is reconstructed from saved caller context. Bare
+`RETURN` (mask=0) clears all ten controlled CRs. No pre-call values are restored.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; retain DRs and CR5/CR12/CR13/CR15 descriptor words.
+   All M bits reset at CALL/RETURN boundaries, then CR6 is rearmed.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
-when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+when a thread is resumed; its descriptor words are unchanged by CALL/RETURN.
+No CLEAR bit or stack extension exists; the frame has no hidden CR/DR snapshot.
+Old mask-ignored artifacts are not behaviorally compatible by default despite
+unchanged encoding. Hardware lambda-fast RETURN revalidates accepted CR14
+Inform/X identity and code location through cLoad before mask clearing and
+reconstructs CR6; legacy `lambda_pc` still differs from canonical SZ=0 frames.
+Only the synthetic boot-ROM guard (`savedPC=3`, no active lambda) retains the
+cLoad bypass, without canonical namespace/c-list identity or guaranteed CR6
+reconstruction. This is an unresolved implementation limit, not an approved
+exemption; see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -644,21 +653,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -1174,21 +1181,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -1704,21 +1709,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -2234,21 +2237,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -2764,21 +2765,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -3294,21 +3293,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -3824,21 +3821,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -4354,21 +4349,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -4884,21 +4877,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -5414,21 +5405,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -5944,21 +5933,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -6474,21 +6461,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -7004,21 +6989,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -7534,21 +7517,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -8064,21 +8045,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -8594,21 +8573,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -9124,21 +9101,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -9654,21 +9629,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -10184,21 +10157,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -10714,21 +10685,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -11244,21 +11213,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -11774,21 +11741,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -12304,21 +12269,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -12834,21 +12797,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -13364,21 +13325,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -13894,21 +13853,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -14424,21 +14381,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -14954,21 +14909,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -15484,21 +15437,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -16014,21 +15965,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 
@@ -16544,21 +16493,19 @@ RETURN [mask]
 
 **Encoding**: `opcode[5]=00011 | cond[4] | 0[11] | mask[12]`
 
-`mask` is a reserved 12-bit field in bits [11:0]. Current hardware and the
-simulator ignore it, and the assembler warns for a nonzero value. Bit 6 must
-remain zero because CR6 is always reconstructed from the saved Enter GT. Use
-bare `RETURN` (`mask=0`).
+Low12 is a keep mask: 1 keeps the current descriptor, 0 zeros CR0–CR4/CR7–CR11.
+Bits 5/6 are ignored; CR5 descriptor unchanged, CR6 reconstructed from caller.
 
 **Execution order**:
 1. Pop 2-word frame
 2. mLoad caller's E-GT (Word 0) — version + MAC + G-bit reset; NS split re-derives CR6 and CR14
 3. Restore PC from NIA and machine indicators from Word 1
-4. Leave other CRs and DRs as the callee left them
+4. Apply the keep mask; DRs unchanged. Reset all M bits, then rearm CR6.
 
 Note: CR5 is a thread-bound capability installed by CHANGE from Zone④ bounds
 when a thread is resumed; it is not saved or restored by CALL/RETURN. The
-12-bit RETURN mask is not implemented; nonzero values are ignored and the
-assembler warns. The architectural frame contains no hidden CR or DR snapshot.
+keep mask never restores pre-call values. No CLEAR bit or frame extension.
+Legacy cLoad bypasses and artifact compatibility: see `HARDWARE-DEVIATIONS.md`.
 
 If the call stack is empty, or if RETURN unwinds through the boot sentinel frame (NIA = 0x7FFF), RETURN faults with `STACK_UNDERFLOW` — not a reboot, not a halt. The "warm reboot" description in older documents is incorrect.
 

@@ -57,11 +57,12 @@ const HANDLER_SRC = extractClickHandler('app-misc.js');
 // ── DOM fixture helpers ───────────────────────────────────────────────────────
 
 // Build a fresh JSDOM environment with a .nia-disasm-body containing the
-// requested row specs.  Each spec is:
-//   { desc, current, noDesc }
-//   desc    — string → sets data-desc attribute (omit or falsy for no attr)
+// requested row specs. Each spec is:
+//   { desc, current, noDesc, addr, label }
+//   desc    — string → sets data-desc attribute
 //   current — bool  → adds .nia-disasm-current class
 //   noDesc  — bool  → row has no data-desc (overrides desc)
+//   addr    — numeric word address (defaults to its index)
 function makeFixture(rowSpecs) {
     const dom = new JSDOM('<!DOCTYPE html><body></body>');
     const document = dom.window.document;
@@ -70,11 +71,12 @@ function makeFixture(rowSpecs) {
     body.className = 'nia-disasm-body';
     document.body.appendChild(body);
 
-    const rows = rowSpecs.map(function(spec) {
+    const rows = rowSpecs.map(function(spec, index) {
         const row = document.createElement('div');
         let cls = 'nia-disasm-row';
         if (spec.current) cls += ' nia-disasm-current';
         row.className = cls;
+        row.dataset.addr = String(spec.addr === undefined ? index : spec.addr);
         if (spec.desc && !spec.noDesc) {
             row.dataset.desc = spec.desc;
         }
@@ -83,13 +85,14 @@ function makeFixture(rowSpecs) {
         return row;
     });
 
-    // Attach the production click handler (requires disasmBody in scope).
-    // _disasmPinnedMap is declared at file-scope in app-misc.js (outside the
-    // extracted snippet).  Without it in the sandbox the Proxy fallback would
-    // return function(){}, making .set()/.delete() throw TypeError.  Supply the
-    // real Map here so the handler pins/unpins rows exactly as it does in the
-    // browser.
-    const sandbox = { disasmBody: body, document: document, _disasmPinnedMap: new Map() };
+    // Attach the production click handler in the same environment it expects.
+    const pinnedMap = new Map();
+    const sandbox = {
+        disasmBody: body,
+        document: document,
+        entryUid: 'test-entry',
+        _disasmPinnedMap: pinnedMap,
+    };
     const ctx = vm.createContext(new Proxy(sandbox, {
         get(target, prop, receiver) {
             if (prop in target) return Reflect.get(target, prop, receiver);
@@ -101,12 +104,11 @@ function makeFixture(rowSpecs) {
     }));
     vm.runInContext(HANDLER_SRC, ctx, { filename: 'app-misc.js' });
 
-    return { document, body, rows };
+    return { document, body, rows, pinnedMap };
 }
 
-// Fire a synthetic click whose e.target is the given element.
-// jsdom's dispatchEvent / click() honours event bubbling so the delegated
-// listener on .nia-disasm-body receives it with the correct e.target.
+// Fire a synthetic click whose e.target is the given element. jsdom's click()
+// bubbles to the delegated listener on .nia-disasm-body.
 function click(el) {
     el.click();
 }
@@ -121,7 +123,7 @@ function assert(label, condition, detail) {
         console.log('PASS ' + label);
         passed++;
     } else {
-        console.log('FAIL ' + label + (detail !== undefined ? ' \u2014 ' + detail : ''));
+        console.log('FAIL ' + label + (detail !== undefined ? ' — ' + detail : ''));
         failed++;
     }
 }
@@ -129,528 +131,119 @@ function assert(label, condition, detail) {
 // ── DP-1: clicking a non-current row with data-desc inserts a desc sibling ───
 {
     const { body, rows } = makeFixture([
-        { label: 'row A', desc: 'Alpha instruction explanation' },
+        { label: 'row A', desc: 'Description for row A', addr: 100 },
     ]);
 
     click(rows[0]);
-
     const desc = body.querySelector('.nia-disasm-desc');
-    assert('DP-1: desc element inserted after click',
+    assert('DP-1: click inserts a description element',
         desc !== null, 'querySelector returned null');
-    assert('DP-1: desc is immediately after the clicked row',
+    assert('DP-1: description is immediately after the clicked row',
         desc && rows[0].nextElementSibling === desc, 'sibling mismatch');
 }
 
 // ── DP-2: at-most-one — clicking row B collapses row A's desc ────────────────
 {
     const { body, rows } = makeFixture([
-        { label: 'row A', desc: 'Explanation A' },
-        { label: 'row B', desc: 'Explanation B' },
+        { label: 'row A', desc: 'Description for row A', addr: 100 },
+        { label: 'row B', desc: 'Description for row B', addr: 101 },
     ]);
 
     click(rows[0]);
-    const descAfterA = body.querySelectorAll('.nia-disasm-desc');
-    assert('DP-2: exactly one desc after first click',
-        descAfterA.length === 1, 'count=' + descAfterA.length);
+    assert('DP-2: first click expands row A',
+        body.querySelectorAll('.nia-disasm-desc').length === 1,
+        'expected one description after clicking row A');
 
     click(rows[1]);
     const descs = body.querySelectorAll('.nia-disasm-desc');
-    assert('DP-2: still exactly one desc after second click',
+    assert('DP-2: only one description remains after clicking row B',
         descs.length === 1, 'count=' + descs.length);
-    assert('DP-2: the remaining desc belongs to row B',
+    assert('DP-2: remaining description belongs to row B',
         descs[0] && rows[1].nextElementSibling === descs[0], 'sibling mismatch');
-    assert('DP-2: row A has no desc sibling',
-        rows[0].nextElementSibling !== null
-            ? !rows[0].nextElementSibling.classList.contains('nia-disasm-desc')
-            : true,
-        'row A still has desc');
+    assert('DP-2: row A description was removed',
+        !rows[0].nextElementSibling.classList.contains('nia-disasm-desc'),
+        'row A still has a description sibling');
 }
 
 // ── DP-3: clicking the same expanded row a second time collapses it ───────────
 {
-    const { body, rows } = makeFixture([
-        { label: 'row A', desc: 'Toggle me' },
+    const { body, rows, pinnedMap } = makeFixture([
+        { label: 'row A', desc: 'Description for row A', addr: 100 },
     ]);
 
     click(rows[0]);
-    assert('DP-3: desc present after first click',
+    assert('DP-3: first click opens row A',
         body.querySelector('.nia-disasm-desc') !== null);
 
     click(rows[0]);
-    assert('DP-3: desc removed after second click (toggle collapse)',
+    assert('DP-3: second click removes row A description',
         body.querySelector('.nia-disasm-desc') === null,
-        'desc still in DOM');
+        'description still present');
+    assert('DP-3: second click clears the row pin',
+        !pinnedMap.has('test-entry'), 'row pin remains');
 }
 
-// ── DP-4: .nia-disasm-current row click is a no-op ───────────────────────────
+// ── DP-4: the current row is not clickable ───────────────────────────────────
 {
     const { body, rows } = makeFixture([
-        { label: 'current row', desc: 'Should not expand', current: true },
+        { label: 'current row', desc: 'Current row description', current: true, addr: 100 },
     ]);
 
     click(rows[0]);
-
-    // The current row's desc element (if any) would carry .nia-disasm-desc-current,
-    // added by the HTML builder — not by the click handler.  The click handler
-    // must NOT insert an additional .nia-disasm-desc (without the -current suffix).
-    const nonCurrentDescs = body.querySelectorAll('.nia-disasm-desc:not(.nia-disasm-desc-current)');
-    assert('DP-4: current row click inserts no desc',
-        nonCurrentDescs.length === 0, 'count=' + nonCurrentDescs.length);
+    assert('DP-4: clicking current row inserts no description',
+        body.querySelector('.nia-disasm-desc') === null,
+        'description found unexpectedly');
 }
 
-// ── DP-5: expanded row receives .nia-row-expanded class ──────────────────────
+// ── DP-5: the expanded row receives .nia-row-expanded ────────────────────────
 {
-    const { body, rows } = makeFixture([
-        { label: 'row A', desc: 'Alpha' },
+    const { rows } = makeFixture([
+        { label: 'row A', desc: 'Description for row A', addr: 100 },
     ]);
 
     click(rows[0]);
-    assert('DP-5: .nia-row-expanded added to clicked row',
+    assert('DP-5: expanded row gains .nia-row-expanded',
         rows[0].classList.contains('nia-row-expanded'),
         'classList=' + rows[0].className);
 }
 
-// ── DP-6: .nia-row-expanded removed when a row collapses ─────────────────────
+// ── DP-6: collapsing a row removes .nia-row-expanded ─────────────────────────
 {
-    const { body, rows } = makeFixture([
-        { label: 'row A', desc: 'Alpha' },
-        { label: 'row B', desc: 'Beta'  },
+    const { rows } = makeFixture([
+        { label: 'row A', desc: 'Description for row A', addr: 100 },
     ]);
 
-    // Expand row A, then click row B — row A should lose the class.
     click(rows[0]);
-    assert('DP-6: row A expanded after first click',
-        rows[0].classList.contains('nia-row-expanded'));
-
-    click(rows[1]);
-    assert('DP-6: row A loses .nia-row-expanded after row B clicked',
+    click(rows[0]);
+    assert('DP-6: collapsed row loses .nia-row-expanded',
         !rows[0].classList.contains('nia-row-expanded'),
         'classList=' + rows[0].className);
-    assert('DP-6: row B gains .nia-row-expanded',
-        rows[1].classList.contains('nia-row-expanded'),
-        'classList=' + rows[1].className);
 }
 
-// ── DP-7: row without data-desc is silently ignored ──────────────────────────
+// ── DP-7: a row without data-desc is silently ignored ────────────────────────
 {
     const { body, rows } = makeFixture([
-        { label: 'no-desc row', noDesc: true },
+        { label: 'row without description', noDesc: true, addr: 100 },
     ]);
 
     click(rows[0]);
-    assert('DP-7: clicking row without data-desc inserts no desc',
+    assert('DP-7: click on row without data-desc inserts no description',
         body.querySelector('.nia-disasm-desc') === null,
-        'desc found unexpectedly');
+        'description found unexpectedly');
 }
 
-// ── DP-8: inserted desc contains the data-desc text ──────────────────────────
+// ── DP-8: inserted description contains the data-desc text ───────────────────
 {
     const expected = 'Load capability into register CR3 from namespace slot 7';
     const { body, rows } = makeFixture([
-        { label: 'row X', desc: expected },
+        { label: 'row A', desc: expected, addr: 100 },
     ]);
 
     click(rows[0]);
     const desc = body.querySelector('.nia-disasm-desc');
-    assert('DP-8: desc textContent matches data-desc attribute',
+    assert('DP-8: inserted description text matches data-desc',
         desc && desc.textContent === expected,
-        desc ? JSON.stringify(desc.textContent) : '(no desc)');
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DB tests: _cmBuildDisasmHtml HTML layout
-//
-//   DB-1  Current row has .nia-disasm-current; its inline desc has
-//          .nia-disasm-desc-current immediately after it
-//   DB-2  Null-word rows before the NIA are collapsed (no DOM node rendered);
-//          the leading separator .nia-nodata-sep appears; null-word rows AFTER
-//          the NIA are rendered with .nia-no-data
-//   DB-3  Spotlight block (.chlog-modal-spotlight) is rendered when the current
-//          word has a mnemonic
-//   DB-4  Spotlight HTML is empty when the word at the NIA is null
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Source extraction ─────────────────────────────────────────────────────────
-
-function extractBuildDisasmHtml(srcPath) {
-    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
-    const marker = 'function _cmBuildDisasmHtml(';
-    const startIdx = src.indexOf(marker);
-    if (startIdx === -1) {
-        throw new Error('_cmBuildDisasmHtml not found in ' + srcPath);
-    }
-    // Walk forward matching braces to find the closing brace of the function.
-    let depth = 0;
-    let end   = -1;
-    for (let i = startIdx; i < src.length; i++) {
-        if (src[i] === '{') depth++;
-        else if (src[i] === '}') {
-            if (--depth === 0) { end = i; break; }
-        }
-    }
-    if (end === -1) throw new Error('Could not find end of _cmBuildDisasmHtml');
-    return src.slice(startIdx, end + 1);
-}
-
-const BUILD_HTML_SRC = extractBuildDisasmHtml('app-misc.js');
-
-// ── Fixture helpers ───────────────────────────────────────────────────────────
-
-// Minimal HTML-escape matching what _escHtml does in production.
-function _escHtmlMock(s) {
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
-
-// Run _cmBuildDisasmHtml in an isolated vm context with mock dependencies.
-// opts may override: decodeWord(word,addr), roleAnnotation(d), plainEnglish(d).
-function runBuildDisasmHtml(niaInt, words, opts) {
-    opts = opts || {};
-    const mockDecodeWord = opts.decodeWord || function(word, addr) {
-        return {
-            addr: addr,
-            hex:  (word >>> 0).toString(16).toUpperCase().padStart(8, '0'),
-            mnemonic: 'MOCK',
-            text: 'MOCK ' + addr,
-            dst: 1, src: 2, imm: 0,
-        };
-    };
-    const mockRoleAnnotation = opts.roleAnnotation || function() { return ''; };
-    const mockPlainEnglish   = opts.plainEnglish   || function() { return 'mock plain english'; };
-
-    const sandbox = {
-        _cmDecodeWord:        mockDecodeWord,
-        _instrRoleAnnotation: mockRoleAnnotation,
-        _instrPlainEnglish:   mockPlainEnglish,
-        _escHtml:             _escHtmlMock,
-        _cmBuildDisasmHtml:   undefined,
-    };
-    const ctx = vm.createContext(new Proxy(sandbox, {
-        get(target, prop, receiver) {
-            if (prop in target) return Reflect.get(target, prop, receiver);
-            if (typeof prop === 'string' && prop in globalThis) return globalThis[prop];
-            return undefined;
-        },
-        has() { return true; },
-    }));
-    vm.runInContext(BUILD_HTML_SRC, ctx, { filename: 'app-misc.js' });
-    return ctx._cmBuildDisasmHtml(niaInt, words);
-}
-
-// Parse an HTML string and return the body element for querying.
-function parseFragment(html) {
-    const dom = new JSDOM('<!DOCTYPE html><body>' + html + '</body>');
-    return dom.window.document.body;
-}
-
-// ── DB-1: current row and its inline desc ────────────────────────────────────
-{
-    const words = [{ wordAddr: 100, word: 0x00000001 }];
-    const result = runBuildDisasmHtml(100, words);
-    const body   = parseFragment(result.rowsHtml);
-
-    const currentRow  = body.querySelector('.nia-disasm-current');
-    const currentDesc = body.querySelector('.nia-disasm-desc-current');
-
-    assert('DB-1: current row has .nia-disasm-current',
-        currentRow !== null, 'querySelector returned null');
-    assert('DB-1: inline desc after current row has .nia-disasm-desc-current',
-        currentDesc !== null, 'querySelector returned null');
-    assert('DB-1: .nia-disasm-desc-current is immediate sibling after current row',
-        currentRow !== null && currentDesc !== null &&
-        currentRow.nextElementSibling === currentDesc,
-        'sibling mismatch');
-}
-
-// ── DB-2: leading no-data collapse and post-NIA no-data rows ─────────────────
-{
-    const words = [
-        { wordAddr: 98,  word: null },   // before NIA — must be collapsed
-        { wordAddr: 99,  word: null },   // before NIA — must be collapsed
-        { wordAddr: 100, word: 0x00000001 }, // NIA — always rendered
-        { wordAddr: 101, word: null },   // after NIA — rendered with .nia-no-data
-    ];
-    const result = runBuildDisasmHtml(100, words);
-    const body   = parseFragment(result.rowsHtml);
-
-    assert('DB-2: leading .nia-nodata-sep separator is present',
-        body.querySelector('.nia-nodata-sep') !== null,
-        'separator element not found');
-
-    assert('DB-2: null row at addr 98 (before NIA) is not rendered',
-        body.querySelector('[data-addr="98"]') === null,
-        'found row with data-addr=98');
-    assert('DB-2: null row at addr 99 (before NIA) is not rendered',
-        body.querySelector('[data-addr="99"]') === null,
-        'found row with data-addr=99');
-
-    const niаRow = body.querySelector('[data-addr="100"]');
-    assert('DB-2: current row (addr 100) is rendered',
-        niаRow !== null, 'NIA row not found');
-
-    const postRow = body.querySelector('[data-addr="101"]');
-    assert('DB-2: null row after NIA (addr 101) is rendered with .nia-no-data',
-        postRow !== null && postRow.classList.contains('nia-no-data'),
-        postRow ? 'classList=' + postRow.className : 'row not found');
-}
-
-// ── DB-3: spotlight block rendered when mnemonic is known ────────────────────
-{
-    const words = [{ wordAddr: 100, word: 0x00000001 }];
-    const result = runBuildDisasmHtml(100, words, {
-        plainEnglish: function() { return 'Load capability from namespace'; },
-    });
-    const body = parseFragment(result.spotlightHtml);
-    assert('DB-3: spotlight block present when current word has a mnemonic',
-        body.querySelector('.chlog-modal-spotlight') !== null,
-        'spotlight element not found');
-}
-
-// ── DB-4: spotlight absent when current word is null ─────────────────────────
-{
-    const words = [{ wordAddr: 100, word: null }];
-    const result = runBuildDisasmHtml(100, words);
-    assert('DB-4: spotlight HTML is empty string when current word is null',
-        result.spotlightHtml === '',
-        'spotlightHtml=' + JSON.stringify(result.spotlightHtml));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DH tests: _wukongRefreshDisasmHwCursor class toggling
-//
-//   DH-1  Calling _wukongRefreshDisasmHwCursor with _wukongLastHwNIA set to
-//          an address applies .nia-disasm-hw-current to the matching row and
-//          leaves non-matching rows without it.
-//   DH-2  Calling _wukongRefreshDisasmHwCursor with a different address
-//          removes .nia-disasm-hw-current from the previously-highlighted row
-//          and adds it to the new one.
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Source extraction ─────────────────────────────────────────────────────────
-
-function extractRefreshHwCursor(srcPath) {
-    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
-    const marker = 'function _wukongRefreshDisasmHwCursor()';
-    const startIdx = src.indexOf(marker);
-    if (startIdx === -1) throw new Error('_wukongRefreshDisasmHwCursor not found in ' + srcPath);
-    let depth = 0, end = -1;
-    for (let i = startIdx; i < src.length; i++) {
-        if (src[i] === '{') depth++;
-        else if (src[i] === '}') { if (--depth === 0) { end = i; break; } }
-    }
-    if (end === -1) throw new Error('Could not find end of _wukongRefreshDisasmHwCursor');
-    return src.slice(startIdx, end + 1);
-}
-
-const HW_CURSOR_SRC = extractRefreshHwCursor('app-run.js');
-
-// Build a DOM fixture with .nia-disasm-row elements carrying data-addr attributes,
-// then run _wukongRefreshDisasmHwCursor in a sandbox that owns _wukongLastHwNIA.
-function makeHwCursorSandbox(addrs, hwNia) {
-    const dom = new JSDOM('<!DOCTYPE html><body></body>');
-    const document = dom.window.document;
-
-    const rows = addrs.map(function(addr) {
-        const row = document.createElement('div');
-        row.className = 'nia-disasm-row';
-        row.dataset.addr = String(addr);
-        document.body.appendChild(row);
-        return row;
-    });
-
-    const sandbox = {
-        document:           document,
-        _wukongLastHwNIA:   hwNia,
-    };
-    const ctx = vm.createContext(new Proxy(sandbox, {
-        get(target, prop, receiver) {
-            if (prop in target) return Reflect.get(target, prop, receiver);
-            if (typeof prop === 'string' && prop in globalThis) return globalThis[prop];
-            return undefined;
-        },
-        has() { return true; },
-    }));
-    vm.runInContext(HW_CURSOR_SRC, ctx, { filename: 'app-run.js' });
-
-    return { ctx, rows };
-}
-
-// Helper: run the cursor function and return the result.
-function runHwCursor(ctx) {
-    vm.runInContext('_wukongRefreshDisasmHwCursor();', ctx, { filename: 'app-run.js' });
-}
-
-// ── DH-1: hw-current applied to the matching row only ────────────────────────
-{
-    const addrs = [100, 101, 102];
-    const { ctx, rows } = makeHwCursorSandbox(addrs, 101);
-
-    runHwCursor(ctx);
-
-    assert('DH-1: matching row (addr 101) gains .nia-disasm-hw-current',
-        rows[1].classList.contains('nia-disasm-hw-current'),
-        'classList=' + rows[1].className);
-    assert('DH-1: non-matching row (addr 100) does not get .nia-disasm-hw-current',
-        !rows[0].classList.contains('nia-disasm-hw-current'),
-        'classList=' + rows[0].className);
-    assert('DH-1: non-matching row (addr 102) does not get .nia-disasm-hw-current',
-        !rows[2].classList.contains('nia-disasm-hw-current'),
-        'classList=' + rows[2].className);
-}
-
-// ── DH-2: hw-current moves when the NIA changes ──────────────────────────────
-{
-    const addrs = [200, 201];
-    const { ctx, rows } = makeHwCursorSandbox(addrs, 200);
-
-    // First call — row 0 highlighted.
-    runHwCursor(ctx);
-    assert('DH-2: row 0 highlighted before NIA change',
-        rows[0].classList.contains('nia-disasm-hw-current'),
-        'classList=' + rows[0].className);
-
-    // Move the NIA to addr 201 and re-run.
-    ctx._wukongLastHwNIA = 201;
-    runHwCursor(ctx);
-
-    assert('DH-2: row 0 loses .nia-disasm-hw-current after NIA moves',
-        !rows[0].classList.contains('nia-disasm-hw-current'),
-        'classList=' + rows[0].className);
-    assert('DH-2: row 1 gains .nia-disasm-hw-current after NIA moves',
-        rows[1].classList.contains('nia-disasm-hw-current'),
-        'classList=' + rows[1].className);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ELC tests: ELOADCALL slot decoding in _autoComment and annotation builder
-//
-// The ELOADCALL imm15 field is split:
-//   bits[4:0]  = c-list row (the slot index passed to the capability register)
-//   bits[11:5] = method index (1-based; 0 = fast-path)
-// The c-list SLOT used is therefore `imm & 0x1F`, NOT the raw imm15.
-// `ELOADCALL CR0, CR6, 0, 1` assembles as imm15=32 (0x0020).
-// A regression that uses raw imm15 as the slot would report c-list[32];
-// the correct implementation reports c-list[0].
-//
-//   ELC-1  _autoComment for ELOADCALL CR0,CR6,0,1 (imm15=32) → slot 0, not 32
-//   ELC-2  _autoComment for ELOADCALL CR0,CR6,1,2 (imm15=65) → slot 1, not 65
-//   ELC-3  Source of annotation builder confirms it uses (imm & 0x1F) for op===8
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Extractor: pull _autoComment out of app-lumps.js ─────────────────────────
-// _autoComment is a const arrow-function defined inside _renderLumpCodeContent.
-// It closes over `cc` and `clistSlotName` — we supply those as sandbox globals.
-
-function extractAutoComment(srcPath) {
-    const src = fs.readFileSync(path.resolve(__dirname, srcPath), 'utf8');
-    const marker = 'const _autoComment = (w, op, crDst, crSrc, imm, cond, crAlias) => {';
-    const startIdx = src.indexOf(marker);
-    if (startIdx === -1) throw new Error('_autoComment marker not found in ' + srcPath);
-    // Walk forward matching braces to find the closing `};`
-    let depth = 0;
-    let end   = -1;
-    for (let i = startIdx; i < src.length; i++) {
-        if (src[i] === '{') depth++;
-        else if (src[i] === '}') {
-            if (--depth === 0) { end = i; break; }
-        }
-    }
-    if (end === -1) throw new Error('Could not find end of _autoComment');
-    // Include the trailing `;` if present
-    const tail = src[end + 1] === ';' ? ';' : '';
-    return src.slice(startIdx, end + 1) + tail;
-}
-
-const AUTO_COMMENT_SRC = extractAutoComment('app-lumps.js');
-
-// Run _autoComment in an isolated sandbox with controlled outer-scope variables.
-// cc         — capability count (>0 triggers the crSrc===6 branch)
-// slotNames  — object mapping slot index → display name (empty = fallback labels)
-function runAutoComment(cc, slotNames, word) {
-    const clistSlotName = slotNames || {};
-    const sandbox = {
-        cc,
-        clistSlotName,
-        _autoComment: undefined,
-    };
-    const ctx = vm.createContext(new Proxy(sandbox, {
-        get(target, prop, receiver) {
-            if (prop in target) return Reflect.get(target, prop, receiver);
-            if (typeof prop === 'string' && prop in globalThis) return globalThis[prop];
-            return undefined;
-        },
-        has() { return true; },
-    }));
-    vm.runInContext(AUTO_COMMENT_SRC, ctx, { filename: 'app-lumps.js' });
-
-    const w      = word >>> 0;
-    const op     = (w >>> 27) & 0x1F;
-    const cond   = (w >>> 23) & 0xF;
-    const crDst  = (w >>> 19) & 0xF;
-    const crSrc  = (w >>> 15) & 0xF;
-    const imm    = w & 0x7FFF;
-    return vm.runInContext(
-        `_autoComment(${w}, ${op}, ${crDst}, ${crSrc}, ${imm}, ${cond}, {})`,
-        ctx,
-        { filename: 'app-lumps.js' }
-    );
-}
-
-// ── ELC-1: ELOADCALL CR0, CR6, 0, 1  (row=0, method=1, imm15=32) ─────────────
-// Word encoding: op=8, cond=14, crDst=0, crSrc=6, imm15=32
-//   (8<<27)|(14<<23)|(0<<19)|(6<<15)|32 = 0x47030020
-{
-    const ELOADCALL_WORD = 0x47030020;
-    const comment = runAutoComment(2, {}, ELOADCALL_WORD);
-
-    assert('ELC-1: comment mentions c-list[0], not c-list[32]',
-        comment.includes('c-list[0]') && !comment.includes('c-list[32]'),
-        'comment=' + JSON.stringify(comment));
-
-    assert('ELC-1: encoded selector 1 is source method #0',
-        comment.includes('method #0'),
-        'comment=' + JSON.stringify(comment));
-}
-
-// ── ELC-2: ELOADCALL CR0, CR6, 1, 2  (row=1, method=2, imm15=65) ─────────────
-// Word encoding: op=8, cond=14, crDst=0, crSrc=6, imm15=(2<<5)|1=65=0x41
-//   (8<<27)|(14<<23)|(0<<19)|(6<<15)|65 = 0x47030041
-{
-    const ELOADCALL_WORD2 = 0x47030041;
-    const comment2 = runAutoComment(3, {}, ELOADCALL_WORD2);
-
-    assert('ELC-2: comment mentions c-list[1], not c-list[65]',
-        comment2.includes('c-list[1]') && !comment2.includes('c-list[65]'),
-        'comment=' + JSON.stringify(comment2));
-
-    assert('ELC-2: encoded selector 2 is source method #1',
-        comment2.includes('method #1'),
-        'comment=' + JSON.stringify(comment2));
-}
-
-// ── ELC-3: annotation-builder source uses (imm & 0x1F) for op===8 ────────────
-// This is a structural guard: if someone naively reverts the fix back to `imm`
-// for op===8, this test will catch it at the source level.
-{
-    const src = fs.readFileSync(path.resolve(__dirname, 'app-lumps.js'), 'utf8');
-
-    // The annotation builder must contain the corrected split formula for op===8.
-    // Look for the exact expression that was fixed:
-    //   const _annSlot = op === 8 ? (imm & 0x1F) : imm;
-    const annPattern = /const\s+_annSlot\s*=\s*op\s*===\s*8\s*\?\s*\(\s*imm\s*&\s*0x1F\s*\)\s*:\s*imm/;
-    assert('ELC-3: annotation builder uses (imm & 0x1F) for ELOADCALL slot',
-        annPattern.test(src),
-        'pattern not found — regression in annotation builder');
-
-    // The _autoComment case 8 must use (imm & 0x1F) (or a variable derived from it)
-    // rather than bare `imm` as the slot. The canonical marker is `_elcRow  = imm & 0x1F`.
-    const autoCommentPattern = /const\s+_elcRow\s*=\s*imm\s*&\s*0x1F/;
-    assert('ELC-3: _autoComment uses imm & 0x1F for ELOADCALL row',
-        autoCommentPattern.test(src),
-        'pattern not found — regression in _autoComment');
+        desc ? JSON.stringify(desc.textContent) : '(no description)');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

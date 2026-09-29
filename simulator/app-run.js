@@ -1454,15 +1454,13 @@ function updateThreadContextModal() {
         row.lifecycleStatus === 'suspended';
     run.textContent = row.lifecycleStatus === 'suspended' ? 'Resume & Run' : 'Run';
     _setThreadModalAction(run,
-        resumable && !_pendingSimLoad && !executing && !bootAnimating,
+        resumable && !executing && !bootAnimating,
         row.lifecycleStatus === 'halted'
             ? 'This Thread is halted; reset it before running again'
             : (row.lifecycleStatus === 'unavailable'
                 ? 'This Thread has no valid canonical CHURCH resume frame'
                 : (executing ? 'Stop the current Run or Walk before starting this Thread'
-            : (_pendingSimLoad
-                ? 'Run or clear the pending compiled program before resuming a Thread'
-                : 'Wait for the boot animation to finish'))));
+            : 'Wait for the boot animation to finish')));
     _setThreadModalAction(stop, owns && executing,
         owns ? 'No Run or Walk is executing for this Thread'
             : 'Only the active Thread can stop execution');
@@ -1565,7 +1563,7 @@ function closeThreadContextModal(restoreFocus = true) {
 
 function runThreadFromModal() {
     const row = _threadModalRow();
-    if (!row || _pendingSimLoad || _simRunActive || sim.running ||
+    if (!row || _simRunActive || sim.running ||
             walkRunning || sim.walkActive || bootAnimating) return;
     if (row.lifecycleStatus !== 'running' &&
             row.lifecycleStatus !== 'suspended') {
@@ -1602,6 +1600,7 @@ function runThreadFromModal() {
     // has just restored CR0–CR11, DR0–DR15, CR12, CR14/CR6, FLAGS, STO, and
     // NIA from this Thread's saved image. Never let the generic editor
     // Compile+Run install path replace that restored code identity or PC.
+    if (typeof _clearPendingSimLoad === 'function') _clearPendingSimLoad();
     runSimGo(undefined, { applyPendingLoad: false });
 }
 
@@ -2876,11 +2875,25 @@ function _openConfiguredBootLumpInDefaultEditor() {
                     Number.isInteger(Number(row.slot));
             })
             : null;
-        const token = _configuredBootLumpToken(
-            bootCatalog, bootMarker ? Number(bootMarker.slot) : null);
+        // The committed Namespace row identifies an exact revision. Catalog
+        // sorting is only a legacy fallback when that row has no artifact
+        // identity; an unrelated stale boot input cannot promote another
+        // executable into the inspection pane.
+        const selectedToken = bootMarker && bootMarker.token;
+        const selected = selectedToken && window.LumpRegistry.getServerList()
+            .find(function(row) {
+                return row && String(row.token).toLowerCase() ===
+                    String(selectedToken).toLowerCase() &&
+                    (!bootMarker.filename || row.filename === bootMarker.filename) &&
+                    (!bootMarker.binary_hash || row.binary_hash === bootMarker.binary_hash);
+            });
+        // Without an exact committed row, guessing a "newest" artifact can
+        // make a different binary appear to be the executed SelfTest.
+        const token = selected && selected.token;
         if (!token) return false;
         return Promise.resolve(openLumpInEditor(token, {
             startupDefault: true,
+            bootInspection: true,
         })).then(function() {
             return true;
         });
@@ -3043,11 +3056,7 @@ function _recordUnreportedBootFailure(context, error) {
 let _bootImageRefreshInFlight = null;
 
 function _bootHasCommittedImage() {
-    if (!(window.bootImage && window.bootImageAvailable)) return false;
-    const bootState = window.BootEntryUI &&
-        typeof window.BootEntryUI.get === 'function'
-        ? window.BootEntryUI.get() : null;
-    return !bootState || bootState.status === 'prepared';
+    return !!(window.bootImage && window.bootImageAvailable);
 }
 
 function _isInternalPreparationError(reason) {
@@ -3176,7 +3185,7 @@ function _blockBootForMissingCommittedImage(context, reason) {
 // pending. The successful retry re-enters the explicit reset/boot path.
 function _ensureCommittedImageForBoot(context) {
     if (_bootHasCommittedImage()) return true;
-    if (window.bootImageAvailable && typeof window._refreshCommittedBootImageCache === 'function') {
+    if (typeof window._refreshCommittedBootImageCache === 'function') {
         if (!_bootImageRefreshInFlight) {
             _bootImageRefreshInFlight = window._refreshCommittedBootImageCache()
                 .then(() => {
@@ -3205,9 +3214,9 @@ function _ensureCommittedImageForBoot(context) {
 }
 
 function _requireCommittedImageForExecution(context) {
-    // A booted machine's live Thread/frames are execution authority. Image
-    // freshness gates the next boot, not resume: its refresh path overlays
-    // memory and resets, destroying a paused instruction before it can run.
+    // A booted machine's live Thread/frames (including explicit Load/Assemble)
+    // are execution authority. Image freshness gates the next boot, not resume:
+    // its refresh path overlays memory and destroys a paused instruction.
     if (sim && sim.bootComplete) return true;
     if (_bootHasCommittedImage() && sim && sim._bootImageLoaded === true) return true;
     _ensureCommittedImageForBoot(context);
@@ -3749,7 +3758,7 @@ window._r1TryDemoProgram = function() {
             }
             Promise.resolve(window.IDEActions.compile()).then(function(result) {
                 if (!result || result.ok === false) return;
-                window.IDEActions.run();
+                window.IDEActions.runCandidate();
             }).catch(function(error) {
                 appendOutput('Demo build failed: ' + (error && error.message || error), 'error');
             });
@@ -12916,6 +12925,9 @@ function loadEditorState() {
         // binary. No source-replacement consent or saved-content loader.
         void window._restoreSavedLumpBinaryPresentation(
             documentState.owner.id, documentState.savedBinary, editor);
+    } else if (restoredPersonalTab &&
+            typeof window._presentPersonalSavedBinary === 'function') {
+        void window._presentPersonalSavedBinary(restoredPersonalTab);
     }
 }
 
@@ -15653,7 +15665,7 @@ function showReleaseHistory() {
         ] },
         { date: '2026-05-02 UTC', title: 'Doc Audit, ISA Corrections & Hardware Alignment', changes: [
             'Full 14-item stale-documentation audit completed: all stale claims corrected across docs, simulator comments, and figures',
-            'RETURN mask: marked as not implemented in all docs (call-stack.md, church-instructions.md, boot-rom-layout.md, instruction-matrix.md) — mask field silently ignored by hardware; assembler now warns on any non-zero mask (Task #888)',
+            'Historical Task #888 warning is superseded: RETURN uses a low-12-bit keep mask; set bits prevent working-CR clearing, zero bits clear. CR5 descriptor and CR6 reconstruction are mask-independent.',
             'SWITCH semantics: corrected to the destination-M-gated isolated LOAD form for CR12–CR15, with explicit destination, source, and row operands',
             'TPERM D-3 closed: removed 3 stale notes claiming simulator produces Z=0 for reserved preset codes — simulator now faults with TPERM_RSV identical to hardware (Task #873)',
             'ISA reference E-2 corrected: "Assembler should reject" → "Assembler warns" to match Task #888 warn-only implementation',
@@ -15664,7 +15676,7 @@ function showReleaseHistory() {
             '"TPERM never traps" phrasing clarified to "does not fault" in church-instructions.md and instruction-set.md — avoids confusion with TPERM_RSV reserved-preset fault',
             'Historical audit docs stamped: CONSISTENCY-AUDIT, AMARANTH-SIMULATOR-AUDIT, SIMULATOR-HARDWARE-GAPS, SIMULATOR-HARDWARE-MISMATCH all carry SUPERSEDED banners pointing to HARDWARE-DEVIATIONS.md',
             'Task #887 merged: D-9 LAMBDA hardware fix — CR6 state correctly preserved on LAMBDA CR6 re-entry path in Amaranth hardware',
-            'Task #888 merged: RETURN mask assembler warning — assembler warns on any non-zero mask or reserved bit 6 instead of silently encoding',
+            'Task #888 historical mask warnings superseded: valid RETURN keep masks encode without warnings; out-of-range masks are rejected.',
             'Task #890 merged: LAMBDA CR6 re-entry simulator test added to gate suite',
             'Task #17 merged: Navana.Init wired as a callable method-table entry — 3-word lump injected at ROM word 320 (NS slot 5); method index 1 → PC=2 → RETURN AL; PRIVATE_METHOD fault eliminated (D-5 CLOSED)',
             'Task #891 merged: boot entry CALL test corrected — PC after a method-index-0 CALL is 1 (word 1, first code word after lump header), not 0; both default and custom_step1 configurations now pass',
@@ -16681,10 +16693,18 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
         lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
             ? _lumpsCache : [],
     });
+    const embeddedApi = typeof lumpDecodeContentFrameApi === 'function'
+        ? lumpDecodeContentFrameApi(words) : null;
+    const embeddedSelf = embeddedApi && Array.isArray(embeddedApi.capabilities)
+        ? embeddedApi.capabilities[0] : null;
     const validation = CapabilityTokens.validateClist(
         words, start, resolved,
         {
             sim,
+            allowCompilerSelfPlaceholder: !!(embeddedSelf &&
+                ['SELF', '__SELF__'].includes(embeddedSelf.name) &&
+                JSON.stringify(embeddedSelf.rights) === '["E"]'),
+            embeddedApi,
             lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
                 ? _lumpsCache : [],
         }
@@ -16695,16 +16715,8 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
             validation.errors.join(' ')
         );
     }
-    // Keep this explicit even though validateClist rejects FEED markers: the
-    // final-byte invariant is security-relevant and must not regress if a
-    // future capability validator grows an intermediate-mode option.
-    for (let row = 0; row < cc; row++) {
-        if (((words[start + row] || 0) >>> 16) === 0xFEED) {
-            throw new Error(
-                `authoritative save plan left c-list row ${row} as an unresolved placeholder`
-            );
-        }
-    }
+    // Named pending rows carry no local GT. Their embedded API declarations
+    // survive save; the attempted ISA operation performs lazy resolution.
     return true;
 }
 
@@ -16939,6 +16951,8 @@ async function confirmSaveToNamespace() {
             }
             _caps = _fallbackMaterialized.resolvedCaps.map(function(cap) {
                 return {
+                    ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                        .filter(key => typeof cap[key] === 'string').map(key => [key, cap[key]])),
                     name: cap.name,
                     rights: cap.rights.slice(),
                     grants: cap.grants.slice(),
@@ -16975,6 +16989,8 @@ async function confirmSaveToNamespace() {
                 // allowed before authoritative save preparation chooses the
                 // destination Namespace slot.
                 allowCompilerSelfPlaceholder: true,
+                embeddedApi: typeof lumpDecodeContentFrameApi === 'function'
+                    ? lumpDecodeContentFrameApi(_svBinary) : null,
             }
         );
         if (!_preSaveValidation.ok) {
@@ -17944,12 +17960,12 @@ const INSTRUCTION_DATA = [
     },
     {
         opcode: 3, mnemonic: 'RETURN', domain: 'church',
-        mState: 'down', mStateNote: 'At RETURN boundary: _mwinWriteback() commits and clears the M-window on CR15; _resetAllMBits() zeroes all CRs; caller CRs are then restored from the saved frame snapshot (which carried their pre-CALL M=0 state).',
+        mState: 'down', mStateNote: 'RETURN commits the M-window, clears every CR M bit (including CR5), then establishes CR6.M=1. Kept descriptors do not restore saved M bits.',
         syntax: 'RETURN [mask]',
-        brief: 'Exit an abstraction \u2014 restore caller context; optionally scrub working CRs',
+        brief: 'Exit an abstraction \u2014 restore caller context; keep mask prevents working-CR clearing',
         encoding: 'opcode[5]=00011 | cond[4] | 0[11] | mask[12]',
         fields: [
-            { name: 'mask', desc: '12-bit literal (bits [11:0]). Bit N = 1 clears CR_N to NULL after frame restoration. Bit 6 reserved (must be 0 — CR6 is always restored from the frame E-GT). mask=0 is the no-op default (bare RETURN).' },
+            { name: 'mask', desc: '12-bit literal (0–4095). For CR0–CR4 and CR7–CR11, 1 prevents clearing the current descriptor; 0 zeros it, never restores a saved value. Bits 5/6 do not control CR5/CR6: CR5 descriptor stays unchanged; CR6 always reconstructs caller context.' },
         ],
         permission: 'None',
         flags: 'None',
@@ -17960,9 +17976,9 @@ const INSTRUCTION_DATA = [
           + '  └──────┴──────┴─────────────┴─────────────┘\n'
           + '   5-bit   4-bit    11-bit        12-bit\n\n'
           + 'mask[11:0]: 12-bit literal embedded in the instruction.\n'
-          + '  Bit N = 1 → clear CR_N to NULL after frame restoration.\n'
-          + '  Bit 6 reserved (must be 0): CR6 is always restored from the frame E-GT.\n'
-          + '  mask = 0 → no clearing; bare RETURN is fully backward-compatible.\n\n'
+          + '  For CR0–CR4/CR7–CR11: 1 prevents clearing; 0 zeros the descriptor.\n'
+          + '  CR5 descriptor is unchanged; CR6 always reconstructs caller context, regardless of bits 5/6.\n'
+          + '  mask = 0 → clear every working CR; never restore working CR snapshots.\n\n'
           + 'Execution order:\n'
           + '  1. Read frame word at top of LIFO stack; check SZ bit.\n'
           + '     SZ=1 (CALL frame): pop 2 words (E-GT word 0 + frame word 1).\n'
@@ -17971,21 +17987,20 @@ const INSTRUCTION_DATA = [
           + '     Hidden STO register ← frame[11:0] (the saved pre-call STO value).\n'
           + '  3. SZ=1 only: revalidate caller E-GT (word 0) via mLoad — FAULT on failure.\n'
           + '     NS split re-runs to re-derive CR6 (c-list) and CR14 (code) for caller.\n'
-          + '  4. Apply mask: all marked CRs written to NULL in one parallel clock edge.\n'
-          + '     The 12-bit literal fans directly into CR write enables — zero overhead.\n\n'
+          + '  4. Apply keep mask to CR0–CR4/CR7–CR11: zero bits clear, one bits leave current descriptors.\n'
+          + '     M boundary rules apply independently of the keep mask.\n\n'
           + 'Why mask is in the instruction (not the frame):\n'
           + '  GTs are first-class. The callee may return a GT in CR0.\n'
           + '  Only the programmer knows which CRs carry return values vs. working state.\n'
-          + '  The CLOOMC compiler emits the mask as a compile-time literal from a\n'
-          + '  "clear:" annotation. The hardware enforces it as part of the instruction.\n'
+          + '  The programmer or compiler supplies the keep mask as an instruction literal.\n'
           + '  The freed 12 bits in the frame word are used for STO instead.\n\n'
-          + 'DRs and non-masked CRs retain whatever values the callee left.\n'
+          + 'DR1–DR3 retain return values; DR4–DR15 restore the existing caller context.\n'
           + 'Shared between Church and Turing domains — the only exit from a safe\n'
-          + 'Turing abstraction. If the call stack is empty, the machine halts.',
-        example: 'RETURN                   ; mask=0 — no scrub, backward-compatible\n'
-               + 'RETURN 0b111111011111    ; clear CR0–CR5, CR7–CR11 — scrub all working regs\n'
-               + 'RETURN 0b000000011110    ; clear CR1–CR4 only — CR0 carries a return GT',
-        mState: { badge: 'M↓', note: 'Hardware clears all CR M-bits at function exit. CHANGE (not RETURN) is the mechanism that saves and restores M-bits across context switches.' },
+          + 'Turing abstraction. An empty call stack causes a stack-underflow fault.',
+        example: 'RETURN                   ; clear all working CRs (not CR5/CR6)\n'
+               + 'RETURN 0xFFF             ; prevent clearing all working CRs\n'
+               + 'RETURN 1                 ; keep CR0 return GT; clear other working CRs',
+        mState: { badge: 'M↓', note: 'RETURN resets all M bits, including CR5.M, then sets CR6.M. Descriptor preservation does not preserve M.' },
     },
     {
         opcode: 4, mnemonic: 'CHANGE', domain: 'church',
@@ -19105,6 +19120,11 @@ let _wukongBridgeAlertFingerprint = '';
 
 let _wukongLastHwNIA    = null;    // last hardware NIA seen from trace packets
 let _wukongHwNia        = null;    // retiring NIA of last HW trace packet
+// Hardware observations belong to the board, never to the executable simulator.
+// Null slots mean no value was observed (a zero GT is a valid observation).
+const _wukongHardwareRegisters = {
+    cr: Array(16).fill(null), dr: null, snapshot: null
+};
 
 let _wukongLastEventSeq = 0;       // cursor into the server-side ordered event queue
 let _wukongLastRetirementSeq = 0;  // trace events only; excludes status/info rows
@@ -20409,40 +20429,71 @@ function _wukongUpdateCallDepthBadge() {
     badge.title         = 'HW call-stack depth: ' + _wukongCallDepth;
 }
 function _wukongApplyCRUpdate(data) {
-    if (!data || !sim || !sim.cr) return;
+    if (!data) return;
     let updated = false;
-    if (data.cr6_gt !== undefined && sim.cr[6]) {
-        sim.cr[6].word0 = data.cr6_gt >>> 0;
+    if (data.cr6_gt != null) {
+        _wukongHardwareRegisters.cr[6] = data.cr6_gt >>> 0;
         updated = true;
     }
-    if (data.cr14_gt !== undefined && sim.cr[14]) {
-        sim.cr[14].word0 = data.cr14_gt >>> 0;
+    if (data.cr14_gt != null) {
+        _wukongHardwareRegisters.cr[14] = data.cr14_gt >>> 0;
         updated = true;
     }
-    if (updated && typeof updateCRDisplay === 'function') {
-        updateCRDisplay();
+    if (updated) _wukongRenderHardwareRegisters();
+}
+
+function _wukongClearHardwareRegisters() {
+    _wukongHardwareRegisters.cr.fill(null);
+    _wukongHardwareRegisters.dr = null;
+    _wukongHardwareRegisters.snapshot = null;
+    _wukongRenderHardwareRegisters();
+}
+
+function _wukongRenderHardwareRegisters() {
+    const panel = document.getElementById('wukong-hw-log');
+    if (!panel) return;
+    let display = document.getElementById('wukong-hw-registers');
+    if (!display) {
+        display = document.createElement('details');
+        display.id = 'wukong-hw-registers';
+        display.dataset.source = 'hardware';
+        const summary = document.createElement('summary');
+        summary.textContent = 'Board registers (observed hardware only)';
+        display.appendChild(summary);
+        panel.appendChild(display);
     }
+    let content = display.querySelector('pre');
+    if (!content) {
+        content = document.createElement('pre');
+        content.style.cssText = 'white-space:pre-wrap;max-height:160px;overflow:auto;font-size:11px';
+        display.appendChild(content);
+    }
+    const hw = _wukongHardwareRegisters;
+    const cr = hw.cr.map((gt, i) => 'CR' + i + '=' +
+        (gt == null ? 'unavailable' : _wukongHex(gt))).join('  ');
+    const dr = hw.dr == null ? 'DR=unavailable' :
+        hw.dr.map((value, i) => 'DR' + i + '=' + _wukongHex(value)).join('  ');
+    content.textContent = 'Hardware only — software simulator registers unchanged\n' +
+        (hw.snapshot ? 'Snapshot #' + (hw.snapshot.seq == null ? 'unavailable' : hw.snapshot.seq) +
+            ' NIA=' + _wukongHex(hw.snapshot.nia) + '\n' : '') + cr + '\n' + dr;
 }
 
 function _wukongApplySnapshot(data) {
-    if (!sim || !data || data.snapshot !== true ||
-        typeof sim.applyHardwareSnapshot !== 'function') return false;
-    const result = sim.applyHardwareSnapshot(data);
-    if (!result || !result.ok) return false;
-    // StateChange normally refreshes these, but these calls also cover pages
-    // whose register panels are mounted outside the simulator shell.
-    if (typeof updateCRDisplay === 'function') updateCRDisplay();
-    if (typeof updateDRDisplay === 'function') updateDRDisplay();
-    if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
-    if (typeof updateInfoDisplay === 'function') updateInfoDisplay();
+    if (!data || data.snapshot !== true || data.crc_valid === false ||
+        !Array.isArray(data.cr) || data.cr.length !== 16 ||
+        !data.cr.every(row => Array.isArray(row) && row.length >= 3 &&
+            row.slice(0, 3).every(Number.isInteger)) ||
+        !Array.isArray(data.dr) || data.dr.length !== 16 ||
+        !data.dr.every(Number.isInteger)) return false;
+    _wukongHardwareRegisters.cr = data.cr.map(row => row[0] >>> 0);
+    _wukongHardwareRegisters.dr = data.dr.map(value => value >>> 0);
+    _wukongHardwareRegisters.snapshot = data;
+    _wukongRenderHardwareRegisters();
     if (typeof _wukongSetHwCursor === 'function') {
         _wukongLastHwNIA = data.nia >>> 0;
         _wukongSetHwCursor(_wukongLastHwNIA);
     }
-    // The snapshot has no memory payload; re-render the currently selected
-    // view so thread/memory panels reflect the atomically committed registers
-    // without pretending that hardware memory was read.
-    if (typeof renderMemoryView === 'function') renderMemoryView();
+    // A board snapshot has no memory payload and cannot update software views.
     // A reason-2 snapshot is the complete architectural state captured before
     // the bridge reboots a faulted board.  Upgrade the trace-only Last Fault
     // panel from the server's promoted record; Boot.0 events that follow must
@@ -20485,6 +20536,7 @@ async function _wukongDrainEvents() {
     if (serverSeq !== null && _wukongLastEventSeq > 0 && serverSeq < _wukongLastEventSeq) {
         _wukongLastEventSeq = 0;
         _wukongCallDepth    = typeof data.call_depth === 'number' ? data.call_depth : 0;
+        _wukongClearHardwareRegisters();
         return false;   // next poll/step will re-drain from after=0
     }
 
@@ -20515,7 +20567,10 @@ async function _wukongDrainEvents() {
         if ((ev.ts  || 0) > _wukongLastTraceTs)  _wukongLastTraceTs  = ev.ts;
     }
     // On reconnect reset local depth (per-event call_depth will re-establish it).
-    if (!wasConnected) _wukongCallDepth = 0;
+    if (!wasConnected) {
+        _wukongCallDepth = 0;
+        _wukongClearHardwareRegisters();
+    }
 
     // Log a "board connected" message the first time events arrive after a gap.
     if (!wasConnected && _wukongIsConnected()) {
@@ -20538,7 +20593,7 @@ async function _wukongDrainEvents() {
             _wukongAppendTrace(ev);
         }
     }
-    // data carries cr6_gt / cr14_gt at top level (same shape as trace GET).
+    // Top-level CR values are latest board observations, not event operands.
     _wukongApplyCRUpdate(data);
     // Refresh the machine-status chip after processing drained events so it
     // shows HW RUNNING / HW FAULTED without waiting for a fault transition.
@@ -20629,14 +20684,15 @@ function _wukongTraceLocationText(data) {
 function _callReturnInstructionLocation(event, context) {
     event = event || {};
     context = context || {};
+    const hardware = typeof event.ev_type === 'number' || event.source === 'hardware';
     const rawAddr = event.nia != null ? event.nia :
         (event.physicalPC != null ? event.physicalPC :
             (context.physicalPC != null ? context.physicalPC : context.pc));
     const address = rawAddr == null ? null : (Number(rawAddr) >>> 0);
-    let word = event.instrWord != null ? event.instrWord :
-        (context.instrWord != null ? context.instrWord : null);
-    if (word == null && address != null && typeof sim !== 'undefined' && sim.memory &&
-        address < sim.memory.length) word = sim.memory[address] >>> 0;
+    const word = event.observed_instr_word != null ? event.observed_instr_word :
+        (event.instrWord != null ? event.instrWord :
+            (hardware ? (event.instr != null ? event.instr : null) :
+                (context.instrWord != null ? context.instrWord : null)));
 
     let decoded = null;
     if (word != null && typeof _cmDecodeWord === 'function') {
@@ -20650,35 +20706,37 @@ function _callReturnInstructionLocation(event, context) {
         ? traceLabel.slice(0, traceLabel.lastIndexOf('.')) : null;
     const inferredMethod = traceLabel && traceLabel.indexOf('.') >= 0
         ? traceLabel.slice(traceLabel.lastIndexOf('.') + 1) : null;
-    let owner = null;
-    if (address != null && typeof _nsOwnerOf === 'function') owner = _nsOwnerOf(address);
     const nsIdx = event.nsIndex != null ? event.nsIndex :
-        (context.nsIndex != null ? context.nsIndex : (owner && owner.nsIdx));
-    const lump = event.lump || context.lump || (owner && owner.label) ||
-        (nsIdx != null && typeof sim !== 'undefined' && sim.nsLabels
-            ? sim.nsLabels[nsIdx] : null);
+        (context.nsIndex != null ? context.nsIndex : null);
+    const lump = event.lump || context.lump || null;
     const method = event.method || context.method || inferredMethod || null;
     return {
         kind: String(event.kind || event.event || context.opName || mnemonic).toUpperCase(),
         lump: lump || inferredLump || (nsIdx != null ? 'NS[' + nsIdx + ']' : null),
         method,
-        offset: event.offset != null ? event.offset :
-            (owner && owner.base != null && address != null ? address - owner.base : null),
+        offset: event.offset != null ? event.offset : (context.offset != null ? context.offset : null),
         physicalAddress: address,
         rawWord: word == null ? null : (word >>> 0),
         decoded,
         mnemonic,
-        operands: decoded && decoded.text ? decoded.text : (event.disasm || context.desc || null),
+        operands: decoded && decoded.text ? decoded.text : (event.disasm || null),
         disassembly: event.disasm || (decoded && decoded.text) || null,
         caller: event.caller || context.caller || null,
         callee: event.callee || context.callee || null,
         callDepth: event.call_depth != null ? event.call_depth :
-            (context.callDepth != null ? context.callDepth :
-                (typeof sim !== 'undefined' && sim.callStack ? sim.callStack.length : null)),
-        cr14: event.cr14_gt != null ? event.cr14_gt :
-            (context.cr14 != null ? context.cr14 : null),
-        cr12: event.cr12_gt != null ? event.cr12_gt :
-            (context.cr12 != null ? context.cr12 : null),
+            (context.callDepth != null ? context.callDepth : null),
+        // The poll's latest CR GTs are not operands of an older CALL_PUSH or
+        // RETURN_POP. Only a GT carried by this exact micro-event is evidence.
+        cr14: hardware
+            ? ((event.ev_type === 0x07 || event.ev_type === 0x0B) &&
+                event.payload_gt != null ? event.payload_gt >>> 0 : null)
+            : (event.cr14_gt != null ? event.cr14_gt :
+                (context.cr14 != null ? context.cr14 : null)),
+        cr12: hardware
+            ? (event.ev_type === 0x04 && event.payload_gt != null ?
+                event.payload_gt >>> 0 : null)
+            : (event.cr12_gt != null ? event.cr12_gt :
+                (context.cr12 != null ? context.cr12 : null)),
         source: event.source || context.source || null,
     };
 }
@@ -20731,14 +20789,15 @@ function _openCallReturnDrilldown(event, context) {
         '<dt>Offset</dt><dd>' + value(loc.offset) + '</dd>' +
         '<dt>Physical address</dt><dd>' + value(address) + '</dd>' +
         '<dt>Raw instruction</dt><dd>' + value(raw) + '</dd>' +
-        '<dt>Decoded instruction</dt><dd>' + value(loc.operands) + '</dd>' +
+        '<dt>Static decode</dt><dd>' + value(loc.operands) + ' (symbolic, not execution evidence)</dd>' +
+        '<dt>Operand effects</dt><dd>Unavailable unless captured in the original execution event; never inferred from current state.</dd>' +
         '<dt>Source / map</dt><dd>' + value(loc.source) + '</dd>' +
-        '<dt>Caller → callee</dt><dd>' + value(loc.caller || loc.callee) + '</dd>' +
+        '<dt>Caller → callee</dt><dd>' + value(loc.caller) + ' → ' + value(loc.callee) + '</dd>' +
         '<dt>Call-stack depth</dt><dd>' + value(loc.callDepth) + '</dd>' +
-        '<dt>CR14 / CR12</dt><dd>' + value(loc.cr14 || loc.cr12) + '</dd>' +
+        '<dt>CR14 / CR12</dt><dd>' + value(loc.cr14) + ' / ' + value(loc.cr12) + '</dd>' +
         '</dl><div class="crd-actions">' +
         (loc.physicalAddress == null ? '' :
-            '<button class="crd-action crd-open-row">Open surrounding instructions</button>') +
+            '<button class="crd-action crd-open-row">Browse current memory (not historical evidence)</button>') +
         '</div>';
     document.body.appendChild(popup);
     popup.querySelector('.crd-close').addEventListener('click', _dismissCallReturnDrilldown);
@@ -20756,9 +20815,13 @@ window._openCallReturnDrilldown = _openCallReturnDrilldown;
 
 function _appendSimulatorStepLog(result, container) {
     if (!container) return;
+    const evidence = result && result.executionEvidence;
+    const stepCount = result && result.stepCount != null ? result.stepCount :
+        (evidence && evidence.post && evidence.post.stepCount != null ? evidence.post.stepCount : '?');
     const line = document.createElement('div');
-    line.appendChild(document.createTextNode('\n[' + (sim ? sim.stepCount : '?') + '] ' +
-        ((result && result.desc) || 'executed') + ' '));
+    line.executionEvidence = evidence || null;
+    line.appendChild(document.createTextNode('\n[' + stepCount + '] ' +
+        ((evidence && evidence.description) || (result && result.desc) || 'Execution description unavailable') + ' '));
     if (result && result.eventLocation &&
         (result.eventLocation.kind === 'CALL' || result.eventLocation.kind === 'RETURN')) {
         const link = document.createElement('button');
@@ -20926,14 +20989,9 @@ function _wukongBuildHwFaultObj(data) {
     const niaInt    = (data.nia || 0) >>> 0;
     const flags     = data.flags || 0;
     const evType    = data.ev_type || 0;
-    // Snapshot current CR values from the live simulator so the modal can show
-    // whatever CR state the hardware last reported via CALL_CR6 / CALL_CR14.
+    // Trace packets do not capture a full CR bank. A later snapshot or the
+    // live simulator is not evidence of the faulting instruction's operands.
     const crSnap = [];
-    if (typeof sim !== 'undefined' && sim && sim.cr) {
-        for (let i = 0; i < 16; i++) {
-            crSnap[i] = sim.cr[i] ? Object.assign({}, sim.cr[i]) : null;
-        }
-    }
     return {
         type:             faultName,
         message:          faultName + ' at NIA 0x' +
@@ -20945,7 +21003,7 @@ function _wukongBuildHwFaultObj(data) {
         instrHistory:     [],      // not available from hardware
         crSnapshot:       crSnap,
         drSnapshot:       [],      // not available from hardware
-        flagsSnapshot:    { N: !!(flags & 8), Z: !!(flags & 4), C: !!(flags & 2), V: !!(flags & 1) },
+        flagsSnapshot:    data.flags == null ? null : { N: !!(flags & 8), Z: !!(flags & 4), C: !!(flags & 2), V: !!(flags & 1) },
         faultLabel:       data.nia_label || null,
         faultCode:        faultCode,
         faultingMnemonic: _WUKONG_EV_INSTR_NAME[evType] || null,
@@ -20989,8 +21047,10 @@ function _wukongNormalizeEvent(e) {
         metadata: e.metadata_status || (e.disasm ? 'NIA map' : 'unavailable'),
         source: e.source_map || 'unavailable',
         flags: e.flags == null ? 'unavailable' : _wukongFlagsStr(e.flags),
-        gt: hasGt ? _wukongHex(e.payload_gt || 0) : 'unavailable',
-        gtLabel: e.gt_label || (hasGt ? (_decodeGtLabel(e.payload_gt >>> 0) || 'unavailable') : 'unavailable'),
+        gt: hasGt && e.payload_gt != null ? _wukongHex(e.payload_gt) : 'unavailable',
+        gtLabel: hasGt && e.payload_gt != null
+            ? (e.gt_label || _decodeGtLabel(e.payload_gt >>> 0) || 'unavailable')
+            : 'unavailable',
         depth: e.call_depth == null ? 'unavailable' : e.call_depth,
         breakpoint: e.bp_hit ? 'hit' : 'not hit',
         fault: e.fault_valid ? ((_WUKONG_FAULT_NAMES[e.fault_code] || 'FAULT_' + e.fault_code) +
@@ -21025,10 +21085,11 @@ function _wukongFormatEvent(e) {
         (e.group || (e.nia == null ? 'unavailable' : _wukongHex(e.nia) + ':' + n.event.split(' ')[0])) +
         ' event=' + n.event +
         ' nia=' + n.nia + ' lump=' + n.lump + ' offset=' + n.offset +
-        ' raw=' + n.raw + ' decoded=' + n.decoded + ' metadata=' + n.metadata +
+        ' raw=' + n.raw + ' decoded(symbolic)=' + n.decoded + ' metadata=' + n.metadata +
         ' source=' + n.source +
         ' flags=' + n.flags + ' payload_gt=' + n.gt + ' gt_label=' + n.gtLabel +
-        ' depth=' + n.depth + ' breakpoint=' + n.breakpoint + ' fault=' + n.fault;
+        ' depth=' + n.depth + ' breakpoint=' + n.breakpoint + ' fault=' + n.fault +
+        ' operand_effects=unavailable';
 }
 
 function _wukongAppendTrace(data) {
@@ -21100,29 +21161,30 @@ function _wukongAppendTrace(data) {
     _wukongSetHwCursor(niaInt);
     _wukongSetPipelineHwNIA(niaInt);
 
-    // ── Apply CR register updates from ev_type + payload_gt ──────────────────
-    // Only CRs explicitly reported in packets are touched; sim is not stepped.
+    // ── Record board CR observations from ev_type + payload_gt ───────────────
+    // Only CRs explicitly reported in packets are observed; sim is untouched.
     //   0x02 LOAD_NEW   → CR_dst (decoded from instruction word bits[19:16])
     //   0x04 CHANGE_CR12→ CR12
     //   0x05 CHANGE_CR5 → CR5
     //   0x06 CALL_CR6   → CR6      0x0A RETURN_CR6  → CR6
     //   0x07 CALL_CR14  → CR14     0x0B RETURN_CR14 → CR14
-    if (sim && sim.cr) {
+    if (_WUKONG_EV_HAS_GT_PAYLOAD.has(evType) && data.payload_gt != null) {
         const gt = (data.payload_gt >>> 0);
         let crIdx = -1;
         if (evType === 0x02) {
-            // Decode CR_dst from the retiring instruction word bits[19:16].
-            const instrWord = (sim.memory && niaInt < sim.memory.length)
-                ? (sim.memory[niaInt] >>> 0) : 0;
-            crIdx = (instrWord >>> 16) & 0xF;
+            // No live simulator memory: only this packet's correlated raw word
+            // can identify the destination. Otherwise leave it unavailable.
+            const instrWord = data.observed_instr_word != null ? data.observed_instr_word :
+                (data.instr != null ? data.instr : null);
+            if (instrWord != null) crIdx = (instrWord >>> 16) & 0xF;
         } else if (evType === 0x04) { crIdx = 12;
         } else if (evType === 0x05) { crIdx = 5;
         } else if (evType === 0x06 || evType === 0x0A) { crIdx = 6;
         } else if (evType === 0x07 || evType === 0x0B) { crIdx = 14;
         }
-        if (crIdx >= 0 && sim.cr[crIdx]) {
-            sim.cr[crIdx].word0 = gt;
-            if (typeof updateCRDisplay === 'function') updateCRDisplay();
+        if (crIdx >= 0) {
+            _wukongHardwareRegisters.cr[crIdx] = gt;
+            _wukongRenderHardwareRegisters();
         }
     }
 
@@ -21189,7 +21251,19 @@ function _wukongAppendTrace(data) {
     // then scroll to bottom.  Works for both editorConsole and hwLogBody.
     function _appendToLog(container, node, maxChildren) {
         if (!container) return;
-        container.appendChild(node.cloneNode(true));
+        // Preserve event listeners on the first insertion and recreate the
+        // drilldown handler on copies using captured event-time data.
+        const copy = node.cloneNode(true);
+        const originalLink = node.querySelector('.call-return-event');
+        const copiedLink = copy.querySelector('.call-return-event');
+        if (originalLink && copiedLink && originalLink._traceEvent) {
+            const captured = originalLink._traceEvent;
+            copiedLink.addEventListener('click', function(e) {
+                e.stopPropagation();
+                _openCallReturnDrilldown(captured);
+            });
+        }
+        container.appendChild(copy);
         if (maxChildren && container.childElementCount > maxChildren) {
             container.removeChild(container.firstElementChild);
         }
@@ -21216,11 +21290,12 @@ function _wukongAppendTrace(data) {
         callLink.className = 'call-return-event';
         callLink.textContent = 'CALL push (depth ' + _wukongCallDepth + ')';
         callLink.title = 'Open the exact CALL instruction';
+        callLink._traceEvent = Object.freeze(Object.assign({}, data, {
+            kind: 'CALL', call_depth: _wukongCallDepth
+        }));
         callLink.addEventListener('click', function(e) {
             e.stopPropagation();
-            _openCallReturnDrilldown(Object.assign({}, data, {
-                kind: 'CALL', call_depth: _wukongCallDepth
-            }));
+            _openCallReturnDrilldown(callLink._traceEvent);
         });
         line.appendChild(callLink);
         if (data.fault_valid) line.appendChild(document.createTextNode(
@@ -21250,11 +21325,12 @@ function _wukongAppendTrace(data) {
         returnLink.className = 'call-return-event';
         returnLink.textContent = 'RETURN (depth ' + _wukongCallDepth + ')';
         returnLink.title = 'Open the exact RETURN instruction';
+        returnLink._traceEvent = Object.freeze(Object.assign({}, data, {
+            kind: 'RETURN', call_depth: _wukongCallDepth
+        }));
         returnLink.addEventListener('click', function(e) {
             e.stopPropagation();
-            _openCallReturnDrilldown(Object.assign({}, data, {
-                kind: 'RETURN', call_depth: _wukongCallDepth
-            }));
+            _openCallReturnDrilldown(returnLink._traceEvent);
         });
         line.appendChild(returnLink);
         if (data.fault_valid) line.appendChild(document.createTextNode(
@@ -21282,7 +21358,7 @@ function _wukongAppendTrace(data) {
     // ── Event-type name and GT annotation ────────────────────────────────────
     const evTraceName = _WUKONG_EV_TRACE_NAMES[evType] || '';
     let gtAnnotation = '';
-    if (_WUKONG_EV_HAS_GT_PAYLOAD.has(evType)) {
+    if (_WUKONG_EV_HAS_GT_PAYLOAD.has(evType) && data.payload_gt != null) {
         // payload_gt is the actual GT value for this event — show it even when
         // 0x00000000 (that IS a null GT, which is informative for LOAD events).
         const rawGt = (data.payload_gt >>> 0);

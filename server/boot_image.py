@@ -829,14 +829,21 @@ def read_namespace_header_info(image_bytes):
 
 
 def _encoded_thread_count(words, slots):
-    """Infer contiguous configured Thread contexts from their fixed NS slots."""
+    """Infer contiguous resident Thread contexts, not arbitrary occupied slots.
+
+    A code-free design placement can retain a nonzero generation at NS[14]
+    after revocation. W1 alone must never manufacture an extra Thread.
+    """
     count, candidate = 1, GENERATED_THREAD_FIRST_NS_SLOT
     while count < MAX_THREAD_COUNT:
         if candidate != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
             if candidate >= slots:
                 break
             base = len(words) - (candidate + 1) * NS_ENTRY_WORDS
-            if words[base] == 0 and words[base + 1] == 0:
+            location = words[base]
+            if (location == 0 or location >= len(words)
+                    or ((words[location] >> 27) & 0x1F) != 0x1F
+                    or ((words[location] >> 8) & 3) != 2):
                 break
             count += 1
         candidate += 1
@@ -933,7 +940,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
         if base < 0:
             continue
         location = words[base]
-        if location >= physical["table_base"] or location >= n_words:
+        if location == 0 or location >= physical["table_base"] or location >= n_words:
             continue
         header_word = words[location]
         if ((header_word >> 27) & 0x1F) == 0x1F and ((header_word >> 8) & 3) == 2:
@@ -1601,7 +1608,7 @@ def _resolve_authoritative_selftest_lump(lumps_dir):
 
     state_rows = [
         row for row in state.get("abstractions", []) if isinstance(row, dict)
-        and row.get("name") == "SelfTest"
+        and row.get("name") == "SelfTest" and row.get("symbolic") is not True
     ] if isinstance(state, dict) else []
     if len(state_rows) != 1:
         raise ValueError(

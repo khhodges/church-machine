@@ -85,8 +85,8 @@ word and parse diagnostics, but must not promote it to an executable frame.
 | **5. Register Setup** | CR6 = callee C-List (L-only), CR14 = callee code (X-only, privileged) |
 | **6. PC** | method entry offset (hardware method-table dispatch via imm15; method index 0 → word 1) |
 
-**Registers not touched by CALL**: DR0–DR15, CR0–CR5, CR7–CR13, CR15.
-The callee inherits all of these from the caller unchanged. CR5 (Heap GT) belongs to the thread and is installed by CHANGE from the incoming thread's Zone ④ bounds — it is not saved or restored by CALL/RETURN.
+**Descriptor words and DR values not touched by CALL**: DR0–DR15, CR0–CR5, CR7–CR13, CR15.
+The callee inherits their descriptor words and DR values. CR5 (thread settings/Heap GT) belongs to the thread and is installed by CHANGE from the incoming thread's Zone ④ bounds — its descriptor words are not modified, saved or restored by CALL/RETURN. Boundary M-bit handling is separate: all M bits reset, then CR6 is rearmed.
 
 ---
 
@@ -104,7 +104,7 @@ RETURN pops the top 2-word frame and resumes the caller.
 | **CR6/CR14 Restore** | Re-derived from caller's NS entry via NS split (same logic as CALL) |
 | **PC Restore** | Set to NIA from Word 1 |
 | **Machine Indicators** | Restored from Word 1 (LAMBDA-active, flags, etc.) |
-| **Mask Apply** | Not implemented — mask field is ignored in current hardware (see below) |
+| **Mask Apply** | Bits 0–4/7–11: 1 keeps current descriptor, 0 zeros it directly; bits 5/6 ignored |
 | **Stack Indicators** | stackFrames and stackSpace updated |
 
 RETURN requires no permission — it is always permitted if a saved context exists on the call stack. If the stack is empty, a FAULT is triggered.
@@ -113,16 +113,26 @@ CR6 and CR14 are recomputed from the caller's E-GT rather than stored directly �
 
 ### RETURN Mask
 
-> **Not implemented.** The 12-bit mask field in bits [11:0] is defined in the ISA encoding but is **not implemented in current hardware or simulator**. All mask bits are silently ignored. Use bare `RETURN` (mask = 0). The assembler will warn if any mask bit is set. Bit 6 is additionally reserved and must always be zero.
+The 12-bit field in instruction bits [11:0] is a **keep mask**. For CR0–CR4 and CR7–CR11, bit N=1 prevents clearing and retains the current descriptor left by the callee; bit N=0 zeros it directly without capability resolution. It does not restore pre-call values.
 
-The intended design (for future implementation): Bit N = 1 would clear CR_N to NULL after frame restoration, letting a callee scrub working registers in a single instruction. CR6 (bit 6) is permanently reserved — it is always re-derived from the caller's E-GT by cload regardless of the mask field.
+Bits 5 and 6 have no effect. CR5 descriptor words remain unchanged by CALL/RETURN. CR6 is reconstructed from the saved caller's E-GT regardless of mask. All M bits still reset at the boundary, including CR5.M and kept registers' M bits, then CR6.M is rearmed. There is no CLEAR bit, extra snapshot or stack-frame extension.
 
 | Example | Effect |
 |---------|--------|
-| `RETURN` | mask=0 — no scrub, backward-compatible (current hardware) |
-| `RETURN 0b111111011111` | **Assembler warning** — mask bits set but not implemented; no CRs cleared |
+| `RETURN` | mask=0 — zero CR0–CR4 and CR7–CR11 |
+| `RETURN 0xF9F` | Keep current descriptor words of all ten controlled CRs |
+| `RETURN 1` | Keep current CR0 descriptor; zero CR1–CR4 and CR7–CR11 |
 
-DRs and non-masked CRs retain whatever values the callee left.
+DRs and CR5/CR12/CR13/CR15 descriptor words retain their current values.
+The frame/Thread ABI and instruction bit layout do not change, but older
+mask-ignored artifacts are not behaviorally compatible by default. Hardware
+lambda-fast RETURN revalidates accepted CR14 Inform/X identity and code
+location through cLoad before mask clearing and reconstructs CR6. Legacy
+`lambda_pc` return-address state still differs from canonical SZ=0 frames.
+The synthetic boot-ROM guard (`savedPC=3`, no active lambda) alone retains
+the cLoad bypass, lacking canonical namespace/c-list identity and guaranteed
+CR6 reconstruction. This is an unresolved implementation limit, not a
+user-approved exemption; see `HARDWARE-DEVIATIONS.md`.
 
 ---
 

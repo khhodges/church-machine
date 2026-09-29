@@ -689,21 +689,46 @@ function onLangChange(restoring) {
     }
 }
 
+// Compiler exceptions are IDE faults, never line-numbered source diagnostics.
+// Expose only local script locations in technical details (no source excerpts,
+// full paths, request URLs, or query strings from an exception stack).
+function _internalCompileDiagnostic(error, stage) {
+    const name = error && typeof error.name === 'string' && /^[A-Za-z]+Error$/.test(error.name)
+        ? error.name : 'Error';
+    const message = String(error && error.message || error || 'Unknown internal error')
+        .split(/[\r\n]/)[0]
+        .replace(/https?:\/\/\S+/gi, '[URL redacted]')
+        .replace(/(?:\/(?:home|private|Users|tmp)\/)\S+/g, '[path redacted]')
+        .replace(/\b(?:token|password|secret|api[_-]?key)=[^\s]+/gi, '[credential redacted]')
+        .slice(0, 240);
+    const locations = String(error && error.stack || '').split('\n').slice(1)
+        .map(line => line.match(/(?:^|[(/])(?:simulator\/)?(app-[\w-]+|assembler|cloomc_compiler|capability_tokens|lump_assembler)\.js:(\d+):(\d+)/))
+        .filter(Boolean).slice(0, 6)
+        .map(match => match[1] + '.js:' + match[2] + ':' + match[3]);
+    return {
+        message: 'Internal IDE error during ' + stage + ': ' + name + ': ' + message,
+        detail: locations.length ? 'IDE code locations:\n' + locations.join('\n')
+            : 'No local IDE code location was available.'
+    };
+}
+
 function smartCompile(options) {
     const _smartOptions = options && typeof options === 'object' ? options : {};
     const _smartCompileError = (error, kind) => {
         const _kind = kind === 'assembly' ? 'Assembly' : 'CLOOMC++';
-        const _message = error && error.message
-            ? error.message : String(error || 'unknown error');
+        const _diagnostic = _internalCompileDiagnostic(
+            error, _kind + ' candidate preparation');
         console.error(`smartCompile ${_kind.toLowerCase()} error:`, error);
         const con = document.getElementById('editorConsole');
-        if (con) con.textContent = `${_kind} compile error: ${_message}`;
+        if (con) con.textContent = _diagnostic.message + '\n' + _diagnostic.detail;
         if (typeof _showAsmErrors === 'function') {
-            _showAsmErrors([{ line: null, message: _message }],
-                `${_kind} compile error \u2014 code not applied`);
+            _showAsmErrors([{ line: null, message: _diagnostic.message,
+                detail: _diagnostic.detail }],
+                'Internal IDE error \u2014 code not applied');
         }
         if (typeof showNextSteps === 'function') showNextSteps('error');
-        return { ok: false, kind, error: _message };
+        return { ok: false, kind: 'internal', stage: kind,
+            error: _diagnostic.message, detail: _diagnostic.detail };
     };
     const _smartCompileResult = (kind, result) => {
         if (result && result.ok === false) return result;

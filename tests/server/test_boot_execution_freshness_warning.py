@@ -17,6 +17,56 @@ def _write_structural_lump(directory, filename, row0):
         b"".join(word.to_bytes(4, "big") for word in words))
 
 
+def test_namespace_response_recovers_exact_legacy_catalog_versions(tmp_path):
+    ethernet = b"exact Ethernet saved artifact"
+    capability = b"exact CapabilityTest saved artifact"
+    (tmp_path / "Ethernet.1.b169bba4.lump").write_bytes(ethernet)
+    (tmp_path / "CapabilityTest.1.39f77d6e.lump").write_bytes(capability)
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        {
+            "abstraction": "Ethernet",
+            "filename": "Ethernet.1.b169bba4.lump",
+            "token": "b169bba4",
+            "lump_version": 0,
+        },
+        {
+            "abstraction": "CapabilityTest",
+            "filename": "CapabilityTest.1.39f77d6e.lump",
+            "token": "4a00000a",
+            "lump_version": 34,
+        },
+        {
+            "abstraction": "CapabilityTest",
+            "filename": "CapabilityTest.history.lump",
+            "token": "4a00000a",
+            "lump_version": 35,
+            "archived": True,
+        },
+    ]))
+    (tmp_path / "CapabilityTest.history.lump").write_bytes(b"newer history")
+    state = {"abstractions": [
+        {"name": "Ethernet", "slot": 9},
+        {
+            "name": "CapabilityTest",
+            "slot": 10,
+            "filename": "CapabilityTest.1.39f77d6e.lump",
+            "token": "4a00000a",
+            "binary_hash": hashlib.sha256(capability).hexdigest(),
+        },
+    ]}
+
+    resolved = app_module._resolve_namespace_saved_artifacts(
+        state, str(tmp_path))
+
+    ethernet_row, capability_row = resolved["abstractions"]
+    assert ethernet_row["lump_version"] == 0
+    assert ethernet_row["filename"] == "Ethernet.1.b169bba4.lump"
+    assert ethernet_row["binary_hash"] == hashlib.sha256(ethernet).hexdigest()
+    assert capability_row["lump_version"] == 34
+    assert capability_row["filename"] == "CapabilityTest.1.39f77d6e.lump"
+    assert state["abstractions"][0] == {"name": "Ethernet", "slot": 9}
+
+
 def test_execution_freshness_names_selected_and_latest_artifacts(tmp_path):
     _write_lump(tmp_path, "SelfTest.old.lump")
     _write_lump(tmp_path, "SelfTest.latest.lump")

@@ -298,7 +298,7 @@ This is **correct** (64 words = 2^6). No contradiction found elsewhere.
 All documentation corrections identified by this audit have been applied in place (11 corrections: C-1 through C-11 in `HARDWARE-DEVIATIONS.md`). Open deviations between documentation and the merged hardware implementation are tracked in [`docs/HARDWARE-DEVIATIONS.md`](HARDWARE-DEVIATIONS.md) (entries D-1 through D-8) for architect review:
 
 - **D-1**: Minimum lump size enforcement gap
-- **D-2**: RETURN MASK field not implemented (Task #8)
+- **D-2**: Historical mask-ignored finding superseded by keep-mask implementation; see `HARDWARE-DEVIATIONS.md` for current semantics and remaining legacy cLoad bypasses.
 - **D-3**: TPERM faulting model mismatch
 - **D-4**: CR12/CR14 dual register names
 - **D-5**: Navana.Init wiring

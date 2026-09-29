@@ -120,4 +120,30 @@ for (const nia of [0x7FFE, 0x7FFF]) {
     assert.equal(s.cr[6].m, 1);
     unchangedFault(s, 'STACK_UNDERFLOW');
 }
-console.log('PASS protected RETURN validation, nested CALL/LAMBDA, and immutable faults');
+for (const lambda of [false, true]) {
+    for (const mask of [0, 0xFFF, 0x895]) {
+        const s = fixture();
+        const heap = {...s.cr[5], m: 0};
+        const caller6 = {...s.cr[6], m: 1};
+        if (lambda) {
+            s.cr[0] = {...s.cr[14]};
+            assert.ok(s._execLambda({crDst: 0}));
+        } else call(s, 3);
+        for (const i of [0,1,2,3,4,7,8,9,10,11]) {
+            s.cr[i] = {word0: 100+i, word1: 200+i, word2: 300+i, word3: 400+i, m: 1};
+        }
+        // A stale diagnostic CR6 must never outrank protected caller context.
+        s.callStack.at(-1).savedCRs[6] = {word0: 0, word1: 999, word2: 0, word3: 0, m: 0};
+        s.cr[6] = {word0: 0, word1: 888, word2: 0, word3: 0, m: 0};
+        assert.ok(s._execReturn({imm: mask}));
+        for (const i of [0,1,2,3,4,7,8,9,10,11]) {
+            assert.equal(s.cr[i].word0, mask & (1 << i) ? 100+i : 0);
+            assert.equal(s.cr[i].m, 0);
+        }
+        assert.deepEqual(s.cr[5], heap);
+        assert.equal(s.cr[6].word0, caller6.word0);
+        assert.equal(s.cr[6].word1, caller6.word1);
+        assert.equal(s.cr[6].m, 1);
+    }
+}
+console.log('PASS protected RETURN validation, nested CALL/LAMBDA, keep masks, and immutable faults');

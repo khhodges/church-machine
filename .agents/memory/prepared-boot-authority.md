@@ -44,6 +44,13 @@ reached their final transaction state.
 when provenance or freshness timestamps describe the pre-save Namespace.
 
 **How to apply:** Treat save success and subsequent boot readability as one
-contract. Cached-image failure must block boot, never substitute factory memory.
-Execution guards apply even if a synthetic standalone fallback has already set
-`bootComplete`; accepted committed-image ownership is a separate requirement.
+contract. Missing or malformed cached bytes must not silently substitute factory
+memory. Preparation freshness is not a simulator testing authorization gate:
+the programmer may test existing structurally valid image bytes with a warning.
+This does not authorize hardware deployment or rewrite the stored image.
+
+**Why:** The user rejected IDE-imposed preparation and approval lockouts on
+software testing; unrelated artifact drift must not disable Run/Step/Walk.
+**How to apply:** Separate explicit preparation/publication from volatile
+simulation. Preserve runtime ISA enforcement and identify the bytes actually
+loaded; never promote a newer artifact merely because Run was pressed.

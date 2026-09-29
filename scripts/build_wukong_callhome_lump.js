@@ -106,6 +106,15 @@ function contentFrame(name, text) {
 }
 const FRAME = contentFrame('WukongCallHome', source);
 
+if (words.length !== 74) {
+    console.error(`ERROR: expected 74 words, got ${words.length}.`);
+    console.error('wukong_callhome.cloomc must produce exactly 74 instructions.');
+    console.error('Words 0-1 are LOAD setup, words 2-71 mirror WUKONG_NUC_PROGRAM,');
+    console.error('word 72 is the direct CALL handoff,');
+    console.error('and word 73 is the BRANCH loop_top fallback.');
+    process.exit(1);
+}
+
 const BINDINGS = {
     Salvation:          { gt: 0x4A000004, ns_slot: 4, rights: ['E'] },
     Navana:              { gt: 0x4A000005, ns_slot: 5, rights: ['E'] },

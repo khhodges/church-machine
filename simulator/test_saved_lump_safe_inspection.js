@@ -31,8 +31,8 @@ const FORMAT_BYTES_SRC = extractFunction('_formatSavedLumpExactBytes');
 const TAIL_METADATA_SRC = extractFunction('_readSavedLumpExactTail');
 const OPEN_SRC = extractFunction('openLumpInEditor');
 
-// Missing source remains an explicit state, never a synthesized assembly
-// listing or an implicit sidecar/catalog fallback.
+// Missing source remains explicit at resolution time. The UI uses the exact
+// binary disassembly as its readable, read-only left-pane fallback.
 {
     const context = vm.createContext({ console });
     vm.runInContext(RESOLVE_SRC, context);
@@ -40,8 +40,44 @@ const OPEN_SRC = extractFunction('openLumpInEditor');
         '_resolveSavedLumpEditorSource(null, null, true)', context);
     assert.equal(missing.origin, 'missing');
     assert.equal(missing.restored, false);
-    assert.match(missing.source, /Embedded source is unavailable/);
+    assert.equal(missing.source, '');
+    assert.match(missing.provenanceWarning, /Embedded source is unavailable/);
     assert(!missing.source.includes('0xF8000000'));
+}
+
+// Embedded source remains authoritative and is not relabelled as fallback.
+{
+    const context = vm.createContext({ console });
+    vm.runInContext(RESOLVE_SRC, context);
+    const embedded = vm.runInContext(
+        '_resolveSavedLumpEditorSource("embedded exact", null, true, "legacy")',
+        context);
+    assert.equal(embedded.origin, 'server-extracted');
+    assert.equal(embedded.restored, true);
+    assert.equal(embedded.source, 'embedded exact');
+}
+
+// Exact-version sidecar/catalog text is visible but explicitly unverified.
+{
+    const context = vm.createContext({ console });
+    vm.runInContext(RESOLVE_SRC, context);
+    const fallback = vm.runInContext(
+        '_resolveSavedLumpEditorSource(null, null, true, "legacy source", "legacy sidecar for exact filename")',
+        context);
+    assert.equal(fallback.origin, 'unverified-fallback');
+    assert.equal(fallback.restored, false);
+    assert.equal(fallback.source, 'legacy source');
+    assert.match(fallback.unverifiedProvenance, /exact filename/);
+}
+
+// The production no-source path fills the left pane with disassembly rather
+// than clearing it, while keeping the buffer sealed.
+{
+    assert(OPEN_SRC.includes("_sourceResolution.origin === 'reconstructed-source'"));
+    assert(OPEN_SRC.includes("asmEd.readOnly = !_editableSourceAvailable"));
+    assert(!OPEN_SRC.includes("_setSavedLumpEditorSource('');"));
+    assert(!OPEN_SRC.includes("asmEd.readOnly = true"),
+        'binary trust must not impose a blanket read-only source editor');
 }
 
 // Raw words remain useful inspection data even when they are explicitly
@@ -118,6 +154,7 @@ const OPEN_SRC = extractFunction('openLumpInEditor');
         classList: {
             add(name) { classes.add(name); },
             remove(name) { classes.delete(name); },
+            toggle(name, enabled) { if (enabled) classes.add(name); else classes.delete(name); },
         },
         addEventListener() {},
         removeEventListener() {},
@@ -180,6 +217,12 @@ const OPEN_SRC = extractFunction('openLumpInEditor');
         _migrateBfextBfinsSyntax(value) { return value; },
         _draftLsSet() {},
         _draftLsDel() {},
+        _captureEditorWriteGuard() {
+            return { accepts() { return true; } };
+        },
+        _selectSavedLumpCodeDisplay() {
+            return { kind: 'disassembly', text: '; exact disassembly' };
+        },
         _enterSavedLumpEditorMode(disasm, name, lump, token, inspection) {
             opened.disasm = disasm;
             opened.name = name;
@@ -246,9 +289,23 @@ const OPEN_SRC = extractFunction('openLumpInEditor');
                     assert(!opened.inspection.appendText.includes('word[1]'));
                     assert.equal(opened.lump._identityProvenance, 'unverified');
                     assert.equal(editor.value, '; exact unverified source');
-                    assert.equal(editor.readOnly, true);
-                    assert(classes.has('cm-editor-sealed'));
-                    console.log('PASS saved LUMP safe read-only inspection boundaries');
+                    assert.equal(editor.readOnly, false);
+                    assert(!classes.has('cm-editor-sealed'));
+                    assert.equal(opened.inspection.unverified, true,
+                        'editing source must not approve the binary');
+                    sandbox._editorNavigationBuffers = {
+                        ['lump:' + saved.token]: {
+                            original: '; exact unverified source',
+                            source: 'unsaved repair draft\r\n'
+                        }
+                    };
+                    sandbox._lumpTokenIdentity = value => value;
+                    return vm.runInContext('openLumpInEditor("' + saved.token + '")', context);
+                }).then(function() {
+                    assert.equal(editor.value, 'unsaved repair draft\r\n',
+                        'trust warning must not overwrite unsaved draft');
+                    assert.equal(editor.readOnly, false);
+                    console.log('PASS saved LUMP inspection, editable unapproved source, and draft preservation');
                 });
         })
         .catch(function(error) {

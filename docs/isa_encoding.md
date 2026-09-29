@@ -107,7 +107,7 @@ Example: `IADDLT DR4, DR1, DR2` encodes opcode=0x15, cond=11.
 |  0 | LOAD        | CR dst    | CR base   | unsigned word offset into c-list (0–32767)   |
 |  1 | SAVE        | CR dst (c-list, S perm) | CR src (GT, B=1) | unsigned word offset into c-list (0–32767) |
 |  2 | CALL        | CR src    | 0         | method index (15 bits; see note below)       |
-|  3 | RETURN      | 0          | 0          | 12-bit mask in bits [11:0] — bit N=1 **preserves** CR_N (return value to caller); bit N=0 restores caller's saved CR_N or scrubs to NULL; bit 6 reserved (must be 0); mask=0 → secure default (restore all caller CRs) |
+|  3 | RETURN      | 0          | 0          | 12-bit keep mask in bits [11:0] — for CR0–CR4 and CR7–CR11, bit N=1 keeps the current descriptor, bit N=0 zeros it directly; bits 5/6 ignored: CR5 descriptor unchanged, CR6 reconstructed from caller Enter GT; mask=0 clears all controlled CRs. No snapshot restoration or CLEAR bit. All M bits reset, then CR6 is rearmed. |
 |  4 | CHANGE      | CR dst    | 0         | NS slot index (unsigned)                     |
 |  5 | SWITCH      | 0         | CR src    | new permission — lower 3 bits (0–7)          |
 |  6 | TPERM       | CR dst    | 0         | 5-bit preset code (see §6)                   |

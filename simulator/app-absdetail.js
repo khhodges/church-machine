@@ -1617,18 +1617,19 @@ const METHOD_REGISTER_CONVENTIONS = {
     // assembler's CALL Tunnel.X / ELOADCALL encoding (app-shell.js feeds
     // METHOD_REGISTER_CONVENTIONS directly into new ChurchAssembler(conv)).
     'Ethernet': {
-        'Send':    { index: 0, input: 'CR1 = data GT (R-perm Inform), DR1 = byte length', output: 'DR0 = 0 (queued) | \u22120x01 (TX busy) | \u22120x02 (link down)', dispatch: 'CALL Ethernet.Send',    note: 'Fire-and-forget raw frame send. Caller holds an E-only GT on Ethernet; the device GT is internal to the abstraction\u2019s c-list.' },
-        'Receive': { index: 1, input: 'DR1 = timeout steps (0 = wait forever)',           output: 'CR0 = data GT (R-perm Inform), DR0 = byte length (0 = timeout)', dispatch: 'CALL Ethernet.Receive', note: 'Block until a frame arrives or timeout expires. Returned GT covers exactly byteLen bytes; caller must mSave before returning.' },
-        'Connect': { index: 2, input: 'DR1 = IPv4 address (packed 32-bit), DR2 = port',   output: 'DR0 = 0 (link up) | \u22120x10 (PHY fault) | \u22120x11 (timeout)',  dispatch: 'CALL Ethernet.Connect', note: 'Configure the remote endpoint; arms the PHY and waits for link. Only needed when acting as a client; server mode calls Receive immediately.' },
-        'Status':  { index: 3, input: 'none',                                              output: 'DR0 = 0 (down) | 1 (up) | 2 (busy)',                             dispatch: 'CALL Ethernet.Status',  note: 'Non-blocking status poll. Returns link state without blocking. XC7A100T only \u2014 not present on Tang Nano 20K.' },
+        'Send':    { index: 0, input: 'DR1=reserved dataGT word (unused), DR2=preloaded byte count', output: 'DR1=requested byte count', dispatch: 'CALL Ethernet.Send', note: 'Draft: EthernetDevice RW is UNBOUND. Raw TX_LEN write only; no DMA, FIFO loading or delivery guarantee. Requires verified device binding.' },
+        'Receive': { index: 1, input: 'none', output: 'DR1=raw RX_LEN', dispatch: 'CALL Ethernet.Receive', note: 'Draft: EthernetDevice RW is UNBOUND. Nonblocking register read only; no buffer GT, drain, framing or timeout.' },
+        'Connect': { index: 2, input: 'DR1=packed IPv4, DR2=port (both unused)', output: 'DR1=-1 NOT_IMPLEMENTED', dispatch: 'CALL Ethernet.Connect', note: 'Draft stub: no I/O. UDP session establishment and PHY/link waiting NOT IMPLEMENTED.' },
+        'Status':  { index: 3, input: 'none', output: 'DR1=raw STATUS', dispatch: 'CALL Ethernet.Status', note: 'Draft: EthernetDevice RW is UNBOUND. Historical 0/1/2 down/up/negotiating intent is not verified on a current device. No Tunnel dependency.' },
     },
     'Tunnel': {
-        'Register': { index: 0, input: 'DR1=boot_reason, DR2=last_fault, DR3=fault_NIA', output: 'DR0 = 1 (IDE ACK) | \u22640 (offline)', dispatch: 'CALL Tunnel.Register', note: 'Send 23-byte call-home packet to IDE and await ACK. Replaces hardwired B:02\u00bd boot step.' },
-        'Send':     { index: 1, input: 'DR1=FourCC tag, DR2=word count, DR3=first payload', output: 'DR0 = 0 (queued) | 1 (TX overrun)',      dispatch: 'CALL Tunnel.Send',     note: 'Fire-and-forget media packet. Tags: TEXT=0x54455854 \u00b7 LUMP=0x4C554D50 \u00b7 GTKN=0x47544B4E \u2026' },
-        'Receive':  { index: 2, input: 'DR1=timeout steps (0=forever)',                    output: 'DR0=word count (0=timeout), DR1=FourCC tag, DR2\u2026=payload', dispatch: 'CALL Tunnel.Receive', note: 'Block until IDE sends a media packet or timeout expires.' },
-        'Fault':    { index: 3, input: 'DR1=fault_code, DR2=ns_idx, DR3=thread_gt, DR4=abstr_idx, DR5=method_idx, DR6=instr_offset', output: 'none (fire-and-forget)', dispatch: 'CALL Tunnel.Fault', note: 'Report full semantic fault location to IDE Devices view. Bypasses send queue.' },
-        'Fetch':    { index: 4, input: 'DR1=slot token, DR2=expected words, CR2=write-GT', output: 'DR0 = 0 (installed) | error code',       dispatch: 'CALL Tunnel.Fetch',    note: 'Download lump binary from IDE by NS slot token. Validates header (magic, CRC) before writing.' },
-        'Connect':  { index: 5, input: 'CR2=remote GT (Outform/far-end abstraction)',      output: 'DR0 = far-end return value',              dispatch: 'CALL Tunnel.Connect', note: 'Hello Mum primitive: forward CALL via GTKN packet to far-end Mum.Greet().' },
+        // Editable first-pass ABI, not an attestation of the historical binary.
+        'Register': { index: 0, input: 'DR1=boot_reason, DR2=last_fault, DR3=fault_NIA', output: 'DR1=raw RX', dispatch: 'CALL Tunnel.Register', note: 'Draft: three TX writes, one RX read. No ACK or offline-safe boot guarantee.' },
+        'Send':     { index: 1, input: 'DR1=FourCC tag, DR2=count (1 only), DR3=payload', output: 'DR1=raw STATUS, or -1 unsupported count; DR4 clobbered', dispatch: 'CALL Tunnel.Send', note: 'Draft: multiword Send NOT IMPLEMENTED. STATUS is not delivery acknowledgement.' },
+        'Receive':  { index: 2, input: 'DR1=timeout hint (not enforced)', output: 'DR1=raw count, DR2=raw tag, DR3=raw first payload', dispatch: 'CALL Tunnel.Receive', note: 'Draft: hint write and three RX reads; no framing, blocking or timeout implementation.' },
+        'Fault':    { index: 3, input: 'DR1=fault_code, DR2=ns_idx, DR3=thread_gt, DR4=abstr_idx, DR5=method_idx, DR6=instr_offset', output: 'DR1=raw STATUS', dispatch: 'CALL Tunnel.Fault', note: 'Draft: six raw TX writes; no priority bypass or transmission guarantee.' },
+        'Fetch':    { index: 4, input: 'CR2=proposed destination (unused), DR1=requested token, DR2=expected words', output: 'DR1=-1 NOT_IMPLEMENTED, DR2=raw RX', dispatch: 'CALL Tunnel.Fetch', note: 'Draft request body only. Installation, stream receive, size validation and CRC NOT IMPLEMENTED.' },
+        'Call':     { index: 5, input: 'CR2=proposed remote GT (unused)', output: 'DR1=-1 NOT_IMPLEMENTED', dispatch: 'CALL Tunnel.Call', note: 'Draft stub: no I/O or CALL. Real remote handshake NOT IMPLEMENTED.' },
     },
     // ── System layer 1 abstractions ─────────────────────────────────────────────────────
     // Indices match the methods[] array in abstractions.js createAbstraction() calls.
@@ -1726,10 +1727,10 @@ function getMethodPurposes(abs) {
         'Schoolroom': { 'Join': 'Schoolroom.Join(class_GT) — student enters class', 'Lesson': 'Schoolroom.Lesson(class_GT, content_GT) — teacher posts lesson', 'Submit': 'Schoolroom.Submit(work_GT) — student submits work', 'Grade': 'Schoolroom.Grade(work_GT, score) — teacher grades work' },
         'Friends': { 'Request': 'Friends.Request(peer_GT) — send friend request (needs parent approval)', 'Accept': 'Friends.Accept(requester_GT) — accept request', 'Share': 'Friends.Share(friend_GT, cap_GT) — share capability', 'Revoke': 'Friends.Revoke(cap_GT) — revoke shared capability' },
         'Ethernet': {
-            'Send':    'Ethernet.Send(dataGT, byteLen) — transmit a raw Ethernet frame. CR1 = R-perm Inform GT covering the frame buffer; DR1 = byte length. Fire-and-forget; DR0 \u2190 0 queued | \u22120x01 TX busy | \u22120x02 link down. XC7A100T only.',
-            'Receive': 'Ethernet.Receive(timeout) — block until a frame arrives. DR1 = timeout in steps (0 = wait forever). CR0 \u2190 R-perm Inform GT covering exactly byteLen bytes of the received frame; DR0 \u2190 byte length (0 = timeout). Caller must copy data before returning.',
-            'Connect': 'Ethernet.Connect(ipv4, port) — configure remote endpoint and arm the PHY. DR1 = packed IPv4 (big-endian 32-bit); DR2 = port number. DR0 \u2190 0 link up | \u22120x10 PHY fault | \u22120x11 timeout. Only required for client-mode connections.',
-            'Status':  'Ethernet.Status() — non-blocking link state poll. No inputs. DR0 \u2190 0 (down) | 1 (up) | 2 (busy). Use before Send to avoid TX errors. XC7A100T only \u2014 absent on Tang Nano 20K.',
+            'Send':    'Draft Ethernet.Send: DR1 reserved dataGT word (unused), DR2 preloaded byte count; DR1 returns requested count, not delivered bytes. Raw TX_LEN write only. EthernetDevice RW UNBOUND; requires verified binding.',
+            'Receive': 'Draft Ethernet.Receive: no inputs; DR1 raw RX_LEN. Nonblocking read only, no buffer GT, FIFO drain or timeout. EthernetDevice RW UNBOUND.',
+            'Connect': 'Draft Ethernet.Connect: DR1 IPv4, DR2 port (unused); DR1=-1 NOT_IMPLEMENTED. No I/O, UDP session or PHY/link wait.',
+            'Status':  'Draft Ethernet.Status: no inputs; DR1 raw STATUS. EthernetDevice RW UNBOUND. Historical 0/1/2 meanings unverified. No Tunnel dependency.',
         },
         'Tunnel': {
             'Register': 'Tunnel.Register(boot_reason, last_fault, fault_NIA) — send the 23-byte call-home identification packet [0xCE11 · board · FW · HMAC(4B) · UID(8B) · reason · fault · NIA(4B)] and await ACK. Replaces the hardwired B:02\u00BD boot step. DR0 \u2190 1 (IDE connected) | 0 (offline).',

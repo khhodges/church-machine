@@ -425,6 +425,9 @@ async function importFromLibrary(path) {
         });
         const data = await resp.json();
 
+        if (typeof data.source !== 'string' || data.source.length === 0) {
+            throw new Error('Source is missing for this library item. No data was changed. Ask the publisher to provide source, then retry Import.');
+        }
         if (data.source && writeGuard.accepts()) {
             const editor = document.getElementById('asmEditor');
             if (!editor || !window.confirmSourceReplacement ||
@@ -992,6 +995,97 @@ function initEditorDivider() {
         if (!dragging) return;
         dragging = false;
         divider.classList.remove('dragging');
+    });
+}
+
+function initEditorHorizontalDivider() {
+    const divider = document.getElementById('editorHorizontalDivider');
+    if (!divider) return;
+    const layout = divider.parentElement;
+    const storageKey = 'editorDisassemblyConsoleSplit';
+    function splitVisible() {
+        return layout.classList.contains('saved-lump-editor-layout') ||
+            layout.classList.contains('disassembly-diagnostics-layout');
+    }
+    let ratio = 60;
+    try {
+        const stored = window.localStorage.getItem(storageKey);
+        const saved = Number(stored);
+        if (stored !== null && Number.isFinite(saved) && saved >= 0 && saved <= 100) ratio = saved;
+    } catch (_) { /* Private browsing may disallow local storage. */ }
+
+    function bounds() {
+        const rect = layout.getBoundingClientRect();
+        const gap = parseFloat(window.getComputedStyle(layout).rowGap) || 0;
+        const available = Math.max(0, rect.height - divider.getBoundingClientRect().height - 2 * gap);
+        const min = Math.min(120, available / 2);
+        return { rect, available, gap, min: available ? (min / available) * 100 : 0 };
+    }
+    function setRatio(value, save) {
+        const { min } = bounds();
+        ratio = Math.max(min, Math.min(100 - min, value));
+        layout.style.setProperty('--editor-diagnostics-top', `${ratio}fr`);
+        layout.style.setProperty('--editor-diagnostics-bottom', `${100 - ratio}fr`);
+        divider.setAttribute('aria-valuenow', String(Math.round(ratio)));
+        if (save) {
+            try { window.localStorage.setItem(storageKey, String(ratio)); }
+            catch (_) { /* Resizing remains available without persistence. */ }
+        }
+    }
+    // The workspace may be hidden on load. Restore the saved ratio now; the
+    // bounds are recalculated when the divider is actually used.
+    setRatio(ratio, false);
+    let pointerId = null;
+    let priorCursor = '';
+    let priorSelection = '';
+    function move(event) {
+        if (pointerId !== event.pointerId) return;
+        const { rect, available, gap } = bounds();
+        if (available) setRatio(((event.clientY - rect.top - gap) / available) * 100, false);
+    }
+    function finish(event) {
+        if (pointerId !== event.pointerId) return;
+        pointerId = null;
+        divider.classList.remove('dragging');
+        document.body.style.cursor = priorCursor;
+        document.body.style.userSelect = priorSelection;
+        document.removeEventListener('pointermove', move);
+        document.removeEventListener('pointerup', finish);
+        document.removeEventListener('pointercancel', finish);
+        window.removeEventListener('blur', cancel);
+        setRatio(ratio, true);
+    }
+    function cancel() {
+        if (pointerId !== null) finish({ pointerId });
+    }
+    divider.addEventListener('pointerdown', function(event) {
+        if (pointerId !== null || (event.pointerType === 'mouse' && event.button !== 0) ||
+                !splitVisible()) return;
+        event.preventDefault();
+        pointerId = event.pointerId;
+        priorCursor = document.body.style.cursor;
+        priorSelection = document.body.style.userSelect;
+        document.body.style.cursor = 'row-resize';
+        document.body.style.userSelect = 'none';
+        divider.classList.add('dragging');
+        document.addEventListener('pointermove', move);
+        document.addEventListener('pointerup', finish);
+        document.addEventListener('pointercancel', finish);
+        window.addEventListener('blur', cancel);
+    });
+    divider.addEventListener('keydown', function(event) {
+        if (!splitVisible()) return;
+        const { available, min } = bounds();
+        if (!available) return;
+        const step = 24 / available * 100;
+        let next;
+        if (event.key === 'ArrowUp') next = ratio - step;
+        else if (event.key === 'ArrowDown') next = ratio + step;
+        else if (event.key === 'Home') next = min;
+        else if (event.key === 'End') next = 100 - min;
+        else return;
+        event.preventDefault();
+        setRatio(next, true);
     });
 }
 
@@ -3149,16 +3243,16 @@ function _cmDecodeWord(word, wordAddr) {
     switch (opcode) {
         case 0:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
         case 1:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
-        case 2:  operands = imm15 ? 'CR'+src+', #'+imm15 : 'CR'+src; break;
+        case 2:  operands = src === 6 ? 'CR6['+(imm15 & 31)+'], #'+((imm15 >>> 5) & 127) : (imm15 ? 'CR'+dst+', #'+imm15 : 'CR'+dst); break;
         case 3:  operands = imm15 ? '#0x'+(imm15).toString(16).toUpperCase() : ''; break;
         case 4:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
-        case 5:  operands = 'CR'+dst+', CR'+src; break;
+        case 5:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
         case 6:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
         case 7:  operands = 'CR'+dst; break;
         case 8:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
         case 9:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
         case 16: operands = 'DR'+dst+', CR'+src+', #'+imm15; break;
-        case 17: operands = 'CR'+dst+', #'+imm15+', DR'+src; break;
+        case 17: operands = 'DR'+dst+', CR'+src+', #'+imm15; break;
         case 18: case 19: case 21: case 22: case 24: case 25:
             operands = 'DR'+dst+', DR'+src+', #'+imm15; break;
         case 20: operands = 'DR'+dst+', DR'+src; break;
@@ -3184,11 +3278,12 @@ function _crRoleName(n) {
         0:  'Result',
         1:  'Arg\u202f1',
         2:  'Heap',
-        3:  'C-List',
-        4:  'Services',
-        5:  'Thread',
-        6:  'IRQ',
-        12: 'Return',
+        3:  'Local\u202f#3',
+        4:  'Local\u202f#4',
+        5:  'Instance data',
+        6:  'C-List',
+        12: 'Thread',
+        13: 'IRQ',
         14: 'Active\u202fLUMP',
         15: 'Namespace'
     };
@@ -3202,6 +3297,16 @@ function _crRoleName(n) {
 //   8 ELOADCALL  9 XLOADLAMBDA  10 DREAD  11 DWRITE  12 BFEXT  13 BFINS
 //   20 MCMP  21 IADD  22 ISUB  23 BRANCH  24 SHL  25 SHR  (word=0 → HALT)
 function _instrPlainEnglish(decoded) {
+    var meaning = _instrSymbolicMeaning(decoded);
+    if (meaning && decoded.dst === 0 &&
+        ['DREAD','BFEXT','BFINS','IADD','ISUB','SHL','SHR'].indexOf(decoded.mnemonic) >= 0) {
+        meaning += ' DR0 destination write is discarded; DR0 remains zero.';
+    }
+    return meaning ? 'Static decode (symbolic; execution and operand values unavailable): ' +
+        (decoded.cond && decoded.cond !== 'AL' ? 'Predicate ' + decoded.cond + '; ' : '') + meaning : '';
+}
+
+function _instrSymbolicMeaning(decoded) {
     if (!decoded || !decoded.mnemonic) return '';
     var m   = decoded.mnemonic;
     var dst = decoded.dst;
@@ -3209,45 +3314,58 @@ function _instrPlainEnglish(decoded) {
     var imm = decoded.imm;
     var dn  = (dst !== null && dst !== undefined) ? _crRoleName(dst) : '';
     var sn  = (src !== null && src !== undefined) ? _crRoleName(src) : '';
+    var dataOffset = (imm & 0x4000) ? '#' + (imm & 0x3FFF) :
+        '#' + ((imm >>> 4) & 0x3FF) + ' + DR' + (imm & 15);
     switch (m) {
         case 'LOAD':
-            return 'Load namespace slot #' + imm + ' from ' + sn + ' into ' + dn + '.';
+            return 'Load C-list row #' + imm + ' through CR' + src + ' into CR' + dst + ' if authorized.';
         case 'SAVE':
-            return 'Save ' + dn + ' into namespace slot #' + imm + ' of ' + sn + '.';
+            return 'Save CR' + dst + ' into C-list row #' + imm + ' through CR' + src + ' if authorized.';
         case 'CALL':
-            return 'Call the capability held in ' + sn + (imm ? ', entry #' + imm : '') + '.';
+            if (src === 6) return 'Call the capability in C-list row CR6[' + (imm & 31) + '], method index #' + ((imm >>> 5) & 127) + ' if authorized; target values unavailable.';
+            return 'Call the capability held in CR' + dst + ' (' + dn + '), method index #' + imm + '.';
         case 'RETURN':
-            return 'Return to caller' + (imm ? ' with status 0x' + imm.toString(16).toUpperCase() : '') + '.';
+            return 'Return using the saved frame; keep mask 0x' + (imm & 0xFFF).toString(16).toUpperCase() + ': CR0–CR4/CR7–CR11 set bits prevent clearing, zero bits clear; CR5 descriptor unchanged; CR6 always reconstructed. M boundary rules still apply.';
         case 'CHANGE':
-            return 'Replace ' + dn + ' with the capability at slot #' + imm + ' from ' + sn + '.';
+            return 'CHANGE CR' + dst + ' through CR' + src + '[' + imm + '] if authorized; ' +
+                (dst < 12 ? 'PRIV_REG fault if executed.' : dst >= 14 ? 'Thread-context switch.' : 'system capability load.');
         case 'SWITCH':
-            return 'Switch context: hand control from ' + dn + ' to ' + sn + '.';
+            return 'Isolated-register LOAD into CR' + dst + ' from CR' + src + ', C-list row #' + imm + '; destination M authorizes access and is consumed on success.';
         case 'TPERM':
-            return 'Test permission bit #' + imm + ' in ' + sn + '; store result into ' + dn + '.';
+            if (imm === 0x7FFF) return 'Attenuate CR' + dst + ' to permissions requested by CR' + src + '; no expansion allowed.';
+            var preset = imm & 15;
+            if (preset === 13) return 'FRAME: query whether a return frame exists; flags unavailable.';
+            if (preset === 14) return 'EXACT: assert CR' + dst + '.GT equals CR' + src + '.GT; mismatch faults BIND.';
+            var presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
+            return 'TPERM CR' + dst + ' ' + (presets[preset] || 'reserved preset (fault if executed)') +
+                (preset === 0 ? ': validate non-NULL capability, not permission removal.' : preset < 10 ? ': test exact permissions.' : '.') +
+                ((imm & 16) ? ' Clear B on successful test.' : '');
         case 'LAMBDA':
-            return 'Create a lambda closure from ' + dn + '.';
+            return 'Enter Church reduction through CR' + dst + ' (' + dn + ').';
         case 'ELOADCALL':
-            return 'Extended-load slot #' + imm + ' from ' + sn + ' and call it; result into ' + dn + '.';
+            return 'Load C-list row #' + (imm & 31) + ' through CR' + src + ' into CR' + dst + ', then CALL method #' + ((imm >>> 5) & 127) + ' if authorized.';
         case 'XLOADLAMBDA':
-            return 'Cross-load lambda slot #' + imm + ' from ' + sn + ' into ' + dn + '.';
+            return 'Load C-list row #' + imm + ' through CR' + src + ' into CR' + dst + ', then enter LAMBDA reduction if authorized.';
         case 'DREAD':
-            return 'Read word at offset #' + imm + ' from capability ' + sn + ' into data register DR' + dst + '.';
+            return 'Read word through CR' + src + ' at word offset ' + dataOffset + ' into DR' + dst + ' if authorized.';
         case 'DWRITE':
-            return 'Write data register DR' + src + ' to the address pointed by ' + dn + ' + #' + imm + '.';
+            return 'Write DR' + dst + ' through CR' + src + ' at word offset ' + dataOffset + ' if authorized.';
         case 'BFEXT':
-            return 'Extract bit-field #' + imm + ' from DR' + src + ' into DR' + dst + '.';
+            if (!(imm & 31) || ((imm >>> 5) & 31) + (imm & 31) > 32) return 'Invalid bit-field geometry; BOUNDS fault if executed.';
+            return 'Extract field at bit ' + ((imm >>> 5) & 31) + ', width ' + (imm & 31) + ', from DR' + src + ' into DR' + dst + '.';
         case 'BFINS':
-            return 'Insert bit-field #' + imm + ' from DR' + src + ' into DR' + dst + '.';
+            if (!(imm & 31) || ((imm >>> 5) & 31) + (imm & 31) > 32) return 'Invalid bit-field geometry; BOUNDS fault if executed.';
+            return 'Insert field at bit ' + ((imm >>> 5) & 31) + ', width ' + (imm & 31) + ', from low bits of DR' + src + ' into DR' + dst + '; preserve other bits.';
         case 'MCMP':
             return 'Compare DR' + dst + ' with DR' + src + '; set condition flags.';
         case 'IADD':
-            return 'Add DR' + src + ' and #' + imm + '; store result in DR' + dst + '.';
+            return 'Add DR' + src + ' and ' + ((imm & 0x4000) ? '#' + (imm & 0x3FFF) : 'DR' + (imm & 15)) + '; destination DR' + dst + '.';
         case 'ISUB':
-            return 'Subtract DR' + src + ' from DR' + dst + '; store result in DR' + dst + '.';
+            return 'Subtract ' + ((imm & 0x4000) ? '#' + (imm & 0x3FFF) : 'DR' + (imm & 15)) + ' from DR' + src + '; destination DR' + dst + '.';
         case 'SHL':
-            return 'Shift DR' + dst + ' left by #' + imm + ' bits; store in DR' + dst + '.';
+            return 'Shift DR' + src + ' left by #' + (imm & 31) + ' bits; destination DR' + dst + '.';
         case 'SHR':
-            return 'Shift DR' + dst + ' right by #' + imm + ' bits; store in DR' + dst + '.';
+            return 'Shift DR' + src + ' ' + ((imm & 32) ? 'arithmetic right (sign-fill)' : 'logical right (zero-fill)') + ' by #' + (imm & 31) + ' bits; destination DR' + dst + '.';
         case 'BRANCH': {
             var signedOff = (imm !== null && (imm & 0x4000)) ? (imm - 0x8000) : (imm || 0);
             return 'Branch ' + (signedOff >= 0 ? '+' : '') + signedOff + ' instructions if condition holds.';
@@ -3269,11 +3387,14 @@ function _instrRoleAnnotation(decoded) {
     var m   = decoded.mnemonic;
     var dst = decoded.dst;
     var src = decoded.src;
-    var dstIsCR = ['LOAD','SAVE','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA','DWRITE'].indexOf(m) >= 0;
-    var srcIsCR = ['LOAD','SAVE','CALL','CHANGE','SWITCH','TPERM','ELOADCALL','XLOADLAMBDA','DREAD'].indexOf(m) >= 0;
+    var dstIsCR = ['LOAD','SAVE','CALL','CHANGE','SWITCH','TPERM','LAMBDA','ELOADCALL','XLOADLAMBDA'].indexOf(m) >= 0;
+    var srcIsCR = ['LOAD','SAVE','CHANGE','SWITCH','ELOADCALL','XLOADLAMBDA','DREAD','DWRITE'].indexOf(m) >= 0 ||
+        (m === 'TPERM' && (decoded.imm === 0x7FFF || (decoded.imm & 15) === 14));
+    if (m === 'CALL' && src === 6) { dstIsCR = false; srcIsCR = true; }
+    if (m === 'TPERM' && decoded.imm !== 0x7FFF && (decoded.imm & 15) === 13) dstIsCR = false;
     var parts = [];
     if (dstIsCR && dst !== null && dst !== undefined) parts.push(_crRoleName(dst));
-    if (srcIsCR && src !== null && src !== undefined && src !== dst) parts.push(_crRoleName(src));
+    if (srcIsCR && src !== null && src !== undefined && (!dstIsCR || src !== dst)) parts.push(_crRoleName(src));
     return parts.join('\u2009\u00b7\u2009');
 }
 
@@ -3347,10 +3468,7 @@ function _chlogNsSlotName(rawStr) {
     if (isNaN(idx)) return rawStr;
     // 1. Fixed boot-image table
     if (_CHLOG_NS_SLOT_NAMES[idx]) return _CHLOG_NS_SLOT_NAMES[idx];
-    // 2. Live simulator namespace labels (if simulator is loaded)
-    if (typeof sim !== 'undefined' && sim && sim.nsLabels && sim.nsLabels[idx]) {
-        return sim.nsLabels[idx];
-    }
+    // Never use the unrelated live simulator to label a historical hardware row.
     // 3. Numeric fallback
     return 'NS\u202f#' + idx;
 }

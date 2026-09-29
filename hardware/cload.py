@@ -59,6 +59,10 @@ class ChurchCLoad(Elaboratable):
         self.cload_fault_type = Signal(5)
 
         self.e_gt = Signal(32)
+        # RETURN from an in-scope LAMBDA uses its current executable identity.
+        # Require that identity to resolve to the accepted CR14 code location.
+        self.same_code = Signal()
+        self.code_location = Signal(32)
 
         self.cr15_namespace = Signal(CAP_REG_LAYOUT)
 
@@ -79,6 +83,8 @@ class ChurchCLoad(Elaboratable):
         )
 
         e_gt_latched   = Signal(32)
+        same_code_latched = Signal()
+        code_location_latched = Signal(32)
         e_gt_view      = View(GT_LAYOUT, e_gt_latched)
         fault_type_reg = Signal(5)
 
@@ -163,6 +169,8 @@ class ChurchCLoad(Elaboratable):
                         n_minus_6_reg.eq(0),
                         lump_size_reg.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
+                        same_code_latched.eq(self.same_code),
+                        code_location_latched.eq(self.code_location),
                     ]
                     m.next = "CHECK_TYPE"
 
@@ -201,11 +209,16 @@ class ChurchCLoad(Elaboratable):
                     m.d.sync += fault_type_reg.eq(u_ns_gate.ns_gate_fault_type)
                     m.next = "FAULT"
                 with m.Elif(u_ns_gate.ns_gate_done):
-                    m.d.sync += [
-                        raw_base.eq(u_ns_gate.raw_base),
-                        raw_w2.eq(u_ns_gate.raw_w2),
-                    ]
-                    m.next = "FETCH_HDR"
+                    with m.If(same_code_latched &
+                              ((u_ns_gate.raw_base + 4) != code_location_latched)):
+                        m.d.sync += fault_type_reg.eq(FaultType.STACK_CORRUPT)
+                        m.next = "FAULT"
+                    with m.Else():
+                        m.d.sync += [
+                            raw_base.eq(u_ns_gate.raw_base),
+                            raw_w2.eq(u_ns_gate.raw_w2),
+                        ]
+                        m.next = "FETCH_HDR"
 
             with m.State("FETCH_HDR"):
                 m.d.comb += [
@@ -220,7 +233,12 @@ class ChurchCLoad(Elaboratable):
                         n_minus_6_reg.eq(_hdr.n_minus_6),
                         lump_size_reg.eq(Const(1, 15) << (_hdr.n_minus_6 + 6)),
                     ]
-                    m.next = "WRITE_CR14"
+                    with m.If(same_code_latched):
+                        # In-scope LAMBDA retains CR14 verbatim; only CR6 is
+                        # reconstructed from the revalidated code identity.
+                        m.next = "WRITE_CR6"
+                    with m.Else():
+                        m.next = "WRITE_CR14"
 
             with m.State("WRITE_CR14"):
                 m.d.comb += [

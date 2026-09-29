@@ -202,7 +202,7 @@ LOAD_NUC:
     TPERM   AL, CR7, #X        ; strip to X only
     LAMBDA  AL, CR7            ; re-enter boot finalisation code
 
-    ; Final RETURN with capability mask 0b100000 (mask CR5)
+    ; Final RETURN: bit 5 does not affect the CR5 thread descriptor
     RETURN  0b000000100000     ; clear CR5 on exit; boot sequence complete
 
     ; Preserve the thread GT in C-List slot 2 for runtime use
@@ -284,7 +284,7 @@ LOAD_NUC:
     TPERM   AL, CR7, #X        ; restrict to X
     LAMBDA  AL, CR7            ; re-enter boot finalisation (seal re-checked here)
 
-    RETURN  0b000000100000     ; clear CR5 (bit 5 of mask); boot complete
+    RETURN  0b000000100000     ; clear working CRs, not CR5/CR6; boot complete
 
     SAVE    AL, CR6, CR1, #2   ; persist Thread GT at c-list[2] for runtime use
 
@@ -412,7 +412,7 @@ USER_ENTRY:
 <tr><td>[8]</td><td><code>LOAD AL, CR7, CR6[1]</code></td><td>Epilogue \u2014 reload boot code GT</td></tr>
 <tr><td>[9]</td><td><code>TPERM AL, CR7, #X</code></td><td>Epilogue \u2014 restrict to X</td></tr>
 <tr><td>[10]</td><td><code>LAMBDA AL, CR7</code></td><td>Epilogue \u2014 re-enter boot finalisation</td></tr>
-<tr><td>[11]</td><td><code>RETURN 0b000000100000</code></td><td>Epilogue \u2014 boot complete; mask CR5</td></tr>
+<tr><td>[11]</td><td><code>RETURN 0b000000100000</code></td><td>Epilogue \u2014 clear working CRs; CR5 descriptor unchanged, CR6 reconstructed</td></tr>
 <tr><td>[12]</td><td><code>SAVE AL, CR6, CR1, #2</code></td><td>Epilogue \u2014 persist Thread GT to c-list[2]</td></tr>
 </table>
 <div class="sr-key-concept"><div class="sr-concept-title">DEMO_CLIST and DEMO_NAMESPACE</div>

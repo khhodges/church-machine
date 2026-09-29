@@ -39,10 +39,13 @@ All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviat
 - **Decision (architect, May 2026)**: 64 words is an **advisory minimum** — the `n_minus_6` encoding physically cannot express sub-64-word lumps (`n_minus_6 = 0` gives 64 words; the field has no value for smaller). Hardware never receives a smaller-than-64-word lump because the encoding cannot represent one. The minimum is therefore self-enforcing by encoding, not by a run-time fault check.
 - **Action taken**: `architecture.md` updated; no hardware change required. **CLOSED.**
 
-### D-2: RETURN MASK Field — CLOSED (bit 6 reserved; full mask not implemented)
+### D-2: RETURN keep mask — implemented; legacy cLoad bypasses remain
 
-- **Decision (architect, May 2026)**: The mask field in RETURN is currently **not implemented** in hardware (`ret.py` has no mask logic). Mask bit 6 is **reserved and must be zero** — hardware always re-derives CR6 unconditionally via cload; a set bit 6 has no effect and must not be encoded. The remaining mask bits (0–5, 7–11) are also unimplemented; hardware ignores them. No hardware mask mechanism will be added at this time. The boot epilogue should use bare `RETURN` (mask=0).
-- **Action taken**: `instruction-set.md` and `isa_reference.md §8.4` updated (E-2 closed). Assembler should warn if any mask bit is set. Task #8 retracted. **CLOSED.**
+- **Superseding explicit user decision**: Low12 is a keep mask, not a restore mask. For CR0–CR4/CR7–CR11, 1 prevents clearing and keeps the current descriptor; 0 zeros it directly. Bits 5/6 are ignored. CR5 descriptor words are unchanged by CALL/RETURN. CR6 is reconstructed from saved caller context independently of the mask. All M bits reset, then CR6 is rearmed.
+- **Scope**: Simulator and hardware implement mask clearing; no CLEAR bit, saved snapshots, or frame/Thread ABI extension. The previous mask-ignored decision and assembler-warning advice are superseded.
+- **LAMBDA reconstruction fixed**: Hardware lambda-fast RETURN derives identity from the accepted CR14 Inform/X descriptor, revalidates through cLoad and checks the code location before clearing any masked descriptor. Invalid identity/location faults before mask clearing; successful validation reconstructs CR6. It no longer bypasses cLoad.
+- **Remaining hardware limits**: LAMBDA still uses legacy `lambda_pc` return-address state rather than the canonical SZ=0 frame path. Separately, the synthetic boot-ROM guard (`savedPC=3`, no active lambda) still bypasses cLoad and lacks canonical namespace/c-list identity: CR6 reconstruction is not guaranteed there. This is an unresolved implementation limit, **not a user-approved architectural exemption**. Do not claim full cross-path parity or use the keep mask as authority to bypass reconstruction.
+- **Artifact compatibility**: Instruction/frame layouts are unchanged but behavior changes, including bare RETURN (mask=0), which now zeros all ten controlled descriptors. Existing immutable binaries and bitstreams remain historical artifacts; they must not be relabeled as compatible without explicit validation or rebuilding under the new semantics. No artifacts were rebuilt for this documentation update.
 
 ### D-3: TPERM Faulting Model — CLOSED (Task #873 + doc fix May 2026)
 

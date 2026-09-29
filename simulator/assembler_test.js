@@ -3620,7 +3620,7 @@ validateGTConstant('SM_GT_RWX_IDX1', SM_GT_RWX_IDX1);
 }
 
 // RM2: RETURN with non-zero mask (bit 5 set, decimal 32) encodes silently — no warning, no error.
-//      set bit = PRESERVE that CR (return value to caller).
+//      Bit 5 is accepted but CR5 descriptor is always unchanged.
 {
     const a = new ChurchAssembler();
     const r = a.assemble('RETURN 32');
@@ -3630,10 +3630,10 @@ validateGTConstant('SM_GT_RWX_IDX1', SM_GT_RWX_IDX1);
         'got ' + a.warnings.length + ': ' + a.warnings.map(w => w.message).join('; '));
     assert('RM2 RETURN 32: word count = 1', r.words.length === 1, 'got ' + r.words.length);
     const mask = r.words[0] & 0xFFF;
-    assert('RM2 RETURN 32: mask field = 32 in encoded word (bit 5 = preserve CR5)', mask === 32, 'got ' + mask);
+    assert('RM2 RETURN 32: mask field = 32 (CR5 is mask-independent)', mask === 32, 'got ' + mask);
 }
 
-// RM3: RETURN 0xFFF preserves all CR0–CR11 (all return values) — no warning, no error.
+// RM3: RETURN 0xFFF prevents clearing all working CRs — no warning, no error.
 {
     const a = new ChurchAssembler();
     const r = a.assemble('RETURN 0xFFF');
@@ -3643,7 +3643,7 @@ validateGTConstant('SM_GT_RWX_IDX1', SM_GT_RWX_IDX1);
         'got ' + a.warnings.length);
     assert('RM3 RETURN 0xFFF: word count = 1', r.words.length === 1, 'got ' + r.words.length);
     const mask = r.words[0] & 0xFFF;
-    assert('RM3 RETURN 0xFFF: mask field = 0xFFF (preserve all CR0–CR11)', mask === 0xFFF, 'got 0x' + mask.toString(16));
+    assert('RM3 RETURN 0xFFF: mask field = 0xFFF (keep working CRs; CR5/CR6 independent)', mask === 0xFFF, 'got 0x' + mask.toString(16));
 }
 
 // RM4: RETURN 0b000000000001 — preserve only CR0 (single capability return value)

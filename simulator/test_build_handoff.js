@@ -63,7 +63,24 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     assert.equal(box().indeterminate, true);
     assert.equal(box().disabled, true);
     assert(panel.textContent.includes('Storage offline'));
+    assert(panel.textContent.includes('Simulator testing is unaffected'));
+    assert(panel.querySelector('.handoff-status-warning'));
+    const writesBeforeRetry = requests.filter(r => r.method === 'POST').length;
+    const retry = panel.querySelector('button');
+    assert.equal(retry.hidden, false);
     fail = false;
+    // The write response might have been lost after persistence.
+    released = true;
+    retry.click();
+    await tick(); await tick();
+    assert.equal(requests.filter(r => r.method === 'POST').length, writesBeforeRetry,
+        'status check must never replay a write');
+    assert.equal(requests.at(-1).method, 'GET');
+    assert.equal(box().checked, true);
+    assert.equal(box().indeterminate, false);
+    assert.equal(box().disabled, false);
+    assert.equal(retry.hidden, true);
+    assert.equal(panel.querySelector('.handoff-status-warning'), null);
     pending = {};
     render();
     panel.innerHTML = 'different document';

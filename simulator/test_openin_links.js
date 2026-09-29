@@ -1257,7 +1257,8 @@ trackAsync((async function t21() {
         unconfirmedMissing.integrityError.includes('could not confirm'), unconfirmedMissing);
     assert('T22 missing source is explicitly identified',
         missing.origin === 'missing' && missing.restored === false &&
-        missing.source.includes('Embedded source is unavailable'), missing.source);
+        missing.source === '' &&
+        missing.provenanceWarning.includes('Embedded source is unavailable'), missing);
     assert('T22 missing-source buffer never copies compiled disassembly',
         !missing.source.includes('0xF8000000'), missing.source);
 })();

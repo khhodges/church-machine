@@ -233,7 +233,7 @@ ${this._p2Sizes()}
 <tr><td>Read SZ from frame word[12]</td><td>1 \u2192 2-word CALL frame \u00b7 0 \u2192 1-word LAMBDA frame</td></tr>
 <tr><td>Restore FLAGS, PC, STO</td><td>From frame word bits [31:28], [27:13], [11:0]</td></tr>
 <tr><td>Re-derive CR6 and CR14</td><td>SZ\u202f=\u202f1 only: frame word\u202f0 is the caller\u2019s E-GT; re-validate seal then re-derive both registers</td></tr>
-<tr><td>Apply MASK[11:0]</td><td>Low 12 bits of the RETURN literal: each 1-bit clears that CR. Enforces callee-declared capability cleanup.</td></tr>
+<tr><td>Apply MASK[11:0]</td><td>For CR0–CR4/CR7–CR11, each 1-bit prevents clearing the current descriptor; each 0-bit zeros it, never restores a snapshot. CR5 descriptor stays unchanged; CR6 always reconstructs caller context, regardless of bits 5/6. M boundary rules still apply.</td></tr>
 </table>
 <p>The MASK lives in the <strong>RETURN instruction</strong>, not the frame. This leaves all 12 STO bits free in the frame word and ensures the callee (not the caller) controls which CRs are cleared on exit.</p>
 <div class="sr-key-concept"><div class="sr-concept-title">Re-deriving CR6 / CR14 \u2014 Why Not Just Restore?</div>

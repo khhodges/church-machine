@@ -492,7 +492,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     let codeHtml = '<table class="cr-table code-view-table"><thead><tr>';
                     codeHtml += '<th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th>';
                     if (_ba1.hasBranches) codeHtml += '<th class="br-arrow-hdr"></th>';
-                    codeHtml += '<th class="code-decompiled-hdr">Decompiled</th></tr></thead><tbody>';
+                    codeHtml += '<th class="code-decompiled-hdr" title="Symbolic meaning, not recorded execution">Static meaning</th></tr></thead><tbody>';
                     for (let w = 0; w < cw; w++) {
                         const addr = loc + 1 + w;
                         if (addr >= sim.memory.length) break;
@@ -590,6 +590,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                 const asm2 = new ChurchAssembler();
                 const _clBase2 = (cc2 > 0) ? (loc + allocSize2 - cc2) : 0;
                 const _crPets2 = {};
+                const _callContext2 = _codeViewCallContext(loc, sim.parseLumpHeader(sim.memory[loc] >>> 0));
                 const _cw2 = [];
                 for (let w = 0; w < clistStart2; w++) {
                     const a = loc + w;
@@ -599,7 +600,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                 let codeHtml2 = '<table class="cr-table code-view-table"><thead><tr>';
                 codeHtml2 += '<th>Off</th><th>Addr</th><th>Hex</th><th>Decode</th>';
                 if (_ba2.hasBranches) codeHtml2 += '<th class="br-arrow-hdr"></th>';
-                codeHtml2 += '<th class="code-decompiled-hdr">Decompiled</th></tr></thead><tbody>';
+                codeHtml2 += '<th class="code-decompiled-hdr" title="Symbolic meaning, not recorded execution">Static meaning</th></tr></thead><tbody>';
                 for (let w = 0; w < clistStart2; w++) {
                     const addr = loc + w;
                     if (addr >= sim.memory.length) break;
@@ -608,7 +609,7 @@ function renderCListEntryDetail(nsIdx, entry) {
                     const _disasm2 = _applyMethodCRNames(_applyMethodDRNames(_annotateRawClistSlot(asm2.disassemble(word), _clBase2, nsIdx), _mObj2), _mObj2);
                     const decoded = word === 0 ? 'HALT' : _wrapRegHover(typeof _highlightCLOOMCSource === 'function' ? _highlightCLOOMCSource(_disasm2, 'assembly') : _disasm2);
                     const dimmed = word === 0 ? ' style="opacity:0.35;"' : '';
-                    const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2, _crPets2);
+                    const _dc2 = _decompileWord(word, addr, nsIdx, _clBase2, _crPets2, _callContext2);
                     const _dc2Cls = _dc2 ? (_dc2.compiler ? 'code-decompiled-compiler' : 'code-decompiled-user') : '';
                     const rowCls2 = _dc2 && _dc2.compiler ? ' class="code-row-compiler"' : '';
                     codeHtml2 += `<tr${rowCls2}${dimmed}>`;

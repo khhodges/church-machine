@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Alice / Mallory — Isolated Simulator Test Lab</title>
+<style>
+body{background:#0b0d18;color:#d9ddeb;font:15px system-ui,sans-serif;max-width:1100px;margin:24px auto;padding:0 18px}
+h1,h2{color:#e6bb65}section{border:1px solid #39384a;border-radius:10px;padding:16px;margin:16px 0;background:#161a2a}
+button,select{background:#252f48;color:#fff;border:1px solid #69778f;border-radius:5px;padding:9px 13px;margin:4px;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}button:focus-visible,select:focus-visible{outline:2px solid #f6c560}
+pre{white-space:pre-wrap;word-break:break-word;background:#0c1020;padding:12px;border-radius:5px;max-height:370px;overflow:auto}
+.note{color:#aeb6cb}.error{color:#ff9e9e}#status{font-weight:600}
+</style>
+</head>
+<body>
+<h1>Alice / Mallory Test Lab</h1>
+<p class="note">Isolated in-memory ChurchSimulator in this separate page. Does not change the main IDE, saved Namespace, boot configuration, editor draft, or saved LUMPs. Canonical boot and fixture driver preparation run during Load; these are <strong>not</strong> tests in the lightning-bolt CapabilityTest. CHANGE driver words are encoded by the fixture, not accepted through the assembler.</p>
+<section>
+<label for="scenario">Test:</label>
+<select id="scenario">
+<option value="setup">Setup only (no workload)</option>
+<option value="roundtrip">Thread.2 roundtrip</option>
+<option value="alice">Alice Stash → Reveal</option>
+<option value="mallory">Mallory denied capability</option>
+</select>
+<button id="load">Load isolated test</button>
+<button id="step" disabled>Step instruction</button>
+<button id="run" disabled>Run to test boundary</button>
+<button id="reset" disabled>Reset loaded test</button>
+<p id="status" role="status">Choose a test and load it. Saved Alice/Mallory binaries are fetched read-only.</p>
+</section>
+<section><h2>Current execution</h2><pre id="execution">No test loaded.</pre></section>
+<section><h2>Thread inspection</h2><label for="thread">Inspect:</label><select id="thread" disabled></select>
+<pre id="registers">No test loaded.</pre></section>
+<section><h2>Instruction occurrences</h2><pre id="trace">No instructions attempted.</pre></section>
+<script>window.bootConfig={step1:{totalNamespaceWords:16384,namespaceLumpWords:64,threadLumpWords:512,threadCount:3}};</script>
+<script src="architecture_contracts.js"></script>
+<script src="abstract_gt_manager.js"></script>
+<script src="thread_design.js"></script>
+<script src="simulator.js"></script>
+<script src="test_alice_mallory_thread_setup.js"></script>
+<script src="alice_mallory_lab.js"></script>
+<script src="alice_mallory_lab_ui.js"></script>
+</body></html>

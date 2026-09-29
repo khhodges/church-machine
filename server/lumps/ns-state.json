@@ -118,7 +118,11 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA8D6EF"
+      "seal": "0xDEA8D6EF",
+      "token": "00001f00",
+      "filename": "Tunnel.1.9381d362.lump",
+      "lump_version": 1,
+      "binary_hash": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5"
     },
     {
       "name": "Ethernet",
@@ -129,7 +133,11 @@
       "g": 0,
       "limit": "0x0003F",
       "seq": 0,
-      "seal": "0xDEA8F6EF"
+      "seal": "0xDEA8F6EF",
+      "token": "b169bba4",
+      "filename": "Ethernet.1.fc72b0e3.lump",
+      "lump_version": 1,
+      "binary_hash": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb"
     },
     {
       "name": "CapabilityTest",
@@ -142,10 +150,10 @@
       "seq": 0,
       "seal": "0xDED1F6EF",
       "token": "4a00000a",
-      "filename": "CapabilityTest.1.3f7e1c54.lump",
+      "filename": "CapabilityTest.1.39f77d6e.lump",
       "issue_n": 1,
-      "lump_version": 33,
-      "binary_hash": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
+      "lump_version": 34,
+      "binary_hash": "094fd4de8634a5d6255b4d066f6a7378b8c4255110fc4fc0a3b5eb5043ce0ec7",
       "resident": true,
       "boot_resident": true,
       "load_policy": "Resident",
@@ -188,8 +196,47 @@
       "limit": "0x00000",
       "seq": 0,
       "seal": "0x21523090"
+    },
+    {
+      "name": "ide.Alice",
+      "slot": 14,
+      "location": "0x00000400",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00009",
+      "seq": 0,
+      "seal": "0xDEAE9EEF",
+      "token": "4730c311",
+      "filename": "ide.Alice.1.1e49ecb5.lump",
+      "issue_n": 1,
+      "lump_version": 1,
+      "binary_hash": "c36f5d774a07b4d37230b68164484e41989f1c7a8ebba3fc16cb815b7e59b16f",
+      "resident": true,
+      "load_policy": "Resident"
+    },
+    {
+      "name": "ide.Mallory",
+      "slot": 15,
+      "location": "0x00000000",
+      "type": "Inform",
+      "f": 0,
+      "g": 0,
+      "limit": "0x00000",
+      "seq": 0,
+      "seal": "0xDEADBEEF",
+      "symbolic": true,
+      "implementationMissing": true,
+      "resident": false,
+      "selection": {
+        "status": "unresolved",
+        "diagnostic": "Saved artifact is selected for design only; execution requires a validated Install.",
+        "token": "0ca567b5",
+        "filename": "ide.Mallory.1.0ca567b5.lump",
+        "binaryHash": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f"
+      }
     }
   ],
-  "generated_at": 1790199025.627901,
-  "committed_raw_fingerprint": "5af0fc791970a9f911c532dc99e366831eab4fa4c7d1e93d2435350592d84ab1"
+  "generated_at": 1790506565.7879386,
+  "committed_raw_fingerprint": "cef05e1a45da9861d974e53d8727395a6ce45347a13cdda58f053061cdcb49e5"
 }

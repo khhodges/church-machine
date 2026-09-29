@@ -17,7 +17,8 @@
     "token": "00001f00",
     "abstraction": "Tunnel",
     "lump_version": 0,
-    "filename": "Tunnel.1.8770bf03.lump"
+    "filename": "Tunnel.1.8770bf03.lump",
+    "archived": true
   },
   {
     "token": "00002000",
@@ -31,7 +32,8 @@
     "abstraction": "Ethernet",
     "version": "1.1.0",
     "lump_version": 0,
-    "filename": "Ethernet.1.b169bba4.lump"
+    "filename": "Ethernet.1.b169bba4.lump",
+    "archived": true
   },
   {
     "token": "cb8739cf",
@@ -1429,5 +1431,135 @@
       }
     ],
     "operation_id": "8d647b42-de6a-4e2c-b13e-5999698657b9"
+  },
+  {
+    "token": "4a00000a",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.39f77d6e.lump",
+    "lump_version": 34,
+    "compiled_at": 1790248382.438412,
+    "dot_name": "CapabilityTest",
+    "issue_n": 1,
+    "petname": "",
+    "content_profile": 2,
+    "output_profile": 2,
+    "capabilities": [
+      {
+        "name": "SELF",
+        "rights": [
+          "E"
+        ],
+        "grants": [
+          "E"
+        ],
+        "nsIndex": null,
+        "compiler_owned_self": true,
+        "placeholder": true
+      },
+      {
+        "name": "SelfTest",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 6
+      },
+      {
+        "name": "LED_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 3
+      },
+      {
+        "name": "UART_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 2
+      },
+      {
+        "name": "BTN_DEV",
+        "rights": [
+          "R"
+        ],
+        "grants": [],
+        "nsIndex": 4
+      },
+      {
+        "name": "TIMER_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 5
+      },
+      {
+        "name": "M_BIT_DEV",
+        "rights": [
+          "R",
+          "W"
+        ],
+        "grants": [],
+        "nsIndex": 13
+      },
+      {
+        "name": "WukongCallHome",
+        "rights": [
+          "E"
+        ],
+        "grants": [],
+        "nsIndex": 7
+      },
+      {
+        "name": "Thread.2",
+        "rights": [],
+        "grants": [],
+        "nsIndex": 11
+      },
+      {
+        "name": "Thread.3",
+        "rights": [],
+        "grants": [],
+        "nsIndex": 12
+      },
+      {
+        "name": "Boot.Thread",
+        "rights": [],
+        "grants": [],
+        "nsIndex": 1
+      }
+    ],
+    "operation_id": "35fd573a-4577-43a6-9c06-13c5e58e2505",
+    "archived": true
+  },
+  {
+    "token": "00001f00",
+    "abstraction": "Tunnel",
+    "filename": "Tunnel.1.9381d362.lump",
+    "lump_version": 1,
+    "compiled_at": 1790279943.7405238,
+    "operation_id": "4a0ecaf9-fdaf-4046-b3a3-93a862fcc0bb"
+  },
+  {
+    "token": "b169bba4",
+    "abstraction": "Ethernet",
+    "filename": "Ethernet.1.fc72b0e3.lump",
+    "lump_version": 1,
+    "compiled_at": 1790283251.1792533,
+    "operation_id": "8fd932d4-088e-4cec-9ed6-dbdded46a484"
+  },
+  {
+    "token": "4730c311",
+    "abstraction": "ide.Alice",
+    "filename": "ide.Alice.1.1e49ecb5.lump",
+    "lump_version": 1,
+    "compiled_at": 1790506439.9806974,
+    "operation_id": "04abb17b-a296-418e-b41b-820bfffcffaa"
   }
 ]

@@ -115,7 +115,133 @@ def isolated_lumps(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "_LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(tmp_path / "absent-boot.bin"))
+    monkeypatch.setattr(app_module, "BOOT_IMAGE_PROVENANCE_PATH", str(tmp_path / "boot-image-provenance.json"))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
+    monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(tmp_path / "boot-config.json"))
+    monkeypatch.setattr(app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "legacy-boot-config.json"))
+    # Include one synthetic boot row, but keep the provenance-test destination
+    # dynamic. Never infer bootstrap identity from a developer's saved setup.
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": [
+        {"name": "Synthetic.Boot", "slot": 0, "boot": True, "seq": 0},
+        {"name": "Synthetic.Destination", "slot": 7, "seq": 0},
+    ]}))
+    (tmp_path / "boot-config.json").write_text("{}")
     return tmp_path
+
+
+@pytest.mark.parametrize("reference", ["Future.Device", "0x1234567890abcdef000000000001"])
+@pytest.mark.parametrize("representation", ["compiler-zero", "reviewed-feed"])
+def test_signed_symbolic_save_roundtrip_without_target(isolated_lumps, monkeypatch, reference, representation):
+    monkeypatch.setenv("COMPILER_SIGNING_SECRET", "isolated-symbolic-compiler-key-" + "x" * 40)
+    state = isolated_lumps / "ns-state.json"
+    state.write_text(json.dumps({"abstractions": []}))
+    monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state))
+    source = """abstraction SymbolicSave {
+    capabilities { REFERENCE RW }
+    method Ping() {
+        return(7)
+    }
+}
+""".replace("REFERENCE", reference)
+    with app_module.app.test_client() as client:
+        response = client.post("/api/compile", json={
+            "source": source, "language": "javascript", "tier": 2,
+        })
+        compiled = response.get_json()
+        assert response.status_code == 200 and compiled["ok"], compiled
+        assert compiled["methods"] and compiled["compiler_record"]["cw"] > 0
+        record = compiled["compiler_record"]
+        candidate = {
+            "binary": compiled["words"],
+            "metadata": {
+                "abstraction": "SymbolicSave", "language": "javascript",
+                "content_type": "code", "ns_slot": None, "grants": ["E"],
+                "capabilities": compiled["capabilities"],
+                "submitted_source": source,
+                "trust_origin": compiled["trust_origin"],
+                "compiler_record": record,
+                "compiler_identity": record["compiler_identity"],
+                "compiler_version": record["compiler_version"],
+            },
+        }
+        if representation == "reviewed-feed":
+            candidate["binary"][-2] = 0xFEED5E1F
+            candidate["binary"][-1] = 0xFEED0000
+            for key in ("trust_origin", "compiler_record", "compiler_identity", "compiler_version"):
+                candidate["metadata"].pop(key, None)
+        original = state.read_bytes()
+        tampered = json.loads(json.dumps(candidate))
+        tampered["metadata"]["capabilities"][1]["rights"] = ["E"]
+        rejected = client.post("/api/lumps/save-plan", json=tampered)
+        assert rejected.status_code == 422
+        if reference.startswith("0x"):
+            tampered = json.loads(json.dumps(candidate))
+            tampered["metadata"]["capabilities"][1]["token"] = "0x00000001"
+            rejected = client.post("/api/lumps/save-plan", json=tampered)
+            assert rejected.status_code == 422
+        if representation == "compiler-zero":
+            tampered = json.loads(json.dumps(candidate))
+            tampered["binary"][-3] ^= 1
+            rejected = client.post("/api/lumps/save-plan", json=tampered)
+            assert rejected.status_code in (403, 422)
+        assert state.read_bytes() == original
+        assert json.loads((isolated_lumps / "manifest.json").read_text()) == []
+        planned = client.post("/api/lumps/save-plan", json=candidate)
+        assert planned.status_code == 201, planned.get_data(as_text=True)
+        plan = planned.get_json()
+        issued = client.post("/api/lumps/approval-intent", json={
+            "digest": plan["digest"], "action": plan["action"],
+            "plan_id": plan["plan_id"], "confirmation": True,
+            "approval": {"grants": ["E"], "capability_type": "inform"},
+        })
+        assert issued.status_code == 201, issued.get_data(as_text=True)
+        commit = {
+            "binary": plan["final_binary"],
+            "metadata": dict(candidate["metadata"], save_plan_id=plan["plan_id"],
+                             approval_intent=issued.get_json()["intent"]),
+        }
+        saved = client.post("/api/lumps/save", json=commit)
+        assert saved.status_code == 428, saved.get_data(as_text=True)
+        saved = client.post("/api/lumps/save", json=commit, headers={
+            "X-Change-Confirmation": saved.get_json()["change_confirmation"]["id"],
+        })
+        assert saved.status_code == 200, saved.get_data(as_text=True)
+        result = saved.get_json()
+    assert state.read_bytes() == original
+    inspection = app_module._inspect_lump_binary(isolated_lumps / result["filename"])
+    cap = inspection["api_definition"]["capabilities"][1]
+    assert cap["name"] == reference
+    assert cap["rights"] == ["R", "W"]
+    if reference.startswith("0x"):
+        assert cap["token"] == reference
+    assert inspection["source"] == source
+    assert inspection["words"][-1] == (0 if representation == "compiler-zero" else 0xFEED0000)
+    if representation == "compiler-zero":
+        assert app_module._trusted_compile_metadata(
+            candidate["metadata"], inspection["binary_hash"], inspection["words"])
+
+
+def test_symbolic_row_requires_embedded_exact_name_and_rights(isolated_lumps):
+    api = {"capabilities": [
+        {"name": "SELF", "rights": ["E"]},
+        {"name": "Future.Device", "rights": ["R", "W"]},
+    ]}
+    encoded = json.dumps(api).encode()
+    words = [0] * 128
+    words[0] = (0x1f << 27) | (1 << 23) | (1 << 10) | 2
+    words[1] = 0x18000000
+    words[2] = (0xab << 24) | len(encoded)
+    for offset in range(0, len(encoded), 4):
+        words[3 + offset // 4] = int.from_bytes(encoded[offset:offset + 4].ljust(4, b"\0"), "big")
+    caps = [dict(api["capabilities"][0], compiler_owned_self=True), dict(api["capabilities"][1])]
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0, 1}
+    caps[1]["name"] = "Other.Device"
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
+    caps[1] = dict(api["capabilities"][1], rights=["E"])
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
+    caps[1] = dict(api["capabilities"][1])
+    words[-1] = 0xFEED5E1F
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
 
 
 def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
@@ -706,13 +832,24 @@ def test_runtime_m_bit_policy_does_not_block_save_metadata(
             "approval_intent": issued.get_json()["intent"],
         })
         saved = client.post("/api/lumps/save", json=candidate)
+        assert saved.status_code == 428, saved.get_data(as_text=True)
+        confirmation = saved.get_json()["change_confirmation"]["id"]
+        saved = client.post(
+            "/api/lumps/save", json=candidate,
+            headers={"X-Change-Confirmation": confirmation},
+        )
 
     assert saved.status_code == 200, saved.get_data(as_text=True)
     manifest = json.loads((isolated_lumps / "manifest.json").read_text())
     persisted = next(
         row for row in manifest if row["abstraction"] == "ChangedPermission")
-    assert persisted["capabilities"][1]["rights"] == ["E"]
-    assert (isolated_lumps / persisted["filename"]).is_file()
+    assert "capabilities" not in persisted
+    binary_path = isolated_lumps / persisted["filename"]
+    assert binary_path.is_file()
+    inspected = app_module._inspect_lump_binary(str(binary_path))
+    assert len(inspected["clist_entries"]) == 2
+    assert inspected["clist_entries"][1]["perms"] == "E"
+    assert inspected["clist_entries"][1]["ns_index"] == 3
 
 
 @pytest.mark.parametrize("submitted_word", [0xFEEDDEAD, 0])
@@ -747,6 +884,12 @@ def test_compiler_self_marker_requires_compiler_provenance(
         isolated_lumps):
     words = _words(cw=1, cc=1, marker=0)
     words[-1] = 0xFEED5E1F
+    config_before = {
+        path: path.read_bytes()
+        for path in (isolated_lumps / "ns-state.json",
+                     isolated_lumps / "boot-config.json",
+                     isolated_lumps / "manifest.json")
+    }
     with app_module.app.test_client() as client:
         response = client.post("/api/lumps/save-plan", json={
             "binary": words,
@@ -764,6 +907,8 @@ def test_compiler_self_marker_requires_compiler_provenance(
     assert body["self_intermediate_contract_failed"] is True
     assert body["actual_word"] == 0xFEED5E1F
     assert not list(isolated_lumps.glob("*.lump"))
+    assert all(path.read_bytes() == contents
+               for path, contents in config_before.items())
 
 
 def test_misplaced_self_marker_is_rejected_before_namespace_rewrite(

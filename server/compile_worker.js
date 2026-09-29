@@ -279,6 +279,8 @@ if (isMainThread) {
     const capabilities = (compileResult.capabilities || []).map((cap, row) => ({
         name: String(cap && cap.name || ''),
         rights: Array.isArray(cap && cap.rights) ? cap.rights.slice() : [],
+        ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+            .filter(key => cap && typeof cap[key] === 'string').map(key => [key, cap[key]])),
         relocation_row: row,
         compiler_owned_self: !!(cap && cap.compiler_owned_self),
         symbolic_self: !!(cap && cap.symbolic_self),

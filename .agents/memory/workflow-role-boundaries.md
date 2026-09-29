@@ -54,3 +54,73 @@ their handoff, not to allocate slots, change immutable LUMPs, or start builds.
 Do not inherit release status across new revisions or treat it as permission to
 configure or flash. A specific UI implementation request permits that narrow
 code change, not unrelated changes to programmer artifacts.
+
+Design Thread/capability workflows collaboratively from the existing Namespace,
+not a substitute test harness. Use the walkthrough to identify unnecessary
+steps and unclear feedback; propose improvements separately from implementing them.
+
+**Why:** The user explicitly redirected the Alice/Mallory work toward joint
+design using the existing Namespace and asked that workflow improvements be
+considered as the steps are established.
+
+**How to apply:** Track the walkthrough in the conversation, preserve durable
+design decisions here rather than an activity log, and get agreement before
+changing artifacts or implementing suggested workflow improvements.
+
+Namespace design must allow selecting a saved library abstraction even when it
+has validation errors, malformed bytes, or no saved implementation at all;
+selection must not be equated with certification.
+
+**Why:** During the joint Namespace walkthrough the user explicitly rejected
+blocking slot creation merely because a library abstraction is “bad,” and
+explicitly included nonexistent abstractions.
+
+**How to apply:** Keep findings visible without silently repairing the selected
+artifact. Retain design-time name/slot choices and visible diagnostics separately
+from executable authority. A placement is not evidence that bytes exist or have
+passed validation; missing implementations must not prevent Namespace design.
+
+Namespace design-save checks must be tested through the real review and commit
+path, not only through placement helpers.
+
+**Why:** A locally visible added row previously reached executable boot-image
+approval during Save, blocking the intended design-only workflow. Local
+placement success did not prove persistence.
+
+**How to apply:** Keep non-executable placement as the default design action.
+Converting a pending executable selection to design-only state requires an
+explicit action and must retain the chosen slot and artifact identity.
+
+Cryptographic certification belongs at bitstream definition, not ordinary
+Namespace editing or saving. Namespace contents may be largely missing,
+malformed, or inconsistent during design.
+
+**Why:** The user explicitly clarified that “99% of a namespace can be rubbish”
+and that defining a bitstream is the time to check cryptography. A special
+design-only fallback does not satisfy that ordinary workflow.
+
+**How to apply:** Do not gate ordinary Namespace persistence on artifact
+cryptographic approval or boot-image generation. Show diagnostics without
+discarding design choices. Enforce required cryptographic/build checks when
+defining the bitstream; preserve runtime capability enforcement separately.
+This supersedes treating design placement as an exceptional recovery action.
+
+Hosting and sidecar-policy checks are not sources of truth for LUMP contents
+or Namespace correctness.
+
+**Why:** The user explicitly rejected presenting those policy checks as
+authoritative blockers while discussing editor and compiler fixes.
+
+**How to apply:** Separate configured completion gates from evidence about
+artifact correctness. Do not change user artifacts to satisfy unrelated policy
+tests or describe those failures as proof that the artifact is wrong.
+
+Opening a selected saved LUMP for editing must not require installation or
+executable approval.
+
+**Why:** The user was blocked from editing Alice by a non-executable placement
+dialog, despite that placement identifying an existing saved artifact.
+
+**How to apply:** Route to the exact selected artifact's source using normal
+draft-preserving editor navigation. Keep inspection/edit permission separate
+from permission to execute or include bytes in a certified bitstream.

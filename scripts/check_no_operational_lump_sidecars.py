@@ -40,6 +40,8 @@ MANIFEST_ALLOWED_FIELDS = frozenset({
     # Revision, archive, and artifact compatibility history.
     "abstraction", "version", "lump_version", "compiled_at", "archived", "forked",
     "variant_group", "pre_embedded_content",
+    # Durable save transaction correlation, never binary/admission authority.
+    "operation_id",
 })
 MANIFEST_FORBIDDEN_FIELDS = frozenset({
     "sidecar_file",
@@ -65,6 +67,62 @@ APPROVAL_INTRINSIC_FIELDS = frozenset({
     "clist_entries", "methods", "capabilities", "profile", "language",
     "content_type",
 })
+
+_EXACT_SOURCE_INSPECTION = '''
+def _attach_unverified_exact_source(response, lump_path, catalog_record=None):
+    if response.get("source"):
+        return response
+    fallback_source = None
+    fallback_provenance = None
+    sidecar_path = os.path.splitext(lump_path)[0] + ".json"
+    if os.path.isfile(sidecar_path):
+        try:
+            with open(sidecar_path, encoding="utf-8") as sidecar_file:
+                sidecar_record = json.load(sidecar_file)
+            candidate = sidecar_record.get("source") if isinstance(
+                sidecar_record, dict) else None
+            if isinstance(candidate, str) and candidate:
+                fallback_source = candidate
+                fallback_provenance = "legacy sidecar for exact filename"
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            pass
+    if fallback_source is None and isinstance(catalog_record, dict):
+        candidate = catalog_record.get("source")
+        if isinstance(candidate, str) and candidate:
+            fallback_source = candidate
+            fallback_provenance = "catalog record for exact filename"
+    if fallback_source is not None:
+        response["unverified_source"] = fallback_source
+        response["unverified_source_provenance"] = fallback_provenance
+    return response
+'''
+
+
+def _exact_source_inspection_lines(lines: list[str], rel: str) -> set[int]:
+    """Prove the whole reviewed read-only inspector, not merely its name.
+
+    AST equality ignores formatting/comments/docstrings only. Any executable
+    change (writes, broader lookup, authority outputs, decorators, scope or
+    signature) requires a new review instead of inheriting this exception.
+    """
+    if rel != "server/app.py":
+        return set()
+    try:
+        tree = ast.parse("\n".join(lines))
+    except SyntaxError:
+        return set()
+    expected = ast.dump(ast.parse(_EXACT_SOURCE_INSPECTION).body[0])
+    allowed = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef):
+            continue
+        if (node.body and isinstance(node.body[0], ast.Expr)
+                and isinstance(node.body[0].value, ast.Constant)
+                and isinstance(node.body[0].value.value, str)):
+            node.body = node.body[1:]
+        if ast.dump(node) == expected:
+            allowed.update(range(node.lineno, node.end_lineno + 1))
+    return allowed
 
 
 def _code_lines(lines: list[str], suffix: str) -> list[str]:
@@ -399,6 +457,13 @@ def check(root: Path) -> list[str]:
             )
             continue
         token = entry.get("token", "?")
+        if "operation_id" in entry and (
+                not isinstance(entry["operation_id"], str)
+                or not re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", entry["operation_id"])):
+            errors.append(
+                f"server/lumps/manifest.json entry {index} ({token}): "
+                "operation_id must be a bounded save-recovery identifier"
+            )
         forbidden = sorted(set(entry) & MANIFEST_FORBIDDEN_FIELDS)
         unknown = sorted(set(entry) - MANIFEST_ALLOWED_FIELDS)
         if forbidden:
@@ -433,8 +498,11 @@ def check(root: Path) -> list[str]:
         code_lines = _code_lines(lines, path.suffix)
         bitstream_lines = _bitstream_provenance_lines(lines, path.suffix)
         python_allowances = _python_allowances(lines, path.suffix)
+        inspection_lines = _exact_source_inspection_lines(lines, rel)
         for line_no, (line, code) in enumerate(zip(lines, code_lines), 1):
             if not code.strip():
+                continue
+            if line_no in inspection_lines:
                 continue
             # Hardware build provenance uses <bitstream>.meta.json and is not
             # per-LUMP metadata.

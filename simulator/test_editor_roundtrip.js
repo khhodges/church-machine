@@ -130,6 +130,17 @@ function check(label, cond, detail) {
     }
 }
 
+// Editor keeps RETURN's literal low-12-bit convention, including bits 5/6.
+for (const mask of [0, 1, 32, 64, 0x895, 0xFFF]) {
+    const asm = new ChurchAssembler();
+    const word = (RETURN_WORD | mask) >>> 0;
+    const text = asm.disassemble(word);
+    const rebuilt = asm.assemble(text);
+    check(`RETURN keep-mask ${mask} editor disassembly round-trip`,
+        asm.errors.length === 0 && asm.warnings.length === 0 &&
+        rebuilt.words[0] === word);
+}
+
 // ── T-ER01: 2-method LUMP (Alpha/Beta) full round-trip ────────────────────────
 // Bodies:  Alpha = [RETURN_WORD, RETURN_WORD]   (2 words)
 //          Beta  = [RETURN_WORD]                (1 word)

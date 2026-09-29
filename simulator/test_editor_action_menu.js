@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 
 const index = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const run = fs.readFileSync(path.join(__dirname, 'app-run.js'), 'utf8');
@@ -17,9 +18,8 @@ function check(condition, message) {
 
 check(!index.includes('id="executionIdentityEditor"'),
     'the editor no-program-loaded row is removed');
-check(!index.includes('id="btnToolbarCompile"') &&
-      !index.includes('id="btnToolbarSaveLumpPerm"'),
-    'compile and Save Lump are no longer duplicated in the toolbar');
+check(/id="langSelector"[\s\S]*?<\/select>\s*<button[^>]*id="btnToolbarCompile"[^>]*onclick="document.getElementById\('btnHamCompile'\).click\(\)"[\s\S]*?<\/button>\s*<button[^>]*id="btnToolbarSaveLump"[^>]*onclick="document.getElementById\('btnHamSaveLump'\).click\(\)"/.test(index),
+    'Compile and Save LUMP sit beside language and delegate to the original actions');
 check(!index.includes('class="asm-picker-toolbar"'),
     'the separate instruction/C-List toolbar is removed');
 check(index.includes('id="btnHamCompile"') &&
@@ -65,9 +65,10 @@ check(index.includes('class="editor-toolbar"') &&
     'the toolbar sits above the two-column source and disassembly workspace');
 check(toolbar.includes('.editor-layout.saved-lump-editor-layout') &&
       toolbar.includes('grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)') &&
-      toolbar.includes('.saved-lump-editor-layout > .console-panel'),
-    'saved-LUMP mode places source left and disassembly right while hiding the console');
-check(toolbar.includes('grid-template-columns: minmax(0, 1fr) 6px minmax(0, 1fr)') &&
+      toolbar.includes('.saved-lump-editor-layout > .console-panel') &&
+      toolbar.includes('.saved-lump-editor-layout > .editor-horizontal-divider'),
+    'saved-LUMP mode places source left and disassembly above a resizable console');
+check(toolbar.includes('grid-template-columns: minmax(0, 1fr) 10px minmax(0, 1fr)') &&
       toolbar.includes('grid-template-rows: minmax(0, 1fr)'),
     'the source/console workspace is a static three-column row');
 check(!lumps.includes('getElementById(\'btnToolbarCompile\')') &&
@@ -83,5 +84,69 @@ check(lumps.includes("_savedArtifactFailed ? 'alert' : 'status'") &&
       fs.readFileSync(__dirname + '/styles-lumps.css', 'utf8')
           .includes('.lump-source-restored-indicator.is-failed'),
     'failed saved-artifact integrity remains visible as a red X');
+
+const misc = fs.readFileSync(path.join(__dirname, 'app-misc.js'), 'utf8');
+const actions = fs.readFileSync(path.join(__dirname, 'app-actions.js'), 'utf8');
+check(shell.includes('initEditorHorizontalDivider();') &&
+      toolbar.includes('.editor-layout.disassembly-diagnostics-layout > .editor-horizontal-divider') &&
+      toolbar.includes('grid-row: 3;') &&
+      lumps.includes("if (typeof switchCodeTab === 'function') switchCodeTab('console');") &&
+      actions.includes("applyButton('btnToolbarCompile', 'compile')") &&
+      actions.includes("applyButton('btnToolbarSaveLump', 'save')"),
+    'saved and failed builds show the split and new buttons share action eligibility');
+
+function target() {
+    const listeners = new Map();
+    return {
+        listeners,
+        addEventListener(type, fn) {
+            if (!listeners.has(type)) listeners.set(type, new Set());
+            listeners.get(type).add(fn);
+        },
+        removeEventListener(type, fn) { listeners.get(type)?.delete(fn); },
+        fire(type, event) { for (const fn of listeners.get(type) || []) fn(event); }
+    };
+}
+const doc = target();
+doc.body = { style: { cursor: 'auto', userSelect: 'text' } };
+const win = target();
+const stored = new Map([['editorDisassemblyConsoleSplit', '65']]);
+win.localStorage = {
+    getItem(key) { return stored.get(key) ?? null; },
+    setItem(key, value) { stored.set(key, value); }
+};
+win.getComputedStyle = () => ({ rowGap: '8px' });
+const properties = {};
+const layout = {
+    style: { setProperty(key, value) { properties[key] = value; } },
+    getBoundingClientRect() { return { top: 100, height: 500 }; },
+    classList: { contains(name) { return name === 'saved-lump-editor-layout'; } }
+};
+const divider = target();
+divider.parentElement = layout;
+divider.getBoundingClientRect = () => ({ height: 10 });
+divider.classList = { add() {}, remove() {} };
+divider.setAttribute = (name, value) => { divider[name] = value; };
+doc.getElementById = id => id === 'editorHorizontalDivider' ? divider : null;
+const start = misc.indexOf('function initEditorHorizontalDivider()');
+const end = misc.indexOf('function initReplDivider()', start);
+check(start !== -1 && end > start, 'horizontal divider initializer exists');
+vm.runInNewContext(misc.slice(start, end) + '\ninitEditorHorizontalDivider();',
+    { document: doc, window: win });
+check(properties['--editor-diagnostics-top'] === '65fr',
+    'a persisted split restores without touching source or Namespace data');
+divider.fire('keydown', { key: 'ArrowDown', preventDefault() {} });
+check(Number(stored.get('editorDisassemblyConsoleSplit')) > 65,
+    'keyboard adjustment persists the split');
+divider.fire('pointerdown', {
+    pointerId: 7, pointerType: 'mouse', button: 0, preventDefault() {}
+});
+doc.fire('pointermove', { pointerId: 7, clientY: 11000 });
+check(Number(divider['aria-valuenow']) < 100,
+    'pointer drag clamps console to a nonzero minimum height');
+doc.fire('pointercancel', { pointerId: 7 });
+check(doc.body.style.cursor === 'auto' && doc.body.style.userSelect === 'text' &&
+      doc.listeners.get('pointermove').size === 0,
+    'pointer cancellation removes drag listeners and restores body styles');
 
 console.log('Editor action menu regression: PASS');

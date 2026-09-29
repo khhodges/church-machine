@@ -115,6 +115,7 @@ function bootSlotsEqual(a, b) {
 function callNsTableClear(simInst, slot) {
     const sandbox = vm.createContext({
         sim: simInst,
+        window: {},
         updateNamespace: function() {},
         _setNsDirty: function() {},
     });
@@ -564,6 +565,124 @@ function callNsTableClearWithHydration(simInst, slots) {
     }
     check('T415c: Navana.Init leaves all existing NS slots unchanged',
         !bootSlotsChanged);
+}
+
+// Read-only, variable-sized allocation used by the real Add LUMP modal.
+{
+    const sim = makeSim();
+    const before = sim.memory.slice();
+    const first = sim.findFreeLumpRange(512);
+    check('T416: 512-word Alice-sized LUMP has a complete aligned extent',
+        first === 0x800 && first + 512 <= sim.NS_TABLE_BASE);
+    check('T417: allocation preflight does not mutate memory or Namespace',
+        sim.memory.every((word, index) => word === before[index]));
+
+    sim.memory[first] = sim.packLumpHeader(3, 9, 2, 0);
+    const slot = sim.firstUserNsSlot();
+    writeEntry(sim, slot, first, 9, 0, 0, 1, 0, 2, 0);
+    check('T418: next 512-word body cannot overlap previous body',
+        sim.findFreeLumpRange(512) === first + 512);
+
+    sim.memory[first] = 0; // lazy header absent; manifest still owns full extent
+    sim.lazyManifest[slot] = { allocBase: first, allocSize: 512 };
+    check('T419: evicted lazy body retains full reservation',
+        sim.findFreeLumpRange(512) === first + 512);
+    delete sim.lazyManifest[slot];
+    const failedBefore = sim.memory.slice();
+    let unknown = '';
+    try { sim.findFreeLumpRange(512); } catch (err) { unknown = err.message; }
+    check('T420: unknown size at programmable address fails closed without mutation',
+        /trustworthy allocation size/.test(unknown) &&
+        sim.memory.every((word, index) => word === failedBefore[index]));
+}
+{
+    const sim = makeSim();
+    sim.NS_TABLE_BASE = 0xa00;
+    sim.nsCount = sim.firstUserNsSlot();
+    sim.memory[0x800] = sim.packLumpHeader(3, 9, 2, 0);
+    writeEntry(sim, sim.firstUserNsSlot(), 0x800, 9, 0, 0, 1, 0, 2, 0);
+    const before = sim.memory.slice();
+    check('T421: no room below Namespace table returns OOM without mutation',
+        sim.findFreeLumpRange(512) === null &&
+        sim.memory.every((word, index) => word === before[index]));
+}
+{
+    const sim = makeSim();
+    const slot = sim.firstUserNsSlot();
+    sim.memory[0x1000] = sim.packLumpHeader(3, 9, 2, 0);
+    writeEntry(sim, slot, 0x1000, 9, 0, 0, 1, 0, 2, 0);
+    check('T421a: earlier free gap is usable below a higher resident body',
+        sim.findFreeLumpRange(512) === 0x800);
+    sim._activeThreadBase = () => 0x800;
+    sim._threadLayoutAtBase = () => ({ lumpSize: 512 });
+    check('T421b: active Thread interval is never allocated over',
+        sim.findFreeLumpRange(512) === 0xa00);
+    const before = sim.memory.slice();
+    let bad = '';
+    try { sim.findFreeLumpRange(500); } catch (err) { bad = err.message; }
+    check('T421c: malformed non-power-of-two extent rejected without writes',
+        /Invalid LUMP allocation bounds/.test(bad) &&
+        sim.memory.every((word, index) => word === before[index]));
+}
+{
+    const sim = makeSim();
+    const before = sim.memory.slice(0, sim.NS_TABLE_BASE);
+    const missing = sim.defineSymbolicAbstraction('Future.Absent', null, {
+        status: 'missing', diagnostic: 'No saved library artifact exists.'
+    });
+    const invalid = sim.defineSymbolicAbstraction('Future.Broken', null, {
+        status: 'invalid', diagnostic: 'Invalid LUMP header',
+        token: 'deadbeef', filename: 'Future.Broken.deadbeef.lump'
+    });
+    const validDesign = sim.defineSymbolicAbstraction('Future.Selected', null, {
+        status: 'unresolved', diagnostic: 'Design only; install required.',
+        token: '1234abcd', filename: 'Future.Selected.1234abcd.lump'
+    });
+    const petName = sim.defineSymbolicAbstraction('My future idea!', null, {
+        status: 'missing', diagnostic: 'No saved library artifact exists.'
+    });
+    check('T425: missing abstraction accepts a non-canonical pet name',
+        sim.symbolicEntryAt(petName.slot).name === 'My future idea!');
+    const secondPet = sim.defineSymbolicAbstraction('My future idea!', null, {
+        status: 'missing', diagnostic: 'A separate design placement.'
+    });
+    check('T425a: duplicate pet name still allocates a distinct free slot',
+        secondPet.slot !== petName.slot);
+    check('T426: missing, invalid and valid-library designs occupy distinct slots without body writes',
+        new Set([missing.slot, invalid.slot, validDesign.slot]).size === 3 &&
+        sim.memory.slice(0, sim.NS_TABLE_BASE).every((word, i) => word === before[i]));
+    let collision = '';
+    try {
+        sim.defineSymbolicAbstraction('Future.Another', invalid.slot, {
+            status: 'missing', diagnostic: 'Absent'
+        });
+    } catch (err) { collision = err.message; }
+    check('T427: design slot collision is rejected', /already occupied/.test(collision));
+
+    const rows = [missing, invalid, validDesign].map(result => ({
+        ...sim.symbolicEntryAt(result.slot)
+    }));
+    const saved = JSON.parse(JSON.stringify({ abstractions: rows }));
+    const reloaded = makeSim();
+    const sandbox = vm.createContext({
+        sim: reloaded, window: { _nsState: saved }
+    });
+    vm.runInContext(hydrateSymbolicSrc, sandbox);
+    vm.runInContext('_hydrateNsSymbolicState();', sandbox);
+    check('T428: persisted exact design identity and diagnostic survive hydration',
+        reloaded.symbolicEntryAt(invalid.slot).selection.filename ===
+            'Future.Broken.deadbeef.lump' &&
+        reloaded.symbolicEntryAt(missing.slot).selection.status === 'missing' &&
+        reloaded.readNSEntry(invalid.slot).word0_location === 0);
+    const result = reloaded.mLoad(
+        reloaded.createGT(invalid.seq, invalid.slot, { E: 1 }, 1),
+        'E', 0, 0);
+    check('T429: design placement cannot resolve capability execution',
+        !result.ok && result.fault === 'CODE_NOT_RESIDENT');
+    callNsTableClear(reloaded, invalid.slot);
+    check('T430: Clear removes selected design binding and releases slot',
+        !reloaded.symbolicEntryAt(invalid.slot) &&
+        !reloaded.isNSEntryValid(invalid.slot));
 }
 
 console.log(`\n${pass + fail} tests: ${pass} passed, ${fail} failed`);
