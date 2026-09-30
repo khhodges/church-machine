@@ -227,16 +227,22 @@
       "seal": "0xDEADBEEF",
       "symbolic": true,
       "implementationMissing": true,
-      "resident": false,
+      "resident": true,
       "selection": {
         "status": "unresolved",
         "diagnostic": "Saved artifact is selected for design only; execution requires a validated Install.",
         "token": "0ca567b5",
         "filename": "ide.Mallory.1.0ca567b5.lump",
         "binaryHash": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f"
-      }
+      },
+      "token": "04b2913d",
+      "filename": "ide.Mallory.1.fdaed91d.lump",
+      "issue_n": 1,
+      "lump_version": 1,
+      "load_policy": "Resident",
+      "binary_hash": "8a9e5540721dbb9ff2bc1a5f8c8189cfd082d3e86745cb3452d2ea14ec922b32"
     }
   ],
-  "generated_at": 1790506565.7879386,
+  "generated_at": 1790763975.3611934,
   "committed_raw_fingerprint": "cef05e1a45da9861d974e53d8727395a6ce45347a13cdda58f053061cdcb49e5"
 }
