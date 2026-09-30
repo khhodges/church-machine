@@ -11,7 +11,8 @@ from server import boot_capacity
 def _fixture(tmp_path, monkeypatch, *, size=128, thread=False, second=False):
     # Replace only external boot validation in this small deterministic
     # geometry fixture; the production report still calls the real validators.
-    monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", lambda _: None)
+    monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image",
+                        lambda _image, *, check_layout=True: None)
     monkeypatch.setattr(boot_capacity.boot_image, "validate_resident_boot_profile",
                         lambda _: None)
     monkeypatch.setattr(boot_capacity.boot_image, "namespace_boot_marker_slot",
@@ -117,7 +118,7 @@ def test_source_length_and_compression_follow_content_frame_contract(tmp_path, m
 
 def test_invalid_image_still_lists_hash_verified_saved_cost(tmp_path, monkeypatch):
     rows, image = _fixture(tmp_path, monkeypatch)
-    def invalid(_image):
+    def invalid(_image, *, check_layout=True):
         raise ValueError("invalid boot image")
     monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", invalid)
     report = boot_capacity.capacity_report(rows, image, str(tmp_path))
@@ -126,6 +127,20 @@ def test_invalid_image_still_lists_hash_verified_saved_cost(tmp_path, monkeypatc
     assert report["rows"][0]["savedAllocationWords"] == 128
     assert report["rows"][0]["allocatedWords"] is None
     assert report["rows"][0]["savedPaddingWords"] is None
+
+
+def test_invalid_layout_retains_verified_installed_size(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    def layout_only(_image, *, check_layout=True):
+        if check_layout:
+            raise ValueError("overlapping bodies")
+    monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", layout_only)
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path))
+    assert not report["trusted"]
+    assert report["freeWords"] is None
+    assert report["rows"][0]["savedAllocationWords"] == 128
+    assert report["rows"][0]["allocatedWords"] == 128
+    assert any("overlapping bodies" in warning for warning in report["warnings"])
 
 
 def test_negative_slot_is_never_used_to_index_a_descriptor(tmp_path, monkeypatch):

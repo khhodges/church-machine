@@ -130,7 +130,13 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
         try:
             if len(image_bytes) % 4:
                 raise ValueError("Boot image length is not word aligned")
-            boot_image.validate_boot_image(image_bytes)
+            # Forensic reporting needs intact descriptors and known saved
+            # allocations even when the composite placement is invalid.
+            boot_image.validate_boot_image(image_bytes, check_layout=False)
+            try:
+                boot_image.validate_boot_image(image_bytes)
+            except ValueError as layout_error:
+                warnings.append("Committed image layout invalid: " + str(layout_error))
             header = boot_image.read_namespace_header_info(image_bytes)
             table_start = header["table_offset_words"]
             if header["slot_count"] < max(

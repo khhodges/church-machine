@@ -852,7 +852,73 @@ def _encoded_thread_count(words, slots):
 
 # ----- pre-flight validator --------------------------------------------------
 
-def validate_boot_image(image_bytes, total_namespace_words=None):
+def validate_boot_body_ranges(words, physical):
+    """Validate physical RAM allocations, independent of NS capability limits.
+
+    An NS limit describes access to a body (often excluding its c-list); it
+    does not reserve memory. Serialized LUMP headers establish full body
+    allocations; the generator's unloaded fixed catalog rows reserve 64
+    zero words each. Device and zero-location symbolic rows have no RAM body.
+    """
+    total = len(words)
+    table = physical["table_base"]
+    claims = [(0, NAMESPACE_HEADER_V2_WORDS, "Namespace header"),
+              (table, total, "Namespace table")]
+    for slot in range(physical["slots"]):
+        base = total - (slot + 1) * NS_ENTRY_WORDS
+        location, authority = words[base], words[base + 1]
+        if location == 0 and authority == 0:
+            continue
+        if slot == 0:
+            if location != physical["start"]:
+                raise ValueError("validate_boot_image: NS slot 0 does not name Namespace Header V2")
+            continue
+        if location == 0 and slot not in _MMIO_SLOT_SPECS:
+            # A code-free symbolic row may keep its generation/authority
+            # without installing a LUMP. Mandatory residents cannot.
+            if slot in _MANDATORY_NS_SLOTS:
+                raise ValueError(f"validate_boot_image: mandatory NS slot {slot} has no resident body")
+            continue
+        if slot in _MMIO_SLOT_SPECS:
+            if (location, _ns_word1_get(authority, "limit_offset")) != _MMIO_SLOT_SPECS[slot]:
+                raise ValueError(f"validate_boot_image: NS slot {slot} has invalid device MMIO descriptor")
+            continue
+        if location >= total or location < NAMESPACE_HEADER_V2_WORDS:
+            raise ValueError(f"validate_boot_image: NS slot {slot} has out-of-range RAM location {location}")
+        header = words[location]
+        if header == 0 and slot in (7, 8, 9, 10):
+            # Generator reserves a full 64-word catalog slot even when
+            # optional catalog residents (CallHome, Tunnel, Ethernet,
+            # CapabilityTest) have not been selected/installed yet.
+            end = location + SLOT_SIZE
+            if end > table or any(words[location:end]):
+                raise ValueError(
+                    f"validate_boot_image: NS slot {slot} has truncated or nonempty unloaded catalog allocation")
+            claims.append((location, end, f"NS slot {slot} unloaded catalog"))
+            continue
+        if header >> 27 != 0x1f:
+            raise ValueError(f"validate_boot_image: NS slot {slot} has invalid or missing LUMP header")
+        size = 1 << (((header >> 23) & 15) + 6)
+        typ = (header >> 8) & 3
+        cw, cc = (header >> 10) & 8191, header & 255
+        # typ 00 executable, 01 data (away from the physical NS header),
+        # 10 Thread, 11 Outform. Each still occupies its entire allocation.
+        if 1 + cw + cc > size:
+            raise ValueError(f"validate_boot_image: NS slot {slot} has malformed LUMP header")
+        if location + size > table:
+            raise ValueError(
+                f"validate_boot_image: NS slot {slot} full LUMP allocation "
+                f"[{location}, {location + size}) overlaps Namespace header/table or exceeds RAM")
+        claims.append((location, location + size, f"NS slot {slot}"))
+    claims.sort()
+    for left, right in zip(claims, claims[1:]):
+        if right[0] < left[1]:
+            raise ValueError(
+                f"validate_boot_image: {left[2]} [{left[0]}, {left[1]}) "
+                f"overlaps {right[2]} [{right[0]}, {right[1]})")
+
+
+def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout=True):
     """Inspect the NS table inside a boot image and raise ValueError early.
 
     Checks that the format-version tag at mem[ns_table_base - 1] equals
@@ -867,6 +933,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
     ``total_namespace_words`` defaults to ``len(image_bytes) // 4``. When an
     explicit configured size is supplied, the image must contain exactly that
     many words; partial overlays and trailing padding are rejected.
+    ``check_layout=False`` is only for read-only forensic size reporting:
+    it is never an admission check for publication or execution.
 
     Foundational slots (0, 1, 6=Boot.Abstr) and MMIO device slots
     (2=UART_DEV, 3=LED_DEV, 4=BTN_DEV, 5=TIMER_DEV) are all checked.
@@ -1052,22 +1120,8 @@ def validate_boot_image(image_bytes, total_namespace_words=None):
 
     # Do not infer Inform/Outform from any NS word.  State belongs exclusively
     # to access GTs, which are outside this raw table validator.
-    for slot in range(physical["slots"]):
-        base = n_words - (slot + 1) * NS_ENTRY_WORDS
-        location, authority = words[base], words[base + 1]
-        if location == 0 and authority == 0:
-            continue
-        # Slot zero names the physically separate Namespace header.  Every
-        # other RAM-resident body must end before its metadata block.
-        if slot == 0:
-            if location != physical["start"]:
-                raise ValueError("validate_boot_image: NS slot 0 does not name Namespace Header V2")
-            continue
-        if (NAMESPACE_HEADER_V2_WORDS <= location < physical["table_base"]
-                and location + _ns_word1_get(authority, "limit_offset") + 1
-                > physical["table_base"]):
-            raise ValueError(
-                f"validate_boot_image: NS slot {slot} resident body overlaps Namespace header/table")
+    if check_layout:
+        validate_boot_body_ranges(words, physical)
 
 
 def read_boot_entry_info(image_bytes):

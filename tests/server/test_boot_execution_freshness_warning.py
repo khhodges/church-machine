@@ -418,6 +418,12 @@ def test_prepare_run_updates_dependencies_and_preserves_per_row_pin(
 
 
 def _endpoint_fixture(tmp_path, monkeypatch):
+    # These route-level unit tests exercise the commit boundary after an
+    # authorized review; bypass only the review hook, never production policy.
+    monkeypatch.setitem(
+        app_module.app.before_request_funcs, None,
+        [hook for hook in app_module.app.before_request_funcs.get(None, [])
+         if hook.__name__ != "review"])
     state_path = tmp_path / "ns-state.json"
     image_path = tmp_path / "boot-image.bin"
     provenance_path = tmp_path / "boot-image.provenance.json"
@@ -465,10 +471,17 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
 
     def fail_generation(*_args, **_kwargs):
         assert lock_active["depth"] > 0
+        assert json.loads((Path(_args[1]) / "ns-state.json").read_text())[
+            "abstractions"][0]["filename"] == "Entry.new.lump"
+        assert state_path.read_bytes() == before[0]
         raise ValueError("dependency NS[7] is missing")
 
     monkeypatch.setattr(
         app_module._boot_image_gen, "generate_boot_image", fail_generation)
+    monkeypatch.setattr(
+        app_module, "_write_ns_state",
+        lambda _rows: (_ for _ in ()).throw(
+            AssertionError("generation must pass before shared Namespace write")))
     fingerprint = app_module._namespace_state_fingerprint(rows)
     response = app_module.app.test_client().post(
         "/api/boot-image/generate",
@@ -479,6 +492,35 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
     assert (state_path.read_bytes(), image_path.read_bytes(),
             provenance_path.read_bytes()) == before
     assert lock_active["depth"] == 0
+
+
+def test_prepare_run_invalid_generated_image_never_writes_shared_state(
+        tmp_path, monkeypatch):
+    rows, state_path, image_path, provenance_path = _endpoint_fixture(
+        tmp_path, monkeypatch)
+    before = (state_path.read_bytes(), image_path.read_bytes(),
+              provenance_path.read_bytes())
+    monkeypatch.setattr(
+        app_module, "_prepare_run_candidates",
+        lambda *_args, **_kwargs: (
+            [dict(rows[0], filename="Entry.new.lump", token="e2")],
+            [{"slot": 6, "abstraction": "Entry"}]))
+    monkeypatch.setattr(app_module._boot_image_gen, "generate_boot_image",
+                        lambda *_args, **_kwargs: b"invalid-image")
+    monkeypatch.setattr(
+        app_module, "_write_ns_state",
+        lambda _rows: (_ for _ in ()).throw(
+            AssertionError("invalid image must not write shared Namespace state")))
+    response = app_module.app.test_client().post(
+        "/api/boot-image/generate", json={
+            "prepareRun": True,
+            "namespaceFingerprint": app_module._namespace_state_fingerprint(rows),
+        })
+    assert response.status_code == 409
+    assert "invalid image" in response.get_json()["error"].lower() or (
+        "image size" in response.get_json()["error"].lower())
+    assert (state_path.read_bytes(), image_path.read_bytes(),
+            provenance_path.read_bytes()) == before
 
 
 def test_prepare_run_endpoint_rolls_back_publication_failure(tmp_path, monkeypatch):
@@ -494,6 +536,8 @@ def test_prepare_run_endpoint_rolls_back_publication_failure(tmp_path, monkeypat
     monkeypatch.setattr(
         app_module._boot_image_gen, "generate_boot_image",
         lambda *_args, **_kwargs: b"generated-image")
+    monkeypatch.setattr(
+        app_module._boot_image_gen, "validate_boot_image", lambda _image: None)
 
     def fail_publish(_blob):
         image_path.write_bytes(b"partial-new-image")

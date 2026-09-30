@@ -4804,6 +4804,9 @@ def _write_boot_image_bytes(image_bytes, *, provenance_origin="generated",
     already installed the matching decoded state and needs provenance computed
     from those final inputs.
     """
+    # This shared publication path must refuse invalid images before it
+    # invalidates raw Namespace state or writes either publication artifact.
+    _boot_image_gen.validate_boot_image(image_bytes)
     tmp_path = BOOT_IMAGE_PATH + ".tmp"
     provenance_tmp_path = BOOT_IMAGE_PROVENANCE_PATH + ".tmp"
     with _namespace_commit_guard():
@@ -4908,6 +4911,7 @@ def _commit_boot_selection_transaction(cfg, image_bytes):
     invalidation.  Both writers are individually atomic; this wrapper restores
     the prior config if the image-side transaction rejects or rolls back.
     """
+    _boot_image_gen.validate_boot_image(image_bytes)
     with _namespace_commit_guard():
         try:
             with open(BOOT_CONFIG_PATH, "rb") as source:
@@ -5278,10 +5282,9 @@ def boot_image_generate():
                         boot_pin=body.get("artifactPin"),
                         boot_pin_supplied="artifactPin" in body,
                         artifact_pins=body.get("artifactPins"))
+                    blob = _stage_prepare_run_boot_image(
+                        cfg, prepared_rows, entry_slot, for_hardware)
                     _write_ns_state(prepared_rows)
-                    blob = _boot_image_gen.generate_boot_image(
-                        cfg, LUMPS_DIR, boot_entry_slot=entry_slot,
-                        require_entry_resident=for_hardware)
                     _write_boot_image_bytes(blob)
                     next_fingerprint = _namespace_state_fingerprint(prepared_rows)
                     execution_freshness = _boot_execution_freshness(
@@ -6806,6 +6809,27 @@ def _stage_namespace_save_image(cfg, entries):
                        g=(authority >> 30) & 1, f=(authority >> 31) & 1,
                        seal=f"0x{seal:08X}")
         return image, rows
+
+
+def _stage_prepare_run_boot_image(cfg, prepared_rows, entry_slot, for_hardware):
+    """Generate/validate against private candidate state before any shared write.
+
+    The generator reads ns-state.json and other inputs from the same directory.
+    Copy the full library rather than linking it: a generator must never gain
+    write access to saved artifacts through this preflight stage.
+    """
+    import shutil
+    from pathlib import Path
+    with tempfile.TemporaryDirectory(prefix="prepare-run-") as directory:
+        stage = Path(directory) / "lumps"
+        shutil.copytree(LUMPS_DIR, stage)
+        (stage / "ns-state.json").write_text(
+            json.dumps({"abstractions": prepared_rows}), encoding="utf-8")
+        image = _boot_image_gen.generate_boot_image(
+            cfg, str(stage), boot_entry_slot=entry_slot,
+            require_entry_resident=for_hardware)
+        _boot_image_gen.validate_boot_image(image)
+        return image
 
 
 @app.route("/api/boot-image/save-ns", methods=["POST"])

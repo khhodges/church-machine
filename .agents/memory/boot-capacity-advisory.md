@@ -14,3 +14,9 @@ Present capacity primarily as whole-LUMP sizes and address-ordered base/end rang
 **Why:** The user explicitly approved the whole-LUMP simplification and requested base/limit addresses in sequence. Internal breakdowns had obscured the known sizes.
 
 **How to apply:** Label inclusive allocation ends and address units clearly; do not confuse them with capability limits. Keep layout validation separate from size accounting and leave uninstalled locations unspecified.
+
+Use full installed allocation intervals for overlap checks, including empty catalog reservations; saved catalog artifact sizes do not describe those unloaded reservations.
+
+**Why:** An overlap investigation initially misidentified unloaded catalog entries as their much larger saved binaries. Geometry and hash agreement also failed to establish that the installed body remained intact after another descriptor occupied its range.
+
+**How to apply:** Distinguish raw installed headers, explicitly reserved empty spans, symbolic entries with no body, and saved library artifacts. Preserve forensic inspection when execution/publication validation rejects an image. Repair from independently verified saved bytes, not from a potentially overwritten image.
