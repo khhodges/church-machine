@@ -27,8 +27,10 @@ Important syntax note:
 """
 
 import base64
+import hashlib
 import json
 import os
+from pathlib import Path
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from unittest.mock import patch, MagicMock
@@ -89,6 +91,32 @@ Create an abstraction called Greeter
 Add a method called Run
   return 1
 """
+
+def test_alice_embedded_source_trusted_compile_and_attestation(client):
+    """Read only the immutable compressed frame; never edit a saved revision."""
+    fixture = Path(ROOT) / "server/lumps/ide.Alice.1.1e49ecb5.lump"
+    before = fixture.read_bytes()
+    source = server_app_module._inspect_lump_binary(before)["source"]
+    assert "SELF E," in source and "SECRET_DATA RW" in source
+    compiled = _post(client, source, "assembly").get_json()
+    assert compiled["ok"] is True, compiled.get("error")
+    assert compiled["compiler_record"]["source_hash"] == hashlib.sha256(
+        source.encode("utf-8")).hexdigest()
+    assert compiled["compiler_record"]["cc"] == 2
+    assert [(row["name"], row["rights"], row["compiler_owned_self"],
+             row["pending_symbolic"]) for row in
+            compiled["compiler_record"]["capability_rows"]] == [
+                ("SELF", ["E"], True, False),
+                ("SECRET_DATA", ["R", "W"], False, True),
+            ]
+    assert compiled["words"][-2:] == [0, 0]
+    assert server_app_module._symbolic_declared_clist_rows(
+        compiled["words"], compiled["capabilities"]) == {0, 1}
+    assert client.post("/api/compile/attest", json={
+        "words": compiled["words"],
+        "compiler_record": compiled["compiler_record"],
+    }).status_code == 200
+    assert fixture.read_bytes() == before
 
 
 # ---------------------------------------------------------------------------

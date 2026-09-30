@@ -1337,12 +1337,23 @@ class CLOOMCCompiler {
         ).concat(callApiDiagnostics.errors);
         if (asm._hasCapBlock &&
                 (!result.capabilities[0] ||
-                 !/^_?SELF_?$/i.test(String(result.capabilities[0].name || '')))) {
+                 !/^(?:SELF|__SELF__)$/i.test(String(result.capabilities[0].name || '')))) {
             result.errors.push({
                 line: asm._capBlockLine || 1,
                 col: 0,
                 endCol: 0,
                 message: 'C-list fault: row 0 must be SELF. Put SELF first in the capabilities block.',
+            });
+        }
+        // Both spellings denote the same compiler-owned row. Do not promote
+        // another row or silently shift authored reference operands.
+        // Assembly operands continue to use the author's original row indices.
+        const selfRows = (result.capabilities || []).flatMap((cap, row) =>
+            cap && /^(?:SELF|__SELF__)$/i.test(String(cap.name || '')) ? [row] : []);
+        if (selfRows.length > 1 || selfRows.some(row => row !== 0)) {
+            result.errors.push({
+                line: asm._capBlockLine || 1,
+                message: 'C-list fault: SELF and __SELF__ name one row only, at row 0.',
             });
         }
 
@@ -1458,11 +1469,19 @@ class CLOOMCCompiler {
         // zero word, must neither move nor gain a new implicit owner row.
         const hasCompilerSelf = this._reserveCompilerSelfRow === true && !fixedLayout;
         if (hasCompilerSelf) {
+            // Keep explicitly declared permissions intact. SELF ownership
+            // establishes identity, not permission policy: the runtime
+            // enforces authority when a GT is used.
+            const authoredSelf = caps.find(cap => nameOf(cap) === '__SELF__');
             for (let i = caps.length - 1; i >= 0; i--) {
                 if (nameOf(caps[i]) === '__SELF__' && !concrete(caps[i])) caps.splice(i, 1);
             }
             caps.unshift({
-                name: 'SELF', rights: ['E'], grants: ['E'],
+                name: 'SELF',
+                rights: authoredSelf && Array.isArray(authoredSelf.rights)
+                    ? authoredSelf.rights.slice() : ['E'],
+                grants: authoredSelf && Array.isArray(authoredSelf.grants)
+                    ? authoredSelf.grants.slice() : ['E'],
                 symbolic_self: true,
                 compiler_owned_self: true, compiler_assisted_self: true, placeholder: true,
             });
@@ -1572,7 +1591,7 @@ class CLOOMCCompiler {
             }
             return { name, token: name, rights };
         }
-        if (!universalMatch &&
+        if (name !== '__SELF__' && !universalMatch &&
             !/^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/.test(name)) {
             // Preserve the bad item so @portable can fail closed rather than
             // silently dropping a malformed dependency.

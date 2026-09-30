@@ -3146,9 +3146,9 @@ class ChurchAssembler {
         if (/^NULL$/i.test(name) && tokens.length === 1) {
             return { name: 'NULL', rights: [], null_row: true };
         }
-        // __SELF__ is the one reserved symbolic row-zero capability. It is
-        // present in saved assembly such as Alice's; silently dropping it
-        // shifts every subsequent C-list row and makes a rebuilt LUMP invalid.
+        // SELF is the public spelling of the reserved symbolic row-zero
+        // capability; __SELF__ is its historical internal spelling. Neither
+        // spelling changes the source or the position of any following row.
         if (name !== '__SELF__' &&
                 !/^[A-Za-z][A-Za-z0-9_]*(?:[.#][A-Za-z0-9_]+)*$/.test(name)) return null;
         const rights = [];
@@ -3159,7 +3159,7 @@ class ChurchAssembler {
                 }
             }
         }
-        return name === '__SELF__'
+        return name.toUpperCase() === 'SELF' || name === '__SELF__'
             ? { name, rights, symbolic_self: true, compiler_owned_self: true,
                 placeholder: true, identity_contract: 'dynamic-local' }
             : { name, rights };

@@ -9,6 +9,10 @@
 
 const assert = require('assert');
 const path = require('path');
+const fs = require('fs');
+const zlib = require('zlib');
+const crypto = require('crypto');
+const { execFileSync } = require('child_process');
 
 global.ChurchAssembler = require(path.join(__dirname, 'assembler.js'));
 global.METHOD_REGISTER_CONVENTIONS = {
@@ -616,6 +620,87 @@ check('fixed concrete C-list faults when row zero is not SELF', () => {
     assert.ok(result.errors.some(error =>
         /C-list fault: row 0 must be SELF/.test(error.message)));
     assert.deepStrictEqual(capabilityNames(result.capabilities), ['Pinned', 'Foo', 'Bar']);
+});
+
+check('unchanged embedded Alice source compiles with one owned SELF and unresolved private row', () => {
+    const original = fs.readFileSync(path.join(__dirname,
+        '../server/lumps/ide.Alice.1.1e49ecb5.lump'));
+    const originalHash = crypto.createHash('sha256').update(original).digest('hex');
+    const words = Array.from({ length: original.length / 4 },
+        (_, i) => original.readUInt32BE(i * 4));
+    const cw = (words[0] >>> 10) & 0x1FFF;
+    const cc = words[0] & 0xFF;
+    const start = 1 + cw;
+    assert.strictEqual(words[start] >>> 16, 0xAB07);
+    const apiLen = words[start] & 0xFFFF;
+    const sourceLenIndex = start + 1 + Math.ceil(apiLen / 4);
+    const sourceLen = words[sourceLenIndex];
+    const compressed = original.subarray((sourceLenIndex + 1) * 4,
+        (sourceLenIndex + 1) * 4 + sourceLen);
+    const sourceBytes = zlib.inflateRawSync(compressed);
+    const source = sourceBytes.toString('utf8');
+    assert.match(source, /capabilities\s*\{\s*SELF E,\s*SECRET_DATA RW\s*\}/);
+    const compile = text => JSON.parse(execFileSync('node',
+        [path.join(__dirname, '../server/compile_worker.js')],
+        { input: JSON.stringify({ source: text, language: 'assembly' }) }).toString());
+    const actual = compile(source);
+    assert.strictEqual(actual.ok, true, actual.error);
+    assert.strictEqual(actual.words.length, 512);
+    assert.strictEqual(actual.compiler_record.cw, 10);
+    assert.strictEqual(actual.compiler_record.cc, 2);
+    assert.deepStrictEqual(actual.words.slice(-2), [0, 0]);
+    assert.deepStrictEqual(actual.capabilities.map(c => c.name), ['SELF', 'SECRET_DATA']);
+    assert.deepStrictEqual(actual.capabilities.map(c => c.rights), [['E'], ['R', 'W']]);
+    assert.strictEqual(actual.capabilities[0].compiler_owned_self, true);
+    assert.strictEqual(actual.capabilities[0].pending_symbolic, false);
+    assert.strictEqual(actual.capabilities[1].compiler_owned_self, false);
+    assert.strictEqual(actual.capabilities[1].pending_symbolic, true);
+    assert.strictEqual(actual.compiler_record.source_hash,
+        crypto.createHash('sha256').update(sourceBytes).digest('hex'));
+    const historical = compile(source.replace(/\bSELF E,/, '__SELF__ E,'));
+    assert.strictEqual(historical.ok, true, historical.error);
+    assert.deepStrictEqual(historical.words.slice(1, 1 + cw), actual.words.slice(1, 1 + cw));
+    assert.deepStrictEqual(historical.capabilities.map(c => c.rights),
+        actual.capabilities.map(c => c.rights));
+    assert.strictEqual(historical.capabilities[0].compiler_owned_self, true);
+    assert.strictEqual(crypto.createHash('sha256').update(original).digest('hex'), originalHash);
+    assert.strictEqual(cc, 2);
+});
+
+check('assembly rejects duplicate or misplaced SELF without shifting rows or narrowing rights', () => {
+    const compile = source => new CLOOMCCompiler().compileAssembly(source, []);
+    for (const source of [
+        'capabilities { SELF E, __SELF__ E }\nRETURN',
+        'capabilities { External E, SELF E }\nRETURN',
+    ]) {
+        const result = compile(source);
+        assert.ok(result.errors.some(e => /C-list fault/.test(e.message)), source);
+    }
+    const external = compile('capabilities { SELF E, External RW }\nLOAD CR1, CR6, 1\nRETURN');
+    assert.deepStrictEqual(external.errors, []);
+    assert.strictEqual(external.capabilities[1].name, 'External');
+    assert.strictEqual(external.capabilities[1].compiler_owned_self, undefined);
+    const authored = compile('capabilities { SELF RW, SECRET_DATA RW }\nRETURN');
+    const internal = compile('capabilities { __SELF__ RW, SECRET_DATA RW }\nRETURN');
+    assert.deepStrictEqual(authored.errors, []);
+    assert.deepStrictEqual(internal.errors, []);
+    assert.deepStrictEqual(authored.capabilities.map(c => c.rights),
+        internal.capabilities.map(c => c.rights));
+    assert.deepStrictEqual(authored.capabilities[0].rights, ['R', 'W']);
+    assert.deepStrictEqual(authored.capabilities[1].rights, ['R', 'W']);
+});
+
+check('generated compiler preserves authored SELF permissions for both spellings', () => {
+    const build = spelling => `abstraction Owner {
+        capabilities { ${spelling} RW, Foo E }
+        method Run() { Foo.Run() }
+    }`;
+    const publicSelf = compileOrThrow(new CLOOMCCompiler(), build('SELF'), []);
+    const internalSelf = compileOrThrow(new CLOOMCCompiler(), build('__SELF__'), []);
+    assert.deepStrictEqual(publicSelf.capabilities[0].rights, ['R', 'W']);
+    assert.deepStrictEqual(internalSelf.capabilities[0].rights, ['R', 'W']);
+    assert.deepStrictEqual(publicSelf.capabilities.map(c => c.rights),
+        internalSelf.capabilities.map(c => c.rights));
 });
 
 console.log(`Results: ${passed} passed, ${failed} failed`);

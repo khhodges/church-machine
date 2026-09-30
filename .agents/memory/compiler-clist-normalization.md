@@ -29,3 +29,9 @@ appear as invalid CALL rows despite a small, valid local C-list.
 **How to apply:** Include a regression where the same name has different local
 and Namespace indexes, with the Namespace index above CALL's row range. Keep
 the real instruction-width check intact.
+
+Fix compiler compatibility defects rather than requiring programmers to rewrite valid public source syntax to internal spellings.
+
+**Why:** The user explicitly rejected changing Alice's authored `SELF E` to `__SELF__ E` and directed that the compiler be fixed instead.
+
+**How to apply:** Preserve source bytes and authored permissions while establishing correct compiler-owned identity metadata. Test using the original embedded source, and keep unrelated unresolved capabilities pending rather than inventing authority.

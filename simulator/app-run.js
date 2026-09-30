@@ -186,13 +186,17 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
         };
     }
 
-    const hasSelf = !!(caps[0] && (
-        (typeof CapabilityTokens.isContextualSelf === 'function' &&
-            CapabilityTokens.isContextualSelf(caps[0])) ||
-        (typeof caps[0] === 'object' &&
-            (caps[0].compiler_owned_self === true || caps[0].symbolic_self === true) &&
-            ['SELF', '__SELF__'].includes(String(caps[0].name || '').toUpperCase()))
-    ));
+    // A named dependency (or a user-supplied plain SELF label) is not
+    // sufficient to mint the local identity. Require compiler provenance.
+    const hasSelf = !!(caps[0] &&
+        CapabilityTokens.isCompilerOwnedSelf(caps[0]));
+    if (caps[0] && CapabilityTokens.isContextualSelf(caps[0]) && !hasSelf) {
+        return {
+            ok: false,
+            errors: [`${actionLabel}: SELF row 0 requires compiler-owned provenance.`],
+            capabilities: [],
+        };
+    }
     const userCaps = hasSelf ? caps.slice(1) : caps;
     const tokenWords = new Array(caps.length).fill(0);
     if (hasSelf) {
