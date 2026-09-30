@@ -36,7 +36,9 @@ context._renderBootCapacity({
     }],
 });
 assert.match(root.innerHTML, /Capacity not validated/);
-assert.match(root.innerHTML, /Free: unavailable/);
+assert.match(root.innerHTML, /Free: Cannot validate — see layout issues below/);
+assert.match(root.innerHTML, /Not installed — design placement/);
+assert.doesNotMatch(root.innerHTML, /unavailable/i);
 assert.match(root.innerHTML, /NS\[15\] &lt;unsafe&gt;/);
 assert.doesNotMatch(root.innerHTML, /<unsafe>/);
 assert.match(root.innerHTML, /Saved unclassified contents \/ slack/);
@@ -54,3 +56,25 @@ context._renderBootCapacity({
 assert.match(root.innerHTML, /advisory budget exceeded by 712 words/);
 assert.doesNotMatch(root.innerHTML, /headroom below the 48 KiB threshold: -/);
 assert.match(root.innerHTML, /Exact saved cost/);
+context._renderBootCapacity({
+    denseBytes: 65536, totalWords: 16384, warnings: [], rows: [{
+        slot: 1, name: 'Thread', allocatedWords: 256,
+        threadHeapWords: 194, threadStackWords: 32,
+        status: 'installed Thread geometry',
+    }, {
+        slot: 6, name: 'Unknown frame', savedAllocationWords: 128,
+        savedPaddingWords: null, savedUnclassifiedWords: 100,
+    }, {
+        slot: 7, name: 'Missing file', savedIssue: 'Exact selected artifact is missing',
+        status: 'Exact selected artifact is missing',
+    }],
+});
+assert.match(root.innerHTML, /Not applicable — measured from installed Thread/);
+assert.match(root.innerHTML, /256 words \(1,024 bytes\)/);
+assert.match(root.innerHTML, /194 words \(776 bytes\) \/ 32 words \(128 bytes\)/);
+assert.match(root.innerHTML, /Unknown padding — content boundary not verified/);
+assert.match(root.innerHTML, /Cannot verify saved file — Exact selected artifact is missing/);
+assert.doesNotMatch(root.innerHTML, /unavailable/i);
+context._renderBootCapacity({ denseBytes: null, rows: [], warnings: ['No image'] });
+assert.match(root.innerHTML, /Cannot calculate — no committed boot image/);
+assert.doesNotMatch(root.innerHTML, /unavailable/i);

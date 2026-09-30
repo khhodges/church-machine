@@ -177,6 +177,8 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
 
         saved_cost, saved_error = _saved_cost(row, lumps_dir) if row.get("filename") else (
             None, "Exact saved artifact binding is missing")
+        item["savedIssue"] = saved_error
+        item["designOnly"] = row.get("symbolic") is True or row.get("implementationMissing") is True
         if saved_cost:
             item["savedAllocationWords"] = saved_cost["size"]
             item["savedPaddingWords"] = saved_cost["padding"]

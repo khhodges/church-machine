@@ -220,21 +220,27 @@ function _renderBootCapacity(report) {
     const root = document.getElementById('bootCapacityReport');
     if (!root) return;
     if (!report || !Array.isArray(report.rows) || !Array.isArray(report.warnings)) {
-        root.textContent = 'Capacity report is unavailable.';
+        root.textContent = 'Could not read the capacity report: the server response is incomplete. Refresh to retry.';
         return;
     }
-    const words = value => Number.isInteger(value)
+    const words = (value, reason = 'Unknown — measurement not supplied') => Number.isInteger(value)
         ? _escHtml(value.toLocaleString() + ' words (' +
-            (value * 4).toLocaleString() + ' bytes)') : 'unavailable';
+            (value * 4).toLocaleString() + ' bytes)') : _escHtml(reason);
+    const noImage = report.denseBytes == null;
+    const totalsReason = noImage ? 'Cannot calculate — no committed boot image' :
+        report.warnings.length ? 'Cannot validate — see layout issues below' :
+        'Unknown — total not supplied';
     let html = '<div>' + _escHtml(report.layout || 'Committed generic image') +
         ' — dense file: ' +
         (Number.isInteger(report.denseBytes)
             ? _escHtml(report.denseBytes.toLocaleString() + ' bytes')
-            : 'unavailable') + '; image window: ' + words(report.totalWords) + '.</div>';
-    html += '<div>Namespace header/table reservation: ' + words(report.reservedWords) +
-        '. Occupied allocations: ' + words(report.allocatedWords) +
-        '. Free: ' + words(report.freeWords) +
-        '. Largest contiguous gap: ' + words(report.largestFreeWords) + '.</div>';
+            : 'No committed boot image') + '; image window: ' +
+        words(report.totalWords, 'No committed boot image') + '.</div>';
+    html += '<div>Namespace header/table reservation: ' +
+        words(report.reservedWords, noImage ? 'No committed boot image' : 'Cannot validate — image header not verified') +
+        '. Occupied allocations: ' + words(report.allocatedWords, totalsReason) +
+        '. Free: ' + words(report.freeWords, totalsReason) +
+        '. Largest contiguous gap: ' + words(report.largestFreeWords, totalsReason) + '.</div>';
     if (report.advisory && report.advisory.applies) {
         html += '<div>Advisory only (not enforced): 48 KiB boot budget / 16 KiB runtime ' +
             'reserve for a 64 KiB Wukong target. ' +
@@ -244,7 +250,7 @@ function _renderBootCapacity(report) {
                         words(report.allocatedWords - report.advisory.bootBudgetWords) + '. '
                     : 'Generic-window headroom below the 48 KiB threshold: ' +
                         words(report.advisory.bootBudgetWords - report.allocatedWords) + '. ')
-                : 'Threshold headroom is unavailable until validation succeeds. ') +
+                : 'Budget headroom: ' + _escHtml(totalsReason) + '. ') +
             'This comparison does not establish physical projection fit.</div>';
     }
     if (report.physicalTarget) {
@@ -255,7 +261,7 @@ function _renderBootCapacity(report) {
     }
     if (report.warnings.length) {
         html += '<div style="color:#f87171;font-weight:600;">Capacity not validated: ' +
-            'free and occupied totals are unavailable. Resolve these issues first.</div><ul>' +
+            'free and occupied totals cannot be confirmed. Known individual sizes remain shown. Resolve these issues first.</div><ul>' +
             report.warnings.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul>';
     }
     html += '<div style="overflow-x:auto;"><table class="ns-table" style="width:100%;">' +
@@ -265,14 +271,28 @@ function _renderBootCapacity(report) {
         '<th>Assessment</th></tr></thead><tbody>';
     for (const row of report.rows) {
         const text = value => _escHtml(String(value));
+        const isThread = Number.isInteger(row.threadHeapWords);
+        const designOnly = row.designOnly === true ||
+            row.status === 'Design-only symbolic placement; not installed';
+        const savedReason = isThread
+            ? 'Not applicable — measured from installed Thread'
+            : 'Cannot verify saved file — ' + (row.savedIssue || 'exact saved binding not verified');
+        const paddingReason = Number.isInteger(row.savedAllocationWords)
+            ? 'Unknown padding — content boundary not verified' : savedReason;
+        const installedReason = designOnly ? 'Not installed — design placement' :
+            'Cannot verify installation — ' + (row.status || 'image layout not verified');
         html += '<tr><td>NS[' + text(row.slot) + '] ' + text(row.name) +
-            '</td><td>' + (Number.isInteger(row.version) ? 'v' + text(row.version) : 'NA') +
-            '</td><td>' + words(row.savedAllocationWords) + '</td><td>' +
-            words(row.savedPaddingWords) + '</td><td>' +
-            words(row.allocatedWords) + '</td><td>' +
+            '</td><td>' + (Number.isInteger(row.version) ? 'v' + text(row.version) :
+                (isThread ? 'Not applicable — installed Thread' : 'Unknown saved version')) +
+            '</td><td>' + words(row.savedAllocationWords, savedReason) + '</td><td>' +
+            words(row.savedPaddingWords, paddingReason) + '</td><td>' +
+            words(row.allocatedWords, installedReason) + '</td><td>' +
             (Number.isInteger(row.threadHeapWords)
                 ? words(row.threadHeapWords) + ' / ' + words(row.threadStackWords)
-                : '—') + '</td><td>' + words(row.savedUnclassifiedWords) +
+                : (designOnly || Number.isInteger(row.savedAllocationWords)
+                    ? 'Not applicable — no installed Thread'
+                    : 'Unknown — installed object type not verified')) +
+            '</td><td>' + words(row.savedUnclassifiedWords, savedReason) +
             '</td><td>' + text(row.status) + '</td></tr>';
     }
     html += '</tbody></table></div><small>Saved cost is an exact hash-checked library ' +
