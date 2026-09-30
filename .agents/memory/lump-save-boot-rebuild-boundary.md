@@ -19,6 +19,24 @@ artifact being mutated. Treat composite boot-image generation as a separate
 authority transition whose failure is surfaced without revoking the completed
 artifact save.
 
+## Namespace state transitions must agree across writers
+
+Separating artifact publication from image preparation does not permit a saved
+Namespace row to combine design-only selection with executable binding fields.
+Apply the same semantic state rules at every publication boundary; do not
+silently convert a design placement into an installation by merging metadata.
+
+**Why:** An audit found a design-only Mallory selection coexisting with a
+different resident artifact binding. Namespace Save rejected the combination,
+while the artifact-save path could preserve it. Atomic file replacement alone
+does not ensure a semantically valid transition.
+
+**How to apply:** Test replacement of design-only and installed destinations
+separately. Preserve explicit installation consent, reject contradictory state
+before publication, and keep current image identity distinct from the latest
+saved artifact. Never repair a historical address overlap by silently relocating
+an entry or regenerating an image during an unrelated artifact save.
+
 ## Namespace save boundary
 
 An invalidated browser boot-image cache does not mean the simulator's live
