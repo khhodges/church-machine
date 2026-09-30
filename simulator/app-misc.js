@@ -1263,7 +1263,13 @@ function initTabOverflow(container) {
     }
 
     var overflowResizePending = false;
-    var observer = new ResizeObserver(function() {
+    var overflowWidth = null;
+    var overflowHeight = null;
+    var observer = new ResizeObserver(function(entries) {
+        var rect = entries[0] && entries[0].contentRect;
+        if (!rect || (rect.width === overflowWidth && rect.height === overflowHeight)) return;
+        overflowWidth = rect.width;
+        overflowHeight = rect.height;
         if (overflowResizePending) return;
         overflowResizePending = true;
         // ResizeObserver notifications run inside layout delivery. Defer DOM
@@ -1313,8 +1319,24 @@ function syncVisualViewportTop() {
 function observeToolbarHeight() {
     const toolbar = document.querySelector('.fixed-toolbar');
     if (!toolbar || toolbar._viewTopResizeObserver || typeof ResizeObserver !== 'function') return;
-    toolbar._viewTopResizeObserver = new ResizeObserver(function() {
-        requestAnimationFrame(function() { setTimeout(adjustViewTop, 0); });
+    let pending = false;
+    let lastHeight = null;
+    let lastWidth = null;
+    toolbar._viewTopResizeObserver = new ResizeObserver(function(entries) {
+        const rect = entries[0] && entries[0].contentRect;
+        if (!rect || (rect.height === lastHeight && rect.width === lastWidth)) return;
+        lastHeight = rect.height;
+        lastWidth = rect.width;
+        if (pending) return;
+        pending = true;
+        // Toolbar content may wrap while typing; collapse notifications and
+        // apply view offsets only after observer delivery has finished.
+        requestAnimationFrame(function() {
+            setTimeout(function() {
+                pending = false;
+                adjustViewTop();
+            }, 0);
+        });
     });
     toolbar._viewTopResizeObserver.observe(toolbar);
 }

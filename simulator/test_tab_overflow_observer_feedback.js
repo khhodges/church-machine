@@ -48,12 +48,13 @@ async function check() {
     await new Promise(resolve => setTimeout(resolve, 90));
     assert(measurements > stable, 'external tab changes must still recalculate overflow');
     const afterMutation = measurements;
-    resize();
+    resize([{contentRect: {width: 70, height: 20}}]);
     await new Promise(resolve => setTimeout(resolve, 90));
     assert(measurements > afterMutation, 'real container resizes must still recalculate overflow');
     const afterResize = measurements;
+    resize([{contentRect: {width: 70, height: 20}}]);
     await new Promise(resolve => setTimeout(resolve, 90));
-    assert.equal(measurements, afterResize, 'resize-triggered render must not feed back through mutations');
+    assert.equal(measurements, afterResize, 'unchanged geometry and resize-triggered mutations must not render again');
     window.close();
     console.log('PASS tab overflow observer feedback');
 }

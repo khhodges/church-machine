@@ -1958,10 +1958,24 @@ function init() {
         // ─────────────────────────────────────────────────────────────────────
         asmEd.addEventListener('scroll', syncLineScroll);
         if (typeof ResizeObserver !== 'undefined') {
-            new ResizeObserver(function() {
-                // Do not write layout during the observer delivery frame.
+            var _editorResizePending = false;
+            var _editorResizeWidth = null;
+            var _editorResizeHeight = null;
+            new ResizeObserver(function(entries) {
+                var rect = entries[0] && entries[0].contentRect;
+                if (!rect || (rect.width === _editorResizeWidth && rect.height === _editorResizeHeight)) return;
+                _editorResizeWidth = rect.width;
+                _editorResizeHeight = rect.height;
+                if (_editorResizePending) return;
+                _editorResizePending = true;
+                // Never write overlay scroll/layout during ResizeObserver delivery.
+                // A burst of textarea resizes needs only one post-frame sync.
                 requestAnimationFrame(function() {
-                    setTimeout(function() { syncLineScroll(); _debouncedErrorRecalc(); }, 0);
+                    setTimeout(function() {
+                        _editorResizePending = false;
+                        syncLineScroll();
+                        _debouncedErrorRecalc();
+                    }, 0);
                 });
             }).observe(asmEd);
         }
