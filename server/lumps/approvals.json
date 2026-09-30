@@ -869,6 +869,20 @@
         "signature": "a92228d41d3a84876c5037dd1fdcfa9e0687a502494bae54970412e9dbf8b7b3"
       },
       "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe"
+    },
+    "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0": {
+      "abstraction": "ide.Alice",
+      "grants": [
+        "E"
+      ],
+      "capability_type": "inform",
+      "save_as_latest": true,
+      "binary_hash": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
+      "dot_name": "ide.Alice",
+      "issue_n": 1,
+      "filename": "ide.Alice.1.a91d33f7.lump",
+      "compiled_at": 1790775537.4939208,
+      "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843"
     }
   }
 }

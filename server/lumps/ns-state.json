@@ -208,10 +208,10 @@
       "seq": 0,
       "seal": "0xDEAE9EEF",
       "token": "4730c311",
-      "filename": "ide.Alice.1.1e49ecb5.lump",
+      "filename": "ide.Alice.1.a91d33f7.lump",
       "issue_n": 1,
-      "lump_version": 1,
-      "binary_hash": "c36f5d774a07b4d37230b68164484e41989f1c7a8ebba3fc16cb815b7e59b16f",
+      "lump_version": 2,
+      "binary_hash": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
       "resident": true,
       "load_policy": "Resident"
     },
@@ -243,6 +243,6 @@
       "binary_hash": "8a9e5540721dbb9ff2bc1a5f8c8189cfd082d3e86745cb3452d2ea14ec922b32"
     }
   ],
-  "generated_at": 1790763975.3611934,
+  "generated_at": 1790775537.516451,
   "committed_raw_fingerprint": "cef05e1a45da9861d974e53d8727395a6ce45347a13cdda58f053061cdcb49e5"
 }

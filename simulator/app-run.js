@@ -12660,12 +12660,32 @@ function _editorActionIdentity(name) {
     return `${dotName}#${issue}`;
 }
 
+function _editorDisplayPetName(name) {
+    const value = String(name || '').trim();
+    const tokenMatch = value.match(/^(?:Lump\s+)?(?:0x)?([0-9a-f]{8,64})$/i);
+    if (!tokenMatch) return value;
+    // A legacy document title can be a token. Resolve that exact artifact,
+    // never the current execution or another selected registry entry.
+    const token = tokenMatch[1];
+    const registry = window.LumpRegistry;
+    const entry = registry && registry.resolve ? registry.resolve(token) : null;
+    const server = entry && entry.sources && entry.sources.server;
+    const openMeta = window._editorOpenLumpMeta;
+    const meta = server || (openMeta &&
+        String(openMeta.token || '').replace(/^0x/i, '').toLowerCase() === token.toLowerCase()
+        ? openMeta : null);
+    const petName = meta && (meta.dot_name || meta.pet_name || meta.abstraction) ||
+        entry && entry.abstraction || '';
+    return petName && !/^(?:Lump\s+)?(?:0x)?[0-9a-f]{8,64}$/i.test(petName)
+        ? String(petName) : 'Pet Name unavailable';
+}
+
 function _refreshEditorActionIdentity(name) {
     // The editor document's name is not the execution identity. Compilation,
     // registry refreshes and global issue settings must not rename the tab.
     const tab = typeof userTabs !== 'undefined' && typeof activeUserTabId !== 'undefined'
         ? userTabs.find(item => item.id === activeUserTabId) : null;
-    const chosenName = tab ? tab.name : (name || window._editorCodeNameValue || '');
+    const chosenName = _editorDisplayPetName(tab ? tab.name : (name || window._editorCodeNameValue || ''));
     const identityName = document.getElementById('editorCodeName');
     if (identityName) {
         const openMeta = window._editorOpenLumpMeta;
