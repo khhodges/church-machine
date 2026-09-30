@@ -103,8 +103,20 @@ dispatch('error', {
 assert.equal(sent.at(-1).resource, 'styles-lumps.css');
 assert.equal(prevented, 0, 'resource failures remain observable');
 assert.equal(stopped, 0, 'resource failures reach later listeners');
+window.__recordChurchResize('editor', {width: 744.2, height: 801.3, source: 'PRIVATE'}, true);
+window.__recordChurchResize('tabs', {width: 802, height: 28}, false);
+window.__recordChurchResize('PRIVATE arbitrary selector', {width: 10, height: 10}, true);
 dispatch('error', {target: window, message:'ResizeObserver loop completed with undelivered notifications.'});
 assert.equal(sent.at(-1).kind, 'resize_observer');
+assert.deepEqual(sent.at(-1).resize_observers, [
+    {target: 'editor', width: 744, height: 801, scheduled: true},
+    {target: 'tabs', width: 802, height: 28, scheduled: false},
+]);
+assert(!JSON.stringify(sent.at(-1)).includes('PRIVATE'));
+now += 2100;
+dispatch('error', {target: window, message:'ResizeObserver loop limit exceeded',
+    filename: 'https://ide.example/simulator/app-shell.js', lineno: 1, colno: 0});
+assert.deepEqual(sent.at(-1).resize_observers, [], 'stale observer activity must not be attributed');
 for (let i=0;i<20;i++) dispatch('error', {filename: 'https://ide.example/simulator/app-run.js', lineno:i});
 assert.equal(sent.length, 10, 'minute cap');
 now += 61000;

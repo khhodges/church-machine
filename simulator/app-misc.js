@@ -1267,7 +1267,11 @@ function initTabOverflow(container) {
     var overflowHeight = null;
     var observer = new ResizeObserver(function(entries) {
         var rect = entries[0] && entries[0].contentRect;
-        if (!rect || (rect.width === overflowWidth && rect.height === overflowHeight)) return;
+        var changed = rect && (rect.width !== overflowWidth || rect.height !== overflowHeight);
+        if (typeof window.__recordChurchResize === 'function') {
+            window.__recordChurchResize('tabs', rect, !!changed && !overflowResizePending);
+        }
+        if (!changed) return;
         overflowWidth = rect.width;
         overflowHeight = rect.height;
         if (overflowResizePending) return;
@@ -1324,7 +1328,11 @@ function observeToolbarHeight() {
     let lastWidth = null;
     toolbar._viewTopResizeObserver = new ResizeObserver(function(entries) {
         const rect = entries[0] && entries[0].contentRect;
-        if (!rect || (rect.height === lastHeight && rect.width === lastWidth)) return;
+        const changed = rect && (rect.height !== lastHeight || rect.width !== lastWidth);
+        if (typeof window.__recordChurchResize === 'function') {
+            window.__recordChurchResize('toolbar', rect, !!changed && !pending);
+        }
+        if (!changed) return;
         lastHeight = rect.height;
         lastWidth = rect.width;
         if (pending) return;

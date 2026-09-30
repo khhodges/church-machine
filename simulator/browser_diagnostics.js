@@ -7,6 +7,20 @@
     var seen = new Map();
     var sent = 0;
     var windowStart = Date.now();
+    var recentResizes = [];
+    // Only fixed UI observer names and numeric dimensions; never inspect
+    // textarea content, arbitrary DOM identifiers, or click targets.
+    window.__recordChurchResize = function(target, rect, scheduled) {
+        if (['editor', 'tabs', 'toolbar'].indexOf(target) === -1 || !rect) return;
+        recentResizes.push({
+            at: Date.now(),
+            target: target,
+            width: Math.min(100000, position(Math.round(rect.width))),
+            height: Math.min(100000, position(Math.round(rect.height))),
+            scheduled: !!scheduled
+        });
+        if (recentResizes.length > 8) recentResizes.shift();
+    };
     var errorTypes = ['Error', 'TypeError', 'ReferenceError', 'SyntaxError',
         'RangeError', 'URIError', 'EvalError'];
 
@@ -109,6 +123,14 @@
                 resource: resource || '',
                 version: version ? version[1] : 'unknown'
             };
+            if (kind === 'resize_observer') {
+                payload.resize_observers = recentResizes.filter(function(item) {
+                    return now - item.at >= 0 && now - item.at <= 2000;
+                }).map(function(item) {
+                    return {target: item.target, width: item.width, height: item.height,
+                        scheduled: item.scheduled};
+                });
+            }
             var key = JSON.stringify([kind, payload.error_type, payload.frames, payload.resource]);
             if (seen.has(key)) return;
             seen.set(key, true);

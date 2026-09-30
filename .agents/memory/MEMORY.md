@@ -154,3 +154,4 @@
 - [Instruction commentary evidence](instruction-commentary-evidence.md) — static meaning stays symbolic; historical effects need exact immutable occurrence evidence, never live-register recomputation
 - [Uniform indexed operand intent](register-indexed-load-intent.md) — all indexed instructions should support runtime DR value plus immediate; parser limitations are not intended semantics.
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
+- [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.

@@ -21,7 +21,7 @@ assert.match(diagnostics,
 function exercise(source, start, end, setup, observed, name, invoke = '') {
     const code = source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
     assert(code.length && code.includes('new ResizeObserver'), name + ' observer source missing');
-    let observer, writes = 0, frames = [], tasks = [];
+    let observer, writes = 0, frames = [], tasks = [], recorded = [];
     class ResizeObserver {
         constructor(callback) { observer = callback; }
         observe(element) { assert.equal(element, observed); }
@@ -29,6 +29,8 @@ function exercise(source, start, end, setup, observed, name, invoke = '') {
     const write = () => { writes++; };
     const context = {
         ResizeObserver,
+        window: { __recordChurchResize: (target, rect, scheduled) =>
+            recorded.push({target, width: rect.width, height: rect.height, scheduled}) },
         requestAnimationFrame: callback => { frames.push(callback); },
         setTimeout: callback => { tasks.push(callback); },
         ...setup(write)
@@ -53,6 +55,9 @@ function exercise(source, start, end, setup, observed, name, invoke = '') {
     assert.equal(frames.length, 1, name + ' must respond to a real resize');
     flush(1);
     assert.equal(writes, 2);
+    assert.equal(recorded.length, 5);
+    assert.deepEqual(recorded.map(item => item.scheduled),
+        [true, false, false, false, true], name + ' must attribute only scheduled resizes');
 }
 
 const editor = {};

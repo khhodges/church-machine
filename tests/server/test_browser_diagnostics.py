@@ -45,6 +45,34 @@ def _report(**overrides):
     return report
 
 
+def test_resize_observer_attribution_is_bounded_and_allowlisted(diagnostics_app, caplog):
+    client = diagnostics_app.test_client()
+    with caplog.at_level(logging.WARNING):
+        response = client.post("/api/browser-diagnostics", json=_report(
+            kind="resize_observer", error_type="NonError",
+            resize_observers=[{
+                "target": "editor", "width": 744, "height": 801,
+                "scheduled": True, "source": "PRIVATE",
+            }],
+        ))
+    assert response.status_code == 200
+    logged = "\n".join(record.message for record in caplog.records)
+    assert '"resize_observers":' in logged
+    assert "PRIVATE" not in logged
+    for observers in (
+        [{"target": "PRIVATE", "width": 744, "height": 801, "scheduled": True}],
+        [{"target": "editor", "width": -1, "height": 801, "scheduled": True}],
+        [{"target": "editor", "width": 744, "height": 801, "scheduled": "yes"}],
+        [{"target": "tabs", "width": 1, "height": 1, "scheduled": False}] * 9,
+    ):
+        assert client.post("/api/browser-diagnostics", json=_report(
+            kind="resize_observer", resize_observers=observers,
+        )).status_code == 400
+    assert client.post("/api/browser-diagnostics", json=_report(
+        resize_observers=[],
+    )).status_code == 400
+
+
 def test_report_is_reduced_to_safe_allowlist(diagnostics_app, caplog):
     with caplog.at_level(logging.WARNING, logger="browser_diagnostics"):
         with diagnostics_app.test_client() as client:

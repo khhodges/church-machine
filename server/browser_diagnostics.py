@@ -208,9 +208,27 @@ def _normalize_report(
     ):
         return None
 
+    resize_observers = report.get("resize_observers")
+    normalized_resizes = None
+    if resize_observers is not None:
+        if report["kind"] != "resize_observer" or not isinstance(resize_observers, list) or len(resize_observers) > 8:
+            return None
+        normalized_resizes = []
+        for item in resize_observers:
+            if not isinstance(item, dict) or item.get("target") not in ("editor", "tabs", "toolbar"):
+                return None
+            width = _safe_integer(item.get("width"), minimum=0, maximum=100_000)
+            height = _safe_integer(item.get("height"), minimum=0, maximum=100_000)
+            if width is None or height is None or not isinstance(item.get("scheduled"), bool):
+                return None
+            normalized_resizes.append({
+                "target": item["target"], "width": width, "height": height,
+                "scheduled": item["scheduled"],
+            })
+
     # Construct a fresh object instead of copying the input.  This is the
     # privacy boundary: arbitrary client fields can never reach the logger.
-    return {
+    normalized = {
         "kind": report["kind"],
         "error_type": report["error_type"],
         "occurred_at": occurred_at,
@@ -222,6 +240,9 @@ def _normalize_report(
         "resource": resource,
         "version": version,
     }
+    if normalized_resizes is not None:
+        normalized["resize_observers"] = normalized_resizes
+    return normalized
 
 
 def _same_origin() -> bool:

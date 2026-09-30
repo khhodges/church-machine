@@ -1963,7 +1963,11 @@ function init() {
             var _editorResizeHeight = null;
             new ResizeObserver(function(entries) {
                 var rect = entries[0] && entries[0].contentRect;
-                if (!rect || (rect.width === _editorResizeWidth && rect.height === _editorResizeHeight)) return;
+                var changed = rect && (rect.width !== _editorResizeWidth || rect.height !== _editorResizeHeight);
+                if (typeof window.__recordChurchResize === 'function') {
+                    window.__recordChurchResize('editor', rect, !!changed && !_editorResizePending);
+                }
+                if (!changed) return;
                 _editorResizeWidth = rect.width;
                 _editorResizeHeight = rect.height;
                 if (_editorResizePending) return;
