@@ -822,6 +822,20 @@ async function _commitNamespaceBootMarker(slot) {
             abstractions: rows,
             namespaceFingerprint: nextFingerprint,
         });
+        // Maintain the exact persisted snapshot separately from display rows.
+        // The marker transaction removes all other boot fields (not false).
+        const withCommittedMarker = source => source.map(row => {
+            const next = Object.assign({}, row);
+            delete next.boot;
+            if (Number(next.slot) === target) next.boot = true;
+            return next;
+        });
+        if (Array.isArray(state.savedAbstractions)) {
+            nextState.savedAbstractions = withCommittedMarker(state.savedAbstractions);
+        }
+        if (Array.isArray(window._nsTableDraftRows)) {
+            window._nsTableDraftRows = withCommittedMarker(window._nsTableDraftRows);
+        }
         // Local projections are updated only after the server has acknowledged
         // its CAS commit. The loaded image remains untouched evidence.
         window._nsState = nextState;
@@ -1227,6 +1241,9 @@ async function savePreparedBootEntry() {
                 }) : state.abstractions;
             window._nsState = Object.assign({}, state, {
                 abstractions: nextRows,
+                // This build response is a display projection, not the full
+                // persisted row set. Require a fresh GET before table Save.
+                savedAbstractions: null,
                 namespaceFingerprint: generated.namespaceFingerprint,
                 executionFreshness: generated.executionFreshness ||
                     state.executionFreshness,

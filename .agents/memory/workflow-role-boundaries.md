@@ -1,10 +1,25 @@
 ---
 name: Workflow role boundaries
-description: Programmer, builder, and system engineer have distinct goals and approval boundaries.
+description: Independent LUMP, simulation Namespace, and bitstream deliverables and approval boundaries.
 ---
-The programmer's goal is LUMP creation. The builder's goal is configuration,
-test, and approval. The system engineer's goal is a successful FPGA flash.
+The agreed target workflow is: programmers compile and approve LUMPs; engineers
+compile configurations for simulation and approve Namespaces; testers create
+and approve bitstreams. These role names supersede the older Builder/system
+engineer terminology below. Hardware flashing remains a separate explicit action.
 Do not combine these into one implicit Save/Prepare/Run/Flash workflow.
+
+Each role must be able to work concurrently against exact approved upstream
+deliverables without changing another role's approved outputs. A new LUMP does
+not automatically replace a Namespace selection; a Namespace edit does not
+rewrite a built image or bitstream. Adoption of a new upstream revision is explicit.
+
+**Why:** The user explicitly agreed on independent LUMP, NAMESPACE, and BITSTREAM
+deliverables so the three roles can work side by side without interference.
+
+**How to apply:** Separate drafts, approved revisions, and downstream builds.
+Bind each downstream result to exact inputs and report newer available inputs
+without substituting them. This is a design requirement, not evidence that the
+current implementation already provides isolation or permission to implement it.
 
 Agent authority is read-only review, diagnosis, and recommendations unless the
 user explicitly changes this restriction. Do not edit code, LUMPs, or Namespace
@@ -104,6 +119,31 @@ cryptographic approval or boot-image generation. Show diagnostics without
 discarding design choices. Enforce required cryptographic/build checks when
 defining the bitstream; preserve runtime capability enforcement separately.
 This supersedes treating design placement as an exceptional recovery action.
+
+Ordinary Namespace Save is a table-only boundary, not an image approval.
+Preserve the selected artifact identities and requested fields; row-format
+checks and stale-write protection remain, while executable admission and
+combined memory-layout validation belong to explicit preparation/build.
+
+**Why:** The user authorized separating Namespace persistence after an unrelated
+historical artifact's missing compiler evidence blocked an Alice/Mallory table
+repair. Image-wide uncertainty must not invalidate independently verified row facts.
+
+**How to apply:** Do not rebuild images, normalize other rows, or activate the
+simulator during table Save. Keep old built outputs unchanged and distinguish
+them from the saved design. An earlier approval for an image-coupled repair
+does not authorize committing the same repair through a new table-only path.
+
+Display enrichment is never save authority: preserve a separate exact persisted
+snapshot and apply only explicit edits to it.
+
+**Why:** Legacy Namespace reads can infer artifact identities and Thread display
+fields. Saving the enriched response would silently bind untouched rows or turn
+derived geometry into programmer-authored state.
+
+**How to apply:** Exercise the first save of legacy rows, not only later saves
+of already-normalized state. Confirm untouched rows retain their original field
+presence and exact artifact selectors.
 
 Hosting and sidecar-policy checks are not sources of truth for LUMP contents
 or Namespace correctness.

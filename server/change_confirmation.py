@@ -708,7 +708,12 @@ def install(app, paths, commit_guard, describe=None, store_path=None,
             reason = ("Publish the reviewed LUMP and related repository/Namespace state. "
                       "Existing admission checks still apply. Save processing may add a "
                       "required SELF C-list entry and padding; reject if you do not approve that transformation.")
-        if request.path == "/api/boot-image/save-ns":
+        if request.path == "/api/namespace/save-table":
+            reason = ("Save the reviewed Namespace assignments only. "
+                      "Existing images, LUMPs and hardware remain unchanged. "
+                      "This does not certify a build or activate a simulation.")
+            title = "Review Namespace table save"
+        elif request.path == "/api/boot-image/save-ns":
             reason = ("Review this complete Namespace save, including configuration "
                       "and image effects. Confirm commits the operation once; "
                       "cancel retains your staged edits.")

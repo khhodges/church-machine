@@ -309,14 +309,12 @@ function _renderBootCapacity(report) {
                 : 'Unknown';
         const status = entry.reserved ? 'Reserved descriptor storage' :
             row.entryKind === 'mmio' || row.entryKind === 'namespace' ? row.status :
-            entry.base !== null ? (report.imageMatchesNamespaceRevision === true
-                ? 'Image geometry verified for approved revision — '
-                : 'Image evidence only; approved revision not verified — ') + (row.status || 'verified geometry') :
+            entry.base !== null ? 'Row geometry checked — ' + (row.status || 'verified geometry') :
             row.designOnly || row.status === 'Design-only symbolic placement; not installed'
                 ? (row.status || 'Not installed — design placement') :
                 'Installation unverified — ' + (row.status || 'no validated geometry');
         const evidence = row.imageEvidence;
-        const evidenceText = evidence && !evidence.verifiedSelection
+        const evidenceText = evidence && entry.base === null && !evidence.verifiedSelection
             ? ' Image evidence only (not validated placement): ' +
                 address(evidence.locationWord) + '–' +
                 address(evidence.locationWord + evidence.allocatedWords - 1) +
@@ -333,7 +331,11 @@ function _renderBootCapacity(report) {
             '</td><td>' + (overlap ? '<strong>Overlap — </strong>' : '') +
             _escHtml(status + evidenceText + (row.issues || []).join('; ')) + '</td></tr>';
     }
-    html += '</tbody></table></div><details' + (!trusted ? ' open' : '') +
+    html += '</tbody></table></div><p>' +
+        (report.imageMatchesNamespaceRevision === true
+            ? 'Built image matches the saved Namespace revision. See overall build validation below.'
+            : 'Built image is not verified against the saved Namespace revision. Row-local geometry checks above do not certify the whole image.') +
+        '</p><details' + (!trusted ? ' open' : '') +
         '><summary>Layout validation and budget details</summary>' + details +
         '</details><small>Reserved rows count toward occupied space. ' +
         'Saved size is exact hash-checked artifact cost, not proof of installation. ' +
@@ -857,7 +859,7 @@ function _setNsDirty(dirty) {
     btn.style.maxWidth = '100%';
     btn.title = error !== null
         ? 'Click to dismiss this error. Click again afterward to retry saving.'
-        : 'Save Namespace changes and load policies for the next build';
+        : 'Save Namespace rows only; built images and simulation remain unchanged';
     if (error !== null) {
         btn.textContent = '\u2717 ' + error + '\nClick to dismiss';
         btn.style.color = '#f87171';
@@ -872,7 +874,7 @@ function _setNsDirty(dirty) {
         btn.style.borderColor = 'rgba(240,160,64,0.5)';
         btn.style.background  = '#2a1e0a';
     } else {
-        btn.textContent = '\u{1F4BE} Save for next build';
+        btn.textContent = '\u{1F4BE} Save Namespace Table';
         btn.style.color = '#7ec87e';
         btn.style.borderColor = 'rgba(100,200,100,0.35)';
         btn.style.background  = '#1a2a1f';
@@ -4195,8 +4197,8 @@ function updateNamespace() {
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
-    html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace changes and load policies for the next build">\u{1F4BE} Save for next build</button>`;
-    html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save preserves the submitted layout. If a missing image must be regenerated, locations and limits are recalculated from build settings and LUMP sizes, and descriptor seals are recomputed. This does not select a different artifact revision or boot target. The rebuilt image takes effect on reset; live execution is not reset by saving.</div>';
+    html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace rows only; built images and simulation remain unchanged">\u{1F4BE} Save Namespace Table</button>`;
+    html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save records Namespace rows and explicit policy choices only. It does not normalize layout, generate or replace an image, or activate simulation. A changed table may differ from the unchanged built image; validate and prepare separately.</div>';
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -5942,397 +5944,132 @@ function _nsTableClear(slot) {
     }
     if (window._nsDraftAssignments) delete window._nsDraftAssignments[String(slot)];
 
+    window._nsDeletedSlots = window._nsDeletedSlots || {};
+    window._nsDeletedSlots[String(slot)] = true;
     _setNsDirty(true);
     if (typeof updateNamespace === 'function') updateNamespace();
 }
 
-// ── NS table: Save — the single write path for all NS mutations ───────────────
-// Persists in-memory NS state to server/lumps/boot-image.bin AND
-// server/lumps/ns-state.json via the /api/boot-image/save-ns endpoint, then
-// persists the next-build configuration in the same user action.
-// All NS mutations (Add LUMP, Clear slot, boot-entry drag, load policy changes)
-// remain in-memory until the user clicks Save for next build.
-// The boot image binary is little-endian 32-bit words (struct.pack "<{n}I"),
-// matching Uint32Array's native byte order on x86/x64.
+// Capture only authoritative rows and explicit drafts. Runtime descriptors are
+// evidence for a newly staged row, never authority to rewrite existing rows.
+function _nsTableRowsForSave(state) {
+    if (!state || !Array.isArray(state.savedAbstractions) ||
+            typeof state.namespaceFingerprint !== 'string' ||
+            !state.namespaceFingerprint.trim()) {
+        throw new Error('Reload Namespace before saving: its reviewed fingerprint is unavailable.');
+    }
+    const clone = value => JSON.parse(JSON.stringify(value));
+    // `abstractions` is a display projection: GET may enrich it with inferred
+    // artifact selectors and Thread geometry. Never publish that projection.
+    const rows = clone(window._nsTableDraftRows || state.savedAbstractions)
+        .filter(row => !(window._nsDeletedSlots || {})[String(row.slot)]);
+    for (const row of rows) {
+        const edit = (window._nsTableRowEdits || {})[String(row.slot)];
+        if (edit) Object.assign(row, clone(edit));
+    }
+    const drafts = Object.assign({}, window._nsDraftAssignments || {},
+        window._nsExplicitArtifactBindings || {});
+    for (const key of Object.keys(drafts)) {
+        const slot = Number(key);
+        const draft = drafts[key];
+        const symbolic = sim && typeof sim.symbolicEntryAt === 'function'
+            ? sim.symbolicEntryAt(slot) : null;
+        const entry = sim && sim.readNSEntry(slot);
+        if (!entry) throw new Error(`NS[${slot}] draft has no descriptor; keep the draft and reload before saving.`);
+        const authority = sim.parseNSWord1(entry.word1_limit);
+        const hex = (value, width) => '0x' + (value >>> 0).toString(16).toUpperCase().padStart(width, '0');
+        const index = rows.findIndex(saved => saved.slot === slot);
+        const row = Object.assign({}, index < 0 ? {} : rows[index], clone(symbolic || draft), {
+            name: draft.name, slot,
+            location: hex(entry.word0_location, 8),
+            type: ['Null', 'Inform', 'Outform', 'Abstract'][entry.gtType] || 'Inform',
+            f: authority.f, g: authority.g, limit: hex(authority.limit, 5),
+            seq: authority.gtSeq, seal: hex(entry.word2_seals, 8),
+        });
+        if (index < 0) rows.push(row);
+        else rows[index] = row;
+    }
+    for (const row of rows) {
+        if (!(window._nsPrefetchDirtySlots || {})[String(row.slot)]) continue;
+        // Design placements carry no executable loading policy.
+        if (row.symbolic === true) continue;
+        const cfg = window.bootConfig || {};
+        const configured = cfg.step2 && Array.isArray(cfg.step2.lumps)
+            ? cfg.step2.lumps.find(item => Number(item.nsSlot) === row.slot) : null;
+        const policy = (cfg.slotRules || {})[String(row.slot)] ||
+            (configured && configured.loadPolicy);
+        if (!['Empty', 'Resident', 'Preload', 'Lazy'].includes(policy)) {
+            throw new Error(`NS[${row.slot}] has no explicit valid loading policy.`);
+        }
+        row.load_policy = policy;
+        if (Object.prototype.hasOwnProperty.call(row, 'loadPolicy')) row.loadPolicy = policy;
+        row.resident = policy === 'Resident';
+    }
+    return rows;
+}
+
+// Ordinary Save is deliberately independent of image generation and execution.
 window._nsTableSave = async function(btn) {
-    // Only explicit button acknowledgement clears a retained failure.
-    if (window._nsTableSaveError !== null) return false;
-    if (!sim) return false;
-
-    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; btn.style.color = '#ccc'; }
-    const nsSaveBootUi = typeof window !== 'undefined' && window.BootEntryUI &&
-        typeof window.BootEntryUI.get === 'function' ? window.BootEntryUI.get() : null;
-    const nsSaveBootEntry = Number.isInteger(bootEntrySlot) ? bootEntrySlot : null;
-    const nsSavePreparedSelection = nsSaveBootUi &&
-        nsSaveBootUi.status === 'prepared' &&
-        Number.isInteger(nsSaveBootEntry) && nsSaveBootUi.slot === nsSaveBootEntry;
-
-    // This is a separate Namespace save entry point from /api/lumps/save.
-    // Keep its client-side attempt linked to the same diagnostic contract,
-    // without putting the correlation value into Namespace identity or
-    // idempotency calculations.
-    const _nsSaveDiagnostics = typeof window !== 'undefined'
-        ? window.LumpSaveDiagnostics : null;
-    const _nsSaveMetadata = {};
-    let _nsCommitAcknowledged = false;
-    let _nsCommitStageStarted = false;
+    if (window._nsTableSaveError !== null || window._nsTableSaveInFlight) return false;
+    window._nsTableSaveInFlight = true;
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
     try {
-        if (_nsSaveDiagnostics) {
-            _nsSaveDiagnostics.begin(_nsSaveMetadata, 'namespace._nsTableSave');
-            _nsSaveDiagnostics.stageStart(_nsSaveMetadata, 'prepare',
-                'namespace._nsTableSave', { outcome: 'unknown' });
-        }
-    } catch (_) {}
-
-    try {
-        // Every Namespace write is a compare-and-swap against the exact
-        // server snapshot the user inspected. Do not invent a fingerprint
-        // from browser rows: the server owns canonical identity and policy.
-        let namespaceAuthority = window._nsState;
-        if (!namespaceAuthority ||
-                typeof namespaceAuthority.namespaceFingerprint !== 'string' ||
-                !namespaceAuthority.namespaceFingerprint.trim()) {
-            const nsStateResponse = await fetch('/api/boot-image/ns-state', {
-                cache: 'no-store',
-            });
-            namespaceAuthority = await _actionableJsonResponse(
-                nsStateResponse, 'Load the authoritative Namespace state', {
-                    dataChanged: false,
-                    nextAction: 'Reload Namespace, then retry Save for next build.',
-                });
-            if (!namespaceAuthority ||
-                    typeof namespaceAuthority.namespaceFingerprint !== 'string' ||
-                    !namespaceAuthority.namespaceFingerprint.trim()) {
-                throw new Error(
-                    'The authoritative Namespace fingerprint is unavailable; reload Namespace and retry.');
-            }
-            window._nsState = namespaceAuthority;
-        }
-        const namespaceFingerprint = namespaceAuthority.namespaceFingerprint.trim();
-        if (!Number.isInteger(nsSaveBootEntry)) {
-            throw new Error(
-                'No committed Namespace boot marker is selected; choose a Lightning Bolt target, then retry Save for next build.');
-        }
-
-        // Missing images are generated privately by the single server save
-        // transaction, never published by an earlier dependent request.
-        // A config POST can invalidate the cached browser buffer while the
-        // simulator still holds the last validated image in live memory.
-        // Preserve that image for this explicit Namespace save; regenerating
-        // here would discard unsaved slot locations and resident artifacts.
-        const hasLiveBootImage = sim._bootImageLoaded === true;
-        let imageBinding = null;
-        try {
-            imageBinding = typeof sim.inspectBootEntryBinding === 'function'
-                ? sim.inspectBootEntryBinding() : null;
-        } catch (_) {}
-        const imageTarget = imageBinding &&
-            Number.isInteger(imageBinding.targetSlot) ? imageBinding.targetSlot : null;
-        if (hasLiveBootImage && Number.isInteger(nsSaveBootEntry) &&
-                imageTarget !== nsSaveBootEntry) {
-            // The loaded image is evidence, not a Namespace override. An
-            // explicit Save may prepare a candidate only after the Namespace
-            // marker has committed, so the submitted image and marker agree.
-            if (typeof sim.prepareBootEntry !== 'function') {
-                throw new Error(
-                    `Loaded image targets NS[${imageTarget == null ? '?' : imageTarget}], ` +
-                    `but Namespace targets NS[${nsSaveBootEntry}]. Reload or regenerate before saving.`);
-            }
-            const preparedCandidate = sim.prepareBootEntry(nsSaveBootEntry);
-            if (!preparedCandidate || preparedCandidate.ok !== true) {
-                throw new Error(
-                    `Could not prepare loaded-image evidence for Namespace NS[${nsSaveBootEntry}]: ` +
-                    (preparedCandidate && (preparedCandidate.error || preparedCandidate.reason) ||
-                        'preparation failed'));
-            }
-        }
-        const generateForSave = !hasLiveBootImage &&
-            (!window.bootImage || !window.bootImageAvailable) && !nsSavePreparedSelection;
-        const stagedBuildConfig = (generateForSave || window._nsPrefetchDirty)
-            ? await window._ensureNamespaceBuildConfig(true) : null;
-
-        // Add/Save label writes and the binary commit form one canonical save.
-        // Wait for every in-flight label update so a quick Save→reload cannot
-        // observe the occupied slot before its committed custom label.
-        const labelWrites = (window._nsLabelPersistPromises || []).slice();
-        if (labelWrites.length) {
-            window._nsLabelPersistPromises = [];
-            await Promise.all(labelWrites);
-        }
-
-        // The boot image occupies exactly sim.NS_TABLE_BASE + sim.NS_TABLE_RESERVE
-        // words, because the generator writes the NS table at the tail and the
-        // format-tag scanner computes: NS_TABLE_BASE = tagIdx + 1, and
-        // NS_TABLE_RESERVE = src.length - NS_TABLE_BASE  →  total = NS_TABLE_BASE + NS_TABLE_RESERVE.
-        const bootWordCount = generateForSave ? 8 :
-            (sim.NS_TABLE_BASE >>> 0) + (sim.NS_TABLE_RESERVE >>> 0);
-        if (bootWordCount < 8 || bootWordCount > sim.memory.length) {
-            throw new Error(`Unexpected boot image size: ${bootWordCount} words`);
-        }
-
-        // Snapshot only persistent/static state. Runtime DREAD/DWRITE/LOAD/SAVE
-        // effects remain live execution state and must not leak into the next
-        // composite image merely because the Namespace is explicitly saved.
-        const words = typeof sim.snapshotPersistentMemory === 'function'
-            ? sim.snapshotPersistentMemory(bootWordCount)
-            : new Uint32Array(sim.memory.slice(0, bootWordCount));
-
-        // Keep the boot-entry sentinel in sync with the current UI selection.
-        const sentinelIdx = (sim.NS_TABLE_BASE >>> 0) - 2;
-        if (Number.isInteger(nsSaveBootEntry) &&
-                sentinelIdx >= 0 && sentinelIdx < bootWordCount) {
-            words[sentinelIdx] = nsSaveBootEntry & 0xFF;
-        }
-
-        // ── Re-seal every active NS slot before encoding ───────────────────────
-        // Recomputes word2 (the integrity32 hash) from word0/word1 so no stale
-        // seal survives from an Add, Clear, or direct memory edit.
-        // Canonical NS ABI: W2 = integrity32(W0, W1). gt_seq is NOT stored in W2 —
-        // it is part of the W1 authority word (bits[29:21]) and is preserved
-        // implicitly because we re-hash the existing W1 verbatim.
-        {
-            const nsBase  = sim.NS_TABLE_BASE >>> 0;
-            const nsWords = sim.NS_ENTRY_WORDS;     // = 4
-            const maxSl   = sim.MAX_NS_ENTRIES;
-            for (let si = 0; si < maxSl; si++) {
-                const b = nsBase + si * nsWords;
-                if (b + 3 >= bootWordCount) break;
-                const w0 = words[b] >>> 0;
-                if (w0 === 0) continue;             // unoccupied slot — skip
-                const w1     = words[b + 1] >>> 0;
-                words[b + 2] = sim._integrity32(w0, w1) >>> 0;
-            }
-        }
-
-        // ── Build ns_state: rich per-slot objects from the live NS table ─────────
-        // Iterates sim.readNSEntry(i) for i = 0..sim.nsCount-1 to capture every
-        // column the user sees in the NS table view.  Mirrors the rendered table
-        // exactly: one object per occupied slot, "boot": true on bootEntrySlot.
-        const _GT_TYPE_NAMES = ['Null', 'Inform', 'Outform', 'Abstract'];
-        const _hex8  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(8, '0'));
-        const _hex5  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(5, '0'));
-        const _hex4  = v => '0x' + ((v >>> 0).toString(16).toUpperCase().padStart(4, '0'));
-        const _savedBySlot = new Map();
-        const _savedEntries = window._nsState &&
-            Array.isArray(window._nsState.abstractions)
-            ? window._nsState.abstractions : [];
-        for (const _saved of _savedEntries) {
-            if (!_saved || !Number.isInteger(_saved.slot)) continue;
-            _savedBySlot.set(_saved.slot, _saved);
-            if (!sim.readNSEntry(_saved.slot)) {
-                throw new Error(`Namespace Save refused: approved NS[${_saved.slot}] ${_saved.name} has no runtime descriptor. Reload the approved Namespace; missing runtime state cannot delete an assignment.`);
-            }
-        }
-        const nsAbstractions = [];
-        for (let _si = 0; _si < sim.nsCount; _si++) {
-            const _e = sim.readNSEntry(_si);
-            if (!_e) continue;   // unoccupied slot
-            const _approved = _savedBySlot.get(_si);
-            const _draft = (window._nsExplicitArtifactBindings || {})[String(_si)] ||
-                (window._nsDraftAssignments || {})[String(_si)];
-            if (!_approved && !_draft) {
-                throw new Error(`Namespace Save refused: runtime NS[${_si}] has no approved assignment or explicit local draft. Runtime entries cannot create Namespace assignments.`);
-            }
-            const _lbl = (_draft || _approved).name;
-            if (typeof _lbl !== 'string' || !_lbl.trim()) {
-                throw new Error(`Namespace Save refused: NS[${_si}] has no approved Pet Name.`);
-            }
-            const _pW1 = sim.parseNSWord1(_e.word1_limit);
-            const _loc  = _e.word0_location >>> 0;
-            const _lim  = _pW1.limit & 0x1FFFF;
-            // Canonical NS ABI: gt_seq is W1[29:21]; W2 is a full integrity32 hash;
-            // type is entry-level metadata (side-table via readNSEntry), not W1.
-            const _seq  = _pW1.gtSeq;
-            const _seal = _e.word2_seals >>> 0;
-            const _rich = {
-                name:     _lbl,
-                slot:     _si,
-                location: _hex8(_loc),
-                type:     _GT_TYPE_NAMES[_e.gtType] || 'Inform',
-                // F bit: taken truthfully from parseNSWord1(word1) — never hardcoded.
-                // In v2.0 the far-lump F flag is retired and parseNSWord1 returns f:0
-                // by design (bit[30] is the GC liveness mark); routing through the
-                // parser means the saved value tracks the ISA definition, so if F is
-                // ever reintroduced the save path stays truthful automatically.
-                f:        _pW1.f,
-                g:        _pW1.g,
-                limit:    _hex5(_lim),
-                seq:      _seq,
-                seal:     _hex8(_seal),
-            };
-            const _symbolic = typeof sim.symbolicEntryAt === 'function'
-                ? sim.symbolicEntryAt(_si) : null;
-            if (_symbolic) {
-                _rich.symbolic = true;
-                _rich.implementationMissing = true;
-                _rich.resident = false;
-                if (_symbolic.selection) _rich.selection = { ..._symbolic.selection };
-            }
-            // Artifact identity is sidecar/catalog metadata, not part of the
-            // four-word Namespace entry.  Preserve it when the same slot and
-            // abstraction are still present; otherwise a save can leave a
-            // perfectly valid resident LUMP impossible for the resolver to
-            // locate on the next regeneration.
-            const _saved = _savedBySlot.get(_si);
-            const _explicit = window._nsExplicitArtifactBindings &&
-                window._nsExplicitArtifactBindings[String(_si)];
-            _nsApplyArtifactBindingForSave(
-                _rich, _saved, _explicit, Boolean(_symbolic));
-            if (_si === nsSaveBootEntry) _rich.boot = true;
-            nsAbstractions.push(_rich);
-        }
-        const nsState = { abstractions: nsAbstractions };
-
-        // Encode as base64 (little-endian bytes — matches struct.pack "<{n}I").
-        const bytes = new Uint8Array(words.buffer);
-        let binary = '';
-        const chunk = 8192;
-        for (let i = 0; i < bytes.length; i += chunk) {
-            binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-        }
-        const data_b64 = btoa(binary);
-        if (_nsSaveDiagnostics) {
-            try {
-                _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'prepare',
-                    'unknown', {});
-                _nsSaveDiagnostics.stageStart(_nsSaveMetadata, 'commit',
-                    'namespace.save-ns', { outcome: 'unknown' });
-                _nsCommitStageStarted = true;
-            } catch (_) {}
-        }
-
-        // One protected operation includes staged configuration and any missing
-        // image generation. Namespace rows remain the sole boot-target authority.
-        const resp = await fetch('/api/boot-image/save-ns', {
-            method:  'POST',
-            headers: Object.assign({'Content-Type': 'application/json'},
-                (window.BuildApprovalView && window.BuildApprovalView._authHeaders
-                    ? window.BuildApprovalView._authHeaders() : {})),
-            body:    JSON.stringify({
-                data_b64: generateForSave ? null : data_b64,
-                generate: generateForSave,
-                ns_state: nsState,
-                namespaceFingerprint,
-                boot_config: stagedBuildConfig,
-                // Non-authoritative correlation only; the server's Namespace
-                // state and atomic write identity do not include this field.
-                diagnostic_attempt_id: _nsSaveMetadata.diagnostic_attempt_id,
+        const state = window._nsState;
+        const abstractions = _nsTableRowsForSave(state);
+        const response = await fetch('/api/namespace/save-table', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                namespaceFingerprint: state.namespaceFingerprint,
+                ns_state: { abstractions },
             }),
         });
-        const data = await _actionableJsonResponse(resp, 'Save the Namespace', {
-            allowReviewCancellation: true,
-            dataChanged: false,
-            nextAction: 'Review the Namespace entries, then click Save for next build again.',
+        const data = await _actionableJsonResponse(response, 'Save Namespace Table', {
+            allowReviewCancellation: true, dataChanged: false,
+            nextAction: 'Keep your draft. Reload and review the current Namespace before retrying.',
         });
-        _nsCommitAcknowledged = true;
-        if (_nsSaveDiagnostics) {
-            try {
-                _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'commit',
-                    'committed', { http_status: resp.status });
-                _nsSaveDiagnostics.stageStart(_nsSaveMetadata, 'reload',
-                    'namespace.reload', { outcome: 'unknown' });
-            } catch (_) {}
+        if (!data || !Array.isArray(data.abstractions) ||
+                !Array.isArray(data.savedAbstractions) ||
+                typeof data.namespaceFingerprint !== 'string') {
+            throw new Error('Save response is incomplete; reload Namespace to establish whether it committed before retrying.');
         }
-
-        // The accepted response is the transaction's normalized config; do
-        // not issue a separate config POST after image/state commit.
-        if (data && data.config && typeof window._setActiveBootConfig === 'function') {
-            window._setActiveBootConfig(
-                data.config, data.bootImageInvalidated === true,
-                data.invalidatedBootImageWords);
+        // Review is asynchronous. Preserve edits made while its dialog was
+        // open instead of clearing them with the earlier request's receipt.
+        const currentRows = _nsTableRowsForSave(window._nsState);
+        const newerDraft = JSON.stringify(currentRows) !== JSON.stringify(abstractions);
+        window._nsState = Object.assign({}, data,
+            newerDraft ? { abstractions: currentRows } : {});
+        window._nsTableDraftRows = newerDraft ? currentRows : null;
+        if (!newerDraft) {
+            window._nsPrefetchDirty = false;
+            window._nsPrefetchDirtySlots = {};
+            window._nsExplicitArtifactBindings = {};
+            window._nsDraftAssignments = {};
+            window._nsDeletedSlots = {};
+            window._nsTableRowEdits = {};
         }
-
-        // Cache the exact committed binary, not the local serialization. This
-        // does not reload/reset the simulator or mutate live registers.
-        let cacheRefreshError = null;
-        try {
-            await _refreshCommittedBootImageCache();
-        } catch (error) {
-            cacheRefreshError = error;
-            // Never leave the old ArrayBuffer eligible to overlay this saved
-            // image. `available` makes the reset hook fetch the committed copy.
-            window.bootImage = null;
-            window.bootImageAvailable = true;
-        }
-
-        // Refresh the committed ns-state and its new CAS fingerprint. The
-        // submitted fingerprint is now stale because the saved raw table may
-        // have changed; never reuse it for a later mutation.
-        try {
-            const committedStateResponse = await fetch('/api/boot-image/ns-state', {
-                cache: 'no-store',
-            });
-            const committedState = await _actionableJsonResponse(
-                committedStateResponse, 'Refresh committed Namespace state', {
-                    dataChanged: true,
-                    nextAction: 'Reload Namespace state before making another change.',
-                });
-            window._nsState = committedState;
-            _renderBootExecutionFreshness(committedState);
-            if (typeof window._applyNamespaceBootProjection === 'function') {
-                window._applyNamespaceBootProjection(committedState);
-            }
-            if (typeof updateNamespace === 'function') updateNamespace();
-        } catch (refreshError) {
-            window._nsState = null;
-            cacheRefreshError = cacheRefreshError || refreshError;
-        }
-
-        // Clear staged edits. A regenerated committed layout may differ from
-        // live execution memory, which remains untouched until reset.
-        _setNsDirty(false);
-        window._nsPrefetchDirty = false;
-        window._nsPrefetchDirtySlots = {};
-        window._nsExplicitArtifactBindings = {};
-        window._nsDraftAssignments = {};
-
+        _setNsDirty(newerDraft);
+        const note = document.getElementById('nsSaveLayoutNote');
+        if (note) note.textContent = 'Namespace table saved. Built image, bitstream, and active simulation unchanged. The built image has not been rebuilt or certified against this saved table; prepare and validate separately.';
         if (btn) {
-            btn.textContent = cacheRefreshError
-                ? '\u2713 Saved — image cache retries on reset'
-                : '\u2713 Saved';
-            btn.style.color = cacheRefreshError ? '#f0a040' : '#4ec9b0';
-            btn.title = cacheRefreshError
-                ? 'Namespace/config save committed. The browser cache could not refresh; reset will fetch the committed image.'
-                : 'Namespace and prepared boot image saved.';
-            setTimeout(() => {
-                btn.disabled = false;
-                _setNsDirty(window._nsTableDirty);
-            }, 2000);
-        }
-        if (_nsSaveDiagnostics) {
-            try {
-                _nsSaveDiagnostics.stageComplete(_nsSaveMetadata, 'reload',
-                    'committed', {});
-            } catch (_) {}
+            btn.textContent = newerDraft
+                ? 'Earlier table saved — newer edits unsaved'
+                : '\u2713 Table saved — image unchanged';
+            btn.title = 'Saved rows only. No image generation or simulation activation occurred.';
         }
         return true;
-    } catch (err) {
-        if (err.code === 'change_rejected') {
+    } catch (error) {
+        if (error.code === 'change_rejected') {
             window._nsTableSaveError = null;
             window._nsTableSaveCancelled = true;
-            _setNsDirty(window._nsTableDirty);
-            return false;
-        }
-        try {
-            if (_nsSaveDiagnostics) {
-                _nsSaveDiagnostics.stageException(
-                    _nsSaveMetadata, _nsCommitAcknowledged ? 'reload' :
-                        (_nsCommitStageStarted ? 'commit' : 'prepare'),
-                    err, { outcome: _nsCommitAcknowledged ? 'unknown' : 'unknown' });
-            }
-        } catch (_) {}
-        console.error('[_nsTableSave] Namespace save failed');
-        window._nsTableSaveError = String(err.message || err);
-        if (/exact hash-bound approval|required.*SHA-256|resident bytes differ/i.test(
-                window._nsTableSaveError) &&
-                Object.keys(window._nsExplicitArtifactBindings || {}).length) {
-            window._nsTableSaveError +=
-                '\nThe pending executable row is still in this browser. ' +
-                'Click “Keep as design” beside its NS slot to retain the selected artifact ' +
-                'and slot without installing executable bytes. No data was changed.';
+        } else {
+            window._nsTableSaveError = String(error.message || error);
         }
         _setNsDirty(window._nsTableDirty);
         return false;
+    } finally {
+        window._nsTableSaveInFlight = false;
+        if (btn) btn.disabled = false;
     }
 };
 

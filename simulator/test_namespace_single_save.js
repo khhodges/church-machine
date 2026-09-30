@@ -1,133 +1,169 @@
 #!/usr/bin/env node
-// Regression guard: Namespace changes must have one visible save action that
-// commits both the live table and the next-build configuration.
-
 'use strict';
 
+// Ordinary Namespace Save is not an image build or a simulator activation.
+const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-
-const source = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
-let failures = 0;
-
-function check(name, condition) {
-    if (condition) console.log(`PASS ${name}`);
-    else {
-        console.error(`FAIL ${name}`);
-        failures++;
-    }
-}
-
-const toolbarStart = source.indexOf('id="nsSaveBtn"');
-const toolbarEnd = source.indexOf("html += '<button", toolbarStart);
-const toolbar = source.slice(toolbarStart, toolbarEnd);
-check('Namespace toolbar has Save for next build button',
-    toolbarStart !== -1 && toolbar.includes('Save for next build'));
-check('Namespace save button acknowledges errors before allowing retry',
-    toolbar.includes('_nsTableSaveClick(this)'));
-check('Namespace save explains layout normalization separately from artifact selection',
-    toolbar.includes('aria-describedby="nsSaveLayoutNote"') &&
-    toolbar.includes('locations and limits are recalculated') &&
-    toolbar.includes('does not select a different artifact revision or boot target'));
-check('Namespace toolbar does not expose a separate policy-save button',
-    !toolbar.includes('nsPrefetchSaveBtn') && !source.includes('id="nsPrefetchSaveBtn"'));
-
-const helperStart = source.indexOf('window._ensureNamespaceBuildConfig = async function(stageOnly = false)');
-const helperEnd = source.indexOf('window._nsPrefetchSave = async function()', helperStart);
-const helper = source.slice(helperStart, helperEnd);
-check('fresh projects load defaults before saving Namespace build settings',
-    helper.includes("fetch('/api/boot-config')") &&
-    helper.includes('serverData.config || serverData.defaults'));
-check('Namespace build settings are persisted through the boot-config endpoint',
-    helper.includes("method: 'POST'") && helper.includes("fetch('/api/boot-config'"));
-check('Namespace save carries the authoritative Namespace fingerprint',
-    source.includes('namespaceFingerprint,') &&
-    source.includes("fetch('/api/boot-image/ns-state'"));
-
-const saveStart = source.indexOf('window._nsTableSave = async function(btn)');
-const saveEnd = source.indexOf('// ── NS Table Load', saveStart);
-const save = source.slice(saveStart, saveEnd);
-// Execute the preparation block with real integrity code. Nonzero G/F and
-// high limit bits must not be dropped by the legacy version-seal wrapper.
 const vm = require('vm');
-const ChurchSimulator = require('./simulator.js');
-const sealBlock = save.slice(
-    save.indexOf('        {\n            const nsBase'),
-    save.indexOf('        // ── Build ns_state'));
-const sealWords = new Uint32Array([0x100, 0xC0623456, 0, 0]);
-const sealSim = {
-    NS_TABLE_BASE: 0, NS_ENTRY_WORDS: 4, MAX_NS_ENTRIES: 1,
-    _integrity32: ChurchSimulator.prototype._integrity32,
-};
-vm.runInNewContext(sealBlock, {
-    sim: sealSim, words: sealWords, bootWordCount: sealWords.length,
-});
-const expectedSeal = sealSim._integrity32(sealWords[0], sealWords[1]) >>> 0;
-check('Namespace preparation seals the exact full descriptor authority word',
-    sealWords[2] === expectedSeal && sealWords[1] === 0xC0623456);
-vm.runInNewContext(sealBlock, {
-    sim: sealSim, words: sealWords, bootWordCount: sealWords.length,
-});
-check('unchanged Namespace preparation preserves the descriptor seal',
-    sealWords[2] === expectedSeal);
-const saveRaw = save.indexOf("fetch('/api/boot-image/save-ns'");
-const clearDirty = save.indexOf('_setNsDirty(false)');
-check('single save includes staged configuration in the same Namespace transaction',
-    saveRaw !== -1 &&
-    save.includes('boot_config: stagedBuildConfig') &&
-    save.includes('namespaceFingerprint,'));
-check('single save does not issue a separate post-commit config write',
-    save.indexOf('await window._ensureNamespaceBuildConfig(true)') < saveRaw &&
-    save.includes('window._setActiveBootConfig('));
-check('single save clears the dirty indicator after transaction acknowledgement',
-    clearDirty > saveRaw);
-
-check('Namespace save requests missing-image generation in its single transaction',
-    !save.includes("fetch('/api/boot-image/generate'") &&
-    save.includes('generate: generateForSave') &&
-    helper.includes('if (stageOnly) return cfg;'));
-check('Namespace save preserves a validated live image after cache invalidation',
-    save.includes('sim._bootImageLoaded === true') &&
-    save.includes('const generateForSave = !hasLiveBootImage'));
-check('Namespace save preserves resident artifact locators for unchanged rows',
-    save.includes('_savedBySlot') &&
-    save.includes('_nsApplyArtifactBindingForSave(') &&
-    source.includes("'token', 'filename', 'issue_n'") &&
-    source.includes('Number(binding.seq) === Number(rich.seq)'));
-check('Namespace save prefers exact staged selection over catalog lookup',
-    save.includes('_nsExplicitArtifactBindings') &&
-    !save.includes('_lumpsCache'));
-
-const editorSource = fs.readFileSync(path.join(__dirname, 'app-lump-editor.js'), 'utf8');
-const step1Start = editorSource.indexOf('function _postStep1(');
-const step1End = editorSource.indexOf('function _rlLoad()', step1Start);
-const step1Save = editorSource.slice(step1Start, step1End);
-check('Step 1 save does not write a boot target through boot-config',
-    !step1Save.includes('bootEntrySlot: (function') &&
-    !step1Save.includes("localStorage.getItem('bootEntrySlot')"));
-
-const loadStart = editorSource.indexOf('function _rlLoad()');
-const loadEnd = editorSource.indexOf('function _rlInitStep2(', loadStart);
-const residentLoad = editorSource.slice(loadStart, loadEnd);
-check('Resident LUMP load reads the authoritative Namespace boot entry',
-    residentLoad.includes("fetch('/api/boot-image/ns-state'") &&
-    residentLoad.includes('namespaceFingerprint'));
-
-const addStart = source.indexOf('const _doInstall = async function(words)');
-const addEnd = source.indexOf('const _onError = function(err)', addStart);
-const addInstall = source.slice(addStart, addEnd);
-check('adding a Namespace row automatically invokes the unified save',
-    addInstall.includes('await window._nsTableSave(saveBtn)'));
-
-const policyStart = source.indexOf('window._nsPrefetchChange = function');
-const policyEnd = source.indexOf('window._ensureNamespaceBuildConfig', policyStart);
-const policyChange = source.slice(policyStart, policyEnd);
-check('load-policy edits mark the same save button as dirty',
-    policyChange.includes('_setNsDirty(true)'));
-
-if (failures) {
-    console.error(`\n${failures} Namespace save workflow check(s) failed.`);
-    process.exit(1);
+const source = fs.readFileSync(path.join(__dirname, 'app-memory.js'), 'utf8');
+const saveCode = source.slice(source.indexOf('function _nsTableRowsForSave(state)'),
+    source.indexOf('// ── NS label click'));
+const clone = value => JSON.parse(JSON.stringify(value));
+const originalRows = [
+    {slot: 12, name: 'Thread.3', location: '0x00001290', limit: '0x000FF',
+        seq: 0, seal: '0x12345678', type: 'Inform', f: 0, g: 0, resident: true},
+    {slot: 14, name: 'Alice', filename: 'Alice.exact.lump', binary_hash: 'a'.repeat(64),
+        token: '01234567', lump_version: 2, location: '0x400', limit: '0x9',
+        seq: 0, seal: '0xDEAE9EEF', type: 'Inform', resident: true,
+        load_policy: 'Resident', extraMetadata: {preserve: ['all', 'fields']}},
+];
+function harness() {
+    const calls = [];
+    const note = {textContent: ''};
+    const win = {
+        _nsState: {namespaceFingerprint: 'reviewed-fingerprint',
+            abstractions: clone(originalRows), savedAbstractions: clone(originalRows)},
+        _nsTableSaveError: null, _nsTableDirty: true,
+        _nsExplicitArtifactBindings: {}, _nsDraftAssignments: {},
+        _nsPrefetchDirtySlots: {}, bootImage: new Uint8Array([1, 2, 3]),
+        bootConfig: {untouched: true},
+    };
+    const sim = {
+        memory: new Uint32Array([4, 5, 6]),
+        readNSEntry() { throw new Error('Untouched saved rows must not read execution memory'); },
+        prepareBootEntry() { throw new Error('Save must not prepare execution'); },
+        snapshotPersistentMemory() { throw new Error('Save must not capture an image'); },
+    };
+    const context = {
+        window: win, sim, document: {getElementById() { return note; }},
+        _setNsDirty(value) { win._nsTableDirty = value; },
+        async _actionableJsonResponse(response) {
+            if (response.error) throw response.error;
+            return response.data;
+        },
+        async fetch(url, options) {
+            calls.push({url, options});
+            const payload = JSON.parse(options.body);
+            if (context.onFetch) await context.onFetch(payload);
+            if (context.error) return {error: context.error};
+            return {data: {ok: true, abstractions: payload.ns_state.abstractions,
+                savedAbstractions: payload.ns_state.abstractions,
+                namespaceFingerprint: 'committed-fingerprint', imageRebuilt: false,
+                imageStatus: 'not-rebuilt'}};
+        },
+    };
+    vm.createContext(context);
+    vm.runInContext(saveCode, context);
+    return {win, sim, calls, context, note};
 }
 
-console.log('\nNamespace single-save workflow checks passed.');
+(async function() {
+    let h = harness();
+    const stateBefore = clone(h.win._nsState);
+    const imageBefore = h.win.bootImage;
+    const memoryBefore = h.sim.memory;
+    const configBefore = clone(h.win.bootConfig);
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    assert.strictEqual(h.calls.length, 1, 'one protected transaction; no incidental GET/build/config requests');
+    assert.strictEqual(h.calls[0].url, '/api/namespace/save-table');
+    assert.deepStrictEqual(JSON.parse(h.calls[0].options.body), {
+        namespaceFingerprint: stateBefore.namespaceFingerprint,
+        ns_state: {abstractions: originalRows},
+    });
+    assert.strictEqual(h.win.bootImage, imageBefore);
+    assert.strictEqual(h.sim.memory, memoryBefore);
+    assert.deepStrictEqual(h.win.bootConfig, configBefore);
+    assert.strictEqual(h.win._nsState.namespaceFingerprint, 'committed-fingerprint');
+    assert.strictEqual(h.win._nsTableDirty, false);
+    assert.match(h.note.textContent, /Built image, bitstream, and active simulation unchanged/);
+
+    h = harness();
+    h.win._nsPrefetchDirtySlots = {'14': true};
+    h.win.bootConfig.step2 = {lumps: [{nsSlot: 14, loadPolicy: 'Lazy'}]};
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    const changed = JSON.parse(h.calls[0].options.body).ns_state.abstractions;
+    assert.deepStrictEqual(changed[0], originalRows[0], 'unrelated rows remain exact');
+    assert.deepStrictEqual(changed[1], {...originalRows[1], resident: false, load_policy: 'Lazy'});
+
+    h = harness();
+    h.win._nsDraftAssignments = {'15': {name: 'Mallory', slot: 15}};
+    const symbolic = {name: 'Mallory', slot: 15, seq: 4, symbolic: true,
+        implementationMissing: true,
+        selection: {status: 'unresolved', filename: 'Mallory.exact.lump',
+            token: 'aabbccdd', binaryHash: 'b'.repeat(64), diagnostic: 'Design selection'}};
+    h.sim.symbolicEntryAt = slot => slot === 15 ? symbolic : null;
+    h.sim.readNSEntry = slot => {
+        assert.strictEqual(slot, 15, 'only explicit draft descriptor may be read');
+        return {word0_location: 0, word1_limit: 0, word2_seals: 987, gtType: 1};
+    };
+    h.sim.parseNSWord1 = () => ({f: 0, g: 0, limit: 0, gtSeq: 4});
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    const draftRows = JSON.parse(h.calls[0].options.body).ns_state.abstractions;
+    assert.deepStrictEqual(draftRows.slice(0, 2), originalRows);
+    assert.deepStrictEqual(draftRows[2].selection, symbolic.selection);
+    assert.strictEqual(draftRows[2].seal, '0x000003DB', 'no automatic resealing');
+    assert.strictEqual(draftRows[2].resident, undefined, 'no inferred residency');
+
+    h = harness();
+    h.context.error = new Error('Namespace changed since review; reload');
+    assert.strictEqual(await h.win._nsTableSave(), false);
+    assert.strictEqual(h.calls.length, 1, 'stale state is not automatically refreshed or retried');
+    assert.strictEqual(h.win._nsTableDirty, true);
+    assert.strictEqual(h.win._nsState.namespaceFingerprint, 'reviewed-fingerprint');
+    assert.match(h.win._nsTableSaveError, /changed since review/);
+
+    h = harness();
+    h.context.error = Object.assign(new Error('Cancelled'), {code: 'change_rejected'});
+    assert.strictEqual(await h.win._nsTableSave(), false);
+    assert.strictEqual(h.win._nsTableSaveCancelled, true);
+    assert.strictEqual(h.win._nsTableDirty, true);
+    assert.deepStrictEqual(h.win._nsState.abstractions, originalRows);
+
+    h = harness();
+    delete h.win._nsState.namespaceFingerprint;
+    assert.strictEqual(await h.win._nsTableSave(), false);
+    assert.strictEqual(h.calls.length, 0, 'missing reviewed fingerprint cannot authorize fresh-state save');
+
+    h = harness();
+    h.context.onFetch = async () => { h.win._nsTableRowEdits = {'14': {name: 'Later draft'}}; };
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    assert.strictEqual(h.win._nsTableDirty, true, 'newer edits are not discarded by an older receipt');
+    assert.strictEqual(h.win._nsState.abstractions[1].name, 'Later draft');
+    assert.strictEqual(h.win._nsState.namespaceFingerprint, 'committed-fingerprint');
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    assert.strictEqual(JSON.parse(h.calls[1].options.body).ns_state.abstractions[1].name, 'Later draft');
+
+    h = harness();
+    delete h.win._nsState.savedAbstractions[1].filename;
+    delete h.win._nsState.savedAbstractions[1].token;
+    h.win._nsState.abstractions[0].thread_layout = {size: 256, heap: 20};
+    h.win._nsState.abstractions[0].displayOnly = true;
+    h.win._nsTableRowEdits = {'12': {name: 'Explicit Thread label'}};
+    const legacyBaseline = clone(h.win._nsState.savedAbstractions);
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    const legacyRows = JSON.parse(h.calls[0].options.body).ns_state.abstractions;
+    assert.deepStrictEqual(legacyRows, [{...legacyBaseline[0], name: 'Explicit Thread label'}, legacyBaseline[1]]);
+    assert.strictEqual(legacyRows[1].filename, undefined);
+    assert.strictEqual(legacyRows[1].token, undefined);
+    assert.strictEqual(legacyRows[0].thread_layout, undefined);
+    assert.strictEqual(legacyRows[0].displayOnly, undefined);
+
+    h = harness();
+    h.win._nsDeletedSlots = {'14': true};
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    assert.deepStrictEqual(JSON.parse(h.calls[0].options.body).ns_state.abstractions, [originalRows[0]]);
+    h = harness();
+    delete h.win._nsState.savedAbstractions;
+    assert.strictEqual(await h.win._nsTableSave(), false);
+    assert.strictEqual(h.calls.length, 0, 'never fall back to an enriched projection');
+
+    assert.ok(!saveCode.includes('generate:'));
+    assert.ok(!saveCode.includes('data_b64'));
+    assert.ok(!saveCode.includes('boot_config:'));
+    assert.ok(!saveCode.includes('updateNamespace('), 'save must not invoke memory-hydrating redraw');
+    assert.ok(!source.includes('Image evidence only; approved revision not verified — '));
+    assert.ok(source.includes('Row geometry checked — '));
+    assert.ok(source.includes('Built image is not verified against the saved Namespace revision.'));
+    console.log('Namespace-only save: exact rows, isolation, policy edits, stale CAS, cancellation, and concurrent drafts PASS');
+})().catch(error => { console.error(error); process.exitCode = 1; });

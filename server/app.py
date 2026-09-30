@@ -4520,6 +4520,60 @@ def _expected_namespace_fingerprint(payload):
     return value if isinstance(value, str) and value.strip() else None
 
 
+def _read_namespace_design_document():
+    """Read saved assignments without certifying a boot target or image."""
+    if not os.path.isfile(NS_STATE_PATH):
+        return {"abstractions": []}
+    with open(NS_STATE_PATH, encoding="utf-8") as source:
+        state = json.load(source)
+    if not isinstance(state, dict) or not isinstance(state.get("abstractions"), list):
+        raise ValueError("ns-state.json has no abstractions array")
+    return state
+
+
+def _namespace_table_candidate(payload):
+    """Shared read-only preflight for protected review and Namespace-only commit."""
+    from server.namespace_authority import validate_namespace_design_rows
+    if not isinstance(payload, dict) or set(payload) - {"namespaceFingerprint", "ns_state"}:
+        raise ValueError("Namespace-only save accepts namespaceFingerprint and ns_state only")
+    expected = payload.get("namespaceFingerprint")
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("namespaceFingerprint is required for Namespace-only save")
+    submitted = payload.get("ns_state")
+    if not isinstance(submitted, dict) or set(submitted) != {"abstractions"}:
+        raise ValueError("ns_state must contain only abstractions")
+    rows = submitted["abstractions"]
+    validate_namespace_design_rows(rows, MAX_NS_ENTRIES)
+    state = _read_namespace_design_document()
+    if _namespace_state_fingerprint(state["abstractions"]) != expected:
+        raise ValueError("Namespace changed since review; reload before saving")
+    return state, rows
+
+
+@app.route("/api/namespace/save-table", methods=["POST"])
+def namespace_save_table():
+    """Save design assignments only; never generate, install or certify bytes."""
+    try:
+        with _namespace_commit_guard():
+            state, rows = _namespace_table_candidate(request.get_json(silent=True))
+            state = dict(state)
+            state["abstractions"] = rows
+            state["save_mode"] = "table-only"
+            # An old raw-image fingerprint cannot authenticate a new design.
+            state.pop("committed_raw_fingerprint", None)
+            _atomic_write_json(NS_STATE_PATH, state)
+        fingerprint = _namespace_state_fingerprint(rows)
+        return jsonify(ok=True, abstractions=rows, savedAbstractions=copy.deepcopy(rows),
+                       namespaceFingerprint=fingerprint,
+                       imageRebuilt=False, imageStatus="not-rebuilt")
+    except (ValueError, TypeError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
+    except OSError:
+        logging.exception("Namespace-only publication failed")
+        return jsonify(ok=False, error="Namespace save failed; no image was changed.",
+                       dataChanged=False), 500
+
+
 @app.route("/api/namespace/boot-marker", methods=["POST"])
 def namespace_boot_marker_post():
     """Atomically move the sole Lightning Bolt marker in Namespace state.
@@ -6548,6 +6602,19 @@ def boot_image_ns_state():
     absent, derive it from boot-image.bin (cold-start path).
     """
     try:
+        # Design snapshots may deliberately have no executable boot target.
+        # Return them verbatim: the previous image and catalogue are not a
+        # source from which to hydrate or overwrite these saved assignments.
+        _design_state = _read_namespace_design_document()
+        if _design_state.get("save_mode") == "table-only":
+            _design_state["savedAbstractions"] = copy.deepcopy(_design_state["abstractions"])
+            _design_state["namespaceFingerprint"] = _namespace_state_fingerprint(
+                _design_state["abstractions"])
+            _design_state.update(imageRebuilt=False, imageStatus="not-rebuilt")
+            resp = jsonify(_design_state)
+            resp.headers["ETag"] = f'"{_design_state["namespaceFingerprint"]}"'
+            resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            return resp
         _ensure_ns_state()
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
         return jsonify({
@@ -6555,7 +6622,7 @@ def boot_image_ns_state():
             "dataChanged": False,
         }), 409
     if not os.path.isfile(NS_STATE_PATH):
-        return jsonify({"abstractions": []})
+        return jsonify({"abstractions": [], "savedAbstractions": []})
     try:
         with open(NS_STATE_PATH) as _fh:
             _state = json.load(_fh)
@@ -6564,6 +6631,9 @@ def boot_image_ns_state():
         # produce a fingerprint that no mutation endpoint can ever accept.
         _authoritative_fingerprint = _namespace_state_fingerprint(
             _state.get("abstractions") or [])
+        # The display projection may infer Thread policies and catalogue
+        # identities. Never let a first table save persist those inferences.
+        _state["savedAbstractions"] = copy.deepcopy(_state.get("abstractions") or [])
         _state = _project_effective_thread_policies(_state)
         # Response-only compatibility enrichment for older committed rows. The
         # persisted Namespace and its CAS fingerprint remain unchanged.
@@ -26525,6 +26595,28 @@ def _describe_protected_change(payload):
     if not isinstance(payload, dict):
         return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
     root = Path(__file__).resolve().parent.parent
+    if request.path == "/api/namespace/save-table":
+        state, rows = _namespace_table_candidate(payload)
+        before = {row["slot"]: row for row in state["abstractions"]}
+        after = {row["slot"]: row for row in rows}
+        lines = ["Save Namespace assignments only. No LUMP, configuration, image, "
+                 "simulation or hardware changes; executable admission is not performed."]
+        for slot in sorted(before.keys() | after.keys()):
+            old, new = before.get(slot, {}), after.get(slot, {})
+            if old == new:
+                continue
+            lines.append(
+                f"NS[{slot}]: pet name {old.get('name', '(absent)')} → "
+                f"{new.get('name', '(absent)')}; submitted saved revision "
+                f"{old.get('lump_version', '(unspecified)')} → "
+                f"{new.get('lump_version', '(unspecified)')} "
+                "(artifact revision not certified by table save).")
+            for key in sorted(old.keys() | new.keys()):
+                if key not in old or key not in new or old[key] != new[key]:
+                    previous = json.dumps(old[key], sort_keys=True) if key in old else "(absent)"
+                    proposed = json.dumps(new[key], sort_keys=True) if key in new else "(absent)"
+                    lines.append(f"NS[{slot}] {key}: {previous} → {proposed}")
+        return lines
     if request.path == "/api/boot-image/save-ns":
         # Execute the same validation as commit, stopping before any publication.
         # No internal route request and no bypass token: one ordinary review

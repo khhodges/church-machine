@@ -80,6 +80,7 @@ async function main() {
             { name: 'SelfTest', slot: 6, boot: true },
         ],
     };
+    initial.savedAbstractions = JSON.parse(JSON.stringify(initial.abstractions));
 
     const success = await runMarker(async (_url, options) => {
         assert.strictEqual(options.method, 'POST');
@@ -112,6 +113,10 @@ async function main() {
         false);
     assert.strictEqual(success.context.observedSlot, 10,
         'the legacy bootEntrySlot localStorage value must not override Namespace');
+    assert.strictEqual(success.context.window._nsState.savedAbstractions.find(row => row.slot === 10).boot, true);
+    assert.ok(!Object.prototype.hasOwnProperty.call(
+        success.context.window._nsState.savedAbstractions.find(row => row.slot === 6), 'boot'),
+    'exact baseline follows server marker removal, not display false values');
 
     const rejected = await runMarker(async (_url, _options) => ({
         ok: false,
@@ -181,6 +186,7 @@ async function main() {
         }],
     };
     const selectedHash = 'b'.repeat(64);
+    saveState.savedAbstractions = JSON.parse(JSON.stringify(saveState.abstractions));
     const saveContext = {
         window: {
             _nsState: saveState,
@@ -254,10 +260,14 @@ async function main() {
         },
         fetch: async (url, options) => {
             saveCalls.push({ url, options });
-            if (url === '/api/boot-image/save-ns') {
+            if (url === '/api/namespace/save-table') {
                 return {
                     ok: true, status: 200,
-                    json: async () => ({ ok: true }),
+                    json: async () => ({ ok: true,
+                        abstractions: JSON.parse(options.body).ns_state.abstractions,
+                        savedAbstractions: JSON.parse(options.body).ns_state.abstractions,
+                        namespaceFingerprint: 'fp-after-save',
+                        imageRebuilt: false, imageStatus: 'not-rebuilt' }),
                 };
             }
             if (url === '/api/boot-image/ns-state') {
@@ -271,19 +281,21 @@ async function main() {
             throw new Error(`unexpected fetch ${url}`);
         },
         _actionableJsonResponse: async (response) => response.json(),
+        document: { getElementById: () => null },
         _setNsDirty: () => {},
         btoa: value => Buffer.from(value, 'binary').toString('base64'),
         Uint8Array, Uint32Array, ArrayBuffer, Number, String, Object, JSON,
         Promise, Error, Map, Math,
     };
     vm.runInNewContext(
+        `${extract(memory, '_nsTableRowsForSave')}\n` +
         `${extract(memory, '_nsInheritSavedArtifactMetadata')}\n` +
         `${extract(memory, '_nsApplyArtifactBindingForSave')}\n${saveSource}\n` +
         'result = window._nsTableSave();', saveContext);
     assert.strictEqual(await saveContext.result, true);
     assert.ok(!saveCalls.some(call => call.url === '/api/namespace/boot-marker'),
-        'save payload regression must exercise save-ns directly, not be masked by marker rejection');
-    const saveCall = saveCalls.find(call => call.url === '/api/boot-image/save-ns');
+        'save payload regression must exercise table save directly, not be masked by marker rejection');
+    const saveCall = saveCalls.find(call => call.url === '/api/namespace/save-table');
     assert.ok(saveCall, 'Namespace save endpoint was called');
     const savePayload = JSON.parse(saveCall.options.body);
     assert.strictEqual(savePayload.namespaceFingerprint, 'fp-save');
@@ -298,7 +310,7 @@ async function main() {
     assert.strictEqual(savePayload.ns_state.abstractions[0].seq, 0);
     assert.strictEqual(savePayload.ns_state.abstractions[0].load_policy, 'Resident');
     assert.strictEqual(savePayload.ns_state.abstractions[0].boot, true);
-    assert.strictEqual(savePayload.boot_config, null,
+    assert.strictEqual(savePayload.boot_config, undefined,
         'boot-config must not be a competing boot-plan authority');
 
     console.log('Namespace boot authority runtime checks passed.');

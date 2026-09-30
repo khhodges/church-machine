@@ -148,52 +148,71 @@ test.describe('pet names in namespace table survive page reload', () => {
         await expect(labelCellsAfter.filter({ hasText: CATALOG_LABEL })).toHaveCount(1);
     });
 
-    test('custom label survives the canonical Save NS Table and reset path', async ({ page }) => {
-        let labelSaved = false;
+    test('custom label survives Namespace-only save and reload without image publication', async ({ page }) => {
         let tableSaved = false;
-        await page.route('**/api/boot-config/slot-label', async route => {
-            labelSaved = true;
-            await route.fulfill({
-                status: 200,
-                contentType: 'application/json',
-                body: JSON.stringify({ ok: true, slot: 11, label: 'CanonicalE2ELabel' })
-            });
+        let committed = null;
+        const incidentalWrites = [];
+        page.on('request', request => {
+            if (request.method() === 'POST' &&
+                    /\/api\/(?:boot-config|boot-image)\//.test(request.url())) {
+                incidentalWrites.push(request.url());
+            }
         });
-        await page.route('**/api/boot-image/save-ns', async route => {
+        await page.route('**/api/boot-image/ns-state', async route => {
+            if (!committed) return route.continue();
+            await route.fulfill({status: 200, contentType: 'application/json',
+                body: JSON.stringify(committed)});
+        });
+        await page.route('**/api/namespace/save-table', async route => {
             tableSaved = true;
+            const payload = route.request().postDataJSON();
+            expect(Object.keys(payload).sort()).toEqual(['namespaceFingerprint', 'ns_state']);
+            committed = {
+                ok: true, abstractions: payload.ns_state.abstractions,
+                savedAbstractions: payload.ns_state.abstractions,
+                namespaceFingerprint: 'e2e-saved-table',
+                imageRebuilt: false, imageStatus: 'not-rebuilt',
+            };
             await route.fulfill({
                 status: 200,
                 contentType: 'application/json',
-                body: JSON.stringify({ ok: true })
+                body: JSON.stringify(committed),
             });
         });
 
         await page.goto('/simulator/');
         await waitForSimulatorReady(page);
+        await page.waitForFunction(() => Array.isArray(window._nsState?.savedAbstractions));
 
         const result = await page.evaluate(async () => {
             const label = 'CanonicalE2ELabel';
-            const slot = sim.saveToNamespace(label, [0x18000000], null, 1, []);
-            await window._persistNamespaceSlotLabel(slot, label);
-            await window._nsTableSave(null);
-
-            const committedImage = window.bootImage.slice(0);
-            sim.reset();
-            const loaded = sim.loadBootImage(committedImage);
+            const slot = window._nsState.savedAbstractions.find(row => row.slot === 11).slot;
+            const memory = Array.from(sim.memory);
+            const image = window.bootImage;
+            const config = JSON.stringify(window.bootConfig);
+            window._nsTableRowEdits = {[slot]: {name: label}};
+            _setNsDirty(true);
+            const saved = await window._nsTableSave(null);
             return {
-                slot,
-                loaded,
-                valid: sim.isNSEntryValid(slot),
-                label: sim.nsLabels[slot]
+                slot, saved,
+                memoryUnchanged: JSON.stringify(Array.from(sim.memory)) === JSON.stringify(memory),
+                imageUnchanged: window.bootImage === image,
+                configUnchanged: JSON.stringify(window.bootConfig) === config,
+                label: window._nsState.savedAbstractions.find(row => row.slot === slot).name,
             };
         });
 
-        expect(labelSaved).toBe(true);
         expect(tableSaved).toBe(true);
-        expect(result.slot).toBe(11);
-        expect(result.loaded).toBe(true);
-        expect(result.valid).toBe(true);
+        expect(result.saved).toBe(true);
+        expect(result.memoryUnchanged).toBe(true);
+        expect(result.imageUnchanged).toBe(true);
+        expect(result.configUnchanged).toBe(true);
         expect(result.label).toBe('CanonicalE2ELabel');
+        expect(incidentalWrites).toEqual([]);
+        await page.reload();
+        await waitForSimulatorReady(page);
+        await openNamespaceView(page);
+        await expect(page.locator(`#ns-row-${result.slot} .ns-label`)).toContainText('CanonicalE2ELabel');
     });
 
     test('legacy browser Namespace payload is removed and cannot restore labels', async ({ page }) => {

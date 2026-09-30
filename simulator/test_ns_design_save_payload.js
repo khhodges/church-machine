@@ -47,6 +47,7 @@ const payloads = [];
 const windowState = {
     bootConfig: input.config,
     _nsState: Object.assign({}, input.state, {
+        savedAbstractions: input.state.savedAbstractions || input.state.abstractions,
         namespaceFingerprint: input.fingerprint
     }),
     _nsTableSaveError: null,
@@ -97,7 +98,7 @@ const ctx = {
     bootEntrySlot: input.state.abstractions.find(row => row.boot === true).slot,
     document: { getElementById: name => elements[name] || null },
     fetch: async (url, opts) => {
-        if (url === '/api/boot-image/save-ns') {
+        if (url === '/api/namespace/save-table') {
             payload = JSON.parse(opts.body);
             payloads.push(payload);
             return { ok: false, status: 409 };
@@ -120,7 +121,7 @@ vm.runInContext(part('async function _nsAddPlacementConfirm()', 'async function 
 vm.runInContext(part('async function _nsHashImmutableWords(', 'function _nsMatchingApproval('), ctx);
 vm.runInContext(part('function _nsTableAddConfirm()', '// ── NS table: Clear slot'), ctx);
 vm.runInContext(part('async function _nsKeepPendingAsPlacement(', '// ── NS table: Clear slot'), ctx);
-vm.runInContext(part('window._nsTableSave = async function(btn)', '// ── NS label click'), ctx);
+vm.runInContext(part('function _nsTableRowsForSave(state)', '// ── NS label click'), ctx);
 (async () => {
     if (input.pending) {
         await windowState._nsTableSave(elements.nsSaveBtn);

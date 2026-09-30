@@ -32,6 +32,7 @@ def isolated(tmp_path, monkeypatch):
     tree = ast.parse((root / "server/app.py").read_text())
     names = {"boot_image_save_ns", "_stage_namespace_save_image",
              "_validate_symbolic_namespace_image",
+             "_validate_new_namespace_resident_bytes",
              "_describe_protected_change", "_optional_report_token_check"}
     nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
     for node in nodes:
@@ -77,6 +78,7 @@ def isolated(tmp_path, monkeypatch):
         _read_authoritative_namespace_rows=lambda: ([dict(row)], "current"),
         _validate_boot_image_bytes=validate,
         _validate_symbolic_namespace_entries=validate,
+        _validate_namespace_publication=validate,
         _validate_active_namespace_lumps=validate,
         _validate_namespace_boot_marker=lambda rows: 0,
         _validated_boot_config_candidate=lambda candidate, **kw: (candidate, None),
@@ -245,15 +247,16 @@ def test_server_only_report_token_check_remains_enforced_outside_namespace(isola
         assert allowed and error is None
 
 
-def test_client_stages_dependencies_without_separate_protected_requests():
+def test_client_saves_table_without_build_dependencies():
     text = (Path(__file__).parents[2] / "simulator/app-memory.js").read_text()
     save = text.split("window._nsTableSave = async function(btn) {", 1)[1].split(
         "\n};", 1)[0]
-    assert "_ensureNamespaceBuildConfig(true)" in save
+    assert "_ensureNamespaceBuildConfig" not in save
     assert "fetch('/api/boot-image/generate'" not in save
     assert "fetch('/api/boot-config'" not in save
-    assert save.count("method:  'POST'") == 1
-    assert "boot_config: stagedBuildConfig" in save
+    assert len(re.findall(r"method:\s*'POST'", save)) == 1
+    assert "boot_config: stagedBuildConfig" not in save
+    assert "/api/namespace/save-table" in save
 
 
 def test_config_diff_is_reviewed_and_published_in_same_commit(isolated):
