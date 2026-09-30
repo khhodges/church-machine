@@ -13165,72 +13165,34 @@ function confirmCreateNamespace() {
     updateDashboard();
 }
 
-// Return every populated Namespace slot known to the IDE. A user LUMP may be
-// saved in the repository before its slot appears in the current boot image,
-// so the live simulator table alone is not sufficient after a reload. Live
-// entries take precedence over persisted labels and catalog metadata.
-function _collectSaveNamespaceSlotCandidates(simulator, serverLumps, savedLabels) {
-    if (!simulator || typeof simulator.firstUserNsSlot !== 'function') return [];
-    const firstUserSlot = simulator.firstUserNsSlot();
-    const maxSlots = Number.isInteger(simulator.MAX_NS_ENTRIES)
-        ? simulator.MAX_NS_ENTRIES : (simulator.nsCount || 0);
+// Only committed Namespace rows establish replacement destinations. Neither
+// boot-config slotLabels nor the LUMP catalog proves a slot is allocated.
+function _collectSaveNamespaceSlotCandidates(simulator, state) {
+    if (!state || !Array.isArray(state.abstractions) ||
+            !simulator || !Number.isInteger(simulator.MAX_NS_ENTRIES)) {
+        throw new Error('Authoritative Namespace snapshot is incomplete');
+    }
     const candidates = new Map();
-    const validSlot = function(slot) {
-        return Number.isInteger(slot) && slot >= 0 && slot < maxSlots;
-    };
-    const usableLabel = function(label) {
-        const text = String(label || '').trim();
-        return text && text !== '(free)' && text !== '(reserved)' ? text : '';
-    };
-    const add = function(rawSlot, rawLabel, priority) {
-        const slot = Number(rawSlot);
-        if (!validSlot(slot)) return;
-        const label = usableLabel(rawLabel) || `Saved LUMP ${slot}`;
-        const previous = candidates.get(slot);
-        if (!previous || priority > previous.priority) {
-            candidates.set(slot, {
-                slot,
-                label,
-                priority,
-                // Every Namespace slot is programmer-selectable.
-                disabled: false,
-            });
+    for (const row of state.abstractions) {
+        const slot = row && row.slot;
+        if (!Number.isInteger(slot) || slot < 0 || slot >= simulator.MAX_NS_ENTRIES ||
+                typeof row.name !== 'string' || !row.name.trim() ||
+                candidates.has(slot)) {
+            throw new Error('Authoritative Namespace snapshot contains an invalid slot or name');
         }
-    };
-
-    // Do not stop at nsCount: reloads restore the boot image's count, while a
-    // user-selected replacement slot can legitimately sit above that boundary.
-    for (let slot = 0; slot < maxSlots; slot++) {
-        const entry = simulator.readNSEntry(slot);
-        if (entry) add(slot, entry.label, 3);
+        candidates.set(slot, {
+            slot,
+            label: row.name.trim(),
+            token: typeof row.token === 'string' ? row.token.trim() : '',
+            disabled: slot === 0 || slot === 1,
+        });
     }
-
-    for (const [slot, label] of Object.entries(savedLabels || {})) {
-        add(slot, label, 2);
-    }
-
-    for (const lump of Array.isArray(serverLumps) ? serverLumps : []) {
-        if (!lump || lump.ns_slot === null || lump.ns_slot === undefined) continue;
-        add(lump.ns_slot, lump.abstraction || lump.name, 1);
-    }
-
     return Array.from(candidates.values()).sort((a, b) => a.slot - b.slot);
 }
 
-function _currentSaveNamespaceLumpName() {
-    const current = window.LumpRegistry
-        ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
-        : null;
-    return current && current.abstraction
-        ? String(current.abstraction).trim().toLowerCase()
-        : (sim.programName ? String(sim.programName).trim().toLowerCase() : '');
-}
-
-function _populateSaveNamespaceSlotPicker(options) {
-    const opts = options || {};
+function _populateSaveNamespaceSlotPicker(state, snapshot) {
     const slotSel = document.getElementById('saveNSSlot');
     if (!slotSel) return null;
-    const previousValue = slotSel.value;
     slotSel.innerHTML = '';
 
     const newOpt = document.createElement('option');
@@ -13238,11 +13200,7 @@ function _populateSaveNamespaceSlotPicker(options) {
     newOpt.textContent = '\u2014 New Entry \u2014';
     slotSel.appendChild(newOpt);
 
-    const serverLumps = window.LumpRegistry
-        ? window.LumpRegistry.getServerList()
-        : [];
-    const savedLabels = (window.bootConfig && window.bootConfig.slotLabels) || {};
-    const candidates = _collectSaveNamespaceSlotCandidates(sim, serverLumps, savedLabels);
+    const candidates = _collectSaveNamespaceSlotCandidates(sim, state);
     for (const candidate of candidates) {
         const opt = document.createElement('option');
         opt.value = String(candidate.slot);
@@ -13252,21 +13210,35 @@ function _populateSaveNamespaceSlotPicker(options) {
         slotSel.appendChild(opt);
     }
 
-    let selectedValue = 'new';
-    if (opts.preserveSelection &&
-        Array.from(slotSel.options).some(opt => opt.value === previousValue)) {
-        selectedValue = previousValue;
-    } else if (opts.selectMatchingCurrent) {
-        const currentName = _currentSaveNamespaceLumpName();
-        const match = candidates.find(candidate =>
-            candidate.label.toLowerCase() === currentName);
-        if (match) selectedValue = String(match.slot);
+    // An opened saved LUMP has a frozen source owner. Its exact token (not its
+    // name or a catalog slot hint) must still own a committed row to select a
+    // replacement. Compilation can change the candidate token; in that case
+    // retain the opened source identity. Without a proven owner, never guess a
+    // replacement from a coincidentally matching name.
+    const baseToken = snapshot && snapshot.editorBaseIdentity &&
+        snapshot.editorBaseIdentity.token;
+    const ownerToken = baseToken || (snapshot && snapshot.token);
+    const matches = ownerToken ? candidates.filter(candidate =>
+        !candidate.disabled && candidate.token &&
+        candidate.token.toLowerCase() === String(ownerToken).trim().toLowerCase()) : [];
+    let selectedValue = matches.length === 1 ? String(matches[0].slot) : 'new';
+    if (baseToken && matches.length !== 1) {
+        // A previously opened artifact lost its exact committed binding.
+        // Neither allocate a copy nor overwrite another slot by default.
+        const choose = document.createElement('option');
+        choose.value = 'choose';
+        choose.textContent = '\u2014 Choose destination (previous binding changed) \u2014';
+        choose.disabled = true;
+        slotSel.insertBefore(choose, slotSel.firstChild);
+        selectedValue = 'choose';
     }
     slotSel.value = selectedValue;
     return { selectedValue, candidates };
 }
 
 var _saveNSTrigger = null;
+var _saveNSPickerRequestId = 0;
+var _saveNSPickerReady = false;
 
 function _cloneLumpSaveCapabilities(capabilities) {
     return (Array.isArray(capabilities) ? capabilities : []).map(function(cap) {
@@ -13472,11 +13444,11 @@ function showSaveToNamespace() {
     if (_unifiedReview) _unifiedReview.style.display =
         window._pendingLumpData ? '' : 'none';
     const slotSel = document.getElementById('saveNSSlot');
-    _populateSaveNamespaceSlotPicker({ selectMatchingCurrent: true });
-    const _defaultOption = slotSel.options[slotSel.selectedIndex];
-    document.getElementById('saveNSLabel').value = slotSel.value === 'new'
-        ? ''
-        : ((_defaultOption && _defaultOption.dataset.nsLabel) || '');
+    const pickerRequestId = ++_saveNSPickerRequestId;
+    _saveNSPickerReady = false;
+    slotSel.innerHTML = '';
+    slotSel.disabled = true;
+    document.getElementById('saveNSLabel').value = '';
     document.getElementById('saveNSLabel').disabled = false;
     document.getElementById('saveNSType').value = '1';
     document.getElementById('permR').checked = false;
@@ -13490,31 +13462,63 @@ function showSaveToNamespace() {
     const _csLen = _csWords ? _csWords.length : 0;
     info.textContent = `Code size: ${_csLen} words (${_csLen * 4} bytes)`;
     _setSaveNSFeedback('', '');
-    _restoreSaveOperationStatus(window._saveNSPreparedSnapshot,
-        document.getElementById('saveNSLabel').value.trim());
     _saveNSTrigger = document.activeElement;
     document.getElementById('saveNSDialog').style.display = '';
+    _setSaveNSFeedback('loading', 'Loading committed Namespace destinations…');
     if (!_saveNSTrap) _saveNSTrap = _makeModalFocusTrap('saveNSDialog', closeSaveDialog);
     document.addEventListener('keydown', _saveNSTrap, true);
     document.getElementById('saveNSLabel').focus();
 
-    // The Repository list may not have been visited in this session. Refresh
-    // the picker after its shared catalog fetch resolves; preserve New Entry or
-    // a user-selected slot so an in-progress save is never changed underneath
-    // the programmer.
-    if (window.LumpRegistry && !window.LumpRegistry.isServerListFetched()) {
-        window.LumpRegistry.warmServerList().then(function() {
-            const dialog = document.getElementById('saveNSDialog');
-            if (dialog && dialog.style.display !== 'none') {
-                _populateSaveNamespaceSlotPicker({ preserveSelection: true });
+    // Fetch afresh for every open; the shared bootstrap projection can lag a
+    // save. A late response must not populate a later dialog or undo a choice.
+    fetch('/api/boot-image/ns-state', { cache: 'no-store' })
+        .then(async function(response) {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const state = await response.json();
+            if (!state || !Array.isArray(state.abstractions) ||
+                    typeof state.namespaceFingerprint !== 'string' ||
+                    !state.namespaceFingerprint.trim()) {
+                throw new Error('incomplete committed Namespace snapshot');
             }
+            return state;
+        })
+        .then(function(state) {
+            if (pickerRequestId !== _saveNSPickerRequestId ||
+                    document.getElementById('saveNSDialog').style.display === 'none') return;
+            _populateSaveNamespaceSlotPicker(state, window._saveNSPreparedSnapshot);
+            if (slotSel.value === 'choose') {
+                document.getElementById('saveNSLabel').value = '';
+            } else {
+                onSlotChange();
+            }
+            _restoreSaveOperationStatus(window._saveNSPreparedSnapshot,
+                document.getElementById('saveNSLabel').value.trim());
+            _saveNSPickerReady = true;
+            slotSel.disabled = false;
+            if (slotSel.value === 'choose') {
+                _setSaveNSFeedback('error',
+                    'The opened LUMP no longer owns a committed Namespace slot. Choose the destination explicitly, or choose New Entry to create a separate copy.');
+            } else if (document.getElementById('saveNSStatus').dataset.feedbackKind === 'loading') {
+                _setSaveNSFeedback('', '');
+            }
+        })
+        .catch(function(error) {
+            if (pickerRequestId !== _saveNSPickerRequestId ||
+                    document.getElementById('saveNSDialog').style.display === 'none') return;
+            _setSaveNSFeedback('error',
+                `Cannot load committed Namespace destinations: ${error.message}. Close and reopen Save LUMP to retry.`);
+            document.getElementById('saveNSConfirmBtn').disabled = true;
         });
-    }
 }
 
 function onSlotChange() {
     const slotSel = document.getElementById('saveNSSlot');
     const labelInput = document.getElementById('saveNSLabel');
+    if (slotSel.value === 'choose') return;
+    const feedback = document.getElementById('saveNSStatus');
+    if (feedback && feedback.textContent.includes('opened LUMP no longer owns')) {
+        _setSaveNSFeedback('', '');
+    }
     // Always reset to E-only regardless of slot — the user is saving a freshly
     // compiled binary; the old GT's permissions are not relevant to the new save.
     const _permDefaults = { R: false, W: false, X: false, L: false, S: false, E: true };
@@ -13527,13 +13531,10 @@ function onSlotChange() {
         document.getElementById('saveNSType').value = '1';
     } else {
         const idx = parseInt(slotSel.value);
-        const entry = sim.readNSEntry(idx);
         const selectedOption = slotSel.options[slotSel.selectedIndex];
-        labelInput.value = entry
-            ? (entry.label || '')
-            : ((selectedOption && selectedOption.dataset.nsLabel) || '');
+        labelInput.value = (selectedOption && selectedOption.dataset.nsLabel) || '';
         labelInput.disabled = false;
-        document.getElementById('saveNSType').value = String(entry ? (entry.gtType || 1) : 1);
+        document.getElementById('saveNSType').value = '1';
         // Permissions deliberately NOT copied from the existing GT — the
         // user is overwriting that slot with new compiled code, so the
         // default should be E-only, same as a fresh slot.
@@ -13541,6 +13542,8 @@ function onSlotChange() {
 }
 
 function closeSaveDialog() {
+    ++_saveNSPickerRequestId;
+    _saveNSPickerReady = false;
     if (window._saveNSLeaseStop) {
         window._saveNSLeaseStop();
         window._saveNSLeaseStop = null;
@@ -13788,6 +13791,10 @@ async function _discoverLumpSaveDiagnosticCandidate(operationId) {
 
 let _saveNSRequestInFlight = false;
 async function beginSaveToNamespace() {
+    if (!_saveNSPickerReady || document.getElementById('saveNSSlot').disabled) {
+        _setSaveNSFeedback('error', 'Committed Namespace destinations are not loaded. Close and reopen Save LUMP to retry.');
+        return;
+    }
     if (_saveNSRequestInFlight) return;
     _saveNSRequestInFlight = true;
     if (window._saveNSLeaseStop) window._saveNSLeaseStop();
@@ -16795,6 +16802,12 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
 
 async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
+    if (!_saveNSPickerReady || slotSel.disabled ||
+            !Array.from(slotSel.options).some(option =>
+                option.value === slotSel.value && !option.disabled)) {
+        _setSaveNSFeedback('error', 'Choose a destination from the committed Namespace snapshot before saving.');
+        return;
+    }
     const label = document.getElementById('saveNSLabel').value.trim();
     if (!label) {
         const message = 'Enter a LUMP / Namespace Name, then click Save again.';

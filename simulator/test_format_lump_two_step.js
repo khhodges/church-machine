@@ -146,15 +146,17 @@ const LumpContentFrame = require('./lump-content-frame.js');
         LumpContentFrame.lumpContentFrameProfile(framedWords(0x09)) === null);
 }
 
-// ── T2c: Save-to-NS lists every known slot; bootstrap slots are disabled ───────
+// ── T2c: Save-to-NS takes committed rows, never catalog/slotLabels ───────
 {
     const collectIdx = appRunSrc.indexOf('function _collectSaveNamespaceSlotCandidates(');
     check('T2c save slot collector found', collectIdx !== -1);
     if (collectIdx !== -1) {
-        const collectBody = appRunSrc.slice(collectIdx, appRunSrc.indexOf('function _currentSaveNamespaceLumpName()', collectIdx));
-        check('T2c1 collector enumerates from slot 0 and enables every slot',
-            collectBody.includes('for (let slot = 0; slot < maxSlots; slot++)') &&
-            collectBody.includes('disabled: false'));
+        const collectBody = appRunSrc.slice(collectIdx, appRunSrc.indexOf('function _populateSaveNamespaceSlotPicker(', collectIdx));
+        check('T2c1 collector uses committed rows and disables only bootstrap slots',
+            collectBody.includes('state.abstractions') &&
+            collectBody.includes('slot === 0 || slot === 1') &&
+            !collectBody.includes('slotLabels') &&
+            !collectBody.includes('getServerList()'));
     }
 }
 
@@ -168,7 +170,7 @@ const LumpContentFrame = require('./lump-content-frame.js');
             confirmBody.includes('sim.saveNamespaceStartSlot()') &&
             confirmBody.includes('Save blocked: choose a Namespace slot'));
         check('T2d2 committed save reloads the repository artifact, not preflight words',
-            confirmBody.includes('_reloadCommittedLumpArtifact(resp, label)') &&
+            confirmBody.includes('_reloadCommittedLumpArtifact(resp, label, _svPayload.metadata)') &&
             !confirmBody.includes('sim.saveToNamespaceAt(') &&
             confirmBody.includes('Refresh Needed'));
     }

@@ -122,7 +122,9 @@ if (freshSnapshot.pending !== null ||
 // must retain the independent compiler pair for diagnostics.
 if (!source.includes('original_source: _saveSnapshot') ||
     !source.includes('original_compiled_words: _svWords.slice()') ||
-    !source.includes('original_binary: _svBinary.slice()')) {
+    // Preserve the original compiler binary even when a selected output
+    // profile transforms the eventual submitted binary.
+    !source.includes('original_binary: (_svOriginalBinary || _svBinary).slice()')) {
     throw new Error('API-only save path does not retain original compiler source/binary');
 }
 if (!source.includes('save_as_latest: true') ||
