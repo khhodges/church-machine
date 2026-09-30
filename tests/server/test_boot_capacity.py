@@ -49,6 +49,12 @@ def test_valid_exact_saved_geometry_and_unclassified_not_padding(tmp_path, monke
     assert report["largestFreeWords"] == 1024 - (16 + 128)
     assert report["rows"][0]["allocatedWords"] == 128
     assert report["rows"][0]["savedAllocationWords"] == 128
+    assert report["reservedRanges"] == [
+        {"name": "Namespace header", "locationWord": 0, "allocatedWords": 16},
+        {"name": "Namespace table", "locationWord": 1024, "allocatedWords": 256},
+    ]
+    assert sum(part["allocatedWords"] for part in report["reservedRanges"]) == report["reservedWords"]
+    assert report["allocatedWords"] == report["reservedWords"] + report["rows"][0]["allocatedWords"]
     assert report["rows"][0]["paddingWords"] is None
     assert report["rows"][0]["unclassifiedWords"] == 124
     assert before == (tmp_path / "fixture1.lump").read_bytes()
@@ -116,6 +122,7 @@ def test_invalid_image_still_lists_hash_verified_saved_cost(tmp_path, monkeypatc
     monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", invalid)
     report = boot_capacity.capacity_report(rows, image, str(tmp_path))
     assert not report["trusted"] and report["allocatedWords"] is None
+    assert report["reservedRanges"] == []
     assert report["rows"][0]["savedAllocationWords"] == 128
     assert report["rows"][0]["allocatedWords"] is None
     assert report["rows"][0]["savedPaddingWords"] is None

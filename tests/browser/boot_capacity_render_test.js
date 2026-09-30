@@ -24,57 +24,77 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(source.slice(start, end), context);
-context._renderBootCapacity({
-    layout: 'generic', denseBytes: 65536, totalWords: 16384,
-    advisory: { applies: true }, physicalTarget: {},
+const rows = [
+    { slot: 10, name: 'Ten', locationWord: 256, allocatedWords: 128,
+        status: 'verified' },
+    { slot: 2, name: 'Two', locationWord: 16, allocatedWords: 128,
+        status: 'verified' },
+    { slot: 8, name: 'Eight', locationWord: 100, allocatedWords: 64,
+        status: 'verified' },
+    { slot: 12, name: '<uninstalled>', savedAllocationWords: 256,
+        status: 'No validated committed image descriptor' },
+    { slot: 3, name: 'Three', savedAllocationWords: 128,
+        status: 'Design-only symbolic placement; not installed', designOnly: true },
+];
+const report = {
+    denseBytes: 65536, totalWords: 16384, reservedWords: 272,
     allocatedWords: null, freeWords: null, largestFreeWords: null,
-    warnings: ['Untrusted <slot>'], rows: [{
-        slot: 15, name: '<unsafe>', version: 1,
-        allocatedWords: null, paddingWords: null,
-        unclassifiedWords: null, threadHeapWords: null,
-        status: 'Design-only symbolic placement; not installed',
-    }],
-});
-assert.match(root.innerHTML, /Capacity not validated/);
-assert.match(root.innerHTML, /Free: Cannot validate — see layout issues below/);
-assert.match(root.innerHTML, /Not installed — design placement/);
-assert.doesNotMatch(root.innerHTML, /unavailable/i);
-assert.match(root.innerHTML, /NS\[15\] &lt;unsafe&gt;/);
-assert.doesNotMatch(root.innerHTML, /<unsafe>/);
-assert.match(root.innerHTML, /Saved unclassified contents \/ slack/);
+    warnings: ['NS[2] overlaps NS[8]'], trusted: false,
+    reservedRanges: [
+        { name: 'Namespace table', locationWord: 1024, allocatedWords: 256 },
+        { name: 'Namespace header', locationWord: 0, allocatedWords: 16 },
+    ],
+    rows,
+};
+context._renderBootCapacity(report);
+const html = root.innerHTML;
+const tableRows = [...html.matchAll(/<tr(?: style="[^"]*")?><td>(.*?)<\/tr>/g)]
+    .map(match => match[0]);
+assert.equal(tableRows.length, 7);
+assert.deepEqual(tableRows.map(row => row.match(/<td>(.*?)<\/td>/)[1]), [
+    'Namespace header (Reserved)', 'NS[2] Two', 'NS[8] Eight',
+    'NS[10] Ten', 'Namespace table (Reserved)',
+    'NS[3] Three', 'NS[12] &lt;uninstalled&gt;',
+]);
+assert.equal(rows[0].slot, 10); // Presentation sorting did not mutate report.
+assert.match(html, /word addresses \(hex\)<\/strong>, not byte offsets/);
+assert.match(html, /Base \(word address\)/);
+assert.match(html, /Last \(word address, inclusive\)/);
+assert.match(tableRows[1], /128 words \(512 bytes\)<\/td><td>0x10<\/td><td>0x8F<\/td>/);
+assert.match(tableRows[2], /64 words \(256 bytes\)<\/td><td>0x64<\/td><td>0xA3<\/td>/);
+assert.match(tableRows[0], /0x0<\/td><td>0xF<\/td>/);
+assert.match(tableRows[1], /background:rgba\(248,113,113,0.18\).*Overlap/);
+assert.match(tableRows[2], /background:rgba\(248,113,113,0.18\).*Overlap/);
+assert.doesNotMatch(tableRows[3], /Overlap/);
+assert.match(tableRows[5], /128 words \(512 bytes\) \(saved; not installed size\)<\/td><td>—<\/td><td>—<\/td>/);
+assert.match(tableRows[6], /256 words \(1,024 bytes\) \(saved; not installed size\)<\/td><td>—<\/td><td>—<\/td>/);
+assert.match(html, /Capacity not validated/);
+assert.match(html, /Free: Cannot validate — see layout issues below/);
+assert.doesNotMatch(html, /<uninstalled>/);
+
 context._renderBootCapacity({
-    layout: 'generic', denseBytes: 65536, totalWords: 16384,
-    advisory: { applies: true, bootBudgetWords: 12288 }, physicalTarget: {},
+    denseBytes: 65536, totalWords: 16384,
     trusted: true, allocatedWords: 13000, freeWords: 3384,
-    largestFreeWords: 2000, warnings: [], rows: [{
-        slot: 6, name: 'Example', version: 1,
-        savedAllocationWords: 128, savedPaddingWords: 30,
-        allocatedWords: 128, savedUnclassifiedWords: 0,
-        threadHeapWords: null, status: 'verified',
-    }],
+    largestFreeWords: 2000, warnings: [],
+    advisory: { applies: true, bootBudgetWords: 12288 },
+    rows: [{ slot: 1, locationWord: 4096, allocatedWords: 256,
+        threadHeapWords: 194, status: 'installed Thread geometry' }],
 });
 assert.match(root.innerHTML, /advisory budget exceeded by 712 words/);
-assert.doesNotMatch(root.innerHTML, /headroom below the 48 KiB threshold: -/);
-assert.match(root.innerHTML, /Exact saved cost/);
+assert.match(root.innerHTML, /256 words \(1,024 bytes\)<\/td><td>0x1000<\/td><td>0x10FF/);
+assert.doesNotMatch(root.innerHTML, /Saved verified padding|Thread heap \/ stack/);
+
 context._renderBootCapacity({
-    denseBytes: 65536, totalWords: 16384, warnings: [], rows: [{
-        slot: 1, name: 'Thread', allocatedWords: 256,
-        threadHeapWords: 194, threadStackWords: 32,
-        status: 'installed Thread geometry',
-    }, {
-        slot: 6, name: 'Unknown frame', savedAllocationWords: 128,
-        savedPaddingWords: null, savedUnclassifiedWords: 100,
-    }, {
-        slot: 7, name: 'Missing file', savedIssue: 'Exact selected artifact is missing',
-        status: 'Exact selected artifact is missing',
-    }],
+    denseBytes: 65536, totalWords: 16384, trusted: false,
+    allocatedWords: 1234, freeWords: 456, warnings: [],
+    rows: [{ slot: 7, name: 'Broken', allocatedWords: 128, locationWord: 16,
+        status: 'verified' }, { slot: 9, name: 'Missing file',
+        savedIssue: 'Exact selected artifact is missing',
+        status: 'Exact selected artifact is missing' }],
 });
-assert.match(root.innerHTML, /Not applicable — measured from installed Thread/);
-assert.match(root.innerHTML, /256 words \(1,024 bytes\)/);
-assert.match(root.innerHTML, /194 words \(776 bytes\) \/ 32 words \(128 bytes\)/);
-assert.match(root.innerHTML, /Unknown padding — content boundary not verified/);
-assert.match(root.innerHTML, /Cannot verify saved file — Exact selected artifact is missing/);
-assert.doesNotMatch(root.innerHTML, /unavailable/i);
+assert.match(root.innerHTML, /Capacity not validated/);
+assert.match(root.innerHTML, /Occupied \(including reserved\): Cannot validate/);
+assert.match(root.innerHTML, /128 words \(512 bytes\)<\/td><td>0x10<\/td><td>0x8F/);
+assert.match(root.innerHTML, /Installation unverified — Exact selected artifact is missing/);
 context._renderBootCapacity({ denseBytes: null, rows: [], warnings: ['No image'] });
 assert.match(root.innerHTML, /Cannot calculate — no committed boot image/);
-assert.doesNotMatch(root.innerHTML, /unavailable/i);

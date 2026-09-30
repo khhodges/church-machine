@@ -108,7 +108,7 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
             "runtimeReserveWords": 4096,
             "note": "Proposed 48 KiB/16 KiB split, not an enforced limit. Runtime heap within Thread bodies is accounted separately.",
         },
-        "rows": [], "warnings": [], "trusted": False,
+        "rows": [], "reservedRanges": [], "warnings": [], "trusted": False,
         "allocatedWords": None, "freeWords": None,
         "largestFreeWords": None, "unclassifiedWords": None,
     }
@@ -140,6 +140,10 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
             words = struct.unpack("<%dI" % total, image_bytes)
             claims = [(0, boot_image.NAMESPACE_HEADER_V2_WORDS, "Namespace header"),
                       (table_start, total, "Namespace table")]
+            report["reservedRanges"] = [
+                {"name": name, "locationWord": start, "allocatedWords": end - start}
+                for start, end, name in claims
+            ]
             report["reservedWords"] = (
                 boot_image.NAMESPACE_HEADER_V2_WORDS + total - table_start)
         except (ValueError, TypeError, struct.error) as error:

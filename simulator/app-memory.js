@@ -226,25 +226,27 @@ function _renderBootCapacity(report) {
     const words = (value, reason = 'Unknown — measurement not supplied') => Number.isInteger(value)
         ? _escHtml(value.toLocaleString() + ' words (' +
             (value * 4).toLocaleString() + ' bytes)') : _escHtml(reason);
+    const address = value => '0x' + value.toString(16).toUpperCase();
     const noImage = report.denseBytes == null;
     const totalsReason = noImage ? 'Cannot calculate — no committed boot image' :
-        report.warnings.length ? 'Cannot validate — see layout issues below' :
+        (report.warnings.length || !report.trusted) ? 'Cannot validate — see layout issues below' :
         'Unknown — total not supplied';
-    let html = '<div>' + _escHtml(report.layout || 'Committed generic image') +
-        ' — dense file: ' +
-        (Number.isInteger(report.denseBytes)
-            ? _escHtml(report.denseBytes.toLocaleString() + ' bytes')
-            : 'No committed boot image') + '; image window: ' +
+    const trusted = report.trusted === true && !report.warnings.length;
+    const total = value => words(trusted ? value : null, totalsReason);
+    let html = '<div>Committed generic image — addresses are <strong>word addresses (hex)</strong>, ' +
+        'not byte offsets. Image window: ' +
         words(report.totalWords, 'No committed boot image') + '.</div>';
-    html += '<div>Namespace header/table reservation: ' +
+    html += '<div>Reserved: ' +
         words(report.reservedWords, noImage ? 'No committed boot image' : 'Cannot validate — image header not verified') +
-        '. Occupied allocations: ' + words(report.allocatedWords, totalsReason) +
-        '. Free: ' + words(report.freeWords, totalsReason) +
-        '. Largest contiguous gap: ' + words(report.largestFreeWords, totalsReason) + '.</div>';
+        '. Occupied (including reserved): ' + total(report.allocatedWords) +
+        '. Free: ' + total(report.freeWords) +
+        '. Largest contiguous gap: ' + total(report.largestFreeWords) + '.</div>';
+    const summary = html;
+    html = '';
     if (report.advisory && report.advisory.applies) {
         html += '<div>Advisory only (not enforced): 48 KiB boot budget / 16 KiB runtime ' +
             'reserve for a 64 KiB Wukong target. ' +
-            (report.trusted && Number.isInteger(report.allocatedWords)
+            (trusted && Number.isInteger(report.allocatedWords)
                 ? (report.allocatedWords > report.advisory.bootBudgetWords
                     ? 'Generic-window advisory budget exceeded by ' +
                         words(report.allocatedWords - report.advisory.bootBudgetWords) + '. '
@@ -259,49 +261,71 @@ function _renderBootCapacity(report) {
             'Separate layout; the generic allocation totals above are not physical ' +
             'placement or hardware compatibility evidence.</div>';
     }
-    if (report.warnings.length) {
+    if (report.warnings.length || !trusted) {
         html += '<div style="color:#f87171;font-weight:600;">Capacity not validated: ' +
-            'free and occupied totals cannot be confirmed. Known individual sizes remain shown. Resolve these issues first.</div><ul>' +
-            report.warnings.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul>';
+            'free and occupied totals cannot be confirmed. Known individual sizes remain shown. Resolve these issues first.</div>';
+        if (report.warnings.length) {
+            html += '<ul>' + report.warnings.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul>';
+        }
+    }
+    const details = html;
+    html = summary;
+    // Sort a presentation-only copy; no unknown placement is inferred from saved cost.
+    const entries = report.rows.map(row => ({
+        row, reserved: false,
+        base: Number.isSafeInteger(row.locationWord) && row.locationWord >= 0 &&
+            Number.isSafeInteger(row.allocatedWords) && row.allocatedWords > 0
+            ? row.locationWord : null,
+        size: row.allocatedWords,
+    }));
+    for (const range of (Array.isArray(report.reservedRanges) ? report.reservedRanges : [])) {
+        if (Number.isSafeInteger(range.locationWord) && range.locationWord >= 0 &&
+                Number.isSafeInteger(range.allocatedWords) && range.allocatedWords > 0) {
+            entries.push({ row: range, reserved: true, base: range.locationWord,
+                size: range.allocatedWords });
+        }
+    }
+    entries.sort((a, b) => a.base === null ? (b.base === null
+        ? (a.row.slot ?? Infinity) - (b.row.slot ?? Infinity) : 1) :
+        b.base === null ? -1 : a.base - b.base ||
+            (a.row.slot ?? -1) - (b.row.slot ?? -1));
+    const overlapping = new Set();
+    const placed = entries.filter(entry => entry.base !== null);
+    for (let i = 0; i < placed.length; i++) {
+        for (let j = i + 1; j < placed.length && placed[j].base < placed[i].base + placed[i].size; j++) {
+            overlapping.add(placed[i]);
+            overlapping.add(placed[j]);
+        }
     }
     html += '<div style="overflow-x:auto;"><table class="ns-table" style="width:100%;">' +
-        '<thead><tr><th>Slot / name</th><th>Saved version</th><th>Exact saved cost</th>' +
-        '<th>Saved verified padding</th><th>Installed allocation</th>' +
-        '<th>Thread heap / stack</th><th>Saved unclassified contents / slack</th>' +
-        '<th>Assessment</th></tr></thead><tbody>';
-    for (const row of report.rows) {
-        const text = value => _escHtml(String(value));
-        const isThread = Number.isInteger(row.threadHeapWords);
-        const designOnly = row.designOnly === true ||
-            row.status === 'Design-only symbolic placement; not installed';
-        const savedReason = isThread
-            ? 'Not applicable — measured from installed Thread'
-            : 'Cannot verify saved file — ' + (row.savedIssue || 'exact saved binding not verified');
-        const paddingReason = Number.isInteger(row.savedAllocationWords)
-            ? 'Unknown padding — content boundary not verified' : savedReason;
-        const installedReason = designOnly ? 'Not installed — design placement' :
-            'Cannot verify installation — ' + (row.status || 'image layout not verified');
-        html += '<tr><td>NS[' + text(row.slot) + '] ' + text(row.name) +
-            '</td><td>' + (Number.isInteger(row.version) ? 'v' + text(row.version) :
-                (isThread ? 'Not applicable — installed Thread' : 'Unknown saved version')) +
-            '</td><td>' + words(row.savedAllocationWords, savedReason) + '</td><td>' +
-            words(row.savedPaddingWords, paddingReason) + '</td><td>' +
-            words(row.allocatedWords, installedReason) + '</td><td>' +
-            (Number.isInteger(row.threadHeapWords)
-                ? words(row.threadHeapWords) + ' / ' + words(row.threadStackWords)
-                : (designOnly || Number.isInteger(row.savedAllocationWords)
-                    ? 'Not applicable — no installed Thread'
-                    : 'Unknown — installed object type not verified')) +
-            '</td><td>' + words(row.savedUnclassifiedWords, savedReason) +
-            '</td><td>' + text(row.status) + '</td></tr>';
+        '<thead><tr><th>LUMP / slot</th><th>Size</th><th>Base (word address)</th>' +
+        '<th>Last (word address, inclusive)</th><th>Status</th></tr></thead><tbody>';
+    for (const entry of entries) {
+        const row = entry.row;
+        const overlap = overlapping.has(entry);
+        const size = Number.isSafeInteger(row.allocatedWords) ? words(row.allocatedWords) :
+            Number.isSafeInteger(row.savedAllocationWords)
+                ? words(row.savedAllocationWords) + ' (saved; not installed size)'
+                : 'Unknown';
+        const status = entry.reserved ? 'Reserved' :
+            entry.base !== null ? 'Installed — ' + (row.status || 'verified geometry') :
+            row.designOnly || row.status === 'Design-only symbolic placement; not installed'
+                ? 'Not installed — design placement' :
+                'Installation unverified — ' + (row.status || 'no validated geometry');
+        html += '<tr' + (overlap ? ' style="background:rgba(248,113,113,0.18);"' : '') +
+            '><td>' + (entry.reserved ? _escHtml(row.name) + ' (Reserved)' :
+                'NS[' + _escHtml(String(row.slot)) + '] ' + _escHtml(String(row.name || ''))) +
+            '</td><td>' + size + '</td><td>' +
+            (entry.base === null ? '—' : address(entry.base)) + '</td><td>' +
+            (entry.base === null ? '—' : address(entry.base + entry.size - 1)) +
+            '</td><td>' + (overlap ? '<strong>Overlap — </strong>' : '') +
+            _escHtml(status) + '</td></tr>';
     }
-    html += '</tbody></table></div><small>Saved cost is an exact hash-checked library ' +
-        'artifact, not proof of installation. Installed allocation is omitted until the ' +
-        'image geometry is verified. Unclassified contents/slack may include embedded ' +
-        'metadata, source, and padding. Padding is counted only when a complete content ' +
-        'frame and its zero-filled tail can be identified. Thread heap is runtime space ' +
-        'inside its allocated body, not extra free ' +
-        'memory. Saved revision metadata is not proof that relocated image bytes are identical.</small>';
+    html += '</tbody></table></div><details' + (!trusted ? ' open' : '') +
+        '><summary>Layout validation and budget details</summary>' + details +
+        '</details><small>Reserved rows count toward occupied space. ' +
+        'Saved size is exact hash-checked artifact cost, not proof of installation. ' +
+        'Only validated installed allocations have word addresses; no free gaps are inferred from untrusted layouts.</small>';
     root.innerHTML = html;
 }
 window._renderBootCapacity = _renderBootCapacity;
