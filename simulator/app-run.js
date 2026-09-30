@@ -1704,20 +1704,12 @@ function onRunBtnClick() {
 }
 
 function prepareAndRunSavedArtifact(propagateError) {
-    // Explicit "Prepare latest & Run" only, never the ordinary Run button.
-    const run = () => {
-        if (window.IDEActions) window.IDEActions.run();
-        else runSimGo();
-    };
-    if (typeof window.prepareSavedArtifactForRun !== 'function') {
-        run();
-        return Promise.resolve(true);
-    }
-    return window.prepareSavedArtifactForRun().then(ok => {
-        if (ok) run();
-        return !!ok;
+    // Compatibility entry point: preparation never approves, activates or runs.
+    return Promise.resolve().then(() => {
+        if (!window.SimulationPreparation) throw new Error('Simulation preparation is unavailable.');
+        return window.SimulationPreparation.prepare();
     }).catch(error => {
-        _showBootPreparationBlocked('Run', error);
+        _showBootPreparationBlocked('Prepare for Simulation', error);
         if (propagateError) throw error;
         return false;
     });
@@ -1761,6 +1753,9 @@ function hideRunPopover() {
 //     • Unknown name → null GT (0)
 //   cc = lastAssembledCapabilities.length.
 function _injectClistNow(capabilitiesOverride, targetSlotOverride = null) {
+    if (sim && sim.simulationConfiguration) {
+        throw new Error('C-list injection blocked: the active simulation configuration is frozen. Prepare and activate a new configuration.');
+    }
     const _hasActiveThread = typeof sim._activeThreadBase === 'function' &&
         sim._activeThreadBase() !== null;
     if ((!sim.bootComplete && !_hasActiveThread) ||
@@ -3022,6 +3017,9 @@ if (window._configuredBootLumpOpenerReady === true) {
 }
 
 function _autoLoadDefaultProgram() {
+    // A reviewed private image is exact: neither editor cache nor sticky
+    // runtime patches may silently replace bytes after its boot completes.
+    if (sim && sim.simulationConfiguration) return;
     // Re-apply any sticky patches (set via patchSimulator()) that should survive
     // reset.  Safe to call here because the NS table and lump addresses are stable
     // after every boot sequence completes.
@@ -20955,6 +20953,14 @@ function _appendSimulatorStepLog(result, container) {
     line.executionEvidence = evidence || null;
     line.appendChild(document.createTextNode('\n[' + stepCount + '] ' +
         ((evidence && evidence.description) || (result && result.desc) || 'Execution description unavailable') + ' '));
+    const configuration = evidence && (evidence.simulationConfiguration ||
+        (evidence.pre && evidence.pre.simulationConfiguration));
+    if (configuration) {
+        const provenance = document.createElement('span');
+        provenance.textContent = ' [Simulation configuration ' + configuration.configurationHash + '] ';
+        provenance.title = 'Executed frozen Namespace ' + configuration.sourceNamespaceFingerprint;
+        line.appendChild(provenance);
+    }
     if (result && result.eventLocation &&
         (result.eventLocation.kind === 'CALL' || result.eventLocation.kind === 'RETURN')) {
         const link = document.createElement('button');

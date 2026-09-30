@@ -980,6 +980,15 @@ function refreshCREditTarget() {
 
 function injectCRCode(logEl) {
     const log = msg => { if (logEl) { logEl.textContent += msg + '\n'; logEl.scrollTop = logEl.scrollHeight; } };
+    if (sim && sim.simulationConfiguration) {
+        const message = 'Patch rejected: the active simulation configuration is frozen. Save the changed artifact and Namespace, then prepare, approve and activate a new configuration.';
+        log(message);
+        if (!logEl) {
+            if (typeof showPatchModal === 'function') showPatchModal(false, 'Patch Simulator', message);
+            else window.alert(message);
+        }
+        return null;
+    }
 
     // The direct "Patch Memory" menu action may be used before "Edit Source".
     // Capture its currently displayed CR once; later editor patches retain that
@@ -1418,6 +1427,11 @@ window._loadStickyPatchesFromStorage = function() {
 // Re-apply all sticky patches from _stickyPatches after a boot sequence.
 // Called by _autoLoadDefaultProgram() (app-run.js) on every boot completion.
 window._reapplyStickyPatches = function() {
+    if (sim && sim.simulationConfiguration) {
+        if (typeof appendOutput === 'function') appendOutput(
+            'Sticky patches skipped: the active simulation configuration is frozen.', 'error');
+        return;
+    }
     const entries = Object.entries(_stickyPatches);
     if (entries.length === 0) return;
     for (const [nsIdxStr, patch] of entries) {

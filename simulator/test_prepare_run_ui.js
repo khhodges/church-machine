@@ -563,10 +563,10 @@ function makeReconciliationContext(options) {
     const explicitCalls = { prepare: 0, run: 0, modal: 0 };
     const explicitContext = {
         window: {
-            async prepareSavedArtifactForRun() {
+            SimulationPreparation: { async prepare() {
                 explicitCalls.prepare++;
                 throw new Error('final preparation rejection');
-            },
+            } },
             IDEActions: { run() { explicitCalls.run++; } },
         },
         _showBootPreparationBlocked() { explicitCalls.modal++; },

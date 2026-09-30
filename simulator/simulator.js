@@ -20,6 +20,14 @@ const ARCH_CONTRACTS = typeof ChurchArchitectureContracts !== 'undefined'
     ? ChurchArchitectureContracts
     : require('./architecture_contracts.js');
 const ARCH_PROFILE_NAME = 'simulator-v20';
+// Private copies prevent a mutable browser cache (or a matching identifier
+// attached to unrelated bytes) from restoring simulation provenance.
+const SIMULATION_IMAGE_BINDINGS = new WeakMap();
+function sameSimulationImage(left, right) {
+    if (!left || !right || left.byteLength !== right.byteLength) return false;
+    const bytes = new Uint8Array(right);
+    return left.every((byte, index) => byte === bytes[index]);
+}
 const ARCH_PROFILE = ARCH_CONTRACTS.profiles[ARCH_PROFILE_NAME];
 const ARCH_BOOT = ARCH_CONTRACTS.boot;
 const ARCH_MMIO_SLOTS = new Set(Object.keys(ARCH_BOOT.devices).map(
@@ -539,6 +547,12 @@ class ChurchSimulator {
     //     from window.bootConfig so empty slots remain addressable in
     //     the dashboard and through the runtime nsCount.
     loadBootImage(arrayBuffer) {
+        this.simulationConfiguration = null;
+        const previous = SIMULATION_IMAGE_BINDINGS.get(this);
+        const binding = previous && previous.binding &&
+            sameSimulationImage(previous.binding.bytes, arrayBuffer)
+            ? previous.binding : null;
+        SIMULATION_IMAGE_BINDINGS.delete(this);
         let accepted = false;
         let thrown = null;
         this._recordControlFlowDiagnostic('LOAD_BOOT_IMAGE', 'pre', {
@@ -547,6 +561,12 @@ class ChurchSimulator {
         });
         try {
             accepted = this._loadBootImageCore(arrayBuffer);
+            if (accepted === true) {
+                SIMULATION_IMAGE_BINDINGS.set(this, {
+                    loadedBytes: new Uint8Array(arrayBuffer).slice(), binding,
+                });
+                this.simulationConfiguration = binding ? binding.configuration : null;
+            }
             return accepted;
         } catch (error) {
             thrown = error;
@@ -562,6 +582,29 @@ class ChurchSimulator {
                 }),
             });
         }
+    }
+
+    bindSimulationConfiguration(arrayBuffer, configuration) {
+        const loaded = SIMULATION_IMAGE_BINDINGS.get(this);
+        if (!loaded || !sameSimulationImage(loaded.loadedBytes, arrayBuffer) ||
+                !configuration || !configuration.preparationId ||
+                !configuration.configurationHash || configuration.hardwareCertified !== false) {
+            throw new Error('Simulation configuration must bind the exact accepted private image.');
+        }
+        const immutable = JSON.parse(JSON.stringify(configuration));
+        const freeze = value => {
+            if (value && typeof value === 'object') {
+                Object.values(value).forEach(freeze);
+                Object.freeze(value);
+            }
+            return value;
+        };
+        loaded.binding = {
+            bytes: loaded.loadedBytes.slice(),
+            configuration: freeze(immutable),
+        };
+        this.simulationConfiguration = loaded.binding.configuration;
+        return this.simulationConfiguration;
     }
 
     _loadBootImageCore(arrayBuffer) {
@@ -1219,6 +1262,12 @@ class ChurchSimulator {
     }
 
     reset(reason = null) {
+        this.simulationConfiguration = null;
+        // Reset alone has no configuration. A subsequent successful loader
+        // restores it only when every byte matches the activated private image.
+        const privateImage = SIMULATION_IMAGE_BINDINGS.get(this);
+        if (reason !== null) SIMULATION_IMAGE_BINDINGS.delete(this);
+        else if (privateImage) privateImage.loadedBytes = null;
         this._ensureControlFlowDiagnostics();
         this._recordControlFlowDiagnostic(
             'RESET', 'before', this._diagnosticResetProvenance(reason));
@@ -10415,6 +10464,8 @@ class ChurchSimulator {
     }
 
     loadProgram(words, startAddr, targetSlot = null) {
+        this.simulationConfiguration = null;
+        SIMULATION_IMAGE_BINDINGS.delete(this);
         const abstrSlot = Number.isInteger(targetSlot)
             ? targetSlot
             : this.bootEntrySlot;  // boot selection remains unchanged unless direct-run supplies a slot
@@ -10579,6 +10630,8 @@ class ChurchSimulator {
     }
 
     loadLumpBinary(words, nsSlot, options = {}) {
+        this.simulationConfiguration = null;
+        SIMULATION_IMAGE_BINDINGS.delete(this);
         const LEGACY_EXTENDED_BASE = 0x0400;
         const _nsSlotRaw     = (nsSlot !== undefined && nsSlot !== null) ? Number(nsSlot) : NaN;
         const abstrSlot      = Number.isInteger(_nsSlotRaw) ? _nsSlotRaw : this.bootEntrySlot;
@@ -12167,6 +12220,7 @@ class ChurchSimulator {
         const identity = slot !== null && this._slotIdentity
             ? this._slotIdentity.get(slot) : null;
         return this._freezeExecutionEvidence({
+            simulationConfiguration: this.simulationConfiguration || null,
             pc: this.pc, physicalPC: this.physicalPC, stepCount: this.stepCount,
             dr: this.dr, cr: this.cr, flags: this.flags,
             callDepth: this.callStack.length, sto: this.sto,
@@ -12195,6 +12249,7 @@ class ChurchSimulator {
                 : result ? 'retired' : 'aborted';
             attempt.evidence = this._freezeExecutionEvidence({
                 version: 1, epoch: attempt.epoch, occurrenceId: attempt.occurrenceId,
+                simulationConfiguration: attempt.pre.simulationConfiguration || null,
                 instruction: attempt.instruction || null,
                 pre: attempt.pre, post: this._executionEvidenceState(),
                 outcome, fault: attempt.fault || null,

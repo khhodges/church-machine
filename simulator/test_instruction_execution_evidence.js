@@ -17,6 +17,19 @@ function fixture(words) {
 }
 
 // Aliasing every arithmetic operand must not recompute inputs from destination.
+{
+    const sim = fixture([word(21, 1, 1, 0x4001)]);
+    sim.simulationConfiguration = { configurationHash: 'frozen-config', hardwareCertified: false,
+        artifactBindings: [{ artifactHash: 'exact-artifact' }] };
+    const evidence = sim.step().executionEvidence;
+    sim.simulationConfiguration.artifactBindings[0].artifactHash = 'changed';
+    assert.strictEqual(evidence.simulationConfiguration.artifactBindings[0].artifactHash, 'exact-artifact');
+    assert.strictEqual(evidence.simulationConfiguration.hardwareCertified, false);
+    assert(Object.isFrozen(evidence.simulationConfiguration));
+    sim.reset();
+    assert.strictEqual(sim.simulationConfiguration, null);
+    assert.strictEqual(evidence.simulationConfiguration.configurationHash, 'frozen-config');
+}
 for (const op of [21, 22]) {
     for (const [dst, src, rhs] of [[1, 1, 2], [2, 1, 2], [1, 1, 1]]) {
         const sim = fixture([word(op, dst, src, rhs)]);

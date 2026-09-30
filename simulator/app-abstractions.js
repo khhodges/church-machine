@@ -1308,36 +1308,11 @@ async function savePreparedBootEntry() {
 }
 window.savePreparedBootEntry = savePreparedBootEntry;
 
-// Only explicit "Prepare latest & Run" calls this. Ordinary Run consumes the
-// committed image without preparation. Serialize explicit preparation and
-// prevent it from swapping the selected body during an execution batch.
-let _prepareSavedArtifactForRunInFlight = null;
+// Compatibility API now uses private simulation review, never saved-image
+// generation, artifact resolution, approval, activation, or execution.
 async function prepareSavedArtifactForRun() {
-    if ((typeof _simRunActive !== 'undefined' && _simRunActive) ||
-            (sim && (sim.running || sim.walkActive))) {
-        throw new Error('Stop the active execution before preparing another revision.');
-    }
-    if (_prepareSavedArtifactForRunInFlight) {
-        return _prepareSavedArtifactForRunInFlight;
-    }
-    const operation = savePreparedBootEntry();
-    _prepareSavedArtifactForRunInFlight = operation;
-    try {
-        const ok = await operation;
-        if (!ok) {
-            const state = window.BootEntryUI &&
-                typeof window.BootEntryUI.get === 'function'
-                ? window.BootEntryUI.get() : null;
-            throw window._lastPrepareRunError || new Error(
-                state && state.message ||
-                'Prepare/Run was rejected without changing the previous selection.');
-        }
-        return true;
-    } finally {
-        if (_prepareSavedArtifactForRunInFlight === operation) {
-            _prepareSavedArtifactForRunInFlight = null;
-        }
-    }
+    if (!window.SimulationPreparation) throw new Error('Simulation preparation is unavailable.');
+    return window.SimulationPreparation.prepare();
 }
 window.prepareSavedArtifactForRun = prepareSavedArtifactForRun;
 

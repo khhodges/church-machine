@@ -691,7 +691,19 @@ async function _openBootExecutionUpdate() {
 }
 window._openBootExecutionUpdate = _openBootExecutionUpdate;
 
+function _blockFrozenSimulationEdit(action) {
+    if (!sim || !sim.simulationConfiguration) return false;
+    const message = action + ' blocked: the active simulation configuration is frozen. ' +
+        'Save changed source/artifacts and prepare, approve and activate a new configuration; ' +
+        'load a different image to leave the frozen simulation before editing live memory.';
+    if (typeof showPatchModal === 'function') showPatchModal(false, action, message);
+    else window.alert(message);
+    return true;
+}
+
 function _hydrateNsSymbolicState() {
+    // Saved design-side metadata cannot install descriptors in a private image.
+    if (sim && sim.simulationConfiguration) return;
     const rows = window._nsState && Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
     if (!sim) return;
@@ -839,6 +851,7 @@ function _nsTableSaveClick(btn) {
 // Looks for #nsSaveBtn in the DOM (rendered by updateNamespace).
 function _setNsDirty(dirty) {
     window._nsTableDirty = Boolean(dirty);
+    if (dirty && window.SimulationPreparation) window.SimulationPreparation.invalidate();
     const btn = document.getElementById('nsSaveBtn');
     if (!btn) return;
     const error = window._nsTableSaveError;
@@ -4198,6 +4211,7 @@ function updateNamespace() {
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace rows only; built images and simulation remain unchanged">\u{1F4BE} Save Namespace Table</button>`;
+    if (window.SimulationPreparation) html += '<section id="simulationPreparationPanel" style="flex-basis:100%;padding:8px 0">' + window.SimulationPreparation.markup() + '</section>';
     html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save records Namespace rows and explicit policy choices only. It does not normalize layout, generate or replace an image, or activate simulation. A changed table may differ from the unchanged built image; validate and prepare separately.</div>';
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
     html += '</div>';
@@ -4933,6 +4947,7 @@ function _nsUpdatePlacementButton() {
 }
 
 async function _nsAddPlacementConfirm() {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Add Namespace placement')) return false;
     const nameEl = document.getElementById('_nsPlacementName');
     const slotEl = document.getElementById('_nsPlacementSlot');
     const sel = document.getElementById('_nsAddSelect');
@@ -4996,6 +5011,7 @@ async function _nsOpenNewAssembler() {
 }
 
 function _nsAddSetMode(mode) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Allocate Namespace placement')) return false;
     const install = document.getElementById('_nsInstallPane');
     const symbolic = document.getElementById('_nsSymbolicPane');
     const newButton = document.getElementById('_nsNewButton');
@@ -5028,6 +5044,7 @@ function _nsAddSetMode(mode) {
 }
 
 async function _nsDefineSymbolicConfirm() {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Define Namespace abstraction')) return false;
     const nameEl = document.getElementById('_nsSymbolicName');
     const slotEl = document.getElementById('_nsSymbolicSlot');
     const errEl = document.getElementById('_nsSymbolicError');
@@ -5323,6 +5340,7 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
 }
 
 function _nsTableAddConfirm() {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Install Namespace artifact')) return false;
     const sel = document.getElementById('_nsAddSelect');
     const errEl = document.getElementById('_nsAddError');
     const confirmBtn = document.getElementById('_nsAddConfirmBtn');
@@ -5391,6 +5409,7 @@ function _nsTableAddConfirm() {
         if (!hdr.valid) return Promise.reject(new Error('Invalid LUMP header (magic mismatch)'));
         if (!artifactDetail) return Promise.reject(new Error('Immutable LUMP inspection is unavailable'));
         const actualBinaryHash = await _nsHashImmutableWords(words);
+        if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Install Namespace artifact')) return false;
         const receipt = window._nsAddExecutableReceipt;
         if (!receipt || receipt.token !== token ||
                 receipt.catalogIndex !== sel.selectedIndex - 1 ||
@@ -5519,6 +5538,7 @@ function _nsTableAddConfirm() {
                 'without a saved, compiler-approved artifact for that exact SHA-256. ' +
                 'Use Add to Namespace (design); no Namespace or saved-library bytes were changed.');
         }
+        if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Install Namespace artifact')) return false;
         words = _identity.words;
 
         // limit17: always hdr.cw (real grant interval) regardless of load mode.
@@ -5815,6 +5835,7 @@ function _nsTableAddConfirm() {
 // approval boundary. This never claims the reminted body is approved, changes
 // an immutable library artifact, or silently changes what the programmer chose.
 async function _nsKeepPendingAsPlacement(slot) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Change Namespace placement')) return false;
     const binding = window._nsExplicitArtifactBindings &&
         window._nsExplicitArtifactBindings[String(slot)];
     const entry = sim && sim.readNSEntry(slot);
@@ -5912,6 +5933,7 @@ async function _nsKeepPendingAsPlacement(slot) {
 // Revokes all existing GTs for the slot by bumping the gt_seq cycle count,
 // then zeroes the entry. Any pre-Clear GT will fail GT validation on next use.
 function _nsTableClear(slot) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Clear Namespace descriptor')) return false;
     if (!sim) return;
     // Namespace allocation owns the reserved catalog boundary. Do not repeat
     // that boundary here as a numeric range; the simulator is authoritative.
@@ -7087,6 +7109,7 @@ let userMethodLists = {};
 // any instruction, reducing cc before computing the minimum size.
 // After a successful shrink the lump is automatically saved to server/lumps/.
 window.lumpCompress = async function(nsIdx) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Compress LUMP')) return false;
     const logEl = document.getElementById('crInjectLog');
     function log(msg) { if (logEl) { logEl.style.display = 'block'; logEl.textContent = msg; } }
 
@@ -7673,6 +7696,7 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
 // Zero a single c-list row in simulator memory (marks the GT as null/empty).
 // Called by the "× zero" button in the C-List panel.
 function zeroLumpSlot(addr) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Zero C-list row')) return false;
     if (!sim || addr < 0 || addr >= sim.memory.length) return;
     sim.writePersistentWord(addr, 0);
     updateCRDetail();
@@ -7683,6 +7707,7 @@ function zeroLumpSlot(addr) {
 // references via CR6 is cleared, minimising ambient authority. After zeroing,
 // trailing null slots become eligible for removal by lumpCompress().
 window.zeroAllUnrefSlots = function(nsIdx) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Zero unreferenced C-list rows')) return false;
     if (!sim) return;
     const nse = sim.readNSEntry(nsIdx);
     if (!nse) return;
@@ -7733,6 +7758,7 @@ window.zeroAllUnrefSlots = function(nsIdx) {
 //   5. Update lump header cc + NS entry word1.
 //   6. Auto-save to server/lumps/ and show a patch-modal with full report.
 window.applyPOLA = async function(nsIdx) {
+    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Rewrite C-list / Apply POLA')) return false;
     if (!sim) return;
     const nse = sim.readNSEntry(nsIdx);
     if (!nse) return;

@@ -4550,6 +4550,66 @@ def _namespace_table_candidate(payload):
     return state, rows
 
 
+from server.simulation_preparation import PreparationStore as _SimulationPreparationStore
+
+_simulation_preparations = _SimulationPreparationStore()
+
+
+@app.route("/api/simulation/prepare", methods=["POST"])
+def simulation_prepare():
+    """Prepare a private image from exact saved assignments; publish nothing."""
+    payload = request.get_json(silent=True)
+    if (not isinstance(payload, dict) or set(payload) != {"namespaceFingerprint"}
+            or not isinstance(payload.get("namespaceFingerprint"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", payload["namespaceFingerprint"])):
+        return jsonify(ok=False, error="Expected namespaceFingerprint only",
+                       dataChanged=False, hardwareCertified=False), 400
+    try:
+        with _namespace_commit_guard():
+            rows = _read_namespace_design_document()["abstractions"]
+            if _namespace_state_fingerprint(rows) != payload["namespaceFingerprint"]:
+                raise ValueError("Saved Namespace changed; reload before preparing simulation")
+            # Read geometry only, not the legacy Step-2 catalog validator:
+            # uncertified, exact saved artifacts are valid simulator inputs.
+            config_path = (BOOT_CONFIG_PATH if os.path.isfile(BOOT_CONFIG_PATH)
+                           else BOOT_CONFIG_LEGACY_PATH)
+            with open(config_path, encoding="utf-8") as source:
+                cfg = json.load(source)
+            _migrate_legacy_board(cfg)
+            error = _validate_step1(cfg.get("targetBoard"), cfg.get("step1") or {})
+            if error:
+                raise ValueError(error)
+            result = _simulation_preparations.prepare(
+                rows, cfg, LUMPS_DIR, _validate_namespace_boot_marker(rows))
+        return jsonify(ok=True, **result)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False,
+                       hardwareCertified=False), 409
+
+
+@app.route("/api/simulation/approve", methods=["POST"])
+def simulation_approve():
+    return _simulation_transition(False)
+
+
+@app.route("/api/simulation/activate", methods=["POST"])
+def simulation_activate():
+    return _simulation_transition(True)
+
+
+def _simulation_transition(activate):
+    try:
+        with _namespace_commit_guard():
+            result = _simulation_preparations.transition(
+                request.get_json(silent=True),
+                _read_namespace_design_document()["abstractions"], LUMPS_DIR,
+                activate=activate)
+        return jsonify(ok=True, **result)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False,
+                       hardwareCertified=False), 409
+
+
 @app.route("/api/namespace/save-table", methods=["POST"])
 def namespace_save_table():
     """Save design assignments only; never generate, install or certify bytes."""

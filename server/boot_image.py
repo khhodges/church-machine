@@ -2370,6 +2370,21 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
 
 def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                         require_entry_resident=False):
+    """Hardware/publication generator: compiler admission is mandatory."""
+    return _generate_boot_image(
+        cfg, lumps_dir, boot_entry_slot, require_entry_resident,
+        _require_approved_executable_lump)
+
+
+def generate_simulation_image(cfg, lumps_dir, boot_entry_slot=None):
+    """Private simulator generation; never confers hardware admission."""
+    from server.simulation_preparation import validate_simulation_executable
+    return _generate_boot_image(
+        cfg, lumps_dir, boot_entry_slot, True, validate_simulation_executable)
+
+
+def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
+                         require_entry_resident, executable_validator):
     """Produce the binary boot image bytes for the given config dict.
 
     `cfg` must already be Step-1 valid (target board + step1 fields).
@@ -2434,7 +2449,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         if not isinstance(_owner_filename, str):
             raise ValueError(
                 f"generate_boot_image: frozen resident slot {_owner_slot} has no locator")
-        _require_approved_executable_lump(
+        executable_validator(
             os.path.join(lumps_dir, _owner_filename), lumps_dir,
             f"frozen resident owner slot {_owner_slot}", _owner)
     if _selftest_slot >= _ns_slots_max:
@@ -2514,7 +2529,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Validation is deliberately outside the legacy parsing guard below:
     # approval, filename, hash, or structural failures must never fall back to
     # a generated executable body.
-    _require_approved_executable_lump(
+    executable_validator(
         _boot_saved_path, lumps_dir, "SelfTest",
         _bootstrap_by_slot.get(_selftest_slot))
     try:
@@ -2562,6 +2577,11 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
                             if _op in _CLIST_OPS and _cr_src == 6 and _slot >= _bscc:
                                 _needs_lazy = True
                                 break
+                    if executable_validator is not _require_approved_executable_lump:
+                        # Private simulation validates complete capability
+                        # references up front. Never strip immutable c-list
+                        # content to invite a later catalog-driven injection.
+                        _needs_lazy = False
                     if _needs_lazy:
                         # Pre-LAZY / stale c-list: strip cc → 0 in the header AND
                         # zero any c-list words in the tail so the embedded lump is
@@ -2742,6 +2762,14 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # Namespace state remains the sole source used to resolve artifact bytes.
     _selected_slot_tokens = {}
     trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
+    if executable_validator is not _require_approved_executable_lump:
+        # The private simulator stage has already structurally checked every
+        # exact Namespace-selected artifact. Hardware still uses admission.
+        trusted_cache_tokens = {
+            row["slot"]: int(str(row.get("token") or row.get("cache_token")), 16)
+            for row in _bootstrap_rows
+            if row.get("filename") and (row.get("token") or row.get("cache_token"))
+        }
     # A frozen bootstrap resident uses its approved SELF capability as the
     # descriptor's non-authoritative cache word.  This is deliberately not
     # inferred through the ordinary artifact-token resolver: bootstrap T is a
@@ -2817,7 +2845,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         _cw = (_body[0] >> 10) & 0x1FFF
         _typ = (_body[0] >> 8) & 0x3
         if _typ == 0 and _cw > 0:
-            _body = _require_approved_executable_lump(
+            _body = executable_validator(
                 _selected_path, lumps_dir, f"boot-resident Namespace slot {_slot}",
                 _bootstrap_by_slot.get(_slot))
             _declared_words = len(_body)
@@ -3357,7 +3385,7 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         token = token_map.get(slot)
         body_path = _resolve_selected_lump_locator(
             lumps_dir, slot, token)
-        body = _require_approved_executable_lump(
+        body = executable_validator(
             body_path, lumps_dir, f"Step-2 resident slot {slot}",
             _bootstrap_by_slot.get(slot))
         _binding = (_portable_approvals.get(str(token).lower(), {})

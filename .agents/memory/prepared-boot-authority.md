@@ -8,7 +8,7 @@ Boot consumes the image through LOAD CR15, CHANGE CR12, CALL CR0. Browser
 selection, factory defaults, and newer artifact revisions must not replace that
 authority during reset, import, or passive boot.
 
-At the user-approved **Prepare/Run** boundary, preparation now resolves the
+For hardware publication only, at the user-approved **Prepare/Run** boundary, preparation resolves the
 newest saved, admissible revision for the selected abstraction by default.
 Retaining an older revision requires an explicit exact-artifact pin. This
 supersedes the former explicit-revision-selection rule only at that boundary:
@@ -25,6 +25,31 @@ Executable admission validates bytes and provenance; it is not proof that a
 runtime test suite passed. Runtime-test/MTBF claims remain separately
 digest-bound and are cleared rather than inherited when preparation changes a
 revision.
+
+Private simulation preparation instead consumes the exact frozen saved Namespace
+and artifact bytes. It must never choose a newer revision or publish normalized
+rows. Review, configuration approval, and activation are distinct actions.
+Simulation configuration approval is not hardware executable admission.
+
+**Why:** The saved design must remain unchanged while a programmer experiments
+with a proposed combined layout; test evidence applies only to that configuration.
+
+**How to apply:** Keep private preparation separate from legacy hardware
+publication. Bind observed simulation results to the activated configuration,
+not the current editor, library latest version, or subsequently saved table.
+
+Private image validation must cover every selected artifact, including
+non-entry residents, against the actual simulator loader's identity rules.
+Unsupported object types must fail preparation, not disappear from its image.
+Pair reset/reload provenance with exact image bytes, and prevent explicit
+editor patches from retaining the old tested-configuration identity.
+
+**Why:** Structural generation alone can produce images the loader rejects or
+omit selected objects, while reset caches and editor patches can detach evidence
+from the bytes it claims to describe.
+
+**How to apply:** Exercise real-loader round trips and reset/patch boundaries;
+normal architectural runtime writes remain part of simulation, not a new design.
 
 **Why:** Synthetic boot-time target minting hid invalid saved capabilities and
 made visible selection diverge from executable authority. The confirmed design
