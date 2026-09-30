@@ -62,6 +62,7 @@ const rows = [
     },
 ];
 view._lastMap = { boot_entry_slot: 10, slot_rules: rows };
+context.window._nsState = { abstractions: [{ slot: 10, boot: true }] };
 
 const bootNamespace = view._renderRow(rows[0]);
 assert(bootNamespace.includes('<td class="ba-num">32</td>'));
@@ -307,7 +308,7 @@ const realRefresh = view.refresh;
     mapBody = { innerHTML: '' };
     approveButton = { disabled: true };
     context.fetch = async (url, options) => {
-        if (url === '/api/boot-config' && !options) {
+        if (url === '/api/boot-config' && (!options || options.method !== 'POST')) {
             return {
                 ok: true,
                 async json() {
@@ -326,26 +327,29 @@ const realRefresh = view.refresh;
     };
 
     const select = { dataset: { previousValue: 'Lazy' }, value: 'Starter', disabled: false };
+    const markerCalls = [];
+    context.window._commitNamespaceBootMarker = async slot => {
+        markerCalls.push(slot);
+        context.window._nsState.abstractions = [{ slot, boot: true }];
+    };
     await view._changeSlotRule(10, 'Starter', select);
-    assert.strictEqual(posted[0].bootEntrySlot, 10);
-    assert.strictEqual(posted[0].slotRules['10'], 'LightningBolt');
-    assert.deepStrictEqual(posted[0].step2.lumps, [],
-        'LightningBolt must not be persisted as a load-policy row');
+    assert.deepStrictEqual(markerCalls, [10]);
+    assert.strictEqual(posted.length, 0,
+        'Lightning Bolt must use the Namespace marker CAS, not boot-config POST');
 
     const moveSelect = { dataset: { previousValue: 'Lazy' }, value: 'Starter', disabled: false };
     await view._changeSlotRule(6, 'Starter', moveSelect);
-    assert.strictEqual(posted[1].bootEntrySlot, 6);
-    assert.strictEqual(posted[1].slotRules['6'], 'LightningBolt');
-    assert.strictEqual(posted[1].slotRules['10'], 'Resident',
-        'moving LightningBolt must restore the previous slot rule');
+    assert.deepStrictEqual(markerCalls, [10, 6],
+        'moving Lightning Bolt commits the intended Namespace slot only');
+    assert.strictEqual(posted.length, 0);
 
     const residentSelect = { dataset: { previousValue: 'LightningBolt' }, value: 'Resident', disabled: false };
     await view._changeSlotRule(10, 'Resident', residentSelect);
-    const saved = posted[2].step2.lumps.find(row => row.nsSlot === 10);
+    const saved = posted[0].step2.lumps.find(row => row.nsSlot === 10);
     assert(saved, 'load-policy selection must create/update the slot row');
     assert.strictEqual(saved.loadPolicy, 'Resident');
-    assert.strictEqual(posted[2].bootEntrySlot, 6,
-        'changing a load policy must not silently change LightningBolt');
+    assert.strictEqual(posted[0].bootEntrySlot, 6,
+        'changing a load policy must not silently change the saved boot-config projection');
     assert.strictEqual(saved.physAddr, 0x3c0);
     assert.strictEqual(saved.lumpSize, 64);
 

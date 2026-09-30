@@ -155,3 +155,4 @@
 - [Uniform indexed operand intent](register-indexed-load-intent.md) — all indexed instructions should support runtime DR value plus immediate; parser limitations are not intended semantics.
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
 - [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
+- [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.

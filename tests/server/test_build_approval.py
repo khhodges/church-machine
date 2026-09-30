@@ -19,6 +19,9 @@ import os
 import struct
 import sys
 import tempfile
+import hashlib
+import io
+import tarfile
 from unittest.mock import patch
 
 import pytest
@@ -34,6 +37,28 @@ client = _app.app.test_client()
 
 REPORT_TOKEN = os.environ.get('REPORT_TOKEN', '')
 AUTH_HEADERS = {'Authorization': f'Bearer {REPORT_TOKEN}'} if REPORT_TOKEN else {}
+
+
+def _approved_revision(monkeypatch, tmp_path, snapshot=None):
+    """A real immutable revision, never an implicit latest/live-state fallback."""
+    monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    source = io.BytesIO()
+    with tarfile.open(fileobj=source, mode="w"):
+        pass
+    monkeypatch.setattr(_app, 'verified_source_archive', lambda *args: source.getvalue())
+    snapshot = snapshot or {
+        'schema_version': 1, 'fingerprint': 'a' * 64,
+        'namespace': {'decoded_slots': [], 'raw': {'entries': []}},
+    }
+    files = {'boot-image.bin': b'isolated-image', 'namespace.json': b'{}',
+             'boot-config.json': b'{}', 'build-provenance.json': b'{}',
+             'approvals.json': b'{}', 'church_wukong_xc7a100t.v': b'isolated-verilog'}
+    return _app._artifact_revision_store().publish(
+        'namespace',
+        {'approval_state': 'approved', 'snapshot': snapshot,
+         'source_commit': 'a' * 40, 'hardware_version': 17,
+         'build_inputs': {'church_wukong_xc7a100t.v': hashlib.sha256(
+             files['church_wukong_xc7a100t.v']).hexdigest()}}, files)
 
 
 def _report_live_build_target(
@@ -364,6 +389,8 @@ def test_freeze_snapshot_derives_map_server_side(monkeypatch, tmp_path):
     if not REPORT_TOKEN:
         pytest.skip('REPORT_TOKEN not set')
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    revision = _approved_revision(monkeypatch, tmp_path)
+    monkeypatch.setattr(_app, '_freeze_namespace_revision', lambda *args: (revision, {}))
     resp = client.post(
         '/api/build-approval/freeze-snapshot',
         json={'map': {'attacker': 'payload'}},
@@ -402,6 +429,8 @@ def test_freeze_snapshot_stores_all_checks_pass(monkeypatch, tmp_path):
     if not REPORT_TOKEN:
         pytest.skip('REPORT_TOKEN not set')
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    revision = _approved_revision(monkeypatch, tmp_path)
+    monkeypatch.setattr(_app, '_freeze_namespace_revision', lambda *args: (revision, {}))
     resp = client.post(
         '/api/build-approval/freeze-snapshot',
         json={},
@@ -1036,6 +1065,9 @@ def test_worker_command_construction(monkeypatch, tmp_path):
 
     # Write a clean approved snapshot so the /start gate passes
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
+    revision = _approved_revision(monkeypatch, tmp_path)
+    monkeypatch.setattr(_app, '_ba_build_version_context', {
+        'namespace_revision_id': revision, 'source_commit': 'a' * 40, 'version': 17})
     history_path = tmp_path / 'wukong-bitstream-versions.json'
     clean_snap = {
         'frozen_at': '20260101T000000Z',
@@ -1048,9 +1080,18 @@ def test_worker_command_construction(monkeypatch, tmp_path):
 
     def _mock_run(cmd, **kwargs):
         captured_cmds.append(cmd)
+        if "input" in kwargs:
+            with tarfile.open(fileobj=io.BytesIO(kwargs["input"])) as bundle:
+                assert bundle.extractfile("build/church_wukong_xc7a100t.v").read() == b"isolated-verilog"
+                assert bundle.extractfile("server/lumps/boot-image.bin").read() == b"isolated-image"
+                checks = bundle.extractfile(".frozen-inputs.sha256").read()
+                assert b"build/church_wukong_xc7a100t.v" in checks
         class _R:
             returncode = 0
-            stdout = 'ARTIFACT_MD5_0123456789abcdef0123456789abcdef\nEXIT_0\n'
+            stdout = (b'isolated-bitstream' if cmd[-1].startswith('cat ') else
+                      'ARTIFACT_MD5_' + hashlib.md5(b'isolated-bitstream').hexdigest()
+                      + '\nARTIFACT_SHA256_' + hashlib.sha256(b'isolated-bitstream').hexdigest()
+                      + '\nEXIT_0\n')
             stderr = ''
         return _R()
 
@@ -1092,15 +1133,49 @@ def test_worker_command_construction(monkeypatch, tmp_path):
     assert _app._DROPLET_IP in ssh_cmd, (
         f'SSH command must contain droplet IP {_app._DROPLET_IP!r}; got: {ssh_cmd[:200]}'
     )
-    assert _app._DROPLET_BUILD_DIR in ssh_cmd, (
-        f'SSH command must contain build dir {_app._DROPLET_BUILD_DIR!r}; got: {ssh_cmd[:200]}'
-    )
-    assert 'git rev-parse HEAD' in ssh_cmd
-    assert 'git diff --quiet' in ssh_cmd
-    assert 'rm -f church_wukong_xc7a100t.bit' in ssh_cmd
-    assert 'ARTIFACT_MD5_' in ssh_cmd
+    assert '/tmp/church-build-' in ssh_cmd
+    assert 'git clone' not in ssh_cmd
+    assert _app._DROPLET_BUILD_DIR not in ssh_cmd
+    all_commands = '\n'.join(cmd[-1] for cmd in captured_cmds)
+    assert 'tmux kill-session' not in all_commands
+    assert 'ARTIFACT_MD5_' in all_commands
+    assert 'sha256sum -c .staged-inputs.sha256' in all_commands
+    assert 'vivado -mode batch -source ../hardware/wukong_xc7a100t.tcl' in all_commands
+    fetch = next(cmd[-1] for cmd in captured_cmds if cmd[-1].startswith('cat '))
+    assert '/run/build/church_wukong_xc7a100t.bit' in fetch
+    assert revision in fetch
+    assert len(_app._artifact_revision_store().history('bitstream')) == 1
     assert history_path.exists()
     assert json.loads(history_path.read_text())[-1]['status'] == 'succeeded'
+
+
+@pytest.mark.parametrize("failure", ["stage", "transferred-output"])
+def test_frozen_worker_never_publishes_failed_stage_or_changed_output(
+        monkeypatch, tmp_path, failure):
+    revision = _approved_revision(monkeypatch, tmp_path)
+    monkeypatch.setattr(_app, '_ba_build_version_context', {
+        'namespace_revision_id': revision, 'source_commit': 'a' * 40,
+        'version': 17, 'record_id': None})
+    monkeypatch.setattr(_app, '_ba_build_log', [])
+    monkeypatch.setattr(_app.time, 'sleep', lambda _: None)
+    calls = []
+    def run(cmd, **kwargs):
+        calls.append(cmd[-1])
+        class Result:
+            returncode = 49 if failure == "stage" and "input" in kwargs else 0
+            stdout = (b"changed during transfer" if cmd[-1].startswith("cat ") else
+                      "ARTIFACT_MD5_" + hashlib.md5(b"approved-output").hexdigest()
+                      + "\nARTIFACT_SHA256_" + hashlib.sha256(b"approved-output").hexdigest()
+                      + "\nEXIT_0\n")
+            stderr = ""
+        return Result()
+    monkeypatch.setattr(_app.subprocess, 'run', run)
+    _app._ba_build_worker(str(tmp_path / 'fake-key'))
+    assert _app._ba_build_exit != 0
+    assert _app._artifact_revision_store().history("bitstream") == []
+    if failure == "stage":
+        assert len(calls) == 1
+        assert not any("tmux new-session" in command for command in calls)
 
 def test_worker_failed_build_records_isolated_history(monkeypatch, tmp_path):
     """
@@ -1114,13 +1189,15 @@ def test_worker_failed_build_records_isolated_history(monkeypatch, tmp_path):
     committed_before = open(committed_history, 'rb').read()
 
     history_path = tmp_path / 'wukong-bitstream-versions.json'
+    revision = _approved_revision(monkeypatch, tmp_path)
     monkeypatch.setattr(
         _app, '_bitstream_version_log_path', lambda: str(history_path)
     )
     monkeypatch.setattr(_app, '_ba_build_version_context', {
         'version': 17,
-        'source_commit': '0123456789abcdef0123456789abcdef01234567',
+        'source_commit': 'a' * 40,
         'record_id': None,
+        'namespace_revision_id': revision,
     })
     monkeypatch.setattr(_app, '_ba_build_log', [])
     monkeypatch.setattr(_app, '_ba_build_done', True)
@@ -1133,7 +1210,7 @@ def test_worker_failed_build_records_isolated_history(monkeypatch, tmp_path):
 
         class _Result:
             returncode = 0
-            stdout = 'EXIT_17\n' if len(calls) == 2 else ''
+            stdout = 'EXIT_17\n' if len(calls) == 3 else ''
             stderr = ''
 
         return _Result()
@@ -1158,7 +1235,7 @@ def test_worker_failed_build_records_isolated_history(monkeypatch, tmp_path):
     finally:
         _os.unlink(key_path)
 
-    assert len(calls) == 2, 'Worker must launch and then poll the remote build'
+    assert len(calls) == 3, 'Worker must stage, launch and poll the isolated remote build'
     assert history_path.exists()
     records = json.loads(history_path.read_text())
     assert records[-1] == {
@@ -1166,7 +1243,7 @@ def test_worker_failed_build_records_isolated_history(monkeypatch, tmp_path):
         'status': 'failed',
         'version': 17,
         'source': 'remote-vivado',
-        'source_commit': '0123456789abcdef0123456789abcdef01234567',
+        'source_commit': 'a' * 40,
         'bit_hash': None,
     }
     assert _app._ba_build_exit == 17
@@ -1191,6 +1268,8 @@ def test_start_rejected_with_failed_snapshot(monkeypatch, tmp_path):
     snap_file.write_text(json.dumps(bad_snap))
     ns_resp = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
     nonce = ns_resp.get_json().get('build_nonce', '')
+    bad_snap['provenance_identity'] = nonce
+    snap_file.write_text(json.dumps(bad_snap))
     device_uid, session_id = _report_live_build_target()
     resp = client.post(
         '/api/wukong-build/start',
@@ -1223,7 +1302,9 @@ def test_approved_start_freezes_committed_namespace_before_worker_runs(monkeypat
             'raw': {'entries': [{'slot': 6, 'w0': 1, 'w1': 2, 'w2': 3, 'w3': 4}]},
         },
     }
-    monkeypatch.setattr(_app, '_capture_committed_namespace_snapshot', lambda **_: namespace_a)
+    revision = _approved_revision(monkeypatch, tmp_path, namespace_a)
+    monkeypatch.setattr(_app, '_capture_committed_namespace_snapshot',
+                        lambda **_: pytest.fail('Build must not re-read the mutable Namespace'))
     monkeypatch.setattr(_app, '_ba_write_ssh_key', lambda: str(tmp_path / 'key'))
 
     class _NoWorkerThread:
@@ -1237,6 +1318,15 @@ def test_approved_start_freezes_committed_namespace_before_worker_runs(monkeypat
     monkeypatch.setattr(_app, '_ba_build_log', [])
     nonce_response = client.get('/api/build-approval/ns-map', headers=AUTH_HEADERS)
     nonce = nonce_response.get_json()['build_nonce']
+    (tmp_path / 'build-approval-20260823T000000Z.json').write_text(json.dumps({
+        'frozen_at': '20260823T000000Z', 'all_checks_pass': True,
+        'provenance_identity': nonce, 'namespace_revision_id': revision,
+    }))
+    # A newer approval cannot silently replace the explicitly selected one.
+    (tmp_path / 'build-approval-20260824T000000Z.json').write_text(json.dumps({
+        'all_checks_pass': True, 'provenance_identity': 'newer-unselected',
+        'namespace_revision_id': '0' * 64,
+    }))
     device_uid, session_id = _report_live_build_target()
     response = client.post(
         '/api/wukong-build/start',

@@ -12,6 +12,7 @@ import base64
 import mimetypes
 import warnings as _warnings_mod
 import zipfile
+import tarfile
 import subprocess
 import tempfile
 import gzip as _gzip
@@ -22,6 +23,12 @@ import contextvars
 import fcntl
 import requests as http_requests
 import html as _html
+try:
+    from server.artifact_revisions import RevisionStore
+    from server.build_staging import verified_source_archive, staging_archive
+except ImportError:
+    from artifact_revisions import RevisionStore
+    from build_staging import verified_source_archive, staging_archive
 try:
     from server.idx1_profile import (
         validate_execution, execution_fields, reframe_execution, IDX1Error,
@@ -2113,15 +2120,28 @@ def upload_wukong_bit():
                 binding_error = "Upload source commit does not exactly match the approved build."
             elif not candidate.bit_hash:
                 binding_error = "Approved build has no verified remote artifact digest."
-            elif candidate.bit_path:
+            elif candidate.upload_completed_at:
                 binding_error = "Approved build artifact was already uploaded."
             else:
                 candidate_snapshot = _read_record_namespace_snapshot(candidate)
                 if candidate_snapshot is None:
                     binding_error = "Approved build has no Namespace snapshot."
                 else:
-                    matched_record = candidate
-                    matched_snapshot = candidate_snapshot
+                    try:
+                        frozen = _artifact_revision_store().read(
+                            "namespace", candidate_snapshot.get("namespace_revision_id", ""))
+                        metadata = frozen["metadata"]
+                        if (metadata.get("approval_state") != "approved"
+                                or metadata.get("source_commit") != source_commit
+                                or metadata.get("hardware_version") != version
+                                or metadata.get("snapshot", {}).get("fingerprint")
+                                != candidate_snapshot.get("fingerprint")):
+                            raise ValueError("Immutable Namespace approval does not match this build.")
+                    except (ValueError, OSError, KeyError) as exc:
+                        binding_error = "Approved Namespace revision is unavailable: " + str(exc)
+                    else:
+                        matched_record = candidate
+                        matched_snapshot = candidate_snapshot
             if binding_error:
                 _record_build_event(
                     board="wukong-xc7a100t", status="failed",
@@ -2153,6 +2173,38 @@ def upload_wukong_bit():
                     "build_id": matched_record.id,
                     "fingerprint": matched_snapshot["fingerprint"],
                 }
+            with open(tmp_path, "rb") as stream:
+                bit_bytes = stream.read()
+            namespace_revision_id = (matched_snapshot or {}).get("namespace_revision_id")
+            if matched_record is not None:
+                if not namespace_revision_id:
+                    raise ValueError("Approved build has no immutable Namespace revision")
+                _artifact_revision_store().read("namespace", namespace_revision_id)
+            bit_revision_id = _artifact_revision_store().publish(
+                "bitstream",
+                {"namespace_revision_id": namespace_revision_id,
+                 "build_record_id": build_record_id, "source_commit": source_commit,
+                 "hardware_version": version,
+                 "approval_state": "approved" if matched_record else "unmatched"},
+                {"bitstream.bit": bit_bytes})
+            immutable_bit_path = _artifact_revision_store().file_path(
+                "bitstream", bit_revision_id, "bitstream.bit")
+            # Preserve pre-revision-store uploads before moving the compatibility
+            # download pointer. Only rebind history rows whose digest proves
+            # that these are the bytes they originally described.
+            if os.path.isfile(bit_path):
+                with open(bit_path, "rb") as stream:
+                    previous_bytes = stream.read()
+                previous_revision = _artifact_revision_store().publish(
+                    "bitstream", {"approval_state": "legacy-unverified"},
+                    {"bitstream.bit": previous_bytes})
+                previous_path = _artifact_revision_store().file_path(
+                    "bitstream", previous_revision, "bitstream.bit")
+                previous_md5 = hashlib.md5(previous_bytes).hexdigest()
+                for previous_record in BuildRecord.query.filter_by(bit_path=bit_path).all():
+                    if previous_record.bit_hash == previous_md5:
+                        previous_record.bit_path = previous_path
+                db.session.commit()
             os.replace(_bitstream_sidecar_path(tmp_path), _bitstream_sidecar_path(bit_path))
             os.replace(tmp_path, bit_path)
             size = os.path.getsize(bit_path)
@@ -2174,15 +2226,18 @@ def upload_wukong_bit():
             board="wukong-xc7a100t",
             status="succeeded",
             notes="upload" if matched_snapshot else "upload_namespace_unavailable",
-            bit_path=bit_path,
+            bit_path=immutable_bit_path,
             bit_hash=meta["md5"],
             approver=_approver,
             ns_snapshot=matched_snapshot,
             hardware_version=version,
             git_commit=(matched_record.git_commit if matched_record else (source_commit or "")),
+            upload_completed_at=_ba_datetime.datetime.now(_ba_datetime.timezone.utc).isoformat(),
         )
         if matched_record is not None:
-            matched_record.bit_path = bit_path
+            matched_record.bit_path = immutable_bit_path
+            matched_record.upload_completed_at = _ba_datetime.datetime.now(
+                _ba_datetime.timezone.utc).isoformat()
             db.session.commit()
         _record_bitstream_version_event(
             status="succeeded",
@@ -2193,6 +2248,8 @@ def upload_wukong_bit():
         )
 
     return jsonify({"ok": True, "size_bytes": size, "version": version, "md5": meta["md5"],
+                    "bitstream_revision_id": bit_revision_id,
+                    "namespace_revision_id": namespace_revision_id,
                     "namespace_snapshot": match.get("state") == "available",
                     "namespace_reason": match.get("reason")})
 
@@ -2315,7 +2372,8 @@ def api_bitstream_status():
 
 
 def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_path="", approver="",
-                        ns_snapshot=None, hardware_version=None, git_commit=None):
+                        ns_snapshot=None, hardware_version=None, git_commit=None,
+                        upload_completed_at=None):
     """Write a BuildRecord directly from server-side code.
 
     Called by build_fpga() and upload_wukong_bit() — no client auth required.
@@ -2339,6 +2397,7 @@ def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_p
                          if isinstance(ns_snapshot, dict) else None),
             bit_path=str(bit_path or "")[:512],
             bit_hash=str(bit_hash or "")[:64],
+            upload_completed_at=upload_completed_at,
             mcs_path=str(mcs_path or "")[:512],
             notes=str(notes or ""),
         )
@@ -2359,6 +2418,196 @@ def _record_build_event(board, status, notes="", bit_path="", bit_hash="", mcs_p
 
 _NAMESPACE_SNAPSHOT_SCHEMA_VERSION = 1
 _NAMESPACE_SNAPSHOT_MAX_SLOTS = 256
+
+
+def _artifact_revision_store():
+    return RevisionStore(os.path.join(_BUILD_SNAPSHOTS_DIR, "revisions"))
+
+
+def _namespace_revision_build_intent(ns_map, revision_id, metadata):
+    base_identity = _ba_provenance_identity(
+        ns_map, source_commit=metadata["source_commit"],
+        source_version=metadata["hardware_version"])
+    return "wukong-build-intent:v2:" + hashlib.sha256(
+        (base_identity + ":" + revision_id).encode("utf-8")).hexdigest()
+
+
+def _decorate_namespace_revision_history(records):
+    """Expose selection authority only from a matching, clean frozen approval."""
+    approved = {
+        record["revision_id"]: record for record in records
+        if record.get("metadata", {}).get("approval_state") == "approved"
+    }
+    if not approved or not os.path.isdir(_BUILD_SNAPSHOTS_DIR):
+        return records
+    for filename in sorted(os.listdir(_BUILD_SNAPSHOTS_DIR)):
+        if not (filename.startswith("build-approval-") and filename.endswith(".json")):
+            continue
+        with open(os.path.join(_BUILD_SNAPSHOTS_DIR, filename), encoding="utf-8") as stream:
+            snapshot = json.load(stream)
+        record = approved.get(snapshot.get("namespace_revision_id"))
+        if (record is None or snapshot.get("all_checks_pass") is not True
+                or not isinstance(snapshot.get("ns_map"), dict)):
+            continue
+        metadata = record["metadata"]
+        if (not re.fullmatch(r"[0-9a-f]{40,64}", str(metadata.get("source_commit", "")))
+                or not isinstance(metadata.get("hardware_version"), int)):
+            continue
+        identity = _namespace_revision_build_intent(
+            snapshot["ns_map"], record["revision_id"], metadata)
+        if not hmac.compare_digest(str(snapshot.get("provenance_identity", "")), identity):
+            continue
+        record.update(build_intent_id=identity, snapshot_filename=filename)
+    return records
+
+
+@app.route("/api/artifact-revisions/<kind>", methods=["GET"])
+@app.route("/api/artifact-revisions/<kind>/<revision_id>", methods=["GET"])
+def artifact_revision_history(kind, revision_id=None):
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return err
+    try:
+        store = _artifact_revision_store()
+        records = [store.read(kind, revision_id)] if revision_id else store.history(kind)
+        if kind == "namespace":
+            records = _decorate_namespace_revision_history(records)
+        return jsonify(ok=True, **(
+            {"revision": records[0]} if revision_id else {"revisions": records}))
+    except (ValueError, OSError) as exc:
+        return jsonify(ok=False, error=str(exc)), 409
+
+
+@app.route("/api/artifact-revisions/bitstream/<revision_id>/download", methods=["GET"])
+def download_bitstream_revision(revision_id):
+    ok, err = _ba_check_report_token()
+    if not ok:
+        return err
+    try:
+        store = _artifact_revision_store()
+        record = store.read("bitstream", revision_id)
+        metadata = record["metadata"]
+        if metadata.get("approval_state") != "approved":
+            raise ValueError("This bitstream revision is not approved for delivery.")
+        build_record_id = metadata.get("build_record_id")
+        build_record = (db.session.get(BuildRecord, build_record_id)
+                        if isinstance(build_record_id, int) else None)
+        if (build_record is None or build_record.status != "succeeded"
+                or build_record.git_commit != metadata.get("source_commit")
+                or build_record.hardware_version != metadata.get("hardware_version")):
+            raise ValueError("Bitstream has no matching successful approved build record.")
+        upstream = store.read("namespace", metadata.get("namespace_revision_id", ""))
+        if (upstream["metadata"].get("approval_state") != "approved"
+                or upstream["metadata"].get("source_commit") != metadata.get("source_commit")
+                or upstream["metadata"].get("hardware_version") != metadata.get("hardware_version")):
+            raise ValueError("Bitstream upstream approval does not match.")
+        with open(store.file_path("bitstream", revision_id, "bitstream.bit"), "rb") as stream:
+            data = stream.read()
+        if hashlib.sha256(data).hexdigest() != record["files"]["bitstream.bit"]:
+            raise ValueError("Bitstream revision bytes changed during download.")
+        if hashlib.md5(data).hexdigest() != build_record.bit_hash:
+            raise ValueError("Bitstream does not match the successful build digest.")
+        return send_file(io.BytesIO(data), mimetype="application/octet-stream",
+                         as_attachment=True, download_name=f"wukong-{revision_id}.bit")
+    except (ValueError, OSError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc)), 409
+
+
+def _freeze_namespace_revision(frozen_at, expected_map=None):
+    """Capture verified bytes, not mutable catalog aliases or future 'latest'."""
+    with _namespace_commit_guard():
+        if expected_map is not None and _ba_build_ns_map() != expected_map:
+            raise ValueError("Namespace changed during approval; review and freeze again.")
+        snapshot = _capture_committed_namespace_snapshot(
+            hardware_version=_wukong_build_version(), source_commit=_git_full_head(),
+            approval_frozen_at=frozen_at)
+        with open(NS_STATE_PATH, encoding="utf-8") as stream:
+            state = json.load(stream)
+        with open(BOOT_IMAGE_PATH, "rb") as stream:
+            files = {"boot-image.bin": stream.read()}
+        selections = []
+        policies = {row.get("slot"): row.get("load_policy", row.get("loadPolicy"))
+                    for row in (expected_map or {}).get("slot_rules", [])}
+        for row in state["abstractions"]:
+            if not row.get("filename") and not row.get("binary_hash"):
+                if policies.get(row.get("slot"), row.get("load_policy")) in {"Lazy", "Dynamic"}:
+                    selections.append({
+                        "slot": row.get("slot"), "name": row.get("name"),
+                        "token": row.get("token"), "filename": None, "binary_hash": None,
+                        "availability": "unavailable",
+                        "reason": "No exact saved filename/hash is selected; no latest artifact was substituted.",
+                    })
+                continue
+            selection = {key: row.get(key) for key in (
+                "slot", "name", "token", "filename", "binary_hash", "lump_version")}
+            policy = policies.get(row.get("slot"), row.get("load_policy"))
+            required = (policy in {"Bootstrap", "Hardware", "Resident"} if policy else
+                        row.get("boot_resident") is True or row.get("resident") is True)
+            try:
+                _validate_namespace_selected_binary(LUMPS_DIR, row)
+                if required:
+                    _boot_image_gen._require_approved_executable_lump(
+                        os.path.join(LUMPS_DIR, row["filename"]), LUMPS_DIR,
+                        f"Freeze Namespace NS[{row.get('slot')}]", row)
+                with open(os.path.join(LUMPS_DIR, row["filename"]), "rb") as stream:
+                    data = stream.read()
+                if hashlib.sha256(data).hexdigest() != row["binary_hash"]:
+                    raise ValueError("Selected LUMP changed during Namespace freeze")
+                files[row["binary_hash"] + ".lump"] = data
+                selection.update(availability="retained", approval=_matching_lump_approval(
+                    LUMPS_DIR, row["binary_hash"]))
+            except (ValueError, OSError) as exc:
+                if required:
+                    raise
+                selection.update(availability="unavailable", reason=str(exc))
+            selections.append(selection)
+        files["namespace.json"] = json.dumps(state, sort_keys=True).encode("utf-8")
+        with open(BOOT_CONFIG_PATH, "rb") as stream:
+            files["boot-config.json"] = stream.read()
+        files["approvals.json"] = json.dumps(
+            _shared_approval_envelope(_read_lump_approvals(LUMPS_DIR)),
+            sort_keys=True).encode("utf-8")
+        metadata = {"snapshot": snapshot, "selected_lumps": selections,
+                    "source_commit": _git_full_head(),
+                    "hardware_version": _wukong_build_version()}
+        build_inputs = {}
+        paths, _, _, _, _ = _fpga_paths("wukong-xc7a100t")
+        for key in ("verilog", "rtlil", "xdc", "tcl"):
+            path = paths[key]
+            with open(path, "rb") as stream:
+                data = stream.read()
+            name = os.path.basename(path)
+            files[name] = data
+            build_inputs[name] = hashlib.sha256(data).hexdigest()
+        metadata["build_inputs"] = build_inputs
+        provenance_path = os.path.join(
+            os.path.dirname(paths["verilog"]), "church_wukong_xc7a100t.provenance.json")
+        with open(provenance_path, "rb") as stream:
+            provenance_bytes = stream.read()
+        provenance = json.loads(provenance_bytes)
+        image_hash = hashlib.sha256(files["boot-image.bin"]).hexdigest()
+        if (provenance.get("schema_version") != 1
+                or provenance.get("source_tree_clean") is not True
+                or provenance.get("source_commit") != metadata["source_commit"]
+                or provenance.get("boot_inputs_sha256", {}).get(
+                    "server/lumps/boot-image.bin") != image_hash
+                or provenance.get("artifacts", {}).get(
+                    os.path.basename(paths["verilog"]), {}).get("sha256")
+                    != build_inputs[os.path.basename(paths["verilog"])]):
+            raise ValueError(
+                "Generated Verilog provenance does not bind the exact frozen Namespace "
+                "image and source commit; regenerate and review provenance before approval.")
+        for key in ("xdc", "tcl"):
+            name = os.path.basename(paths[key])
+            if provenance.get("input_files_sha256", {}).get("hardware/" + name) != build_inputs[name]:
+                raise ValueError("Build constraint/script provenance changed; review before approval.")
+        if provenance.get("artifacts", {}).get(os.path.basename(paths["rtlil"]), {}).get(
+                "sha256") != build_inputs[os.path.basename(paths["rtlil"])]:
+            raise ValueError("Generated RTLIL provenance changed; review before approval.")
+        files["build-provenance.json"] = provenance_bytes
+        metadata["approval_state"] = "approved"
+        revision = _artifact_revision_store().publish("namespace", metadata, files)
+        return revision, snapshot
 
 
 def _namespace_snapshot_fingerprint(namespace):
@@ -20015,6 +20264,22 @@ with app.app_context():
             refreshed = {c["name"] for c in _sa_inspect(db.engine).get_columns("build_records")}
             if "hardware_version" not in refreshed:
                 raise
+    if "upload_completed_at" not in _existing_br_cols:
+        try:
+            db.session.execute(_sa_text(
+                "ALTER TABLE build_records ADD COLUMN upload_completed_at VARCHAR(32) DEFAULT NULL"))
+            # Existing path-bearing records predate separate retained-output
+            # storage and represented completed uploads. Preserve their replay
+            # protection; newly built retained outputs leave this marker NULL.
+            db.session.execute(_sa_text(
+                "UPDATE build_records SET upload_completed_at = timestamp "
+                "WHERE bit_path IS NOT NULL AND bit_path != ''"))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            refreshed = {c["name"] for c in _sa_inspect(db.engine).get_columns("build_records")}
+            if "upload_completed_at" not in refreshed:
+                raise
     _existing_cols = {c["name"] for c in _inspector.get_columns("devices")}
     if "bridge_scheme" not in _existing_cols:
         db.session.execute(_sa_text("ALTER TABLE devices ADD COLUMN bridge_scheme VARCHAR(8) DEFAULT 'http'"))
@@ -23888,6 +24153,7 @@ def build_approval_snapshot_latest():
             'filename': latest, 'frozen_at': snap.get('frozen_at'),
             'provenance_identity': snap.get('provenance_identity'),
             'build_intent_id': snap.get('provenance_identity'),
+            'namespace_revision_id': snap.get('namespace_revision_id'),
         })
     except Exception as e:
         return jsonify({'filename': None, 'error': str(e)})
@@ -24864,6 +25130,63 @@ def _ba_classify_build_failure(exit_code, log, phase='unknown'):
             'phase': phase, 'exit_code': exit_code, 'evidence': evidence}
 
 
+def _frozen_build_payload(revision_id):
+    """Only verified frozen files may overlay the exact-commit execution tree."""
+    store = _artifact_revision_store()
+    frozen = store.read("namespace", revision_id)
+    if frozen["metadata"].get("approval_state") != "approved":
+        raise ValueError("Build requires an approved Namespace revision")
+    mapping = {
+        "boot-image.bin": "server/lumps/boot-image.bin",
+        "namespace.json": "server/lumps/ns-state.json",
+        "boot-config.json": "server/boot-config.json",
+        "approvals.json": "server/lumps/approvals.json",
+        "build-provenance.json": "build/church_wukong_xc7a100t.provenance.json",
+    }
+    for name in frozen["metadata"]["build_inputs"]:
+        mapping[name] = ("hardware/" if name.endswith(".tcl") else "build/") + name
+    for selection in frozen["metadata"].get("selected_lumps", []):
+        if selection.get("availability") != "retained":
+            continue
+        filename = selection["filename"]
+        if not filename or filename in (".", "..") or os.path.basename(filename) != filename:
+            raise ValueError("Invalid retained LUMP filename")
+        mapping[selection["binary_hash"] + ".lump"] = "server/lumps/" + filename
+    payload = io.BytesIO()
+    checks = []
+    with tarfile.open(fileobj=payload, mode="w") as archive:
+        for name, destination in mapping.items():
+            with open(store.file_path("namespace", revision_id, name), "rb") as stream:
+                data = stream.read()
+            expected = frozen["files"][name]
+            if hashlib.sha256(data).hexdigest() != expected:
+                raise ValueError("Frozen input changed during staging")
+            info = tarfile.TarInfo(destination)
+            info.size = len(data)
+            info.mode = 0o600
+            archive.addfile(info, io.BytesIO(data))
+            checks.append(f"{expected}  {destination}\n")
+        data = "".join(checks).encode("utf-8")
+        info = tarfile.TarInfo(".frozen-inputs.sha256")
+        info.size = len(data)
+        archive.addfile(info, io.BytesIO(data))
+    return frozen, payload.getvalue()
+
+
+def _isolated_build_payload(revision_id):
+    frozen, overlay = _frozen_build_payload(revision_id)
+    commit = frozen["metadata"]["source_commit"]
+    source = verified_source_archive(BASE_DIR, commit)
+    unavailable = [
+        "server/lumps/" + selection["filename"]
+        for selection in frozen["metadata"].get("selected_lumps", [])
+        if selection.get("availability") == "unavailable"
+        and isinstance(selection.get("filename"), str)
+        and os.path.basename(selection["filename"]) == selection["filename"]
+    ]
+    return frozen, staging_archive(source, overlay, commit, unavailable)
+
+
 def _ba_build_worker(key_path):
     """Background thread: SSH to droplet, start Vivado in tmux, stream log."""
     global _ba_build_log, _ba_build_done, _ba_build_exit, _ba_build_phase, _ba_build_diagnosis
@@ -24886,6 +25209,8 @@ def _ba_build_worker(key_path):
     with _ba_build_lock:
         active_build_context = dict(_ba_build_version_context or {})
     artifact_hash = None
+    artifact_sha256 = None
+    retained_bit_path = ""
 
     def _finish(code):
         nonlocal artifact_hash
@@ -24918,6 +25243,7 @@ def _ba_build_worker(key_path):
                         record.status = "succeeded" if code == 0 else "failed"
                         if code == 0:
                             record.bit_hash = artifact_hash
+                            record.bit_path = retained_bit_path
                         db.session.commit()
         except Exception:
             app.logger.exception("Could not persist Wukong bitstream version log")
@@ -24926,32 +25252,56 @@ def _ba_build_worker(key_path):
     with _ba_build_lock:
         _ba_build_phase = 'launching'
     try:
-        # 1. Kill any existing session + start new tmux Vivado build
+        # Materialize verified local Git objects plus approved frozen overlays.
+        # The droplet may only have an extracted ZIP, not a Git checkout.
+        # Shared droplet files and prior jobs never supply selected input bytes.
         import shlex as _ba_shlex
-        expected_commit = str(active_build_context.get("source_commit") or
-                              _git_full_head() or _git_short_hash())
+        expected_commit = str(active_build_context.get("source_commit") or "")
+        if not re.fullmatch(r"[0-9a-f]{40,64}", expected_commit):
+            raise ValueError("Build requires an exact full source commit")
+        revision_id = active_build_context["namespace_revision_id"]
+        frozen, payload = _isolated_build_payload(revision_id)
+        if frozen["metadata"]["source_commit"] != expected_commit:
+            raise ValueError("Frozen source commit does not match build")
+        job_name = revision_id + "-" + uuid.uuid4().hex
+        remote_root = "/tmp/church-build-" + job_name
+        remote_build = remote_root + "/run/build"
+        session_name = _VIVADO_SESSION + "-" + job_name[:12] + "-" + job_name[-12:]
+        payload_hash = hashlib.sha256(payload).hexdigest()
+        stage_cmd = (
+            f"set -euo pipefail; mkdir {_ba_shlex.quote(remote_root)}; "
+            f"cat > {remote_root}/inputs.tar; "
+            f"echo '{payload_hash}  {remote_root}/inputs.tar' | sha256sum -c -; "
+            f"mkdir {remote_root}/run; "
+            f"tar -xf {remote_root}/inputs.tar -C {remote_root}/run; "
+            f"cd {remote_root}/run; sha256sum -c .staged-inputs.sha256"
+        )
+        staged = subprocess.run(
+            ssh_base + ["bash -c " + _ba_shlex.quote(stage_cmd)],
+            input=payload, capture_output=True, timeout=120)
+        if staged.returncode != 0:
+            _append("❌ Frozen revision staging or exact source checkout failed")
+            _finish(staged.returncode)
+            return
         remote_body = (
             "source /opt/Xilinx/2026.1/Vivado/settings64.sh; "
-            "actual_commit=$(git rev-parse HEAD 2>/dev/null); "
-            f"if [ \"$actual_commit\" != {_ba_shlex.quote(expected_commit)} ]; then "
-            "echo REMOTE_COMMIT_MISMATCH; echo EXIT_43; exit 43; fi; "
-            "if ! git diff --quiet || ! git diff --cached --quiet; then "
-            "echo REMOTE_WORKTREE_DIRTY; echo EXIT_46; exit 46; fi; "
-            "rm -f church_wukong_xc7a100t.bit; "
-            "vivado -mode batch -source wukong_xc7a100t.tcl; "
+            f"if ! (cd {remote_root}/run && sha256sum -c .staged-inputs.sha256); then "
+            "echo FROZEN_INPUT_MISMATCH; echo EXIT_47; exit 47; fi; "
+            "vivado -mode batch -source ../hardware/wukong_xc7a100t.tcl; "
             "rc=$?; "
             "if [ \"$rc\" -eq 0 ]; then "
             "if [ -f church_wukong_xc7a100t.bit ]; then "
             "digest=$(md5sum church_wukong_xc7a100t.bit | awk '{print $1}'); "
             "echo ARTIFACT_MD5_$digest; "
+            "sha=$(sha256sum church_wukong_xc7a100t.bit | awk '{print $1}'); "
+            "echo ARTIFACT_SHA256_$sha; "
             "else rc=44; echo ARTIFACT_MISSING; fi; fi; "
             "echo EXIT_$rc"
         )
         remote_script = f"{{ {remote_body}; }} > vivado_cm.log 2>&1"
         launch_cmd = (
-            f'cd {_ba_shlex.quote(_DROPLET_BUILD_DIR)} || exit $?; '
-            f'tmux kill-session -t {_VIVADO_SESSION} 2>/dev/null; '
-            f'tmux new-session -d -s {_VIVADO_SESSION} '
+            f'cd {_ba_shlex.quote(remote_build)} || exit $?; '
+            f'tmux new-session -d -s {session_name} '
             f'{_ba_shlex.quote(remote_script)}'
         )
         r = subprocess.run(ssh_base + [launch_cmd],
@@ -24977,8 +25327,8 @@ def _ba_build_worker(key_path):
             _time.sleep(poll_interval)
             # Fetch new log lines
             poll_cmd = (
-                f'tail -n +{seen_lines + 1} {_DROPLET_BUILD_DIR}/vivado_cm.log 2>/dev/null; '
-                f'tmux list-sessions 2>/dev/null | grep {_VIVADO_SESSION} || echo __SESSION_GONE__'
+                f'tail -n +{seen_lines + 1} {remote_build}/vivado_cm.log 2>/dev/null; '
+                f'tmux list-sessions 2>/dev/null | grep {session_name} || echo __SESSION_GONE__'
             )
             pr = subprocess.run(ssh_base + [poll_cmd],
                                 capture_output=True, text=True, timeout=30)
@@ -24996,6 +25346,9 @@ def _ba_build_worker(key_path):
                 digest_match = re.match(r'ARTIFACT_MD5_([0-9a-fA-F]{32})$', ln.strip())
                 if digest_match:
                     artifact_hash = digest_match.group(1).lower()
+                sha_match = re.match(r'ARTIFACT_SHA256_([0-9a-fA-F]{64})$', ln.strip())
+                if sha_match:
+                    artifact_sha256 = sha_match.group(1).lower()
 
             # Check for exit marker
             exit_code = None
@@ -25006,9 +25359,28 @@ def _ba_build_worker(key_path):
                     break
 
             if exit_code is not None:
-                if exit_code == 0 and artifact_hash is None:
+                if exit_code == 0 and (artifact_hash is None or artifact_sha256 is None):
                     _append('❌ Build produced no verifiable artifact digest')
                     exit_code = 45
+                if exit_code == 0:
+                    fetched = subprocess.run(
+                        ssh_base + [f"cat {remote_build}/church_wukong_xc7a100t.bit"],
+                        capture_output=True, timeout=120)
+                    bit_bytes = fetched.stdout
+                    if (fetched.returncode != 0 or not isinstance(bit_bytes, bytes)
+                            or hashlib.sha256(bit_bytes).hexdigest() != artifact_sha256
+                            or hashlib.md5(bit_bytes).hexdigest() != artifact_hash):
+                        raise ValueError("Staged build output failed transfer integrity verification")
+                    bit_revision = _artifact_revision_store().publish("bitstream", {
+                        "approval_state": "approved", "namespace_revision_id": revision_id,
+                        "source_commit": expected_commit,
+                        "hardware_version": active_build_context["version"],
+                        "build_record_id": active_build_context.get("record_id"),
+                    }, {"bitstream.bit": bit_bytes})
+                    retained_bit_path = _artifact_revision_store().file_path(
+                        "bitstream", bit_revision, "bitstream.bit")
+                    with _ba_build_lock:
+                        _ba_build_version_context["bitstream_revision_id"] = bit_revision
                 _append(f'\n{"✅ Build complete!" if exit_code == 0 else "❌ Build FAILED"} (exit {exit_code})')
                 _finish(exit_code)
                 return
@@ -25069,10 +25441,16 @@ def wukong_build_start():
     if not snap_files:
         return jsonify({'ok': False,
                         'error': 'No approval snapshot found — freeze a clean snapshot first'}), 422
-    latest_snap_path = os.path.join(_BUILD_SNAPSHOTS_DIR, snap_files[-1])
     try:
-        with open(latest_snap_path) as _sf:
-            latest_snap = json.load(_sf)
+        latest_snap = None
+        for filename in reversed(snap_files):
+            with open(os.path.join(_BUILD_SNAPSHOTS_DIR, filename)) as _sf:
+                candidate = json.load(_sf)
+            if candidate.get("provenance_identity") in supplied_identities:
+                latest_snap = candidate
+                break
+        if latest_snap is None:
+            return jsonify(ok=False, error="Select an exact frozen build identity."), 409
     except Exception as _se:
         return jsonify({'ok': False,
                         'error': f'Could not read approval snapshot: {_se}'}), 500
@@ -25091,9 +25469,23 @@ def wukong_build_start():
             'ok': False,
             'error': 'bitstream build requires one exact selected build/provenance identity',
         }), 400
+    try:
+        namespace_revision_id = latest_snap.get("namespace_revision_id", "")
+        frozen_revision = _artifact_revision_store().read("namespace", namespace_revision_id)
+        frozen_metadata = frozen_revision["metadata"]
+        if frozen_metadata.get("approval_state") != "approved":
+            raise ValueError("Namespace revision is not approved.")
+        namespace_snapshot = copy.deepcopy(frozen_metadata["snapshot"])
+        namespace_snapshot["namespace_revision_id"] = namespace_revision_id
+        source_commit = frozen_metadata["source_commit"]
+        source_version = frozen_metadata["hardware_version"]
+        if not source_commit or not re.fullmatch(r"[0-9a-f]{40,64}", source_commit):
+            raise ValueError("Frozen Namespace has no full source commit.")
+    except (ValueError, OSError, KeyError) as exc:
+        return jsonify(ok=False, error="Frozen Namespace unavailable: " + str(exc)), 422
 
     with _ba_build_lock:
-        if _ba_build_done is False and _ba_build_log:
+        if _ba_build_done is False:
             return jsonify({'ok': False, 'error': 'Build already in progress'}), 409
 
     key_path = _ba_write_ssh_key()
@@ -25103,6 +25495,8 @@ def wukong_build_start():
 
     # Reset log state
     with _ba_build_lock:
+        if _ba_build_done is False:
+            return jsonify({'ok': False, 'error': 'Build already in progress'}), 409
         _ba_build_log = []
         _ba_build_done = False
         _ba_build_exit = None
@@ -25112,16 +25506,6 @@ def wukong_build_start():
             _ba_datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
         _ba_build_updated_at = _ba_build_started_at
         _ba_build_finished_at = None
-        source_version = _wukong_build_version()
-        source_commit = _git_full_head() or _git_short_hash()
-        try:
-            namespace_snapshot = _capture_committed_namespace_snapshot(
-                hardware_version=source_version,
-                source_commit=source_commit,
-                approval_frozen_at=latest_snap.get("frozen_at"),
-            )
-        except ValueError as snapshot_error:
-            return jsonify({"ok": False, "error": str(snapshot_error)}), 422
         record_id = _record_build_event(
             board="wukong-xc7a100t",
             status="running",
@@ -25131,12 +25515,14 @@ def wukong_build_start():
             git_commit=source_commit,
         )
         if record_id is None:
+            _ba_build_done = True
             return jsonify({"ok": False, "error": "Could not create the approved build record"}), 500
         _ba_build_version_context = {
             "version": source_version,
             "source_commit": source_commit,
             "record_id": record_id,
             "namespace_fingerprint": namespace_snapshot["fingerprint"],
+            "namespace_revision_id": namespace_revision_id,
             "target_device_uid": target["device_uid"],
             "target_session_id": target["bridge_session"],
             "selected_build_id": approved_identity,
@@ -25183,7 +25569,9 @@ def wukong_build_status():
                     'hardware_version': build_context.get('version'),
                     'source_commit': build_context.get('source_commit'),
                      'namespace_fingerprint': build_context.get('namespace_fingerprint'),
-                     'provenance_identity': build_context.get('provenance_identity')})
+                     'provenance_identity': build_context.get('provenance_identity'),
+                     'namespace_revision_id': build_context.get('namespace_revision_id'),
+                     'bitstream_revision_id': build_context.get('bitstream_revision_id')})
 
 @app.route('/api/build-approval/freeze-snapshot', methods=['POST'])
 def build_approval_freeze_snapshot():
@@ -25227,22 +25615,34 @@ def build_approval_freeze_snapshot():
                         return False
             return True
         all_pass = _snap_all_pass(ns_map)
-        now_str = _ba_datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
+        now_str = _ba_datetime.datetime.utcnow().strftime('%Y%m%dT%H%M%S%fZ')
         filename = f'build-approval-{now_str}.json'
         provenance_identity = _ba_provenance_identity(ns_map)
+        namespace_revision_id = None
+        namespace_snapshot = None
+        if all_pass:
+            namespace_revision_id, namespace_snapshot = _freeze_namespace_revision(now_str, ns_map)
+            provenance_identity = _namespace_revision_build_intent(
+                ns_map, namespace_revision_id,
+                _artifact_revision_store().read("namespace", namespace_revision_id)["metadata"])
         snap = {
             'frozen_at': now_str,
             'all_checks_pass': all_pass,
             'ns_map': ns_map,
             'provenance_identity': provenance_identity,
+            'namespace_revision_id': namespace_revision_id,
+            'namespace_snapshot': namespace_snapshot,
         }
         path = os.path.join(_BUILD_SNAPSHOTS_DIR, filename)
-        with open(path, 'w') as f:
+        with open(path, 'x') as f:
             json.dump(snap, f, indent=2)
         return jsonify({'ok': True, 'filename': filename, 'frozen_at': now_str,
                         'all_checks_pass': all_pass,
                         'provenance_identity': provenance_identity,
+                        'namespace_revision_id': namespace_revision_id,
                         'build_intent_id': provenance_identity})
+    except ValueError as e:
+        return jsonify({'ok': False, 'error': str(e)}), 409
     except Exception as e:
         app.logger.exception('freeze-snapshot error')
         return jsonify({'ok': False, 'error': str(e)}), 500

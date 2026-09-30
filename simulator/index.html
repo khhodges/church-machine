@@ -1582,7 +1582,11 @@
                 <span id="baLastChecked" class="ba-last-checked"></span>
             </div>
             <div class="ba-toolbar">
+                <span class="ba-snapshot-status">Current Namespace: editable draft · freezing approves exact saved inputs</span>
                 <button id="baFreezeBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.freezeSnapshot()">&#x2744;&#xFE0F; Freeze Snapshot</button>
+                <label for="baRevisionSelect">Approved Namespace revision</label>
+                <select id="baRevisionSelect" aria-label="Choose exact approved Namespace revision" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectRevisionId(this.value)"><option value="">Select an approved Namespace revision…</option></select>
+                <button id="baSelectSnapshotBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectAvailableSnapshot()">Use approved revision</button>
                 <button id="baApproveBtn" class="ba-approve-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.startBuild()">&#x1F528; Build Bitstream</button>
                 <span id="baSnapshotStatus" class="ba-snapshot-status"></span>
             </div>
@@ -1591,6 +1595,13 @@
             </div>
             <div id="baIssueComments" class="ba-issue-comments">
                 <div class="ba-loading">Loading approval issues&hellip;</div>
+            </div>
+            <div class="ba-toolbar">
+                <label for="baBitstreamRevisionSelect">Saved bitstreams (read-only)</label>
+                <select id="baBitstreamRevisionSelect" aria-label="Select saved immutable bitstream" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectBitstreamRevision(this.value)"><option value="">Select a saved bitstream…</option></select>
+                <button type="button" class="ba-refresh-btn" onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView._loadBitstreamRevisions()">Refresh outputs</button>
+                <button type="button" id="baDownloadRevisionBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.downloadSelectedBitstream()">Download selected .bit</button>
+                <span id="baBitstreamRevisionStatus" class="ba-snapshot-status">Downloading an older output does not activate or flash it.</span>
             </div>
             <div id="baMapBody" class="ba-map-body">
                 <div class="ba-loading">Select the &#x1F528; Build tab to load NS map&hellip;</div>

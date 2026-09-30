@@ -11,6 +11,11 @@ const BuildApprovalView = {
     _timer: null,
     _inFlight: false,
     _snapFrozen: false,
+    _selectedSnapshot: null,
+    _availableSnapshot: null,
+    _approvedRevisions: [],
+    _bitstreamRevisions: [],
+    _selectedBitstream: null,
     _buildRunning: false,
     _buildTimer: null,
     _lastMap: null,
@@ -130,6 +135,16 @@ const BuildApprovalView = {
 
     _onTokenInput(val) {
         this._setBuildToken(val);
+        // A snapshot fetched with an earlier token must not remain actionable.
+        this._selectedSnapshot = null;
+        this._availableSnapshot = null;
+        this._approvedRevisions = [];
+        this._bitstreamRevisions = [];
+        this._selectedBitstream = null;
+        const download = document.getElementById('baDownloadRevisionBtn');
+        if (download) download.disabled = true;
+        this._snapFrozen = false;
+        this._updateApproveBtn();
         const s = document.getElementById('baTokenStatus');
         if (s) s.textContent = val.trim() ? '✅ ready' : '';
         // Trigger a fresh load now that the token may have changed
@@ -280,6 +295,8 @@ const BuildApprovalView = {
             }, this.AUTO_REFRESH_MS);
         }
         this._loadSnapshot();
+        this._loadRevisions();
+        this._loadBitstreamRevisions();
     },
 
     async refresh(manual) {
@@ -773,13 +790,252 @@ const BuildApprovalView = {
         if (!btn) return;
         const checksOk = this._allChecksPass();
         if (freezeBtn) freezeBtn.disabled = !checksOk || this._buildRunning;
-        btn.disabled = !checksOk || !this._snapFrozen || this._buildRunning;
-        if (!checksOk) {
-            btn.title = 'Fix ❌ checks for blocking per-slot rules before approving (lazy/preload warnings are non-blocking)';
-        } else if (!this._snapFrozen) {
-            btn.title = 'Freeze a snapshot first';
+        // Live draft checks govern a NEW approval, not an already approved
+        // immutable input. Building a selected older revision is intentional.
+        btn.disabled = !this._selectedSnapshot || this._buildRunning;
+        if (!this._selectedSnapshot) {
+            btn.title = 'Freeze or explicitly select an approved Namespace revision first';
         } else {
             btn.title = 'Trigger Vivado synthesis on the build droplet';
+        }
+    },
+
+    _snapshotIdentity(data) {
+        if (!data || typeof data !== 'object') return null;
+        const id = data.provenance_identity || data.build_intent_id;
+        const filename = data.filename;
+        // Old map-only snapshots are not approved Namespace revisions.
+        if (!id || !filename || !data.namespace_revision_id ||
+                !/^build-approval-[\w.-]+\.json$/.test(filename)) return null;
+        return {
+            provenance_identity: String(id),
+            filename: String(filename),
+            namespace_revision_id: String(data.namespace_revision_id),
+            namespace_fingerprint: data.namespace_fingerprint || null,
+            frozen_at: data.frozen_at || null,
+        };
+    },
+
+    _selectSnapshot(snapshot) {
+        if (!snapshot) throw new Error('Approved Namespace revision identity is unavailable.');
+        this._selectedSnapshot = snapshot;
+        this._snapFrozen = true;
+        const status = document.getElementById('baSnapshotStatus');
+        if (status) status.textContent =
+            'Selected approved Namespace: ' + snapshot.filename +
+            (snapshot.namespace_revision_id ? ' · revision ' + snapshot.namespace_revision_id : '') +
+            ' · provenance ' + snapshot.provenance_identity;
+        this._updateApproveBtn();
+    },
+
+    selectAvailableSnapshot() {
+        // Loading a latest record is informational; this is the explicit
+        // adoption action and pins its exact identity until changed by hand.
+        this._selectSnapshot(this._availableSnapshot);
+    },
+
+    _revisionChoice(record) {
+        if (!record || record.kind !== 'namespace' ||
+                !/^[0-9a-f]{64}$/.test(String(record.revision_id || ''))) return null;
+        const metadata = record.metadata || {};
+        if (metadata.approval_state !== 'approved') return null;
+        const snapshot = metadata.snapshot || {};
+        if (!/^[0-9a-f]{64}$/.test(String(snapshot.fingerprint || ''))) return null;
+        return this._snapshotIdentity({
+            filename: record.snapshot_filename || metadata.snapshot_filename,
+            provenance_identity: record.build_intent_id || metadata.build_intent_id,
+            namespace_revision_id: record.revision_id,
+            namespace_fingerprint: snapshot.fingerprint,
+            frozen_at: snapshot.provenance && snapshot.provenance.approval_frozen_at,
+        });
+    },
+
+    async _loadRevisions() {
+        const token = this._getBuildToken();
+        try {
+            const res = await fetch('/api/artifact-revisions/namespace', {
+                headers: this._authHeaders(), cache: 'no-store',
+            });
+            const data = await _actionableJsonResponse(res, 'Load approved Namespace revisions', {
+                dataChanged: false,
+                nextAction: 'Check the build token and refresh Build Approval.',
+            });
+            if (token !== this._getBuildToken()) return;
+            if (!Array.isArray(data.revisions)) throw new Error('Approved revision list is malformed.');
+            // Never infer a provenance identity from a Namespace hash. Only
+            // records carrying the exact build-intent identity issued at
+            // approval time may be selected for a bitstream build.
+            this._approvedRevisions = data.revisions.map(record =>
+                this._revisionChoice(record)).filter(Boolean).sort((a, b) =>
+                String(b.frozen_at || '').localeCompare(String(a.frozen_at || '')));
+            if (!this._approvedRevisions.length && data.revisions.some(record =>
+                record && record.metadata && record.metadata.approval_state === 'approved')) {
+                throw new Error('Approved revisions have no exact build intent and approval snapshot identities.');
+            }
+            const select = document.getElementById('baRevisionSelect');
+            if (select) {
+                select.innerHTML = '<option value="">Select an approved Namespace revision…</option>' +
+                    this._approvedRevisions.map(revision =>
+                        `<option value="${this._esc(revision.namespace_revision_id)}">${
+                            this._esc(revision.frozen_at || 'Approved')} · ${
+                            this._esc(revision.namespace_revision_id.slice(0, 12))} · ${
+                            this._esc(revision.provenance_identity.slice(0, 24))}</option>`).join('');
+                select.value = this._selectedSnapshot
+                    ? this._selectedSnapshot.namespace_revision_id : '';
+            }
+        } catch (error) {
+            const status = document.getElementById('baSnapshotStatus');
+            if (status && !this._selectedSnapshot) status.textContent =
+                'Could not load approved revisions: ' + error.message;
+        }
+    },
+
+    selectRevisionId(revisionId) {
+        const revision = this._approvedRevisions.find(row =>
+            row.namespace_revision_id === revisionId);
+        if (!revision) {
+            const select = document.getElementById('baRevisionSelect');
+            if (select) select.value = this._selectedSnapshot
+                ? this._selectedSnapshot.namespace_revision_id : '';
+            return;
+        }
+        this._selectSnapshot(revision);
+    },
+
+    _bitstreamChoice(record) {
+        if (!record || record.kind !== 'bitstream' ||
+                !/^[0-9a-f]{64}$/.test(String(record.revision_id || ''))) return null;
+        const digest = record.files && record.files['bitstream.bit'];
+        if (!/^[0-9a-f]{64}$/.test(String(digest || ''))) return null;
+        const metadata = record.metadata || {};
+        const state = String(metadata.approval_state || '');
+        if (!['approved', 'unmatched', 'legacy-unverified'].includes(state)) return null;
+        return {
+            revision_id: record.revision_id,
+            sha256: digest,
+            approval_state: state,
+            namespace_revision_id: metadata.namespace_revision_id || null,
+            build_record_id: metadata.build_record_id || null,
+            source_commit: metadata.source_commit || null,
+            hardware_version: metadata.hardware_version == null
+                ? null : metadata.hardware_version,
+        };
+    },
+
+    async _loadBitstreamRevisions() {
+        const token = this._getBuildToken();
+        const status = document.getElementById('baBitstreamRevisionStatus');
+        try {
+            const res = await fetch('/api/artifact-revisions/bitstream', {
+                headers: this._authHeaders(), cache: 'no-store',
+            });
+            const data = await _actionableJsonResponse(res, 'Load immutable bitstream history', {
+                dataChanged: false,
+                nextAction: 'Check the build token and refresh bitstream history.',
+            });
+            if (token !== this._getBuildToken()) return;
+            if (!Array.isArray(data.revisions)) throw new Error('Bitstream revision list is malformed.');
+            this._bitstreamRevisions = data.revisions.map(record =>
+                this._bitstreamChoice(record)).filter(Boolean);
+            const select = document.getElementById('baBitstreamRevisionSelect');
+            if (select) {
+                const options = state => this._bitstreamRevisions
+                    .filter(revision => (revision.approval_state === 'approved') === state)
+                    .map(revision => `<option value="${this._esc(revision.revision_id)}">${
+                        this._esc(revision.revision_id.slice(0, 12))} · ${
+                        this._esc(revision.namespace_revision_id
+                            ? 'Namespace ' + revision.namespace_revision_id.slice(0, 12)
+                            : 'no approved Namespace')}</option>`).join('');
+                select.innerHTML = '<option value="">Select a saved bitstream…</option>' +
+                    '<optgroup label="Approved · exact Namespace and build">' + options(true) + '</optgroup>' +
+                    '<optgroup label="Legacy / unverified · not approved">' + options(false) + '</optgroup>';
+                select.value = this._selectedBitstream
+                    ? this._selectedBitstream.revision_id : '';
+            }
+            const download = document.getElementById('baDownloadRevisionBtn');
+            if (download) download.disabled = !this._selectedBitstream ||
+                this._selectedBitstream.approval_state !== 'approved';
+            if (status && !this._selectedBitstream) status.textContent =
+                this._bitstreamRevisions.length
+                    ? 'Select an immutable output to inspect its exact upstream identity.'
+                    : 'No immutable bitstream revisions available.';
+        } catch (error) {
+            if (status) status.textContent = 'Bitstream history unavailable: ' + error.message;
+        }
+    },
+
+    selectBitstreamRevision(revisionId) {
+        const revision = this._bitstreamRevisions.find(row => row.revision_id === revisionId);
+        const status = document.getElementById('baBitstreamRevisionStatus');
+        const download = document.getElementById('baDownloadRevisionBtn');
+        this._selectedBitstream = revision || null;
+        if (download) download.disabled = !revision || revision.approval_state !== 'approved';
+        if (status) status.textContent = revision
+            ? `${revision.approval_state === 'approved' ? 'Approved' : 'Unverified / legacy'} · ` +
+                `Namespace: ${revision.namespace_revision_id || 'none (not approved)'} · ` +
+                `build record: ${revision.build_record_id || 'unknown'} · ` +
+                `source: ${revision.source_commit || 'unknown'} · ` +
+                `hardware: ${revision.hardware_version == null
+                    ? 'unknown' : revision.hardware_version} · SHA-256: ${revision.sha256}` +
+                (revision.approval_state === 'approved' ? ' · eligible for verified download' :
+                    ' · cannot download without upstream approval')
+            : 'No bitstream revision selected. Nothing was downloaded or activated.';
+    },
+
+    async downloadSelectedBitstream() {
+        const revision = this._selectedBitstream;
+        if (!revision || revision.approval_state !== 'approved' ||
+                !this._bitstreamRevisions.some(row =>
+            row.revision_id === revision.revision_id && row.sha256 === revision.sha256)) return false;
+        const status = document.getElementById('baBitstreamRevisionStatus');
+        const button = document.getElementById('baDownloadRevisionBtn');
+        if (button) button.disabled = true;
+        try {
+            const res = await fetch('/api/artifact-revisions/bitstream/' +
+                encodeURIComponent(revision.revision_id) + '/download', {
+                headers: this._authHeaders(), cache: 'no-store',
+            });
+            if (!res.ok) throw new Error(_formatActionableHttpError(
+                'Download immutable bitstream', res.status, await res.text(), {
+                    dataChanged: false, nextAction: 'Refresh the bitstream history and retry.',
+                }));
+            // Older download responses may omit this header. If present it
+            // must agree; the downloaded bytes are SHA-256 checked regardless.
+            const serverDigest = res.headers && res.headers.get('X-Artifact-SHA256');
+            if (serverDigest && serverDigest !== revision.sha256) {
+                throw new Error('The server returned a different bitstream SHA-256 identity.');
+            }
+            const blob = await res.blob();
+            if (!globalThis.crypto || !globalThis.crypto.subtle) {
+                throw new Error('SHA-256 verification is unavailable; no file was saved.');
+            }
+            const digest = Array.from(new Uint8Array(
+                await globalThis.crypto.subtle.digest('SHA-256', await blob.arrayBuffer())))
+                .map(byte => byte.toString(16).padStart(2, '0')).join('');
+            if (digest !== revision.sha256) {
+                throw new Error('Downloaded bitstream bytes do not match the approved SHA-256.');
+            }
+            const objectUrl = URL.createObjectURL(blob);
+            try {
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = 'church_wukong_' + revision.revision_id.slice(0, 16) + '.bit';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+            } finally {
+                URL.revokeObjectURL(objectUrl);
+            }
+            if (status) status.textContent =
+                'Downloaded exact ' + revision.approval_state + ' bitstream ' +
+                revision.revision_id + '; no device or active build was changed.';
+            return true;
+        } catch (error) {
+            if (status) status.textContent = 'Bitstream download blocked: ' + error.message;
+            return false;
+        } finally {
+            if (button) button.disabled = !this._selectedBitstream ||
+                this._selectedBitstream.approval_state !== 'approved';
         }
     },
 
@@ -798,9 +1054,10 @@ const BuildApprovalView = {
                 dataChanged: false,
                 nextAction: 'Fix blocking approval checks, then click Freeze again.',
             });
-            this._snapFrozen = true;
-            if (status) status.textContent = '✅ Snapshot frozen: ' + (data.filename || '');
-            this._updateApproveBtn();
+            const snapshot = this._snapshotIdentity(data);
+            if (!snapshot) throw new Error('Freeze did not return an exact approved revision identity. Refresh before building.');
+            this._selectSnapshot(snapshot);
+            await this._loadRevisions();
         } catch (e) {
             if (status) status.textContent = '❌ ' + (/\bNo data was changed\b/.test(e.message) ? e.message :
                 _formatActionableNetworkError('Freeze the build snapshot', e, {
@@ -835,6 +1092,9 @@ const BuildApprovalView = {
             });
             if (!res.ok) return;
             const data = await res.json();
+            this._availableSnapshot = this._snapshotIdentity(data);
+            const choice = document.getElementById('baSelectSnapshotBtn');
+            if (choice) choice.disabled = !this._availableSnapshot;
             if (data.filename) {
                 const status = document.getElementById('baSnapshotStatus');
                 const provenance = data.provenance_identity || data.build_intent_id || '';
@@ -851,10 +1111,12 @@ const BuildApprovalView = {
                         choices.appendChild(option);
                     }
                 }
-                if (status && !this._snapFrozen) {
-                    status.textContent = 'Latest snapshot: ' + data.filename + ' (' + (data.frozen_at || '') + ')' +
-                        (provenance ? ' · provenance: ' + provenance : '');
-                }
+                if (status && !this._selectedSnapshot) status.textContent =
+                    (this._availableSnapshot ? 'Available approved revision: ' :
+                        'Legacy snapshot (no approved Namespace revision): ') + data.filename +
+                    (data.namespace_revision_id ? ' · revision ' + data.namespace_revision_id : '') +
+                    (this._availableSnapshot ? ' · choose “Use approved revision” to build it.' :
+                        ' · freeze the current Namespace to build.');
             }
         } catch (_) { /* ignore */ }
     },
@@ -862,7 +1124,19 @@ const BuildApprovalView = {
     async startBuild() {
         // build_nonce is CSRF protection, never an artifact identity.  The
         // programmer selects a server-published provenance identity.
+        const selected = this._selectedSnapshot;
+        if (!selected) {
+            this._updateApproveBtn();
+            return;
+        }
         const targetBuild = window.TargetState.resolve().buildId || '';
+        if (targetBuild !== selected.provenance_identity) {
+            const status = document.getElementById('baSnapshotStatus');
+            if (status) status.textContent =
+                'Select the same exact provenance identity in the FPGA target before building: ' +
+                selected.provenance_identity;
+            return;
+        }
         const targetAuthorization = window.TargetState.authorize(
             'bitstream', { id: targetBuild });
         if (!targetAuthorization.ok) return;
@@ -880,7 +1154,13 @@ const BuildApprovalView = {
             const res = await fetch('/api/wukong-build/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-                body: JSON.stringify(Object.assign({ build_nonce: this._buildNonce || '' }, targetAuthorization.request)),
+                body: JSON.stringify(Object.assign({
+                    build_nonce: this._buildNonce || '',
+                    provenance_identity: selected.provenance_identity,
+                    snapshot_filename: selected.filename,
+                    namespace_revision_id: selected.namespace_revision_id,
+                    namespace_fingerprint: selected.namespace_fingerprint,
+                }, targetAuthorization.request)),
             });
             const data = await _actionableJsonResponse(res, 'Start the approved hardware build', {
                 dataChanged: false,

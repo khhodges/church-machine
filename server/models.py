@@ -157,6 +157,7 @@ def register_models(db):
         # Bitstream file references (paths on server/droplet + integrity hashes)
         bit_path     = Column(String(512), default="")
         bit_hash     = Column(String(64), default="")    # md5 hex
+        upload_completed_at = Column(String(32), nullable=True)
         mcs_path     = Column(String(512), default="")
         notes        = Column(Text, default="")
 

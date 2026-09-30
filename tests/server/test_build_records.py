@@ -138,6 +138,11 @@ def _historical_snapshot(name, slot=6, raw_word=0x4A000006, hardware_version=401
 
 def _seed_snapshot_record(snapshot, hardware_version=401, status="succeeded",
                           bit_hash=""):
+    revision = _app._artifact_revision_store().publish(
+        "namespace", {"approval_state": "approved", "snapshot": snapshot,
+                      "source_commit": "snapshot-test", "hardware_version": hardware_version},
+        {"boot-image.bin": b"isolated-test-image"})
+    snapshot = dict(snapshot, namespace_revision_id=revision)
     record = _app.BuildRecord(
         version=0,
         timestamp=datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
