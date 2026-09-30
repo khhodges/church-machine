@@ -6601,6 +6601,40 @@ def boot_image_ns_state():
         return jsonify({"error": str(_exc)}), 500
 
 
+@app.route("/api/boot-image/capacity", methods=["GET"])
+def boot_image_capacity():
+    """Inspect committed Namespace/image bytes without preparing or saving."""
+    try:
+        try:
+            from server.boot_capacity import capacity_report
+        except ImportError:
+            from boot_capacity import capacity_report
+        # Use the same cross-process commit guard as the image/Namespace/config
+        # publisher, including exact artifact reads inside capacity_report.
+        with _namespace_commit_guard():
+            if not os.path.isfile(NS_STATE_PATH):
+                return jsonify({"error": "No committed Namespace state is available."}), 404
+            with open(NS_STATE_PATH, encoding="utf-8") as source:
+                state = json.load(source)
+            rows = state.get("abstractions") if isinstance(state, dict) else None
+            image = None
+            if os.path.isfile(BOOT_IMAGE_PATH):
+                with open(BOOT_IMAGE_PATH, "rb") as source:
+                    image = source.read()
+            target_board = None
+            if os.path.isfile(BOOT_CONFIG_PATH):
+                with open(BOOT_CONFIG_PATH, encoding="utf-8") as source:
+                    config = json.load(source)
+                if isinstance(config, dict):
+                    target_board = config.get("targetBoard")
+            response = jsonify(capacity_report(
+                rows, image, LUMPS_DIR, target_board=target_board))
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        return jsonify({"error": "Boot capacity report is unavailable: " + str(error)}), 500
+
+
 def _validate_symbolic_namespace_entries(entries):
     """Reject symbolic rows that claim an implementation or binary identity."""
     for entry in entries:

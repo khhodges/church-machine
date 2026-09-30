@@ -6,12 +6,10 @@
 - [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; F3 UART; 4-bit NZCV; step mode guarantees TraceUnit is idle
 - [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
-- [Sapphire ROM BRAM iBus/dBus conflict](sapphire-rom-bram-dbus-hang.md) — ROM BRAM single-port: iBus wins always; any dBus lw from ROM hangs; all firmware strings must be static char[] (.data/RAM)
+- [Sapphire/Ti60 build lessons](sapphire-ti60-index.md) — ROM bus conflicts, Efinity BRAM initialization, MAP placeholders, and full firmware pipeline constraints.
 - [LUMP binary is big-endian](lump-binary-big-endian.md) — raw .lump file words are big-endian; ad-hoc LE reads/writes silently corrupt header/c-list, verify with lump-audit.js (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [Shared fetch dedup for concurrent UI lookups](shared-fetch-dedup-for-concurrent-ui-lookups.md) — two independent render paths fetching the same detail endpoint for the same entity will double-fire it; dedupe via shared in-flight-promise cache
 - [Dev server port collision](dev-server-port-collision.md) — check-then-act "free port then bind" isn't race-proof between two independently-starting servers; give secondary servers their own default port + retry-with-backoff on bind
-- [EFX_MAP $readmemb path resolution + VDB caching](efx-map-readmemb.md) — bins must be in $SOC_DIR/ (not just work_syn/); 2026.1 MAP leaves INIT_0=all-FF in map.v (placeholder); PNR resolves $readmemb
-- [Sapphire BRAM init — Variant B stub block](sapphire-bram-init-variant.md) — Efinity 2026.1 IP has stub initial begin (4 zeros) not $readmemb; depth=8192 words; patch_sapphire_init.py handles both variants
 - [Sapphire SoC as Trusted Security Base](sapphire-soc-tsb.md) — RISC-V private RAM is the keystore; APB3 register map; 5 free capabilities; FAULT_RST gap; FP verdict; SHA32 commissioning impact
 - [Wukong NS base is not ISA-safe at zero](wukong-ns-base-isa-conflict.md) — standalone Wukong currently overrides the ISA top-of-memory NS base to 0; do not promote that shortcut into a new image without resolving DMEM size/base
 - [Boot namespace architecture rules](boot-namespace-rules.md) — 2 hardwired slots only; namespace liveness rule; authority = Abstract GT not NS entry; 3-layer boot model; SelfTest loop/CALL pattern
@@ -22,8 +20,6 @@
 - [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
 - [Editor-state migration coverage gap](editor-state-migration-coverage-gap.md) — a one-shot text migration must be wired into every independent save/restore path (keyed draft store AND generic "last session" snapshot), or the "fixed" bug reappears via the unpatched path
 - [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
-- [Sapphire BRAM guard false-positive modes](sapphire-bram-guard-false-positive.md) — RC=3 has 2 modes: stale real content (bad) vs all-FF MAP placeholder (2026.1 normal/false-positive); RC=1 (all-zero) is always fatal
-- [Ti60 firmware update pipeline](ti60-firmware-update-pipeline.md) — PNR-only skips 3 required steps (patch sapphire.v, delete VDB, MAP); must run full OBBS; serve hex from $SOC_DIR/outflow/ not repo bitstreams/ (git pull overwrites)
 - [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
@@ -157,3 +153,4 @@
 - [Protected review audit boundary](protected-review-audit-boundary.md) — cancellation telemetry is not approval; persist safe server evidence, never source diffs or credentials
 - [Instruction commentary evidence](instruction-commentary-evidence.md) — static meaning stays symbolic; historical effects need exact immutable occurrence evidence, never live-register recomputation
 - [Uniform indexed operand intent](register-indexed-load-intent.md) — all indexed instructions should support runtime DR value plus immediate; parser limitations are not intended semantics.
+- [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.

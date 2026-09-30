@@ -2823,7 +2823,15 @@ function switchView(viewId) {
 
     if (viewId === 'dashboard') { restoreAutoBootPref(); updateDashboard(); }
     if (viewId === 'github') loadGitHubCommunity();
-    if (viewId === 'namespace') { updateNamespace(); setTimeout(function() { const tbl = document.getElementById('namespaceTable'); if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 80); }
+    if (viewId === 'namespace') {
+        updateNamespace();
+        if (typeof refreshBootCapacity === 'function') refreshBootCapacity();
+        setTimeout(function() {
+            const top = document.getElementById('bootCapacityPanel') ||
+                document.getElementById('namespaceTable');
+            if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 80);
+    }
     if (viewId === 'memory')    renderMemoryView();
     if (viewId === 'abstractions') renderAbstractions();
     if (viewId === 'lumps') {

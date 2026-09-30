@@ -214,6 +214,98 @@ function _nsRenderSavedVersionCell(assigned, freshness, slot) {
 }
 window._nsRenderSavedVersionCell = _nsRenderSavedVersionCell;
 
+// Capacity reads the committed server image/Namespace, never a draft editor
+// selection or simulator cache. Warnings suppress claims about usable space.
+function _renderBootCapacity(report) {
+    const root = document.getElementById('bootCapacityReport');
+    if (!root) return;
+    if (!report || !Array.isArray(report.rows) || !Array.isArray(report.warnings)) {
+        root.textContent = 'Capacity report is unavailable.';
+        return;
+    }
+    const words = value => Number.isInteger(value)
+        ? _escHtml(value.toLocaleString() + ' words (' +
+            (value * 4).toLocaleString() + ' bytes)') : 'unavailable';
+    let html = '<div>' + _escHtml(report.layout || 'Committed generic image') +
+        ' — dense file: ' +
+        (Number.isInteger(report.denseBytes)
+            ? _escHtml(report.denseBytes.toLocaleString() + ' bytes')
+            : 'unavailable') + '; image window: ' + words(report.totalWords) + '.</div>';
+    html += '<div>Namespace header/table reservation: ' + words(report.reservedWords) +
+        '. Occupied allocations: ' + words(report.allocatedWords) +
+        '. Free: ' + words(report.freeWords) +
+        '. Largest contiguous gap: ' + words(report.largestFreeWords) + '.</div>';
+    if (report.advisory && report.advisory.applies) {
+        html += '<div>Advisory only (not enforced): 48 KiB boot budget / 16 KiB runtime ' +
+            'reserve for a 64 KiB Wukong target. ' +
+            (report.trusted && Number.isInteger(report.allocatedWords)
+                ? (report.allocatedWords > report.advisory.bootBudgetWords
+                    ? 'Generic-window advisory budget exceeded by ' +
+                        words(report.allocatedWords - report.advisory.bootBudgetWords) + '. '
+                    : 'Generic-window headroom below the 48 KiB threshold: ' +
+                        words(report.advisory.bootBudgetWords - report.allocatedWords) + '. ')
+                : 'Threshold headroom is unavailable until validation succeeds. ') +
+            'This comparison does not establish physical projection fit.</div>';
+    }
+    if (report.physicalTarget) {
+        html += '<div>Physical Wukong projection: 16,384 words, 64 four-word ' +
+            'Namespace slots, factory body through word 1,279, at most 3 Threads. ' +
+            'Separate layout; the generic allocation totals above are not physical ' +
+            'placement or hardware compatibility evidence.</div>';
+    }
+    if (report.warnings.length) {
+        html += '<div style="color:#f87171;font-weight:600;">Capacity not validated: ' +
+            'free and occupied totals are unavailable. Resolve these issues first.</div><ul>' +
+            report.warnings.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul>';
+    }
+    html += '<div style="overflow-x:auto;"><table class="ns-table" style="width:100%;">' +
+        '<thead><tr><th>Slot / name</th><th>Saved version</th><th>Exact saved cost</th>' +
+        '<th>Saved verified padding</th><th>Installed allocation</th>' +
+        '<th>Thread heap / stack</th><th>Saved unclassified contents / slack</th>' +
+        '<th>Assessment</th></tr></thead><tbody>';
+    for (const row of report.rows) {
+        const text = value => _escHtml(String(value));
+        html += '<tr><td>NS[' + text(row.slot) + '] ' + text(row.name) +
+            '</td><td>' + (Number.isInteger(row.version) ? 'v' + text(row.version) : 'NA') +
+            '</td><td>' + words(row.savedAllocationWords) + '</td><td>' +
+            words(row.savedPaddingWords) + '</td><td>' +
+            words(row.allocatedWords) + '</td><td>' +
+            (Number.isInteger(row.threadHeapWords)
+                ? words(row.threadHeapWords) + ' / ' + words(row.threadStackWords)
+                : '—') + '</td><td>' + words(row.savedUnclassifiedWords) +
+            '</td><td>' + text(row.status) + '</td></tr>';
+    }
+    html += '</tbody></table></div><small>Saved cost is an exact hash-checked library ' +
+        'artifact, not proof of installation. Installed allocation is omitted until the ' +
+        'image geometry is verified. Unclassified contents/slack may include embedded ' +
+        'metadata, source, and padding. Padding is counted only when a complete content ' +
+        'frame and its zero-filled tail can be identified. Thread heap is runtime space ' +
+        'inside its allocated body, not extra free ' +
+        'memory. Saved revision metadata is not proof that relocated image bytes are identical.</small>';
+    root.innerHTML = html;
+}
+window._renderBootCapacity = _renderBootCapacity;
+
+async function refreshBootCapacity() {
+    const root = document.getElementById('bootCapacityReport');
+    const button = document.getElementById('bootCapacityRefresh');
+    if (!root || !button || button.disabled) return;
+    button.disabled = true;
+    root.textContent = 'Reading committed capacity…';
+    try {
+        const response = await fetch('/api/boot-image/capacity', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Capacity request failed');
+        _renderBootCapacity(data);
+    } catch (error) {
+        root.textContent = 'Capacity report unavailable: ' +
+            (error && error.message || String(error));
+    } finally {
+        button.disabled = false;
+    }
+}
+window.refreshBootCapacity = refreshBootCapacity;
+
 // Pending Prepare/Run pins are browser intent only until the atomic server CAS
 // succeeds. They never mutate the loaded simulator image or committed state.
 window._prepareRunArtifactPins = window._prepareRunArtifactPins || {};
