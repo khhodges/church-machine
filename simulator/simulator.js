@@ -12320,6 +12320,15 @@ class ChurchSimulator {
             return null;
         }
         const instrWord = fetch.word;
+        // Capture successful fetches before dispatch/admission can fault.
+        // A rejected instruction is still observed; only failed fetches have
+        // no instruction evidence.
+        if (this._executionAttempt) {
+            this._executionAttempt.instruction = {
+                raw: instrWord >>> 0, physicalPC: fetch.addr,
+                decoded: instrWord === 0 ? null : this.decodeInstruction(instrWord),
+            };
+        }
         const executionSlot = this.cr[14] && this.cr[14].word0
             ? this.parseGT(this.cr[14].word0).index : null;
         const executionIdentity = executionSlot !== null ? this.getSlotIdentity(executionSlot) : null;
@@ -12351,12 +12360,6 @@ class ChurchSimulator {
                 this.fault(error.code || 'INVALID_OP', error.message);
                 return null;
             }
-        }
-        if (this._executionAttempt) {
-            this._executionAttempt.instruction = {
-                raw: instrWord >>> 0, physicalPC: fetch.addr,
-                decoded: instrWord === 0 ? null : this.decodeInstruction(instrWord),
-            };
         }
         // HALT is the all-zero pseudo-instruction emitted by both assemblers.
         // Before boot it remains the PP250 return sentinel. After boot it is a

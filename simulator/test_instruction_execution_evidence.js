@@ -112,15 +112,42 @@ for (const [op, imm, input, expected] of [
     assert.strictEqual(next.pre.dr[1], 4096);
     assert.match(next.description, /4096 \+ 4096 = 8192/);
 }
-for (const encoded of [word(18, 1, 1, 0), word(10), word(17, 1, 0, 0x4000)]) {
+// These faults happen after a successful fetch, including IDX1 admission.
+for (const [encoded, type, message] of [
+    [word(18, 1, 1, 0), 'BOUNDS', /BFEXT: invalid bitfield/],
+    [word(10), 'INVALID_OP', /requires an admitted IDX1 execution envelope/],
+    [word(17, 1, 0, 0x4000), 'NULL_CAP', /DWRITE: CR0 is NULL/],
+]) {
     const sim = fixture([encoded]);
     sim.cr[0].word0 = 0;
     assert.strictEqual(sim.step(), null);
     const e = sim.lastStepEvidence;
     assert.strictEqual(e.outcome, 'fault');
+    assert(e.instruction, `Fetched opcode ${encoded >>> 27} must retain instruction evidence`);
     assert.strictEqual(e.instruction.raw, encoded);
-    assert(e.fault.message);
+    assert.strictEqual(e.instruction.physicalPC, 0x301);
+    assert.strictEqual(e.fault.type, type);
+    assert.match(e.fault.message, message);
+    assert(Object.isFrozen(e.instruction));
     assert(Object.isFrozen(e.fault));
+}
+// Genuine pre-fetch authority failures must not borrow the previous
+// occurrence's instruction, even when bytes remain at the predicted address.
+for (const [invalidate, type] of [
+    [sim => { sim.cr[14].word0 = 0; }, 'NULL_CAP'],
+    [sim => { sim.cr[14].word1 = sim.memory.length; }, 'BOUNDS'],
+]) {
+    const sim = fixture([word(21, 1, 1, 0x4001), word(10)]);
+    const prior = sim.step().executionEvidence;
+    invalidate(sim);
+    assert.strictEqual(sim.step(), null);
+    const e = sim.lastStepEvidence;
+    assert.strictEqual(e.outcome, 'fault');
+    assert.strictEqual(e.fault.type, type);
+    assert.strictEqual(e.instruction, null);
+    assert.notStrictEqual(e.occurrenceId, prior.occurrenceId);
+    assert.strictEqual(prior.instruction.raw, word(21, 1, 1, 0x4001));
+    assert.deepStrictEqual(e.pre.dr, e.post.dr);
 }
 {
     const sim = fixture([word(5, 15, 15)]);
