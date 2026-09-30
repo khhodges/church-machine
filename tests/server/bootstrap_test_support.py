@@ -43,16 +43,28 @@ def reviewed_post(client, path, payload):
 def select_bootstrap_residents(lumps):
     """Select the approved live bootstrap catalog in a disposable test copy.
 
-    The checked-in Namespace may contain an IDE draft that has no authenticated
-    compiler provenance, and its CapabilityTest binding may point to an archived
-    publication. Neither is part of this bootstrap-only fixture.
+    The checked-in Namespace may contain IDE drafts (including an IDX1
+    selection at slot 15) that cannot be prepared as bootstrap residents,
+    and its CapabilityTest binding may point to an archived publication.
+    Neither is part of this bootstrap-only fixture.
     """
     state_path = lumps / "ns-state.json"
     state = json.loads(state_path.read_text())
     manifest = json.loads((lumps / "manifest.json").read_text())
     approvals = json.loads((lumps / "approvals.json").read_text())["approvals"]
+    drafts = [row for row in state["abstractions"]
+              if row.get("slot") in (14, 15)]
+    assert {(row["slot"], row["name"]) for row in drafts} == {
+        (14, "ide.Alice"), (15, "ide.Mallory"),
+    }
+    assert all(row.get("boot_resident") is not True for row in drafts)
+    # These are unrelated IDE designs, not approved legacy bootstrap bodies.
+    # Keep their immutable files/history but omit their Namespace placements
+    # from this bootstrap-only copy so the strict image validator sees none.
+    state["abstractions"] = [row for row in state["abstractions"]
+                             if row.get("slot") not in (14, 15)]
     for row in state["abstractions"]:
-        if row.get("name") in {"Tunnel", "Ethernet", "ide.Alice"}:
+        if row.get("name") in {"Tunnel", "Ethernet"}:
             for field in ("token", "filename", "binary_hash"):
                 row.pop(field, None)
         if row.get("name") == "CapabilityTest" and row.get("slot") == 10:

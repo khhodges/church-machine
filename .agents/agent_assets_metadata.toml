@@ -332,3 +332,17 @@ mtime_ms = 1789083879744
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7361846c-14fa-444d-a337-d9c9772265c3/c6b09ab1-35a3-4608-8655-8912d2885c0c"
 storage_version_token = "1789084016719635"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "DlEQ5YxSQLXYkxlK1Iq1z"
+uri = "file://reports/alice-mallory-namespace-repair-review.md"
+type = "text"
+title = "Alice and Mallory — Namespace repair review"
+description = "Read-only before/after review with full allocation ranges, exact artifact identities, Mallory alternatives, and approval boundaries."
+logical_id = "902780ea-7b3b-498d-bf9c-1ddcbbe14b6e"
+content_hash = "sha256:0603a1aaf3b852a01096d5cfc5665c79c9f181b731743e22f28ab9112b76f8eb"
+size = 13950
+mtime_ms = 1790780694940
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/902780ea-7b3b-498d-bf9c-1ddcbbe14b6e/3926ec76-5d18-4747-ae91-c719fdecfaf2"
+storage_version_token = "1790780714902313"
+content_type = "text/markdown"

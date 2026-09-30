@@ -125,6 +125,15 @@ def _candidate(row0, cc=1):
     return __import__("struct").pack(">64I", *words)
 
 
+def _save_plan(client, words, metadata):
+    # Bind each review to the exact isolated Namespace state it observes.
+    # Keep this on metadata for the later approval/commit of the same plan.
+    metadata["namespaceFingerprint"] = (
+        app_module._read_authoritative_namespace_rows()[1])
+    return client.post(
+        "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+
+
 def test_candidate_validation_uses_sealed_row_zero_as_ultimate_truth():
     raw = _candidate(0x4A01BEEF)
     digest = __import__("hashlib").sha256(raw).hexdigest()
@@ -405,9 +414,7 @@ def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
     }]
 
     with app_module.app.test_client() as client:
-        response = client.post("/api/lumps/save-plan", json={
-            "binary": words,
-            "metadata": {
+        response = _save_plan(client, words, {
                 "abstraction": "WukongCallHome",
                 "ns_slot": 7,
                 # The browser computes this from content. The verified SELF row,
@@ -416,7 +423,6 @@ def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
                 "content_type": "code",
                 "capabilities": capabilities,
                 "grants": ["E"],
-            },
         })
 
     assert response.status_code == 201, response.get_data(as_text=True)
@@ -428,9 +434,7 @@ def test_programmer_can_replace_frozen_slot2_with_compiler_owned_lump():
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0xFEED5E1F
     with app_module.app.test_client() as client:
-        response = client.post("/api/lumps/save-plan", json={
-            "binary": words,
-            "metadata": {
+        response = _save_plan(client, words, {
                 "abstraction": "ProgrammerChoice",
                 "ns_slot": 2,
                 "token": "deadbeef",
@@ -441,7 +445,6 @@ def test_programmer_can_replace_frozen_slot2_with_compiler_owned_lump():
                     "compiler_owned_self": True,
                 }],
                 "grants": ["E"],
-            },
         })
 
     assert response.status_code == 201, response.get_data(as_text=True)
@@ -459,9 +462,7 @@ def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000006
     with app_module.app.test_client() as client:
-        response = client.post("/api/lumps/save-plan", json={
-            "binary": words,
-            "metadata": {
+        response = _save_plan(client, words, {
                 "abstraction": "ProgrammerChoice",
                 "ns_slot": 2,
                 "token": "deadbeef",
@@ -470,7 +471,6 @@ def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
                 # retaining the reserved __SELF__ row name.
                 "capabilities": [{"name": "__SELF__", "rights": ["E"]}],
                 "grants": ["E"],
-            },
         })
 
     assert response.status_code == 201, response.get_data(as_text=True)
@@ -583,8 +583,7 @@ def _bootstrap_save_payload(
     }
     if enforce:
         metadata["enforce_bootstrap_identity"] = True
-    plan_response = client.post(
-        "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+    plan_response = _save_plan(client, words, metadata)
     assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
     plan = plan_response.get_json()
     canonical = list(words)
@@ -721,15 +720,12 @@ def test_bootstrap_sequence_mismatch_is_rejected_without_mutation(
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000006
     with app_module.app.test_client() as client:
-        response = client.post("/api/lumps/save-plan", json={
-            "binary": words,
-            "metadata": {
+        response = _save_plan(client, words, {
                 "abstraction": "CapabilityTest", "ns_slot": 10,
                 "namespace_sequence": 1, "token": "4a00000a",
                 "content_type": "code", "enforce_bootstrap_identity": True,
                 "capabilities": [{"name": "__SELF__", "rights": ["E"]}],
                 "grants": ["E"],
-            },
         })
     assert response.status_code == 422
     assert "IDE refused" in response.get_json()["error"]
@@ -742,15 +738,12 @@ def test_bootstrap_token_mismatch_is_rejected_without_mutation(
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000006
     with app_module.app.test_client() as client:
-        response = client.post("/api/lumps/save-plan", json={
-            "binary": words,
-            "metadata": {
+        response = _save_plan(client, words, {
                 "abstraction": "CapabilityTest", "ns_slot": 10,
                 "namespace_sequence": 0, "token": "4a000006",
                 "content_type": "code", "enforce_bootstrap_identity": True,
                 "capabilities": [{"name": "__SELF__", "rights": ["E"]}],
                 "grants": ["E"],
-            },
         })
     assert response.status_code == 422
     assert "canonical token differs" in response.get_json()["error"]
@@ -804,8 +797,8 @@ def test_namespace_change_before_final_lock_preserves_repository_and_authorizati
         assert plan_id in app_module._LUMP_SAVE_PLANS
         assert intent_id in app_module._LUMP_APPROVAL_INTENTS
 
-    assert response.status_code == 422
-    assert "IDE refused" in response.get_json()["error"]
+    assert response.status_code == 409
+    assert "Namespace changed since review" in response.get_json()["error"]
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
@@ -848,8 +841,7 @@ def test_selftest_source_identity_change_between_reads_is_rejected(
     monkeypatch.setattr(app_module, "_bootstrap_pre_lock_hook", mutate_between_reads)
     with app_module.app.test_client() as client:
         before = _repository_snapshot(isolated_bootstrap_repository)
-        response = client.post(
-            "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+        response = _save_plan(client, words, metadata)
 
     assert response.status_code == 409, response.get_data(as_text=True)
     assert "SelfTest Namespace slot changed" in response.get_json()["error"]
@@ -860,8 +852,7 @@ def test_selftest_source_identity_change_between_reads_is_rejected(
     # Namespace state committed by the competing writer. The programmer's
     # source/settings are unchanged and no second confirmation is required.
     with app_module.app.test_client() as client:
-        plan_response = client.post(
-            "/api/lumps/save-plan", json={"binary": words, "metadata": metadata})
+        plan_response = _save_plan(client, words, metadata)
         assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
         plan = plan_response.get_json()
         intent_response = client.post("/api/lumps/approval-intent", json={

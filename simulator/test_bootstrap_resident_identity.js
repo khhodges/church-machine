@@ -62,18 +62,25 @@ function residentFixture() {
 
 // The boot-image descriptor table, not generated API metadata, is the frozen
 // inventory authority. The repository image also contains an unrelated IDE
-// draft at NS[14] without an authenticated resident SELF/W3 binding. Exclude
-// that draft in this in-memory frozen-bootstrap-only fixture; do not change
-// the published image or relax validation of any selected resident.
+// draft at NS[14] and an uninstalled IDX1 design at NS[15], neither with an
+// authenticated resident SELF/W3 binding. Exclude both in this in-memory
+// frozen-bootstrap-only fixture; do not change the published image or relax
+// validation of any selected resident.
 function correctedBootImage() {
     const bytes = fs.readFileSync(path.join(__dirname, '..', 'server', 'lumps', 'boot-image.bin'));
     const image = new Uint32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
     const probe = new ChurchSimulator();
     const expectedSlots = [6, 7, 10];
-    const draftBase = image.length - (14 + 1) * probe.NS_ENTRY_WORDS;
-    assert.strictEqual(image[draftBase + 3] >>> 0, 0,
-        'unbound IDE draft is not an approved frozen bootstrap resident');
-    image.fill(0, draftBase, draftBase + probe.NS_ENTRY_WORDS);
+    for (const draftSlot of [14, 15]) {
+        const draftBase = image.length - (draftSlot + 1) * probe.NS_ENTRY_WORDS;
+        assert.strictEqual(image[draftBase + 3] >>> 0, 0,
+            `NS[${draftSlot}] design is not an approved frozen bootstrap resident`);
+        if (draftSlot === 15) {
+            assert.strictEqual(image[draftBase] >>> 0, 0,
+                'IDX1 design has no installed executable body');
+        }
+        image.fill(0, draftBase, draftBase + probe.NS_ENTRY_WORDS);
+    }
     for (const slot of expectedSlots) {
         const nsBase = image.length - (slot + 1) * probe.NS_ENTRY_WORDS;
         const location = image[nsBase] >>> 0;
