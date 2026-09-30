@@ -92,6 +92,7 @@ function makeFlow(choice, options = {}) {
     };
     vm.createContext(context);
     vm.runInContext(
+        extractFunction(appLumps, '_freezeLumpSaveNamespaceRevision') +
         extractFunction(appLumps, '_confirmLumpSavePlan') +
         '\nthis.confirm = _confirmLumpSavePlan;',
         context

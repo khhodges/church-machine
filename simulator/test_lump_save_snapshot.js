@@ -182,7 +182,7 @@ diagnosticContext.preserve({
         _lumpSha256Words: async words => words.join(',') === '9,10' ? 'a'.repeat(64) : '',
         sim: {
             nsLabels: {},
-            loadLumpBinary: (words, slot) => words.join(',') === '9,10' && slot === 17,
+            loadLumpBinary: () => { throw new Error('Save must not install into runtime'); },
         },
     };
     vm.createContext(exactLoadContext);
@@ -197,8 +197,8 @@ diagnosticContext.preserve({
         digest: 'a'.repeat(64),
         final_binary: [9, 10],
     }, 'Exact.Load').then(words => {
-        if (words.join(',') !== '9,10' || exactLoadContext.sim.nsLabels[17] !== 'Exact.Load') {
-            throw new Error('committed final_binary was not loaded exactly into authoritative slot');
+        if (words.join(',') !== '9,10' || exactLoadContext.sim.nsLabels[17] !== undefined) {
+            throw new Error('committed binary verification changed the running Namespace');
         }
         console.log('LUMP save snapshot regression: PASS');
     });

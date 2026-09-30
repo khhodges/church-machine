@@ -13259,6 +13259,7 @@ function _populateSaveNamespaceSlotPicker(state, snapshot) {
 var _saveNSTrigger = null;
 var _saveNSPickerRequestId = 0;
 var _saveNSPickerReady = false;
+var _saveNSNamespaceFingerprint = null;
 
 function _cloneLumpSaveCapabilities(capabilities) {
     return (Array.isArray(capabilities) ? capabilities : []).map(function(cap) {
@@ -13466,6 +13467,7 @@ function showSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
     const pickerRequestId = ++_saveNSPickerRequestId;
     _saveNSPickerReady = false;
+    _saveNSNamespaceFingerprint = null;
     slotSel.innerHTML = '';
     slotSel.disabled = true;
     document.getElementById('saveNSLabel').value = '';
@@ -13506,6 +13508,7 @@ function showSaveToNamespace() {
             if (pickerRequestId !== _saveNSPickerRequestId ||
                     document.getElementById('saveNSDialog').style.display === 'none') return;
             _populateSaveNamespaceSlotPicker(state, window._saveNSPreparedSnapshot);
+            _saveNSNamespaceFingerprint = state.namespaceFingerprint;
             if (slotSel.value === 'choose') {
                 document.getElementById('saveNSLabel').value = '';
             } else {
@@ -13562,6 +13565,7 @@ function onSlotChange() {
 }
 
 function closeSaveDialog() {
+    _saveNSNamespaceFingerprint = null;
     ++_saveNSPickerRequestId;
     _saveNSPickerReady = false;
     if (window._saveNSLeaseStop) {
@@ -16709,13 +16713,10 @@ async function _reloadCommittedLumpArtifact(response, fallbackName, savedMetadat
             'IDX1 LUMP saved. Use Load into Sim for protected admission; Prepare Boot and hardware delivery remain unavailable.', 'info');
         return committedWords;
     }
-    if (typeof sim === 'undefined' || !sim || !sim.loadLumpBinary ||
-            !sim.loadLumpBinary(committedWords, Number(nsSlot))) {
-        throw new Error('simulator rejected the exact committed LUMP artifact');
-    }
-    if (sim.nsLabels) sim.nsLabels[Number(nsSlot)] =
-        response.abstraction || fallbackName || token;
-    if (typeof _syncBootEntryFromSim === 'function') _syncBootEntryFromSim();
+    // Artifact retention is not approval to splice bytes into an executing
+    // machine. Explicit Prepare/Run or Load owns runtime admission.
+    if (typeof appendOutput === 'function') appendOutput(
+        'LUMP saved. Running machine unchanged; use explicit Prepare/Run or Load to install.', 'info');
     return committedWords;
 }
 
@@ -16822,7 +16823,7 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
 
 async function confirmSaveToNamespace() {
     const slotSel = document.getElementById('saveNSSlot');
-    if (!_saveNSPickerReady || slotSel.disabled ||
+    if (!_saveNSPickerReady || !_saveNSNamespaceFingerprint || slotSel.disabled ||
             !Array.from(slotSel.options).some(option =>
                 option.value === slotSel.value && !option.disabled)) {
         _setSaveNSFeedback('error', 'Choose a destination from the committed Namespace snapshot before saving.');
@@ -17215,6 +17216,7 @@ async function confirmSaveToNamespace() {
                 capability_type: gtType === 1 ? 'inform' :
                     (gtType === 2 ? 'outform' : 'abstract'),
                 namespace_sequence: _targetSequence,
+                namespaceFingerprint: _saveNSNamespaceFingerprint,
                 replacement: slotSel.value !== 'new',
                 // New Entry is a server allocation request, never a browser
                 // assertion that its observed first-free slot remains free.

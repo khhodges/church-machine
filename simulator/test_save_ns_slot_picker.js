@@ -97,6 +97,7 @@ const before = JSON.stringify({ committed, bootConfig, catalog });
 const flush = () => new Promise(resolve => setImmediate(resolve));
 (async () => {
     context.showSaveToNamespace();
+    assert.strictEqual(context._saveNSNamespaceFingerprint, null);
     assert(slotSel.disabled);
     assert(element('saveNSConfirmBtn').disabled);
     context.closeSaveDialog();
@@ -112,6 +113,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
     latest.resolve({ ok: true, json: async () => committed });
     await flush();
     assert.strictEqual(slotSel.options.length, 17);
+    assert.strictEqual(context._saveNSNamespaceFingerprint, 'committed-fingerprint');
     assert.strictEqual(slotSel.options[15].textContent, '[14] ide.Alice');
     assert.strictEqual(slotSel.options[16].textContent, '[15] ide.Mallory');
     assert.strictEqual(slotSel.value, 'new', 'no implicit name-based replacement without an owner');
@@ -130,6 +132,7 @@ const flush = () => new Promise(resolve => setImmediate(resolve));
     assert.strictEqual(element('saveNSLabel').value, 'ide.Alice',
         'selection must not read stale live Namespace labels');
     context.closeSaveDialog();
+    assert.strictEqual(context._saveNSNamespaceFingerprint, null);
     assert.strictEqual(JSON.stringify({ committed, bootConfig, catalog }), before,
         'opening and cancelling must not modify authority or boot config');
 

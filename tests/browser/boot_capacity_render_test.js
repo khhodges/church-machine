@@ -98,3 +98,17 @@ assert.match(root.innerHTML, /128 words \(512 bytes\)<\/td><td>0x10<\/td><td>0x8
 assert.match(root.innerHTML, /Installation unverified — Exact selected artifact is missing/);
 context._renderBootCapacity({ denseBytes: null, rows: [], warnings: ['No image'] });
 assert.match(root.innerHTML, /Cannot calculate — no committed boot image/);
+context._renderBootCapacity({
+    denseBytes: null, trusted: false, warnings: ['Invalid placement'],
+    rows: [
+        { slot: 13, name: 'M_BIT_DEV', entryKind: 'mmio',
+            physicalByteAddress: 0xFFFFFF1C, status: 'Memory-mapped I/O — no LUMP RAM body' },
+        { slot: 14, name: 'ide.Alice', imageEvidence: {
+            locationWord: 1024, allocatedWords: 256, verifiedSelection: false },
+            status: 'saved code words=8; image code words=9' },
+    ],
+});
+assert.match(root.innerHTML, /M_BIT_DEV/);
+assert.match(root.innerHTML, /0xFFFFFF1C \(physical byte address\)/);
+assert.match(root.innerHTML, /Image evidence only \(not validated placement\): 0x400–0x4FF/);
+assert.match(root.innerHTML, /saved code words=8; image code words=9/);

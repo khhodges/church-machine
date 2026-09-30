@@ -53,9 +53,12 @@ const context = {
         _nsState: {
             namespaceFingerprint: 'fixture-a',
             abstractions: [
-                { slot: 2, load_policy: 'Lazy' },
-                { slot: 3, load_policy: 'Resident' },
-                { slot: 4, load_policy: 'Empty' },
+                { slot: 0, name: 'Boot.NS' },
+                { slot: 1, name: 'Worker.Thread' },
+                { slot: 2, name: 'Tunnel', load_policy: 'Lazy' },
+                { slot: 3, name: 'Ethernet', load_policy: 'Resident' },
+                { slot: 4, name: 'Pending.Empty', load_policy: 'Empty' },
+                { slot: 13, name: 'M_BIT_DEV' },
             ],
         },
         bootConfig: { slotRules: {}, step2: { lumps: [] } },
@@ -114,14 +117,14 @@ assert.deepStrictEqual(
         garbage: current.counts.garbage,
         free: current.counts.free,
     },
-    { resident: 4, lazy: 1, garbage: 1, free: 250 });
+    { resident: 4, lazy: 1, garbage: 1, free: 249 });
 
 // Empty is projected capacity, not revocation garbage. A cleared generation is
 // Garbage and therefore excluded from Free until the slot is reissued.
 assert.strictEqual(current.slots[4].classification, 'free');
 assert.strictEqual(current.slots[5].classification, 'garbage');
 assert.strictEqual(
-    current.counts.resident + current.counts.lazy +
+    current.counts.assigned +
         current.counts.garbage + current.counts.free,
     current.counts.max);
 
@@ -152,12 +155,11 @@ assert.strictEqual(current.slots[2].classification, 'lazy');
 assert.strictEqual(current.slots[3].classification, 'lazy');
 assert.strictEqual(current.slots[4].classification, 'free');
 
-// Clear/reissue transition: the retained generation is Garbage, then an
-// occupied reissue removes it and follows authoritative Resident policy.
+// Runtime clearing alone cannot revoke an approved assignment.
 entries.delete(3);
 context.sim._nsFreeSequences[3] = 8;
 current = snapshot();
-assert.strictEqual(current.slots[3].classification, 'garbage');
+assert.strictEqual(current.slots[3].classification, 'lazy');
 entries.set(3, { label: 'Ethernet', word0_location: 700 });
 delete context.sim._nsFreeSequences[3];
 context.window._nsState.abstractions =
@@ -166,4 +168,19 @@ context.window._nsState.abstractions =
 current = snapshot();
 assert.strictEqual(current.slots[3].classification, 'resident');
 
-console.log('namespace summary counts: 18 assertions passed');
+// Stale runtime/catalog labels cannot invent or rename assignments.
+entries.set(16, { label: 'Ghost', word0_location: 800 });
+context.sim.nsCount = 17;
+context.sim.nsLabels[16] = 'Ghost';
+current = snapshot();
+assert.strictEqual(current.displayCount, 6);
+context.window._nsState.abstractions.push({ slot: 14, name: 'ide.Alice', load_policy: 'Resident' });
+entries.set(14, { label: 'Bridge.Preload', word0_location: 1024 });
+current = snapshot();
+assert.strictEqual(current.slots[14].entry.label, 'ide.Alice');
+context.window._nsDraftAssignments = { 17: { slot: 17, name: 'ide.Draft' } };
+entries.set(17, { label: 'stale', word0_location: 0 });
+current = snapshot();
+assert.strictEqual(current.slots[17].entry.label, 'ide.Draft');
+assert.strictEqual(current.slots[16].entry, null);
+console.log('namespace summary authority and counts: passed');

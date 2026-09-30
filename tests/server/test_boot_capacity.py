@@ -1,5 +1,6 @@
 """Isolated read-only capacity geometry; no live boot state is rewritten."""
 import hashlib
+import json
 import struct
 import zlib
 
@@ -39,7 +40,12 @@ def _fixture(tmp_path, monkeypatch, *, size=128, thread=False, second=False):
             row.update({"filename": name, "token": "%08x" % slot,
                         "binary_hash": hashlib.sha256(raw).hexdigest()})
         rows.append(row)
-    return rows, struct.pack("<%dI" % total, *image)
+    raw_image = struct.pack("<%dI" % total, *image)
+    (tmp_path / "boot-image.provenance.json").write_text(json.dumps({
+        "namespace_fingerprint": boot_capacity.boot_image.namespace_fingerprint(rows),
+        "image_sha256": hashlib.sha256(raw_image).hexdigest(),
+    }))
+    return rows, raw_image
 
 
 def test_valid_exact_saved_geometry_and_unclassified_not_padding(tmp_path, monkeypatch):
@@ -186,3 +192,56 @@ def test_advisory_only_on_wukong_sized_window(tmp_path, monkeypatch):
     assert boot_capacity.capacity_report([], bytes(16384 * 4), str(tmp_path),
         target_board="wukong-xc7a100t")[
         "advisory"]["applies"]
+
+
+def test_all_assignments_and_mmio_are_visible_without_ram_claims(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    rows.extend([
+        {"slot": 13, "name": "M_BIT_DEV", "location": "0xFFFFFF1C"},
+        {"slot": 15, "name": "ide.Design", "location": "0x0",
+         "symbolic": True, "implementationMissing": True},
+        {"slot": 16, "name": "ide.Unverified", "load_policy": "Lazy"},
+    ])
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path))
+    mapped = {row["slot"]: row for row in report["rows"]}
+    assert set(mapped) == {1, 13, 15, 16}
+    assert mapped[13]["physicalByteAddress"] == 0xFFFFFF1C
+    assert mapped[13]["ramWords"] == 0
+    assert mapped[13]["allocatedWords"] is None
+    assert mapped[15]["entryKind"] == "design"
+    assert mapped[16]["allocatedWords"] is None
+
+
+def test_mismatch_retains_full_overlap_evidence_and_exact_header_fields(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch, second=True)
+    words = list(struct.unpack("<1280I", image))
+    words[1280 - 12] = 100
+    words[100] = words[300] + (1 << 10)
+    rows[1]["location"] = hex(100)
+    report = boot_capacity.capacity_report(rows, struct.pack("<1280I", *words), str(tmp_path))
+    mismatch = report["rows"][1]
+    assert mismatch["allocatedWords"] is None
+    assert mismatch["imageEvidence"]["allocatedWords"] == 128
+    assert "code words=2" in mismatch["status"]
+    assert "code words=3" in mismatch["status"]
+    assert any("0x64–0x8F" in warning for warning in report["warnings"])
+    assert report["freeWords"] is None
+
+
+def test_symbolic_executable_contradiction_is_not_normalized(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    rows[0].update(symbolic=True, implementationMissing=True)
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path))
+    assert "Contradictory Namespace assignment" in report["rows"][0]["status"]
+    assert rows[0]["resident"] is True and rows[0]["filename"]
+
+
+def test_stale_namespace_fingerprint_never_claims_current_installation(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    rows[0]["name"] = "ide.NewApprovedName"
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path))
+    assert not report["imageMatchesNamespaceRevision"]
+    assert not report["trusted"]
+    assert report["freeWords"] is None
+    assert not report["rows"][0]["imageEvidence"]["verifiedSelection"]
+    assert report["rows"][0]["name"] == "ide.NewApprovedName"

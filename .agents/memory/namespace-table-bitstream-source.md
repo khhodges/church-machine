@@ -22,6 +22,19 @@ image generation, and publication.
 **How to apply:** Preserve exact artifact identity across boundaries; distinguish
 artifact hashes from descriptor seals that depend on physical placement.
 
+Approval is bound to the complete reviewed Namespace revision, not just a
+destination slot. A concurrent change requires fresh review; retries must not
+silently fetch a new revision and reuse the old consent. Saving an artifact is
+not permission to install it into the running simulator.
+
+**Why:** The programmer explicitly required their approved Namespace to be the
+only assignment authority after independent save paths produced contradictory
+state. Preserving a slot number alone does not preserve the reviewed plan.
+
+**How to apply:** Keep approved assignments, local uncommitted drafts, stored
+image evidence, and hardware observations distinct. Invalid historical data
+stays inspectable but cannot be silently normalized or published.
+
 **Why:** The manifest contains catalog, lazy-load, example, and historical artifacts in addition to resident hardware content; treating it as authoritative makes Build Approval and image tooling report unrelated or stale LUMPs and metadata.
 
 **How to apply:** Build-image generation and Build Approval must derive membership and metadata from the final Namespace Table and its assigned slot/LUMP data. The manifest may be treated only as an untrusted catalog or lookup aid, never as truth. Lazy/runtime catalog entries are not bitstream LUMPs unless explicitly represented in the Namespace Table.

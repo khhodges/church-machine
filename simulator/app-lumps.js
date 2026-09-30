@@ -9868,6 +9868,25 @@ function _showLumpSaveStaleConflictDialog(response) {
 }
 window._showLumpSaveStaleConflictDialog = _showLumpSaveStaleConflictDialog;
 
+async function _freezeLumpSaveNamespaceRevision(metadata) {
+    const promotionSlot = metadata.promotion_binding && metadata.promotion_binding.ns_slot;
+    const bound = metadata.ns_slot !== null && metadata.ns_slot !== undefined ||
+        metadata.new_entry === true || metadata.ns_slot_policy === 'dynamic' ||
+        promotionSlot !== null && promotionSlot !== undefined;
+    if (!bound || metadata.namespaceFingerprint) return;
+    // Acquire once before review, never on commit or retry. The original
+    // metadata carries this same revision through plan, approval and save.
+    const response = await fetch('/api/boot-image/ns-state', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Cannot review Namespace: HTTP ${response.status}`);
+    const state = await response.json();
+    if (!state || !Array.isArray(state.abstractions) ||
+            typeof state.namespaceFingerprint !== 'string' || !state.namespaceFingerprint.trim()) {
+        throw new Error('Cannot review Namespace: committed revision unavailable');
+    }
+    metadata.namespaceFingerprint = state.namespaceFingerprint;
+}
+window._freezeLumpSaveNamespaceRevision = _freezeLumpSaveNamespaceRevision;
+
 async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     if (!metadata || typeof metadata !== 'object') metadata = {};
     const _saveDiagnostics = typeof window !== 'undefined'
@@ -9890,6 +9909,10 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
             ? JSON.parse(JSON.stringify(metadata)) : {};
     } catch (_) {
         _metadataSnapshot = Object.assign({}, metadata || {});
+    }
+    await _freezeLumpSaveNamespaceRevision(_metadataSnapshot);
+    if (_metadataSnapshot.namespaceFingerprint) {
+        metadata.namespaceFingerprint = _metadataSnapshot.namespaceFingerprint;
     }
     let plan;
     let stopLeaseHeartbeat = null;

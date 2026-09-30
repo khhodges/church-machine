@@ -1455,7 +1455,7 @@ async function _doWipVersionSave() {
     const _attestedCompilerRecord = savePayload.metadata.compiler_record;
     savePayload.metadata.compiler_record = _attestedCompilerRecord;
     let _wipApproval = null;
-    if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation)) {
+    { // Compiler attestation proves bytes, not consent to change Namespace.
         _wipApproval = await window._confirmLumpSavePlan(
             savePayload.binary, savePayload.metadata,
             () => `Save the tested version of "${absName}"?`);
@@ -1595,7 +1595,7 @@ async function _confirmLumpRelease() {
     if (notes) data.savePayload.metadata.release_notes = notes;
     const _attestedCompilerRecord = data.savePayload.metadata.compiler_record;
     let _releaseApproval = null;
-    if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation)) {
+    { // Release approval includes the frozen Namespace revision.
         _releaseApproval = await window._confirmLumpSavePlan(
             data.savePayload.binary, data.savePayload.metadata,
             () => `Release version "${ver}" of "${data.absName}"?`);
@@ -2554,7 +2554,7 @@ async function compileAndBuild(options) {
     const compiler_record = _attestedCompilerRecord;
     const _trustedSaveMetadata = { compiler_record: _attestedCompilerRecord };
     let _buildApproval = null;
-    if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation)) {
+    { // A trusted compiler must still obtain explicit publication approval.
         _buildApproval = await window._confirmLumpSavePlan(
             savePayload.binary, savePayload.metadata,
             () => `Save "${absName}" as an immutable LUMP?\n\nApproval will be bound to the exact SHA-256 of the compiled binary.`);

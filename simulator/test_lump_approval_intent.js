@@ -184,24 +184,24 @@ vm.runInContext(source.slice(start, end), sandbox);
     check('retired WIP source endpoint is absent', !shell.includes('/wip-source'));
 
     const loaderStart = lumps.indexOf('async function _loadLumpBinaryIntoSim(');
-    const loaderEnd = lumps.indexOf('\nasync function _lumpGTNameCommit', loaderStart);
+    const loaderEnd = lumps.indexOf('// ── Run Selftest shortcut', loaderStart);
     const localLoader = lumps.slice(loaderStart, loaderEnd);
-    check('local simulator deployment confirms, consumes deploy intent, then loads',
+    const loadAt = localLoader.indexOf('const loaded = sim.loadLumpBinary(');
+    const validateAt = localLoader.indexOf('_validateSavedLumpClist(');
+    const hashAt = localLoader.indexOf('Saved binary response does not match');
+    const bootAt = localLoader.indexOf('if (!sim.bootComplete && typeof instantBoot');
+    check('explicit local Load validates exact saved bytes without server publication',
         loaderStart >= 0 && loaderEnd > loaderStart &&
         localLoader.includes('_loadSavedLumpCapabilities(token, data)') &&
-        localLoader.includes('if (!confirm(`Deploy "') &&
-        localLoader.includes("_requestLumpApprovalIntent(rawWords, 'deploy'") &&
-        localLoader.includes("fetch('/api/lumps/deploy-authorize'") &&
-        localLoader.indexOf("fetch('/api/lumps/deploy-authorize'") <
-            localLoader.indexOf('sim.loadLumpBinary('));
-    check('cancel or authorization failure occurs before simulator mutation',
-        localLoader.indexOf('if (!confirm(`Deploy "') <
-            localLoader.indexOf('if (!sim.bootComplete && typeof instantBoot') &&
-        localLoader.indexOf('if (!_deployAuth.ok || !_deployResult.ok)') <
-            localLoader.indexOf('if (!sim.bootComplete && typeof instantBoot'));
-    check('authorization succeeds before any boot-entry memory mutation',
-        localLoader.indexOf('if (!_deployAuth.ok || !_deployResult.ok)') <
-            localLoader.indexOf('sim.bootEntrySlot = _BOOT_SLOT'));
+        hashAt >= 0 && hashAt < loadAt &&
+        !localLoader.includes('/api/lumps/deploy-authorize') &&
+        !localLoader.includes('/api/lumps/save') &&
+        localLoader.includes('activateExecution: true'));
+    check('saved capability validation precedes boot and runtime admission',
+        validateAt >= 0 && validateAt < bootAt && bootAt < loadAt);
+    check('local Load does not select the next boot entry',
+        !/sim\.bootEntrySlot\s*=/.test(localLoader) &&
+        localLoader.includes('Deployment is not a Prepare action'));
 
     // A strict approval has no capability/method/profile/language fields. Build
     // declarations from the exact embedded frame + c-list and install the same

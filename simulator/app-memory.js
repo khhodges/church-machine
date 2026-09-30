@@ -307,19 +307,31 @@ function _renderBootCapacity(report) {
             Number.isSafeInteger(row.savedAllocationWords)
                 ? words(row.savedAllocationWords) + ' (saved; not installed size)'
                 : 'Unknown';
-        const status = entry.reserved ? 'Reserved' :
-            entry.base !== null ? 'Installed — ' + (row.status || 'verified geometry') :
+        const status = entry.reserved ? 'Reserved descriptor storage' :
+            row.entryKind === 'mmio' || row.entryKind === 'namespace' ? row.status :
+            entry.base !== null ? (report.imageMatchesNamespaceRevision === true
+                ? 'Image geometry verified for approved revision — '
+                : 'Image evidence only; approved revision not verified — ') + (row.status || 'verified geometry') :
             row.designOnly || row.status === 'Design-only symbolic placement; not installed'
-                ? 'Not installed — design placement' :
+                ? (row.status || 'Not installed — design placement') :
                 'Installation unverified — ' + (row.status || 'no validated geometry');
+        const evidence = row.imageEvidence;
+        const evidenceText = evidence && !evidence.verifiedSelection
+            ? ' Image evidence only (not validated placement): ' +
+                address(evidence.locationWord) + '–' +
+                address(evidence.locationWord + evidence.allocatedWords - 1) +
+                ' word addresses; ' + evidence.allocatedWords + ' words.'
+            : '';
         html += '<tr' + (overlap ? ' style="background:rgba(248,113,113,0.18);"' : '') +
             '><td>' + (entry.reserved ? _escHtml(row.name) + ' (Reserved)' :
                 'NS[' + _escHtml(String(row.slot)) + '] ' + _escHtml(String(row.name || ''))) +
-            '</td><td>' + size + '</td><td>' +
-            (entry.base === null ? '—' : address(entry.base)) + '</td><td>' +
+            '</td><td>' + (row.entryKind === 'mmio' ? 'No LUMP RAM body' : size) + '</td><td>' +
+            (row.entryKind === 'mmio' && Number.isSafeInteger(row.physicalByteAddress)
+                ? address(row.physicalByteAddress) + ' (physical byte address)'
+                : entry.base === null ? '—' : address(entry.base)) + '</td><td>' +
             (entry.base === null ? '—' : address(entry.base + entry.size - 1)) +
             '</td><td>' + (overlap ? '<strong>Overlap — </strong>' : '') +
-            _escHtml(status) + '</td></tr>';
+            _escHtml(status + evidenceText + (row.issues || []).join('; ')) + '</td></tr>';
     }
     html += '</tbody></table></div><details' + (!trusted ? ' open' : '') +
         '><summary>Layout validation and budget details</summary>' + details +
@@ -340,6 +352,10 @@ async function refreshBootCapacity() {
         const response = await fetch('/api/boot-image/capacity', { cache: 'no-store' });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Capacity request failed');
+        if (window._nsState && window._nsState.namespaceFingerprint &&
+                data.namespaceFingerprint !== window._nsState.namespaceFingerprint) {
+            throw new Error('The approved Namespace revision changed. Reload the Namespace before viewing capacity; stale and current assignments were not merged.');
+        }
         _renderBootCapacity(data);
     } catch (error) {
         root.textContent = 'Capacity report unavailable: ' +
@@ -773,9 +789,13 @@ function _nsApplyArtifactBindingForSave(rich, saved, explicit, symbolic) {
 }
 (function _initNsStateFetch() {
     fetch('/api/boot-image/ns-state', { cache: 'no-store' })
-        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(r) {
+            if (!r.ok) throw new Error('Namespace authority request failed (HTTP ' + r.status + ')');
+            return r.json();
+        })
         .then(function(s) {
-            if (!s || typeof s !== 'object') return;
+            if (!s || !Array.isArray(s.abstractions)) throw new Error('Namespace authority response is incomplete');
+            window._nsStateError = null;
             window._nsState = s;
             _renderBootExecutionFreshness(s);
             _hydrateNsSymbolicState();
@@ -784,7 +804,10 @@ function _nsApplyArtifactBindingForSave(rich, saved, explicit, symbolic) {
             }
             if (typeof updateNamespace === 'function') updateNamespace();
         })
-        .catch(function() {});
+        .catch(function(error) {
+            window._nsStateError = error.message;
+            if (typeof updateNamespace === 'function') updateNamespace();
+        });
 })();
 
 // ── NS table dirty tracking ──────────────────────────────────────────────────
@@ -968,9 +991,15 @@ function _namespaceSummarySnapshot() {
         ? window._nsState.abstractions : [];
     const freeSequences = sim && sim._nsFreeSequences
         ? sim._nsFreeSequences : {};
-    let lastRelevantSlot = Math.max(0, Number(sim && sim.nsCount) || 0) - 1;
+    let lastRelevantSlot = -1;
     authorityRows.forEach(function(row) {
         const slot = row && Number(row.slot);
+        if (Number.isInteger(slot)) lastRelevantSlot = Math.max(lastRelevantSlot, slot);
+    });
+    const stagedRows = Object.assign({}, window._nsDraftAssignments || {},
+        window._nsExplicitArtifactBindings || {});
+    Object.keys(stagedRows).forEach(function(rawSlot) {
+        const slot = Number(rawSlot);
         if (Number.isInteger(slot)) lastRelevantSlot = Math.max(lastRelevantSlot, slot);
     });
     Object.keys(freeSequences).forEach(function(rawSlot) {
@@ -980,19 +1009,23 @@ function _namespaceSummarySnapshot() {
 
     const displayCount = Math.min(max, Math.max(0, lastRelevantSlot + 1));
     const slots = [];
-    const counts = { max, resident: 0, lazy: 0, garbage: 0, free: 0 };
+    const counts = { max, assigned: 0, resident: 0, lazy: 0, garbage: 0, free: 0 };
     for (let slot = 0; slot < displayCount; slot++) {
-        const entry = sim.readNSEntry(slot);
-        const hasClearedGeneration = !entry &&
+        const assigned = authorityRows.find(row => row && Number(row.slot) === slot);
+        const staged = stagedRows[String(slot)];
+        if (assigned || staged) counts.assigned++;
+        const liveEntry = sim.readNSEntry(slot);
+        const entry = (assigned || staged) && liveEntry
+            ? Object.assign({}, liveEntry, { label: (staged || assigned).name }) : null;
+        const hasClearedGeneration = !entry && !assigned && !staged &&
             Object.prototype.hasOwnProperty.call(freeSequences, String(slot)) &&
             Number.isInteger(freeSequences[slot]);
         let classification = 'free';
         let policy = null;
         if (hasClearedGeneration) {
             classification = 'garbage';
-        } else if (entry) {
-            const label = entry.label ||
-                (sim.nsLabels && sim.nsLabels[slot]) || '';
+        } else if (assigned || staged) {
+            const label = (staged || assigned).name || '';
             const manifest = sim.lazyManifest ? sim.lazyManifest[slot] : null;
             if (_isBootstrapSlot(slot, label) ||
                     _isResidentIORegister(slot, label) ||
@@ -1013,8 +1046,7 @@ function _namespaceSummarySnapshot() {
             clearedGeneration: hasClearedGeneration ? freeSequences[slot] : null,
         });
     }
-    counts.free = Math.max(
-        0, counts.max - counts.resident - counts.lazy - counts.garbage);
+    counts.free = Math.max(0, counts.max - counts.assigned - counts.garbage);
     return { max, displayCount, slots, counts };
 }
 window._namespaceSummarySnapshot = _namespaceSummarySnapshot;
@@ -4122,6 +4154,12 @@ function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;
     if (!sim) return;
+    if (!window._nsState || !Array.isArray(window._nsState.abstractions)) {
+        container.textContent = window._nsStateError
+            ? 'Namespace unavailable: ' + window._nsStateError + '. Reload to retry; runtime and catalog names are not authoritative.'
+            : 'Loading approved Namespace…';
+        return;
+    }
     _hydrateNsSymbolicState();
     if (window._nsPrefetchDirty === undefined) window._nsPrefetchDirty = false;
     // Lazily warm the LumpRegistry server list so Source buttons appear even on
@@ -4151,8 +4189,9 @@ function updateNamespace() {
     let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 4 words per entry (128 bits; word3 reserved) \u2014 click a row to inspect memory</div>';
     html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
     html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Total NS slots available in this boot image');
-    html += _statChip('Resident', _cntResident, '#4ec9b0', 'Slots with lump code fully resident in DMEM');
-    html += _statChip('Lazy Load',_cntLazy,     '#f0a040', 'Slots evicted — code loads on first CALL');
+    html += _statChip('Assigned', _nsSnapshot.counts.assigned, '#a0c0e0', 'Approved assignments and explicit local drafts; not proof of image installation');
+    html += _statChip('Resident policy', _cntResident, '#4ec9b0', 'Selected policy or architectural object kind, not proof of installed bytes');
+    html += _statChip('Lazy policy',_cntLazy,     '#f0a040', 'Selected next-build policy, not observed hardware state');
     html += _statChip('Garbage',  _cntGarbage,  '#f87171', 'Cleared slots — GT cycle count bumped, content zeroed');
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
@@ -4462,12 +4501,12 @@ function updateNamespace() {
             html += `<tr id="ns-row-${i}" class="ns-row" style="opacity:0.45;">`;
             html += `<td class="ns-idx-cell"><span style="color:#666;">${i}</span></td>`;
             html += _savedVersionCell;
-            const _gapLabel = (sim.nsLabels && sim.nsLabels[i] && sim.nsLabels[i] !== '(free)' && sim.nsLabels[i] !== '(reserved)') ? sim.nsLabels[i] : '';
+            const _gapLabel = _assignedRow ? _assignedRow.name : '';
             if (_snapshotRow.classification === 'garbage') {
                 html += `<td colspan="8" style="color:#875f5f;font-style:italic;font-size:0.8rem;">(cleared; generation ${_snapshotRow.clearedGeneration} retained for revocation)</td>`;
             } else if (_gapLabel) {
                 html += `<td class="ns-label ns-label-clickable" style="color:#666;font-style:italic;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open ${_escHtml(_gapLabel)}">${_escHtml(_gapLabel)}</td>`;
-                html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">(no DMEM entry)</td>`;
+                html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">Assigned in approved Namespace; no matching runtime entry</td>`;
             } else {
                 html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(no entry installed)</td>`;
             }
@@ -4930,6 +4969,8 @@ async function _nsAddPlacementConfirm() {
         if (btn) { btn.disabled = true; btn.textContent = 'Saving placement…'; }
         const result = sim.defineSymbolicAbstraction(nameEl.value,
             slotText ? Number(slotText) : null, selection);
+        window._nsDraftAssignments = window._nsDraftAssignments || {};
+        window._nsDraftAssignments[result.slot] = { name: result.name, slot: result.slot };
         _setNsDirty(true);
         updateNamespace();
         const saved = await window._nsTableSave(document.getElementById('nsSaveBtn'));
@@ -4993,6 +5034,8 @@ async function _nsDefineSymbolicConfirm() {
         const slotText = slotEl ? slotEl.value.trim() : '';
         const result = sim.defineSymbolicAbstraction(nameEl ? nameEl.value : '',
             slotText === '' ? null : Number(slotText));
+        window._nsDraftAssignments = window._nsDraftAssignments || {};
+        window._nsDraftAssignments[result.slot] = { name: result.name, slot: result.slot };
         if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
         _setNsDirty(true);
         updateNamespace();
@@ -5838,6 +5881,8 @@ async function _nsKeepPendingAsPlacement(slot) {
     }
     if (sim.lazyManifest) delete sim.lazyManifest[slot];
     sim.defineSymbolicAbstraction(binding.name, slot, selection);
+    window._nsDraftAssignments = window._nsDraftAssignments || {};
+    window._nsDraftAssignments[slot] = { name: binding.name, slot };
     delete window._nsExplicitArtifactBindings[String(slot)];
     // A previous committed symbolic version of this slot must not rehydrate
     // over the newly retained generation before its replacement is saved.
@@ -5895,6 +5940,7 @@ function _nsTableClear(slot) {
     if (window._nsExplicitArtifactBindings) {
         delete window._nsExplicitArtifactBindings[String(slot)];
     }
+    if (window._nsDraftAssignments) delete window._nsDraftAssignments[String(slot)];
 
     _setNsDirty(true);
     if (typeof updateNamespace === 'function') updateNamespace();
@@ -6073,13 +6119,24 @@ window._nsTableSave = async function(btn) {
         for (const _saved of _savedEntries) {
             if (!_saved || !Number.isInteger(_saved.slot)) continue;
             _savedBySlot.set(_saved.slot, _saved);
+            if (!sim.readNSEntry(_saved.slot)) {
+                throw new Error(`Namespace Save refused: approved NS[${_saved.slot}] ${_saved.name} has no runtime descriptor. Reload the approved Namespace; missing runtime state cannot delete an assignment.`);
+            }
         }
         const nsAbstractions = [];
         for (let _si = 0; _si < sim.nsCount; _si++) {
             const _e = sim.readNSEntry(_si);
             if (!_e) continue;   // unoccupied slot
-            const _lbl = sim.nsLabels[_si] || `slot_${_si}`;
-            if (!_lbl || _lbl === '(free)' || _lbl === '(reserved)') continue;
+            const _approved = _savedBySlot.get(_si);
+            const _draft = (window._nsExplicitArtifactBindings || {})[String(_si)] ||
+                (window._nsDraftAssignments || {})[String(_si)];
+            if (!_approved && !_draft) {
+                throw new Error(`Namespace Save refused: runtime NS[${_si}] has no approved assignment or explicit local draft. Runtime entries cannot create Namespace assignments.`);
+            }
+            const _lbl = (_draft || _approved).name;
+            if (typeof _lbl !== 'string' || !_lbl.trim()) {
+                throw new Error(`Namespace Save refused: NS[${_si}] has no approved Pet Name.`);
+            }
             const _pW1 = sim.parseNSWord1(_e.word1_limit);
             const _loc  = _e.word0_location >>> 0;
             const _lim  = _pW1.limit & 0x1FFFF;
@@ -6227,6 +6284,7 @@ window._nsTableSave = async function(btn) {
         window._nsPrefetchDirty = false;
         window._nsPrefetchDirtySlots = {};
         window._nsExplicitArtifactBindings = {};
+        window._nsDraftAssignments = {};
 
         if (btn) {
             btn.textContent = cacheRefreshError

@@ -50,6 +50,7 @@ from server.lump_integrity import (
 from server.bootstrap_identity import (
     bootstrap_t_from_self_gt, verify_bootstrap_self_gt,
 )
+from server.namespace_authority import validate_namespace_rows, namespace_fingerprint
 import os
 import re
 import struct
@@ -2171,7 +2172,8 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
 
 
 def validate_resident_artifact_bindings(
-        image_bytes, lumps_dir, require_provenance_image_digest=True):
+        image_bytes, lumps_dir, require_provenance_image_digest=True,
+        ns_state_path=None):
     """Require each Namespace-selected resident artifact to match the image.
 
     The Namespace descriptor does not serialize a filename, so exact binding is
@@ -2200,10 +2202,17 @@ def validate_resident_artifact_bindings(
     except (OSError, ValueError, TypeError) as exc:
         raise ValueError(f"boot image generation provenance is unavailable: {exc}") from exc
     try:
-        with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as state_file:
+        with open(ns_state_path or os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as state_file:
             state = json.load(state_file)
     except (OSError, ValueError, TypeError) as exc:
         raise ValueError(f"resident binding inventory is unavailable: {exc}") from exc
+    entries = state.get("abstractions") if isinstance(state, dict) else None
+    validate_namespace_rows(entries)
+    if provenance.get("namespace_fingerprint") != namespace_fingerprint(entries):
+        raise ValueError(
+            "Boot image Namespace revision differs from the approved Namespace "
+            "or its revision provenance is missing; review and explicitly prepare "
+            "an image from the current Namespace. No state was changed.")
     state_by_slot = {
         row["slot"]: row for row in state.get("abstractions", [])
         if isinstance(row, dict) and isinstance(row.get("slot"), int)
@@ -2262,7 +2271,9 @@ def validate_resident_artifact_bindings(
             raise ValueError(f"resident NS slot {slot} has an invalid image location")
         actual = image_words[location:location + len(expected)]
         image_cc = image_words[location] & 0xFF
-        image_allocation = _ns_word1_get(authority, "limit_offset") + image_cc + 1
+        # A capability limit restricts access; it is not the allocated body.
+        # Compare the full header allocation even for deliberately short limits.
+        image_allocation = 1 << (((image_words[location] >> 23) & 0xF) + 6)
         if image_allocation != len(expected):
             raise ValueError(
                 f"resident NS slot {slot} allocation is stale "
@@ -2299,6 +2310,8 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
     state_path = ns_state_path or os.path.join(lumps_dir, "ns-state.json")
     with open(state_path, encoding="utf-8") as state_file:
         state = json.load(state_file)
+    entries = state.get("abstractions") if isinstance(state, dict) else None
+    validate_namespace_rows(entries)
     rows = []
     for binding in state.get("abstractions", []):
         if (not isinstance(binding, dict)
@@ -2350,6 +2363,7 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
     return {
         "version": 1,
         "image_sha256": hashlib.sha256(image_bytes).hexdigest(),
+        "namespace_fingerprint": namespace_fingerprint(entries),
         "resident_bindings": sorted(rows, key=lambda row: row["slot"]),
     }
 

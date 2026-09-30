@@ -6787,6 +6787,7 @@ def _stage_namespace_save_image(cfg, entries):
     """
     import shutil
     from pathlib import Path
+    _validate_namespace_publication(entries)
     with tempfile.TemporaryDirectory(prefix="namespace-save-") as directory:
         stage = Path(directory) / "lumps"
         shutil.copytree(LUMPS_DIR, stage)
@@ -6820,6 +6821,7 @@ def _stage_prepare_run_boot_image(cfg, prepared_rows, entry_slot, for_hardware):
     """
     import shutil
     from pathlib import Path
+    _validate_namespace_publication(prepared_rows)
     with tempfile.TemporaryDirectory(prefix="prepare-run-") as directory:
         stage = Path(directory) / "lumps"
         shutil.copytree(LUMPS_DIR, stage)
@@ -6829,6 +6831,22 @@ def _stage_prepare_run_boot_image(cfg, prepared_rows, entry_slot, for_hardware):
             cfg, str(stage), boot_entry_slot=entry_slot,
             require_entry_resident=for_hardware)
         _boot_image_gen.validate_boot_image(image)
+        # Publish the actual staged descriptors, not the pre-generation
+        # locations. Final provenance is bound after these rows are committed.
+        words = struct.unpack(f"<{len(image) // 4}I", image)
+        for row in prepared_rows:
+            base = len(words) - (row["slot"] + 1) * 4
+            if base < 0 or base + 3 >= len(words):
+                raise ValueError("Generated Namespace descriptor is outside image")
+            location, authority, seal, _ = words[base:base + 4]
+            if location == 0 and authority == 0:
+                continue
+            row.update(location=f"0x{location:08X}",
+                       limit=f"0x{authority & 0x1FFFFF:05X}",
+                       seq=(authority >> 21) & 0x1FF,
+                       g=(authority >> 30) & 1, f=(authority >> 31) & 1,
+                       seal=f"0x{seal:08X}")
+        _validate_namespace_publication(prepared_rows)
         return image
 
 
@@ -11021,6 +11039,7 @@ def _read_boot_entry_name_from_image():
 
 def _build_ns_state_document(entries):
     """Build the exact rich Namespace document without mutating the repository."""
+    _validate_namespace_publication(entries)
     import time as _tm_ns
     state = {
         "abstractions": list(entries or []),
@@ -11036,7 +11055,7 @@ def _build_ns_state_document(entries):
 
 def _write_ns_state(entries):
     """Write ns-state.json atomically — rich list of NS row objects."""
-    _validate_namespace_boot_marker(entries)
+    _validate_namespace_publication(entries)
     _tmp = NS_STATE_PATH + ".tmp"
     with _namespace_commit_guard():
         _state = _build_ns_state_document(entries)
@@ -11067,10 +11086,16 @@ def _prepare_saved_lump_ns_state(
     else:
         entries = []
 
+    _validate_namespace_publication(entries)
     entry = next(
         (row for row in entries
          if isinstance(row, dict) and row.get("slot") == ns_slot),
         None)
+    if entry and (entry.get("symbolic") is True
+                  or entry.get("implementationMissing") is True):
+        raise ValueError(
+            f"NS[{ns_slot}] is a design placement; saving an artifact cannot "
+            "install it. Review an explicit Namespace installation first.")
     if replace_abstraction:
         # A destination-bound bootstrap repair moves one logical abstraction;
         # it must not leave the superseded source binding active at its old
@@ -11100,11 +11125,14 @@ def _prepare_saved_lump_ns_state(
             # An occupied target is still programmer-replaceable. Remove the old
             # SelfTest binding so the selected target becomes its sole identity.
             entries.remove(selftest_entry)
+    destination_existed = entry is not None
     if entry is None:
         # A programmer may install into an unused non-bootstrap slot.  Sequence
         # zero is the initial live sequence for a newly allocated descriptor.
         entry = {"name": abstraction, "slot": ns_slot, "seq": 0}
         entries.append(entry)
+    existing_policy = {key: entry[key] for key in
+                       ("resident", "boot_resident", "load_policy") if key in entry}
     entry.update({
         "name": abstraction,
         "slot": ns_slot,
@@ -11115,7 +11143,34 @@ def _prepare_saved_lump_ns_state(
         "resident": True,
         "load_policy": "Resident",
     })
+    if destination_existed:
+        for key in ("resident", "boot_resident", "load_policy"):
+            entry.pop(key, None)
+    entry.update(existing_policy)
+    _validate_namespace_publication(entries)
     return entries
+
+
+def _check_namespace_save_revision(metadata):
+    expected = _expected_namespace_fingerprint(metadata)
+    if expected is None:
+        raise ValueError("namespaceFingerprint is required to review a Namespace-bound LUMP save")
+    rows, current = _read_authoritative_namespace_rows()
+    if current != expected:
+        raise ValueError("Namespace changed since review; reopen Save LUMP before approving")
+    _validate_namespace_publication(rows)
+    return current
+
+
+def _validate_namespace_publication(entries):
+    """Common admission gate for every rich Namespace publication."""
+    try:
+        from namespace_authority import validate_namespace_rows
+    except ImportError:
+        from server.namespace_authority import validate_namespace_rows
+    validate_namespace_rows(entries, MAX_NS_ENTRIES)
+    _validate_namespace_boot_marker(entries)
+    _validate_symbolic_namespace_entries(entries)
 
 
 def _namespace_state_fingerprint(entries):
@@ -12311,6 +12366,12 @@ def save_lump():
                 ),
             }), 400
     _bootstrap_identity = None
+    if ns_slot is not None:
+        try:
+            _check_namespace_save_revision(metadata)
+        except ValueError as exc:
+            return jsonify(error=str(exc), namespace_identity_failed=True,
+                           committed=False, safe_retry=True), 409
     if token_hint:
         token8 = str(token_hint).lower().zfill(8)[:8]
     elif ns_slot is not None:
@@ -13729,6 +13790,9 @@ def save_lump():
     if _early_plan is not None:
         if (token8 != _early_plan.get("token")
                 or ns_slot != _early_plan.get("ns_slot")
+                or (ns_slot is not None and
+                    _expected_namespace_fingerprint(metadata) !=
+                    _early_plan.get("namespaceFingerprint"))
                 or _binary_hash != _early_plan.get("digest")
                 or bool(_early_plan.get("save_as_latest", False)) != _save_as_latest
                 or list(_sl_words) != _early_plan.get("final_binary")):
@@ -13812,6 +13876,7 @@ def save_lump():
                 "compiler_record": _preflight_compiler_record,
                 "ns_slot": ns_slot,
                 "new_entry": metadata.get("new_entry") is True,
+                "namespaceFingerprint": _expected_namespace_fingerprint(metadata),
                 "candidate_id": _candidate_id,
                 "attempt_id": g._lump_save_diagnostic.get("attempt_id"),
                 "client_diagnostic_attempt_id": g._lump_save_diagnostic.get(
@@ -13911,6 +13976,13 @@ def save_lump():
     def _release_save_commit_namespace_guard(response):
         _save_commit_namespace_guard.__exit__(None, None, None)
         return response
+
+    if ns_slot is not None:
+        try:
+            _check_namespace_save_revision(metadata)
+        except ValueError as exc:
+            return jsonify(error=str(exc), namespace_identity_failed=True,
+                           committed=False, safe_retry=True), 409
 
     # Compare the active revision reserved by save-plan with a fresh manifest
     # snapshot before preparing any destination state. The transition helper
@@ -16156,6 +16228,7 @@ def _bootstrap_history_repair_candidate(current_token, version, archive_filename
         "_bootstrap_repair_destination": destination_binding,
         "_bootstrap_repair_source_row": destination["source_row"],
         "_bootstrap_repair_namespace_identity": destination["namespace_identity"],
+        "namespaceFingerprint": destination["namespace_identity"],
         "_bootstrap_repair_destination_identity": _manifest_entry_identity({
             "slot": destination["slot"],
             "seq": destination["sequence"],
@@ -25972,6 +26045,7 @@ def _commit_lump_history_transition(
                     namespace_rows = namespace_document.get("abstractions")
                     if not isinstance(namespace_rows, list):
                         raise ValueError("Namespace transition has no abstractions array")
+                    _validate_namespace_publication(namespace_rows)
                     for namespace_row in namespace_rows:
                         if not isinstance(namespace_row, dict):
                             continue

@@ -1,7 +1,6 @@
 'use strict';
 
-// Regression guard for task #3488: trusted compiler bytes must bypass the
-// approval/localization final_binary path, while untrusted bytes retain it.
+// Compiler byte attestation does not authorize Namespace publication.
 const fs = require('fs');
 const source = fs.readFileSync(__dirname + '/app-compile.js', 'utf8');
 
@@ -20,15 +19,11 @@ const approvalCalls = [...source.matchAll(/_confirmLumpSavePlan\s*\(/g)];
 check('three approval call sites remain (WIP, release, direct legacy)',
       approvalCalls.length === 3);
 
-// Every approval call must be guarded by the negative attestation predicate,
-// and final_binary localization must occur only inside that guarded branch.
+// All release paths obtain approval; byte evidence remains attached.
 for (const [index, match] of approvalCalls.entries()) {
     const before = source.slice(Math.max(0, match.index - 1200), match.index);
-    check(`approval call ${index + 1} has an attestation bypass guard`,
-          (/if\s*\(\s*!\s*\(/.test(before) ||
-           /if\s*\(\s*!_attestedCompilerRecord\s*\)/.test(before)) &&
-          (/compiler_record/.test(before) || /_attestedCompilerRecord/.test(before)) &&
-          (/attestation/.test(before) || /_attestedCompilerRecord/.test(before)));
+    check(`approval call ${index + 1} has no attestation bypass`,
+          !before.includes('if (!(_attestedCompilerRecord && _attestedCompilerRecord.attestation))'));
 }
 
 const finalBinaryAssignments = [...source.matchAll(

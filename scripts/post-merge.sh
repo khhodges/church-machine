@@ -3,6 +3,20 @@ set -e
 
 echo "Post-merge setup complete (no dependencies to install)"
 
+# A task merge may include saved runtime artifacts. Refuse to publish a changed
+# Namespace/image bundle unless the checked-out bundle passes the same read-only
+# semantic and image-admission rules as the server. Code-only merges do not
+# silently repair or require migration of the programmer's historical state.
+# --root also covers the first commit; -m includes every merge parent.
+CHANGED_RUNTIME=$(git diff-tree --root -m --no-commit-id --name-only -r HEAD -- server/lumps/)
+if [ -n "$CHANGED_RUNTIME" ]; then
+    echo "post-merge: validating changed Namespace/artifact bundle before publication"
+    if ! python3 scripts/check_namespace_authority.py --lumps-dir server/lumps; then
+        echo "post-merge: publication blocked; review Namespace diagnostics. No repair was attempted." >&2
+        exit 1
+    fi
+fi
+
 # Use a file lock so concurrent post-merge runs (rapid back-to-back task
 # merges) queue rather than racing on .git/config.lock — which caused the
 # 90 s timeout when two merges landed simultaneously.
