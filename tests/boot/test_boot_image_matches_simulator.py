@@ -477,6 +477,73 @@ def test_generated_thread_body_overlap_and_nondefault_boot_entry_are_rejected_or
             _cfg_generated_threads(5), str(tmp_path), boot_entry_slot=300)
 
 
+def test_authoritative_extended_resident_placement_is_not_a_fixed_catalog_override(tmp_path):
+    """An exact selected resident can be placed explicitly, but not over a body."""
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    from server.lump_approvals import read_approvals, write_approvals
+    from server.lump_integrity import compute_number
+
+    body = [0] * 256
+    body[0] = (0x1F << 27) | (2 << 23) | (1 << 10) | 1
+    body[1] = 0x10000000
+    body[-1] = create_gt(0, 14, {"E": 1}, 1)
+    raw = struct.pack(">256I", *body)
+    filename = f"Step2Fixture.1.{compute_number('Step2Fixture', raw)}.lump"
+    (tmp_path / filename).write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    approvals_path = tmp_path / "approvals.json"
+    approvals = read_approvals(str(approvals_path))
+    approvals[digest] = _trusted_compiler_approval(raw, filename, "Step2Fixture", 1)
+    write_approvals(str(approvals_path), approvals)
+    manifest_path = tmp_path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest.append({"token": "a000000e", "abstraction": "Step2Fixture",
+                     "filename": filename, "ns_slot": 14})
+    manifest_path.write_text(json.dumps(manifest))
+    state_path = tmp_path / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    state["abstractions"].append({
+        "name": "Step2Fixture", "slot": 14, "seq": 0,
+        "location": "0x1400", "type": "Inform", "token": "a000000e",
+        "filename": filename, "binary_hash": digest,
+        "resident": True, "load_policy": "Resident",
+    })
+    state_path.write_text(json.dumps(state))
+    cfg = _cfg_generated_threads(3)
+    cfg["step2"] = {"lumps": [{"nsSlot": 14, "resident": True,
+                               "physAddr": 0x1400, "lumpSize": 256}]}
+    image = generate_boot_image(cfg, str(tmp_path))
+    words = struct.unpack("<%dI" % (len(image) // 4), image)
+    assert words[len(words) - (14 + 1) * NS_ENTRY_WORDS] == 0x1400
+    assert words[0x1400:0x1500] == tuple(body)
+
+    cfg["step2"]["lumps"][0]["physAddr"] = 0x1300
+    with pytest.raises(ValueError, match="disagrees with Namespace state"):
+        generate_boot_image(cfg, str(tmp_path))
+    cfg["step2"]["lumps"][0]["physAddr"] = 0x1400
+    state["abstractions"][-1]["location"] = "0x00000010"
+    state_path.write_text(json.dumps(state))
+    cfg["step2"]["lumps"][0]["physAddr"] = 0x10
+    with pytest.raises(ValueError, match="overlaps"):
+        generate_boot_image(cfg, str(tmp_path))
+
+
+def test_fixed_catalog_still_rejects_explicit_physical_override(tmp_path):
+    _write_synthetic_boot_abstr_lump(str(tmp_path))
+    state_path = tmp_path / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    state["abstractions"].append({
+        "name": "FixedCatalog", "slot": 7, "location": "0x1400",
+        "type": "Inform", "resident": True, "load_policy": "Resident",
+    })
+    state_path.write_text(json.dumps(state))
+    cfg = _cfg_default()
+    cfg["step2"] = {"lumps": [{"nsSlot": 7, "resident": True,
+                               "physAddr": 0x1400, "lumpSize": 256}]}
+    with pytest.raises(ValueError, match="fixed catalog"):
+        generate_boot_image(cfg, str(tmp_path))
+
+
 def test_default_thread_count_remains_byte_compatible(tmp_path):
     """The pre-feature default omits threadCount and must remain unchanged."""
     _write_synthetic_boot_abstr_lump(str(tmp_path))

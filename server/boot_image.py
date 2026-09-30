@@ -2674,9 +2674,10 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
     # windows (2-5) must not be overridden by caller-supplied physAddr values.
     _FOUNDATIONAL_SLOTS = {0, 1}  # Namespace and Thread are the only protected slots.
     _DEVICE_REG_SLOTS   = set(_MMIO_SLOT_SPECS.keys())            # slots 2..5 (MMIO)
-    # Every fixed catalog body has a deterministic RAM location, not just the
-    # foundational trio.  Keep all catalog identities immutable so direct
-    # generator callers cannot create an overlap the Builder would reject.
+    # Keep the historical fixed catalog immutable.  Namespace-selected
+    # residents appended below are not fixed catalog identities: their
+    # physical location is the authoritative Namespace placement, and a
+    # matching Step-2 row must be allowed to carry it into this projection.
     # The authoritative SelfTest slot owns its identity, even when it replaces
     # a historical catalog/MMIO slot.  Slot 6 itself is otherwise free.
     catalog = list(DEFAULT_ABSTRACTION_CATALOG)
@@ -2703,7 +2704,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
             False,
         )
     _RESERVED_SLOTS = ({0, 1, _selftest_slot}
-                       | {slot for slot, entry in enumerate(catalog) if entry is not None}
+                       | {slot for slot, entry in enumerate(DEFAULT_ABSTRACTION_CATALOG)
+                          if entry is not None}
                        | set(_generated_thread_slots))
 
     phys_override = {}
@@ -2714,7 +2716,8 @@ def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
         if isinstance(ns_slot, int) and ns_slot in _RESERVED_SLOTS:
             raise ValueError(
                 f"generate_boot_image: NS slot {ns_slot} is reserved "
-                f"(foundational lump or device MMIO); physAddr override rejected"
+                f"(foundational lump, fixed catalog, or generated Thread); "
+                "physAddr override rejected"
             )
         if (e.get("resident")
                 and isinstance(e.get("physAddr"), int) and e["physAddr"] > 0):
