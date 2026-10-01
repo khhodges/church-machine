@@ -252,7 +252,7 @@ def test_update_to_latest_is_retired_without_mutating_repository(tmp_path, monke
     assert (tmp_path / "ns-state.json").read_text() == before
 
 
-def test_prepare_run_defaults_to_latest_exact_saved_digest(tmp_path, monkeypatch):
+def test_prepare_run_keeps_namespace_selected_exact_saved_digest(tmp_path, monkeypatch):
     old = b"old-approved-body"
     latest = b"latest-approved-body"
     (tmp_path / "WukongCallHome.11.658e6ba8.lump").write_bytes(old)
@@ -278,15 +278,16 @@ def test_prepare_run_defaults_to_latest_exact_saved_digest(tmp_path, monkeypatch
         "resident": True, "boot_resident": True, "load_policy": "Resident",
         "filename": "WukongCallHome.11.658e6ba8.lump",
         "token": "658e6ba8", "lump_version": 11,
+        "binary_hash": hashlib.sha256(old).hexdigest(),
     }]
 
     old_row, selected = app_module._prepare_run_candidate(
         rows, str(tmp_path))
 
     assert old_row["lump_version"] == 11
-    assert selected["filename"] == "WukongCallHome.12.74c8ff97.lump"
-    assert selected["token"] == "74c8ff97"
-    assert selected["binary_hash"] == __import__("hashlib").sha256(latest).hexdigest()
+    assert selected["filename"] == "WukongCallHome.11.658e6ba8.lump"
+    assert selected["token"] == "658e6ba8"
+    assert selected["binary_hash"] == hashlib.sha256(old).hexdigest()
     assert "artifact_pin" not in selected
     assert checked == [str(tmp_path / selected["filename"])]
 
@@ -325,26 +326,38 @@ def test_prepare_run_exact_pin_keeps_older_revision(tmp_path, monkeypatch):
 
 
 def test_real_validator_binds_wukong_evidence_to_exact_digest(tmp_path):
-    source = Path(app_module.LUMPS_DIR)
-    for name in (
-        "manifest.json", "approvals.json",
-        "WukongCallHome.1.658e6ba8.lump",
-        "WukongCallHome.1.74c8ff97.lump",
-    ):
-        shutil.copy2(source / name, tmp_path / name)
-    row = json.loads((source / "ns-state.json").read_text())["abstractions"]
-    row = next(item for item in row if item["name"] == "WukongCallHome")
-    row["boot"] = True
+    # Self-contained immutable bootstrap fixture: never depend on the user's
+    # accumulating live history or canonical-filename aliases.
+    import struct
+    filename = "WukongCallHome.1.658e6ba8.lump"
+    raw = struct.pack(">64I", (31 << 27) | (1 << 10) | 1,
+                      *([0] * 62), 0x4A000007)
+    (tmp_path / filename).write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256", "approvals": {digest: {
+            "filename": filename, "binary_hash": digest,
+            "dot_name": "WukongCallHome", "issue_n": 1,
+            "bootstrap_t": "4a000007", "bootstrap_runtime_gt": 0x4A000007,
+        }},
+    }))
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        {"abstraction": "WukongCallHome", "filename": filename,
+         "token": "4a000007", "lump_version": 1},
+        {"abstraction": "WukongCallHome", "filename": "Newer.2.12345678.lump",
+         "token": "12345678", "lump_version": 2},
+    ]))
+    row = {"name": "WukongCallHome", "slot": 7, "boot": True,
+           "resident": True, "boot_resident": True, "load_policy": "Resident",
+           "type": "Inform", "ns_slot_policy": "static", "seq": 0}
 
-    # The latest saved body is currently an IDE-generated identity rejection;
-    # default Prepare/Run must report that real reason rather than silently
-    # falling back or calling it a user security incident.
-    try:
-        app_module._prepare_run_candidate([row], str(tmp_path))
-    except ValueError as exc:
-        assert "IDE-generated identity" in str(exc)
-    else:
-        raise AssertionError("identity-invalid latest Wukong revision was accepted")
+    # Preparation consumes exactly the reviewed bytes, not an unrelated newer
+    # compilation (even when that newer revision lacks valid admission).
+    row.update(filename="WukongCallHome.1.658e6ba8.lump", token="4a000007",
+               lump_version=1, binary_hash=hashlib.sha256(
+                   (tmp_path / "WukongCallHome.1.658e6ba8.lump").read_bytes()).hexdigest())
+    _, exact = app_module._prepare_run_candidate([row], str(tmp_path))
+    assert exact["filename"] == row["filename"]
 
     # The exact older pinned digest still has its own valid admission record.
     _, selected = app_module._prepare_run_candidate([row], str(tmp_path), pin={
@@ -372,7 +385,7 @@ def test_real_validator_binds_wukong_evidence_to_exact_digest(tmp_path):
         raise AssertionError("admission evidence transferred to mutated digest")
 
 
-def test_prepare_run_updates_dependencies_and_preserves_per_row_pin(
+def test_prepare_run_keeps_selected_residents_and_preserves_per_row_pin(
         tmp_path, monkeypatch):
     bodies = {
         "Entry.old.lump": b"entry-old", "Entry.new.lump": b"entry-new",
@@ -400,7 +413,7 @@ def test_prepare_run_updates_dependencies_and_preserves_per_row_pin(
          "test_results": {"runtime-suite": "pass"},
          "mtbf": {"status": "green"}},
         {"name": "Dep", "slot": 7, "filename": "Dep.old.lump",
-         "token": "d1", "lump_version": 1,
+         "token": "d1", "lump_version": 1, "load_policy": "Resident",
          "artifact_pin": {
              "filename": "Dep.old.lump", "token": "d1", "revision": 1,
          }},
@@ -409,12 +422,12 @@ def test_prepare_run_updates_dependencies_and_preserves_per_row_pin(
     prepared, changes = app_module._prepare_run_candidates(
         rows, str(tmp_path), boot_pin_supplied=True, boot_pin=None)
 
-    assert prepared[0]["filename"] == "Entry.new.lump"
-    assert "test_results" not in prepared[0]
-    assert "mtbf" not in prepared[0]
+    assert prepared[0]["filename"] == "Entry.old.lump"
+    assert prepared[0]["test_results"] == rows[0]["test_results"]
+    assert prepared[0]["mtbf"] == rows[0]["mtbf"]
     assert prepared[1]["filename"] == "Dep.old.lump"
     assert prepared[1]["artifact_pin"]["revision"] == 1
-    assert [item["abstraction"] for item in changes] == ["Entry", "Dep"]
+    assert [item["abstraction"] for item in changes] == ["Dep"]
 
 
 def _endpoint_fixture(tmp_path, monkeypatch):

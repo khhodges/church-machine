@@ -35,6 +35,20 @@ state. Preserving a slot number alone does not preserve the reviewed plan.
 image evidence, and hardware observations distinct. Invalid historical data
 stays inspectable but cannot be silently normalized or published.
 
+An assigned saved artifact is not automatically selected for an image. The boot
+entry and explicitly resident bodies participate; dormant assignments remain in
+the saved design but must not be probed, copied, promoted, or admitted as image
+inputs. Generated architectural objects have their own construction rules.
+
+**Why:** Preparation of CapabilityTest was blocked by missing compiler provenance
+on unselected Tunnel because the preflight treated every filename-bearing row
+as an image participant. The programmer explicitly required unselected items
+to stay out.
+
+**How to apply:** Use the same selection boundary for candidate resolution,
+private staging, image generation, and provenance. Continue enforcing exact-byte
+approval on selected bodies; never evade the check by dropping a selected item.
+
 **Why:** The manifest contains catalog, lazy-load, example, and historical artifacts in addition to resident hardware content; treating it as authoritative makes Build Approval and image tooling report unrelated or stale LUMPs and metadata.
 
 **How to apply:** Build-image generation and Build Approval must derive membership and metadata from the final Namespace Table and its assigned slot/LUMP data. The manifest may be treated only as an untrusted catalog or lookup aid, never as truth. Lazy/runtime catalog entries are not bitstream LUMPs unless explicitly represented in the Namespace Table.

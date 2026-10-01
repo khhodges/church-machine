@@ -21,19 +21,14 @@ def digest(value):
 
 def artifact_bindings(rows, directory):
     """Verify exact saved locators, not manifest history or latest versions."""
-    from server.boot_image import _MMIO_SLOT_SPECS, generated_thread_label
-    generated = {0, 1, *_MMIO_SLOT_SPECS}
+    from server.boot_image import image_artifact_selected
     bindings = []
     for row in rows:
+        if not image_artifact_selected(row):
+            continue
         filename = row.get("filename")
         if not filename:
-            is_thread = (row.get("slot", -1) >= 11
-                         and row.get("name") == generated_thread_label(row["slot"]))
-            if (row.get("slot") not in generated and not is_thread
-                    and row.get("type") in ("Inform", "Resident")
-                    and row.get("symbolic") is not True):
-                raise ValueError(f"NS[{row['slot']}] requires an exact saved artifact")
-            continue
+            raise ValueError(f"NS[{row['slot']}] selected for image requires an exact saved artifact")
         if row.get("type") not in ("Inform", "Resident"):
             raise ValueError(
                 f"NS[{row['slot']}] artifact-bound {row.get('type')!r} rows are "
@@ -141,9 +136,9 @@ def stage_image(cfg, rows, directory, entry_slot):
     # authority. The private simulator uses only frozen Namespace rows.
     cfg["step2"] = {"lumps": []}
     for row in prepared:
-        if row.get("filename") and row.get("type") in ("Inform", "Resident"):
-            # No runtime catalog/lazy substitution after activation. All
-            # selected executable bodies belong to this private image.
+        if boot_image.image_artifact_selected(row) and row.get("filename"):
+            # Prepared configuration records actual residency only for bodies
+            # selected by the frozen source. The source rows remain unchanged.
             row.update(resident=True, boot_resident=True, load_policy="Resident")
     with tempfile.TemporaryDirectory(prefix="simulation-private-") as private:
         stage = Path(private)

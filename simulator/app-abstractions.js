@@ -628,9 +628,8 @@ function _bootBindingFingerprint(binding) {
 let _namespaceBootMarkerInFlight = null;
 let _preparedArtifactSelection = null;
 
-// Destination selection remains exact. At the explicit Prepare/Run boundary,
-// however, the server defaults to the latest admissible saved revision unless
-// the programmer checks the exact-revision pin.
+// Preparation keeps the exact Namespace-selected revision. A different revision
+// requires an explicit selection; a newer catalog entry is never substituted.
 function selectArtifactForPreparation(selection, revisions) {
     const chooser = window.LumpAdmission &&
         typeof window.LumpAdmission.chooseArtifact === 'function'
@@ -1255,7 +1254,7 @@ async function savePreparedBootEntry() {
             _applyNamespaceBootProjection(window._nsState,
                 selected && selected.pinned
                     ? `Prepared pinned revision ${selected.revision}.`
-                    : `Prepared latest saved revision ${selected && selected.revision != null
+                    : `Prepared Namespace-selected revision ${selected && selected.revision != null
                         ? selected.revision : ''}.`);
             // Pending pin intent becomes committed only after the server CAS
             // succeeds. Clear the exact submitted snapshot; newer checkbox

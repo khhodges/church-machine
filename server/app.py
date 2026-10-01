@@ -6537,12 +6537,7 @@ def _resolve_namespace_saved_artifacts(state, lumps_dir):
 
 
 def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
-    """Resolve the exact saved artifact for the Prepare/Run boundary.
-
-    Passive reads/imports never call this helper.  At the explicit preparation
-    boundary the newest admissible saved body is the default; an exact pin is
-    the sole way to retain an older revision.
-    """
+    """Resolve the approved exact saved artifact, or an explicitly reviewed pin."""
     boot_rows = [
         row for row in rows
         if isinstance(row, dict) and row.get("boot") is True
@@ -6551,13 +6546,12 @@ def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
     if len(boot_rows) != 1:
         raise ValueError("Namespace must contain exactly one live Lightning Bolt row")
     selected = boot_rows[0]
-    manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
-    if not isinstance(manifest, list):
-        raise ValueError("saved artifact manifest is unavailable")
-
     if pin is not None:
         if not isinstance(pin, dict):
             raise ValueError("artifactPin must be an exact revision descriptor")
+        manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
+        if not isinstance(manifest, list):
+            raise ValueError("saved artifact manifest is unavailable")
         matches = [
             entry for entry in manifest
             if isinstance(entry, dict)
@@ -6574,36 +6568,10 @@ def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
         candidate = matches[0]
         pinned = True
     else:
-        freshness = _boot_execution_freshness(
-            {"abstractions": [selected]}, lumps_dir)
-        failed = freshness.get("failedSaves") or []
-        if failed:
-            incident = failed[0]
-            raise ValueError(
-                f"IDE-generated identity for {incident.get('filename')!r} is "
-                "invalid; rebuild/save it in the IDE before preparing")
-        warnings = freshness.get("warnings") or []
-        latest = warnings[0]["latest"] if warnings else None
-        if latest is None:
-            matches = [
-                entry for entry in manifest
-                if isinstance(entry, dict)
-                and entry.get("filename") == selected.get("filename")
-                and str(entry.get("token", "")).lower()
-                == str(selected.get("token", "")).lower()
-            ]
-        else:
-            matches = [
-                entry for entry in manifest
-                if isinstance(entry, dict)
-                and entry.get("filename") == latest.get("filename")
-                and str(entry.get("token", "")).lower()
-                == str(latest.get("token", "")).lower()
-            ]
-        if len(matches) != 1:
-            raise ValueError("latest admissible saved artifact cannot be resolved exactly")
-        candidate = matches[0]
-        pinned = False
+        # The Namespace already owns the exact locator. Catalog freshness is
+        # not consent to promote a different revision during preparation.
+        candidate = dict(selected)
+        pinned = isinstance(selected.get("artifact_pin"), dict)
 
     filename = candidate.get("filename")
     if not isinstance(filename, str) or os.path.basename(filename) != filename:
@@ -6619,6 +6587,10 @@ def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
             updated[key] = candidate[key]
     candidate_digest = _file_sha256(artifact_path)
     previous_digest = selected.get("binary_hash") or selected.get("binaryHash")
+    if pin is None and (
+            not isinstance(previous_digest, str)
+            or previous_digest.lower() != candidate_digest.lower()):
+        raise ValueError("Namespace-selected artifact hash is missing or differs from saved bytes")
     revision_changed = (
         selected.get("filename") != candidate.get("filename")
         or str(selected.get("token", "")).lower()
@@ -6651,7 +6623,7 @@ def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
     # suite evidence. No evidence fields are copied from another revision.
     _boot_image_gen._require_approved_executable_lump(
         artifact_path, lumps_dir,
-        f"Prepare/Run target NS[{selected.get('slot')}]", updated)
+        f"Prepare/Run selected artifact {selected.get('name')} NS[{selected.get('slot')}]", updated)
     return selected, updated
 
 
@@ -6664,8 +6636,7 @@ def _prepare_run_candidates(rows, lumps_dir, *, boot_pin=None,
     prepared = [dict(row) for row in rows]
     changes = []
     for index, row in enumerate(rows):
-        if (not isinstance(row, dict) or row.get("archived") is True
-                or row.get("symbolic") is True or not row.get("filename")):
+        if not _boot_image_gen.image_artifact_selected(row):
             continue
         # Hardware/MMIO and generated Namespace/Thread rows do not name saved
         # executable artifacts. Assigned artifact rows do.
@@ -6699,7 +6670,7 @@ def _prepare_run_candidates(rows, lumps_dir, *, boot_pin=None,
             })
     if pending_pin_slots:
         raise ValueError(
-            "artifactPins names unassigned or non-executable Namespace slot(s): "
+            "artifactPins names unselected, unassigned or non-executable Namespace slot(s): "
             + ", ".join(sorted(pending_pin_slots)))
     return prepared, changes
 
@@ -7164,12 +7135,11 @@ def _stage_namespace_save_image(cfg, entries):
     Copy, do not hardlink: even a future generator writing an input must not
     modify an immutable saved artifact. The review lock protects the snapshot.
     """
-    import shutil
     from pathlib import Path
     _validate_namespace_publication(entries)
     with tempfile.TemporaryDirectory(prefix="namespace-save-") as directory:
         stage = Path(directory) / "lumps"
-        shutil.copytree(LUMPS_DIR, stage)
+        _boot_image_gen.copy_selected_image_inputs(LUMPS_DIR, stage, entries)
         rows = [dict(row) for row in entries]
         (stage / "ns-state.json").write_text(
             json.dumps({"abstractions": rows}), encoding="utf-8")
@@ -7195,15 +7165,14 @@ def _stage_prepare_run_boot_image(cfg, prepared_rows, entry_slot, for_hardware):
     """Generate/validate against private candidate state before any shared write.
 
     The generator reads ns-state.json and other inputs from the same directory.
-    Copy the full library rather than linking it: a generator must never gain
-    write access to saved artifacts through this preflight stage.
+    Copy only selected bodies, never link them or inspect dormant artifacts.
+    A generator must never gain write access to saved artifacts.
     """
-    import shutil
     from pathlib import Path
     _validate_namespace_publication(prepared_rows)
     with tempfile.TemporaryDirectory(prefix="prepare-run-") as directory:
         stage = Path(directory) / "lumps"
-        shutil.copytree(LUMPS_DIR, stage)
+        _boot_image_gen.copy_selected_image_inputs(LUMPS_DIR, stage, prepared_rows)
         (stage / "ns-state.json").write_text(
             json.dumps({"abstractions": prepared_rows}), encoding="utf-8")
         image = _boot_image_gen.generate_boot_image(

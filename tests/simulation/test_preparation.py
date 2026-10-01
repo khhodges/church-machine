@@ -178,7 +178,8 @@ def test_invalid_immutable_resident_identity_rejected_without_repair(saved, defe
 def test_artifact_bound_outform_is_rejected_before_review(saved, monkeypatch):
     root, rows, cfg = saved
     outform = copy.deepcopy(rows[-1])
-    outform.update(slot=7, name="Output", type="Outform", boot=False)
+    outform.update(slot=7, name="Output", type="Outform", boot=False,
+                   resident=True, boot_resident=True, load_policy="Resident")
     rows.append(outform)
     before = snapshot(root)
     def unexpected_generation(*args, **kwargs):
@@ -196,7 +197,8 @@ def test_every_binding_requires_its_exact_physical_body(saved, monkeypatch, defe
     root, rows, cfg = saved
     resident = copy.deepcopy(rows[-1])
     resident.update(slot=7, name="Other", filename="Other.1.87654321.lump",
-                    token="4a000007", boot=False)
+                    token="4a000007", boot=False, resident=True,
+                    boot_resident=True, load_policy="Resident")
     words = list(struct.unpack(">64I", (root / rows[-1]["filename"]).read_bytes()))
     words[-1] = 0x4A000007
     raw = struct.pack(">64I", *words)
@@ -229,7 +231,8 @@ def test_real_church_simulator_accepts_activation_and_rejects_inventory_tamperin
     # not stop after checking the selected boot entry.
     resident = copy.deepcopy(rows[-1])
     resident.update(slot=7, name="Other", filename="Other.1.87654321.lump",
-                    token="4a020007", seq=2, boot=False)
+                    token="4a020007", seq=2, boot=False, resident=True,
+                    boot_resident=True, load_policy="Resident")
     words = list(struct.unpack(">64I", (root / rows[-1]["filename"]).read_bytes()))
     words[-1] = 0x4A020007
     raw = struct.pack(">64I", *words)

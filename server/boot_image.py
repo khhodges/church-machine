@@ -2039,6 +2039,51 @@ def _load_ns_state_sequence_map(lumps_dir):
         return {}
 
 
+def image_artifact_selected(row):
+    """Whether the approved assignment selects a saved body for this image.
+
+    Assignment/filename alone is not residency. The boot marker selects the
+    entry body; other bodies require an explicit resident policy. Generated
+    Namespace/Thread/MMIO objects are handled by their own constructors.
+    """
+    if (not isinstance(row, dict) or row.get("archived") is True
+            or row.get("symbolic") is True
+            or row.get("implementationMissing") is True
+            or row.get("type") in ("Device", "Thread", "Namespace")):
+        return False
+    if row.get("boot") is True:
+        return True
+    policy = row.get("load_policy", row.get("loadPolicy"))
+    if policy is not None:
+        return policy == "Resident"
+    return row.get("resident") is True or row.get("boot_resident") is True
+
+
+def copy_selected_image_inputs(lumps_dir, destination, rows):
+    """Stage selected bodies only, never read/copy dormant library artifacts."""
+    import shutil
+    from pathlib import Path
+    source, stage = Path(lumps_dir), Path(destination)
+    stage.mkdir(parents=True)
+    for name in ("manifest.json", "approvals.json"):
+        shutil.copy2(source / name, stage / name)
+    copied = set()
+    for row in rows:
+        if not image_artifact_selected(row):
+            continue
+        filename = row.get("filename")
+        if (not isinstance(filename, str) or not filename
+                or os.path.basename(filename) != filename):
+            raise ValueError(f"NS[{row.get('slot')}] selected body has no exact filename")
+        if filename in copied:
+            continue
+        shutil.copy2(source / filename, stage / filename)
+        sidecar = Path(filename).with_suffix(".json")
+        if (source / sidecar).is_file():
+            shutil.copy2(source / sidecar, stage / sidecar)
+        copied.add(filename)
+
+
 def _load_catalog_token_map(manifest_path, selected_by_slot=None):
     """Return slot→token from Namespace state only.
 
@@ -2048,7 +2093,11 @@ def _load_catalog_token_map(manifest_path, selected_by_slot=None):
     separately writable boot-config cannot retarget an image plan.
     """
     lumps_dir = os.path.dirname(manifest_path)
-    return _load_ns_state_token_map(lumps_dir)
+    with open(os.path.join(lumps_dir, "ns-state.json"), encoding="utf-8") as source:
+        rows = json.load(source)["abstractions"]
+    selected_slots = {row["slot"] for row in rows if image_artifact_selected(row)}
+    return {slot: token for slot, token in _load_ns_state_token_map(lumps_dir).items()
+            if slot in selected_slots}
 
 
 def _load_trusted_cache_token_map(manifest_path):
@@ -2077,6 +2126,8 @@ def _load_trusted_cache_token_map(manifest_path):
 
     trusted = {}
     for slot, token_hex in slot_tokens.items():
+        if not image_artifact_selected(rows_by_slot.get(slot)):
+            continue
         token = str(token_hex or "").strip().lower()
         if len(token) != 8:
             continue
@@ -2152,10 +2203,10 @@ def _load_boot_resident_entries(manifest_path, selected_by_slot=None,
         tok  = e.get("token") or e.get("cache_token")
         if not isinstance(slot, int):
             continue
-        if e.get("resident") is False or e.get("boot_resident") is False:
+        if not image_artifact_selected(e):
             continue
-        if not tok:
-            continue
+        if not tok or not isinstance(e.get("filename"), str) or not e["filename"]:
+            raise ValueError(f"generate_boot_image: selected resident NS[{slot}] has no exact artifact locator")
         out.append((
             slot,
             str(tok).lower(),
@@ -2219,9 +2270,7 @@ def validate_resident_artifact_bindings(
     }
     bindings = [
         row for row in state_by_slot.values()
-        if row.get("type") in ("Inform", "Resident")
-        and row.get("resident") is not False
-        and row.get("boot_resident") is not False
+        if image_artifact_selected(row)
         and (row.get("filename") or row.get("token") or row.get("cache_token"))
     ]
     for binding in bindings:
@@ -2314,11 +2363,9 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
     validate_namespace_rows(entries)
     rows = []
     for binding in state.get("abstractions", []):
-        if (not isinstance(binding, dict)
+        if (not image_artifact_selected(binding)
                 or not isinstance(binding.get("slot"), int)
-                or binding.get("type") not in ("Inform", "Resident")
-                or binding.get("resident") is False
-                or binding.get("boot_resident") is False):
+                or binding.get("type") not in ("Inform", "Resident")):
             continue
         filename = binding.get("filename")
         if not isinstance(filename, str) or not filename:
@@ -2634,6 +2681,8 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
 
     def _state_binding_is_thread(row):
         """Classify by the bound body's header, never by its name."""
+        if not image_artifact_selected(row):
+            return row.get("slot") in _generated_thread_slots
         filename = row.get("filename") if isinstance(row, dict) else None
         if isinstance(filename, str) and os.path.basename(filename) == filename:
             try:
@@ -2669,10 +2718,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
             raise ValueError(
                 f"generate_boot_image: Step-2 token for NS[{_step2_slot}] "
                 "disagrees with Namespace state")
-        _state_policy = str(
-            _state_row.get("load_policy", _state_row.get("loadPolicy"))
-            or ("Resident" if _state_row.get("resident") else "Lazy")
-        )
+        _state_policy = "Resident" if image_artifact_selected(_state_row) else "Lazy"
         _state_is_thread = _state_binding_is_thread(_state_row)
         if _state_is_thread:
             _state_policy = "Resident"
@@ -2725,7 +2771,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         if not isinstance(_resident_row, dict):
             continue
         _resident_slot = _resident_row.get("slot")
-        if (_resident_row.get("resident") is not True
+        if (not image_artifact_selected(_resident_row)
                 or isinstance(_resident_slot, bool)
                 or not isinstance(_resident_slot, int)
                 or _resident_slot < len(DEFAULT_ABSTRACTION_CATALOG)):
@@ -2768,7 +2814,8 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         trusted_cache_tokens = {
             row["slot"]: int(str(row.get("token") or row.get("cache_token")), 16)
             for row in _bootstrap_rows
-            if row.get("filename") and (row.get("token") or row.get("cache_token"))
+            if image_artifact_selected(row) and row.get("filename")
+            and (row.get("token") or row.get("cache_token"))
         }
     # A frozen bootstrap resident uses its approved SELF capability as the
     # descriptor's non-authoritative cache word.  This is deliberately not
@@ -2864,6 +2911,14 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     locations = {}                              # idx -> location word
     for i, entry in enumerate(catalog):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
+        assigned = _state_by_slot.get(i)
+        if (i not in {0, 1, _selftest_slot, *_MMIO_SLOT_SPECS}
+                and i not in _generated_thread_slots
+                and assigned is not None and not image_artifact_selected(assigned)):
+            # Dormant assignments stay in saved design, not in image RAM or
+            # its executable descriptor inventory.
+            clist_gts.append(0)
+            continue
 
         if entry is None:
             # Null/free catalog slot: leave NS entry all-zeros.
@@ -3305,6 +3360,8 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         if len(_p_slots) != 1:
             continue
         _pslot = _p_slots[0]
+        if _pe.get("filename") != _state_by_slot[_pslot].get("filename"):
+            continue
         _pbase = total - (_pslot + 1) * NS_ENTRY_WORDS
         if not (0 <= _pbase + 1 < total):
             raise ValueError(f"portable token {_ptok} has an invalid Namespace slot")
