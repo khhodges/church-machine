@@ -1093,6 +1093,19 @@ def _diagnostic_session_binding():
     return binding
 
 
+def _initialize_ide_session_bindings():
+    """Establish signed-cookie bindings before the IDE starts parallel work.
+
+    Flask cookies contain a complete session snapshot. A late diagnostics or
+    lease response must not overwrite a newly issued review nonce with the
+    older snapshot it received. These independent random bindings confer no
+    approval; each approval/review still requires its existing exact checks.
+    """
+    session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+    session.setdefault("_change_review_session", secrets.token_urlsafe(32))
+    _diagnostic_session_binding()
+
+
 def _diagnostic_has_session_proof():
     """Return whether this browser has a diagnostics-only session binding."""
     binding = session.get(_LUMP_SAVE_DIAGNOSTIC_SESSION_KEY)
@@ -1963,7 +1976,33 @@ def _wukong_min_thread_scheduler_build():
         pass
     return None
 
+def _retired_mutable_hardware_delivery():
+    """Mutable build directories are not an approved deliverable selection."""
+    response = jsonify(
+        ok=False, decision="approved_revision_required", dataChanged=False,
+        error="Mutable hardware downloads are retired. Select an exact approved "
+              "bitstream revision in Build Approval and use Download selected revision. "
+              "No build, download, or flashing was performed.",
+        revision_history="/api/artifact-revisions/bitstream",
+        download_route="/api/artifact-revisions/bitstream/<revision_id>/download")
+    response.status_code = 410
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _retired_hardware_download(handler):
+    # Keep named legacy URLs explicit and actionable, but never invoke their
+    # former read/build side effects (including direct Python callers).
+    from functools import wraps
+
+    @wraps(handler)
+    def retired(*args, **kwargs):
+        return _retired_mutable_hardware_delivery()
+    return retired
+
+
 @app.route("/dl/wukong-bit")
+@_retired_hardware_download
 def download_wukong_bit():
     p = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.bit")
     # Only advertise a version verified against the actual file's sidecar
@@ -1978,6 +2017,7 @@ def download_wukong_bit():
         exact.get("sha256") if exact else None)
 
 @app.route("/dl/wukong-bscan")
+@_retired_hardware_download
 def download_wukong_bscan():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "bscan_spi_xc7a100t_fgg676.bit")
     return send_file(os.path.abspath(p), as_attachment=True,
@@ -1985,6 +2025,7 @@ def download_wukong_bscan():
                      mimetype="application/octet-stream")
 
 @app.route("/dl/wukong-mcs")
+@_retired_hardware_download
 def download_wukong_mcs():
     p = os.path.join(_wukong_build_dir(), "church_wukong_xc7a100t.mcs")
     evidence = _read_wukong_release_evidence(_wukong_build_dir())
@@ -1994,6 +2035,7 @@ def download_wukong_mcs():
         evidence.get("mcs_sha256") if evidence.get("verified") else None)
 
 @app.route("/dl/wukong-v17-bit")
+@_retired_hardware_download
 def download_wukong_v17_bit():
     """Serve the quarantined v17 candidate without replacing the release file."""
     p = os.path.abspath(os.path.join(
@@ -2006,6 +2048,7 @@ def download_wukong_v17_bit():
                      mimetype="application/octet-stream")
 
 @app.route("/dl/wukong-v17-mcs")
+@_retired_hardware_download
 def download_wukong_v17_mcs():
     """Serve the quarantined v17 candidate without replacing the release file."""
     p = os.path.abspath(os.path.join(
@@ -2018,6 +2061,7 @@ def download_wukong_v17_mcs():
                      mimetype="application/octet-stream")
 
 @app.route("/dl/wukong-verilog")
+@_retired_hardware_download
 def download_wukong_verilog():
     p = os.path.join(os.path.dirname(__file__), "..", "build", "church_wukong_xc7a100t.v")
     return send_file(os.path.abspath(p), as_attachment=True,
@@ -2432,12 +2476,54 @@ def _namespace_revision_build_intent(ns_map, revision_id, metadata):
         (base_identity + ":" + revision_id).encode("utf-8")).hexdigest()
 
 
+def _require_hardware_namespace_revision(record):
+    """Simulation approval is not elaboration/hardware build certification."""
+    metadata = record.get("metadata", {})
+    if metadata.get("approval_state") != "approved":
+        raise ValueError("Namespace revision is not approved.")
+    if metadata.get("purpose") not in (None, "approved-hardware"):
+        raise ValueError("Namespace revision is simulation-only, not hardware certified.")
+    files = record.get("files", {})
+    inputs = metadata.get("build_inputs", {})
+    if ("build-provenance.json" not in files or not isinstance(inputs, dict)
+            or not all(any(name.endswith(suffix) and files.get(name) == digest
+                           for name, digest in inputs.items())
+                       for suffix in (".v", ".il", ".xdc", ".tcl"))):
+        raise ValueError("Namespace revision lacks retained hardware elaboration certification.")
+    with open(_artifact_revision_store().file_path(
+            "namespace", record["revision_id"], "build-provenance.json"), "rb") as stream:
+        provenance = json.load(stream)
+    if (not isinstance(provenance, dict) or provenance.get("schema_version") != 1
+            or provenance.get("source_tree_clean") is not True
+            or provenance.get("source_commit") != metadata.get("source_commit")
+            or not files.get("boot-image.bin")
+            or provenance.get("boot_inputs_sha256", {}).get(
+                "server/lumps/boot-image.bin") != files["boot-image.bin"]):
+        raise ValueError("Namespace hardware certification does not bind its retained image/source.")
+    for name, digest in inputs.items():
+        if name.endswith((".v", ".il")):
+            certified = provenance.get("artifacts", {}).get(name, {}).get("sha256")
+        else:
+            certified = provenance.get("input_files_sha256", {}).get("hardware/" + name)
+        if certified != digest or files.get(name) != digest:
+            raise ValueError("Namespace hardware certification does not bind its retained build inputs.")
+
+
 def _decorate_namespace_revision_history(records):
     """Expose selection authority only from a matching, clean frozen approval."""
-    approved = {
-        record["revision_id"]: record for record in records
-        if record.get("metadata", {}).get("approval_state") == "approved"
-    }
+    approved = {}
+    for record in records:
+        record["hardware_certified"] = False
+        try:
+            _require_hardware_namespace_revision(record)
+        except ValueError:
+            # Never promote simulation metadata (even with copied intent fields)
+            # into a hardware selection authority.
+            record.pop("build_intent_id", None)
+            record.pop("snapshot_filename", None)
+            continue
+        record["hardware_certified"] = True
+        approved[record["revision_id"]] = record
     if not approved or not os.path.isdir(_BUILD_SNAPSHOTS_DIR):
         return records
     for filename in sorted(os.listdir(_BUILD_SNAPSHOTS_DIR)):
@@ -2497,6 +2583,8 @@ def download_bitstream_revision(revision_id):
                 or build_record.hardware_version != metadata.get("hardware_version")):
             raise ValueError("Bitstream has no matching successful approved build record.")
         upstream = store.read("namespace", metadata.get("namespace_revision_id", ""))
+        if upstream["metadata"].get("purpose") not in (None, "approved-hardware"):
+            raise ValueError("Simulation-only Namespace is not approved for hardware delivery.")
         if (upstream["metadata"].get("approval_state") != "approved"
                 or upstream["metadata"].get("source_commit") != metadata.get("source_commit")
                 or upstream["metadata"].get("hardware_version") != metadata.get("hardware_version")):
@@ -2507,8 +2595,14 @@ def download_bitstream_revision(revision_id):
             raise ValueError("Bitstream revision bytes changed during download.")
         if hashlib.md5(data).hexdigest() != build_record.bit_hash:
             raise ValueError("Bitstream does not match the successful build digest.")
-        return send_file(io.BytesIO(data), mimetype="application/octet-stream",
-                         as_attachment=True, download_name=f"wukong-{revision_id}.bit")
+        response = send_file(io.BytesIO(data), mimetype="application/octet-stream",
+                             as_attachment=True, download_name=f"wukong-{revision_id}.bit")
+        response.headers["X-Artifact-Revision"] = revision_id
+        response.headers["X-Namespace-Revision"] = metadata["namespace_revision_id"]
+        response.headers["X-Artifact-SHA256"] = record["files"]["bitstream.bit"]
+        response.headers["X-Wukong-Lifecycle-State"] = "downloaded"
+        response.headers["Cache-Control"] = "no-store"
+        return response
     except (ValueError, OSError, KeyError) as exc:
         return jsonify(ok=False, error=str(exc)), 409
 
@@ -2606,6 +2700,7 @@ def _freeze_namespace_revision(frozen_at, expected_map=None):
             raise ValueError("Generated RTLIL provenance changed; review before approval.")
         files["build-provenance.json"] = provenance_bytes
         metadata["approval_state"] = "approved"
+        metadata["purpose"] = "approved-hardware"
         revision = _artifact_revision_store().publish("namespace", metadata, files)
         return revision, snapshot
 
@@ -2958,6 +3053,7 @@ def download_build_soc_cm_md():
 
 
 @app.route("/dl/wukong-zip")
+@_retired_hardware_download
 def download_wukong_zip():
     """Download the QMTECH Wukong XC7A100T build package.
 
@@ -3062,8 +3158,9 @@ def api_releases_publish():
         "description":     data.get("description", ""),
         "boot_rom_words":  data.get("boot_rom_words", []),
         "verilog_sha256":  sha,
-        "verilog_download": "/dl/wukong-verilog",
-        "zip_download":     "/dl/wukong-zip",
+        "verilog_download": None,
+        "zip_download": None,
+        "approved_history": "/simulator/index.html?view=builder&hardware-history=1",
         "notes":           data.get("notes", ""),
     }
     manifest["releases"] = [r for r in manifest.get("releases", []) if r["version"] != version]
@@ -4801,7 +4898,27 @@ def _namespace_table_candidate(payload):
 
 from server.simulation_preparation import PreparationStore as _SimulationPreparationStore
 
-_simulation_preparations = _SimulationPreparationStore()
+_simulation_preparations = _SimulationPreparationStore(
+    revision_store=lambda: RevisionStore(os.path.join(
+        _BUILD_SNAPSHOTS_DIR, "revisions")))
+
+
+@app.route("/api/simulation/history", methods=["GET"])
+def simulation_history():
+    try:
+        return jsonify(ok=True, revisions=_simulation_preparations.history())
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc)), 409
+
+
+@app.route("/api/simulation/reopen", methods=["POST"])
+def simulation_reopen():
+    """Review an already approved immutable simulation; do not activate it."""
+    try:
+        result = _simulation_preparations.reopen(request.get_json(silent=True))
+        return jsonify(ok=True, **result)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
 
 
 @app.route("/api/simulation/prepare", methods=["POST"])
@@ -4851,7 +4968,7 @@ def _simulation_transition(activate):
         with _namespace_commit_guard():
             result = _simulation_preparations.transition(
                 request.get_json(silent=True),
-                _read_namespace_design_document()["abstractions"], LUMPS_DIR,
+                lambda: _read_namespace_design_document()["abstractions"], LUMPS_DIR,
                 activate=activate)
         return jsonify(ok=True, **result)
     except (OSError, ValueError, TypeError, KeyError) as exc:
@@ -8133,7 +8250,7 @@ def release_r12_index():
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Church Machine — Wukong Artix-7 Download</title>
-<meta name="description" content="Download the QMTECH Wukong Artix-7 FPGA package for the Church Machine IDE — Verilog netlist, XDC pin constraints, Vivado build script, and pre-built bitstream.">
+<meta name="description" content="Select an exact approved Wukong .bit revision in Build Approval history. Download and manual hardware programming are separate actions.">
 <link rel="canonical" href="https://lab.cloomc.org/release/r12/">
 <meta property="og:title" content="Church Machine — Wukong Artix-7 Download">
 <meta property="og:description" content="Download the complete Wukong Artix-7 FPGA package for Church Machine — Verilog netlist, pin constraints, Vivado build script, and pre-built bitstream.">
@@ -8201,73 +8318,23 @@ def release_r12_index():
 </style></head><body>
 
 <h1>&#x2B21; Church Machine — QMTECH Wukong Artix-7</h1>
-<div class="tag">QMTECH Wukong XC7A100T &middot; JTAG &middot; Everything in one ZIP &nbsp;&middot;&nbsp;
+<div class="tag">QMTECH Wukong XC7A100T &middot; JTAG &middot; Exact approved revisions &nbsp;&middot;&nbsp;
   <a href="https://www.aliexpress.com/w/wholesale-qmtech-wukong.html"
      target="_blank" rel="noopener"
      style="color:#4ade80;text-decoration:none;">&#x1F6D2; Buy the QMTECH Wukong board</a>
 </div>
 
 <div class="hero">
-  <div class="hero-title">Complete build package &amp; pre-built bitstream</div>
-  <div class="hero-sub">One download. Extract, then build with Vivado — or flash the pre-built bitstream below.</div>
-  <a class="dl-btn" href="/dl/wukong-zip"><span class="dl-btn-icon">&#x2B07;</span>Download church-wukong-package.zip</a>
+  <div class="hero-title">Approved bitstream delivery</div>
+  <div class="hero-sub">Select an exact approved revision in Build Approval history, then Download selected revision.</div>
+  <a class="dl-btn" href="/simulator/index.html?view=builder&amp;hardware-history=1">Open approved bitstream history</a>
   <a class="dl-btn" href="/dl/wukong-bridge" style="margin-left:.5rem;background:#4c1d95;color:#ddd6fe"><span class="dl-btn-icon">&#x2B07;</span>Download wukong_bridge.py</a>
-  <div class="hero-meta">Includes Verilog netlist &middot; XDC pin constraints &middot; Vivado build script &middot; native USB-UART bridge</div>
+  <div class="hero-meta">Approved .bit delivery is supported. Approved .mcs, BSCAN helper, and project-package exports are unavailable. The bridge is a separate host utility.</div>
 </div>
 
-<div id="r12BitstreamCard" style="margin-bottom:1.6rem"></div>
-<script>
-(function(){
-  var card = document.getElementById('r12BitstreamCard');
-  fetch('/api/bitstream-status').then(function(r){return r.json();}).then(function(d){
-    if(d.present){
-      var sz = d.size_bytes ? (d.size_bytes/1048576).toFixed(1)+' MB' : '';
-      var dt = d.built_at ? d.built_at.replace('T',' ').replace('Z',' UTC') : '';
-      var fw = d.version_known ? ('v' + d.firmware_version) : 'version unknown';
-      var warn = '';
-      if(d.version_mismatch && d.mismatch_message){
-        warn = '<div style="background:#1a1408;border:1px solid #854d0e;border-radius:8px;padding:10px 14px;margin-top:8px;font-size:.78rem;color:#fbbf24">'
-          +'<span style="font-weight:700">&#x26A0;&#xFE0F; Version mismatch:</span> '
-          +String(d.mismatch_message).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-          +'</div>';
-      }
-      var versionSuffix = d.version_known ? ('_v' + d.firmware_version) : '';
-      var bitName = 'church_wukong_xc7a100t' + versionSuffix + '.bit';
-      var mcsName = 'church_wukong_xc7a100t' + versionSuffix + '.mcs';
-      function exactUrl(kind) {
-        var item = d.download && d.download[kind];
-        return item && item.available
-          ? '/dl/wukong-' + kind + '?provenance_identity=' +
-            encodeURIComponent(item.provenance_identity) + '&sha256=' +
-            encodeURIComponent(item.sha256)
-          : '';
-      }
-      var bitUrl = exactUrl('bit');
-      var mcsUrl = exactUrl('mcs');
-      var mcs = mcsUrl
-        ? '<a href="'+mcsUrl+'" download="'+mcsName+'" style="padding:.4rem 1rem;background:#4c1d95;border-radius:5px;color:#ddd6fe;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download .mcs (persistent)</a>'
-        : '';
-      card.innerHTML = '<div style="background:#071a0e;border:1px solid #166534;border-radius:8px;padding:14px 16px;margin-bottom:0">'
-        +'<div style="display:flex;align-items:center;gap:14px">'
-        +'<span style="font-size:1.5rem">✅</span>'
-        +'<div><div style="color:#4ade80;font-weight:700;font-size:.9rem">Pre-built bitstream available</div>'
-        +'<div style="font-size:.75rem;color:#64748b;margin-top:2px">'+sz+' &middot; '+fw+(dt?' &middot; built '+dt:'')+'<br>.bit loads once; .mcs programs the board to boot this image after reset.</div></div>'
-        +'</div>'
-        +'<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px">'
-        +(bitUrl ? '<a href="'+bitUrl+'" download="'+bitName+'" style="padding:.4rem 1rem;background:#166534;border-radius:5px;color:#4ade80;text-decoration:none;font-size:.82rem;font-weight:700;white-space:nowrap">&#x2B07; Download current .bit (temporary)</a>' : '')
-        +mcs+'</div>'
-        +'</div>' + warn;
-    } else {
-      card.innerHTML = '<div style="background:#1a0e0e;border:1px solid #4a1212;border-radius:8px;padding:12px 16px;font-size:.8rem;color:#9ca3af">'
-        +'<span style="color:#f87171;font-weight:700">Bitstream not yet built.</span> '
-        +'Build it with Vivado: <code style="background:#0a0e17;padding:.1rem .3rem;border-radius:3px;color:#c4b5fd">source wukong_xc7a100t.tcl</code> from the extracted package, '
-        +'then upload the resulting .bit to the IDE.'
-        +'</div>';
-    }
-  }).catch(function(){});
-})();
-</script>
-<div class="box-title">&#x1F4E6; What&rsquo;s inside the ZIP</div>
+<p id="r12BitstreamCard">Downloading does not program hardware or verify installation.
+If no approved revision is listed, complete an approved build first; a mutable current file is not a substitute.</p>
+<div class="box-title">&#x1F4E6; Build inputs (retained with the approved Namespace; not a downloadable package)</div>
 <div class="contents-grid">
   <div class="highlight"><span class="file">church_wukong_xc7a100t.v</span><span class="note"> — Verilog netlist ✓</span></div>
   <div><span class="file">church_wukong_xc7a100t.il</span><span class="note"> — Amaranth RTLIL source</span></div>
@@ -8285,8 +8352,8 @@ sequence and troubleshooting, see
   <div class="step">
     <div class="step-num">1</div>
     <div class="step-body">
-      <strong>Extract the ZIP</strong>
-      <p>Unzip into a folder and open a terminal there.</p>
+      <strong>Select the approved revision</strong>
+      <p>Open Build Approval history, select the intended .bit revision, and download it. Keep its exact revision identity with the file.</p>
     </div>
   </div>
   <div class="step">
@@ -8294,7 +8361,7 @@ sequence and troubleshooting, see
     <div class="step-body">
       <strong>Temporary: load the FPGA for this session</strong>
       <pre>openFPGALoader church_wukong_xc7a100t.bit</pre>
-      <p>Download the pre-built <code>.bit</code> from the card above. This writes the FPGA's volatile configuration, so pressing reset or removing power clears it.</p>
+      <p>Use the actual filename of the approved <code>.bit</code> you downloaded. Loading it writes the FPGA's volatile configuration; downloading alone does not.</p>
       <p class="alt">Or via Vivado: <strong>Hardware Manager</strong> → Open target → Auto Connect → Program Device → select the <code>.bit</code>.</p>
     </div>
   </div>
@@ -8302,8 +8369,8 @@ sequence and troubleshooting, see
     <div class="step-num">3</div>
     <div class="step-body">
       <strong>Persistent: program the board's SPI boot flash</strong>
-      <p>Download the <code>.mcs</code> file from the purple button. In Vivado Hardware Manager, choose <strong>Add Configuration Memory Device</strong>, select <code>n25q64-3.3v-spi-x1_x2_x4</code>, then program the configuration memory with the downloaded <code>.mcs</code>.</p>
-      <p class="alt">This is the persistent “lock it home” path. It writes the Wukong’s SPI flash so the FPGA reloads this image after reset or power loss. Verify succeeds before resetting the board.</p>
+      <p>Approved <code>.mcs</code> export is not available in this workflow. Do not substitute a mutable release file or claim a .bit download as persistent installation.</p>
+      <p class="alt">External flash tooling requires its own explicit artifact selection and verification. This IDE does not currently verify persistent FPGA installation.</p>
     </div>
   </div>
   <div class="step">
@@ -8384,6 +8451,7 @@ def starter_versioned(version):
 @app.route("/simulator")
 @app.route("/simulator/")
 def simulator_index():
+    _initialize_ide_session_bindings()
     # Redirect to a versioned URL (= git hash) that changes on every merge,
     # busting any proxy or browser cache automatically without a hard refresh.
     # Preserve the original query string (e.g. ?learn=1, ?debug=1) — without
@@ -8400,6 +8468,7 @@ def simulator_index():
 
 @app.route("/simulator/~/<version>")
 def simulator_versioned(version):
+    _initialize_ide_session_bindings()
     filepath = os.path.join(SIMULATOR_DIR, "index.html")
     if os.path.isfile(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
@@ -8451,6 +8520,8 @@ _STALE_VERSION_RE = re.compile(r'^r\d{8}[a-z]?/?$')
 
 @app.route("/simulator/<path:path>")
 def simulator_static(path):
+    if path == "index.html":
+        _initialize_ide_session_bindings()
     # Redirect stale cached version paths (e.g. /simulator/r20260429c/) to current.
     if _STALE_VERSION_RE.match(path):
         resp = redirect(f"/simulator/~/{_SIMULATOR_HTML_VERSION}", code=302)
@@ -8833,16 +8904,7 @@ _ALLOWED_BUILD_FILES = {
 def download_build_file(filename):
     if filename not in _ALLOWED_BUILD_FILES:
         return make_response("Not found", 404)
-    filepath = os.path.join(BUILD_DIR, filename)
-    if not os.path.isfile(filepath):
-        return make_response("File not yet generated", 404)
-    ct = _ALLOWED_BUILD_FILES[filename]
-    with open(filepath, "rb") as f:
-        data = f.read()
-    resp = make_response(data, 200)
-    resp.headers["Content-Type"] = ct
-    resp.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return resp
+    return _retired_mutable_hardware_delivery()
 
 @app.route("/local_bridge.py")
 @app.route("/webserial_bridge.py")
@@ -9608,6 +9670,7 @@ def build_fpga():
 
 
 @app.route("/api/download/fpga-zip")
+@_retired_hardware_download
 def download_fpga_zip():
     """Download the ZIP of the last successfully built FPGA artifacts (no rebuild)."""
     build_dir = os.path.join(BASE_DIR, "build")
@@ -9638,6 +9701,7 @@ def download_fpga_zip():
 
 
 @app.route("/api/download/fpga-verilog")
+@_retired_hardware_download
 def download_fpga_verilog():
     """Download just the Verilog file for the selected board (no zip)."""
     board = request.args.get("board", "wukong-xc7a100t").strip().lower()
@@ -9651,6 +9715,7 @@ def download_fpga_verilog():
 
 
 @app.route("/api/download/fpga-sdc")
+@_retired_hardware_download
 def download_fpga_sdc():
     """Download just the SDC constraints file for the selected board."""
     board = request.args.get("board", "wukong-xc7a100t").strip().lower()
@@ -9664,6 +9729,7 @@ def download_fpga_sdc():
 
 
 @app.route("/api/download/fpga-peri")
+@_retired_hardware_download
 def download_fpga_peri():
     """Download just the peri.xml periphery config for the selected board."""
     board = request.args.get("board", "wukong-xc7a100t").strip().lower()
@@ -9677,6 +9743,7 @@ def download_fpga_peri():
 
 
 @app.route("/api/download/fpga-package")
+@_retired_hardware_download
 def download_fpga_package():
     """Legacy: build + download in one shot (kept for backwards compatibility)."""
     build_dir = os.path.join(BASE_DIR, "build")
@@ -9865,6 +9932,7 @@ def bitstream_upload():
 
 
 @app.route("/api/bitstream/download/<board>")
+@_retired_hardware_download
 def bitstream_download(board):
     """Download the official bitstream for a board."""
     board = board.strip().lower()
@@ -12392,7 +12460,7 @@ def preflight_lump_save_plan():
     # This endpoint is the sole producer of the private preflight marker.
     planned = dict(candidate)
     planned["metadata"] = dict(metadata, _save_plan_preflight=True)
-    session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
+    _initialize_ide_session_bindings()
     reset = _lump_save_payload_override.set(planned)
     try:
         return save_lump()
@@ -12618,11 +12686,31 @@ def save_lump():
             and metadata.get("ns_slot_policy") == "dynamic"
         )
     ):
-        try:
-            metadata = dict(metadata, ns_slot=_allocate_new_lump_slot())
-        except ValueError as exc:
-            return jsonify({"error": f"New Entry allocation failed: {exc}",
-                            "committed": False}), 409
+        return jsonify({
+            "error": "Save LUMP publishes an artifact only. Add or replace Namespace assignments in the engineer's configuration workflow.",
+            "artifact_only_required": True, "committed": False,
+        }), 422
+
+    # Artifact publication never carries deployment authority, even when an
+    # obsolete client or a previously issued plan submits a destination.
+    if (metadata.get("ns_slot") is not None
+            or metadata.get("slot_label") is not None
+            or (isinstance(metadata.get("promotion_binding"), dict)
+                and metadata["promotion_binding"].get("ns_slot") is not None)
+            or metadata.get("_bootstrap_history_repair") is True):
+        return jsonify({
+            "error": "Save LUMP cannot assign, replace, or repair Namespace slots. Save the artifact without deployment metadata, then explicitly adopt it in a Namespace configuration.",
+            "artifact_only_required": True, "committed": False,
+        }), 422
+    if metadata.get("save_as_copy") is True:
+        if metadata.get("editor_base") is not None or metadata.get("save_as_latest") is True:
+            return jsonify(error="Save a copy requires a distinct Pet Name and no revision-owner binding.",
+                           committed=False, artifact_copy_conflict=True), 422
+        # A copy receives its own artifact lookup identity, never the opened
+        # artifact's token. Finalized plans already supply the derived token.
+        if _early_plan is None:
+            metadata = dict(metadata)
+            metadata.pop("token", None)
 
     if not words or len(words) < 2:
         return jsonify({"error": "Binary must contain at least a header and one code word"}), 400
@@ -12778,7 +12866,7 @@ def save_lump():
     _bootstrap_binding = None
     _bootstrap_source_binding = None
     try:
-        if os.path.isfile(NS_STATE_PATH):
+        if ns_slot is not None and os.path.isfile(NS_STATE_PATH):
             with open(NS_STATE_PATH, encoding="utf-8") as _bootstrap_state_file:
                 _bootstrap_rows_all = json.load(_bootstrap_state_file).get("abstractions", [])
         else:
@@ -12960,6 +13048,29 @@ def save_lump():
 
     _clist_row0_idx = _sl_lsz - _sl_cc2
     _symbolic_cap_rows = _symbolic_declared_clist_rows(_sl_words, _declared_caps_raw)
+    if (_compiler_self_row and _portable_binding is None and _sl_cc2 == 1
+            and (_trusted_input or 0 in _symbolic_cap_rows)):
+        # Preserve the compiler's unresolved SELF marker. Never mint a local
+        # GT as part of publishing a programmer-owned artifact.
+        try:
+            from portable_binding import validate_portable_binding as _portable_contract
+            from lump_integrity import to_dot_name as _portable_dot_name
+        except ImportError:
+            from server.portable_binding import validate_portable_binding as _portable_contract
+            from server.lump_integrity import to_dot_name as _portable_dot_name
+        try:
+            _portable_binding = _portable_contract({
+                "schema": "church.portable-lump-binding/v1",
+                "owner": f"{_portable_dot_name(f'{_petname}.{abs_name}' if _petname else abs_name)}#{_issue_number}",
+                "dependencies": _declared_caps_raw,
+            }, _sl_cc2)
+            if _trusted_input and _sl_words[_clist_row0_idx] == 0:
+                _sl_words[_clist_row0_idx] = _SELF_CAPABILITY_PLACEHOLDER
+            metadata = dict(metadata, portable_binding=_portable_binding)
+        except ValueError as exc:
+            return jsonify(error=f"Portable artifact binding required: {exc}",
+                           portable_binding_validation_failed=True,
+                           committed=False), 422
     if (_compiler_self_row and ns_slot is None
             and _portable_binding is None and 0 not in _symbolic_cap_rows):
         # A bare SELF claim without its embedded declaration is insufficient
@@ -12967,8 +13078,9 @@ def save_lump():
         # preparation continues to validate and mint its local identity.
         return jsonify({
             "error": (
-                "Namespace identity validation failed: compiler-owned "
-                "SELF requires a selected Namespace slot before saving."
+                "Artifact identity validation failed: compiler-owned SELF "
+                "requires authenticated compiler evidence or its embedded "
+                "symbolic declaration and a portable binding, not a Namespace slot."
             ),
             "namespace_identity_failed": True,
             "clist_row": 0,
@@ -14032,6 +14144,12 @@ def save_lump():
     from lump_integrity import to_dot_name as _to_dot_name, compute_number as _compute_number
     _dot_name_save = _to_dot_name(
         f"{_petname}.{abs_name}" if _petname else abs_name)
+    if metadata.get("save_as_copy") is True and any(
+            isinstance(row, dict) and
+            _to_dot_name(str(row.get("dot_name") or row.get("abstraction") or "")) == _dot_name_save
+            for row in manifest):
+        return jsonify(error="Save a copy requires a distinct, unused Pet Name; use Save revision for an existing artifact.",
+                       committed=False, artifact_copy_conflict=True), 409
     # The UI's universal owner is petname.Abstraction#issue.  Use the same
     # issue supplied for identity_string rather than silently retaining an old
     # manifest issue and creating two contradictory canonical identities.
@@ -14131,11 +14249,16 @@ def save_lump():
     try:
         _library_generation = _authoritative_lump_library_generation(
             lumps_dir, manifest_path, manifest, token8=token8, ns_slot=ns_slot,
-            dependency_slots=_relevant_dependency_slots)
+            # A retained capability word is artifact content, not consent to
+            # bind or validate a deployment against the current Namespace.
+            dependency_slots=())
     except ValueError as _generation_error:
         return jsonify({"error": str(_generation_error)}), 409
 
     if _early_plan is not None:
+        if _portable_binding != _early_plan.get("portable_binding"):
+            return jsonify(error="Portable binding differs from the reviewed artifact plan.",
+                           committed=False, plan_binding_mismatch=True), 409
         if (token8 != _early_plan.get("token")
                 or ns_slot != _early_plan.get("ns_slot")
                 or (ns_slot is not None and
@@ -14205,6 +14328,7 @@ def save_lump():
                        if key in metadata},
                 }, signing_key=_compiler_attestation_key())
             _LUMP_SAVE_PLANS[plan_id] = {
+                "portable_binding": _portable_binding,
                 "plan_id": plan_id,
                 "session": session["_lump_approval_session"],
                 "digest": _binary_hash, "action": _approval_action,
@@ -14249,6 +14373,7 @@ def save_lump():
         return jsonify({
             "plan": plan_id, "plan_id": plan_id, "digest": _binary_hash,
             "final_binary": list(_sl_words), "ns_slot": ns_slot,
+            "portable_binding": _portable_binding,
             **execution_fields(metadata),
             "candidate_id": _candidate_id,
             "action": _approval_action,
@@ -14537,6 +14662,8 @@ def save_lump():
         "compiled_at": _compiled_at,
         **execution_fields(metadata),
     })
+    if _portable_binding is not None:
+        approval["portable_binding"] = _portable_binding
     # Compiler provenance is server-owned evidence, not approval-intent
     # metadata.  Copy it only after the user-controlled allowlist has been
     # applied, and only from the record authenticated against final bytes.
@@ -14641,12 +14768,9 @@ def save_lump():
             }), 503
 
 
+    # Exact previously selected filenames remain immutable inputs to existing
+    # Namespace revisions. Never replace one with a latest-version alias.
     _remove_after_commit = ()
-    if _exist_filename == f"{token8}.lump":
-        _remove_after_commit = tuple(
-            path for path in (_existing_lump,)
-            if os.path.lexists(path)
-        )
     _existing_is_archive_pair = bool(
         _arch_ver is not None
         and _exist_filename == f"{safe_name}_v{_arch_ver}.lump"
@@ -14674,13 +14798,7 @@ def save_lump():
                 os.path.isfile(_existing_lump) and not _is_forked_save
             ),
             remove_paths=_remove_after_commit,
-            compat_old_filename=(
-                _exist_filename
-                if os.path.isfile(_existing_lump)
-                and _exist_filename != f"{token8}.lump"
-                and not _existing_is_archive_pair
-                else None
-            ),
+            compat_old_filename=None,
             compat_new_filename=lump_filename,
             variant_group=f"compiled_{abs_name.lower().replace(' ', '_')}",
             ns_slot=ns_slot,
@@ -25442,8 +25560,7 @@ def wukong_build_start():
         namespace_revision_id = latest_snap.get("namespace_revision_id", "")
         frozen_revision = _artifact_revision_store().read("namespace", namespace_revision_id)
         frozen_metadata = frozen_revision["metadata"]
-        if frozen_metadata.get("approval_state") != "approved":
-            raise ValueError("Namespace revision is not approved.")
+        _require_hardware_namespace_revision(frozen_revision)
         namespace_snapshot = copy.deepcopy(frozen_metadata["snapshot"])
         namespace_snapshot["namespace_revision_id"] = namespace_revision_id
         source_commit = frozen_metadata["source_commit"]

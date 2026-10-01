@@ -3,38 +3,39 @@ const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
 const source = fs.readFileSync('simulator/app-lumps.js', 'utf8');
-const start = source.indexOf('async function _freezeLumpSaveNamespaceRevision(');
+const start = source.indexOf('function _artifactOnlyLumpSaveMetadata(');
 const end = source.indexOf('async function _confirmLumpSavePlan(', start);
-let calls = 0;
-const context = { window: {}, fetch: async () => {
-    calls++;
-    return { ok: true, json: async () => ({
-        namespaceFingerprint: `revision-${calls}`, abstractions: []
-    }) };
-} };
+const context = { window: {}, fetch: () => { throw new Error('No Namespace lookup permitted'); } };
 vm.createContext(context);
 vm.runInContext(source.slice(start, end), context);
-(async () => {
-    const metadata = { ns_slot: 14 };
-    await context._freezeLumpSaveNamespaceRevision(metadata);
-    assert.strictEqual(metadata.namespaceFingerprint, 'revision-1');
-    await context._freezeLumpSaveNamespaceRevision(metadata);
-    assert.strictEqual(calls, 1, 'retry cannot refresh reviewed authority');
-    await context._freezeLumpSaveNamespaceRevision({ ns_slot: null });
-    assert.strictEqual(calls, 1, 'library-only save needs no Namespace lookup');
-    const newEntry = { new_entry: true };
-    await context._freezeLumpSaveNamespaceRevision(newEntry);
-    assert.strictEqual(newEntry.namespaceFingerprint, 'revision-2');
-    const promotion = { promotion_binding: { ns_slot: 14 } };
-    await context._freezeLumpSaveNamespaceRevision(promotion);
-    assert.strictEqual(promotion.namespaceFingerprint, 'revision-3');
-    context.fetch = async () => ({ ok: false, status: 503 });
-    await assert.rejects(context._freezeLumpSaveNamespaceRevision({ ns_slot: 7 }), /503/);
-    const run = fs.readFileSync('simulator/app-run.js', 'utf8');
-    const reload = run.slice(run.indexOf('async function _reloadCommittedLumpArtifact('),
-        run.indexOf('async function _refreshNamespaceAuthorityAfterLumpSave('));
-    assert(!reload.includes('sim.loadLumpBinary'), 'save must not splice runtime bytes');
-    assert(!reload.includes('sim.nsLabels'), 'save must not rename runtime slots');
-    assert(run.includes('namespaceFingerprint: _saveNSNamespaceFingerprint'));
-    console.log('Save Namespace revision and no-runtime-install checks passed');
-})().catch(error => { console.error(error); process.exitCode = 1; });
+const metadata = { abstraction: 'ide.Alice', ns_slot: 14, new_entry: true,
+    namespaceFingerprint: 'old', namespace_sequence: 2, ns_slot_policy: 'dynamic',
+    promotion_binding: { ns_slot: 14 }, resident: true, grants: ['E'],
+    capability_type: 'inform', load_policy: 'Resident',
+    editor_base: { token: 'old' }, compiler_record: { signed: 'opaque' } };
+context._artifactOnlyLumpSaveMetadata(metadata);
+assert.strictEqual(metadata.artifact_only, true);
+for (const key of ['ns_slot', 'new_entry', 'namespaceFingerprint', 'namespace_sequence',
+    'ns_slot_policy', 'promotion_binding', 'resident', 'grants', 'capability_type',
+    'load_policy']) assert(!(key in metadata), key);
+assert.strictEqual(metadata.editor_base.token, 'old');
+assert.strictEqual(metadata.compiler_record.signed, 'opaque');
+metadata.save_as_copy = true;
+context._artifactOnlyLumpSaveMetadata(metadata);
+assert.strictEqual(metadata.save_as_latest, false);
+assert(!('editor_base' in metadata));
+const run = fs.readFileSync('simulator/app-run.js', 'utf8');
+const save = run.slice(run.indexOf('async function confirmSaveToNamespace()'),
+    run.indexOf('function saveNamespace()'));
+assert(!save.includes('_refreshNamespaceAuthorityAfterLumpSave()'));
+assert(!save.includes('_acceptCommittedNamespaceSlotLabel(resp'));
+assert(!save.includes('ns_slot:'));
+assert(save.includes('_saveApproval.plan.portable_binding'));
+assert(save.includes('rebuilt.metadata.portable_binding = plan.portable_binding'));
+assert(source.includes('metadata.portable_binding = plan.portable_binding'));
+assert(source.includes('target.compiler_record = plan.compiler_record'));
+const reload = run.slice(run.indexOf('async function _reloadCommittedLumpArtifact('),
+    run.indexOf('async function _refreshNamespaceAuthorityAfterLumpSave('));
+assert(!reload.includes('sim.loadLumpBinary'));
+assert(!reload.includes('sim.nsLabels'));
+console.log('Artifact-only metadata, portable proof, and no-runtime-install checks passed');

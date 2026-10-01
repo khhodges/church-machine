@@ -1189,6 +1189,20 @@ const _threadRunOutcomes = new Map();
 function updateThreadControl() {
     const status = document.getElementById('activeThreadStatus');
     if (typeof updateThreadIdentityStrip === 'function') updateThreadIdentityStrip();
+    const target = window.TargetState && typeof window.TargetState.resolve === 'function'
+        ? window.TargetState.resolve() : null;
+    const hardwareTarget = target && target.mode !== 'simulator-ram';
+    if (hardwareTarget) {
+        // Simulator factory/thread state is not a hardware observation.
+        if (status) status.textContent = 'Hardware target · ' + (target.ok ? 'selected' : 'unresolved');
+        return;
+    }
+    if (!sim || !sim.simulationConfiguration) {
+        // A factory Thread can be scheduler-runnable without any approved image
+        // or executed instruction. It is not an activated simulation.
+        if (status) status.textContent = 'No simulation activated · stopped';
+        return;
+    }
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     const state = sim.activeThreadStatus();
     if (status) {
@@ -1988,6 +2002,9 @@ function _injectClistNow(capabilitiesOverride, targetSlotOverride = null) {
 
 let _idx1AdmissionInFlight = false;
 async function _applyPendingSimLoad() {
+    // Compiling/editing is independent of an activated configuration. Keep the
+    // draft pending for inspection, but never splice it into approved execution.
+    if (sim && sim.simulationConfiguration) return;
     if (typeof _idx1AdmissionInFlight !== 'undefined' && _idx1AdmissionInFlight) return false;
     const _aplPending = _pendingSimLoadSnapshot;
     const _aplToken = _aplPending
@@ -2716,6 +2733,7 @@ function walkToggle() {
         finishWalk();
         return;
     }
+    if (!_requireCommittedImageForExecution('Walk')) return;
     walkRunning = true;
     sim.walkActive = true;
     if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
@@ -3103,10 +3121,8 @@ function _recordUnreportedBootFailure(context, error) {
     return true;
 }
 
-let _bootImageRefreshInFlight = null;
-
 function _bootHasCommittedImage() {
-    return !!(window.bootImage && window.bootImageAvailable);
+    return !!(sim && sim.simulationConfiguration && sim._bootImageLoaded === true);
 }
 
 function _isInternalPreparationError(reason) {
@@ -3125,7 +3141,7 @@ function _showBootPreparationBlocked(context, reason) {
     const operation = context || 'Execution';
     const internalFailure = _isInternalPreparationError(reason);
     const actualReason = reason && reason.message ? reason.message : (reason ||
-        'No valid committed boot image is available for the current Namespace.');
+        'No simulation activated. Prepare, approve and activate a configuration first.');
     const overlay = document.createElement('div');
     overlay.id = 'bootPreparationBlockedOverlay';
     overlay.className = 'modal-overlay';
@@ -3140,7 +3156,7 @@ function _showBootPreparationBlocked(context, reason) {
     const title = document.createElement('span');
     title.className = 'fault-modal-title';
     title.textContent = internalFailure
-        ? 'IDE Boot Preparation Failure' : 'Boot Preparation Blocked';
+        ? 'IDE Simulation Preparation Failure' : 'Simulation not activated';
     const close = document.createElement('button');
     close.className = 'fault-modal-close';
     close.title = 'Close';
@@ -3165,7 +3181,7 @@ function _showBootPreparationBlocked(context, reason) {
         ['Reason', actualReason],
         ['Next action', reason && reason.nextAction
             ? reason.nextAction
-            : 'Choose the intended Lightning Bolt target, then click Prepare boot image. Retry execution only after the IDE reports that the committed image is prepared.'],
+            : 'Save the Namespace design, then Prepare for Simulation, review and Approve Configuration, and explicitly Activate Simulation. Use Run, Step or Walk only after activation.'],
         ['Safety', 'The IDE did not substitute a factory image or alter the boot image automatically. This is not an IDE-generated security incident.'],
     ];
     for (const [label, value] of detailRows) {
@@ -3190,11 +3206,11 @@ function _showBootPreparationBlocked(context, reason) {
     if (!internalFailure) {
         const prepare = document.createElement('button');
         prepare.className = 'btn btn-warning';
-        prepare.textContent = 'Prepare boot image';
+        prepare.textContent = 'Prepare for Simulation';
         prepare.onclick = () => {
             overlay.remove();
             if (typeof switchView === 'function') switchView('abstractions');
-            if (typeof savePreparedBootEntry === 'function') void savePreparedBootEntry();
+            if (window.SimulationPreparation) void window.SimulationPreparation.prepare();
         };
         actions.appendChild(prepare);
     }
@@ -3210,18 +3226,13 @@ function _showBootPreparationBlocked(context, reason) {
 
 function _blockBootForMissingCommittedImage(context, reason) {
     const actualReason = reason ||
-        'No valid committed boot image is cached for the current Namespace.';
+        'No simulation activated. Prepare, approve and activate a configuration first.';
     const detail = `${context || 'Execution'} did not execute. Boot preparation is blocked; ` +
         `this is not a Thread fault. Reason: ${actualReason} ` +
         'No machine instruction ran and no Thread state changed. Next: choose the intended ' +
-        'Lightning Bolt target and click Prepare boot image. The IDE did not alter or substitute an image.';
-    if (window.BootEntryUI && typeof window.BootEntryUI.noteImagePreparation === 'function') {
-        window.BootEntryUI.noteImagePreparation({
-            status: 'stale-image',
-            configuredSlot: typeof bootEntrySlot === 'number' ? bootEntrySlot : null,
-            reason: detail,
-        });
-    }
+        'Namespace configuration and use Prepare for Simulation, Approve Configuration, then Activate Simulation. The IDE did not alter or substitute an image.';
+    // Absence of an active simulation is not a fault in the saved Namespace's
+    // boot marker or an assertion about the independent disk image.
     const con = document.getElementById('editorConsole');
     if (con && !con.textContent.includes(detail)) {
         con.textContent += (con.textContent ? '\n' : '') + '[BOOTIMG] ' + detail;
@@ -3230,45 +3241,15 @@ function _blockBootForMissingCommittedImage(context, reason) {
     return false;
 }
 
-// A cache may intentionally be empty after a saved image was invalidated.
-// Fetching it is asynchronous; do not reset into factory memory while it is
-// pending. The successful retry re-enters the explicit reset/boot path.
+// Only explicit activation grants execution authority. Never fetch repository
+// bytes or silently reset a paused machine while answering this gate.
 function _ensureCommittedImageForBoot(context) {
     if (_bootHasCommittedImage()) return true;
-    if (typeof window._refreshCommittedBootImageCache === 'function') {
-        if (!_bootImageRefreshInFlight) {
-            _bootImageRefreshInFlight = window._refreshCommittedBootImageCache()
-                .then(() => {
-                    _bootImageRefreshInFlight = null;
-                    // Apply the freshly fetched bytes before evaluating the
-                    // Namespace/image binding again; the old loaded image may
-                    // still be marked stale until this overlay runs.
-                    if (typeof _maybeApplyBootImage === 'function') {
-                        _maybeApplyBootImage();
-                    }
-                    if (_bootHasCommittedImage()) resetSim();
-                    else _blockBootForMissingCommittedImage(context);
-                })
-                .catch(error => {
-                    _bootImageRefreshInFlight = null;
-                    _blockBootForMissingCommittedImage(context,
-                        `The server rejected the committed boot image: ${error && error.message ? error.message : error}`);
-                });
-        }
-        const con = document.getElementById('editorConsole');
-        if (con) con.textContent += (con.textContent ? '\n' : '') +
-            '[BOOTIMG] Fetching committed boot image before reset…';
-        return false;
-    }
     return _blockBootForMissingCommittedImage(context);
 }
 
 function _requireCommittedImageForExecution(context) {
-    // A booted machine's live Thread/frames (including explicit Load/Assemble)
-    // are execution authority. Image freshness gates the next boot, not resume:
-    // its refresh path overlays memory and destroys a paused instruction.
-    if (sim && sim.bootComplete) return true;
-    if (_bootHasCommittedImage() && sim && sim._bootImageLoaded === true) return true;
+    if (_bootHasCommittedImage()) return true;
     _ensureCommittedImageForBoot(context);
     return false;
 }
@@ -3440,6 +3421,9 @@ function slowBoot() {
 }
 
 async function _startBootLumpPrefetch() {
+    // A private configuration has already retained its selected input bytes.
+    // Repository prefetch would introduce mutable, unreviewed inputs.
+    if (sim && sim.simulationConfiguration) return;
     if (!sim) return;
     if (sim._bootPrefetchStarted) {
         return sim._bootPrefetchPromise;
@@ -3502,6 +3486,7 @@ async function _startBootLumpPrefetch() {
 function runSim(preserveView) {
     if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    if (!_requireCommittedImageForExecution('Run')) return;
     // Settings changed between batches apply only to the next Run.
     const runContinuously = continuousRun;
     // Boot is never redirected by the UI. The core executes only LOAD CR15,
@@ -5362,7 +5347,7 @@ function faultModalReboot() {
     _bootAuditAccum = [];
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Fault reboot reset the previous execution identity');
     if (!_ensureCommittedImageForBoot('fault reboot')) return;
-    sim.reset();
+    sim.resetPreparedSimulation();
     if (sim._bootImageLoaded !== true) {
         _blockBootForMissingCommittedImage('fault reboot image overlay');
         return;
@@ -5373,7 +5358,7 @@ function faultModalReboot() {
     bootAnimating = false;
     const con = document.getElementById('editorConsole');
     if (con) con.textContent = '';
-    slowBoot();
+    updateDashboard();
 }
 
 function faultModalInvestigate() {
@@ -5510,6 +5495,12 @@ function _renderPendingCapPanel() {
 // validates the magic, writes it into simulator memory via sim.receiveLump(),
 // and resumes execution from the retry PC.
 async function triggerLazyLoad(absentResult, mode) {
+    if (sim && sim.simulationConfiguration) {
+        const message = 'This artifact is not retained in the activated configuration. Select it explicitly and prepare a new simulation.';
+        if (typeof appendOutput === 'function') appendOutput(message, 'error');
+        if (typeof finishWalk === 'function' && walkRunning) finishWalk();
+        return false;
+    }
     const token = absentResult.token;
     const label = absentResult.label || ('Slot ' + absentResult.nsIndex);
     const con   = document.getElementById('editorConsole');
@@ -5808,11 +5799,13 @@ async function runLazyLoadTest() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function resetSim() {
-    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
-    // Reset emits the boot-image overlay hook synchronously only when there is
-    // a validated cached buffer. Gate before reset so a stale/missing image can
-    // never fall through to the constructor's factory Namespace.
-    if (!_ensureCommittedImageForBoot('Boot button')) return;
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return false;
+    // Reset only the private retained image, with no shared-cache fallback.
+    if (!_ensureCommittedImageForBoot('Reset')) return false;
+    if (_simRunActive || walkRunning || bootAnimating) {
+        if (typeof appendOutput === 'function') appendOutput('Stop Run, Walk or animated boot before resetting the activated simulation.', 'error');
+        return false;
+    }
     // Skip dashboard redirect when a startup default view is pending —
     // slowBoot() will navigate there after boot completes.
     // Search: _startupDefaultView
@@ -5824,76 +5817,32 @@ function resetSim() {
     if (sim && sim.faultLog) sim.faultLog = [];
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
-    // Do NOT clear _defaultProgramLoaded — _autoLoadDefaultProgram() will
-    // reload the user's compiled program after boot completes so the PC
-    // returns to the correct start instruction automatically.
+    // Programmer drafts are retained but never inserted into this reset image.
     _bootAuditAccum = [];
     if (sim && typeof sim.clearBreakpointResume === 'function') {
         sim.clearBreakpointResume();
     }
     _clearLumpPetNames();
     if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
-    sim.reset();
+    sim.resetPreparedSimulation();
     if (sim._bootImageLoaded !== true) {
         _blockBootForMissingCommittedImage('Boot button image overlay');
-        return;
+        return false;
     }
-    _initLazyLoadManifest();
     pipelineViz.reset();
     if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
     bootAnimating = false;
     const con = document.getElementById('editorConsole');
     if (con) con.textContent = '';
-    slowBoot();
+    updateDashboard();
+    return true;
 }
 
-// Fast-reset, complete the boot sequence immediately, then land on the
-// CR14 step view.  Bound to the "↺ Reset & Step" button in the Gate Log panel.
+// Reset is stopped; the explicitly combined action requests exactly one Step.
 function resetAndStep() {
     if (!_ensureCommittedImageForBoot('Reset & Step')) return;
-    _lastFault = null;
-    faultAlertOff();
-    if (sim && sim.faultLog) sim.faultLog = [];
-    try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
-    if (pipelineViz) pipelineViz.setNIA(null);
-    // Do NOT clear _defaultProgramLoaded — see resetSim() comment.
-    _bootAuditAccum = [];
-    if (sim && typeof sim.clearBreakpointResume === 'function') {
-        sim.clearBreakpointResume();
-    }
-    _clearLumpPetNames();
-    if (window.ExecutionIdentity) window.ExecutionIdentity.clear('Reset cleared the previous execution identity');
-    sim.reset();
-    if (sim._bootImageLoaded !== true) {
-        _blockBootForMissingCommittedImage('Reset & Step image overlay');
-        return;
-    }
-    _initLazyLoadManifest();
-    pipelineViz.reset();
-    if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
-    bootAnimating = false;
-    const con = document.getElementById('editorConsole');
-    if (con) con.textContent = '';
-    // Complete boot immediately (no animation) so the machine is ready to step.
-    while (!sim.bootComplete && !sim.halted) {
-        try { sim._bootStep(); } catch(e) {
-            console.error('resetAndStep _bootStep error:', e);
-            if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
-            updateDashboard();
-            return;
-        }
-    }
-    if (!sim.bootComplete) {
-        _recordUnreportedBootFailure('reset-and-step boot did not complete');
-        if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
-        updateDashboard();
-        return;
-    }
-    if (pipelineViz) { pipelineViz.setNIA(_bootNIARows(sim.bootStep)); pipelineViz.render(); }
-    if (!sim.halted) _autoLoadDefaultProgram();
-    updateDashboard();
-    switchView('dashboard');
-    openCRDetail(14);
+    if (resetSim() === false) return;
+    void stepSim();
 }
 
 function runGC() {
@@ -13324,6 +13273,8 @@ function _captureLumpSaveSnapshot() {
         isaProfile: indexedView ? 'IDX1' : 'LEGACY',
         executionLayout: indexedView ? window.ChurchIDX1IDE.freezeLayout(candidate.executionLayout) : null,
         token: token || null,
+        abstraction: pendingMatches && pending.abstractionName ||
+            entry && entry.abstraction || '',
         words: memory && Array.isArray(memory.words) ? memory.words.slice() : [],
         capabilities: _cloneLumpSaveCapabilities(memory && memory.capabilities),
         registeredAt: registeredAt,
@@ -13462,21 +13413,15 @@ function showSaveToNamespace() {
     const _unifiedReview = document.getElementById('unifiedLumpReview');
     if (_unifiedReview) _unifiedReview.style.display =
         window._pendingLumpData ? '' : 'none';
-    const slotSel = document.getElementById('saveNSSlot');
-    const pickerRequestId = ++_saveNSPickerRequestId;
-    _saveNSPickerReady = false;
+    ++_saveNSPickerRequestId;
+    _saveNSPickerReady = true;
     _saveNSNamespaceFingerprint = null;
-    slotSel.innerHTML = '';
-    slotSel.disabled = true;
-    document.getElementById('saveNSLabel').value = '';
+    const snapshot = window._saveNSPreparedSnapshot;
+    document.getElementById('saveNSLabel').value =
+        snapshot.editorBaseIdentity && snapshot.editorBaseIdentity.abstraction ||
+        snapshot.abstraction || '';
     document.getElementById('saveNSLabel').disabled = false;
-    document.getElementById('saveNSType').value = '1';
-    document.getElementById('permR').checked = false;
-    document.getElementById('permW').checked = false;
-    document.getElementById('permX').checked = false;
-    document.getElementById('permL').checked = false;
-    document.getElementById('permS').checked = false;
-    document.getElementById('permE').checked = true;
+    document.getElementById('saveLumpMode').value = 'revision';
     const info = document.getElementById('saveNSInfo');
     const _csWords = window._saveNSPreparedSnapshot && window._saveNSPreparedSnapshot.words;
     const _csLen = _csWords ? _csWords.length : 0;
@@ -13484,52 +13429,13 @@ function showSaveToNamespace() {
     _setSaveNSFeedback('', '');
     _saveNSTrigger = document.activeElement;
     document.getElementById('saveNSDialog').style.display = '';
-    _setSaveNSFeedback('loading', 'Loading committed Namespace destinations…');
+    _setSaveNSFeedback('', '');
     if (!_saveNSTrap) _saveNSTrap = _makeModalFocusTrap('saveNSDialog', closeSaveDialog);
     document.addEventListener('keydown', _saveNSTrap, true);
     document.getElementById('saveNSLabel').focus();
 
-    // Fetch afresh for every open; the shared bootstrap projection can lag a
-    // save. A late response must not populate a later dialog or undo a choice.
-    fetch('/api/boot-image/ns-state', { cache: 'no-store' })
-        .then(async function(response) {
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const state = await response.json();
-            if (!state || !Array.isArray(state.abstractions) ||
-                    typeof state.namespaceFingerprint !== 'string' ||
-                    !state.namespaceFingerprint.trim()) {
-                throw new Error('incomplete committed Namespace snapshot');
-            }
-            return state;
-        })
-        .then(function(state) {
-            if (pickerRequestId !== _saveNSPickerRequestId ||
-                    document.getElementById('saveNSDialog').style.display === 'none') return;
-            _populateSaveNamespaceSlotPicker(state, window._saveNSPreparedSnapshot);
-            _saveNSNamespaceFingerprint = state.namespaceFingerprint;
-            if (slotSel.value === 'choose') {
-                document.getElementById('saveNSLabel').value = '';
-            } else {
-                onSlotChange();
-            }
-            _restoreSaveOperationStatus(window._saveNSPreparedSnapshot,
-                document.getElementById('saveNSLabel').value.trim());
-            _saveNSPickerReady = true;
-            slotSel.disabled = false;
-            if (slotSel.value === 'choose') {
-                _setSaveNSFeedback('error',
-                    'The opened LUMP no longer owns a committed Namespace slot. Choose the destination explicitly, or choose New Entry to create a separate copy.');
-            } else if (document.getElementById('saveNSStatus').dataset.feedbackKind === 'loading') {
-                _setSaveNSFeedback('', '');
-            }
-        })
-        .catch(function(error) {
-            if (pickerRequestId !== _saveNSPickerRequestId ||
-                    document.getElementById('saveNSDialog').style.display === 'none') return;
-            _setSaveNSFeedback('error',
-                `Cannot load committed Namespace destinations: ${error.message}. Close and reopen Save LUMP to retry.`);
-            document.getElementById('saveNSConfirmBtn').disabled = true;
-        });
+    _restoreSaveOperationStatus(snapshot,
+        document.getElementById('saveNSLabel').value.trim());
 }
 
 function onSlotChange() {
@@ -13813,8 +13719,8 @@ async function _discoverLumpSaveDiagnosticCandidate(operationId) {
 
 let _saveNSRequestInFlight = false;
 async function beginSaveToNamespace() {
-    if (!_saveNSPickerReady || document.getElementById('saveNSSlot').disabled) {
-        _setSaveNSFeedback('error', 'Committed Namespace destinations are not loaded. Close and reopen Save LUMP to retry.');
+    if (!window._saveNSPreparedSnapshot) {
+        _setSaveNSFeedback('error', 'Open Save LUMP to review a frozen candidate before publishing.');
         return;
     }
     if (_saveNSRequestInFlight) return;
@@ -16669,10 +16575,8 @@ function _acceptCommittedNamespaceSlotLabel(response, slot) {
 // from the revision that was actually approved and committed.
 async function _reloadCommittedLumpArtifact(response, fallbackName, savedMetadata) {
     const token = response && response.token;
-    const nsSlot = response && (response.ns_slot !== undefined
-        ? response.ns_slot : response.namespace_slot);
-    if (!token || !Number.isInteger(Number(nsSlot))) {
-        throw new Error('committed save response is missing its token or authoritative Namespace slot');
+    if (!token) {
+        throw new Error('committed save response is missing its artifact token');
     }
     let committedWords = Array.isArray(response.final_binary)
         ? response.final_binary.slice() : null;
@@ -16748,7 +16652,7 @@ async function _refreshNamespaceAuthorityAfterLumpSave() {
     }
 }
 
-function _validateFinalLumpSaveBinary(words, capabilities) {
+function _validateFinalLumpSaveBinary(words, capabilities, plan) {
     if (!Array.isArray(words) || words.length < 2) {
         throw new Error('authoritative save plan returned no complete LUMP binary');
     }
@@ -16768,13 +16672,50 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
     }
     const caps = Array.isArray(capabilities) ? capabilities : [];
     const start = lumpSize - cc;
-    // A capability-free legacy candidate may be expanded by the server to its
-    // row-zero identity seal.  There is no declaration to resolve in that
-    // case, but the final bytes must still be concrete.
+    if (plan && plan.portable_binding) {
+        // This is retained artifact form, not permission to execute. The
+        // server-authored, digest-checked plan owns its portable contract;
+        // installation performs destination linking separately.
+        const contract = plan.portable_binding;
+        const portable = window.PortableLumpBinding;
+        if (!portable || contract.schema !== portable.SCHEMA ||
+                contract.canonical_gt_words !== 'unresolved' ||
+                !Array.isArray(contract.dependencies) ||
+                contract.dependencies.length !== cc || cc < 1) {
+            throw new Error('Save plan returned an invalid portable binding');
+        }
+        portable.canonicalName(contract.owner);
+        const seen = new Set();
+        for (const dep of contract.dependencies) {
+            const normalized = dep.symbolic_self === true ? dep :
+                portable.descriptor(dep, dep.relocation_row, contract.owner);
+            if (dep.symbolic_self === true &&
+                    (dep.N !== contract.owner || dep.capability_type !== 1 ||
+                        JSON.stringify(dep.rights) !== '["E"]')) {
+                throw new Error('Save plan returned an invalid portable SELF contract');
+            }
+            const row = normalized.relocation_row;
+            if (!Number.isInteger(row) || row < 0 || row >= cc || seen.has(row) ||
+                    normalized.symbolic_self !== (row === 0)) {
+                throw new Error('Save plan returned invalid portable relocation rows');
+            }
+            seen.add(row);
+            const word = words[start + row] >>> 0;
+            if (row === 0 ? word !== 0xFEED5E1F :
+                    word !== 0 && (word >>> 16) !== 0xFEED) {
+                throw new Error('Save plan portable c-list contains a destination-local capability');
+            }
+        }
+        return true;
+    }
+    // A capability-free legacy candidate may have reserved null rows (the
+    // server also reserves row zero for old cc=0 input). Artifact publication
+    // preserves these inert zero words; it no longer mints an identity seal.
+    // A pending FEED marker still requires a declared/signed portable binding.
     if (caps.length === 0) {
         for (let row = 0; row < cc; row++) {
             const word = (words[start + row] || 0) >>> 0;
-            if (word === 0 || (word >>> 16) === 0xFEED) {
+            if ((word >>> 16) === 0xFEED) {
                 throw new Error(
                     `authoritative save plan left c-list row ${row} unresolved`
                 );
@@ -16820,31 +16761,29 @@ function _validateFinalLumpSaveBinary(words, capabilities) {
 }
 
 async function confirmSaveToNamespace() {
-    const slotSel = document.getElementById('saveNSSlot');
-    if (!_saveNSPickerReady || !_saveNSNamespaceFingerprint || slotSel.disabled ||
-            !Array.from(slotSel.options).some(option =>
-                option.value === slotSel.value && !option.disabled)) {
-        _setSaveNSFeedback('error', 'Choose a destination from the committed Namespace snapshot before saving.');
-        return;
-    }
+    const saveAsCopy = document.getElementById('saveLumpMode').value === 'copy';
     const label = document.getElementById('saveNSLabel').value.trim();
     if (!label) {
-        const message = 'Enter a LUMP / Namespace Name, then click Save again.';
+        const message = 'Enter a Pet Name, then click Save again.';
         _setSaveNSFeedback('error', message);
         const status = document.getElementById('saveNSStatus');
         if (status) status.dataset.terminal = 'true';
         return;
     }
-    const perms = {
-        R: document.getElementById('permR').checked ? 1 : 0,
-        W: document.getElementById('permW').checked ? 1 : 0,
-        X: document.getElementById('permX').checked ? 1 : 0,
-        L: document.getElementById('permL').checked ? 1 : 0,
-        S: document.getElementById('permS').checked ? 1 : 0,
-        E: document.getElementById('permE').checked ? 1 : 0,
-    };
-    const gtType = parseInt(document.getElementById('saveNSType').value) || 0;
     const _saveSnapshot = window._saveNSPreparedSnapshot || null;
+    const originalName = _saveSnapshot && (
+        _saveSnapshot.editorBaseIdentity && _saveSnapshot.editorBaseIdentity.abstraction ||
+        _saveSnapshot.abstraction);
+    if (saveAsCopy && label === originalName) {
+        _setSaveNSFeedback('error', 'A new copy requires a distinct Pet Name.');
+        return;
+    }
+    if (!saveAsCopy && _saveSnapshot && _saveSnapshot.editorBaseIdentity &&
+            originalName && label !== originalName) {
+        _setSaveNSFeedback('error',
+            'A revision keeps its Pet Name. Choose New copy to publish under a distinct Pet Name.');
+        return;
+    }
     let _staleSnapshotReason = _saveSnapshot &&
         _saveSnapshot.sourceMatchesEditor === false
         ? 'the compiled source snapshot already differed from the editor'
@@ -17129,41 +17068,10 @@ async function confirmSaveToNamespace() {
         }
     }
 
-    // Resolve and validate the programmer-selected target before either durable
-    // or browser state is changed. Every Namespace slot is replaceable.
+    // Artifact publication has no deployment destination.
     const _svClistWords = (_svBinary && _caps.length > 0)
         ? _svBinary.slice(_svBinary.length - _caps.length)
         : [];
-    let idx;
-    if (slotSel.value === 'new') {
-        // Namespace allocation is performed by the save-plan transaction.  A
-        // client-side "first free" scan races other saves and can attach a
-        // correctly approved binary to the wrong server slot.
-        idx = null;
-    } else {
-        idx = parseInt(slotSel.value, 10);
-        const _firstSaveSlot = typeof sim.saveNamespaceStartSlot === 'function'
-            ? sim.saveNamespaceStartSlot() : 0;
-        const _maxSaveSlot = sim.MAX_NS_ENTRIES - 1;
-        if (!Number.isInteger(idx) || idx < _firstSaveSlot || idx > _maxSaveSlot) {
-            const _slotError = `Save blocked: choose a Namespace slot between ${_firstSaveSlot} and ${_maxSaveSlot}, or select New Entry.`;
-            if (typeof _showFpgaToast === 'function') {
-                _showFpgaToast('Save to Namespace Blocked', _slotError, 'error', 7000);
-            } else {
-                alert(_slotError);
-            }
-            return;
-        }
-    }
-
-    const _existingTarget = Number.isInteger(idx) ? sim.readNSEntry(idx) : null;
-    const _targetSequence = _existingTarget
-        ? sim.parseNSWord1(_existingTarget.word1_limit).gtSeq : 0;
-    if (Number.isInteger(idx) && _existingTarget && _svBinary &&
-        (_existingTarget.word0_location + _svBinary.length > sim.memory.length)) {
-        alert(`Save blocked: Namespace slot ${idx} is not backed by enough writable LUMP storage.`);
-        return;
-    }
     // Compute the token without registering browser memory. No slot has
     // name-based ownership; the server binds any destination-local SELF row.
     let _svTok = null;
@@ -17182,7 +17090,8 @@ async function confirmSaveToNamespace() {
                 slot_label:   label,
                 content_type: 'code',
                 language:     _svLang,
-                ns_slot:      idx,
+                artifact_only: true,
+                save_as_copy: saveAsCopy,
                 capabilities: _caps,
                 // Keep the complete immutable editor snapshot visible to the
                 // server-side approval/manifest layer. The binary remains the
@@ -17210,26 +17119,17 @@ async function confirmSaveToNamespace() {
                         String(_caps[0].name || '').toUpperCase())),
                 petname: _svPetname,
                 issue_number: _svIssueNumber,
-                grants:       Object.keys(perms).filter(function(p) { return perms[p]; }),
-                capability_type: gtType === 1 ? 'inform' :
-                    (gtType === 2 ? 'outform' : 'abstract'),
-                namespace_sequence: _targetSequence,
-                namespaceFingerprint: _saveNSNamespaceFingerprint,
-                replacement: slotSel.value !== 'new',
-                // New Entry is a server allocation request, never a browser
-                // assertion that its observed first-free slot remains free.
-                new_entry: slotSel.value === 'new',
                 // Pass the content-derived token so ordinary LUMPs remain
                 // addressable immediately. The server canonicalizes this field
                 // from the verified SELF row for an existing resident binding.
                 token:        _svTok || undefined,
-                editor_base: (_saveSnapshot && _saveSnapshot.editorBaseIdentity) || undefined,
+                editor_base: !saveAsCopy && (_saveSnapshot && _saveSnapshot.editorBaseIdentity) || undefined,
                 // Normal Save deliberately publishes this frozen candidate as
                 // the newest immutable revision, even when editor_base is an
                 // older saved revision.  The server binds this intent to the
                 // save plan and one-time approval; it does not relax any
                 // binary, Namespace, capability, or permission validation.
-                save_as_latest: true,
+                save_as_latest: !saveAsCopy,
                 submitted_source: _submittedSource,
                 source_required: typeof _submittedSource === 'string' &&
                     _submittedSource.trim().length > 0,
@@ -17242,15 +17142,6 @@ async function confirmSaveToNamespace() {
                 ].join(':'),
             }
         };
-        const _bootstrapRepair = window._pendingBootstrapRepairMetadata;
-        if (_bootstrapRepair &&
-                _bootstrapRepair.abstraction === _svAbsName &&
-                Number(_bootstrapRepair.ns_slot) === Number(idx)) {
-            _svPayload.metadata.token = _bootstrapRepair.token;
-            _svPayload.metadata.namespace_sequence =
-                _bootstrapRepair.namespace_sequence;
-            _svPayload.metadata.enforce_bootstrap_identity = true;
-        }
         let _saveApproval;
         try {
             if (typeof window._confirmLumpSavePlan !== 'function') {
@@ -17258,15 +17149,15 @@ async function confirmSaveToNamespace() {
             }
             _saveApproval = await window._confirmLumpSavePlan(
                 _svPayload.binary, _svPayload.metadata,
-                () => `Save "${_svAbsName}" to Namespace slot ${idx}?`,
+                () => `Publish "${_svAbsName}" as a ${saveAsCopy ? 'new copy' : 'new revision'}? Namespace and simulation remain unchanged.`,
                 {
                     // The unified IDE dialog already shows the exact candidate,
                     // destination and permissions. Keep the server-authored
                     // consequence in that same dialog and obtain approval there
                     // instead of opening a Chrome confirmation.
                     confirmInDialog: _confirmSavePlanInDialog,
-                    validateFinalBinary: function(finalBinary) {
-                        _validateFinalLumpSaveBinary(finalBinary, _caps);
+                    validateFinalBinary: function(finalBinary, metadata, plan) {
+                        _validateFinalLumpSaveBinary(finalBinary, _caps, plan);
                     },
                 }
             );
@@ -17319,14 +17210,11 @@ async function confirmSaveToNamespace() {
             _svPayload.binary = _saveApproval.final_binary.slice();
             if (_svPayload.metadata.isa_profile === 'IDX1')
                 await window.ChurchIDX1IDE.applySavedPlan(_svPayload.metadata, _saveApproval.plan);
-            idx = _saveApproval.plan.ns_slot;
-            if (!Number.isInteger(idx)) {
-                throw new Error('Save plan is missing an authoritative Namespace slot');
+            if (_saveApproval.plan.ns_slot != null) {
+                throw new Error('Artifact save plan unexpectedly assigns a Namespace slot');
             }
-            _svPayload.metadata.ns_slot = idx;
-            _svPayload.metadata.namespace_sequence =
-                _saveApproval.plan.namespace_sequence !== undefined
-                    ? _saveApproval.plan.namespace_sequence : _targetSequence;
+            if (_saveApproval.plan.portable_binding)
+                _svPayload.metadata.portable_binding = _saveApproval.plan.portable_binding;
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
             if (_saveApproval.plan.compiler_record) {
@@ -17374,20 +17262,13 @@ async function confirmSaveToNamespace() {
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful
             // transaction looking unfinished.
-            _setSaveNSFeedback('loading', 'Active and verified — the canonical LUMP update is committed.');
+            _setSaveNSFeedback('loading', 'LUMP revision published — Namespace and simulation unchanged.');
             _persistSaveOperationStatus(resp.operation_id ||
                 _svPayload.metadata.operation_id, 'committed',
                 `Saved "${resp.abstraction || label}" as ${resp.lump || resp.token}.`);
             closeSaveDialog();
             try {
-                const committedSlot = resp.ns_slot !== undefined
-                    ? Number(resp.ns_slot) : Number(resp.namespace_slot);
-                if (!Number.isInteger(committedSlot)) {
-                    throw new Error('repository response omitted the committed Namespace slot');
-                }
-                idx = committedSlot;
                 await _reloadCommittedLumpArtifact(resp, label, _svPayload.metadata);
-                await _refreshNamespaceAuthorityAfterLumpSave();
             } catch (err) {
                 try {
                     if (window.LumpSaveDiagnostics) {
@@ -17397,8 +17278,8 @@ async function confirmSaveToNamespace() {
                     resp.post_commit_error = String(err && err.message || err);
                 } catch (_) {}
                 console.error('[SaveNS] local reload failed after repository commit');
-                const recovery = `Saved "${label}" to NS[${idx}], but the local view could not update. ` +
-                    'Open Namespace and refresh its contents before running the LUMP.';
+                const recovery = `Published "${label}", but the local view could not update. ` +
+                    'Refresh the LUMP library to inspect the saved artifact.';
                 _showFpgaToast('LUMP Saved — Refresh Needed',
                     recovery + ' ' + err.message,
                     'error', 10000);
@@ -17406,9 +17287,6 @@ async function confirmSaveToNamespace() {
                 return;
             }
             try {
-                // The reviewed repository transaction also committed the label.
-                // Never issue a second protected write after acknowledging Save.
-                _acceptCommittedNamespaceSlotLabel(resp, idx);
                 if (window.LumpRegistry) {
                     // A successful save makes the server's immutable binary the
                     // authority for this token.  Do not register _svWords here:
@@ -17418,7 +17296,6 @@ async function confirmSaveToNamespace() {
                     if (typeof window._commitSavedLumpClientState === 'function') {
                         window._commitSavedLumpClientState(resp, {
                         abstraction: label,
-                        ns_slot: idx,
                         language: _svLang,
                         capabilities: _caps
                         }, {
@@ -17435,7 +17312,6 @@ async function confirmSaveToNamespace() {
                             token: resp.token,
                             abstraction: label,
                             filename: resp.lump,
-                            ns_slot: idx,
                             language: _svLang,
                             capabilities: _caps
                         }]);
@@ -17469,16 +17345,16 @@ async function confirmSaveToNamespace() {
                     resp.post_commit_error = String(err && err.message || err);
                 } catch (_) {}
                 console.error('[SaveNS] post-save UI refresh failed after repository commit');
-                const recovery = `Saved "${label}" to NS[${idx}], but the screen could not refresh. ` +
-                    'Open Namespace and refresh its contents before running the LUMP.';
+                const recovery = `Published "${label}", but the screen could not refresh. ` +
+                    'Refresh the LUMP library to inspect the saved artifact.';
                 _showFpgaToast('LUMP Saved — Refresh Needed',
                     recovery + ' ' + err.message,
                     'error', 10000);
                 if (typeof appendOutput === 'function') appendOutput(recovery, 'error');
                 return;
             }
-            const nextAction = `Saved "${label}" to NS[${idx}]. ` +
-                'Open Namespace to inspect it, or choose Run to execute the latest saved revision.';
+            const nextAction = `Published "${label}" to the LUMP library. ` +
+                'Namespace assignments and the running simulation are unchanged.';
             _showFpgaToast('Lump Saved',
                 nextAction,
                 'ok', 9000);
@@ -17503,11 +17379,11 @@ async function confirmSaveToNamespace() {
                 const plan = await window._requestLumpSavePlan(
                     rebuilt.binary, rebuilt.metadata);
                 rebuilt.binary = plan.final_binary.slice();
-                if (!Number.isInteger(plan.ns_slot)) {
-                    throw new Error('Rebuilt save plan is missing an authoritative Namespace slot');
+                if (plan.ns_slot != null) {
+                    throw new Error('Artifact save plan unexpectedly assigns a Namespace slot');
                 }
-                rebuilt.metadata.ns_slot = plan.ns_slot;
-                rebuilt.metadata.namespace_sequence = plan.namespace_sequence;
+                if (plan.portable_binding)
+                    rebuilt.metadata.portable_binding = plan.portable_binding;
                 if (rebuilt.metadata.isa_profile === 'IDX1')
                     await window.ChurchIDX1IDE.applySavedPlan(rebuilt.metadata, plan);
                 const intent = await window._requestLumpApprovalIntent(

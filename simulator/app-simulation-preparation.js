@@ -5,7 +5,9 @@
     let approved = false;
     let busy = false;
     let revision = 0;
-    let message = 'Save the Namespace Table first, then prepare a private simulation configuration.';
+    let history = [];
+    let historySelection = '';
+    let message = 'No simulation activated. Save the Namespace Table, then prepare, approve and activate a private simulation configuration.';
     const freeze = value => {
         if (value && typeof value === 'object') {
             Object.values(value).forEach(freeze);
@@ -23,6 +25,11 @@
         }
     };
     function invalidate() {
+        if (approved && review && review.approvedRevisionId) {
+            message = 'Namespace draft changed. The reviewed approved simulation remains available for explicit activation.';
+            render();
+            return;
+        }
         revision++;
         review = null;
         approved = false;
@@ -30,7 +37,7 @@
         render();
     }
     function checkReview() {
-        if (review && (window._nsTableDirty ||
+        if (review && !approved && (window._nsTableDirty ||
                 review.sourceNamespaceFingerprint !== fingerprint())) {
             revision++;
             review = null;
@@ -46,24 +53,42 @@
             '<button type="button" class="btn btn-sm" onclick="SimulationPreparation.prepare()"' + disabled + '>Prepare for Simulation</button> ' +
             '<button type="button" class="btn btn-sm" onclick="SimulationPreparation.approve()"' + (busy || !review || approved ? ' disabled' : '') + '>Approve Configuration</button> ' +
             '<button type="button" class="btn btn-sm" onclick="SimulationPreparation.activate()"' + (busy || !review || !approved ? ' disabled' : '') + '>Activate Simulation</button>' +
+            '<div><button type="button" class="btn btn-sm" onclick="SimulationPreparation.refreshHistory()"' + disabled + '>Refresh approved simulation history</button> ' +
+            '<select aria-label="Approved simulation revision" onchange="SimulationPreparation.selectHistory(this.value)"' + disabled + '>' +
+            '<option value="">Choose an approved simulation…</option>' +
+            history.map(item => {
+                const entry = (item.preparedRows || []).find(row => row.slot === item.bootEntrySlot);
+                const petName = entry && entry.name || 'Unnamed configuration';
+                return '<option value="' + escape(item.revisionId) + '"' +
+                    (item.revisionId === historySelection ? ' selected' : '') + '>' +
+                    escape(petName + ' · approved simulation ' + item.revisionId.slice(0, 12)) + '</option>';
+            }).join('') + '</select> ' +
+            '<button type="button" class="btn btn-sm" onclick="SimulationPreparation.reopen()"' +
+            (busy || !historySelection ? ' disabled' : '') + '>Review selected simulation</button></div>' +
             '<p role="status" style="white-space:pre-wrap">' + escape(message) + '</p>' +
             (review ? '<details open><summary>Proposed private layout changes — saved rows remain unchanged</summary><pre style="max-height:240px;overflow:auto;white-space:pre-wrap">' +
                 escape(JSON.stringify(review.layoutChanges, null, 2)) + '</pre></details>' +
                 '<details><summary>Exact prepared rows and artifact bindings</summary><pre style="max-height:240px;overflow:auto;white-space:pre-wrap">' +
                 escape(JSON.stringify({ preparedRows: review.preparedRows, artifactBindings: review.artifactBindings }, null, 2)) +
-                '</pre></details><p>Configuration: <code>' + escape(review.configurationHash) + '</code></p>' : '') +
+                '</pre></details><p>Configuration: <code>' + escape(review.configurationHash) + '</code>' +
+                (review.approvedRevisionId ? '<br>Approved simulation revision: <code>' +
+                    escape(review.approvedRevisionId) + '</code>' : '') + '</p>' : '') +
             (active ? '<p>Loaded simulation / execution evidence configuration: <code>' + escape(active.configurationHash) +
                 '</code><br>Frozen Namespace: <code>' + escape(active.sourceNamespaceFingerprint) + '</code></p>' : '') +
-            '<small>Simulation only. Approval does not activate or execute. Activation does not start Run.</small>';
+            '<small>Simulation only—not hardware certification. Review and approval do not activate or execute. Activation does not start Run.</small>';
     }
     function render() {
-        const panel = document.getElementById('simulationPreparationPanel');
-        if (panel) panel.innerHTML = markup();
+        for (const id of ['simulationPreparationPanel', 'simulationPreparationAbstractionsPanel']) {
+            const panel = document.getElementById(id);
+            if (panel) panel.innerHTML = markup();
+        }
     }
     async function request(action, payload) {
         const response = await fetch('/api/simulation/' + action, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            ...(action === 'history' ? { method: 'GET', cache: 'no-store' } : {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            }),
         });
         const data = await response.json();
         if (!response.ok || data.ok === false) {
@@ -72,43 +97,85 @@
         }
         return data;
     }
+    async function refreshHistory() {
+        if (busy) return false;
+        busy = true;
+        render();
+        try {
+            const data = await request('history');
+            if (!Array.isArray(data.revisions) || data.revisions.some(item =>
+                !item || typeof item.revisionId !== 'string' || item.approved !== true ||
+                item.hardwareCertified !== false)) {
+                throw new Error('History did not return approved simulation revisions.');
+            }
+            history = freeze(JSON.parse(JSON.stringify(data.revisions)));
+            if (!history.some(item => item.revisionId === historySelection)) historySelection = '';
+            message = history.length ? 'Select an approved simulation to review. Nothing has been activated.' :
+                'No retained approved simulations are available.';
+            return true;
+        } catch (error) {
+            history = [];
+            historySelection = '';
+            message = 'Simulation history unavailable: ' + String(error.message || error);
+            return false;
+        } finally {
+            busy = false;
+            render();
+        }
+    }
     async function perform(action) {
         if (busy) return false;
         checkReview();
         busy = true;
         const ticket = revision;
+        const sourceBound = action === 'prepare' || action === 'approve';
         try {
             idle();
-            if (window._nsTableDirty || !fingerprint()) throw new Error('Save the Namespace Table before preparing.');
-            if (action !== 'prepare' && !review) throw new Error('Prepare and review the configuration first.');
+            if (sourceBound && (window._nsTableDirty || !fingerprint())) throw new Error('Save the Namespace Table before preparing.');
+            if (action !== 'prepare' && action !== 'reopen' && !review) throw new Error('Prepare and review the configuration first.');
             if (action === 'activate' && !approved) throw new Error('Approve the reviewed configuration before activation.');
+            if (action === 'reopen' && !history.some(item => item.revisionId === historySelection)) {
+                throw new Error('Choose an approved simulation from history first.');
+            }
             const source = fingerprint();
             const selected = review;
+            const selectedRevision = historySelection;
             if (action === 'prepare') { review = null; approved = false; }
-            message = `${action === 'prepare' ? 'Preparing' : action === 'approve' ? 'Approving' : 'Activating'} private simulation configuration…`;
+            message = `${action === 'prepare' ? 'Preparing' : action === 'approve' ? 'Approving' :
+                action === 'reopen' ? 'Reopening' : 'Activating'} private simulation configuration…`;
             render();
             const data = await request(action, action === 'prepare'
                 ? { namespaceFingerprint: source }
-                : { preparationId: selected.preparationId, configurationHash: selected.configurationHash });
-            if (ticket !== revision || source !== fingerprint() || window._nsTableDirty) {
+                : action === 'reopen' ? { revisionId: selectedRevision }
+                    : { preparationId: selected.preparationId, configurationHash: selected.configurationHash });
+            if (sourceBound && (ticket !== revision || source !== fingerprint() || window._nsTableDirty)) {
                 throw new Error('Namespace changed while the request was pending. Prepare again.');
             }
             idle();
-            if (action === 'prepare') {
-                if (!data.preparationId || !data.configurationHash || data.sourceNamespaceFingerprint !== source ||
+            if (action === 'prepare' || action === 'reopen') {
+                if (!data.preparationId || !data.configurationHash || !data.imageHash ||
+                        (action === 'prepare' && data.sourceNamespaceFingerprint !== source) ||
                         !Array.isArray(data.preparedRows) || !Array.isArray(data.layoutChanges) ||
                         !data.artifactBindings || data.hardwareCertified !== false) {
                     throw new Error('Preparation response is missing frozen configuration provenance.');
                 }
+                if (action === 'reopen' && (data.approved !== true || data.activated !== false ||
+                        data.approvedRevisionId !== selectedRevision)) {
+                    throw new Error('Reopened response does not match the selected approved simulation.');
+                }
                 review = freeze(JSON.parse(JSON.stringify(data)));
-                approved = false;
-                message = 'Review the proposed private layout changes, then approve. Saved Namespace rows have not changed.';
+                approved = action === 'reopen';
+                message = approved ? 'Retained approved simulation reopened for review only. Explicitly activate to load it; current Namespace edits remain unchanged.' :
+                    'Review the proposed private layout changes, then approve. Saved Namespace rows have not changed.';
             } else {
                 if (data.preparationId !== selected.preparationId || data.configurationHash !== selected.configurationHash) {
                     throw new Error('Response does not match the reviewed configuration.');
                 }
                 if (action === 'approve') {
-                    if (data.approved !== true) throw new Error('Configuration approval was not confirmed.');
+                    if (data.approved !== true || typeof data.approvedRevisionId !== 'string' || !data.approvedRevisionId) {
+                        throw new Error('Durable configuration approval was not confirmed.');
+                    }
+                    review = freeze({ ...selected, approvedRevisionId: data.approvedRevisionId });
                     approved = true;
                     message = 'Configuration approved. Explicitly activate to load it; no simulation has started.';
                 } else {
@@ -117,16 +184,22 @@
                         throw new Error('Activation did not return a valid private image.');
                     }
                     const image = new Uint32Array(data.words).buffer;
-                    if (sim.loadBootImage(image) !== true) throw new Error(sim.lastBootImageError || 'Private image was rejected.');
-                    window.bootImage = image;
-                    window.bootImageAvailable = true;
-                    // Loading memory alone does not reset PC, registers or boot
-                    // state. Reset against the new private cache, then explicitly
-                    // reload (also supports shells without a reset overlay hook).
-                    sim.reset();
-                    if (sim.loadBootImage(image) !== true) throw new Error(sim.lastBootImageError || 'Private reset image was rejected.');
-                    if (typeof _clearPendingSimLoad === 'function') _clearPendingSimLoad();
-                    sim.bindSimulationConfiguration(image, { ...selected, imageHash: data.imageHash });
+                    if (data.imageHash !== selected.imageHash) {
+                        throw new Error('Activated image hash does not match the approved configuration.');
+                    }
+                    const digest = await crypto.subtle.digest('SHA-256', image);
+                    const actualHash = Array.from(new Uint8Array(digest), byte =>
+                        byte.toString(16).padStart(2, '0')).join('');
+                    if (actualHash !== selected.imageHash) {
+                        throw new Error('Activated image bytes do not match the approved configuration.');
+                    }
+                    if (selected !== review || !approved) {
+                        throw new Error('Reviewed activation selection changed while bytes were being verified.');
+                    }
+                    idle();
+                    sim.activateSimulationConfiguration(image, { ...selected, imageHash: data.imageHash });
+                    // Keep programmer drafts/pending candidates intact. The
+                    // execution gate prevents their insertion into this image.
                     approved = false;
                     review = null;
                     message = 'Private simulation activated. Use Run, Step or Walk to execute this frozen configuration.';
@@ -149,6 +222,13 @@
         prepare: () => perform('prepare'),
         approve: () => perform('approve'),
         activate: () => perform('activate'),
+        refreshHistory,
+        selectHistory: value => {
+            if (busy) return;
+            historySelection = history.some(item => item.revisionId === value) ? value : '';
+            render();
+        },
+        reopen: () => perform('reopen'),
         invalidate, markup, render,
     };
     // Legacy callers must never invoke the old saved-image normalization flow.

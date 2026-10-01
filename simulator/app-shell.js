@@ -1672,111 +1672,11 @@ function init() {
     if (typeof _onSimFaultSnapshot === 'function') {
         sim.on('faultSnapshot', _onSimFaultSnapshot);
     }
-    // Task #217: every reset rebuilds memory[] from scratch via
-    // _initNamespaceTable. If a programmer-generated boot image is
-    // available, overlay it now so the simulator runs from the
-    // self-supporting binary rather than the hardcoded init alone.
-    sim.on('reset', _maybeApplyBootImage);
-    // Probe once at startup — covers the case where the user navigated
-    // here after a previous session generated an image.
-    _probeBootImage().then(buf => {
-        // A user can request a run while this asynchronous fetch is still in
-        // flight.  In that case the fallback 64-word SelfTest descriptor has
-        // already completed boot and CALL CR0 has entered its prepared target.
-        // Loading the real image below replaces memory, but intentionally does
-        // not rewrite an already-running thread's capability registers.
-        //
-        // Remember this state so an accepted late image can reset through the
-        // normal reset hook after it has been cached.  That hook loads the image
-        // synchronously before the next three-instruction boot attempt.
-        const _wasBootedBeforeImage = !!sim.bootComplete;
-        if (buf) {
-                   // Task #2867: acceptance state must reflect the loader's
-                   // verdict, not merely that a fetch succeeded.  loadBootImage()
-                   // returns false for a stale/rejected binary; in that case the
-                   // image must NOT be marked available (a rejected image cannot
-                   // masquerade as booted memory).
-                   let _accepted = false;
-                   try {
-                       _accepted = sim.loadBootImage(buf) === true;
-                       if (_accepted) {
-                            if (typeof _applyBootEntryToSim === 'function') _applyBootEntryToSim();
-                           // Evict stale sticky patches for all NS slots now owned
-                           // by the boot image.  Patches that differ from the new
-                           // binary are cleared and reported; matching (redundant)
-                           // patches are cleared silently.  Must run before
-                           // _reapplyStickyPatches() fires at boot completion.
-                           if (typeof window._clearBootImageStickyPatches === 'function') {
-                               window._clearBootImageStickyPatches(sim.nsCount || 0);
-                           }
-                       } else {
-                            if (typeof _reportBootImageRejection === 'function') {
-                                _reportBootImageRejection(sim.lastBootImageError);
-                            } else {
-                                console.warn('[bootImage] loadBootImage() rejected the fetched image.');
-                            }
-                       }
-                    } catch(e) {
-                        if (typeof _reportBootImageRejection === 'function') {
-                            _reportBootImageRejection('Saved boot image could not be applied: ' + e.message);
-                        } else {
-                            console.warn('[bootImage] apply failed:', e);
-                        }
-                        _accepted = false;
-                    }
-                   if (_accepted) {
-                        window._bootImageInspectionWarning = null;
-                        if (typeof _showBootArtifactInspectionStatus === 'function') {
-                            _showBootArtifactInspectionStatus();
-                        }
-                       // Cache before resetting: _maybeApplyBootImage(), the
-                       // reset listener, uses this exact buffer to overlay the
-                       // real descriptor synchronously.
-                       window.bootImage = buf;
-                       window.bootImageAvailable = true;
-                       // Code View can be the user's Default View even when
-                       // automatic boot is disabled. The loaded image already
-                       // contains the authoritative boot-entry slot, so show
-                       // its LUMP disassembly without requiring execution.
-                       if (typeof _openConfiguredBootLumpInDefaultEditor === 'function') {
-                           _openConfiguredBootLumpInDefaultEditor().catch(e => {
-                               console.warn('[boot-entry-editor] startup open failed:', e);
-                           });
-                       }
-
-                       if (_wasBootedBeforeImage) {
-                           // Never continue execution with CR14/CR11 derived
-                           // from the fallback 64-word placeholder after the
-                           // real SelfTest LUMP has arrived.  A bare reset is
-                           // deliberate: the normal auto-boot policy below
-                           // decides whether to continue immediately.
-                           if (window.ExecutionIdentity) {
-                               window.ExecutionIdentity.clear('Boot image replacement reset the previous execution identity');
-                           }
-                           sim.reset();
-                       }
-                   } else {
-                       window.bootImage = null;
-                       window.bootImageAvailable = false;
-                   }
-        }
-        // Refresh the namespace table immediately after the boot image loads so
-        // the live unified view populates even if the user navigated there before
-        // the async fetch resolved, or before auto-boot fired.
-        if (currentView === 'namespace' && typeof updateNamespace === 'function') updateNamespace();
-        // ALL auto-boot fires HERE (inside the .then) so that:
-        //   1. window.bootImage is already set → sim.reset() → _maybeApplyBootImage()
-        //      loads the correct binary immediately.
-        //   2. _clearBootImageStickyPatches() has already run → _stickyPatches is
-        //      empty → _reapplyStickyPatches() inside _autoLoadDefaultProgram() is
-        //      a no-op → the stale sticky patch can never overwrite sim.memory.
-        // Previously auto-boot fired from requestAnimationFrame (before the fetch
-        // resolved) so _reapplyStickyPatches() ran with the stale patch still live.
-        if (!sim.bootComplete) {
-            const _abChk = document.getElementById('autoBootChk');
-            if (_abChk && _abChk.checked) resetSim();
-        }
-    });
+    // Startup has no execution authority. Restoring editor/settings/Namespace
+    // views must not probe, load or run a shared repository image.
+    const startupConsole = document.getElementById('editorConsole');
+    if (startupConsole) startupConsole.textContent +=
+        '\nNo simulation activated. Prepare, approve and activate a Namespace configuration.';
     sim.on('programLoaded', () => {
         if (currentView === 'namespace') updateNamespace();
         if (currentView === 'abstractions') renderAbstractions();
@@ -2126,10 +2026,7 @@ function init() {
         pipelineViz.render();
         initTooltipAutoFlip();
         hideLoadingOverlay();
-        // Auto-boot is now deferred to _probeBootImage().then() so that
-        // _clearBootImageStickyPatches() always runs before _reapplyStickyPatches().
-        // Do NOT call resetSim() here — the fetch hasn't returned yet and the
-        // stale sticky-patch eviction hasn't happened.
+        // Rendering a restored view never loads or executes a simulation.
     });
 }
 
@@ -2606,16 +2503,15 @@ function openSimulatorFromMenu() {
 function saveAutoBootPref() {
     const chk = document.getElementById('autoBootChk');
     if (!chk) return;
-    try { localStorage.setItem('churchMachine_autoBootOnOpen', chk.checked ? '1' : '0'); } catch(e) {}
+    chk.checked = false;
 }
 
 function restoreAutoBootPref() {
     const chk = document.getElementById('autoBootChk');
     if (!chk) return;
-    // Default is ON — auto-boot unless the user has explicitly turned it off.
-    // A saved value of '0' means the user unchecked it; anything else (including
-    // null for first-time visitors) means auto-boot is enabled.
-    try { chk.checked = localStorage.getItem('churchMachine_autoBootOnOpen') !== '0'; } catch(e) {}
+    chk.checked = false;
+    chk.disabled = true;
+    chk.title = 'Simulation starts only after explicit preparation, approval and activation; then Run, Step or Walk.';
 }
 
 document.addEventListener('click', function(e) {

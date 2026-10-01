@@ -5046,6 +5046,13 @@ function _commitSavedLumpClientState(resp, fallback, draftSource) {
         binary_hash: resp.binary_hash || base.binary_hash || null,
         identity_hash: resp.identity_hash || base.identity_hash || null,
     });
+    // Artifact publication never advertises an installation inherited from an
+    // older editor/cache descriptor.
+    delete descriptor.ns_slot;
+    delete descriptor.namespace_slot;
+    delete descriptor.resident;
+    delete descriptor.boot_resident;
+    delete descriptor.load_policy;
     if (window.LumpRegistry) {
         window.LumpRegistry.registerFromServer([descriptor]);
         window.LumpRegistry.evictMemory(resp.token);
@@ -9643,6 +9650,7 @@ async function _requestLumpSavePlan(words, metadata) {
     // This gives the server's diagnostic-candidate store one stable operation
     // identity across plan, approval, a lost response, and a page refresh.
     metadata = metadata || {};
+    _artifactOnlyLumpSaveMetadata(metadata);
     const _saveDiagnostics = typeof window !== 'undefined'
         ? window.LumpSaveDiagnostics : null;
     if (_saveDiagnostics) {
@@ -9680,8 +9688,7 @@ async function _requestLumpSavePlan(words, metadata) {
             (metadata &&
                 (metadata.save_as_latest === true) !==
                 (result.save_as_latest === true)) ||
-            (metadata && metadata.new_entry === true &&
-                (!Number.isInteger(Number(finalSlot)) || Number(finalSlot) < 0))) {
+            finalSlot != null) {
             const error = new Error((result && result.error) || 'Invalid save-plan response');
             error.response = result;
             error.status = resp.status;
@@ -9868,27 +9875,26 @@ function _showLumpSaveStaleConflictDialog(response) {
 }
 window._showLumpSaveStaleConflictDialog = _showLumpSaveStaleConflictDialog;
 
-async function _freezeLumpSaveNamespaceRevision(metadata) {
-    const promotionSlot = metadata.promotion_binding && metadata.promotion_binding.ns_slot;
-    const bound = metadata.ns_slot !== null && metadata.ns_slot !== undefined ||
-        metadata.new_entry === true || metadata.ns_slot_policy === 'dynamic' ||
-        promotionSlot !== null && promotionSlot !== undefined;
-    if (!bound || metadata.namespaceFingerprint) return;
-    // Acquire once before review, never on commit or retry. The original
-    // metadata carries this same revision through plan, approval and save.
-    const response = await fetch('/api/boot-image/ns-state', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`Cannot review Namespace: HTTP ${response.status}`);
-    const state = await response.json();
-    if (!state || !Array.isArray(state.abstractions) ||
-            typeof state.namespaceFingerprint !== 'string' || !state.namespaceFingerprint.trim()) {
-        throw new Error('Cannot review Namespace: committed revision unavailable');
+function _artifactOnlyLumpSaveMetadata(metadata) {
+    // Programmer publication is not a deployment operation. Older library
+    // callers may carry historical slot metadata; it is never a save target.
+    for (const key of ['ns_slot', 'namespace_slot', 'ns_slot_policy',
+        'namespace_sequence', 'namespaceFingerprint', 'namespace_fingerprint',
+        'new_entry', 'replacement', 'resident', 'boot_resident', 'load_policy',
+        'boot', 'grants', 'capability_type', 'promotion_binding', 'slot_label',
+        'enforce_bootstrap_identity']) delete metadata[key];
+    metadata.artifact_only = true;
+    if (metadata.save_as_copy === true) {
+        metadata.save_as_latest = false;
+        delete metadata.editor_base;
     }
-    metadata.namespaceFingerprint = state.namespaceFingerprint;
+    return metadata;
 }
-window._freezeLumpSaveNamespaceRevision = _freezeLumpSaveNamespaceRevision;
+window._artifactOnlyLumpSaveMetadata = _artifactOnlyLumpSaveMetadata;
 
 async function _confirmLumpSavePlan(words, metadata, prompt, options) {
     if (!metadata || typeof metadata !== 'object') metadata = {};
+    _artifactOnlyLumpSaveMetadata(metadata);
     const _saveDiagnostics = typeof window !== 'undefined'
         ? window.LumpSaveDiagnostics : null;
     if (_saveDiagnostics) {
@@ -9909,10 +9915,6 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
             ? JSON.parse(JSON.stringify(metadata)) : {};
     } catch (_) {
         _metadataSnapshot = Object.assign({}, metadata || {});
-    }
-    await _freezeLumpSaveNamespaceRevision(_metadataSnapshot);
-    if (_metadataSnapshot.namespaceFingerprint) {
-        metadata.namespaceFingerprint = _metadataSnapshot.namespaceFingerprint;
     }
     let plan;
     let stopLeaseHeartbeat = null;
@@ -10055,6 +10057,18 @@ async function _confirmLumpSavePlan(words, metadata, prompt, options) {
         };
     }
     const finalBinary = plan.final_binary;
+    if (plan.portable_binding) {
+        _metadataSnapshot.portable_binding = plan.portable_binding;
+        metadata.portable_binding = plan.portable_binding;
+    }
+    if (plan.compiler_record) {
+        for (const target of [_metadataSnapshot, metadata]) {
+            target.trust_origin = 'trusted-home-ide';
+            target.compiler_record = plan.compiler_record;
+            target.compiler_identity = plan.compiler_record.compiler_identity;
+            target.compiler_version = plan.compiler_record.compiler_version;
+        }
+    }
     // Callers that own an immutable source/compiler pairing may provide a
     // strict final-byte validator.  Run it after explicit confirmation but
     // before minting the one-time approval intent, so a malformed server plan

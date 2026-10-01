@@ -146,17 +146,16 @@ const LumpContentFrame = require('./lump-content-frame.js');
         LumpContentFrame.lumpContentFrameProfile(framedWords(0x09)) === null);
 }
 
-// ── T2c: Save-to-NS takes committed rows, never catalog/slotLabels ───────
+// ── T2c: Programmer publication does not select Namespace destinations ───────
 {
-    const collectIdx = appRunSrc.indexOf('function _collectSaveNamespaceSlotCandidates(');
-    check('T2c save slot collector found', collectIdx !== -1);
-    if (collectIdx !== -1) {
-        const collectBody = appRunSrc.slice(collectIdx, appRunSrc.indexOf('function _populateSaveNamespaceSlotPicker(', collectIdx));
-        check('T2c1 collector uses committed rows and disables only bootstrap slots',
-            collectBody.includes('state.abstractions') &&
-            collectBody.includes('slot === 0 || slot === 1') &&
-            !collectBody.includes('slotLabels') &&
-            !collectBody.includes('getServerList()'));
+    const showIdx = appRunSrc.indexOf('function showSaveToNamespace(');
+    check('T2c artifact save dialog found', showIdx !== -1);
+    if (showIdx !== -1) {
+        const showBody = appRunSrc.slice(showIdx, appRunSrc.indexOf('function onSlotChange(', showIdx));
+        check('T2c1 dialog has artifact mode and no Namespace lookup',
+            showBody.includes('saveLumpMode') &&
+            !showBody.includes('saveNSSlot') &&
+            !showBody.includes('fetch('));
     }
 }
 
@@ -166,9 +165,10 @@ const LumpContentFrame = require('./lump-content-frame.js');
     check('T2d confirmSaveToNamespace found', confirmIdx !== -1);
     if (confirmIdx !== -1) {
         const confirmBody = appRunSrc.slice(confirmIdx, appRunSrc.indexOf('function ', confirmIdx + 10));
-        check('T2d1 confirm validates the full explicit replacement slot range',
-            confirmBody.includes('sim.saveNamespaceStartSlot()') &&
-            confirmBody.includes('Save blocked: choose a Namespace slot'));
+        check('T2d1 confirmation publishes artifact only without slot allocation',
+            confirmBody.includes('artifact_only: true') &&
+            !confirmBody.includes('sim.saveNamespaceStartSlot()') &&
+            !confirmBody.includes('ns_slot:'));
         check('T2d2 committed save reloads the repository artifact, not preflight words',
             confirmBody.includes('_reloadCommittedLumpArtifact(resp, label, _svPayload.metadata)') &&
             !confirmBody.includes('sim.saveToNamespaceAt(') &&

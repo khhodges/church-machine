@@ -41,40 +41,45 @@ const originalHash = configuration.configurationHash;
 fixture.prepared.configurationHash = 'mutated-response';
 assert.strictEqual(configuration.configurationHash, originalHash);
 
-// Match the shell's synchronous reset-overlay convention.
+// Reset must use private retained bytes, never a shared mutable browser cache.
 let cached = image.slice(0);
-sim.on('reset', () => {
-    if (cached) assert.strictEqual(sim.loadBootImage(cached), true, sim.lastBootImageError);
-});
-sim.reset();
+global.window.bootImage = cached;
+sim.resetPreparedSimulation();
 assert.strictEqual(sim.simulationConfiguration, configuration);
 assert.strictEqual(sim.bootComplete, false);
 assert.strictEqual(sim._executionEvidenceState().simulationConfiguration.configurationHash, originalHash);
-assert.strictEqual(sim.loadBootImage(image.slice(0)), true);
-assert.strictEqual(sim.simulationConfiguration, configuration, 'byte-identical copy retains provenance');
+assert.strictEqual(sim.loadBootImage(image.slice(0)), false, 'even identical legacy loads cannot overwrite paused execution');
+assert.strictEqual(sim.simulationConfiguration, configuration);
 
 // Same ArrayBuffer reference is not sufficient; altering even unused bytes
 // makes this a different configuration, although still a valid boot image.
 new Uint32Array(cached)[15000] ^= 1;
-sim.reset();
-assert.strictEqual(sim.simulationConfiguration, null, 'different accepted image retires binding');
-assert.strictEqual(sim.loadBootImage(image), true);
-assert.strictEqual(sim.simulationConfiguration, null, 'retired binding cannot resurrect later');
-sim.bindSimulationConfiguration(image, { ...fixture.prepared, configurationHash: originalHash });
-cached = null;
+sim.memory[15000] = 123;
+sim.resetPreparedSimulation();
+assert.strictEqual(sim.memory[15000], new Uint32Array(image)[15000]);
+assert.strictEqual(sim.simulationConfiguration, configuration);
+assert.strictEqual(sim.bootStep, 0);
+assert.strictEqual(sim.stepCount, 0);
+const beforeRejected = sim.memory.slice();
+assert.strictEqual(sim.loadBootImage(new ArrayBuffer(0)), false);
+assert.strictEqual(sim.loadLumpBinary([0], 6), false);
+assert.throws(() => sim.loadProgram([0]), /activated simulation/);
+assert.throws(() => sim.writeNsEntryForProgram(6, {}), /activated simulation/);
+assert.throws(() => sim.loadHardwareBinary([], [], []), /activated simulation/);
+assert.throws(() => sim.loadImageFromBinary([], [], []), /activated simulation/);
+assert.strictEqual(sim.receiveLump([0]).ok, false);
+assert.throws(() => sim.activateSimulationConfiguration(new ArrayBuffer(0), fixture.prepared), /empty|small/);
+assert.deepStrictEqual(sim.memory, beforeRejected);
+assert.strictEqual(sim.simulationConfiguration, configuration);
 sim.reset();
 assert.strictEqual(sim.simulationConfiguration, null, 'factory state without overlay has no provenance');
 assert.throws(() => sim.bindSimulationConfiguration(image, fixture.prepared), /exact accepted/);
-assert.strictEqual(sim.loadBootImage(image), true);
-assert(sim.simulationConfiguration, 'exact private overlay may resume after ordinary reset');
+assert.throws(() => sim.resetPreparedSimulation(), /No simulation activated/);
+sim.activateSimulationConfiguration(image, fixture.prepared);
+assert(sim.simulationConfiguration);
 sim.reset('loadHardwareBinary');
 assert.strictEqual(sim.loadBootImage(image), true);
 assert.strictEqual(sim.simulationConfiguration, null, 'unrelated binary reset retires private binding');
-sim.bindSimulationConfiguration(image, fixture.prepared);
-assert.strictEqual(sim.loadBootImage(new ArrayBuffer(0)), false);
-assert.strictEqual(sim.simulationConfiguration, null);
-assert.strictEqual(sim.loadBootImage(image), true);
-assert.strictEqual(sim.simulationConfiguration, null, 'failed load also retires private provenance');
 // Exercise the production UI activator against the real simulator, including
 // a subsequent ordinary shell reset overlay.
 const vm = require('vm');
@@ -84,18 +89,16 @@ const uiWindow = { _nsState: {
     namespaceFingerprint: fixture.prepared.sourceNamespaceFingerprint,
 } };
 const context = {
-    window: uiWindow, sim: uiSim, Uint32Array,
+    window: uiWindow, sim: uiSim, Uint32Array, Uint8Array, crypto: require('crypto').webcrypto,
     document: { getElementById: () => null },
     async fetch(url) {
         return { ok: true, json: async () => ({
             ...fixture.prepared, approved: url.endsWith('/approve'),
             activated: url.endsWith('/activate'), words: fixture.words,
+            approvedRevisionId: 'isolated-retained-revision',
         }) };
     },
 };
-uiSim.on('reset', () => {
-    if (uiWindow.bootImage) uiSim.loadBootImage(uiWindow.bootImage);
-});
 vm.createContext(context);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'app-simulation-preparation.js'), 'utf8'), context);
 (async () => {
@@ -106,7 +109,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname, 'app-simulation-preparation
     assert.strictEqual(await ui.activate(), true);
     const active = uiSim.simulationConfiguration;
     assert(active && Object.isFrozen(active));
-    uiSim.reset();
+    uiSim.resetPreparedSimulation();
     assert.strictEqual(uiSim.simulationConfiguration, active);
     assert.match(ui.markup(), new RegExp(active.configurationHash));
     const detailSource = fs.readFileSync(path.join(__dirname, 'app-cr-detail.js'), 'utf8');

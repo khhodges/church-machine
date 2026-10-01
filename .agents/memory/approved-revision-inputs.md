@@ -15,6 +15,19 @@ consuming an approved revision. Selecting a newer upstream revision is explicit.
 Do not silently rebuild from current files or relax existing hardware build gates
 when a frozen input is missing or mismatched.
 
+Approval and later activation are separate transitions. Before approval,
+require the exact reviewed current inputs; after approval, use the retained
+revision independently of mutable drafts, original library files, or server
+restart. Simulation approval is not hardware certification.
+
+**Why:** An approved-but-not-yet-activated simulation previously became unusable
+when another role advanced the current Namespace, defeating parallel work.
+
+**How to apply:** Retain approved bytes durably, reopen with a fresh one-use
+activation ticket, and keep hardware evidence requirements separate. Programmer
+publication must preserve old selected filenames and bytes rather than redirect
+them to a newer artifact.
+
 Historical builds must stage their retained inputs into a private build tree,
 not merely compare those hashes with the build host's current checkout.
 

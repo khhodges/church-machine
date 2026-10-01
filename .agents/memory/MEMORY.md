@@ -1,4 +1,5 @@
 - [Save diagnostic evidence](save-diagnostic-evidence.md) — shared safe error codes and occurrence times must survive ingestion; missing logs never prove rejection
+- [Review session cookie races](review-session-cookie-races.md) — initialize independent nonce bindings before parallel requests; late signed-cookie responses can overwrite a newer review session.
 - [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry

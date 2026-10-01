@@ -1,4 +1,4 @@
-"""Ephemeral, exact-configuration simulation consent, separate from publication."""
+"""Private simulation review and durable approved inputs, separate from hardware."""
 import copy
 import hashlib
 import json
@@ -47,10 +47,68 @@ def artifact_bindings(rows, directory):
         raw = (Path(directory) / filename).read_bytes()
         if hashlib.sha256(raw).hexdigest() != expected.lower():
             raise ValueError(f"NS[{row['slot']}] saved artifact hash mismatch")
-        _validate_body(raw)
-        bindings.append({"slot": row["slot"], "filename": filename,
-                         "token": token, "binaryHash": expected.lower()})
+        words = _validate_body(raw)
+        binding = {"slot": row["slot"], "filename": filename,
+                   "token": token, "binaryHash": expected.lower()}
+        from server.lump_approvals import (
+            read_approvals, is_trusted_compiler_record, compiler_record_verification_key)
+        approval = read_approvals(str(Path(directory) / "approvals.json")).get(expected.lower())
+        if approval and approval.get("portable_binding") is not None:
+            from server.portable_binding import validate_portable_binding, validate_unresolved_clist
+            from server.lump_integrity import compute_number
+            dot, issue, number = parse_canonical_filename(filename)
+            contract = validate_portable_binding(approval["portable_binding"], words[0] & 255)
+            if {dep["relocation_row"] for dep in contract["dependencies"]} != set(range(words[0] & 255)):
+                raise ValueError("Portable relocation rows must cover the exact c-list")
+            manifest = json.loads((Path(directory) / "manifest.json").read_text())
+            selected = [entry for entry in manifest if entry.get("filename") == filename
+                        and str(entry.get("token", "")).lower() == token.lower()]
+            if (approval.get("filename") != filename or contract["owner"] != f"{dot}#{issue}"
+                    or approval.get("dot_name") != dot or approval.get("issue_n") != issue
+                    or compute_number(dot, raw) != number or len(selected) != 1):
+                raise ValueError("Portable artifact approval identity differs from selected bytes")
+            try:
+                key = compiler_record_verification_key(approval.get("compiler_record"))
+            except RuntimeError as exc:
+                raise ValueError(f"Portable compiler evidence unavailable: {exc}") from exc
+            if not is_trusted_compiler_record(approval, binary=raw, signing_key=key):
+                raise ValueError("Portable simulation requires authenticated compiler evidence")
+            validate_unresolved_clist(contract, words)
+            binding["portableBinding"] = contract
+            binding["approvalHash"] = digest(approval)
+        bindings.append(binding)
     return bindings
+
+
+def _localize_portable(raw, binding, rows, bindings, directory):
+    """Materialize only a private derivative; retain source N/T/hash separately."""
+    from server.portable_binding import mint_gt, verify_candidate
+    contract = binding["portableBinding"]
+    words = _validate_body(raw, executable=True)
+    owner = next(row for row in rows if row["slot"] == binding["slot"])
+    start = len(words) - (words[0] & 255)
+    for dep in contract["dependencies"]:
+        target = owner
+        if not dep["symbolic_self"]:
+            candidates = []
+            for candidate in bindings:
+                dot, issue, _ = parse_canonical_filename(candidate["filename"])
+                identity = f"{dot}#{issue}"
+                metadata = {"N": identity, "binary_hash": candidate["binaryHash"],
+                            "identity_hash": hashlib.sha256(identity.encode()).hexdigest()}
+                data = (Path(directory) / candidate["filename"]).read_bytes()
+                ok, _ = verify_candidate(dep, metadata, data)
+                if ok:
+                    candidates.append(next(row for row in rows if row["slot"] == candidate["slot"]))
+            if len(candidates) != 1:
+                raise ValueError(f"Portable dependency {dep['N']} requires one exact selected assignment")
+            target = candidates[0]
+        sequence = target.get("seq")
+        if type(sequence) is not int or not 0 <= sequence <= 511:
+            raise ValueError("Portable simulation destination requires an exact Namespace sequence")
+        words[start + dep["relocation_row"]] = mint_gt(
+            sequence, target["slot"], dep["rights"], dep["capability_type"])
+    return struct.pack(f">{len(words)}I", *words), words[start]
 
 
 def _validate_body(raw, executable=False):
@@ -142,12 +200,27 @@ def stage_image(cfg, rows, directory, entry_slot):
             row.update(resident=True, boot_resident=True, load_policy="Resident")
     with tempfile.TemporaryDirectory(prefix="simulation-private-") as private:
         stage = Path(private)
+        image_rows = copy.deepcopy(prepared)
+        local_tokens = {}
+        if len({binding["filename"] for binding in bindings}) != len(bindings):
+            raise ValueError("Private simulation requires a unique destination per selected artifact")
         for binding in bindings:
             raw = (Path(directory) / binding["filename"]).read_bytes()
             if hashlib.sha256(raw).hexdigest() != binding["binaryHash"]:
                 raise ValueError("Artifact changed while staging simulation")
+            if "portableBinding" in binding:
+                raw, local_gt = _localize_portable(raw, binding, rows, bindings, directory)
+                local_hash = hashlib.sha256(raw).hexdigest()
+                local_tokens[binding["slot"]] = local_gt
+                staged = next(row for row in image_rows if row["slot"] == binding["slot"])
+                staged.update(token=f"{local_gt:08x}", cache_token=f"{local_gt:08x}",
+                              binary_hash=local_hash)
+                reviewed = next(row for row in prepared if row["slot"] == binding["slot"])
+                reviewed["simulationBinding"] = {
+                    "sourceArtifact": copy.deepcopy(binding), "localSelfGT": f"{local_gt:08x}",
+                    "derivativeHash": local_hash}
             (stage / binding["filename"]).write_bytes(raw)
-        (stage / "ns-state.json").write_text(json.dumps({"abstractions": prepared}))
+        (stage / "ns-state.json").write_text(json.dumps({"abstractions": image_rows}))
         (stage / "manifest.json").write_text("[]")
         (stage / "approvals.json").write_text(
             '{"version":1,"algorithm":"sha256","approvals":{}}')
@@ -169,7 +242,7 @@ def stage_image(cfg, rows, directory, entry_slot):
             raw = (stage / binding["filename"]).read_bytes()
             expected_words = struct.unpack(f">{len(raw) // 4}I", raw)
             if (not authority or location + len(expected_words) > physical["table_offset_words"]
-                    or token != int(binding["token"], 16)
+                    or token != local_tokens.get(slot, int(binding["token"], 16))
                     or image_words[location:location + len(expected_words)] != expected_words):
                 raise ValueError(
                     f"NS[{slot}] frozen artifact is missing or differs from its "
@@ -188,11 +261,56 @@ def stage_image(cfg, rows, directory, entry_slot):
 
 
 class PreparationStore:
-    """Bounded process-private store. Restart/expiry requires fresh consent."""
-    def __init__(self, ttl=1800, capacity=32):
+    """Ephemeral review/activation tickets backed by immutable approved revisions."""
+    def __init__(self, ttl=1800, capacity=32, revision_store=None):
         self.records = {}
         self.lock = threading.RLock()
         self.ttl, self.capacity = ttl, capacity
+        self.revision_store = revision_store
+
+    def _history_store(self):
+        return self.revision_store() if callable(self.revision_store) else self.revision_store
+
+    def history(self):
+        store = self._history_store()
+        if store is None:
+            return []
+        return [{"revisionId": row["revision_id"], "approved": True,
+                 **copy.deepcopy(row["metadata"]["provenance"])}
+                for row in store.history("namespace")
+                if row["metadata"].get("purpose") == "approved-simulation"]
+
+    def reopen(self, payload):
+        if not isinstance(payload, dict) or set(payload) != {"revisionId"}:
+            raise ValueError("Expected revisionId only")
+        store = self._history_store()
+        if store is None:
+            raise ValueError("Approved simulation history is unavailable")
+        revision = payload["revisionId"]
+        if not isinstance(revision, str):
+            raise ValueError("Invalid revision identity")
+        retained = store.read("namespace", revision)
+        if retained["metadata"].get("purpose") != "approved-simulation":
+            raise ValueError("Revision is not an approved simulation")
+        provenance = copy.deepcopy(retained["metadata"]["provenance"])
+        image = Path(store.file_path("namespace", revision, "simulation.bin")).read_bytes()
+        if hashlib.sha256(image).hexdigest() != provenance["imageHash"]:
+            raise ValueError("Retained simulation image hash mismatch")
+        with self.lock:
+            now = time.monotonic()
+            self.records = {key: value for key, value in self.records.items()
+                            if value["expires"] > now}
+            if len(self.records) >= self.capacity:
+                raise ValueError("Too many simulation preparations; retry after expiry")
+            provenance["preparationId"] = uuid.uuid4().hex
+            provenance["approvedRevisionId"] = revision
+            provenance["configurationHash"] = digest({
+                "revision": revision, "activation": provenance["preparationId"],
+                "imageHash": provenance["imageHash"]})
+            self.records[provenance["preparationId"]] = {
+                "provenance": provenance, "image": image, "source": [],
+                "expires": now + self.ttl, "approved": True, "activated": False}
+            return dict(copy.deepcopy(provenance), approved=True, activated=False)
 
     def prepare(self, rows, cfg, directory, entry_slot, stage=stage_image):
         with self.lock:
@@ -217,6 +335,7 @@ class PreparationStore:
             provenance["configurationHash"] = digest({"provenance": provenance, "config": cfg})
             self.records[provenance["preparationId"]] = {
                 "provenance": provenance, "image": image, "source": source,
+                "config": copy.deepcopy(cfg),
                 "expires": now + self.ttl, "approved": False, "activated": False}
             return copy.deepcopy(provenance)
 
@@ -233,10 +352,30 @@ class PreparationStore:
                 raise ValueError("Simulation configuration hash mismatch")
             if record["activated"]:
                 raise ValueError("Simulation preparation already activated; prepare again")
-            if digest(rows) != provenance["sourceNamespaceFingerprint"]:
-                raise ValueError("Saved Namespace changed; prepare again")
-            if artifact_bindings(record["source"], directory) != provenance["artifactBindings"]:
-                raise ValueError("Saved artifacts changed; prepare again")
+            retained = record["approved"] and provenance.get("approvedRevisionId")
+            if retained:
+                store = self._history_store()
+                store.read("namespace", retained)
+            else:
+                if callable(rows):
+                    rows = rows()
+                if digest(rows) != provenance["sourceNamespaceFingerprint"]:
+                    raise ValueError("Saved Namespace changed; prepare again")
+                if artifact_bindings(record["source"], directory) != provenance["artifactBindings"]:
+                    raise ValueError("Saved artifacts changed; prepare again")
+            if not activate and not record["approved"] and self._history_store() is not None:
+                files = {"simulation.bin": record["image"],
+                         "namespace.json": json.dumps(record["source"], sort_keys=True).encode(),
+                         "configuration.json": json.dumps(record["config"], sort_keys=True).encode()}
+                for binding in provenance["artifactBindings"]:
+                    raw = (Path(directory) / binding["filename"]).read_bytes()
+                    if hashlib.sha256(raw).hexdigest() != binding["binaryHash"]:
+                        raise ValueError("Saved artifacts changed during approval; prepare again")
+                    files[binding["filename"]] = raw
+                revision = self._history_store().publish("namespace", {
+                    "purpose": "approved-simulation", "provenance": copy.deepcopy(provenance),
+                }, files)
+                provenance["approvedRevisionId"] = revision
             result = copy.deepcopy(provenance)
             if activate:
                 if not record["approved"]:

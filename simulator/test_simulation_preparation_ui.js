@@ -2,6 +2,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
+const crypto = require('crypto');
+const imageHash = crypto.createHash('sha256').update(Buffer.from(new Uint32Array([1, 2, 0xffffffff]).buffer)).digest('hex');
 const source = fs.readFileSync(__dirname + '/app-simulation-preparation.js', 'utf8');
 
 function harness() {
@@ -13,11 +15,17 @@ function harness() {
         layoutChanges: [{ slot: 1, from: 800, to: 900 }],
         artifactBindings: [{ slot: 1, binaryHash: 'frozen-artifact' }],
         hardwareCertified: false, approvalRequired: true,
+        imageHash,
     };
     const context = {
         window: { _nsState: { namespaceFingerprint: 'saved-1', savedAbstractions: [{ slot: 1, address: 800 }] } },
         document: { getElementById: id => id === 'simulationPreparationPanel' ? panel : null },
         sim: { running: false, walkActive: false,
+            activateSimulationConfiguration(image, configuration) {
+                this.loadBootImage(image);
+                this.reset();
+                this.bindSimulationConfiguration(image, configuration);
+            },
             bindSimulationConfiguration(image, configuration) {
                 assert(image instanceof ArrayBuffer || image.byteLength === 12);
                 const freeze = value => {
@@ -32,16 +40,19 @@ function harness() {
             calls.push(['load', Array.from(new Uint32Array(image))]); return true;
         } },
         async fetch(url, options) {
-            calls.push([url, JSON.parse(options.body)]);
+            calls.push([url, options.body ? JSON.parse(options.body) : { method: options.method }]);
             if (context.pause) await context.pause;
             const action = url.split('/').pop();
-            return { ok: true, json: async () => context.response || (action === 'prepare' ? prepared : {
-                preparationId: 'private-1', configurationHash: 'hash-1',
-                approved: action === 'approve', activated: action === 'activate',
-                words: [1, 2, 0xffffffff], imageHash: 'image-1',
-            }) };
+            return { ok: true, json: async () => context.response || (action === 'prepare' ? prepared :
+                action === 'history' ? { revisions: [{ ...prepared, approved: true, revisionId: 'retained-1' }] } :
+                action === 'reopen' ? { ...prepared, approved: true, activated: false, approvedRevisionId: 'retained-1' } : {
+                    preparationId: 'private-1', configurationHash: 'hash-1',
+                    approved: action === 'approve', activated: action === 'activate',
+                    approvedRevisionId: 'retained-1',
+                    words: [1, 2, 0xffffffff], imageHash,
+                }) };
         },
-        Uint32Array, JSON, Object, Number, String, Array, Error,
+        Uint32Array, Uint8Array, crypto: crypto.webcrypto, JSON, Object, Number, String, Array, Error,
     };
     vm.createContext(context);
     vm.runInContext(source, context);
@@ -108,6 +119,73 @@ function harness() {
     assert.strictEqual(await active.ui.prepare(), false);
     assert.strictEqual(active.calls.length, 0);
     assert.match(active.panel.innerHTML, /Stop Run or Walk/);
+    const tampered = harness();
+    await tampered.ui.prepare();
+    await tampered.ui.approve();
+    tampered.context.response = {
+        preparationId: 'private-1', configurationHash: 'hash-1',
+        activated: true, imageHash, words: [1, 3, 0xffffffff],
+    };
+    assert.strictEqual(await tampered.ui.activate(), false);
+    assert.strictEqual(tampered.calls.some(c => c[0] === 'load'), false);
+    assert.match(tampered.panel.innerHTML, /bytes do not match/);
+    const retained = harness();
+    await retained.ui.prepare();
+    await retained.ui.approve();
+    retained.context.window._nsState.namespaceFingerprint = 'changed-after-approval';
+    retained.context.window._nsTableDirty = true;
+    retained.ui.invalidate();
+    assert.strictEqual(await retained.ui.activate(), true, 'approved retained configuration is independent of later draft edits');
+    assert.strictEqual(retained.context.sim.simulationConfiguration.approvedRevisionId, 'retained-1');
+    assert.strictEqual(retained.context.window._nsState.namespaceFingerprint, 'changed-after-approval');
+    const approvalRace = harness();
+    await approvalRace.ui.prepare();
+    let releaseApproval;
+    approvalRace.context.pause = new Promise(resolve => { releaseApproval = resolve; });
+    const approving = approvalRace.ui.approve();
+    approvalRace.context.window._nsState.namespaceFingerprint = 'changed-during-approval';
+    approvalRace.ui.invalidate();
+    releaseApproval();
+    assert.strictEqual(await approving, false, 'approval still requires the prepared source CAS');
+    assert.strictEqual(approvalRace.calls.some(c => c[0] === 'load'), false);
+
+    const activationRace = harness();
+    await activationRace.ui.prepare();
+    await activationRace.ui.approve();
+    let releaseActivation;
+    activationRace.context.pause = new Promise(resolve => { releaseActivation = resolve; });
+    const activating = activationRace.ui.activate();
+    activationRace.context.window._nsState = null;
+    activationRace.context.window._nsTableDirty = true;
+    activationRace.ui.invalidate();
+    releaseActivation();
+    assert.strictEqual(await activating, true, 'retained inputs, not current source CAS, authorize activation');
+
+    const historical = harness();
+    historical.context.window._nsState = null;
+    historical.context.window._nsTableDirty = true;
+    assert.strictEqual(await historical.ui.refreshHistory(), true);
+    assert.deepStrictEqual(historical.calls[0], ['/api/simulation/history', { method: 'GET' }]);
+    historical.ui.selectHistory('retained-1');
+    assert.strictEqual(await historical.ui.reopen(), true);
+    assert.deepStrictEqual(historical.calls[1], ['/api/simulation/reopen', { revisionId: 'retained-1' }]);
+    assert.strictEqual(historical.calls.some(c => c[0] === 'load'), false);
+    assert.match(historical.panel.innerHTML, /not hardware certification/);
+    historical.ui.invalidate();
+    assert.strictEqual(await historical.ui.activate(), true);
+    assert.strictEqual(historical.context.window._nsState, null, 'history cannot restore or overwrite current design');
+
+    const wrongHistory = harness();
+    await wrongHistory.ui.refreshHistory();
+    wrongHistory.ui.selectHistory('retained-1');
+    wrongHistory.context.response = { ...wrongHistory.prepared, approved: true, activated: false, approvedRevisionId: 'different' };
+    assert.strictEqual(await wrongHistory.ui.reopen(), false);
+    assert.strictEqual(wrongHistory.calls.some(c => c[0] === 'load'), false);
+    const invalidHistory = harness();
+    invalidHistory.context.response = { revisions: [{ ...invalidHistory.prepared,
+        approved: true, revisionId: 'hardware-result', hardwareCertified: true }] };
+    assert.strictEqual(await invalidHistory.ui.refreshHistory(), false);
+    assert.match(invalidHistory.panel.innerHTML, /History did not return approved simulation revisions/);
     assert.doesNotMatch(source, /save-table|boot-image\/generate|resolve-artifact/);
     console.log('private simulation preparation UI tests passed');
 })().catch(error => { console.error(error); process.exitCode = 1; });

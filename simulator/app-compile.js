@@ -2332,8 +2332,7 @@ async function compileAndBuild(options) {
         binary: lumpWordsArray,
         metadata: {
             abstraction:    absName,
-            ns_slot:        resolvedNsSlot,
-            ns_slot_policy: resolvedNsSlot === null ? 'dynamic' : 'fixed',
+            artifact_only: true,
             cw:             cw,
             cc:             cc,
             profile:        profile,

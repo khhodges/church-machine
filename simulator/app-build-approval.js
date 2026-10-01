@@ -160,63 +160,26 @@ const BuildApprovalView = {
         return value !== null && typeof value === 'object' && !Array.isArray(value);
     },
 
+    openRevisionHistory() {
+        if (typeof switchView === 'function') switchView('builder');
+        if (typeof switchBuilderViewTab === 'function') switchBuilderViewTab('build');
+        const picker = document.getElementById('baBitstreamRevisionSelect');
+        if (picker) { picker.scrollIntoView({ block: 'center' }); picker.focus(); }
+        return false;
+    },
+
     async downloadExactBitstream(event, link) {
         if (event) event.preventDefault();
-        if (!link) return false;
-        const identity = link.dataset.buildId || '';
-        const digest = (link.dataset.sha256 || '').toLowerCase();
-        const auth = window.TargetState.authorize('bitstream', { id: identity });
-        if (!auth.ok) return false;
-        if (!/^[0-9a-f]{64}$/.test(digest)) {
-            if (typeof appendOutput === 'function') {
-                appendOutput('Bitstream download blocked: exact artifact SHA-256 is unavailable.', 'error');
-            }
-            return false;
-        }
-        const url = new URL(link.getAttribute('href'), window.location.origin);
-        url.searchParams.set('artifact_identity', identity);
-        url.searchParams.set('sha256', digest);
-        url.searchParams.set('target_device_uid', auth.target.deviceUid);
-        url.searchParams.set('target_session_id', auth.target.liveSessionId);
-        let response;
-        try {
-            response = await fetch(url.toString(), { cache: 'no-store' });
-        } catch (error) {
-            if (typeof appendOutput === 'function') appendOutput(
-                _formatActionableNetworkError('Download the exact bitstream', error, {
-                    dataChanged: false,
-                    nextAction: 'Check the IDE connection, then click Download again.',
-                }), 'error');
-            return false;
-        }
-        if (!response.ok) {
-            if (typeof appendOutput === 'function') appendOutput(
-                _formatActionableHttpError(
-                    'Download the exact bitstream', response.status,
-                    await response.text(), {
-                        dataChanged: false,
-                        nextAction: 'Refresh build approval, select the exact approved artifact, then retry Download.',
-                    }), 'error');
-            return false;
-        }
-        if (response.headers.get('X-Wukong-Provenance-Identity') !== identity ||
-                response.headers.get('X-Wukong-Artifact-SHA256') !== digest) {
-            if (typeof appendOutput === 'function') appendOutput(
-                'Download the exact bitstream failed. Reason: server target/artifact correlation failed. ' +
-                'No data was changed. Next: refresh build approval and select the exact approved artifact.', 'error');
-            return false;
-        }
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        const save = document.createElement('a');
-        save.href = objectUrl;
-        save.download = link.download || 'wukong-artifact.bin';
-        document.body.appendChild(save);
-        save.click();
-        save.remove();
-        URL.revokeObjectURL(objectUrl);
-        window.TargetState.observeBitstreamLifecycle({ downloadedId: identity });
-        return true;
+        // Legacy current-card links cannot select immutable history implicitly.
+        // A download is not a hardware connection, installation, or flash.
+        const message = 'Select an exact approved bitstream in revision history, ' +
+            'then use Download selected revision. Mutable release downloads are retired; ' +
+            'nothing was built, downloaded, or flashed.';
+        const status = document.getElementById('baBitstreamRevisionStatus');
+        if (status) status.textContent = message;
+        if (typeof appendOutput === 'function') appendOutput(message, 'info');
+        this.openRevisionHistory();
+        return false;
     },
 
     _approvalContractError(message) {
@@ -839,6 +802,8 @@ const BuildApprovalView = {
                 !/^[0-9a-f]{64}$/.test(String(record.revision_id || ''))) return null;
         const metadata = record.metadata || {};
         if (metadata.approval_state !== 'approved') return null;
+        if (record.hardware_certified === false ||
+                (metadata.purpose && metadata.purpose !== 'approved-hardware')) return null;
         const snapshot = metadata.snapshot || {};
         if (!/^[0-9a-f]{64}$/.test(String(snapshot.fingerprint || ''))) return null;
         return this._snapshotIdentity({
@@ -1028,7 +993,8 @@ const BuildApprovalView = {
             }
             if (status) status.textContent =
                 'Downloaded exact ' + revision.approval_state + ' bitstream ' +
-                revision.revision_id + '; no device or active build was changed.';
+                revision.revision_id + '; no device or active build was changed. ' +
+                'Flashing is a separate explicit action; this download does not verify installation.';
             return true;
         } catch (error) {
             if (status) status.textContent = 'Bitstream download blocked: ' + error.message;
@@ -1239,7 +1205,7 @@ const BuildApprovalView = {
                 if (!ok && data.diagnosis && logEl) {
                     logEl.textContent += `\nWhat failed: ${data.diagnosis.what_failed}\nNext: ${data.diagnosis.next_action}\n`;
                 }
-                if (ok && logEl) logEl.textContent += '\n✅ Synthesis complete — download the .bit from the Connect tab.\n';
+                if (ok && logEl) logEl.textContent += '\n✅ Synthesis complete — select its approved bitstream revision in history, then Download selected revision. Flashing is separate.\n';
                 this._updateApproveBtn();
             }
         } catch (_) { /* transient poll error — keep polling */ }
@@ -1247,6 +1213,12 @@ const BuildApprovalView = {
 };
 window.BuildApprovalView = BuildApprovalView;
 if (document && typeof document.addEventListener === 'function') {
+    document.addEventListener('DOMContentLoaded', function() {
+        if (new URLSearchParams(window.location.search || '').get('hardware-history') === '1') {
+            // Let the normal startup view restoration finish first.
+            setTimeout(function() { BuildApprovalView.openRevisionHistory(); }, 0);
+        }
+    });
     document.addEventListener('click', function(event) {
         const link = event.target && event.target.closest
             ? event.target.closest('[data-exact-bitstream-download]') : null;

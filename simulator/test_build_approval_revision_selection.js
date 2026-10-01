@@ -61,6 +61,13 @@ const historical = {
 };
 
 (async () => {
+    assert.strictEqual(view._revisionChoice({
+        ...historical,
+        metadata: { ...historical.metadata, purpose: 'approved-simulation' },
+    }), null, 'simulation approval cannot become a hardware selection');
+    assert.strictEqual(view._revisionChoice({
+        ...historical, hardware_certified: false,
+    }), null, 'uncertified hardware history cannot become a selection');
     assert.strictEqual(view._snapshotIdentity({
         filename: first.filename, provenance_identity: first.provenance_identity,
     }), null, 'legacy map-only snapshots cannot be selected as approved Namespace revisions');

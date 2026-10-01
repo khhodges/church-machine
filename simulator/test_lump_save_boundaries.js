@@ -172,6 +172,7 @@ console.log('\n--- authoritative final-byte validator ---');
         CapabilityTokens,
         sim: new ChurchSimulator(),
         _lumpsCache: [],
+        window: { PortableLumpBinding: require('./portable_lump_binding.js') },
     };
     vm.createContext(context);
     vm.runInContext(
@@ -192,9 +193,18 @@ console.log('\n--- authoritative final-byte validator ---');
         'authoritative concrete row-zero SELF passes final-byte validation',
         context.validateFinal(concrete, [self]) === true
     );
+    const reservedNull = concrete.slice();
+    reservedNull[63] = 0;
+    check('capability-free artifact retains an inert reserved null row',
+        context.validateFinal(reservedNull, []) === true);
+    assert.throws(() => context.validateFinal(reservedNull, [self]),
+        /failed final c-list validation/);
+    check('declared SELF still cannot silently become null', true);
 
     const unresolved = concrete.slice();
     unresolved[63] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER >>> 0;
+    assert.throws(() => context.validateFinal(unresolved, []), /unresolved/);
+    check('undeclared SELF placeholder still requires portable proof', true);
     assert.throws(
         () => context.validateFinal(unresolved, [self]),
         /failed final c-list validation|placeholder/
@@ -203,6 +213,23 @@ console.log('\n--- authoritative final-byte validator ---');
         'authoritative final-byte validation rejects unresolved row-zero SELF',
         true
     );
+    const portablePlan = { portable_binding: {
+        schema: 'church.portable-lump-binding/v1', owner: 'ide.Artifact#1',
+        canonical_gt_words: 'unresolved', dependencies: [{
+            N: 'ide.Artifact#1', relocation_row: 0, symbolic_self: true,
+            rights: ['E'], capability_type: 1
+        }]
+    } };
+    check('portable server plan retains unresolved SELF without installing',
+        context.validateFinal(unresolved, [self], portablePlan) === true);
+    assert.throws(() => context.validateFinal(concrete, [self], portablePlan),
+        /destination-local/);
+    check('portable plan rejects silently localized SELF', true);
+    const invalidSelf = JSON.parse(JSON.stringify(portablePlan));
+    invalidSelf.portable_binding.dependencies[0].rights = ['R'];
+    assert.throws(() => context.validateFinal(unresolved, [self], invalidSelf),
+        /SELF contract/);
+    check('portable plan cannot grant additional SELF rights', true);
 
     const nonSelf = concrete.slice();
     nonSelf[63] = ChurchSimulator.makePendingGT('Future.Dependency');

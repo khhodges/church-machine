@@ -3872,21 +3872,9 @@ window._setActiveBootConfig = _setActiveBootConfig;
 // Task #217 — fetch the saved boot-image.bin (if any) without triggering
 // a 404 console error noise. Returns ArrayBuffer or null.
 function _probeBootImage() {
-    return fetch('/api/boot-image/binary?simulator=1', { cache: 'no-store' })
-        .then(async r => {
-            if (r.ok) {
-                window._simulatorBootImageStale = r.headers && r.headers.get('X-Simulator-Image-Stale') === 'true';
-                return r.arrayBuffer();
-            }
-            let detail = '';
-            try {
-                const body = await r.json();
-                detail = body && body.error ? body.error : '';
-            } catch (_) {}
-            if (detail) _reportBootImageRejection(detail);
-            return null;
-        })
-        .catch(() => null);
+    // Legacy publication callbacks may still call this helper. Repository
+    // images are never simulation inputs; only explicit activation loads one.
+    return Promise.resolve(null);
 }
 
 // Refresh only the browser's next-reset image cache after the server has
@@ -3894,89 +3882,15 @@ function _probeBootImage() {
 // reset(), or write any live register/memory state: the new authority applies
 // on the next reset, not while the current execution context is running.
 async function _refreshCommittedBootImageCache() {
-    let response;
-    try {
-        response = await fetch('/api/boot-image/binary?simulator=1', { cache: 'no-store' });
-    } catch (error) {
-        throw new Error('could not fetch the committed boot image: ' +
-            (error && error.message ? error.message : String(error)));
-    }
-    if (!response.ok) {
-        let detail = '';
-        try {
-            const body = await response.json();
-            detail = body && body.error ? body.error : '';
-        } catch (_) {}
-        throw new Error(detail || `committed boot image fetch failed (HTTP ${response.status})`);
-    }
-    const bytes = await response.arrayBuffer();
-    if (!bytes || bytes.byteLength === 0) {
-        throw new Error('the committed boot image was empty');
-    }
-    window.bootImage = bytes;
-    window.bootImageAvailable = true;
-    window._simulatorBootImageStale = response.headers &&
-        response.headers.get('X-Simulator-Image-Stale') === 'true';
-    return bytes;
+    throw new Error('Repository publication does not activate a simulation. Prepare, approve and activate a configuration.');
 }
 window._refreshCommittedBootImageCache = _refreshCommittedBootImageCache;
 
 // Reset hook: re-overlay the cached boot image (or fetch once) so the
 // programmer-authored binary survives manual resets.
 function _maybeApplyBootImage() {
-    // After every successful loadBootImage call, evict stale sticky patches
-    // for all NS slots the boot image owns.  Patches that differ from the new
-    // binary are cleared with a console + toast warning; matching (redundant)
-    // patches are cleared silently.  Must run before _reapplyStickyPatches()
-    // fires at boot completion.
-    function _evictBootImgPatches() {
-        if (typeof window._clearBootImageStickyPatches === 'function') {
-            window._clearBootImageStickyPatches(sim.nsCount || 0);
-        }
-    }
-    if (window.bootImage) {
-        // Task #2867: honour the loader's verdict.  A cached binary that the
-        // loader now rejects (e.g. a format-tag bump made it stale) must clear
-        // the active/available state instead of masquerading as booted memory.
-        try {
-            if (sim.loadBootImage(window.bootImage) === true) {
-                _applyBootEntryToSim(); _evictBootImgPatches();
-                if (window._simulatorBootImageStale) {
-                    const con = document.getElementById('editorConsole');
-                    if (con) con.textContent += '\n[BOOTIMG] Simulator is using existing committed image bytes; newer boot inputs differ. No image was regenerated.';
-                }
-            } else {
-                _reportBootImageRejection(sim.lastBootImageError);
-                window.bootImage = null;
-                window.bootImageAvailable = false;
-            }
-        } catch (e) {
-            _reportBootImageRejection('Saved boot image could not be applied: ' + e.message);
-            window.bootImage = null;
-            window.bootImageAvailable = false;
-        }
-        return;
-    }
-    if (window.bootImageAvailable) {
-        _probeBootImage().then(buf => {
-            if (buf) {
-                try {
-                    if (sim.loadBootImage(buf) === true) {
-                        window.bootImage = buf;
-                        _applyBootEntryToSim(); _evictBootImgPatches();
-                    } else {
-                        _reportBootImageRejection(sim.lastBootImageError);
-                        window.bootImage = null;
-                        window.bootImageAvailable = false;
-                    }
-                } catch(e){
-                    _reportBootImageRejection('Saved boot image could not be applied: ' + e.message);
-                    window.bootImage = null;
-                    window.bootImageAvailable = false;
-                }
-            }
-        });
-    }
+    // Deliberately no overlay. resetPreparedSimulation owns its private retained
+    // image; a shared cache or asynchronous hardware callback cannot replace it.
 }
 
 // Task #217 — Generate the binary boot image from the persisted boot
@@ -4012,7 +3926,7 @@ function generateBootImage(onApplied) {
                     `(${body.words.toLocaleString()} words, ${kib}\u00a0KiB) \u2014 ` +
                     `<a href="${body.downloadUrl}" download="boot-image.bin" ` +
                     `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
-                    `Reset the simulator to apply this image at boot.`;
+                    `Stored image publication is separate from simulation. Prepare and activate a simulation explicitly.`;
                 const driftWarnings = Array.isArray(body.warnings) ? body.warnings : [];
                 if (driftWarnings.length > 0) {
                     html += driftWarnings.map(w =>
@@ -4021,36 +3935,8 @@ function generateBootImage(onApplied) {
                 }
                 result.innerHTML = html;
             }
-            // Cache the freshly-generated binary so the next sim.reset()
-            // immediately overlays it (no extra round-trip needed). The
-            // 'reset' listener calls _maybeApplyBootImage which prefers
-            // window.bootImage when present.
-            // Task #2867: only mark available once loadBootImage() accepts it.
-            _probeBootImage().then(buf => {
-                if (buf) {
-                    try {
-                        if (sim.loadBootImage(buf) === true) {
-                            window.bootImage = buf;
-                            window.bootImageAvailable = true;
-                            _applyBootEntryToSim();
-                            if (typeof window._clearBootImageStickyPatches === 'function') window._clearBootImageStickyPatches(sim.nsCount || 0);
-                            notifyApplied(true);
-                        } else {
-                            window.bootImage = null;
-                            window.bootImageAvailable = false;
-                            _reportBootImageRejection(sim.lastBootImageError, result);
-                            notifyApplied(false);
-                        }
-                    } catch(e) {
-                        window.bootImage = null;
-                        window.bootImageAvailable = false;
-                        _reportBootImageRejection('Generated boot image could not be applied: ' + e.message, result);
-                        notifyApplied(false);
-                    }
-                } else {
-                    notifyApplied(false);
-                }
-            });
+            // Generation has not applied anything to the active simulation.
+            notifyApplied(false);
         })
         .catch(err => {
             if (result) result.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :
@@ -4095,30 +3981,8 @@ function uploadBootImageFile(file) {
                         `(${body.words.toLocaleString()} words, ${kib}\u00a0KiB) \u2014 ` +
                         `<a href="${body.downloadUrl}" download="boot-image.bin" ` +
                         `style="color:#9bd;text-decoration:underline;">Download boot-image.bin</a>. ` +
-                        `Reset the simulator to apply this image at boot.`;
+                        `Stored image publication is separate from simulation. Prepare and activate a simulation explicitly.`;
                 }
-                // Task #2867: an uploaded image is server-validated, but the
-                // browser loader is the final gate — only mark available if it
-                // accepts the binary.
-                _probeBootImage().then(buf => {
-                    if (buf) {
-                        try {
-                            if (sim.loadBootImage(buf) === true) {
-                                window.bootImage = buf;
-                                window.bootImageAvailable = true;
-                                _applyBootEntryToSim();
-                            } else {
-                                window.bootImage = null;
-                                window.bootImageAvailable = false;
-                                _reportBootImageRejection(sim.lastBootImageError, result);
-                            }
-                        } catch(e) {
-                            window.bootImage = null;
-                            window.bootImageAvailable = false;
-                            _reportBootImageRejection('Uploaded boot image could not be applied: ' + e.message, result);
-                        }
-                    }
-                });
             })
             .catch(err => {
                 if (result) result.textContent = /\bNo data was changed\b/.test(err.message) ? err.message :

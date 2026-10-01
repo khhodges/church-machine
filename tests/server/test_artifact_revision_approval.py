@@ -163,6 +163,47 @@ def test_unapproved_history_cannot_be_selected_as_build_authority(frozen_inputs,
     assert "not approved" in response.get_json()["error"]
 
 
+@pytest.mark.parametrize("invalid", ["simulation", "missing-certificate", "bad-certificate"])
+def test_simulation_approval_is_not_hardware_authority(frozen_inputs, monkeypatch, invalid):
+    root, _, _ = frozen_inputs
+    revision, _ = api._freeze_namespace_revision("hardware-freeze")
+    store = api._artifact_revision_store()
+    retained = store.read("namespace", revision)
+    metadata = dict(retained["metadata"])
+    files = {}
+    for name in retained["files"]:
+        with open(store.file_path("namespace", revision, name), "rb") as stream:
+            files[name] = stream.read()
+    if invalid == "simulation":
+        # Even copying genuine retained hardware evidence cannot promote the
+        # separate simulation approval purpose to hardware authority.
+        metadata["purpose"] = "approved-simulation"
+    elif invalid == "missing-certificate":
+        files.pop("build-provenance.json")
+    else:
+        files["build-provenance.json"] = b'{"schema_version":1,"source_tree_clean":true}'
+    selected = store.publish("namespace", metadata, files)
+    ns_map = {"tiers": {}}
+    identity = api._namespace_revision_build_intent(ns_map, selected, metadata)
+    (root / "snapshots" / "build-approval-cross-kind.json").write_text(json.dumps({
+        "namespace_revision_id": selected, "provenance_identity": identity,
+        "all_checks_pass": True, "ns_map": ns_map}))
+    client = api.app.test_client()
+    history = client.get("/api/artifact-revisions/namespace/" + selected,
+                         headers={"Authorization": "Bearer " + os.environ["REPORT_TOKEN"]})
+    assert history.status_code == 200
+    record = history.get_json()["revision"]
+    assert record["hardware_certified"] is False
+    assert "build_intent_id" not in record
+    monkeypatch.setattr(api, "_ba_validate_build_auth", lambda: (True, None))
+    monkeypatch.setattr(api, "_wukong_target_error", lambda _: ({}, None))
+    monkeypatch.setattr(api, "_ba_write_ssh_key",
+                        lambda: pytest.fail("No uncertified Namespace may launch a worker"))
+    response = client.post("/api/wukong-build/start", json={"build_intent_id": identity})
+    assert response.status_code == 422
+    assert "Namespace" in response.get_json()["error"]
+
+
 @pytest.mark.parametrize("policy", ["Lazy", "Dynamic", "Resident"])
 def test_optional_missing_selected_bytes_do_not_block_hardware_approval(
         frozen_inputs, monkeypatch, policy):

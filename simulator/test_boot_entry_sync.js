@@ -23,39 +23,29 @@ function extract(source, name) {
     throw new Error(name + ' unterminated');
 }
 
-// A plan identity is four fields, not just a slot. This prevents an old
-// descriptor revision being selected after a concurrent Namespace change.
-const planApiStart = memory.indexOf('window.NamespacePlan = (function()');
-const planApiEnd = memory.indexOf('function _hydrateNsSymbolicState', planApiStart);
-const planApi = memory.slice(planApiStart, planApiEnd);
-assert(planApi.includes("['slot', 'seq', 'token', 'filename']"));
-assert(planApi.includes('expected_revision: current.revision'));
-assert(planApi.includes('response.status === 409'));
-assert(planApi.includes('await load(true)'));
-assert(planApi.includes('markers.length !== 1'));
+// The reviewed identity is still exact, but NamespacePlan was superseded by
+// the shared Namespace fingerprint and explicit artifact-selection transaction.
+const marker = extract(abstractions, '_commitNamespaceBootMarker');
+assert(marker.includes("fetch('/api/namespace/boot-marker'"));
+for (const field of ['slot: target', 'revision:', 'token:', 'filename:',
+    'namespaceFingerprint: fingerprint']) assert(marker.includes(field), field);
+assert(marker.includes('if (!fingerprint)'));
+assert(marker.includes('if (!response.ok || !body || body.ok !== true)'));
 
 const prepare = extract(abstractions, 'setBootEntrySlot');
-assert(prepare.startsWith('async function'));
-assert(prepare.includes('await window.NamespacePlan.choose('));
+assert(prepare.includes('selectArtifactForPreparation('));
+assert(prepare.includes('await _commitNamespaceBootMarker(idx)'));
 assert(!prepare.includes('localStorage'));
 assert(!prepare.includes('/api/boot-config'));
 
-const save = extract(abstractions, 'savePreparedBootEntry');
-assert(save.includes("fetch('/api/boot-image/generate'"));
-assert(!save.includes('/api/boot-config'));
-assert(!save.includes('entrySlot'));
-
-// The image loader refuses a known persisted-plan disagreement before it
-// copies image words; imported bytes cannot silently become plan authority.
-assert(simulator.includes('namespacePlan.assertImageSlot(discoveredBootEntrySlot)'));
-assert(simulator.includes('Generate an image from the saved plan.'));
-
+// Hardware remains an explicitly authorized destination, not a simulation
+// startup fallback. Its delivery/ACK contract has dedicated behavioral tests.
 const hardware = extract(runner, '_wukongLoadToHardware');
-assert(hardware.includes('await window.NamespacePlan.load()'));
+assert(hardware.includes("authorizeDestination('runtime')"));
 assert(!hardware.includes('/api/boot-config'));
-assert(!hardware.includes('entrySlot'));
 
-// Default-entry boot guard needs both the persisted plan and matching image.
+// A saved marker or shared image cache alone cannot activate a simulation.
+// Exact image/provenance validation is tested by test_simulation_image_binding.
 const hasImage = extract(runner, '_bootHasCommittedImage');
 const context = {
     window: { bootImage: new ArrayBuffer(8), bootImageAvailable: true,
@@ -64,8 +54,12 @@ const context = {
 };
 vm.createContext(context);
 vm.runInContext(hasImage + '\nok = _bootHasCommittedImage();', context);
+assert.equal(context.ok, false);
+context.sim.simulationConfiguration = { configurationHash: 'approved-exact-inputs' };
+context.sim._bootImageLoaded = true;
+vm.runInContext('ok = _bootHasCommittedImage();', context);
 assert.equal(context.ok, true);
-context.sim.bootEntrySlot = 7;
+context.sim._bootImageLoaded = false;
 vm.runInContext('ok = _bootHasCommittedImage();', context);
 assert.equal(context.ok, false);
 

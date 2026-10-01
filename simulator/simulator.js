@@ -547,6 +547,10 @@ class ChurchSimulator {
     //     from window.bootConfig so empty slots remain addressable in
     //     the dashboard and through the runtime nsCount.
     loadBootImage(arrayBuffer) {
+        if (this.simulationConfiguration) {
+            this.lastBootImageError = 'An activated simulation can only be replaced through explicit simulation activation.';
+            return false;
+        }
         this.simulationConfiguration = null;
         const previous = SIMULATION_IMAGE_BINDINGS.get(this);
         const binding = previous && previous.binding &&
@@ -605,6 +609,43 @@ class ChurchSimulator {
         };
         this.simulationConfiguration = loaded.binding.configuration;
         return this.simulationConfiguration;
+    }
+
+    resetPreparedSimulation() {
+        const retained = SIMULATION_IMAGE_BINDINGS.get(this);
+        if (!retained || !retained.binding || !this.simulationConfiguration ||
+                retained.binding.configuration !== this.simulationConfiguration) {
+            throw new Error('No simulation activated. Prepare, approve and activate a configuration first.');
+        }
+        // The private retained bytes, not a mutable browser cache or repository
+        // image, are the reset authority. Reset itself executes no instruction.
+        const bytes = retained.binding.bytes.slice().buffer;
+        const configuration = retained.binding.configuration;
+        this.reset();
+        if (this.loadBootImage(bytes) !== true) {
+            throw new Error(this.lastBootImageError || 'Activated simulation image was rejected on reset.');
+        }
+        if (!this.simulationConfiguration) this.bindSimulationConfiguration(bytes, configuration);
+        return true;
+    }
+
+    activateSimulationConfiguration(arrayBuffer, configuration) {
+        // Validate on a detached machine before touching a paused live context.
+        // This also rejects malformed provenance before any reset/load event.
+        const candidate = new ChurchSimulator();
+        if (candidate.loadBootImage(arrayBuffer) !== true) {
+            throw new Error(candidate.lastBootImageError || 'Private image was rejected.');
+        }
+        candidate.bindSimulationConfiguration(arrayBuffer, configuration);
+        if (this.running || this.walkActive) {
+            throw new Error('Stop Run or Walk before activating a simulation.');
+        }
+        this.reset();
+        if (this.loadBootImage(arrayBuffer) !== true) {
+            throw new Error(this.lastBootImageError || 'Private image was rejected.');
+        }
+        this.bindSimulationConfiguration(arrayBuffer, configuration);
+        return true;
     }
 
     _loadBootImageCore(arrayBuffer) {
@@ -2645,6 +2686,9 @@ class ChurchSimulator {
     //   opts.caps   — capabilities array (reserves c-list region)
     //   opts.label  — human-readable name stored in nsLabels
     writeNsEntryForProgram(slot, opts) {
+        if (this.simulationConfiguration) {
+            throw new Error('Programmer placement cannot modify an activated simulation configuration.');
+        }
         // Each allocated slot gets its own 256-word (0x100) region in extended
         // memory so lumps never overlap when multiple compiled programs coexist.
         //   First user slot (11) → 0x0800
@@ -10464,6 +10508,9 @@ class ChurchSimulator {
     }
 
     loadProgram(words, startAddr, targetSlot = null) {
+        if (this.simulationConfiguration) {
+            throw new Error('Programmer code cannot replace an activated simulation. Select its approved revision in a new configuration.');
+        }
         this.simulationConfiguration = null;
         SIMULATION_IMAGE_BINDINGS.delete(this);
         const abstrSlot = Number.isInteger(targetSlot)
@@ -10630,6 +10677,10 @@ class ChurchSimulator {
     }
 
     loadLumpBinary(words, nsSlot, options = {}) {
+        if (this.simulationConfiguration) {
+            this.lastLumpLoadError = 'A saved LUMP cannot replace an activated simulation. Prepare and activate a new configuration.';
+            return false;
+        }
         this.simulationConfiguration = null;
         SIMULATION_IMAGE_BINDINGS.delete(this);
         const LEGACY_EXTENDED_BASE = 0x0400;
@@ -10961,6 +11012,9 @@ class ChurchSimulator {
     }
 
     loadHardwareBinary(hwProgram, hwNamespace, hwClist, hwLabels, abstractions) {
+        if (this.simulationConfiguration) {
+            throw new Error('Hardware observations cannot replace an activated simulation.');
+        }
         this.reset('loadHardwareBinary');
 
         this.memory = new Uint32Array(this._namespaceMemoryWords());
@@ -11125,6 +11179,9 @@ class ChurchSimulator {
     }
 
     loadImageFromBinary(nsWords, clistWords, bootProgram) {
+        if (this.simulationConfiguration) {
+            throw new Error('An unreviewed binary cannot replace an activated simulation.');
+        }
         this.reset('loadImageFromBinary');
 
         this.memory = new Uint32Array(this._namespaceMemoryWords());
@@ -11341,6 +11398,9 @@ class ChurchSimulator {
     //   • Resident W0-W3 are committed atomically through _commitResidentInform.
     // Returns { ok, freeBase?, lumpSize?, message? }.
     receiveLump(lumpWords, resolverMeta) {
+        if (this.simulationConfiguration) {
+            return { ok: false, message: 'Repository bytes cannot be inserted into an activated configuration. Prepare a new simulation including the required artifact.' };
+        }
         if (!this.awaitingLump) {
             return { ok: false, message: 'not awaiting a lump' };
         }

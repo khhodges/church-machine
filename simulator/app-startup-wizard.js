@@ -112,27 +112,11 @@ const StartupWizard = (function () {
     function _checkBitstream() {
         var statuses = [_el('swBitstreamStatus'), _el('swBitstreamStatusScratch')];
         statuses.forEach(function (s) {
-            if (s) { s.textContent = 'checking…'; s.className = 'sw-bitstream-status sw-bitstream-checking'; }
+            if (s) {
+                s.textContent = 'Select an approved .bit in Build Approval history. Download does not verify flashing.';
+                s.className = 'sw-bitstream-status';
+            }
         });
-        fetch('/api/bitstream/list')
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
-                const entry = d.bitstreams && d.bitstreams.find(function (b) { return b.board === 'wukong-xc7a100t' || b.board === 'ti60-f225'; });
-                statuses.forEach(function (s) {
-                    if (!s) return;
-                    if (entry && entry.available) {
-                        const mb = (entry.size / 1048576).toFixed(2);
-                        s.textContent = '✓ Ready — ' + mb + ' MB';
-                        s.className   = 'sw-bitstream-status sw-bitstream-ready';
-                    } else {
-                        s.textContent = '✗ Not yet uploaded';
-                        s.className   = 'sw-bitstream-status sw-bitstream-unavail';
-                    }
-                });
-            })
-            .catch(function () {
-                statuses.forEach(function (s) { if (s) { s.textContent = ''; s.className = 'sw-bitstream-status'; } });
-            });
     }
 
     function _wizardEverCompleted() {
@@ -315,13 +299,14 @@ const StartupWizard = (function () {
             }
 
             const dlBtn = _el('swDownloadBtn');
-            if (dlBtn && d.release.verilog_download) {
-                dlBtn.href = d.release.verilog_download;
-                dlBtn.setAttribute('download', 'church_wukong_xc7a100t.v');
+            if (dlBtn) {
+                dlBtn.href = '?view=builder&hardware-history=1';
+                dlBtn.removeAttribute('download');
+                dlBtn.textContent = 'Approved bitstream history';
             }
             const zipBtn = _el('swZipBtn');
-            if (zipBtn && d.release.zip_download) {
-                zipBtn.href = d.release.zip_download;
+            if (zipBtn) {
+                zipBtn.href = '?view=builder&hardware-history=1';
             }
 
             try {
