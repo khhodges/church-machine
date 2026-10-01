@@ -211,3 +211,118 @@ def test_stale_inspection_and_save_do_not_overwrite(routes):
     }).status_code == 409
     assert client.post("/api/namespace/save-table", json=payload).status_code in (409, 422)
     assert state.read_bytes() == before
+
+
+def legacy_assignment(root, slot=15, sequence=0, self_gt=None):
+    words = [(31 << 27) | (1 << 10) | 1] + [0] * 63
+    words[-1] = self_gt if self_gt is not None else 0x4A000000 | (sequence << 16) | slot
+    raw = struct.pack(">64I", *words)
+    filename = f"Sample{slot}.1.1234abcd.lump"
+    (root / filename).write_bytes(raw)
+    return dict(slot=slot, seq=sequence, name=f"Sample{slot}", type="Inform",
+                filename=filename, binary_hash=hashlib.sha256(raw).hexdigest(),
+                token="12345678", cache_token="99999999", location="0x400",
+                limit=1, resident=True, load_policy="Resident", seal="0xDEADBEEF")
+
+
+def test_binding_repair_exact_bytes_only_preserves_every_other_field(tmp_path):
+    row = legacy_assignment(tmp_path, sequence=3)
+    rows = [row]
+    before = {p: p.read_bytes() for p in tmp_path.iterdir()}
+    view = inspect_namespace(rows, 15, tmp_path)
+    assert "simulation-descriptor-mismatch" in {i["code"] for i in view["issues"]}
+    assert "repair-binding" in view["actions"]
+    preview = preview_resolution(rows, proposal(rows, "repair-binding"), tmp_path)
+    expected = dict(row, token="4a03000f", cache_token="4a03000f")
+    assert preview["after"] == expected
+    assert {c["field"] for c in preview["changes"]} == {"token", "cache_token"}
+    assert not any(i["code"] == "simulation-descriptor-mismatch" for i in preview["issues"])
+    assert before == {p: p.read_bytes() for p in tmp_path.iterdir()}
+    assert row["token"] == "12345678"
+
+
+@pytest.mark.parametrize("change", ["wrong-self", "unresolved", "digest", "short", "type", "seq"])
+def test_binding_repair_refuses_unproven_inputs(tmp_path, change):
+    row = legacy_assignment(tmp_path, self_gt={
+        "wrong-self": 0x4A00000E, "unresolved": 0xFEED5E1F}.get(change))
+    if change == "digest":
+        row["binary_hash"] = "0" * 64
+    if change == "short":
+        path = tmp_path / row["filename"]
+        path.write_bytes(path.read_bytes()[:16])
+        row["binary_hash"] = hashlib.sha256(path.read_bytes()).hexdigest()
+    if change == "type":
+        row["type"] = "Other"
+    if change == "seq":
+        row["seq"] = 1
+    assert "repair-binding" not in inspect_namespace([row], 15, tmp_path)["actions"]
+    with pytest.raises(ValueError):
+        preview_resolution([row], proposal([row], "repair-binding"), tmp_path)
+
+
+def test_portable_evidence_uses_existing_validator_never_legacy_repair(tmp_path, monkeypatch):
+    row = legacy_assignment(tmp_path, self_gt=0xFEED5E1F)
+    import server.lump_approvals as approvals
+    import server.simulation_preparation as simulation
+    (tmp_path / "approvals.json").write_text("{}")
+    monkeypatch.setattr(approvals, "read_approvals", lambda _: {
+        row["binary_hash"]: {"portable_binding": {"fixture": True}}})
+    calls = []
+    monkeypatch.setattr(simulation, "artifact_bindings", lambda rows, directory: calls.append(rows))
+    view = inspect_namespace([row], 15, tmp_path)
+    assert calls
+    assert view["claims"]["executable"]["binding"]["status"] == "portable"
+    assert "repair-binding" not in view["actions"]
+    def reject(*args):
+        raise ValueError("Portable simulation requires authenticated compiler evidence")
+    monkeypatch.setattr(simulation, "artifact_bindings", reject)
+    view = inspect_namespace([row], 15, tmp_path)
+    assert "simulation-binding-invalid" in {i["code"] for i in view["issues"]}
+
+
+def test_saved_full_allocation_overlaps_not_limit_and_not_private_image(tmp_path):
+    alice = legacy_assignment(tmp_path, slot=14)
+    other = legacy_assignment(tmp_path, slot=7)
+    other["location"] = "0x3f0"
+    rows = [dict(slot=0, name="Boot.NS"), alice, other]
+    view = inspect_namespace(rows, 14, tmp_path)
+    overlap = next(i for i in view["issues"] if i["code"] == "saved-allocation-overlap")
+    assert "[0x400,0x440)" in overlap["message"]
+    assert "Private simulation" in overlap["nextAction"]
+    assert "saved-geometry-incomplete" in {i["code"] for i in view["issues"]}
+    alice["location"] = 0
+    view = inspect_namespace(rows, 14, tmp_path)
+    assert any("NS[0]" in i["message"] for i in view["issues"] if i["code"] == "saved-allocation-overlap")
+
+
+def test_select_canonical_artifact_preserves_issue_without_catalog_issue(tmp_path):
+    row = legacy_assignment(tmp_path)
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        dict(filename=row["filename"], token=row["token"], abstraction=row["name"], lump_version=4)]))
+    preview = preview_resolution([row], proposal([row], "select-artifact",
+        filename=row["filename"], token=row["token"], binaryHash=row["binary_hash"],
+        policy="Resident"), tmp_path)
+    assert preview["after"]["issue_n"] == 1
+
+
+def test_keep_design_without_nested_selection_requires_explicit_choice(tmp_path):
+    row = legacy_assignment(tmp_path)
+    rows = [row]
+    original = copy.deepcopy(rows)
+    files = {p: p.read_bytes() for p in tmp_path.iterdir()}
+    with pytest.raises(ValueError, match="No existing design selection"):
+        preview_resolution(rows, proposal(rows, "keep-design"), tmp_path)
+    with pytest.raises(ValueError, match="No existing design selection"):
+        preview_resolution(rows, proposal(rows, "keep-design", selection="existing"), tmp_path)
+    kept = preview_resolution(rows, proposal(rows, "keep-design", selection="executable"), tmp_path)["after"]
+    assert kept["selection"]["filename"] == row["filename"]
+    assert kept["selection"]["binaryHash"] == row["binary_hash"]
+    assert kept["selection"]["token"] == row["token"]
+    empty = preview_resolution(rows, proposal(rows, "keep-design", selection="none"), tmp_path)["after"]
+    assert empty["symbolic"] is True and "selection" not in empty and "filename" not in empty
+    assert rows == original
+    assert files == {p: p.read_bytes() for p in tmp_path.iterdir()}
+    unbound = [dict(slot=15, name="Unbound", symbolic=True, implementationMissing=True)]
+    with pytest.raises(ValueError, match="No existing design selection"):
+        preview_resolution(unbound, proposal(unbound, "keep-design"), tmp_path)
+    assert preview_resolution(unbound, proposal(unbound, "keep-design", selection="none"), tmp_path)["after"]["symbolic"]

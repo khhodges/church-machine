@@ -24,7 +24,7 @@ function setup() {
         limitations: ['Review saves only Namespace rows.', 'Image generation is a separate action.'],
         claims: { design: { reference: row.selection, status: 'verified', verified: true },
             executable: { reference: row, status: 'verified', verified: true } },
-        actions: ['keep-design', 'select-artifact', 'edit-geometry'],
+        actions: ['keep-design', 'select-artifact', 'edit-geometry', 'repair-binding'],
     };
     w.fetch = async (url, options = {}) => {
         calls.push({ url, options });
@@ -92,6 +92,48 @@ function setup() {
         assert.strictEqual(posted.ns_state.abstractions[0].slot, 15);
         assert.strictEqual(posted.ns_state.abstractions[0].seq, 7);
         assert.strictEqual(w._nsState.namespaceFingerprint, 'committed');
+        assert.match(w.document.querySelector('[data-status]').textContent, /1 remaining diagnostic/);
+        assert.match(w.document.querySelector('[data-content]').textContent, /Currently saved:/);
+        assert.match(w.document.querySelector('[data-content]').textContent, /does not repair the old committed image/);
+        assert.strictEqual(calls.filter(c => c.url.endsWith('save-table')).length, 1);
+        assert.strictEqual(calls.filter(c => c.url.startsWith('/api/namespace/inspect')).length, 2);
+        assert(!w.document.querySelector('[data-status]').textContent.includes('correction saved'));
+    }
+    {
+        const { w, calls } = setup();
+        await w.NamespaceInspector.open(15);
+        const select = w.document.querySelector('[data-action]');
+        select.value = 'repair-binding'; select.onchange();
+        assert.match(w.document.querySelector('[data-intention]').textContent, /Align Namespace binding with verified saved SELF/);
+        assert.strictEqual(calls.filter(c => c.options.method === 'POST').length, 0);
+        await w.document.querySelector('[data-preview]').onclick();
+        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).action, 'repair-binding');
+        const original = w.fetch;
+        w.fetch = (url, init) => url.startsWith('/api/namespace/inspect')
+            ? Promise.reject(new Error('Inspection unavailable')) : original(url, init);
+        await w.document.querySelector('[data-apply]').onclick();
+        assert.match(w.document.querySelector('[data-status]').textContent, /change saved, but persisted state and remaining diagnostics were not checked/);
+        assert.strictEqual(calls.filter(c => c.url.endsWith('save-table')).length, 1);
+        assert.strictEqual(w.document.querySelector('[data-apply]').disabled, true);
+    }
+    {
+        const { w, calls, inspected } = setup();
+        inspected.row = { ...row };
+        delete inspected.row.selection;
+        await w.NamespaceInspector.open(15);
+        const select = w.document.querySelector('[data-action]');
+        select.value = 'keep-design'; select.onchange();
+        const reference = w.document.querySelector('[name="selection"]');
+        assert.strictEqual(reference.value, '');
+        assert.strictEqual(reference.querySelector('option[value="existing"]'), null);
+        assert(reference.querySelector('option[value="executable"]'));
+        assert(reference.querySelector('option[value="none"]'));
+        await w.document.querySelector('[data-preview]').onclick();
+        assert.strictEqual(calls.filter(c => c.options.method === 'POST').length, 0);
+        assert.match(w.document.querySelector('[data-status]').textContent, /Explicitly choose/);
+        reference.value = 'none';
+        await w.document.querySelector('[data-preview]').onclick();
+        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).options.selection, 'none');
     }
     {
         const { w, calls } = setup();

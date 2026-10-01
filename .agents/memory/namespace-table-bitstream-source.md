@@ -17,6 +17,17 @@ and explicitly required correction controls to cover all such cases.
 keep inspection read-only and bind application to the exact reviewed revision.
 Explain type-specific restrictions rather than pretending every row is a LUMP.
 
+A saved metadata correction is not proof that an entry is ready to execute.
+Reinspect the persisted row and keep remaining binding and full-allocation
+diagnostics visible; distinguish saved placements from private simulation
+layouts and historical disk-image evidence.
+
+**Why:** Fixing a conflicting assignment removed its superficial warning while
+leaving incompatible token bindings and overlapping allocations undisclosed.
+
+**How to apply:** Report what was saved separately from what remains invalid.
+Never convert a successful table-save receipt into an “all fixed” claim.
+
 This authority order also applies when saving LUMPs and Namespaces: an archived, missing, or
 duplicated catalog row must not veto an independently verified Namespace
 selection. Do not make catalog repair a prerequisite for a valid save.

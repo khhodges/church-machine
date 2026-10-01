@@ -13,6 +13,7 @@ select-artifact: filename, token, binaryHash, policy;
 set-policy: policy=Resident|Preload|Lazy|Empty;
 clear-selection: no options (only executable orphan design selections);
 edit-geometry: explicit location and/or limit.
+repair-binding: no options; verified legacy owning SELF only.
 Returns before/after, field-level changes (including presence/deletion),
 remaining issues, and savePayload. POST that exact savePayload to the normal
 /api/namespace/save-table confirmation/CAS flow. Preview never consumes review
@@ -86,7 +87,8 @@ def _artifact(ref, lumps_dir):
         words = 1 << (((header >> 23) & 15) + 6)
         result["geometry"] = dict(allocatedWords=words, codeWords=(header >> 10) & 8191,
                                   capabilityWords=header & 255, type=(header >> 8) & 3)
-        result["structurallyValid"] = (header >> 27 == 31 and len(data) == words * 4)
+        result["structurallyValid"] = (header >> 27 == 31 and len(data) == words * 4
+                                      and 1 + ((header >> 10) & 8191) + (header & 255) <= words)
         expected = ref.get("binary_hash") or ref.get("binaryHash")
         if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
             result.update(status="missing-digest", message="An exact artifact digest is required.")
@@ -98,6 +100,90 @@ def _artifact(ref, lumps_dir):
     except (OSError, ValueError):
         result.update(status="unreadable", message="The exact artifact cannot be safely read.")
     return result
+
+
+def _binding(row, claim, lumps_dir):
+    """Read-only simulator binding evidence; never generate or authorize an image."""
+    from server.simulation_preparation import _validate_body, artifact_bindings
+    from server.lump_approvals import read_approvals
+    result = {"status": "unverified", "repairable": False}
+    if not claim.get("verified") or not claim.get("structurallyValid"):
+        result["message"] = "Exact hash-matching complete bytes are required to inspect SELF."
+        return result
+    try:
+        hashes = [row[k].lower() for k in ("binary_hash", "binaryHash")
+                  if isinstance(row.get(k), str)]
+        if len(set(hashes)) > 1:
+            raise ValueError("Artifact digest aliases conflict; explicitly select one exact artifact first.")
+        raw = (Path(lumps_dir) / row["filename"]).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != claim["actualHash"]:
+            raise ValueError("Artifact changed during inspection.")
+        approvals_path = Path(lumps_dir) / "approvals.json"
+        approvals = read_approvals(str(approvals_path)) if approvals_path.exists() else {}
+        approval = approvals.get(claim["actualHash"], {})
+        if approval.get("portable_binding") is not None:
+            selected = dict(row, resident=True, load_policy="Resident")
+            selected.pop("symbolic", None)
+            selected.pop("implementationMissing", None)
+            artifact_bindings([selected], lumps_dir)
+            return dict(status="portable", repairable=False,
+                        message="Authenticated portable binding: SELF is localized only in a private prepared image; do not replace the saved token.")
+        words = _validate_body(raw, executable=True)
+        if row.get("type") not in ("Inform", "Resident"):
+            raise ValueError("Only Inform/Resident executable assignments support legacy SELF repair.")
+        seq, slot = row.get("seq"), row.get("slot")
+        if type(seq) is not int or not 0 <= seq <= 511 or type(slot) is not int or not 0 <= slot <= 255:
+            raise ValueError("Owning slot and sequence must be exact valid integers.")
+        cc = words[0] & 255
+        if cc < 1:
+            raise ValueError("Legacy executable has no complete SELF row 0.")
+        actual, expected = words[len(words) - cc], 0x4A000000 | (seq << 16) | slot
+        result.update(selfGT=f"{actual:08x}", expectedGT=f"{expected:08x}")
+        if actual != expected:
+            raise ValueError("Immutable SELF does not match this slot/sequence (or is unresolved). Recompile/select a suitable artifact; saved bytes cannot be repaired here.")
+        tokens = [row[k] for k in ("token", "cache_token", "cacheToken") if k in row]
+        mismatch = not tokens or any(not isinstance(t, str) or t.lower() != f"{actual:08x}" for t in tokens)
+        result.update(status="descriptor-mismatch" if mismatch else "legacy-bound",
+                      repairable=mismatch, token=f"{actual:08x}",
+                      message="Immutable SELF matches the owner, but the Namespace token differs. Review Repair binding."
+                      if mismatch else "Legacy SELF and saved descriptor token agree; this is not execution approval.")
+    except (ValueError, OSError, KeyError, TypeError, RuntimeError) as exc:
+        result.update(status="binding-invalid", message=str(exc), repairable=False)
+    return result
+
+
+def _geometry_issues(rows, row, lumps_dir, issue):
+    """Saved design ranges only. Never borrow physical bounds from an old image."""
+    from server.boot_image import image_artifact_selected
+    if not image_artifact_selected(row) or _kind(row) == "mmio":
+        return
+    intervals, unknown = [], []
+    for other in rows:
+        if not isinstance(other, dict) or _kind(other) == "mmio":
+            continue
+        if other.get("slot") == 0:
+            # Current V2 private generator reserves sixteen header words.
+            intervals.append((0, 16, 0))
+            unknown.append("NS[0] table capacity/location")
+            continue
+        if not image_artifact_selected(other):
+            continue
+        claim = _artifact(other, lumps_dir)
+        start = _number(other.get("location"))
+        if start is None or start < 0 or not claim.get("verified") or not claim.get("structurallyValid"):
+            unknown.append(f"NS[{other.get('slot')}] full allocation")
+            continue
+        intervals.append((start, start + claim["geometry"]["allocatedWords"], other["slot"]))
+    own = next((r for r in intervals if r[2] == row["slot"]), None)
+    if own:
+        for start, end, slot in intervals:
+            if slot != row["slot"] and own[0] < end and start < own[1]:
+                issue("saved-allocation-overlap",
+                      f"Saved design NS[{row['slot']}] [{own[0]:#x},{own[1]:#x}) overlaps NS[{slot}] [{start:#x},{end:#x}) (word addresses, full allocations).",
+                      "Review saved placement. Private simulation generates a separate reviewed layout; this is not evidence about that layout or the old committed image.")
+    if unknown:
+        issue("saved-geometry-incomplete", "Saved layout cannot be certified: " + ", ".join(unknown) + " is not established by exact retained bodies.",
+              "Review architectural geometry in preparation. Old disk-image geometry is separate evidence, not saved-design authority.", "warning")
 
 
 def inspect_namespace(rows, slot, lumps_dir):
@@ -169,6 +255,15 @@ def inspect_namespace(rows, slot, lumps_dir):
         issue("invalid-row-format", str(exc), "Correct the named field before saving; unsupported fields remain visible.")
     read_only = kind in ("protected-bootstrap", "mmio", "generated")
     actions = [] if read_only else ["keep-design", "select-artifact", "edit-geometry"]
+    if not design and not read_only and row.get("filename"):
+        binding = _binding(row, claims["executable"], lumps_dir)
+        claims["executable"]["binding"] = binding
+        if binding["status"] not in ("portable", "legacy-bound"):
+            issue("simulation-" + binding["status"], binding["message"],
+                  "Review Repair binding when offered; otherwise select/recompile a valid exact artifact. No LUMP bytes are changed.")
+        if binding["repairable"]:
+            actions.append("repair-binding")
+    _geometry_issues(rows, row, lumps_dir, issue)
     if not read_only and not design:
         actions += ["set-policy"]
         if "selection" in row:
@@ -205,9 +300,16 @@ def _verified_choice(options, row, lumps_dir):
     known_hash = selected.get("binary_hash") or selected.get("binaryHash")
     if known_hash and known_hash != reference["binaryHash"]:
         raise ValueError("Selected artifact metadata has a different digest.")
+    from server.lump_integrity import parse_canonical_filename
+    canonical = parse_canonical_filename(reference["filename"])
+    if canonical and "issue_n" in selected and selected["issue_n"] != canonical[1]:
+        raise ValueError("Catalog issue differs from the exact canonical filename; no issue substitution.")
+    issue_n = {"issue_n": canonical[1]} if canonical else (
+        {"issue_n": row["issue_n"]} if row.get("filename") == reference["filename"] and "issue_n" in row else {})
     return dict(token=reference["token"], filename=reference["filename"],
                 binary_hash=reference["binaryHash"],
-                **{k: selected[k] for k in ("issue_n", "lump_version") if k in selected})
+                **{k: selected[k] for k in ("issue_n", "lump_version") if k in selected},
+                **({} if "issue_n" in selected else issue_n))
 
 
 def preview_resolution(rows, payload, lumps_dir):
@@ -223,7 +325,7 @@ def preview_resolution(rows, payload, lumps_dir):
     if not isinstance(options, dict):
         raise ValueError("options must be an object")
     allowed = {"keep-design": {"selection"}, "select-artifact": {"filename", "token", "binaryHash", "policy"},
-               "clear-selection": set(), "set-policy": {"policy"}, "edit-geometry": {"location", "limit"}}
+               "clear-selection": set(), "repair-binding": set(), "set-policy": {"policy"}, "edit-geometry": {"location", "limit"}}
     if set(options) - allowed[action]:
         raise ValueError("Unexpected action options; no fields were changed.")
     after = copy.deepcopy(view["row"])
@@ -234,6 +336,8 @@ def preview_resolution(rows, payload, lumps_dir):
         if selection not in ("existing", "executable", "none"):
             raise ValueError("selection must be existing, executable or none")
         retained = copy.deepcopy(after.get("selection"))
+        if selection == "existing" and retained is None:
+            raise ValueError("No existing design selection is present. Explicitly retain the executable reference or choose no artifact selection.")
         if selection == "existing" and retained is not None and not isinstance(retained, dict):
             raise ValueError("Existing design selection is malformed; explicitly choose none or executable.")
         if selection == "executable":
@@ -262,6 +366,14 @@ def preview_resolution(rows, payload, lumps_dir):
         for key in POLICY_FIELDS:
             after.pop(key, None)
         after.update(load_policy=policy, resident=policy == "Resident")
+    elif action == "repair-binding":
+        binding = _binding(after, view["claims"]["executable"], lumps_dir)
+        if not binding.get("repairable"):
+            raise ValueError("Exact immutable owning legacy SELF is required; reopen inspection.")
+        after["token"] = binding["token"]
+        for key in ("cache_token", "cacheToken"):
+            if key in after:
+                after[key] = binding["token"]
     elif action == "clear-selection":
         after.pop("selection", None)
     else:

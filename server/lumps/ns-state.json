@@ -202,7 +202,6 @@
       "f": 0,
       "filename": "ide.Alice.1.a91d33f7.lump",
       "g": 0,
-      "issue_n": 1,
       "limit": "0x00009",
       "load_policy": "Resident",
       "location": "0x00000400",
@@ -220,8 +219,6 @@
       "f": 0,
       "filename": "ide.Mallory.1.fdaed91d.lump",
       "g": 0,
-      "implementationMissing": true,
-      "issue_n": 1,
       "limit": "0x00000",
       "load_policy": "Resident",
       "location": "0x00000000",
@@ -229,16 +226,8 @@
       "name": "ide.Mallory",
       "resident": true,
       "seal": "0xDEADBEEF",
-      "selection": {
-        "binaryHash": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f",
-        "diagnostic": "Saved artifact is selected for design only; execution requires a validated Install.",
-        "filename": "ide.Mallory.1.0ca567b5.lump",
-        "status": "unresolved",
-        "token": "0ca567b5"
-      },
       "seq": 0,
       "slot": 15,
-      "symbolic": true,
       "token": "04b2913d",
       "type": "Inform"
     }
