@@ -77,19 +77,70 @@
                 return `<tr><th scope="row">${esc(change.field)}</th><td><strong>${esc(operation)}</strong></td><td><pre>${esc(before)}</pre></td><td><pre>${esc(after)}</pre></td></tr>`;
             }).join('') + '</tbody></table></div>';
     }
-    function diagnostics(issues) {
-        if (!Array.isArray(issues)) return '<p>Diagnostics were not checked.</p>';
-        if (!issues.length) return '<p>No remaining issues reported by this inspection. This is not execution or image approval.</p>';
-        return '<ul class="ns-inspector-issues">' + issues.map(issue => {
-            if (typeof issue === 'string') return `<li>${esc(issue)}</li>`;
-            const severity = ({ error: 'Error', warning: 'Warning', info: 'Information' })[issue.severity] || 'Issue';
-            return `<li><strong>${severity}:</strong> ${esc(issue.message || 'An issue needs review.')}` +
-                (issue.nextAction ? `<p><strong>Next action:</strong> ${esc(issue.nextAction)}</p>` : '') +
-                `<details><summary>Technical details</summary><pre>${esc(json(issue))}</pre></details></li>`;
-        }).join('') + '</ul>';
+    function advice(issue) {
+        const code = issue.code || '';
+        if (code === 'simulation-descriptor-mismatch') return {
+            problem: 'The Namespace binding does not match the saved program.',
+            fix: 'Review a binding correction using the verified saved program. Its code and placement will not change.',
+            actions: [['repair-binding', 'Review binding fix']],
+        };
+        if (code === 'saved-allocation-overlap') return {
+            problem: 'This entry shares reserved memory with another entry.',
+            fix: 'Choose a non-overlapping word address, then review the placement change. No address is chosen automatically. This edits the saved plan, not an existing image.',
+            actions: [['edit-geometry', 'Review placement']],
+        };
+        if (['mixed-design-executable', 'incomplete-design-flags', 'different-artifact-claims', 'design-location'].includes(code)) return {
+            problem: code === 'different-artifact-claims' ? 'This entry refers to two different saved programs.' :
+                'This entry contains conflicting design-only and executable settings.',
+            fix: 'Choose what you intend: keep a design-only reference, or choose the exact program to include. Review which reference is retained before saving.',
+            actions: [['keep-design', 'Keep design-only…'], ['select-artifact', 'Choose program…']],
+        };
+        if (['policy-alias-conflict', 'unknown-policy', 'policy-flag-conflict', 'residency-alias-conflict', 'boot-policy-conflict'].includes(code)) return {
+            problem: 'The loading settings disagree or are not supported.',
+            fix: 'Choose one loading policy and review the changes. The boot entry still requires a separate boot-marker change if you intend to exclude it.',
+            actions: [['set-policy', 'Review loading settings']],
+        };
+        if (code === 'orphan-design-selection') return {
+            problem: 'An executable entry still contains an old design-only reference.',
+            fix: 'Compare the references in Technical details. If the executable choice is correct, review removing the old design-only reference.',
+            actions: [['clear-selection', 'Review reference cleanup']],
+        };
+        if (/artifact-binding|digest-alias|^(design|executable)-/.test(code)) return {
+            problem: issue.message || 'The selected saved program cannot be verified.',
+            fix: 'Find or save the intended program, then choose its exact saved revision. Missing or damaged bytes cannot be repaired by changing a label.',
+            actions: [['select-artifact', 'Choose saved program…']],
+        };
+        return { problem: issue.message || String(issue), fix: issue.nextAction ||
+            'Inspect Technical details to identify the required correction. No automatic change is available.', actions: [] };
     }
-    function diagnosticCount(issues) {
-        return Array.isArray(issues) ? `${issues.length} remaining diagnostic${issues.length === 1 ? '' : 's'}` : 'Remaining diagnostics not checked';
+    function diagnostics(issues, interactive = false, imageSelected = interactive ? snapshot.imageSelected : undefined) {
+        if (!Array.isArray(issues)) return '<p>Problems have not been checked.</p>';
+        const dormant = issues.filter(issue => imageSelected === false && (issue.code || '').startsWith('simulation-'));
+        const incomplete = issues.filter(issue => issue.code === 'saved-geometry-incomplete' ||
+            issue.severity === 'info' || /unverified$/.test(issue.code || '')).filter(issue => !dormant.includes(issue));
+        const problems = issues.filter(issue => !incomplete.includes(issue) && !dormant.includes(issue));
+        const permitted = interactive ? actions(snapshot).filter(a => a.enabled !== false && a.allowed !== false).map(a => a.id) : [];
+        return (problems.length ? '<ul class="ns-inspector-issues">' + problems.map(issue => {
+            const help = advice(issue);
+            const buttons = help.actions.filter(([action]) => permitted.includes(action));
+            return `<li><p><strong>What is wrong:</strong> ${esc(help.problem)}</p>` +
+                `<p><strong>How to fix it:</strong> ${esc(help.fix)}</p>` +
+                buttons.map(([action, label]) => `<button type="button" data-fix-action="${action}">${esc(label)}</button>`).join(' ') +
+                `<details><summary>Technical details</summary><pre>${esc(json(issue))}</pre></details></li>`;
+        }).join('') + '</ul>' : '<p>No problems found in the checks completed. This does not approve execution or an image.</p>') +
+            (incomplete.length ? `<details class="ns-inspector-incomplete"><summary>Checks not completed (${incomplete.length})</summary>` +
+                '<p>These are limits of this inspection, not confirmed defects.</p>' +
+                incomplete.map(issue => `<p>${esc(issue.message)} ${esc(issue.nextAction || '')}</p>`).join('') + '</details>' : '') +
+            (dormant.length ? '<details data-dormant><summary>Not included in the current image</summary>' +
+                '<p>This entry is not selected. These future execution checks do not block the current image.</p>' +
+                dormant.map(issue => `<p>${esc(advice(issue).problem)} ${esc(advice(issue).fix)}</p>`).join('') + '</details>' : '');
+    }
+    function diagnosticCount(issues, imageSelected) {
+        if (!Array.isArray(issues)) return 'Remaining problems not checked';
+        const count = issues.filter(issue => issue.code !== 'saved-geometry-incomplete' &&
+            issue.severity !== 'info' && !/unverified$/.test(issue.code || '') &&
+            !(imageSelected === false && (issue.code || '').startsWith('simulation-'))).length;
+        return `${count} remaining problem${count === 1 ? '' : 's'}`;
     }
     function mode(row) {
         if (row.symbolic || row.implementationMissing) return 'design-only assignment' +
@@ -109,12 +160,13 @@
         dialog.querySelector('[data-review]').innerHTML = '';
     }
     function lockControls(locked) {
-        for (const el of dialog.querySelectorAll('[data-action], [data-fields] input, [data-fields] select, [data-preview]'))
+        for (const el of dialog.querySelectorAll('[data-action], [data-fix-action], [data-fields] input, [data-fields] select, [data-preview]'))
             el.disabled = locked;
     }
     function fields() {
         invalidate();
         const action = dialog.querySelector('[data-action]').value;
+        dialog.querySelector('[data-correction]').hidden = !action;
         let html = '';
         if (action === 'keep-design') {
             const hasSelection = snapshot.row.selection && typeof snapshot.row.selection === 'object' &&
@@ -174,12 +226,12 @@
             dialog.querySelector('[data-review]').innerHTML =
                 '<h3>Review exact field changes</h3><p>Removed fields are deletions, not empty replacements. Slot, Pet Name and generation remain unchanged.</p>' +
                 diff(result.changes) +
-                `<div class="ns-inspector-columns"><section><h4>Before</h4><pre>${esc(json(result.before))}</pre></section><section><h4>After</h4><pre>${esc(json(result.after))}</pre></section></div>` +
+                `<details><summary>Full before / after fields</summary><div class="ns-inspector-columns"><section><h4>Before</h4><pre>${esc(json(result.before))}</pre></section><section><h4>After</h4><pre>${esc(json(result.after))}</pre></section></div></details>` +
                 `<p><strong>Proposed state:</strong> ${esc(mode(result.after))}</p>` +
-                `<h4>${esc(diagnosticCount(result.issues))} after this proposed change</h4>${diagnostics(result.issues)}` +
+                `<h4>${esc(diagnosticCount(result.issues, result.imageSelected))} after this proposed change</h4>${diagnostics(result.issues, false, result.imageSelected)}` +
                 `<p>${boundary}</p>`;
             dialog.querySelector('[data-apply]').disabled = false;
-            status(`Review ready: ${diagnosticCount(result.issues)}. Apply saves only the reviewed Namespace rows; saving is not a claim that the entry is fixed.`);
+            status(`Review ready: ${diagnosticCount(result.issues, result.imageSelected)}. Apply saves only the reviewed Namespace rows; saving is not a claim that the entry is fixed.`);
         } catch (error) { if (current(id)) status(`${error.message} Close and reopen to review current state; no automatic retry.`); }
         finally { if (current(id)) { busy = false; lockControls(false); } }
     }
@@ -219,11 +271,11 @@
                 dialog.querySelector('[data-content]').innerHTML =
                     `<h3>Persisted NS[${persisted.row.slot}] ${esc(persisted.row.name)}</h3>` +
                     `<p><strong>Currently saved:</strong> ${esc(mode(persisted.row))}</p>` +
-                    `<h4>${esc(diagnosticCount(persisted.issues))}</h4>${diagnostics(persisted.issues)}` +
+                    `<h4>${esc(diagnosticCount(persisted.issues, persisted.imageSelected))}</h4>${diagnostics(persisted.issues, false, persisted.imageSelected)}` +
                     `<details><summary>Exact persisted fields</summary><pre>${esc(json(persisted.row))}</pre></details><p>${boundary}</p>`;
                 const concurrent = persisted.namespaceFingerprint !== result.namespaceFingerprint
                     ? ' The Namespace changed again after this save; the inspection shows its current state.' : '';
-                status(`Namespace table change saved; ${diagnosticCount(persisted.issues)}.${concurrent} Close and reopen to review any further correction.`);
+                status(`Namespace table change saved; ${diagnosticCount(persisted.issues, persisted.imageSelected)}.${concurrent} Close and reopen to review any further correction.`);
             } catch (error) {
                 if (current(id)) status(`Namespace table change saved, but persisted state and remaining diagnostics were not checked: ${error.message} Close and reopen to inspect. No automatic retry.`);
             }
@@ -262,16 +314,16 @@
             }
             const allowed = actions(data).filter(a => a.enabled !== false && a.allowed !== false);
             dialog.querySelector('[data-content]').innerHTML =
-                `<h3>NS[${slot}] ${esc(data.row.name)} — ${esc(data.kind)}</h3>` +
-                `<p><strong>Currently saved:</strong> ${esc(mode(data.row))}</p><p data-intention>No correction chosen. The saved assignment is unchanged.</p>` +
-                '<p>Saved assignment is authoritative. Image and runtime evidence cannot replace it.</p>' +
-                `<p>${boundary}</p><h3>${esc(diagnosticCount(data.issues))}</h3>${diagnostics(data.issues)}` +
+                `<h3>NS[${slot}] ${esc(data.row.name)}</h3>` +
+                diagnostics(data.issues, true) +
+                `<details data-technical><summary>Technical details and saved references</summary>` +
+                `<p><strong>Currently saved:</strong> ${esc(mode(data.row))}</p>` +
                 `<div class="ns-inspector-columns">${claimCard('Design selection', data.claims && data.claims.design, 'design')}${claimCard('Executable reference', data.claims && data.claims.executable, 'executable')}</div>` +
                 `<details><summary>Exact saved fields and field permissions</summary><pre>${esc(json(data.row))}</pre><pre>${esc(json(data.actions))}</pre></details>` +
                 limitations(data.limitations) +
-                `<details><summary>Stored image evidence — not assignment authority</summary><pre data-image>Loading read-only evidence…</pre></details>` +
-                (allowed.length ? `<label>Intended correction<select data-action><option value="">Choose explicitly…</option>${allowed.map(a => `<option value="${esc(a.id)}">${esc(a.label || labels[a.id] || a.id)}</option>`).join('')}</select></label>` +
-                '<div data-fields></div><button type="button" data-preview disabled>Review proposed changes</button>' :
+                `<details><summary>Stored image evidence — not assignment authority</summary><pre data-image>Loading read-only evidence…</pre></details></details>` +
+                (allowed.length ? `<details data-other><summary>Other changes</summary><label>Intended correction<select data-action><option value="">Choose explicitly…</option>${allowed.map(a => `<option value="${esc(a.id)}">${esc(a.label || labels[a.id] || a.id)}</option>`).join('')}</select></label></details>` +
+                '<section data-correction hidden><p data-intention></p><div data-fields></div><button type="button" data-preview disabled>Review proposed changes</button></section>' :
                 '<p>This entry is inspect-only. No correction is permitted here.</p>') +
                 '<div data-review></div>';
             for (const button of dialog.querySelectorAll('[data-source]')) button.onclick = async () => {
@@ -284,12 +336,19 @@
             };
             if (allowed.length) {
                 dialog.querySelector('[data-action]').onchange = fields;
+                for (const button of dialog.querySelectorAll('[data-fix-action]')) button.onclick = () => {
+                    if (busy) return;
+                    dialog.querySelector('[data-action]').value = button.dataset.fixAction;
+                    fields();
+                    dialog.querySelector('[data-correction]').scrollIntoView?.({ block: 'nearest' });
+                    dialog.querySelector('[data-preview]').focus();
+                };
                 dialog.querySelector('[data-preview]').onclick = preview;
                 dialog.querySelector('[data-fields]').addEventListener('input', invalidate);
                 dialog.querySelector('[data-fields]').addEventListener('change', invalidate);
             }
             dialog.querySelector('[data-apply]').onclick = apply;
-            status('Inspection is read-only. Choose a correction, review its exact diff, then explicitly apply.');
+            status('Read-only check. Review a fix below; nothing changes until you apply it.');
             fetch('/api/lumps/list', { cache: 'no-store' }).then(responseJSON).then(list => {
                 if (!current(id)) return;
                 const rows = Array.isArray(list) ? list : list.lumps;

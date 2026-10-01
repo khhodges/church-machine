@@ -268,7 +268,9 @@ def inspect_namespace(rows, slot, lumps_dir):
         actions += ["set-policy"]
         if "selection" in row:
             actions += ["clear-selection"]
-    return dict(ok=True, namespaceFingerprint=namespace_fingerprint(rows),
+    from server.boot_image import image_artifact_selected
+    return dict(ok=True, imageSelected=image_artifact_selected(row),
+                namespaceFingerprint=namespace_fingerprint(rows),
                 savedAbstractions=copy.deepcopy(rows), row=row, kind=kind,
                 claims=claims, issues=issues, actions=actions,
                 limitations=[
@@ -386,7 +388,9 @@ def preview_resolution(rows, payload, lumps_dir):
                     before=view["row"].get(k), after=after.get(k))
                for k in sorted(set(view["row"]) | set(after))
                if (k in view["row"]) != (k in after) or view["row"].get(k) != after.get(k)]
-    return dict(ok=True, dataChanged=False, before=view["row"], after=after, changes=changes,
+    from server.boot_image import image_artifact_selected
+    return dict(ok=True, imageSelected=image_artifact_selected(after),
+                dataChanged=False, before=view["row"], after=after, changes=changes,
                 issues=inspect_namespace(proposed, after["slot"], lumps_dir)["issues"],
                 namespaceFingerprint=view["namespaceFingerprint"],
                 savePayload={"namespaceFingerprint": view["namespaceFingerprint"],

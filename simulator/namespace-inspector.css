@@ -15,6 +15,11 @@
 .ns-inspector-columns section { min-width:0; }
 .ns-inspector footer { flex-shrink:0;padding-top:12px;border-top:1px solid #384662; }
 .ns-inspector-issues { padding-left:22px; }
+.ns-inspector-issues { list-style:none;padding:0; }
+.ns-inspector-issues > li { padding:12px;border:1px solid #485a79;border-radius:6px;background:#1b263b; }
+.ns-inspector details { margin:12px 0; }
+.ns-inspector summary { cursor:pointer;color:#aabbd3; }
+.ns-inspector [data-correction] { padding:12px;border:1px solid #7187aa;border-radius:6px;margin-top:14px; }
 .ns-inspector-issues > li { margin:12px 0;line-height:1.45; }
 .ns-inspector-issues p { margin:6px 0; }
 .ns-inspector-limitations li { margin:7px 0;line-height:1.4; }

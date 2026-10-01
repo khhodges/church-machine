@@ -17,6 +17,16 @@ and explicitly required correction controls to cover all such cases.
 keep inspection read-only and bind application to the exact reviewed revision.
 Explain type-specific restrictions rather than pretending every row is a LUMP.
 
+Present Namespace audits as problems and how to fix them, not a general-purpose
+metadata editor. Keep healthy evidence and advanced fields collapsed.
+
+**Why:** The user explicitly found the full inspector too complex and asked to
+see only problems with instructions for correcting them.
+
+**How to apply:** Pair each confirmed issue with its relevant reviewed action.
+Separate incomplete checks and dormant-image concerns from current blockers;
+never hide them by claiming the whole configuration is valid.
+
 A saved metadata correction is not proof that an entry is ready to execute.
 Reinspect the persisted row and keep remaining binding and full-allocation
 diagnostics visible; distinguish saved placements from private simulation

@@ -19,7 +19,7 @@ function setup() {
     const calls = [];
     const inspected = {
         ok: true, namespaceFingerprint: 'reviewed', savedAbstractions: [row], row,
-        kind: 'design', issues: [{ code: 'mixed', message: 'Conflicting executable identity',
+        kind: 'design', issues: [{ code: 'mixed-design-executable', message: 'Conflicting executable identity',
             severity: 'error', nextAction: 'Compare the two references and choose your intended assignment.' }],
         limitations: ['Review saves only Namespace rows.', 'Image generation is a separate action.'],
         claims: { design: { reference: row.selection, status: 'verified', verified: true },
@@ -60,8 +60,13 @@ function setup() {
         assert(w.document.querySelector('#namespaceInspector').textContent.includes('Mallory.executable.lump'));
         assert(w.document.querySelector('#namespaceInspector').textContent.includes('Mallory.design.lump'));
         const issue = w.document.querySelector('.ns-inspector-issues li');
-        assert(issue.textContent.includes('Error: Conflicting executable identity'));
-        assert(issue.querySelector('p').textContent.startsWith('Next action: Compare'));
+        assert(issue.textContent.includes('What is wrong:'));
+        assert(issue.textContent.includes('How to fix it:'));
+        assert(!issue.textContent.includes('Error:'));
+        assert.strictEqual(w.document.querySelector('[data-technical]').open, false);
+        assert.strictEqual(w.document.querySelector('[data-other]').open, false);
+        assert.strictEqual(w.document.querySelector('[data-correction]').hidden, true);
+        assert(issue.querySelector('[data-fix-action="keep-design"]'));
         assert.strictEqual(issue.querySelector('details').open, false);
         assert.strictEqual(issue.querySelector('summary').textContent, 'Technical details');
         assert.strictEqual(w.document.querySelectorAll('.ns-inspector-limitations li').length, 2);
@@ -76,7 +81,9 @@ function setup() {
         const { w, calls } = setup();
         await w.NamespaceInspector.open(15);
         const select = w.document.querySelector('[data-action]');
-        select.value = 'keep-design'; select.onchange();
+        w.document.querySelector('[data-fix-action="keep-design"]').click();
+        assert.strictEqual(select.value, 'keep-design');
+        assert.strictEqual(w.document.querySelector('[data-correction]').hidden, false);
         await w.document.querySelector('[data-preview]').onclick();
         const diffRows = w.document.querySelectorAll('.ns-inspector-diff tbody tr');
         assert.strictEqual(diffRows[0].cells[1].textContent, 'REMOVED');
@@ -92,7 +99,7 @@ function setup() {
         assert.strictEqual(posted.ns_state.abstractions[0].slot, 15);
         assert.strictEqual(posted.ns_state.abstractions[0].seq, 7);
         assert.strictEqual(w._nsState.namespaceFingerprint, 'committed');
-        assert.match(w.document.querySelector('[data-status]').textContent, /1 remaining diagnostic/);
+        assert.match(w.document.querySelector('[data-status]').textContent, /1 remaining problem/);
         assert.match(w.document.querySelector('[data-content]').textContent, /Currently saved:/);
         assert.match(w.document.querySelector('[data-content]').textContent, /does not repair the old committed image/);
         assert.strictEqual(calls.filter(c => c.url.endsWith('save-table')).length, 1);
@@ -134,6 +141,34 @@ function setup() {
         reference.value = 'none';
         await w.document.querySelector('[data-preview]').onclick();
         assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).options.selection, 'none');
+    }
+    {
+        const { w, calls, inspected } = setup();
+        inspected.imageSelected = false;
+        inspected.issues = [
+            { code: 'simulation-descriptor-mismatch', message: 'A future binding issue.' },
+            { code: 'saved-allocation-overlap', message: 'Saved placement overlaps another entry.' },
+            { code: 'saved-geometry-incomplete', message: 'Thread geometry unavailable.' },
+        ];
+        await w.NamespaceInspector.open(15);
+        assert(w.document.querySelector('[data-dormant]'));
+        assert.strictEqual(w.document.querySelector('[data-dormant]').open, false);
+        assert.strictEqual(w.document.querySelector('[data-fix-action="repair-binding"]'), null);
+        assert(w.document.querySelector('[data-fix-action="edit-geometry"]'));
+        assert.strictEqual(w.document.querySelector('.ns-inspector-incomplete').open, false);
+        assert.strictEqual(w.document.querySelectorAll('.ns-inspector-issues > li').length, 1);
+        assert.strictEqual(calls.filter(c => c.options.method === 'POST').length, 0);
+    }
+    {
+        const { w, calls, inspected } = setup();
+        inspected.imageSelected = true;
+        inspected.issues = [{ code: 'simulation-descriptor-mismatch', message: 'Wrong token.' }];
+        await w.NamespaceInspector.open(15);
+        w.document.querySelector('[data-fix-action="repair-binding"]').click();
+        assert.strictEqual(w.document.querySelector('[data-action]').value, 'repair-binding');
+        assert.strictEqual(calls.filter(c => c.options.method === 'POST').length, 0);
+        await w.document.querySelector('[data-preview]').onclick();
+        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).action, 'repair-binding');
     }
     {
         const { w, calls } = setup();

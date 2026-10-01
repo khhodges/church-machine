@@ -51,9 +51,10 @@ test('inspect and cancel are read-only; reviewed design correction preserves slo
     await page.evaluate(slot => NamespaceInspector.open(slot), target.slot);
     await expect(inspector).toContainText(target.name);
     await expect(inspector).toContainText(target.selection.filename);
-    await expect(inspector.locator('.ns-inspector-issues').first()).toContainText('Next action:');
+    await expect(inspector.locator('.ns-inspector-issues').first()).toContainText('How to fix it:');
     await expect(inspector.locator('.ns-inspector-issues details[open]')).toHaveCount(0);
-    await expect(inspector.locator('.ns-inspector-limitations li').first()).toBeVisible();
+    await expect(inspector.locator('[data-technical]')).not.toHaveAttribute('open', '');
+    await expect(inspector.locator('.ns-inspector-limitations li').first()).toBeHidden();
     await page.screenshot({ path: '/tmp/namespace-inspector-opened.png' });
     await page.setViewportSize({ width: 1024, height: 576 });
     await inspector.locator('[data-scroll]').evaluate(el => { el.scrollTop = el.scrollHeight; });
@@ -73,7 +74,7 @@ test('inspect and cancel are read-only; reviewed design correction preserves slo
     expect(hash(stateFile)).toBe(stateHash);
     expect(mutations.filter(url => /\/api\/namespace\//.test(url))).toEqual([]);
     await page.evaluate(slot => NamespaceInspector.open(slot), target.slot);
-    await inspector.locator('[data-action]').selectOption('keep-design');
+    await inspector.locator('[data-fix-action="keep-design"]').first().click();
     await inspector.locator('[data-preview]').click();
     await expect(inspector.locator('[data-apply]')).toBeEnabled();
     await expect(inspector.locator('[data-review]')).toContainText('REMOVED');
@@ -86,7 +87,7 @@ test('inspect and cancel are read-only; reviewed design correction preserves slo
     await page.getByRole('button', { name: 'Confirm this change', exact: true }).click();
     await expect(inspector.locator('[data-status]')).toContainText('Namespace table change saved;');
     await expect(inspector.locator('[data-content]')).toContainText('Currently saved: design-only assignment');
-    await expect(inspector.locator('[data-content]')).toContainText('remaining diagnostics');
+    await expect(inspector.locator('[data-content]')).toContainText('remaining problems');
     const updated = JSON.parse(fs.readFileSync(stateFile)).abstractions;
     const repaired = updated.find(r => r.slot === target.slot);
     expect(repaired.name).toBe(target.name);
@@ -128,7 +129,7 @@ test('binding correction saves the exact token but continues to report allocatio
     await page.waitForFunction(() => !!window.NamespaceInspector);
     await page.evaluate(() => NamespaceInspector.open(14));
     const inspector = page.locator('#namespaceInspector');
-    await inspector.locator('[data-action]').selectOption('repair-binding');
+    await inspector.locator('[data-fix-action="repair-binding"]').click();
     await expect(inspector.locator('[data-intention]')).toContainText('Not saved');
     await inspector.locator('[data-preview]').click();
     await expect(inspector.locator('[data-apply]')).toBeEnabled();
@@ -137,7 +138,7 @@ test('binding correction saves the exact token but continues to report allocatio
     await inspector.locator('[data-apply]').click();
     await page.getByRole('button', { name: 'Confirm this change', exact: true }).click();
     await expect(inspector.locator('[data-status]')).toContainText('Namespace table change saved;');
-    await expect(inspector.locator('[data-status]')).toContainText(/[1-9]\d* remaining diagnostic/);
+    await expect(inspector.locator('[data-status]')).toContainText(/[1-9]\d* remaining problem/);
     await expect(inspector.locator('[data-content]')).toContainText('overlaps NS[16]');
     await expect(inspector.locator('[data-content]')).toContainText('does not repair the old committed image');
     const updated = JSON.parse(fs.readFileSync(stateFile)).abstractions;
