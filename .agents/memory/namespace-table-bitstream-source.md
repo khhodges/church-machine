@@ -5,6 +5,18 @@ description: The serialized Namespace Table, not the catalog manifest or loose f
 
 The Namespace Table is the sole authoritative source of LUMPs and their metadata in a bitstream. Truth is ordered as: (1) the Namespace Table, then (2) the assigned slots and LUMPs represented by that table. The manifest is not authoritative for membership, metadata, identity, version, slot, size, or any other property.
 
+Conflicting Namespace state must be inspectable and correctable by the user
+through a general reviewed interface, not hidden behind symbolic-row labels
+or repaired only through agent-written JSON. Clear/re-add is not an equivalent
+repair because it changes capability generation.
+
+**Why:** The user found that a design-only row hid a second executable identity
+and explicitly required correction controls to cover all such cases.
+
+**How to apply:** Expose both claims, field removals and unresolved diagnostics;
+keep inspection read-only and bind application to the exact reviewed revision.
+Explain type-specific restrictions rather than pretending every row is a LUMP.
+
 This authority order also applies when saving LUMPs and Namespaces: an archived, missing, or
 duplicated catalog row must not veto an independently verified Namespace
 selection. Do not make catalog repair a prerequisite for a valid save.

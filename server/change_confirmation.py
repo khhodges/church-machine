@@ -377,6 +377,8 @@ def protected_request(path, method):
         "/api/lumps/save-plan", "/api/lumps/finalize",
         "/api/lumps/save-diagnostics", "/api/lumps/approval-intent",
         "/api/lumps/deploy-authorize",
+        # Pure candidate calculation; publication still uses protected save-table.
+        "/api/namespace/resolve-preview",
     }
     if path in exempt or path.startswith("/api/lumps/lease"):
         return False

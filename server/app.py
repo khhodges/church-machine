@@ -5000,6 +5000,35 @@ def namespace_save_table():
                        dataChanged=False), 500
 
 
+@app.route("/api/namespace/inspect", methods=["GET"])
+def namespace_inspect():
+    """Inspect exact saved rows, never the enriched/runtime Namespace projection."""
+    from server.namespace_inspector import inspect_namespace
+    try:
+        raw_slot = request.args.get("slot", "")
+        if not re.fullmatch(r"[0-9]+", raw_slot):
+            raise ValueError("slot must be a non-negative integer")
+        with _namespace_commit_guard():
+            rows = _read_namespace_design_document()["abstractions"]
+            result = inspect_namespace(rows, int(raw_slot), LUMPS_DIR)
+        return jsonify(result)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
+
+
+@app.route("/api/namespace/resolve-preview", methods=["POST"])
+def namespace_resolve_preview():
+    """Pure proposal; use ordinary protected save-table review to publish it."""
+    from server.namespace_inspector import preview_resolution
+    try:
+        with _namespace_commit_guard():
+            rows = _read_namespace_design_document()["abstractions"]
+            result = preview_resolution(rows, request.get_json(silent=True), LUMPS_DIR)
+        return jsonify(result)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
+
+
 @app.route("/api/namespace/boot-marker", methods=["POST"])
 def namespace_boot_marker_post():
     """Atomically move the sole Lightning Bolt marker in Namespace state.

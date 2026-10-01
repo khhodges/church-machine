@@ -4373,6 +4373,8 @@ function updateNamespace() {
         const _assignedRow = _assignedRows.find(function(row) {
             return row && Number(row.slot) === Number(i);
         }) || null;
+        const _inspectButton = _assignedRow
+            ? `<button type="button" class="btn btn-xs ns-inspect-btn" onclick="event.stopPropagation();NamespaceInspector.open(${i})" title="Inspect all saved claims and review an in-place correction">Inspect and resolve</button>` : '';
         const _assignedFreshness = _nsAssignedLumpFreshness(
             i, _assignedRow, window._nsState);
         const _savedVersionCell = _nsRenderSavedVersionCell(
@@ -4390,7 +4392,7 @@ function updateNamespace() {
             } else {
                 html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(no entry installed)</td>`;
             }
-            html += `<td class="ns-entry-actions"></td>`;
+            html += `<td class="ns-entry-actions">${_inspectButton}</td>`;
             html += '</tr>';
             continue;
         }
@@ -4401,7 +4403,7 @@ function updateNamespace() {
             html += _savedVersionCell;
             html += `<td class="ns-label ns-label-clickable" style="color:#c4a7ff;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open Bank private custody">Bank private custody</td>`;
             html += `<td colspan="7" style="color:#777;font-size:0.78rem;">Lockbox ${privateBankSlot.lockboxId} — protected backing record</td>`;
-            html += `<td class="ns-entry-actions"></td></tr>`;
+            html += `<td class="ns-entry-actions">${_inspectButton}</td></tr>`;
             continue;
         }
         const manifest = sim.lazyManifest ? sim.lazyManifest[i] : null;
@@ -4512,9 +4514,9 @@ function updateNamespace() {
                                 _hwCapRe.test(e.label || '') ||
                                 _residentIO;
             if (symbolic) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">non-executable · click name for validation</span></td>`;
+                html += `<td class="ns-entry-actions">${_inspectButton}<span style="${warmStyle}">non-executable · click name for validation</span></td>`;
             } else if (codeNotResident) {
-                html += `<td class="ns-entry-actions"><span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
+                html += `<td class="ns-entry-actions">${_inspectButton}<span style="${warmStyle}">not resident</span>${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
             } else {
                 let _srcBtn = '';
                 if (!_hideSource) {
@@ -4526,7 +4528,7 @@ function updateNamespace() {
                         : `null,${i}`;
                     _srcBtn = `<button class="btn btn-xs" onclick="event.stopPropagation();_openLumpSource(${_onclickTarget})" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);" title="Open the complete saved LUMP workspace">Open LUMP</button>`;
                 }
-                html += `<td class="ns-entry-actions">${_srcBtn}${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
+                html += `<td class="ns-entry-actions">${_inspectButton}${_srcBtn}${_nsPrefetchRow(i, manifest, e.label, _snapshotRow.policy)}${_identityBtn}${_pinControl}</td>`;
             }
         }
         html += '</tr>';
