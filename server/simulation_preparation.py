@@ -38,11 +38,8 @@ def artifact_bindings(rows, directory):
         expected = row.get("binary_hash") or row.get("binaryHash")
         token = row.get("token") or row.get("cache_token")
         if (not isinstance(filename, str) or os.path.basename(filename) != filename
-                or parse_canonical_filename(filename) is None
                 or not isinstance(expected, str)
-                or not re.fullmatch(r"[0-9a-fA-F]{64}", expected)
-                or not isinstance(token, str)
-                or not re.fullmatch(r"[0-9a-fA-F]{8}", token)):
+                or not re.fullmatch(r"[0-9a-fA-F]{64}", expected)):
             raise ValueError(f"NS[{row['slot']}] has an invalid immutable artifact binding")
         raw = (Path(directory) / filename).read_bytes()
         if hashlib.sha256(raw).hexdigest() != expected.lower():
@@ -56,16 +53,16 @@ def artifact_bindings(rows, directory):
         if approval and approval.get("portable_binding") is not None:
             from server.portable_binding import validate_portable_binding, validate_unresolved_clist
             from server.lump_integrity import compute_number
-            dot, issue, number = parse_canonical_filename(filename)
+            identity = parse_canonical_filename(filename)
+            if identity is None:
+                raise ValueError("Portable artifact requires its signed canonical identity")
+            dot, issue, number = identity
             contract = validate_portable_binding(approval["portable_binding"], words[0] & 255)
             if {dep["relocation_row"] for dep in contract["dependencies"]} != set(range(words[0] & 255)):
                 raise ValueError("Portable relocation rows must cover the exact c-list")
-            manifest = json.loads((Path(directory) / "manifest.json").read_text())
-            selected = [entry for entry in manifest if entry.get("filename") == filename
-                        and str(entry.get("token", "")).lower() == token.lower()]
             if (approval.get("filename") != filename or contract["owner"] != f"{dot}#{issue}"
                     or approval.get("dot_name") != dot or approval.get("issue_n") != issue
-                    or compute_number(dot, raw) != number or len(selected) != 1):
+                    or compute_number(dot, raw) != number):
                 raise ValueError("Portable artifact approval identity differs from selected bytes")
             try:
                 key = compiler_record_verification_key(approval.get("compiler_record"))
@@ -92,7 +89,10 @@ def _localize_portable(raw, binding, rows, bindings, directory):
         if not dep["symbolic_self"]:
             candidates = []
             for candidate in bindings:
-                dot, issue, _ = parse_canonical_filename(candidate["filename"])
+                identity = parse_canonical_filename(candidate["filename"])
+                if identity is None:
+                    continue
+                dot, issue, _ = identity
                 identity = f"{dot}#{issue}"
                 metadata = {"N": identity, "binary_hash": candidate["binaryHash"],
                             "identity_hash": hashlib.sha256(identity.encode()).hexdigest()}
@@ -148,8 +148,6 @@ def validate_simulation_executable(path, lumps_dir, label, bootstrap_binding=Non
         expected = 0x4A000000 | (sequence << 16) | row["slot"]
         if words[len(words) - cc] != expected:
             raise ValueError(f"{label}: immutable SELF row 0 differs from owning Namespace GT")
-        if int(row.get("token") or row.get("cache_token"), 16) != expected:
-            raise ValueError(f"{label}: Namespace token must bind descriptor W3 to the full SELF GT")
     return words
 
 
@@ -210,15 +208,28 @@ def stage_image(cfg, rows, directory, entry_slot):
                 raise ValueError("Artifact changed while staging simulation")
             if "portableBinding" in binding:
                 raw, local_gt = _localize_portable(raw, binding, rows, bindings, directory)
-                local_hash = hashlib.sha256(raw).hexdigest()
-                local_tokens[binding["slot"]] = local_gt
-                staged = next(row for row in image_rows if row["slot"] == binding["slot"])
-                staged.update(token=f"{local_gt:08x}", cache_token=f"{local_gt:08x}",
-                              binary_hash=local_hash)
-                reviewed = next(row for row in prepared if row["slot"] == binding["slot"])
-                reviewed["simulationBinding"] = {
-                    "sourceArtifact": copy.deepcopy(binding), "localSelfGT": f"{local_gt:08x}",
-                    "derivativeHash": local_hash}
+            else:
+                # Catalog lookup identity is not the destination runtime GT.
+                # Validate immutable SELF against the Namespace, then derive
+                # only the private descriptor. Never rewrite the saved binding.
+                words = _validate_body(raw, executable=True)
+                owner = next(row for row in rows if row["slot"] == binding["slot"])
+                sequence = owner.get("seq")
+                if type(sequence) is not int or not 0 <= sequence <= 511:
+                    raise ValueError(f"NS[{owner['slot']}] simulator resident has an invalid sequence")
+                cc = words[0] & 255
+                local_gt = 0x4A000000 | (sequence << 16) | owner["slot"]
+                if not cc or words[len(words) - cc] != local_gt:
+                    raise ValueError(f"NS[{owner['slot']}] immutable SELF row 0 differs from owning Namespace GT")
+            local_hash = hashlib.sha256(raw).hexdigest()
+            local_tokens[binding["slot"]] = local_gt
+            staged = next(row for row in image_rows if row["slot"] == binding["slot"])
+            staged.update(token=f"{local_gt:08x}", cache_token=f"{local_gt:08x}",
+                          binary_hash=local_hash)
+            reviewed = next(row for row in prepared if row["slot"] == binding["slot"])
+            reviewed["simulationBinding"] = {
+                "sourceArtifact": copy.deepcopy(binding), "localSelfGT": f"{local_gt:08x}",
+                "derivativeHash": local_hash}
             (stage / binding["filename"]).write_bytes(raw)
         (stage / "ns-state.json").write_text(json.dumps({"abstractions": image_rows}))
         (stage / "manifest.json").write_text("[]")
@@ -239,10 +250,16 @@ def stage_image(cfg, rows, directory, entry_slot):
                 raise ValueError(f"NS[{slot}] frozen artifact has no physical simulation descriptor")
             offset = len(image_words) - (slot + 1) * 4
             location, authority, _, token = image_words[offset:offset + 4]
+            source = next(row for row in rows if row["slot"] == slot)
+            if "location" in source:
+                requested = source["location"]
+                requested = int(requested, 0) if isinstance(requested, str) else requested
+                if location != requested:
+                    raise ValueError(f"NS[{slot}] generated image moved its saved Namespace location")
             raw = (stage / binding["filename"]).read_bytes()
             expected_words = struct.unpack(f">{len(raw) // 4}I", raw)
             if (not authority or location + len(expected_words) > physical["table_offset_words"]
-                    or token != local_tokens.get(slot, int(binding["token"], 16))
+                    or token != local_tokens[slot]
                     or image_words[location:location + len(expected_words)] != expected_words):
                 raise ValueError(
                     f"NS[{slot}] frozen artifact is missing or differs from its "

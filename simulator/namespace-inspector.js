@@ -12,7 +12,6 @@
         'clear-selection': 'Remove orphan design-selection metadata',
         'set-policy': 'Change loading policy',
         'edit-geometry': 'Edit declared geometry',
-        'repair-binding': 'Align Namespace binding with verified saved SELF',
     };
     function dirty() {
         return !!(window._nsTableDirty || window._nsTableSaveInFlight ||
@@ -79,11 +78,6 @@
     }
     function advice(issue) {
         const code = issue.code || '';
-        if (code === 'simulation-descriptor-mismatch') return {
-            problem: 'The Namespace binding does not match the saved program.',
-            fix: 'Review a binding correction using the verified saved program. Its code and placement will not change.',
-            actions: [['repair-binding', 'Review binding fix']],
-        };
         if (code === 'saved-allocation-overlap') return {
             problem: 'This entry shares reserved memory with another entry.',
             fix: 'Choose a non-overlapping word address, then review the placement change. No address is chosen automatically. This edits the saved plan, not an existing image.',
@@ -182,7 +176,6 @@
         if (action === 'set-policy' || action === 'select-artifact')
             html += '<label>Loading policy<select name="policy"><option value="Lazy">Lazy — not selected as a resident image body</option><option value="Resident">Resident — include in preparation</option><option value="Preload">Preload</option><option value="Empty">Empty</option></select></label>';
         if (action === 'edit-geometry') html = '<p>Declared Namespace geometry only. Image allocations are separately validated; no relocation or image rebuild is performed.</p><label>Location (word address; decimal or 0x hexadecimal)<input name="location" required></label><label>Access limit (not allocation size)<input name="limit" required></label>';
-        if (action === 'repair-binding') html = '<p>Review the binding derived from the exact saved SELF. No LUMP bytes or allocation will be changed. Other diagnostics may remain.</p>';
         dialog.querySelector('[data-fields]').innerHTML = html;
         dialog.querySelector('[data-intention]').textContent = action
             ? `Your proposed choice: ${labels[action] || action}. Not saved until you review and apply.`

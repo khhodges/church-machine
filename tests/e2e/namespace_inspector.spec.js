@@ -101,7 +101,7 @@ test('inspect and cancel are read-only; reviewed design correction preserves slo
     expect(protectedFiles.map(hash)).toEqual(before);
 });
 
-test('binding correction saves the exact token but continues to report allocation problems', async ({ page }) => {
+test('artifact lookup token is preserved while real allocation problems remain visible', async ({ page }) => {
     const directory = process.env.CHURCH_TEST_LUMPS_DIR;
     const stateFile = path.join(directory, 'ns-state.json');
     const state = JSON.parse(fs.readFileSync(stateFile));
@@ -129,20 +129,14 @@ test('binding correction saves the exact token but continues to report allocatio
     await page.waitForFunction(() => !!window.NamespaceInspector);
     await page.evaluate(() => NamespaceInspector.open(14));
     const inspector = page.locator('#namespaceInspector');
-    await inspector.locator('[data-fix-action="repair-binding"]').click();
-    await expect(inspector.locator('[data-intention]')).toContainText('Not saved');
-    await inspector.locator('[data-preview]').click();
-    await expect(inspector.locator('[data-apply]')).toBeEnabled();
-    await expect(inspector.locator('[data-review]')).toContainText('4a00000e');
-    expect(JSON.parse(fs.readFileSync(stateFile)).abstractions.find(r => r.slot === 14).token).toBe('12345678');
-    await inspector.locator('[data-apply]').click();
-    await page.getByRole('button', { name: 'Confirm this change', exact: true }).click();
-    await expect(inspector.locator('[data-status]')).toContainText('Namespace table change saved;');
-    await expect(inspector.locator('[data-status]')).toContainText(/[1-9]\d* remaining problem/);
+    await expect(inspector.locator('[data-fix-action="repair-binding"]')).toHaveCount(0);
+    await expect(inspector.locator('[data-action] option[value="repair-binding"]')).toHaveCount(0);
+    await expect(inspector.locator('[data-fix-action="edit-geometry"]').first()).toBeVisible();
+    await expect(inspector.locator('[data-content]')).not.toContainText('Namespace binding does not match');
     await expect(inspector.locator('[data-content]')).toContainText('overlaps NS[16]');
-    await expect(inspector.locator('[data-content]')).toContainText('does not repair the old committed image');
+    await expect(inspector.locator('[data-content]')).toContainText('This edits the saved plan, not an existing image.');
     const updated = JSON.parse(fs.readFileSync(stateFile)).abstractions;
-    expect(updated.find(r => r.slot === 14)).toEqual({ ...row, token: '4a00000e' });
+    expect(updated.find(r => r.slot === 14)).toEqual(row);
     expect(updated.filter(r => r.slot !== 14)).toEqual(state.abstractions.filter(r => r.slot !== 14));
     expect(protectedFiles.map(hash)).toEqual(protectedHashes);
     expect(hash(path.join(directory, filename))).toBe(binaryHash);

@@ -24,7 +24,7 @@ function setup() {
         limitations: ['Review saves only Namespace rows.', 'Image generation is a separate action.'],
         claims: { design: { reference: row.selection, status: 'verified', verified: true },
             executable: { reference: row, status: 'verified', verified: true } },
-        actions: ['keep-design', 'select-artifact', 'edit-geometry', 'repair-binding'],
+        actions: ['keep-design', 'select-artifact', 'edit-geometry'],
     };
     w.fetch = async (url, options = {}) => {
         calls.push({ url, options });
@@ -110,11 +110,10 @@ function setup() {
         const { w, calls } = setup();
         await w.NamespaceInspector.open(15);
         const select = w.document.querySelector('[data-action]');
-        select.value = 'repair-binding'; select.onchange();
-        assert.match(w.document.querySelector('[data-intention]').textContent, /Align Namespace binding with verified saved SELF/);
+        select.value = 'edit-geometry'; select.onchange();
         assert.strictEqual(calls.filter(c => c.options.method === 'POST').length, 0);
         await w.document.querySelector('[data-preview]').onclick();
-        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).action, 'repair-binding');
+        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).action, 'edit-geometry');
         const original = w.fetch;
         w.fetch = (url, init) => url.startsWith('/api/namespace/inspect')
             ? Promise.reject(new Error('Inspection unavailable')) : original(url, init);
@@ -146,7 +145,7 @@ function setup() {
         const { w, calls, inspected } = setup();
         inspected.imageSelected = false;
         inspected.issues = [
-            { code: 'simulation-descriptor-mismatch', message: 'A future binding issue.' },
+            { code: 'simulation-binding-invalid', message: 'Saved SELF does not match its slot.' },
             { code: 'saved-allocation-overlap', message: 'Saved placement overlaps another entry.' },
             { code: 'saved-geometry-incomplete', message: 'Thread geometry unavailable.' },
         ];
@@ -162,13 +161,14 @@ function setup() {
     {
         const { w, calls, inspected } = setup();
         inspected.imageSelected = true;
-        inspected.issues = [{ code: 'simulation-descriptor-mismatch', message: 'Wrong token.' }];
+        inspected.issues = [{ code: 'saved-allocation-overlap', message: 'Overlapping allocation.' }];
         await w.NamespaceInspector.open(15);
-        w.document.querySelector('[data-fix-action="repair-binding"]').click();
-        assert.strictEqual(w.document.querySelector('[data-action]').value, 'repair-binding');
+        assert.strictEqual(w.document.querySelector('[data-fix-action="repair-binding"]'), null);
+        w.document.querySelector('[data-fix-action="edit-geometry"]').click();
+        assert.strictEqual(w.document.querySelector('[data-action]').value, 'edit-geometry');
         assert.strictEqual(calls.filter(c => c.options.method === 'POST').length, 0);
         await w.document.querySelector('[data-preview]').onclick();
-        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).action, 'repair-binding');
+        assert.strictEqual(JSON.parse(calls.find(c => c.url.endsWith('resolve-preview')).options.body).action, 'edit-geometry');
     }
     {
         const { w, calls } = setup();

@@ -38,6 +38,20 @@ leaving incompatible token bindings and overlapping allocations undisclosed.
 **How to apply:** Report what was saved separately from what remains invalid.
 Never convert a successful table-save receipt into an “all fixed” claim.
 
+Artifact lookup tokens are not runtime SELF capabilities. Never require their
+equality or offer to rewrite the catalog token to cure that invented mismatch.
+Validate actual SELF ownership against the Namespace slot and sequence, and
+materialize the runtime descriptor from that verified authority.
+
+**Why:** An IDE-only equality check rejected valid Alice/Mallory LUMPs and led
+to misleading repair advice. The user explicitly required removing those
+metadata blockers and following the Namespace layout.
+
+**How to apply:** Exact Namespace-selected bytes outrank mutable catalog
+records. Honor explicit saved locations; report real full-allocation overlaps
+instead of silently relocating bodies. Keep actual integrity and capability
+checks, and preserve original artifact lookup metadata.
+
 This authority order also applies when saving LUMPs and Namespaces: an archived, missing, or
 duplicated catalog row must not veto an independently verified Namespace
 selection. Do not make catalog repair a prerequisite for a valid save.

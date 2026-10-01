@@ -21,7 +21,8 @@ from server.simulation_preparation import (
 @pytest.fixture
 def saved(tmp_path):
     # A real frozen resident identity: row zero is the full E-only SELF GT
-    # for NS[6]/sequence 0, and Namespace token supplies exactly that W3.
+    # for NS[6]/sequence 0. The runtime W3 is derived from this SELF, not
+    # from an IDE catalog token.
     raw = struct.pack(">64I", (31 << 27) | (3 << 10) | 1,
                       *([0] * 62), 0x4A000006)
     filename = "SelfTest.1.12345678.lump"
@@ -153,17 +154,15 @@ def test_unresolved_clist_cannot_trigger_later_catalog_injection(saved):
         PreparationStore().prepare(rows, cfg, root, 6)
 
 
-@pytest.mark.parametrize("defect", ["missing_self", "wrong_self", "wrong_token"])
+@pytest.mark.parametrize("defect", ["missing_self", "wrong_self"])
 def test_invalid_immutable_resident_identity_rejected_without_repair(saved, defect):
     root, rows, cfg = saved
     path = root / rows[-1]["filename"]
     words = list(struct.unpack(">64I", path.read_bytes()))
     if defect == "missing_self":
         words[0] &= ~255
-    elif defect == "wrong_self":
-        words[-1] = 0x4A000007
     else:
-        rows[-1]["token"] = "12345678"
+        words[-1] = 0x4A000007
     raw = struct.pack(">64I", *words)
     path.write_bytes(raw)
     rows[-1]["binary_hash"] = hashlib.sha256(raw).hexdigest()

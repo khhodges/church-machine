@@ -13,7 +13,10 @@ from server.artifact_revisions import RevisionStore
 from server.simulation_preparation import PreparationStore
 
 
-@pytest.mark.parametrize("defect", [None, "signature", "missing-approval", "missing-key"])
+@pytest.mark.parametrize("defect", [
+    None, "signature", "missing-approval", "missing-key",
+    "missing-catalog", "stale-catalog",
+])
 def test_published_portable_a_is_privately_bound_without_rewriting_source(
         isolated_lumps, monkeypatch, defect):
     root = isolated_lumps
@@ -71,7 +74,15 @@ def test_published_portable_a_is_privately_bound_without_rewriting_source(
             "X-Change-Confirmation": response.json["change_confirmation"]["id"]})
     assert response.status_code == 200, response.json
     saved_design = (root / "ns-state.json").read_bytes()
-    if defect:
+    invalid_evidence = defect in ("signature", "missing-approval", "missing-key")
+    if defect == "missing-catalog":
+        (root / "manifest.json").unlink()
+    elif defect == "stale-catalog":
+        (root / "manifest.json").write_text(json.dumps([
+            {"filename": saved["filename"], "token": "ffffffff", "archived": True},
+            {"filename": saved["filename"], "token": "ffffffff", "archived": True},
+        ]))
+    if invalid_evidence:
         approvals_path = root / "approvals.json"
         approvals = json.loads(approvals_path.read_text())
         approval = approvals["approvals"][saved["binary_hash"]]
@@ -84,7 +95,7 @@ def test_published_portable_a_is_privately_bound_without_rewriting_source(
         approvals_path.write_text(json.dumps(approvals))
     response = client.post("/api/simulation/prepare", json={
         "namespaceFingerprint": app_module._namespace_state_fingerprint(rows)})
-    if defect:
+    if invalid_evidence:
         assert response.status_code == 409, response.json
         assert response.json["dataChanged"] is False
         assert (root / saved["filename"]).read_bytes() == original

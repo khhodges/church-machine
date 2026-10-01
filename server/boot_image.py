@@ -2427,11 +2427,13 @@ def generate_simulation_image(cfg, lumps_dir, boot_entry_slot=None):
     """Private simulator generation; never confers hardware admission."""
     from server.simulation_preparation import validate_simulation_executable
     return _generate_boot_image(
-        cfg, lumps_dir, boot_entry_slot, True, validate_simulation_executable)
+        cfg, lumps_dir, boot_entry_slot, True, validate_simulation_executable,
+        honor_namespace_layout=True)
 
 
 def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
-                         require_entry_resident, executable_validator):
+                         require_entry_resident, executable_validator,
+                         honor_namespace_layout=False):
     """Produce the binary boot image bytes for the given config dict.
 
     `cfg` must already be Step-1 valid (target board + step1 fields).
@@ -2807,22 +2809,25 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     # Configured Step-2 tokens were validated above only for compatibility;
     # Namespace state remains the sole source used to resolve artifact bytes.
     _selected_slot_tokens = {}
-    trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
+    trusted_cache_tokens = {}
     if executable_validator is not _require_approved_executable_lump:
-        # The private simulator stage has already structurally checked every
-        # exact Namespace-selected artifact. Hardware still uses admission.
-        trusted_cache_tokens = {
-            row["slot"]: int(str(row.get("token") or row.get("cache_token")), 16)
-            for row in _bootstrap_rows
-            if image_artifact_selected(row) and row.get("filename")
-            and (row.get("token") or row.get("cache_token"))
-        }
+        # W3 is runtime capability evidence, not an IDE artifact lookup ID.
+        for row in _bootstrap_rows:
+            if image_artifact_selected(row) and row.get("filename"):
+                body = executable_validator(
+                    os.path.join(lumps_dir, row["filename"]), lumps_dir,
+                    f"NS[{row['slot']}]")
+                trusted_cache_tokens[row["slot"]] = body[len(body) - (body[0] & 255)]
+    else:
+        trusted_cache_tokens = _load_trusted_cache_token_map(_manifest_path_for_cache)
     # A frozen bootstrap resident uses its approved SELF capability as the
     # descriptor's non-authoritative cache word.  This is deliberately not
     # inferred through the ordinary artifact-token resolver: bootstrap T is a
     # capability encoding, while the resolver's cache-token convention is
     # artifact-oriented.  Its exact approval was verified above.
     for _bootstrap_slot, _bootstrap_owner in _bootstrap_by_slot.items():
+        if executable_validator is not _require_approved_executable_lump:
+            continue
         try:
             trusted_cache_tokens[_bootstrap_slot] = int(
                 str(_bootstrap_owner["token"]), 16) & 0xFFFFFFFF
@@ -2909,6 +2914,37 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     clist_gts = []
     running_offset = NAMESPACE_HEADER_V2_WORDS
     locations = {}                              # idx -> location word
+    _simulation_ranges = [(0, NAMESPACE_HEADER_V2_WORDS, 0)]
+
+    def _namespace_location(slot, fallback):
+        if not honor_namespace_layout:
+            return fallback
+        row = _state_by_slot.get(slot, {})
+        if "location" not in row:
+            return fallback
+        value = row["location"]
+        try:
+            location = int(value, 0) if isinstance(value, str) else value
+        except ValueError:
+            location = None
+        if type(location) is not int or location < 0:
+            raise ValueError(f"NS[{slot}] saved Namespace location must be a nonnegative word address")
+        return location
+
+    def _claim_simulation_range(slot, location, size):
+        if not honor_namespace_layout:
+            return
+        end = location + size
+        if location < NAMESPACE_HEADER_V2_WORDS or end > _metadata_start:
+            raise ValueError(
+                f"NS[{slot}] saved Namespace allocation [0x{location:X},0x{end:X}) "
+                "overlaps the reserved header/table or exceeds image bounds; review Namespace placement")
+        for start, stop, other in _simulation_ranges:
+            if location < stop and end > start:
+                raise ValueError(
+                    f"NS[{slot}] saved Namespace allocation [0x{location:X},0x{end:X}) "
+                    f"overlaps NS[{other}] [0x{start:X},0x{stop:X}); review Namespace placement")
+        _simulation_ranges.append((location, end, slot))
     for i, entry in enumerate(catalog):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
         assigned = _state_by_slot.get(i)
@@ -2936,9 +2972,13 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
             # Namespace Header V2 has a real physical block before the table.
             # runningOffset is NOT advanced so Thread (slot 1) naturally gets loc=0.
             loc = ns_header_base
+            if _namespace_location(i, loc) != loc:
+                raise ValueError("NS[0] saved Namespace location disagrees with the architectural header")
         elif i in _MMIO_SLOT_SPECS and i != _selftest_slot:
             # MMIO NS slot: physical MMIO byte address, no RAM body allocated.
             loc = _MMIO_SLOT_SPECS[i][0]
+            if _namespace_location(i, loc) != loc:
+                raise ValueError(f"NS[{i}] saved Namespace location disagrees with its architectural MMIO address")
             # Don't advance running_offset (no RAM reservation for MMIO).
         else:
             if override is not None:
@@ -2948,6 +2988,11 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                 running_offset += my_size
             else:
                 loc = 0   # placeholder; NS entry not written (bitstream fills it)
+            if not bitstream_only:
+                loc = _namespace_location(i, loc)
+                _claim_simulation_range(i, loc, my_size)
+                if honor_namespace_layout:
+                    running_offset = max(running_offset, loc + my_size)
         locations[i] = loc
 
         # Slot 0: limit covers the NS TABLE region (NS_TABLE_RESERVE words).
@@ -2979,7 +3024,8 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     # SelfTest is not a catalog-position body.  Its authoritative Namespace
     # state selects both its slot and the exact approved allocation, so place
     # it in the same running resident pool as other executable bodies.
-    _selftest_loc = running_offset
+    _selftest_loc = _namespace_location(_selftest_slot, running_offset)
+    _claim_simulation_range(_selftest_slot, _selftest_loc, actual_abstr_size)
     _selftest_end = _selftest_loc + actual_abstr_size
     if _selftest_end > _metadata_start:
         raise ValueError(
@@ -2992,7 +3038,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         (actual_abstr_size - 1) & 0x1FFFF, 0, 0, 1, _selftest_sequence, 0,
         trusted_cache_tokens.get(_selftest_slot, 0))
     locations[_selftest_slot] = _selftest_loc
-    running_offset = _selftest_end
+    running_offset = max(running_offset, _selftest_end) if honor_namespace_layout else _selftest_end
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
     # All 11 catalog entries are non-null (slots 0–10). This must match simulator.js nsCount.
@@ -3006,7 +3052,8 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     # simulator.js fallback initialization exactly.
     extra_thread_locs = []
     for _ordinal, _thread_slot in enumerate(_generated_thread_slots, start=2):
-        _thread_loc = running_offset
+        _thread_loc = _namespace_location(_thread_slot, running_offset)
+        _claim_simulation_range(_thread_slot, _thread_loc, thread_size)
         _thread_end = _thread_loc + thread_size
         # Keep all resident bodies below the three metadata sentinel words.
         if _thread_end > _metadata_start:
@@ -3018,10 +3065,11 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                 f"totalNamespaceWords."
             )
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _thread_slot, _thread_loc,
-                       (thread_size - 1) & 0x1FFFF, 0, 0, 1, 0, 0, 0)
+                       (thread_size - 1) & 0x1FFFF, 0, 0, 1,
+                       retained_sequences.get(_thread_slot, 0) if honor_namespace_layout else 0, 0, 0)
         locations[_thread_slot] = _thread_loc
         extra_thread_locs.append(_thread_loc)
-        running_offset = _thread_end
+        running_offset = max(running_offset, _thread_end) if honor_namespace_layout else _thread_end
         ns_count = max(ns_count, _thread_slot + 1)
 
     # The catalog loop has reserved RAM for all fixed catalog bodies and the

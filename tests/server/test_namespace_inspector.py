@@ -22,7 +22,7 @@ from server.change_confirmation import install
 @pytest.fixture
 def data(tmp_path):
     binary = struct.pack(">64I", (31 << 27) | (1 << 10), *([0] * 63))
-    name = "owner.Sample.1.exact.lump"
+    name = f"owner.Sample.1.{hashlib.sha256(b'owner.Sample' + binary).hexdigest()[:8]}.lump"
     (tmp_path / name).write_bytes(binary)
     digest = hashlib.sha256(binary).hexdigest()
     artifact = dict(filename=name, token="12345678", binary_hash=digest)
@@ -93,7 +93,7 @@ def test_exact_selection_and_policy_not_latest(data):
         binaryHash=artifact["binary_hash"], policy="Lazy"), root)
     after = result["after"]
     assert after["filename"] == artifact["filename"]
-    assert after["lump_version"] == 4
+    assert "lump_version" not in after  # Catalog history is not revision authority.
     assert after["resident"] is False and after["load_policy"] == "Lazy"
     assert not any(k in after for k in ("selection", "symbolic", "implementationMissing", "loadPolicy"))
     assert after["seq"] == 7 and after["location"] == rows[-1]["location"]
@@ -102,7 +102,7 @@ def test_exact_selection_and_policy_not_latest(data):
 
 @pytest.mark.parametrize("change", [
     {"filename": "missing.lump"}, {"binaryHash": "0" * 64},
-    {"token": "ffffffff"}, {"filename": "../escape.lump"},
+    {"token": "not-a-token"}, {"filename": "../escape.lump"},
 ])
 def test_missing_digest_or_identity_mismatch_rejected(data, change):
     root, rows, artifact = data
@@ -217,7 +217,7 @@ def legacy_assignment(root, slot=15, sequence=0, self_gt=None):
     words = [(31 << 27) | (1 << 10) | 1] + [0] * 63
     words[-1] = self_gt if self_gt is not None else 0x4A000000 | (sequence << 16) | slot
     raw = struct.pack(">64I", *words)
-    filename = f"Sample{slot}.1.1234abcd.lump"
+    filename = f"Sample{slot}.1.{hashlib.sha256(f'Sample{slot}'.encode() + raw).hexdigest()[:8]}.lump"
     (root / filename).write_bytes(raw)
     return dict(slot=slot, seq=sequence, name=f"Sample{slot}", type="Inform",
                 filename=filename, binary_hash=hashlib.sha256(raw).hexdigest(),
@@ -225,18 +225,15 @@ def legacy_assignment(root, slot=15, sequence=0, self_gt=None):
                 limit=1, resident=True, load_policy="Resident", seal="0xDEADBEEF")
 
 
-def test_binding_repair_exact_bytes_only_preserves_every_other_field(tmp_path):
+def test_lookup_token_is_not_runtime_self_and_cannot_be_rewritten(tmp_path):
     row = legacy_assignment(tmp_path, sequence=3)
     rows = [row]
     before = {p: p.read_bytes() for p in tmp_path.iterdir()}
     view = inspect_namespace(rows, 15, tmp_path)
-    assert "simulation-descriptor-mismatch" in {i["code"] for i in view["issues"]}
-    assert "repair-binding" in view["actions"]
-    preview = preview_resolution(rows, proposal(rows, "repair-binding"), tmp_path)
-    expected = dict(row, token="4a03000f", cache_token="4a03000f")
-    assert preview["after"] == expected
-    assert {c["field"] for c in preview["changes"]} == {"token", "cache_token"}
-    assert not any(i["code"] == "simulation-descriptor-mismatch" for i in preview["issues"])
+    assert not any(i["code"].startswith("simulation-") for i in view["issues"])
+    assert "repair-binding" not in view["actions"]
+    with pytest.raises(ValueError):
+        preview_resolution(rows, proposal(rows, "repair-binding"), tmp_path)
     assert before == {p: p.read_bytes() for p in tmp_path.iterdir()}
     assert row["token"] == "12345678"
 
@@ -255,7 +252,9 @@ def test_binding_repair_refuses_unproven_inputs(tmp_path, change):
         row["type"] = "Other"
     if change == "seq":
         row["seq"] = 1
-    assert "repair-binding" not in inspect_namespace([row], 15, tmp_path)["actions"]
+    view = inspect_namespace([row], 15, tmp_path)
+    assert "repair-binding" not in view["actions"]
+    assert any(i["code"].startswith("simulation-") for i in view["issues"])
     with pytest.raises(ValueError):
         preview_resolution([row], proposal([row], "repair-binding"), tmp_path)
 
@@ -303,6 +302,36 @@ def test_select_canonical_artifact_preserves_issue_without_catalog_issue(tmp_pat
         filename=row["filename"], token=row["token"], binaryHash=row["binary_hash"],
         policy="Resident"), tmp_path)
     assert preview["after"]["issue_n"] == 1
+
+
+def test_exact_namespace_selection_does_not_depend_on_catalog(tmp_path):
+    row = legacy_assignment(tmp_path)
+    row["lump_version"] = 8
+    row["name"] = "User chosen Pet Name"
+    original = copy.deepcopy(row)
+    options = dict(filename=row["filename"], token=row["token"],
+                   binaryHash=row["binary_hash"], policy="Resident")
+    # Absent catalog, then conflicting duplicated metadata, cannot veto bytes.
+    for catalog in (None, [dict(filename=row["filename"], token="ffffffff",
+                               abstraction="Wrong name", archived=True)] * 2):
+        if catalog is not None:
+            (tmp_path / "manifest.json").write_text(json.dumps(catalog))
+        after = preview_resolution([row], proposal([row], "select-artifact", **options), tmp_path)["after"]
+        assert after["token"] == row["token"]
+        assert after["name"] == row["name"]
+        assert after["lump_version"] == 8
+        assert after["issue_n"] == 1
+        assert row == original
+
+
+def test_new_selection_rejects_filename_not_bound_to_bytes(tmp_path):
+    row = legacy_assignment(tmp_path)
+    wrong = "Other.1.12345678.lump"
+    (tmp_path / wrong).write_bytes((tmp_path / row["filename"]).read_bytes())
+    with pytest.raises(ValueError, match="canonical filename"):
+        preview_resolution([row], proposal([row], "select-artifact",
+            filename=wrong, token=row["token"], binaryHash=row["binary_hash"],
+            policy="Resident"), tmp_path)
 
 
 def test_keep_design_without_nested_selection_requires_explicit_choice(tmp_path):
