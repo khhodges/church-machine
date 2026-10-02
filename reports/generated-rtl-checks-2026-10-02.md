@@ -5,6 +5,11 @@
 **33 generated SystemVerilog replays passed:** 28 full-core runs across Full
 and IoT profiles, plus five standalone TPERM EXACT comparisons.
 
+**The same 33 checks also passed using the actual Wukong release converter**
+on temporary RTLIL inputs. Five unit checks and three core checks completed
+before the first command hit its five-minute execution limit; the remaining
+25 core checks completed in a background continuation with exit code 0.
+
 The test harness runs the existing Amaranth benches with their independent
 assertions, records every input write, clock step, and observed value, then
 replays that sequence in Icarus against freshly emitted RTL. Four-state case
@@ -40,6 +45,23 @@ This is a separate simulation/emission finding. It does **not** demonstrate
 that an existing FPGA bitstream has a boot defect, nor certify the release
 pipeline. No production emitter was changed to conceal the failure.
 
+## Release-converter verification
+
+The replay harness now supports `--release-converter`, which calls
+`hardware.gen_rtlil._rtlil_to_verilog` directly. This uses the release
+pipeline's full `proc`, flattening, optimization, and `techmap` passes, then
+plain-Verilog emission and its existing cell-fixup functions. Converter
+failure is fatal: there is no fallback to SystemVerilog. Repeated identical
+RTLIL inputs may reuse converted text within the process, keyed by SHA-256.
+
+All selected replays passed without changing the release converter or dialect.
+The default converter's boot simulation failure did not reproduce through
+these release conversion stages. No release-emitter correction is justified
+by that earlier failure alone.
+
+This checks instrumented Full/IoT cores and the EXACT unit, not the complete
+Wukong board top, checked-in release artifacts, or a physical FPGA.
+
 ## Reproduction
 
 ```sh
@@ -51,6 +73,9 @@ python3 scripts/check_corrected_generated_rtl.py --exact-unit-only
 
 # Default plain-Verilog mode (expected full-core boot failure):
 python3 scripts/check_corrected_generated_rtl.py --plain-verilog
+
+# All 33 checks through the actual release converter (allow more than five minutes):
+python3 scripts/check_corrected_generated_rtl.py --release-converter
 ```
 
 Environment: Amaranth 0.5.9, system Yosys 0.51, Icarus Verilog 12.0.
@@ -67,6 +92,5 @@ a reported `/tmp/church-rtl-failure-*` directory.
 - The two previously reported stale SelfTest trace expectations remain outside
   this verification-only change.
 
-Next: verify and correct the actual release RTL emission path's constant
-combinational assignments, then repeat the same checks in that exact dialect
-and pipeline before considering hardware release.
+Remaining coverage includes successful LOAD/SAVE completion and complete-board
+verification. These results do not constitute hardware release approval.

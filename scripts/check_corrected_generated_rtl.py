@@ -5,6 +5,7 @@ synthesis, saved image regeneration, or hardware connection is performed.
 """
 import importlib.util
 import argparse
+import hashlib
 import pathlib
 import shutil
 import subprocess
@@ -43,6 +44,8 @@ class ReplayDesign(Elaboratable):
 
 class Recorder:
     write_verilog_opts = ("-sv",)
+    release_converter = False
+    release_rtl_cache = {}
 
     def __init__(self, core):
         self.core = core
@@ -100,8 +103,10 @@ class Recorder:
         design = ReplayDesign(self.model._design.fragment, self.reads, self.writes)
         # SystemVerilog always_comb executes constant-only combinational blocks
         # once at time zero; Verilog always @* has an empty sensitivity list.
-        il = rtlil.convert(design, name="dut", ports=ports)
-        rtl = verilog._convert_rtlil_text(il, write_verilog_opts=self.write_verilog_opts)
+        il = rtlil.convert(design, name="top" if self.release_converter else "dut",
+                           ports=ports)
+        rtl = (None if self.release_converter else
+               verilog._convert_rtlil_text(il, write_verilog_opts=self.write_verilog_opts))
         declarations = ["reg clk=0;", "reg rst=0;"]
         bindings = [".clk(clk)", ".rst(rst)"]
         for i, signal in enumerate(self.writes):
@@ -128,7 +133,20 @@ class Recorder:
                         "end endmodule"]))
         with tempfile.TemporaryDirectory(prefix="church-rtl-") as directory:
             path = pathlib.Path(directory)
-            (path / "dut.v").write_text(rtl)
+            if self.release_converter:
+                from hardware.gen_rtlil import _rtlil_to_verilog
+                key = hashlib.sha256(il.encode()).hexdigest()
+                if key in self.release_rtl_cache:
+                    (path / "dut.v").write_text(self.release_rtl_cache[key])
+                else:
+                    (path / "dut.il").write_text(il)
+                    result = _rtlil_to_verilog(str(path / "dut.il"),
+                                              str(path / "dut.v"), module_name="dut")
+                    if result is None:
+                        raise RuntimeError("Release RTL converter failed; no fallback is allowed")
+                    self.release_rtl_cache[key] = (path / "dut.v").read_text()
+            else:
+                (path / "dut.v").write_text(rtl)
             (path / "tb.v").write_text(tb)
             compiled = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(path / "sim"),
                             str(path / "dut.v"), str(path / "tb.v")],
@@ -156,12 +174,18 @@ def load(name, filename):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--plain-verilog", action="store_true",
+    emitters = parser.add_mutually_exclusive_group()
+    emitters.add_argument("--plain-verilog", action="store_true",
                         help="Reproduce default Verilog emission, including its boot simulation failure")
+    emitters.add_argument("--release-converter", action="store_true",
+                          help="Use the actual Wukong RTLIL-to-Verilog converter on temporary inputs")
     parser.add_argument("--exact-unit-only", action="store_true")
     args = parser.parse_args()
     if args.plain_verilog:
         Recorder.write_verilog_opts = ()
+    Recorder.release_converter = args.release_converter
+    print("Emitter: " + ("Wukong release converter" if args.release_converter else
+                         "plain Verilog" if args.plain_verilog else "SystemVerilog"), flush=True)
     compact = load("compact", "tests/hardware/test_compact_index_core.py")
     exact = load("exact", "tests/hardware/test_tperm_exact_core.py")
     for delta in (0, 1, 1 << 16, 1 << 28, 1 << 31):
