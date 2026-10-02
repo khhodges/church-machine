@@ -75,6 +75,43 @@ def namespace_fingerprint(entries):
     ).encode("utf-8")).hexdigest()
 
 
+def namespace_removal_generations(state, rows):
+    """Retain local binding generations without retaining absent descriptors.
+
+    Exhaustion fails closed: wrapping the nine-bit sequence could grant an old
+    capability authority over a different object. The library is not modified.
+    """
+    before = {row["slot"]: row for row in state["abstractions"]}
+    after = {row["slot"]: row for row in rows}
+    generations = dict(state.get("freeSlotSequences", {}))
+    for key, value in generations.items():
+        if (not isinstance(key, str) or not key.isdecimal() or str(int(key)) != key
+                or int(key) < 2 or type(value) is not int or not 0 <= value <= 512):
+            raise ValueError("Invalid retained Namespace binding generation")
+    for slot, old in before.items():
+        if slot in after:
+            continue
+        if slot in (0, 1):
+            raise ValueError(f"NS[{slot}] is foundational and cannot be cleared")
+        if old.get("boot") is True:
+            raise ValueError(f"NS[{slot}] is the selected boot entry; select a different boot entry explicitly before clearing")
+        seq = old.get("seq", 0)
+        seq = int(seq, 0) if isinstance(seq, str) and seq.startswith("0x") else int(seq)
+        generations[str(slot)] = seq + 1
+    for slot, row in after.items():
+        if slot in before or str(slot) not in generations:
+            continue
+        seq = generations[str(slot)]
+        if seq > 511:
+            raise ValueError(f"NS[{slot}] binding generation exhausted; choose another slot")
+        supplied = row.get("seq", 0)
+        supplied = int(supplied, 0) if isinstance(supplied, str) and supplied.startswith("0x") else int(supplied)
+        if supplied != seq:
+            raise ValueError(f"NS[{slot}] requires retained binding generation {seq}; reload before installing")
+        del generations[str(slot)]
+    return generations
+
+
 def validate_namespace_rows(entries, max_slots=256):
     """Reject contradictory assignments; do not infer, hydrate, or mutate rows."""
     if not isinstance(entries, list):

@@ -1058,9 +1058,10 @@ function _nsSavedLoadPolicy(slot, manifest) {
         (cfg.slotRules[String(slot)] || cfg.slotRules[slot]);
     const savedValue = valid.includes(slotRuleValue)
         ? slotRuleValue : saved && (saved.loadPolicy || saved.load_policy);
-    const authorityRows = window._nsState &&
+    const authorityRows = (window._nsState &&
         Array.isArray(window._nsState.abstractions)
-        ? window._nsState.abstractions : [];
+        ? window._nsState.abstractions : []).filter(row =>
+            !(window._nsDeletedSlots || {})[String(row.slot)]);
     const authorityRow = authorityRows.find(row => row &&
         Number(row.slot) === Number(slot)) || null;
     const authorityValue = authorityRow &&
@@ -1120,6 +1121,9 @@ function _namespaceSummarySnapshot() {
         const slot = Number(rawSlot);
         if (Number.isInteger(slot)) lastRelevantSlot = Math.max(lastRelevantSlot, slot);
     });
+    Object.keys(window._nsDeletedSlots || {}).concat(
+        Object.keys(window._nsState && window._nsState.freeSlotSequences || {}))
+        .forEach(key => { lastRelevantSlot = Math.max(lastRelevantSlot, Number(key)); });
 
     const displayCount = Math.min(max, Math.max(0, lastRelevantSlot + 1));
     const slots = [];
@@ -4469,7 +4473,7 @@ function updateNamespace() {
         const _assignedRows = window._nsState &&
             Array.isArray(window._nsState.abstractions)
             ? window._nsState.abstractions : [];
-        const _assignedRow = _assignedRows.find(function(row) {
+        const _assignedRow = (window._nsDeletedSlots || {})[String(i)] ? null : _assignedRows.find(function(row) {
             return row && Number(row.slot) === Number(i);
         }) || null;
         const _inspectButton = _assignedRow
@@ -4488,10 +4492,14 @@ function updateNamespace() {
             } else if (_gapLabel) {
                 html += `<td class="ns-label ns-label-clickable" style="color:#666;font-style:italic;cursor:pointer;text-decoration:underline dotted;" onclick="_nsLabelOpen(${i})" title="Open ${_escHtml(_gapLabel)}">${_escHtml(_gapLabel)}</td>`;
                 html += `<td colspan="7" style="color:#555;font-style:italic;font-size:0.8rem;">Assigned in approved Namespace; no matching runtime entry</td>`;
+            } else if ((window._nsDeletedSlots || {})[String(i)]) {
+                html += '<td colspan="8">Removal staged — Save Namespace to commit. Stored image and running machine unchanged.</td>';
             } else {
                 html += `<td colspan="8" style="color:#555;font-style:italic;font-size:0.8rem;">(no entry installed)</td>`;
             }
-            html += `<td class="ns-entry-actions">${_inspectButton}</td>`;
+            html += `<td class="ns-entry-actions">${_inspectButton}${
+                _assignedRow && i >= 2 && !_assignedRow.boot
+                    ? `<button onclick="_nsTableClear(${i})">Clear</button>` : ''}</td>`;
             html += '</tr>';
             continue;
         }
@@ -4850,7 +4858,7 @@ function _nsTableAdd() {
                     <input id="_nsPlacementName" placeholder="Example.Service" oninput="_nsUpdatePlacementButton()" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
                 </label>
                 <label style="display:block;margin-bottom:8px;">Design-time slot (blank = first free)
-                    <input id="_nsPlacementSlot" type="number" min="${sim.firstUserNsSlot()}" max="${sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
+                    <input id="_nsPlacementSlot" type="number" min="2" max="${sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
                 </label>
                 <div style="font-size:0.74rem;color:#f0a040;margin-bottom:8px;">Add to Namespace saves the selection without executing or changing its saved bytes. Install executable is a separate advanced action requiring exact compiler-approved, unmodified binary bytes.</div>
                 <div id="_nsAddMeta" style="margin-bottom:8px;"></div>
@@ -4893,7 +4901,7 @@ function _nsTableAdd() {
                 slot.id = '_nsPlacementSlot';
                 slot.type = 'number';
                 slot.placeholder = 'Slot (blank = first free)';
-                slot.min = sim.firstUserNsSlot();
+                slot.min = 2;
                 slot.max = sim.MAX_NS_ENTRIES - 1;
                 slot.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:8px;';
                 const error = document.createElement('div');
@@ -4949,10 +4957,10 @@ async function _nsAddPlacementConfirm() {
             selection.binaryHash = record.binary_hash;
         }
         if (btn) { btn.disabled = true; btn.textContent = 'Saving placement…'; }
-        const result = sim.defineSymbolicAbstraction(nameEl.value,
+        const result = _nsStageDesignPlacement(nameEl.value,
             slotText ? Number(slotText) : null, selection);
         window._nsDraftAssignments = window._nsDraftAssignments || {};
-        window._nsDraftAssignments[result.slot] = { name: result.name, slot: result.slot };
+        window._nsDraftAssignments[result.slot] = result;
         _setNsDirty(true);
         updateNamespace();
         const saved = await window._nsTableSave(document.getElementById('nsSaveBtn'));
@@ -5241,7 +5249,7 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
                 </div>
                 <div>
                     <span style="${sLabel}">NS Slot</span>
-                    <input type="number" id="_nsSlotInput" min="11" max="${sim.MAX_NS_ENTRIES - 1}"
+                    <input type="number" id="_nsSlotInput" min="2" max="${sim.MAX_NS_ENTRIES - 1}"
                            placeholder="Auto-assign" value="${nsSlotVal}" style="${sInput}">
                     <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Blank = auto (first free slot ≥ 11)</div>
                 </div>
@@ -5312,8 +5320,8 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
 function _nsFindDraftSlot() {
     const rows = _nsTableRowsForSave(window._nsState);
     const assigned = new Set(rows.map(row => Number(row.slot)));
-    for (let slot = sim.firstUserNsSlot(); slot < sim.MAX_NS_ENTRIES; slot++) {
-        if (!assigned.has(slot) && !sim.isNSEntryValid(slot)) return slot;
+    for (let slot = 2; slot < sim.MAX_NS_ENTRIES; slot++) {
+        if (!assigned.has(slot) && _nsDraftSequence(slot) <= 511) return slot;
     }
     return null;
 }
@@ -5360,7 +5368,7 @@ function _nsTableAddConfirm() {
     let userSlot = null;
     if (slotInputVal !== '') {
         userSlot = parseInt(slotInputVal, 10);
-        const firstUserSlot = sim.firstUserNsSlot();
+        const firstUserSlot = 2;
         if (isNaN(userSlot) || userSlot < firstUserSlot || userSlot >= sim.MAX_NS_ENTRIES) {
             if (errEl) errEl.textContent = `Slot must be between ${firstUserSlot} and ${sim.MAX_NS_ENTRIES - 1}.`;
             return;
@@ -5371,7 +5379,7 @@ function _nsTableAddConfirm() {
             ((occupiedSymbolic.selection && occupiedSymbolic.selection.token === token) ||
              (String(occupiedSymbolic.name).toLowerCase() === String(installCanonicalName).toLowerCase() &&
               (!occupiedSymbolic.selection || !occupiedSymbolic.selection.token)));
-        if (sim.isNSEntryValid(userSlot) && !replacesMatchingSymbolic) {
+        if (_nsTableRowsForSave(window._nsState).some(row => row.slot === userSlot) && !replacesMatchingSymbolic) {
             if (errEl) errEl.textContent = `Slot ${userSlot} is already occupied. Choose a free slot.`;
             return;
         }
@@ -5502,6 +5510,9 @@ function _nsTableAddConfirm() {
             ? sim.parseNSWord1(sim.memory[sim._nsSlotBase(_sourceSelfSlot) + 1] >>> 0).gtSeq
             : NaN;
         const _identity = sim._mintOrdinaryLumpIdentity(words, slot, lumpBase, {
+            // This is a private, non-installing validation of the saved design,
+            // not the potentially older descriptor in the executing image.
+            destinationSequence: _nsDraftSequence(slot),
             // A compiler marker cannot be bypassed by selecting an Outform in
             // the modal.  Raw assembly remains an explicit non-ordinary layout.
             architectural: hdr.typ !== 0 || (gtType !== 1 && !_compilerOwnedSelf),
@@ -5613,11 +5624,14 @@ function _nsTableAddConfirm() {
         //   • secure Outform → cache tag T (cacheToken32) — the canonical W3.
         //   • Inform / legacy → cache token when available, else 0.  W3 no longer
         //     carries an Abstract GT (Task #2862 W3=cache_token migration).
-        const slotGtSeq = sim._nsSequenceForWrite(slot);
+        const slotGtSeq = _nsDraftSequence(slot);
 
         // Stage only a descriptor proposal. The locked server commit rechecks
         // complete allocations; even successful table Save does not install it.
         const draftSeq = _identity.ordinary ? _identity.entry.seq : slotGtSeq;
+        if (slotGtSeq > 511 || draftSeq !== slotGtSeq) {
+            throw new Error(`NS[${slot}] requires binding generation ${slotGtSeq}. This saved LUMP's old local binding cannot be reused; select a destination-bound artifact.`);
+        }
         const draftHex = value => '0x' + (value >>> 0).toString(16).toUpperCase().padStart(8, '0');
         window._nsExplicitArtifactBindings[String(slot)] = Object.assign(
             {}, listed, _idMeta, {
@@ -5639,6 +5653,7 @@ function _nsTableAddConfirm() {
                 resident: loadPolicy === 'Resident',
                 boot_resident: loadPolicy === 'Resident',
             });
+        if (window._nsDeletedSlots) delete window._nsDeletedSlots[String(slot)];
 
         // Stage the label in the one reviewed Namespace save. Never PATCH the
         // live boot configuration before exact binary approval has committed.
@@ -5852,11 +5867,25 @@ async function _nsKeepPendingAsPlacement(slot) {
 function _nsTableClear(slot) {
     if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Clear Namespace descriptor')) return false;
     if (!sim) return;
-    // Namespace allocation owns the reserved catalog boundary. Do not repeat
-    // that boundary here as a numeric range; the simulator is authoritative.
-    const firstUserSlot = typeof sim.firstUserNsSlot === 'function'
-        ? sim.firstUserNsSlot() : null;
-    if (Number.isInteger(firstUserSlot) && slot < firstUserSlot) return;
+    if (!Number.isInteger(slot) || slot < 2 || slot >= sim.MAX_NS_ENTRIES) return false;
+    const saved = window._nsState;
+    if (saved && Array.isArray(saved.savedAbstractions)) {
+        const row = _nsTableRowsForSave(saved).find(row => row.slot === slot);
+        if (!row) return false;
+        if (row.boot === true) {
+            window.alert('Select a different boot entry explicitly before clearing this slot. Nothing changed.');
+            return false;
+        }
+        // Design edits must not splice descriptors into the executing machine.
+        window._nsDeletedSlots = window._nsDeletedSlots || {};
+        window._nsDeletedSlots[String(slot)] = true;
+        if (window._nsExplicitArtifactBindings) delete window._nsExplicitArtifactBindings[String(slot)];
+        if (window._nsDraftAssignments) delete window._nsDraftAssignments[String(slot)];
+        _setNsDirty(true);
+        if (typeof updateNamespace === 'function') updateNamespace();
+        return true;
+    }
+    if (slot === sim.bootEntrySlot) return false;
 
     // A free entry must be all-zero so the shared allocator can reuse it.
     // clearNSEntry keeps the bumped generation out-of-band until reissue.
@@ -5887,6 +5916,36 @@ function _nsTableClear(slot) {
     window._nsDeletedSlots[String(slot)] = true;
     _setNsDirty(true);
     if (typeof updateNamespace === 'function') updateNamespace();
+}
+
+function _nsDraftSequence(slot) {
+    const state = window._nsState || {};
+    const old = (state.savedAbstractions || []).find(row => row.slot === slot);
+    if ((window._nsDeletedSlots || {})[String(slot)] && old) return Number(old.seq || 0) + 1;
+    const retained = (state.freeSlotSequences || {})[String(slot)];
+    return Number.isInteger(retained) ? retained :
+        Array.isArray(state.savedAbstractions) ? Number(old && old.seq || 0) :
+        sim._nsSequenceForWrite(slot);
+}
+
+function _nsStageDesignPlacement(name, slot, selection) {
+    if (!window._nsState || !Array.isArray(window._nsState.savedAbstractions)) {
+        return sim.defineSymbolicAbstraction(name, slot, selection);
+    }
+    name = String(name || '').trim();
+    if (!name || name.length > 128 || /[\u0000-\u001f\u007f]/.test(name)) {
+        throw new Error('Enter a bounded, nonempty pet name.');
+    }
+    if (slot === null) slot = _nsFindDraftSlot();
+    if (!Number.isInteger(slot) || slot < 2 || slot >= sim.MAX_NS_ENTRIES ||
+            _nsTableRowsForSave(window._nsState).some(row => row.slot === slot)) {
+        throw new Error('Choose a free non-foundational Namespace slot.');
+    }
+    const seq = _nsDraftSequence(slot);
+    if (seq > 511) throw new Error('Binding generation exhausted; choose another slot.');
+    return {name, slot, seq, symbolic: true, implementationMissing: true,
+        resident: false, load_policy: 'Lazy', type: 'Inform', selection,
+        location: 0, limit: 0, seal: 0, f: 0, g: 0};
 }
 
 // Capture only authoritative rows and explicit drafts. Runtime descriptors are

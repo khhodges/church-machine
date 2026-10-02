@@ -293,3 +293,102 @@ def test_hardware_executable_admission_still_rejects_unattested_bytes(tmp_path):
             "grants": ["E"], "capability_type": "inform"}}}))
     with pytest.raises(ValueError, match="artifact lacks authenticated compiler or bootstrap provenance"):
         _require_approved_executable_lump(str(path), str(tmp_path), "test Alice")
+
+
+def test_clear_tunnel_save_reload_and_reuse_generation(isolated):
+    app, _, state, paths, scope = isolated
+    rows = [
+        dict(slot=0, name="Boot.NS", seq=0),
+        dict(slot=1, name="Boot.Thread", seq=0),
+        dict(slot=6, name="Boot.Target", seq=0, boot=True),
+        dict(slot=8, name="Tunnel", seq=7),
+    ]
+    state.write_text(json.dumps({"abstractions": rows}))
+    original = snapshot(paths)
+    client = app.test_client()
+    def save(proposed, fingerprint):
+        payload = dict(namespaceFingerprint=fingerprint, ns_state={"abstractions": proposed})
+        pending = review(client, payload)
+        return client.post("/api/namespace/save-table", json=payload, headers={
+            "X-Change-Confirmation": pending["id"]})
+    response = save(rows[:-1], namespace_fingerprint(rows))
+    assert response.status_code == 200, response.json
+    restored = client.get("/api/boot-image/ns-state").json
+    assert restored["abstractions"] == rows[:-1]
+    assert restored["freeSlotSequences"] == {"8": 8}
+    # Boot-marker / resident-publication document rebuilds must not erase the
+    # tombstone. Exercise the actual shared builder without importing live app.
+    tree = ast.parse((Path(__file__).resolve().parents[2] / "server/app.py").read_text())
+    builder = next(n for n in tree.body if isinstance(n, ast.FunctionDef)
+                   and n.name == "_build_ns_state_document")
+    scope["_validate_namespace_publication"] = lambda rows: None
+    scope["BOOT_IMAGE_PATH"] = str(state.parent / "absent-image.bin")
+    exec(compile(ast.Module(body=[builder], type_ignores=[]), "<state builder>", "exec"), scope)
+    rebuilt = scope["_build_ns_state_document"](restored["savedAbstractions"])
+    assert rebuilt["freeSlotSequences"] == {"8": 8}
+    assert rebuilt["save_mode"] == "table-only"
+    state.write_text(json.dumps(rebuilt))
+    for path in paths:
+        if path != state:
+            assert path.read_bytes() == original[str(path)]
+    stale = dict(slot=8, name="Replacement", seq=7)
+    payload = dict(namespaceFingerprint=restored["namespaceFingerprint"],
+                   ns_state={"abstractions": rows[:-1] + [stale]})
+    assert client.post("/api/namespace/save-table", json=payload).status_code == 409
+    assert save(rows[:-1] + [dict(stale, seq=8)], restored["namespaceFingerprint"]).status_code == 200
+    assert client.get("/api/boot-image/ns-state").json["abstractions"][-1]["seq"] == 8
+
+
+@pytest.mark.parametrize("slot", [0, 1, 6])
+def test_clear_protected_assignment_never_issues_review(isolated, slot):
+    app, _, state, paths, scope = isolated
+    rows = [dict(slot=0, name="Boot.NS"), dict(slot=1, name="Boot.Thread"),
+            dict(slot=6, name="Target", boot=True)]
+    state.write_text(json.dumps({"abstractions": rows}))
+    before = snapshot(paths)
+    payload = dict(namespaceFingerprint=namespace_fingerprint(rows),
+                   ns_state={"abstractions": [row for row in rows if row["slot"] != slot]})
+    assert app.test_client().post("/api/namespace/save-table", json=payload).status_code == 409
+    assert snapshot(paths) == before
+
+
+def test_clear_save_reload_refresh_preserves_library_and_retained_ranges(isolated):
+    from server.namespace_image_refresh import RefreshStore, reconstruct
+    app, _, state, paths, scope = isolated
+    cfg = {"step1": {"totalNamespaceWords": 8192, "nsSlotsMax": 64,
+                     "threadLumpWords": 256, "threadStackWords": 32}}
+    rows = [dict(slot=0, name="Boot.NS", type="Namespace", location=0, limit=4095, seq=0),
+            dict(slot=1, name="Boot.Thread", type="Thread", location=512, limit=7, seq=0)]
+    for slot, name, location in [(6, "Target", 1024), (8, "Tunnel", 1280)]:
+        raw = struct.pack(">64I", (31 << 27) | (1 << 10) | 1,
+                          0x18000000, *([0] * 61), 0x4a000000 | slot)
+        filename = name + ".lump"
+        (state.parent / filename).write_bytes(raw)
+        rows.append(dict(slot=slot, name=name, location=location, limit=1, seq=0,
+                         type="Inform", filename=filename, binary_hash=hashlib.sha256(raw).hexdigest(),
+                         token=f"{0x4a000000 | slot:08x}", boot=slot == 6, load_policy="Resident"))
+    config = state.parent / "boot-config.json"
+    config.write_text(json.dumps(cfg))
+    state.write_text(json.dumps({"abstractions": rows}))
+    image = state.parent / "boot-image.bin"
+    image.write_bytes(reconstruct(cfg, rows, state.parent)[0])
+    protected = {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in state.parent.iterdir()
+                 if p.is_file() and p.suffix in (".lump", ".json", ".cloomc", ".bin")
+                 and p.name not in ("ns-state.json", "boot-image.bin", "boot-image.provenance.json")}
+    client = app.test_client()
+    payload = dict(namespaceFingerprint=namespace_fingerprint(rows),
+                   ns_state={"abstractions": rows[:-1]})
+    pending = review(client, payload)
+    old_image = image.read_bytes()
+    assert client.post("/api/namespace/save-table", json=payload, headers={
+        "X-Change-Confirmation": pending["id"]}).status_code == 200
+    assert client.get("/api/boot-image/ns-state").json["savedAbstractions"] == rows[:-1]
+    assert image.read_bytes() == old_image
+    service = RefreshStore(state.parent, state, config)
+    plan = service.prepare("test-owner")
+    service.commit(plan["operationId"], "test-owner")
+    words = struct.unpack("<8192I", image.read_bytes())
+    assert words[8192-9*4:8192-8*4] == (0, 0, 0, 0)
+    assert words[1280:1344] == (0,) * 64
+    assert image.read_bytes()[1024*4:1088*4] == old_image[1024*4:1088*4]
+    assert all(hashlib.sha256(p.read_bytes()).hexdigest() == digest for p, digest in protected.items())

@@ -41,3 +41,16 @@ cleared and their LUMPs reloaded later in a new slot.
 and active machines. Preserve identity and binding-generation history across sessions; rebind through
 verified destination-local copies without changing originals or silently
 retargeting capabilities held by other objects.
+
+Cleared generations belong to saved Namespace state even while the image
+descriptor is four zero words. Design allocation must read the saved table,
+not the older executing image. Fail closed on nine-bit generation exhaustion.
+
+**Why:** Removing a catalog assignment must survive reload without skipping the
+freed slot or allowing its former local capability to address a replacement.
+
+**How to apply:** Keep the next generation outside empty descriptors, preserve it
+through protected Save, and validate it on explicit reissue. Do not use catalog
+membership as a reservation or mutate active memory to stage a design removal.
+Every document publisher must preserve that history, including unrelated boot
+marker and resident-publication writes, not just the Clear/Save endpoint.

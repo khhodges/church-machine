@@ -4899,7 +4899,7 @@ def _read_namespace_design_document():
 
 def _namespace_table_candidate(payload):
     """Shared read-only preflight for protected review and Namespace-only commit."""
-    from server.namespace_authority import validate_namespace_design_rows
+    from server.namespace_authority import validate_namespace_design_rows, namespace_removal_generations
     if not isinstance(payload, dict) or set(payload) - {"namespaceFingerprint", "ns_state"}:
         raise ValueError("Namespace-only save accepts namespaceFingerprint and ns_state only")
     expected = payload.get("namespaceFingerprint")
@@ -4913,6 +4913,7 @@ def _namespace_table_candidate(payload):
     state = _read_namespace_design_document()
     if _namespace_state_fingerprint(state["abstractions"]) != expected:
         raise ValueError("Namespace changed since review; reload before saving")
+    namespace_removal_generations(state, rows)
     _check_namespace_allocation(rows)
     return state, rows
 
@@ -5010,14 +5011,18 @@ def namespace_save_table():
     try:
         with _namespace_commit_guard():
             state, rows = _namespace_table_candidate(request.get_json(silent=True))
+            from server.namespace_authority import namespace_removal_generations
+            generations = namespace_removal_generations(state, rows)
             state = dict(state)
             state["abstractions"] = rows
+            state["freeSlotSequences"] = generations
             state["save_mode"] = "table-only"
             # An old raw-image fingerprint cannot authenticate a new design.
             state.pop("committed_raw_fingerprint", None)
             _atomic_write_json(NS_STATE_PATH, state)
         fingerprint = _namespace_state_fingerprint(rows)
         return jsonify(ok=True, abstractions=rows, savedAbstractions=copy.deepcopy(rows),
+                       freeSlotSequences=generations, save_mode="table-only",
                        namespaceFingerprint=fingerprint,
                        imageRebuilt=False, imageStatus="not-rebuilt")
     except (ValueError, TypeError) as exc:
@@ -11595,6 +11600,15 @@ def _build_ns_state_document(entries):
         "abstractions": list(entries or []),
         "generated_at": _tm_ns.time(),
     }
+    # Every publisher must carry revocation history, not only Save Table.
+    from server.namespace_authority import namespace_removal_generations
+    previous = {"abstractions": []}
+    if os.path.isfile(NS_STATE_PATH):
+        with open(NS_STATE_PATH, encoding="utf-8") as previous_file:
+            previous = json.load(previous_file)
+    state["freeSlotSequences"] = namespace_removal_generations(previous, state["abstractions"])
+    if previous.get("save_mode") == "table-only":
+        state["save_mode"] = "table-only"
     if os.path.isfile(BOOT_IMAGE_PATH):
         with open(BOOT_IMAGE_PATH, "rb") as image_file:
             raw = _boot_image_gen.parse_ns_table_raw(image_file.read())

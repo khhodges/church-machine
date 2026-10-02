@@ -2192,7 +2192,11 @@ class ChurchSimulator {
         }
 
         const nsBase = this._nsSlotBase(slot);
-        const seq = this._nsSequenceForWrite(slot);
+        const seq = opts.destinationSequence === undefined
+            ? this._nsSequenceForWrite(slot) : opts.destinationSequence;
+        if (!Number.isInteger(seq) || seq < 0 || seq > 511) {
+            return fail('IDENTITY_SEQUENCE', 'Destination binding generation is unavailable or exhausted');
+        }
         const expectedSelf = this.createGT(seq, slot, { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
         const expectedPrivateData = this.createGT(
             seq, slot, { R: 1, W: 1, X: 0, L: 0, S: 0, E: 0 }, 1) >>> 0;
@@ -2436,6 +2440,9 @@ class ChurchSimulator {
         return BOOT_NAMED_SLOTS.length;
     }
 
+    // Catalog indices are default assignments, not architectural reservations.
+    firstAssignableNsSlot() { return 2; }
+
     // Explicit Save-to-Namespace replacement may target every Namespace slot.
     saveNamespaceStartSlot() {
         return 0;
@@ -2443,7 +2450,7 @@ class ChurchSimulator {
 
     _nsSequenceForWrite(idx) {
         const remembered = this._nsFreeSequences && this._nsFreeSequences[idx];
-        if (Number.isInteger(remembered)) return remembered & 0x1FF;
+        if (Number.isInteger(remembered)) return remembered;
         if (!Number.isInteger(idx) || idx < 0 || idx >= this.MAX_NS_ENTRIES) return 0;
         return this.parseNSWord1(
             this.memory[this._nsSlotBase(idx) + 1] >>> 0
@@ -2477,7 +2484,9 @@ class ChurchSimulator {
             slot = this.allocOrFindNsSlot(null, canonical,
                 selection ? 'ns-design-placement' : undefined);
         }
-        if (!Number.isInteger(slot) || slot < this.firstUserNsSlot() || slot >= this.MAX_NS_ENTRIES) {
+        if (!Number.isInteger(slot) || slot < this.firstAssignableNsSlot() ||
+                (slot < this.firstUserNsSlot() && !Number.isInteger(this._nsFreeSequences[slot])) ||
+                slot >= this.MAX_NS_ENTRIES) {
             throw new Error(`Slot must be between ${this.firstUserNsSlot()} and ${this.MAX_NS_ENTRIES - 1}.`);
         }
         if (this.isNSEntryValid(slot)) {
@@ -2560,7 +2569,11 @@ class ChurchSimulator {
         }
         if (this.bootComplete && idx < this.firstUserNsSlot() &&
             this.#builtinNamespaceWriteDepth === 0 &&
-            this.#namespaceSaveWriteDepth === 0) {
+            this.#namespaceSaveWriteDepth === 0 &&
+            !(idx >= this.firstAssignableNsSlot() &&
+              !this.isNSEntryValid(idx) &&
+              Number.isInteger(this._nsFreeSequences && this._nsFreeSequences[idx]) &&
+              version === this._nsFreeSequences[idx])) {
             throw new RangeError(
                 `writeNSEntry: built-in slot ${idx} is immutable after boot`);
         }
@@ -2582,13 +2595,15 @@ class ChurchSimulator {
 
     clearNSEntry(idx) {
         this._assertNamespaceWriteAllowed('clearNSEntry', idx);
-        if (!Number.isInteger(idx) || idx < this.firstUserNsSlot() || idx >= this.MAX_NS_ENTRIES) {
+        if (!Number.isInteger(idx) || idx < this.firstAssignableNsSlot() ||
+                idx === this.bootEntrySlot || idx >= this.MAX_NS_ENTRIES) {
             throw new RangeError(
-                `clearNSEntry: slot must be an integer ${this.firstUserNsSlot()}–${this.MAX_NS_ENTRIES - 1}`);
+                'clearNSEntry: foundational and selected boot slots cannot be cleared');
         }
         const base = this._nsSlotBase(idx);
-        const oldVersion = this.parseNSWord1(this.memory[base + 1] >>> 0).gtSeq;
-        const newVersion = (oldVersion + 1) & 0x1FF;
+        const oldVersion = this._nsSequenceForWrite(idx);
+        const newVersion = oldVersion + 1;
+        if (newVersion > 511) throw new Error('Namespace binding generation exhausted');
         this.memory.fill(0, base, base + this.NS_ENTRY_WORDS);
         if (!this._nsFreeSequences) this._nsFreeSequences = {};
         this._nsFreeSequences[idx] = newVersion;
@@ -2597,6 +2612,7 @@ class ChurchSimulator {
         if (this.nsLabels) delete this.nsLabels[idx];
         if (this._compilerOwnedSelfSlots) delete this._compilerOwnedSelfSlots[idx];
         if (this._nsSymbolicEntries) delete this._nsSymbolicEntries[idx];
+        if (this.lazyManifest) delete this.lazyManifest[idx];
         if (this._tokenSlotMap) {
             for (const [token, slot] of this._tokenSlotMap) {
                 if (slot === idx) this._tokenSlotMap.delete(token);
@@ -2631,8 +2647,10 @@ class ChurchSimulator {
     // programs — they go through this function.
     _rebuildNamespaceFreeList() {
         this._nsFreeList = [];
-        for (let slot = this.firstUserNsSlot(); slot < this.MAX_NS_ENTRIES; slot++) {
-            if (!this.isNSEntryValid(slot)) this._nsFreeList.push(slot);
+        for (let slot = this.firstAssignableNsSlot(); slot < this.MAX_NS_ENTRIES; slot++) {
+            if ((slot >= this.firstUserNsSlot() ||
+                    Number.isInteger(this._nsFreeSequences && this._nsFreeSequences[slot])) &&
+                    !this.isNSEntryValid(slot)) this._nsFreeList.push(slot);
         }
     }
 
@@ -2697,7 +2715,7 @@ class ChurchSimulator {
         const EXTENDED_STRIDE  = 0x0100;   // 256 words per slot; enough for any program
         const PROG_SLOT        = this.firstUserNsSlot();
         const slotOffset       = Math.max(0, slot - PROG_SLOT);
-        const lumpBase         = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
+        let lumpBase           = EXTENDED_BASE + slotOffset * EXTENDED_STRIDE;
 
         const DEMO_CC = 18;  // max c-list entries used by DEMO_CLIST injection
         const words  = (opts && opts.words) || [];
@@ -2710,6 +2728,35 @@ class ChurchSimulator {
         let newLumpSize = 64;
         while (newLumpSize < 1 + cw + Math.max(caps.length, DEMO_CC)) newLumpSize <<= 1;
         const n_minus_6 = Math.max(0, Math.log2(newLumpSize) - 6) | 0;
+
+        // A catalog slot has no permanent body address. Check the complete
+        // allocation size against retained objects, including lazy reservations,
+        // before writing any bytes (large programs also exceed the old stride).
+        const occupied = [];
+        for (let i = 1; i < this.MAX_NS_ENTRIES; i++) {
+            if (i === slot) continue;
+            const entry = this.readNSEntry(i);
+            if (entry) {
+                const base = entry.word0_location;
+                if (base > 0 && base < this.NS_TABLE_BASE) {
+                    const header = this.parseLumpHeader(this.memory[base]);
+                    const size = header.valid ? header.lumpSize :
+                        this.parseNSWord1(entry.word1_limit).limit + 1;
+                    occupied.push([base, base + size]);
+                }
+            }
+            const lazy = this.lazyManifest && this.lazyManifest[i];
+            if (lazy && lazy.allocSize > 0 && lazy.allocBase >= 0)
+                occupied.push([lazy.allocBase, lazy.allocBase + lazy.allocSize]);
+        }
+        const fits = base => base + newLumpSize <= this.NS_TABLE_BASE &&
+            !occupied.some(([start, end]) => base < end && start < base + newLumpSize);
+        if (!fits(lumpBase)) {
+            lumpBase = EXTENDED_BASE;
+            while (lumpBase + newLumpSize <= this.NS_TABLE_BASE && !fits(lumpBase))
+                lumpBase += 64;
+        }
+        if (!fits(lumpBase)) throw new Error('No non-overlapping memory range available for compiled program.');
 
         // Write a valid lump header at this slot's region (cc=0: let
         // _injectClistNow fill the c-list lazily in the same apply-call).
