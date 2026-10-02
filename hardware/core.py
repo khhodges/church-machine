@@ -1874,7 +1874,7 @@ class ChurchCore(Elaboratable):
             ]
 
             m.d.comb += eloadcall_start_sig.eq(
-                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.ELOADCALL) & ~any_unit_busy
+                0  # Retired opcode: decoder faults; never start legacy side effects.
             )
             m.d.comb += [
                 u_eloadcall.start.eq(eloadcall_start_sig),
@@ -1898,7 +1898,7 @@ class ChurchCore(Elaboratable):
             ]
 
             m.d.comb += xloadlambda_start_sig.eq(
-                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.XLOADLAMBDA) & ~any_unit_busy
+                0  # Retired opcode: decoder faults; never start legacy side effects.
             )
             m.d.comb += [
                 u_xloadlambda.start.eq(xloadlambda_start_sig),

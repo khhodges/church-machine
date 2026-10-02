@@ -9215,6 +9215,8 @@ class ChurchSimulator {
     }
 
     _execEloadcall(d) {
+        this.fault('INVALID_OP', 'ELOADCALL is retired. Correct the source explicitly and recompile.');
+        return null;
         this._flushLambdaCache();
 
         const clistGT = this.cr[d.crSrc].word0;
@@ -9559,6 +9561,8 @@ class ChurchSimulator {
     }
 
     _execXloadlambda(d) {
+        this.fault('INVALID_OP', 'XLOADLAMBDA is retired. Correct the source explicitly and recompile.');
+        return null;
         const clistGT = this.cr[d.crSrc].word0;
         if (clistGT === 0) {
             this.fault('NULL_CAP', `XLOADLAMBDA: CR${d.crSrc} C-List is NULL`);
@@ -12512,6 +12516,12 @@ class ChurchSimulator {
         }
 
         const d = this.decodeInstruction(instrWord);
+        // Retired encodings are invalid even when their condition is false.
+        // Keep disassembly available, but reject before any instruction effect.
+        if (d.opcode === 8 || d.opcode === 9) {
+            this.fault('INVALID_OP', `${this.opName(d.opcode)} is retired. Correct the source explicitly and recompile.`);
+            return null;
+        }
         this.stepCount++;
 
         this._instrHistory.push({

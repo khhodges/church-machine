@@ -8,3 +8,10 @@ Retire ELOADCALL and XLOADLAMBDA with no automatic translation. Existing source 
 **Why:** This Phase 1 cutover was explicitly approved on 2026-09-15. A hard error exposes every stale use and prevents old authority or encoding semantics from being silently carried into extended CALL and LAMBDA.
 
 **How to apply:** The Phase 1 boot load contains exactly CapabilityTest, SelfTest, and WukongCallHome. Manually correct and rebuild those three; reject old opcode-8/9 binaries on the new ISA.
+
+The user explicitly approved enforcing retirement even when saved post-flash
+test artifacts still use ELOADCALL. Leave those artifacts intact and inspectable;
+do not translate or replace them automatically.
+
+**Why:** Keeping an older test executable is not an exception to the hard cutover.
+Programmer source correction and rebuilding remain explicit actions.

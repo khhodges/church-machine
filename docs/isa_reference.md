@@ -1,5 +1,12 @@
 # Church Machine ISA Reference
 
+> **Opcode retirement:** ELOADCALL (8) and XLOADLAMBDA (9) are no longer
+> executable instructions. Compilation rejects their mnemonics, and simulator
+> and hardware execution reject their encodings even with a false condition.
+> Their descriptions below are historical decoding information only. Correct
+> affected source explicitly; no automatic translation or saved-binary rewrite
+> is permitted. This cutover does not add hardware IDX1 support.
+
 **Version 2.0 — June 2026**
 **Machine-readable core authority: [`shared/architecture_contracts.json`](../shared/architecture_contracts.json)**
 

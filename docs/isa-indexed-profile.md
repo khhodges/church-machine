@@ -1,5 +1,10 @@
 # IDX1 indexed instruction profile
 
+> Retirement clarification: legacy-profile compatibility does not authorize
+> executing ELOADCALL/XLOADLAMBDA. Opcodes 8/9 are rejected across profiles.
+> Historical bytes remain inspectable; correcting and rebuilding affected
+> source requires an explicit programmer action.
+
 Status: **approved for coordinated implementation**, with durable Save LUMP
 and protected simulator execution/reload described below. This is not a hardware release,
 compiler certification, or authorization to amend an existing LUMP, Namespace

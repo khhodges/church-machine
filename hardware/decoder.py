@@ -188,7 +188,7 @@ class ChurchDecoder(Elaboratable):
 
         valid_opcode = Signal()
         m.d.comb += valid_opcode.eq(
-            ((opcode_field <= ChurchOpcode.XLOADLAMBDA) & ~iot_excluded) |
+            ((opcode_field <= ChurchOpcode.LAMBDA) & ~iot_excluded) |
             is_dread | is_dwrite | is_iadd | is_isub | is_branch |
             is_shl | is_shr | is_bfext | is_bfins | is_mcmp
         )

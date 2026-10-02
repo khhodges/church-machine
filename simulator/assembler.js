@@ -1892,6 +1892,13 @@ class ChurchAssembler {
             }
         }
 
+        if (opcode === 8 || opcode === 9) {
+            this.errors.push({
+                line: lineNum, ...this._tokenCols(this._currentLineText, parts[0]),
+                message: `${mnemonic} is retired. Correct the source explicitly and recompile; automatic translation is not supported.`,
+            });
+            return null;
+        }
         if (opcode === null) {
             if (mnemonic === 'HALT') return 0;
             // NOP must remain distinguishable from the all-zero HALT sentinel.

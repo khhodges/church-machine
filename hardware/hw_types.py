@@ -131,7 +131,7 @@ FNV_PRIME_32  = 0x01000193
 FNV_SEAL_MASK = (1 << 25) - 1
 
 ENABLE_SEAL_CHECK = True
-ENABLE_FUSED_OPS = True
+ENABLE_FUSED_OPS = False  # Opcodes 8/9 are retired; names remain for disassembly.
 ENABLE_CHANGE_SWITCH = True
 ENABLE_GC = True
 

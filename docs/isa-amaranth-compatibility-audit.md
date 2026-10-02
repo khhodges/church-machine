@@ -17,7 +17,8 @@ The baseline reference is `docs/isa_reference.md`, with encoding details in
 `docs/isa_encoding.md`. The newer indexed profile is defined separately in
 `docs/isa-indexed-profile.md` and `docs/isa-indexed-encoding.md`.
 
-There is an unresolved consistency problem:
+The initial audit found this consistency problem (opcode retirement is now
+enforced as described in the follow-up below):
 
 * The recorded approved cutover retires ELOADCALL/XLOADLAMBDA without automatic
   translation and requires rejection of their old encodings on the new ISA.
@@ -51,8 +52,8 @@ or change the ISA to make the implementations agree.
 | 5 | SWITCH | Legacy unit/dispatch present; independent semantic parity not established. IDX1 SWITCH is not currently enabled in software. |
 | 6 | TPERM | Targeted TPERM and permission-check tests pass. This does not certify all interactions with every caller and fault path. |
 | 7 | LAMBDA | Hardware target-capability/X-permission path present. No independently demonstrated coverage of every approved extended form or caller-scope/frame invariant. IDX1 LAMBDA is unavailable in current software. |
-| 8 | ELOADCALL | **Cutover gap:** live hardware decoder accepts it and core has an execution path. Legacy assembler and simulator paths also remain. |
-| 9 | XLOADLAMBDA | **Cutover gap:** live hardware decoder accepts it and core has an execution path. Legacy assembler and simulator paths also remain. |
+| 8 | ELOADCALL | **Retirement enforced:** compilation returns an error; simulator and hardware reject before execution, including false conditions. Historical decoding remains available. |
+| 9 | XLOADLAMBDA | **Retirement enforced:** compilation returns an error; simulator and hardware reject before execution, including false conditions. Historical decoding remains available. |
 | 10 | IDX1 introducer | **Gap:** live hardware decoder rejects it with fault code 11. No hardware IDX1 packet/profile implementation was found. |
 | 16 | DREAD | Legacy unit/dispatch present. Full result, permissions, MMIO and containment parity unverified. IDX1 runtime DR±immediate packet mode absent. |
 | 17 | DWRITE | Legacy unit/dispatch present. Full write/permission/alias containment parity unverified. IDX1 packet mode absent. |
@@ -190,3 +191,29 @@ results/flags, plus an exact-word and immediate-range regression test.
 No production hardware, assembler, ISA, LUMP, Namespace or boot-image changes
 were needed. This resolves the shift-test evidence gap, not the separately
 identified retired-opcode and IDX1 release blockers.
+
+## Follow-up: approved opcode retirement enforced
+
+With explicit approval of the compatibility consequence for saved post-flash
+tests, opcodes 8/9 now reject in the normal compiler diagnostics, simulator
+execution (including direct helper entry points), and both hardware decoder
+profiles. Core start signals for the legacy fused units are tied inactive.
+Disassembly is retained and no saved artifacts were rewritten or translated.
+
+New evidence:
+
+* `node simulator/test_retired_opcodes.js`: public compilation errors, suffixed
+  mnemonics, direct execution helper rejection, and actual step-path rejection
+  with unchanged CR/DR/PC/STO, including false-condition words.
+* `hardware/test_retired_opcodes.py`: all 16 condition encodings reject in both
+  decoder profiles; full-core checks confirm rejection and no DMEM, Namespace
+  or c-list writes or M-bit changes following rejection.
+* Combined retired-opcode, indexed-CALL and shift tests: 26 pass.
+* Existing simulator CALL-through-CR6 suite: 17 pass.
+* Regenerated core/IoT/Wukong RTL and the separate core copy pass freshness;
+  13 hardware readiness tests pass.
+
+The reference and indexed-profile notes now clarify the hard retirement.
+Historical positive tests for fused execution are not authority to restore it.
+The whole repository suite has not been certified by this focused verification.
+**Release remains on hold for IDX1 and the other unverified audit items.**
