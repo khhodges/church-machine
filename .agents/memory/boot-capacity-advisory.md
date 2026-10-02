@@ -20,3 +20,13 @@ Use full installed allocation intervals for overlap checks, including empty cata
 **Why:** An overlap investigation initially misidentified unloaded catalog entries as their much larger saved binaries. Geometry and hash agreement also failed to establish that the installed body remained intact after another descriptor occupied its range.
 
 **How to apply:** Distinguish raw installed headers, explicitly reserved empty spans, symbolic entries with no body, and saved library artifacts. Preserve forensic inspection when execution/publication validation rejects an image. Repair from independently verified saved bytes, not from a potentially overwritten image.
+
+Present current Namespace problems separately from expandable stored-image
+evidence. Unselected library bodies and device registers are not failed RAM
+installations, and repeated reports of the same overlap are not separate faults.
+
+**Why:** The user requested a corrected report after valid devices and dormant
+artifacts appeared alongside genuine placement conflicts as execution blockers.
+
+**How to apply:** Keep saved costs visible without promoting them to installation
+evidence; stale image observations must not prescribe changes to current artifacts.

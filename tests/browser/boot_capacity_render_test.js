@@ -109,6 +109,22 @@ context._renderBootCapacity({
     ],
 });
 assert.match(root.innerHTML, /M_BIT_DEV/);
-assert.match(root.innerHTML, /0xFFFFFF1C \(physical byte address\)/);
+assert.match(root.innerHTML, /0xFFFFFF1C \(MMIO byte address\)/);
 assert.match(root.innerHTML, /Image evidence only \(not validated placement\): 0x400–0x4FF/);
 assert.match(root.innerHTML, /saved code words=8; image code words=9/);
+
+context._renderBootCapacity({
+    denseBytes: 65536, trusted: false,
+    warnings: ['Current overlap', 'Stale image'],
+    namespaceWarnings: ['Current overlap'], imageWarnings: ['Stale image'],
+    physicalTarget: { words: 16384 },
+    rows: [{ slot: 8, name: 'Tunnel', entryKind: 'unselected',
+        savedAllocationWords: 512, status: 'Not selected for the image — no installed LUMP claimed' }],
+});
+assert.match(root.innerHTML, /Current Namespace — problems to resolve/);
+assert.match(root.innerHTML, /<details><summary>Stored image — separate historical evidence \(1\)/);
+assert.match(root.innerHTML, /upload body starts at word 1,280/);
+assert.doesNotMatch(root.innerHTML, /factory body through/);
+assert.doesNotMatch(root.innerHTML, /Installation unverified — Not selected/);
+assert.equal((root.innerHTML.match(/Current overlap/g) || []).length, 1);
+assert.equal((root.innerHTML.match(/Stale image/g) || []).length, 1);

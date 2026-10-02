@@ -7118,13 +7118,14 @@ def boot_image_capacity():
                 with open(BOOT_IMAGE_PATH, "rb") as source:
                     image = source.read()
             target_board = None
+            config = None
             if os.path.isfile(BOOT_CONFIG_PATH):
                 with open(BOOT_CONFIG_PATH, encoding="utf-8") as source:
                     config = json.load(source)
                 if isinstance(config, dict):
                     target_board = config.get("targetBoard")
             response = jsonify(capacity_report(
-                rows, image, LUMPS_DIR, target_board=target_board))
+                rows, image, LUMPS_DIR, target_board=target_board, config=config))
         response.headers["Cache-Control"] = "no-store"
         return response
     except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:

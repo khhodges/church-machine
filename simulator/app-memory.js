@@ -257,15 +257,23 @@ function _renderBootCapacity(report) {
     }
     if (report.physicalTarget) {
         html += '<div>Physical Wukong projection: 16,384 words, 64 four-word ' +
-            'Namespace slots, factory body through word 1,279, at most 3 Threads. ' +
+            'Namespace slots, upload body starts at word 1,280, at most 3 Threads. ' +
             'Separate layout; the generic allocation totals above are not physical ' +
             'placement or hardware compatibility evidence.</div>';
     }
     if (report.warnings.length || !trusted) {
         html += '<div style="color:#f87171;font-weight:600;">Capacity not validated: ' +
-            'free and occupied totals cannot be confirmed. Known individual sizes remain shown. Resolve these issues first.</div>';
+            'free and occupied totals cannot be confirmed from the stored image. Known saved sizes remain shown.</div>';
         if (report.warnings.length) {
-            html += '<ul>' + report.warnings.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul>';
+            const current = report.namespaceWarnings || [];
+            const oldImage = report.imageWarnings || report.warnings;
+            html += '<h4>Current Namespace — problems to resolve</h4>' +
+                (current.length ? '<ul>' + current.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul>'
+                    : '<p>No current placement conflict was established by this report. This is not execution approval.</p>');
+            if (oldImage.length) html += '<details><summary>Stored image — separate historical evidence (' +
+                oldImage.length + ')</summary><p>These observations do not prove the saved LUMPs are defective. ' +
+                'Changing the Namespace does not rebuild this image.</p><ul>' +
+                oldImage.map(item => '<li>' + _escHtml(item) + '</li>').join('') + '</ul></details>';
         }
     }
     const details = html;
@@ -307,8 +315,8 @@ function _renderBootCapacity(report) {
             Number.isSafeInteger(row.savedAllocationWords)
                 ? words(row.savedAllocationWords) + ' (saved; not installed size)'
                 : 'Unknown';
-        const status = entry.reserved ? 'Reserved descriptor storage' :
-            row.entryKind === 'mmio' || row.entryKind === 'namespace' ? row.status :
+        const status = entry.reserved ? (row.status || 'Reserved descriptor storage') :
+            row.entryKind === 'mmio' || row.entryKind === 'namespace' || row.entryKind === 'unselected' ? row.status :
             entry.base !== null ? 'Row geometry checked — ' + (row.status || 'verified geometry') :
             row.designOnly || row.status === 'Design-only symbolic placement; not installed'
                 ? (row.status || 'Not installed — design placement') :
@@ -325,7 +333,7 @@ function _renderBootCapacity(report) {
                 'NS[' + _escHtml(String(row.slot)) + '] ' + _escHtml(String(row.name || ''))) +
             '</td><td>' + (row.entryKind === 'mmio' ? 'No LUMP RAM body' : size) + '</td><td>' +
             (row.entryKind === 'mmio' && Number.isSafeInteger(row.physicalByteAddress)
-                ? address(row.physicalByteAddress) + ' (physical byte address)'
+                ? address(row.physicalByteAddress) + ' (MMIO byte address)'
                 : entry.base === null ? '—' : address(entry.base)) + '</td><td>' +
             (entry.base === null ? '—' : address(entry.base + entry.size - 1)) +
             '</td><td>' + (overlap ? '<strong>Overlap — </strong>' : '') +
@@ -339,7 +347,7 @@ function _renderBootCapacity(report) {
         '><summary>Layout validation and budget details</summary>' + details +
         '</details><small>Reserved rows count toward occupied space. ' +
         'Saved size is exact hash-checked artifact cost, not proof of installation. ' +
-        'Only validated installed allocations have word addresses; no free gaps are inferred from untrusted layouts.</small>';
+        'Displayed image ranges describe stored bytes, not proof of current installation; no free gaps are inferred from untrusted layouts.</small>';
     root.innerHTML = html;
 }
 window._renderBootCapacity = _renderBootCapacity;

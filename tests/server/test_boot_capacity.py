@@ -245,3 +245,61 @@ def test_stale_namespace_fingerprint_never_claims_current_installation(tmp_path,
     assert report["freeWords"] is None
     assert not report["rows"][0]["imageEvidence"]["verifiedSelection"]
     assert report["rows"][0]["name"] == "ide.NewApprovedName"
+
+
+def test_devices_are_not_ram_and_bad_device_assignment_is_current(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    for slot in (2, 3, 4, 5):
+        address, limit = boot_capacity.boot_image._MMIO_SLOT_SPECS[slot]
+        rows.append(dict(slot=slot, name="Device", location=hex(address), limit=hex(limit)))
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path))
+    assert all(r["entryKind"] == "mmio" for r in report["rows"][1:])
+    assert not any("Missing or invalid committed image location" in w for w in report["warnings"])
+    rows[-1]["limit"] = "0xFFFF"
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path))
+    assert any("I/O limit" in w for w in report["namespaceWarnings"])
+    assert not any("I/O limit" in w for w in report["imageWarnings"])
+
+
+def test_dormant_body_cost_is_not_an_installed_body(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    dormant = dict(rows[0], slot=8, name="Tunnel", location="0x200", limit="0x3f", resident=False)
+    rows.append(dormant)
+    words = list(struct.unpack("<1280I", image))
+    words[1280 - 9 * 4] = 512
+    words[1280 - 9 * 4 + 1] = 63
+    report = boot_capacity.capacity_report(rows, struct.pack("<1280I", *words), str(tmp_path))
+    item = report["rows"][-1]
+    assert item["entryKind"] == "unselected"
+    assert item["savedAllocationWords"] == 128
+    assert item["allocatedWords"] is None
+    assert not any("NS[8]" in w for w in report["warnings"])
+    assert any(r["name"] == "NS[8] old-image reservation" and r["allocatedWords"] == 64
+               for r in report["reservedRanges"])
+
+
+def test_saved_conflicts_are_separate_from_old_image_and_do_not_need_token(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch)
+    rows.append(dict(rows[0], slot=14, name="Alice"))
+    rows[-1].pop("token")
+    config = {"step1": {"threadLumpWords": 128, "totalNamespaceWords": 1280, "nsSlotsMax": 64}}
+    report = boot_capacity.capacity_report(rows, image, str(tmp_path), config=config)
+    assert any("NS[14] Alice" in w and "overlaps" in w for w in report["namespaceWarnings"])
+    assert report["rows"][-1]["savedAllocationWords"] == 128
+    assert any("Stored image is not proven" in w for w in report["imageWarnings"])
+    assert not report["trusted"] and report["freeWords"] is None
+
+
+def test_duplicate_image_overlap_is_one_diagnostic(tmp_path, monkeypatch):
+    rows, image = _fixture(tmp_path, monkeypatch, second=True)
+    rows[1]["location"] = "0x40"
+    words = list(struct.unpack("<1280I", image))
+    words[64] = words[300]
+    words[1280 - 3 * 4] = 64
+    def validate(_, *, check_layout=True):
+        if check_layout:
+            raise ValueError("validate_boot_image: NS slot 1 [16, 144) overlaps NS slot 2 [64, 192)")
+    monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", validate)
+    report = boot_capacity.capacity_report(rows, struct.pack("<1280I", *words), str(tmp_path))
+    assert len([w for w in report["imageWarnings"] if "overlap" in w.lower()]) == 1
+    assert report["freeWords"] is None

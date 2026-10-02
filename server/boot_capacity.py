@@ -6,6 +6,7 @@ resident. An unverified binding makes free-space figures unavailable.
 import hashlib
 import json
 import os
+import re
 import struct
 import zlib
 
@@ -67,8 +68,7 @@ def _saved_cost(row, lumps_dir):
     filename, expected = row.get("filename"), row.get("binary_hash")
     if (not isinstance(filename, str) or not filename or
             filename != os.path.basename(filename) or
-            not isinstance(expected, str) or len(expected) != 64 or
-            not row.get("token")):
+            not isinstance(expected, str) or len(expected) != 64):
         return None, "Exact saved artifact binding is missing"
     try:
         with open(os.path.join(lumps_dir, filename), "rb") as source:
@@ -90,7 +90,38 @@ def _saved_cost(row, lumps_dir):
     }, None
 
 
-def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
+def _namespace_problems(rows, lumps_dir, config):
+    """Current assignments only; never take their geometry from an old image."""
+    from server.namespace_allocation import _physical, _range
+    problems, claims = [], [("Namespace header", 0, 16)]
+    step = (config or {}).get("step1", {})
+    if step.get("totalNamespaceWords") and step.get("nsSlotsMax"):
+        total, slots = int(step["totalNamespaceWords"]), int(step["nsSlotsMax"])
+        claims.append(("Namespace table", total - slots * 4, total))
+    for row in rows:
+        if not isinstance(row, dict) or row.get("slot") == 0 or not _physical(row):
+            continue
+        # Without architecture config, generated Thread geometry is unknown.
+        if not config and (row.get("slot") == 1 or not row.get("filename")):
+            continue
+        try:
+            slot, start, end = _range(row, lumps_dir, config or {}, {})
+            claims.append((f"NS[{slot}] {row.get('name', '')}", start, end))
+            if step.get("totalNamespaceWords") and end > int(step["totalNamespaceWords"]):
+                problems.append(f"NS[{slot}] allocation exceeds configured Namespace memory. Review its placement.")
+        except ValueError as error:
+            problems.append(str(error))
+    for i, (name, start, end) in enumerate(claims):
+        for other, left, right in claims[i + 1:]:
+            if start < right and left < end:
+                problems.append(
+                    f"{name} overlaps {other} at word addresses "
+                    f"0x{max(start, left):X}–0x{min(end, right)-1:X}. "
+                    "Review the assigned placement; no saved LUMP needs to be rewritten.")
+    return problems
+
+
+def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=None):
     total = len(image_bytes) // 4 if image_bytes is not None else None
     report = {
         "layout": "committed generic Namespace image (not Wukong upload)",
@@ -117,6 +148,7 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
         warnings.append("Authoritative Namespace rows are unavailable.")
         return report
     report["namespaceFingerprint"] = boot_image.namespace_fingerprint(rows)
+    report["namespaceWarnings"] = _namespace_problems(rows, lumps_dir, config)
     report["imageMatchesNamespaceRevision"] = False
     if image_bytes is not None:
         try:
@@ -134,7 +166,7 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
         boot_image.validate_resident_boot_profile(rows)
         boot_image.namespace_boot_marker_slot(rows)
     except (ValueError, TypeError) as error:
-        warnings.append(str(error))
+        report["namespaceWarnings"].append(str(error))
     words = None
     table_start = None
     claims = []
@@ -191,9 +223,10 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
             "threadStackWords": None, "unclassifiedWords": None,
         }
         report["rows"].append(item)
-        def fail(reason):
+        def fail(reason, *, current=False):
             item["status"] = reason
-            warnings.append("NS[%d] %s: %s" % (slot, item["name"], reason))
+            destination = report["namespaceWarnings"] if current else warnings
+            destination.append("NS[%d] %s: %s" % (slot, item["name"], reason))
 
         if slot == 0:
             item.update(entryKind="namespace", status="Namespace descriptor table — reserved storage")
@@ -202,17 +235,25 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
             selected_address = int(str(row.get("location")), 0)
         except (ValueError, TypeError):
             selected_address = None
-        if selected_address is not None and selected_address >= 0xFFFF0000:
+        if (slot in boot_image._MMIO_SLOT_SPECS and not row.get("filename")) or (
+                selected_address is not None and selected_address >= 0xFFFF0000):
             expected_address = boot_image._MMIO_SLOT_SPECS.get(slot, (None, None))[0]
             item.update(entryKind="mmio", ramWords=0,
                         status="Memory-mapped I/O — no LUMP RAM body")
             try:
                 item["physicalByteAddress"] = int(str(row.get("location")), 0)
             except (ValueError, TypeError):
-                fail("Memory-mapped I/O assignment has no valid physical byte address")
+                fail("Memory-mapped I/O assignment has no valid physical byte address", current=True)
             else:
                 if item["physicalByteAddress"] != expected_address:
-                    fail("Memory-mapped I/O assignment differs from architecture address")
+                    fail("Memory-mapped I/O assignment differs from architecture address", current=True)
+                else:
+                    try:
+                        limit = int(str(row.get("limit")), 0)
+                    except (ValueError, TypeError):
+                        limit = None
+                    if limit != boot_image._MMIO_SLOT_SPECS[slot][1]:
+                        fail("Memory-mapped I/O limit differs from architecture limit", current=True)
             continue
         # Preserve forensic image evidence independently of selected artifact
         # validity. It is never promoted to validated installation or free RAM.
@@ -244,9 +285,27 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
             item["entryKind"] = "design"
             if any(row.get(key) not in (None, "", False) for key in (
                     "token", "filename", "binary_hash", "resident", "boot_resident")):
-                fail("Contradictory Namespace assignment: design-only flags coexist with executable binding or resident policy")
+                fail("Contradictory Namespace assignment: design-only flags coexist with executable binding or resident policy", current=True)
             else:
                 item["status"] = "Design-only symbolic placement; not installed"
+            continue
+        generated = (slot == 1 or row.get("type") == "Thread" or
+                     (not row.get("filename") and str(row.get("name", "")).startswith("Thread.")))
+        if not generated and not boot_image.image_artifact_selected(row):
+            item.update(entryKind="unselected", status="Not selected for the image — no installed LUMP claimed")
+            if words is not None and slot < (total - table_start) // 4:
+                loc = words[total - (slot + 1) * 4]
+                if 16 <= loc < table_start:
+                    if slot in (7, 8, 9, 10) and not any(words[loc:loc + 64]) and loc + 64 <= table_start:
+                        # Historical zero-filled catalog reservation, not the
+                        # saved library body and not a current installation.
+                        claims.append((loc, loc + 64, f"NS[{slot}] old-image reservation"))
+                        report["reservedRanges"].append(dict(
+                            name=f"NS[{slot}] old-image reservation", locationWord=loc, allocatedWords=64,
+                            status="Stored-image empty reservation — not an installed saved LUMP"))
+                        report["reservedWords"] += 64
+                    else:
+                        warnings.append(f"Stored image retains memory at NS[{slot}], which is not selected now. Rebuild only after reviewing the current Namespace.")
             continue
         if words is None or slot >= (total - table_start) // 4:
             fail("No validated committed image descriptor" +
@@ -316,16 +375,21 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
         evidence = [(item["imageEvidence"]["locationWord"],
                      item["imageEvidence"]["locationWord"] + item["imageEvidence"]["allocatedWords"],
                      item) for item in report["rows"] if "imageEvidence" in item]
+        overlap_pairs = set()
         for index, (start, end, item) in enumerate(evidence):
             for other_start, other_end, other in evidence[index + 1:]:
                 if start < other_end and other_start < end:
+                    overlap_pairs.add(frozenset((item["slot"], other["slot"])))
                     message = ("Image allocation overlap: NS[%d] %s and NS[%d] %s "
                                "at word addresses 0x%X–0x%X (unverified image evidence)" % (
                                    item["slot"], item["name"], other["slot"], other["name"],
                                    max(start, other_start), min(end, other_end) - 1))
                     warnings.append(message)
-                    item.setdefault("issues", []).append(message)
-                    other.setdefault("issues", []).append(message)
+        # Replace the validator's first-overlap message with the same pair's
+        # complete forensic diagnostic; retain all other validation failures.
+        warnings[:] = [message for message in warnings if not (
+            (match := re.search(r"NS slot (\d+) .* overlaps NS slot (\d+)", message))
+            and frozenset(map(int, match.groups())) in overlap_pairs)]
         # Every other live in-RAM descriptor also consumes space. It must not
         # silently inflate the reported free pool if it lacks a resident row.
         for slot in range((total - table_start) // 4):
@@ -348,8 +412,10 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
         ordered = sorted(claims)
         for left, right in zip(ordered, ordered[1:]):
             if left[1] > right[0]:
-                warnings.append("%s overlaps %s" % (left[2], right[2]))
-        if not warnings:
+                pair = re.findall(r"NS\[(\d+)\]", left[2] + right[2])
+                if len(pair) != 2 or frozenset(map(int, pair)) not in overlap_pairs:
+                    warnings.append("%s overlaps %s" % (left[2], right[2]))
+        if not warnings and not report["namespaceWarnings"]:
             gaps = [ordered[0][0]] + [
                 b[0] - a[1] for a, b in zip(ordered, ordered[1:])
             ] + [total - ordered[-1][1]]
@@ -359,4 +425,6 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None):
             report["largestFreeWords"] = max(gaps)
             report["unclassifiedWords"] = sum(
                 item["unclassifiedWords"] or 0 for item in report["rows"])
+    report["imageWarnings"] = list(dict.fromkeys(warnings))
+    report["warnings"] = list(dict.fromkeys(report["namespaceWarnings"] + report["imageWarnings"]))
     return report
