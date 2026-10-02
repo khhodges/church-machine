@@ -10,6 +10,7 @@ Run with:  python -m hardware.test_shift_ops
 """
 
 from amaranth.sim import Simulator
+import pytest
 
 from .core import ChurchCore
 from .hw_types import TuringOpcode, CondCode
@@ -38,8 +39,17 @@ def _enc(opcode, cond, dr_dst, dr_src, imm15):
 
 
 def encode_iadd(dr_dst, dr_src, imm):
-    """IADD DR[dr_dst] = DR[dr_src] + sign_extend(imm15); cond=AL."""
-    return _enc(TuringOpcode.IADD, CondCode.AL, dr_dst, dr_src, imm & 0x7FFF)
+    """IADD immediate: bit 14 selects unsigned imm14, not a sign bit."""
+    if not 0 <= imm <= 0x3FFF:
+        raise ValueError("IADD immediate must be unsigned 14-bit")
+    return _enc(TuringOpcode.IADD, CondCode.AL, dr_dst, dr_src, 0x4000 | imm)
+
+
+def encode_isub(dr_dst, dr_src, imm):
+    """ISUB immediate; DR0 minus a magnitude constructs negative constants."""
+    if not 0 <= imm <= 0x3FFF:
+        raise ValueError("ISUB immediate must be unsigned 14-bit")
+    return _enc(TuringOpcode.ISUB, CondCode.AL, dr_dst, dr_src, 0x4000 | imm)
 
 
 def encode_shl(dr_dst, dr_src, shift_amt):
@@ -88,9 +98,14 @@ async def _exec(ctx, dut, instr):
     """
     ctx.set(dut.imem_valid, 1)
     ctx.set(dut.imem_data,  instr)
+    assert ctx.get(dut.retire_valid), "Test instruction was not accepted"
+    assert ctx.get(dut.retire_instr) == instr
+    assert not ctx.get(dut.fault_valid), f"Instruction fault {ctx.get(dut.fault)}"
+    assert not ctx.get(dut.retire_fault_valid)
     await ctx.tick()
     ctx.set(dut.imem_valid, 0)
     await ctx.tick()
+    assert not ctx.get(dut.fault_valid), f"Post-instruction fault {ctx.get(dut.fault)}"
 
 
 # ---------------------------------------------------------------------------
@@ -114,8 +129,8 @@ def test_shr_lsr_c_set():
         assert N == 0, f"SHR LSR C-set: expected N=0, got N={N}"
         assert Z == 0, f"SHR LSR C-set: expected Z=0, got Z={Z}"
         # Direct result check: DR2 + (-1) should be 0 → Z=1
-        # imm15=0x7FFF sign-extends to -1 (0xFFFFFFFF)
-        await _exec(ctx, dut, encode_iadd(3, 2, 0x7FFF))  # DR3 = DR2 + (-1)
+        # Unsigned immediate subtraction checks the result without a signed encoding.
+        await _exec(ctx, dut, encode_isub(3, 2, 1))  # DR3 = DR2 - 1
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, f"SHR LSR C-set: result check failed — DR2 should be 1, got Z2={Z2} (DR2+(-1) ≠ 0)"
         print("  PASS: SHR LSR (shift_amt=1, src=3) → result=1, C=1, N=0, Z=0")
@@ -144,7 +159,7 @@ def test_shr_lsr_c_clear():
         assert C == 0, f"SHR LSR C-clear: expected C=0, got C={C} (N={N} Z={Z} V={V})"
         assert N == 0, f"SHR LSR C-clear: expected N=0, got N={N}"
         # Direct result check: DR2 + (-1) should be 0 → Z=1
-        await _exec(ctx, dut, encode_iadd(3, 2, 0x7FFF))  # DR3 = DR2 + (-1)
+        await _exec(ctx, dut, encode_isub(3, 2, 1))  # DR3 = DR2 - 1
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, f"SHR LSR C-clear: result check failed — DR2 should be 1, got Z2={Z2} (DR2+(-1) ≠ 0)"
         print("  PASS: SHR LSR (shift_amt=1, src=2) → result=1, C=0, N=0")
@@ -160,7 +175,7 @@ def test_shr_lsr_c_clear():
 def test_shr_asr_negative_result():
     """SHR ASR — sign-extension of a negative value.
 
-    Source = -1 (0xFFFFFFFF).  imm15=0x7FFF → sign_extend15 = 0xFFFFFFFF.
+    Source = -1 (0xFFFFFFFF), constructed with ISUB from DR0.
     Shift right by 1 with ASR (imm[5]=1).
     Expected: result = 0xFFFFFFFF (-1), N=1, C=1 (bit 0 of src was 1).
     LSR of -1 would give 0x7FFFFFFF (N=0), so N=1 distinguishes ASR from LSR.
@@ -169,8 +184,7 @@ def test_shr_asr_negative_result():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        # imm15=0x7FFF (bit14=1 → sign bit set) → 0xFFFFFFFF (-1 in 32-bit)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFF))      # DR1 = -1
+        await _exec(ctx, dut, encode_isub(1, 0, 1))          # DR1 = -1
         await _exec(ctx, dut, encode_shr(2, 1, 1, asr=True))  # DR2 = DR1 >>> 1  → expect -1
         N, Z, C, V = _get_flags(ctx, dut)
         assert N == 1, (
@@ -200,7 +214,7 @@ def test_shr_asr_negative_result():
 def test_shr_asr_c_clear():
     """SHR ASR — C = 0 when the bit shifted out is 0.
 
-    Source = -2 (0xFFFFFFFE).  imm15=0x7FFE → sign_extend15 = 0xFFFFFFFE.
+    Source = -2 (0xFFFFFFFE), constructed with ISUB from DR0.
     Shift right by 1 with ASR.
     Expected: result = 0xFFFFFFFF (-1), N=1, C=0 (bit 0 of src was 0).
     """
@@ -208,8 +222,7 @@ def test_shr_asr_c_clear():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        # imm15=0x7FFE (bit14=1 → sign bit set) → 0xFFFFFFFE (-2 in 32-bit)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFE))      # DR1 = -2
+        await _exec(ctx, dut, encode_isub(1, 0, 2))          # DR1 = -2
         await _exec(ctx, dut, encode_shr(2, 1, 1, asr=True))  # DR2 = DR1 >>> 1  → expect -1
         N, Z, C, V = _get_flags(ctx, dut)
         assert N == 1, f"SHR ASR C-clear: expected N=1, got N={N}"
@@ -243,7 +256,7 @@ def test_shl_c_set():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFF))  # DR1 = -1 (0xFFFFFFFF)
+        await _exec(ctx, dut, encode_isub(1, 0, 1))  # DR1 = -1 (0xFFFFFFFF)
         await _exec(ctx, dut, encode_shl(2, 1, 1))         # DR2 = DR1 << 1  → expect -2 (0xFFFFFFFE)
         N, Z, C, V = _get_flags(ctx, dut)
         assert C == 1, (
@@ -288,7 +301,7 @@ def test_shl_c_clear():
         assert N == 0, f"SHL C-clear: expected N=0, got N={N}"
         assert Z == 0, f"SHL C-clear: expected Z=0, got Z={Z}"
         # Direct result check: DR2 + (-2) should be 0 → Z=1  (result = 2; -2 = imm15 0x7FFE)
-        await _exec(ctx, dut, encode_iadd(3, 2, 0x7FFE))  # DR3 = DR2 + (-2)
+        await _exec(ctx, dut, encode_isub(3, 2, 2))  # DR3 = DR2 - 2
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, (
             f"SHL C-clear: result check failed — DR2 should be 2, "
@@ -313,7 +326,7 @@ def test_shr_shift_by_zero_c_clear():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFF))  # DR1 = -1 (0xFFFFFFFF)
+        await _exec(ctx, dut, encode_isub(1, 0, 1))  # DR1 = -1 (0xFFFFFFFF)
         await _exec(ctx, dut, encode_shr(2, 1, 0))         # DR2 = DR1 >> 0 (LSR, amt=0)
         N, Z, C, V = _get_flags(ctx, dut)
         assert C == 0, (
@@ -341,7 +354,7 @@ def test_shr_asr_shift_by_zero_c_clear():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFF))      # DR1 = -1
+        await _exec(ctx, dut, encode_isub(1, 0, 1))          # DR1 = -1
         await _exec(ctx, dut, encode_shr(2, 1, 0, asr=True))  # DR2 = DR1 >>> 0
         N, Z, C, V = _get_flags(ctx, dut)
         assert C == 0, (
@@ -368,7 +381,7 @@ def test_shl_shift_by_zero_c_clear():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFF))  # DR1 = -1 (0xFFFFFFFF)
+        await _exec(ctx, dut, encode_isub(1, 0, 1))  # DR1 = -1 (0xFFFFFFFF)
         await _exec(ctx, dut, encode_shl(2, 1, 0))         # DR2 = DR1 << 0
         N, Z, C, V = _get_flags(ctx, dut)
         assert C == 0, (
@@ -458,7 +471,7 @@ def test_shr_lsr_shift_by_31():
 
     async def testbench(ctx):
         await _boot(ctx, dut)
-        await _exec(ctx, dut, encode_iadd(1, 0, 0x7FFF))  # DR1 = -1 (0xFFFFFFFF)
+        await _exec(ctx, dut, encode_isub(1, 0, 1))  # DR1 = -1 (0xFFFFFFFF)
         await _exec(ctx, dut, encode_shr(2, 1, 31))        # DR2 = DR1 >> 31 (LSR)  → expect 1
         N, Z, C, V = _get_flags(ctx, dut)
         assert N == 0, (
@@ -469,7 +482,7 @@ def test_shr_lsr_shift_by_31():
             f"SHR LSR shift-by-31: expected C=1 (src[30]=1), "
             f"got C={C} (N={N} Z={Z} V={V})")
         # Direct result check: DR2 + (-1) should be 0 → Z=1  (result = 1)
-        await _exec(ctx, dut, encode_iadd(3, 2, 0x7FFF))  # DR3 = DR2 + (-1)
+        await _exec(ctx, dut, encode_isub(3, 2, 1))  # DR3 = DR2 - 1
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, (
             f"SHR LSR shift-by-31: result check failed — DR2 should be 1, "
@@ -506,7 +519,7 @@ def test_shr_asr_positive_no_sign_extend():
             f"SHR ASR positive: expected C=0 (src bit-0 of 4 is 0), "
             f"got C={C} (N={N} Z={Z} V={V})")
         # Direct result check: DR2 + (-2) should be 0 → Z=1  (result = 2; -2 = imm15 0x7FFE)
-        await _exec(ctx, dut, encode_iadd(3, 2, 0x7FFE))  # DR3 = DR2 + (-2)
+        await _exec(ctx, dut, encode_isub(3, 2, 2))  # DR3 = DR2 - 2
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, (
             f"SHR ASR positive: result check failed — DR2 should be 2, "
@@ -597,7 +610,18 @@ def test_shl_alternating_bits():
 # Entry point
 # ---------------------------------------------------------------------------
 
+def test_setup_arithmetic_encoding_matches_isa():
+    assert encode_iadd(1, 0, 3) == 0xAF084003
+    assert encode_isub(1, 0, 1) == 0xB7084001
+    for encode in (encode_iadd, encode_isub):
+        assert encode(1, 0, 0) & 0x7FFF == 0x4000
+        assert encode(1, 0, 0x3FFF) & 0x7FFF == 0x7FFF
+        for invalid in (-1, 0x4000, 0x7FFF):
+            with pytest.raises(ValueError):
+                encode(1, 0, invalid)
+
 _ALL_TESTS = (
+    test_setup_arithmetic_encoding_matches_isa,
     test_shr_lsr_c_set,
     test_shr_lsr_c_clear,
     test_shr_asr_negative_result,

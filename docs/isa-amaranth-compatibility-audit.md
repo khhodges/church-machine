@@ -62,8 +62,8 @@ or change the ISA to make the implementations agree.
 | 21 | IADD | Core dispatch exists; scheduler tests use arithmetic incidentally. Full carry/overflow and operand-edge parity unverified. |
 | 22 | ISUB | Core dispatch exists. Full borrow/overflow and operand-edge parity unverified. |
 | 23 | BRANCH | Condition truth table and resumed-Thread condition tests passed in the earlier scheduler suite. All signed displacement/bounds cases unverified; IDX1 packet mode absent. |
-| 24 | SHL | Core dispatch exists. **Verification blocked:** the shift suite fails during boot before reaching shift assertions. |
-| 25 | SHR | Core dispatch exists. **Verification blocked:** same boot prerequisite; cannot certify LSR/ASR and carry behavior from that suite. |
+| 24 | SHL | **Targeted pass:** corrected test encodings and boot handshake; original result/flag assertions pass, including zero/large shifts and alternating-bit patterns. |
+| 25 | SHR | **Targeted pass:** original LSR/ASR, sign-extension, carry and zero/large-shift assertions pass after correcting test setup. Full cross-engine equivalence remains unverified. |
 
 Other reserved/data encodings were not exhaustively swept in this audit.
 Acceptance of a decoded opcode alone does not prove correct execution.
@@ -167,6 +167,26 @@ rather than injecting instructions before initialization finishes.
 
 After this test-only correction, all four Mode-2 tests pass. Both core profiles
 complete the boot-helper test with exactly CR12's M bit set. The 14 shift tests
-now reach their instruction/result assertions but still fail; their remaining
-encoding, execution-handshake and arithmetic issues have not been diagnosed
-by this narrow boot fix. The ISA release verdict remains HOLD.
+then reached their instruction/result assertions but failed. The subsequent
+diagnosis below supersedes that failure status. The ISA release verdict remains HOLD.
+
+## Follow-up: shift result failures resolved without hardware changes
+
+A first-case trace showed that the old setup word `0xAF080003` selects the
+register form of IADD (DR3), not immediate 3. With DR3 initially zero, it
+initialized the shift source to zero. The correct immediate word `0xAF084003`
+produces the expected source and subsequent SHR carry. Each instruction was
+observed retiring without a fault.
+
+The test helper now sets the unsigned-immediate selector and rejects values
+outside 0–16383. Negative source constants and subtractive result checks use
+explicit ISUB immediates, as specified in the ISA, rather than obsolete signed
+IADD encodings. The execution helper asserts exact instruction retirement
+and absence of faults instead of assuming a supplied word executed.
+
+Verification: `python3 -m pytest hardware/test_shift_ops.py -q --tb=short`
+reports **15 passed**: all 14 original shift tests with unchanged expected
+results/flags, plus an exact-word and immediate-range regression test.
+No production hardware, assembler, ISA, LUMP, Namespace or boot-image changes
+were needed. This resolves the shift-test evidence gap, not the separately
+identified retired-opcode and IDX1 release blockers.
