@@ -51,15 +51,15 @@ def encode_isub(dr_dst, dr_src, imm):
     return _enc(TuringOpcode.ISUB, CondCode.AL, dr_dst, dr_src, 0x4000 | imm)
 
 
-def encode_shl(dr_dst, dr_src, shift_amt):
-    """SHL DR[dr_dst] = DR[dr_src] << shift_amt; cond=AL."""
-    return _enc(TuringOpcode.SHL, CondCode.AL, dr_dst, dr_src, shift_amt & 0x1F)
+def encode_shl(dr_dst, dr_src, shift_amt, *, cond=CondCode.AL):
+    """SHL DR[dr_dst] = DR[dr_src] << shift_amt."""
+    return _enc(TuringOpcode.SHL, cond, dr_dst, dr_src, shift_amt & 0x1F)
 
 
-def encode_shr(dr_dst, dr_src, shift_amt, asr=False):
-    """SHR DR[dr_dst] = DR[dr_src] >> shift_amt; imm[5]=1 for ASR; cond=AL."""
+def encode_shr(dr_dst, dr_src, shift_amt, asr=False, *, cond=CondCode.AL):
+    """SHR DR[dr_dst] = DR[dr_src] >> shift_amt; imm[5]=1 for ASR."""
     imm = (shift_amt & 0x1F) | (0x20 if asr else 0)
-    return _enc(TuringOpcode.SHR, CondCode.AL, dr_dst, dr_src, imm)
+    return _enc(TuringOpcode.SHR, cond, dr_dst, dr_src, imm)
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +142,95 @@ async def _exec(ctx, dut, instr):
 # ---------------------------------------------------------------------------
 # Test cases
 # ---------------------------------------------------------------------------
+
+async def _check_conditional_shift(ctx, dut, instr, *, taken, result, flags):
+    """Observe one retirement and an idle cycle without a flag-changing probe."""
+    before_dr = [ctx.get(word) for word in dut.debug_dr_words]
+    before_flags = _get_flags(ctx, dut)
+    nia = ctx.get(dut.nia)
+    dst = (instr >> 19) & 15
+    expected_dr = before_dr.copy()
+    if taken and dst:
+        expected_dr[dst] = result
+    expected_flags = flags if taken else before_flags
+    ctx.set(dut.imem_data, instr)
+    ctx.set(dut.imem_valid, 1)
+    assert not ctx.get(dut.fault_valid)
+    assert not ctx.get(dut.retire_fault_valid)
+    assert ctx.get(dut.retire_valid), "Conditional shift was not accepted"
+    assert ctx.get(dut.retire_instr) == instr
+    assert ctx.get(dut.retire_nia) == nia
+    await ctx.tick()
+    ctx.set(dut.imem_valid, 0)
+    for _ in range(2):
+        assert not ctx.get(dut.fault_valid)
+        assert not ctx.get(dut.retire_fault_valid)
+        assert not ctx.get(dut.retire_valid), "Conditional shift retired twice"
+        assert ctx.get(dut.nia) == nia + 4, "Shift must advance NIA exactly once"
+        assert [ctx.get(word) for word in dut.debug_dr_words] == expected_dr
+        assert _get_flags(ctx, dut) == expected_flags
+        await ctx.tick()
+    assert ctx.get(dut.nia) == nia + 4
+    assert [ctx.get(word) for word in dut.debug_dr_words] == expected_dr
+    assert _get_flags(ctx, dut) == expected_flags
+
+
+def _run_conditional_shift_cases(encoder, result, result_flags):
+    dut = ChurchCore(iot_profile=True)
+
+    async def testbench(ctx):
+        await _boot(ctx, dut)
+        for dst in (2, 1, 0):  # Separate destination, alias, and hardwired zero.
+            for zero in (True, False):
+                await _exec(ctx, dut, encode_isub(1, 0, 2))  # Source = -2.
+                await _exec(ctx, dut, encode_iadd(2, 0, 0x123))
+                if zero:
+                    await _exec(ctx, dut, encode_isub(3, 0, 0))
+                    initial_flags = (0, 1, 1, 0)
+                else:
+                    # Signed overflow supplies V=1: a skipped shift must not
+                    # clear it. All flags are established by real instructions.
+                    await _exec(ctx, dut, encode_iadd(3, 0, 1))
+                    await _exec(ctx, dut, encode_shl(3, 3, 31))
+                    await _exec(ctx, dut, encode_isub(3, 3, 1))
+                    await _exec(ctx, dut, encode_iadd(3, 3, 1))
+                    initial_flags = (1, 0, 0, 1)
+                assert _get_flags(ctx, dut) == initial_flags
+                false_cond = CondCode.NE if zero else CondCode.EQ
+                true_cond = CondCode.EQ if zero else CondCode.NE
+                await _check_conditional_shift(
+                    ctx, dut, encoder(dst, false_cond), taken=False,
+                    result=result, flags=result_flags)
+                await _check_conditional_shift(
+                    ctx, dut, encoder(dst, true_cond), taken=True,
+                    result=result, flags=result_flags)
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+
+def test_conditional_shl():
+    """False SHL preserves state; true SHL writes back, including alias/DR0."""
+    _run_conditional_shift_cases(
+        lambda dst, cond: encode_shl(dst, 1, 1, cond=cond),
+        0xFFFFFFFC, (1, 0, 1, 0))
+
+
+def test_conditional_shr_lsr():
+    """False LSR preserves state; true LSR writes back, including alias/DR0."""
+    _run_conditional_shift_cases(
+        lambda dst, cond: encode_shr(dst, 1, 1, cond=cond),
+        0x7FFFFFFF, (0, 0, 0, 0))
+
+
+def test_conditional_shr_asr():
+    """False ASR preserves state; true ASR writes back, including alias/DR0."""
+    _run_conditional_shift_cases(
+        lambda dst, cond: encode_shr(dst, 1, 1, asr=True, cond=cond),
+        0xFFFFFFFF, (1, 0, 0, 0))
+
 
 def test_arithmetic_setup_encoding():
     """Pin literal ISA words so the result oracle cannot hide helper drift."""
@@ -693,6 +782,9 @@ def test_shl_alternating_bits():
 # ---------------------------------------------------------------------------
 
 _ALL_TESTS = (
+    test_conditional_shl,
+    test_conditional_shr_lsr,
+    test_conditional_shr_asr,
     test_arithmetic_setup_encoding,
     test_first_shr_setup_and_retirement,
     test_shr_lsr_c_set,
