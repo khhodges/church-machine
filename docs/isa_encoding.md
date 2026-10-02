@@ -3,15 +3,22 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
-All values verified against `simulator/assembler.js` and `simulator/simulator.js`.
-This document is the complete specification needed to implement an encoder with
-no guesswork.
+This document records the baseline encoding previously compared against
+`simulator/assembler.js` and `simulator/simulator.js`; it is not a certification
+of current cross-engine equivalence.
+
+**Indexed-operand correction (2026-10-02):** the authoritative semantic rule is
+in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics):
+the instruction adds a selected DR's runtime value to the immediate.
+The baseline bit fields below do not yet specify that uniformly. Do not infer
+approval of a multiword IDX1 packet, a new immediate range, or a replacement
+binary layout from this rule. The revised encoding remains to be reconciled.
 
 ---
 
 ## 1. Word Format
 
-Every instruction is a single 32-bit word with this fixed layout:
+The baseline encoding uses a single 32-bit word with this fixed layout:
 
 ```
  31      27 26    23 22   19 18   15 14            0

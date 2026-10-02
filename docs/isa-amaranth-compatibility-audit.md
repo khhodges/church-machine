@@ -1,5 +1,13 @@
 # Amaranth ISA compatibility audit
 
+**Scope correction (2026-10-02):** the user clarified that indexed instructions
+must themselves add the data-register value to the immediate. See
+[ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+The prior multiword IDX1 design is not established as the intended encoding.
+IDX1 gaps recorded below describe implementation differences; they are not
+authority to implement its packet format in Amaranth. Reconcile the encoding
+first, then verify assembler/simulator/hardware behavior against that decision.
+
 ## Verdict
 
 **Do not certify the current hardware as implementing all approved ISA changes.**

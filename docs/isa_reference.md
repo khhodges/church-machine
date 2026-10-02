@@ -23,7 +23,9 @@ profile and are not universal ISA constants.
 
 ## 1. Instruction Word Format
 
-Every instruction is a 32-bit word with a fixed layout:
+The existing baseline instruction encoding is a 32-bit word with this layout.
+It is documented here for interpreting existing code; it does not settle the
+revised indexed-operand encoding described in §1.1.
 
 ```
  31    27 26   23 22   19 18   15 14              0
@@ -46,6 +48,54 @@ a real ISA instruction. Programs may also terminate by fault, by entering an
 infinite loop, or by not returning from a top-level CALL.
 
 ---
+
+### 1.1 Uniform indexed operands — required semantics
+
+For every instruction operand that denotes an index, the instruction itself
+computes:
+
+```text
+effective_index = DR[r] + immediate
+```
+
+`DR[r]` is the value held in the selected data register at execution time,
+not the register number. Any data register may supply that value. The immediate
+is added to it as part of the indexed operation; no separate ADD instruction is
+required. Subtractive offsets use `DR[r] - magnitude`, the corresponding
+negative-offset form.
+
+* Register-only indexing uses an immediate of zero.
+* Immediate-only indexing uses DR0, whose value is zero.
+* Example: with DR11 = 7 and an immediate of 3, the effective index is 10,
+  not 14 (the register number plus 3), and not merely 3.
+* The resulting index retains the indexed operand's units and meaning, such as
+  a c-list row or a data-word offset. An immediate that is not an index does not
+  acquire indexing semantics from this rule.
+* Existing permissions, type checks and capability bounds still apply.
+  Indexing grants no additional authority. Arithmetic overflow, underflow and
+  out-of-range results must not wrap into a permitted access. Rejection must
+  occur before an unauthorized read, write or control transfer.
+
+**Encoding boundary:** this establishes the operand calculation, not a new
+immediate width, register-field allocation, opcode, profile or instruction word
+count. "Any immediate value" does not authorize silent truncation or a newly
+invented range; the representable range must be stated in the eventual encoding.
+The two-/three-word IDX1 packet format in the companion documents is a prior
+proposal/implementation, not the approved consequence of this requirement.
+The user has not imposed an exactly-one-32-bit-word constraint either.
+
+**Implementation status:** the ordinary DREAD/DWRITE indexed forms already
+express register-plus-immediate addition within their existing field limits.
+Ordinary LOAD/SAVE c-list operands are documented below with immediate-only
+encodings; those are implementation gaps relative to this uniform requirement,
+not exceptions to it. The separate IDX1 implementation is not proof that the
+ordinary instruction set or Amaranth matches the requirement. The assembler,
+simulator and hardware must be reconciled against the same explicit encoding.
+
+The per-instruction syntax and bit fields below remain the baseline encoding
+record until that reconciliation; they must not silently reinterpret existing
+saved binaries. This text does not authorize recompilation, migration, or
+replacement of saved programs, Namespace contents, or boot images.
 
 ## 2. Condition Codes
 

@@ -5,8 +5,17 @@
 > Historical bytes remain inspectable; correcting and rebuilding affected
 > source requires an explicit programmer action.
 
-Status: **approved for coordinated implementation**, with durable Save LUMP
-and protected simulator execution/reload described below. This is not a hardware release,
+Status: **existing software profile and prior packet proposal; encoding approval
+is not established by the corrected indexing requirement** (2026-10-02).
+
+The required behavior is the indexed instruction's own calculation of
+`DR[r] + immediate`, as specified in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+Do not infer a required packet format, 20-bit magnitude or fixed instruction
+word count. Packet-specific contracts below describe this separate design;
+they are not instructions to extend Amaranth to match it.
+
+Durable Save LUMP and protected simulator execution/reload are described below.
+This is not a hardware release,
 compiler certification, or authorization to amend an existing LUMP, Namespace
 or boot image. Existing binaries retain their legacy interpretation.
 
@@ -430,7 +439,7 @@ Before implementation can claim conformance:
 Until these are complete, exporting this prospective envelope is a design
 artifact only, not permission to execute IDX1 on current software or hardware.
 
-**Draft freeze signature:** direction approved; exact container/schema/magic,
+**Historical draft freeze signature (not current encoding approval):** exact container/schema/magic,
 handshake and coordinated specification freeze pending review; implementation,
 cryptographic trust-path verification and conformance evidence unavailable.
 No signature over a build or claim of conformance is supplied by this document.

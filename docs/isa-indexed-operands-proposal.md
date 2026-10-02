@@ -1,7 +1,13 @@
 # Uniform indexed operands — correction proposal
 
-Status: **detailed specification approved for implementation; foundation
-modules implemented and synthetically tested; end-to-end execution unavailable**.
+Status: **prior implementation proposal; not approval of the packet encoding
+for the corrected indexing requirement** (2026-10-02).
+
+The controlling requirement is now stated in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics):
+an indexed instruction adds the selected DR's runtime value to its immediate.
+This does not settle the encoding or instruction word count. The packet choices
+and implementation checkpoint below are historical design records, not a mandate
+to add packet fetching to Amaranth. Do not use them to override that requirement.
 
 ## Implementation checkpoint
 
@@ -26,7 +32,7 @@ Detailed contracts:
 
 Where this earlier proposal leaves a rule open, the detailed documents supply
 the proposed decision. Exact envelope identifiers and device wire mappings are
-not implied approved by approval of the compact instruction direction.
+not approved by the indexed-operand semantic requirement.
 
 This document records the first milestone: requirements, operand inventory,
 containment contract, encoding options, implementation dependencies, and

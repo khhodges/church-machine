@@ -1,13 +1,19 @@
 # IDX1 compact indexed-operand encoding
 
-Status: **detailed specification draft following approval of the compact
-two/three-word direction; not an implemented ISA or a released binary format**.
+Status: **prior multiword encoding proposal, not authority for the corrected
+indexing requirement** (2026-10-02).
+
+The confirmed rule is that the instruction computes the selected DR's runtime
+value plus the immediate; see [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+That rule does not approve this packet format or its 20-bit magnitude.
+The layout below is retained to describe the existing proposal and associated
+software, not to prescribe the next simulator or Amaranth implementation.
 IDX1 is a profile name, not a release number. Opcode 10 is allocated to the
 packet introducer **within this proposed profile only**. Nothing here changes
 legacy opcode allocation, artifacts, user programs, simulator behavior or RTL.
 
 See [the requirements and implementation proposal](isa-indexed-operands-proposal.md).
-This specification details the approved compact direction. The larger
+This document records the previously proposed compact direction. The larger
 four/six-word alternative was not selected.
 See also [containment and fault ordering](isa-indexed-containment.md) and
 [profile, packaging and boundaries](isa-indexed-profile.md). Their exact
