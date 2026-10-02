@@ -1175,7 +1175,7 @@
                     <button type="button" class="btn btn-sm" id="namespaceImageRefresh" onclick="refreshNamespaceImage()">Refresh Image</button>
                     <button type="button" class="btn btn-sm" id="namespaceImageStatus" onclick="checkNamespaceImageRefresh()" hidden>Check commit status</button>
                 </div>
-                <p>Refresh Image rebuilds the stored generic image from saved assignments and exact selected LUMPs. It preserves those inputs and does not activate the simulator or upload/flash hardware.</p>
+                <p>Refresh Image packs RAM LUMPs in slot order after the Namespace header. Approval saves the new Namespace addresses and image together. Device addresses and saved LUMP files are preserved; no simulator activation or hardware upload occurs.</p>
                 <pre id="namespaceImageRefreshResult" role="status" aria-live="polite" style="white-space:pre-wrap;max-height:320px;overflow:auto;"></pre>
                 <div id="bootCapacityReport" role="status" aria-live="polite" style="margin-top:8px;">Refresh to inspect the committed image. This report never installs a LUMP.</div>
             </section>

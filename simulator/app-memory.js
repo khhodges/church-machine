@@ -384,13 +384,29 @@ function _imageRefreshOperation(value) {
 function _imageRefreshResult(data) {
     const root = document.getElementById('namespaceImageRefreshResult');
     root.textContent = [
-        data.committed === true ? 'Publication confirmed. Stored image and provenance replaced; saved inputs and running machines unchanged.' :
+        data.committed === true ? 'Publication confirmed. Namespace addresses compacted; stored image and provenance replaced. LUMP files and running machines unchanged.' :
             data.status === 'prepared' ? 'Reconstruction validated. Stored image unchanged; awaiting protected review.' :
             data.committed === false ? 'Not committed. Previous image/provenance and saved inputs unchanged.' :
             'Commit status unknown. Do not rebuild or retry publication; check status.',
-        ...(data.stages || []), ...(data.slotResults || []), ...(data.addressResults || []),
+        ...(data.relocations || []), ...(data.stages || []), ...(data.slotResults || []), ...(data.addressResults || []),
         data.error || '', data.message || '',
     ].filter(Boolean).join('\n');
+}
+async function _reloadCompactedNamespace(result) {
+    try {
+    const response = await fetch('/api/boot-image/ns-state', {cache: 'no-store'});
+    if (!response.ok) throw new Error('Image committed, but updated Namespace could not be read. Reload the Namespace view.');
+    const state = await response.json();
+    if (!Array.isArray(state.abstractions)) throw new Error('Updated Namespace response is invalid.');
+    // Refresh saved design evidence only. Never reload/reset simulator memory.
+    window._nsState = state;
+    updateNamespace();
+    await refreshBootCapacity();
+    } catch (error) {
+        _imageRefreshResult({...result, committed: true,
+            message: 'Compaction committed. View refresh failed: ' + error.message +
+                ' Reload the Namespace view; do not repeat publication.'});
+    }
 }
 async function checkNamespaceImageRefresh() {
     const key = _imageRefreshOperation();
@@ -406,13 +422,17 @@ async function checkNamespaceImageRefresh() {
             _imageRefreshOperation('');
             document.getElementById('namespaceImageStatus').hidden = true;
             button.disabled = false;
-            if (data.committed) await refreshBootCapacity();
+            if (data.committed) await _reloadCompactedNamespace(data);
         }
     } catch (_) {
         _imageRefreshResult({message: 'Status request interrupted. Use Check commit status again; no publication was retried.'});
     } finally { _imageRefreshBusy = false; }
 }
 async function refreshNamespaceImage() {
+    if (window._nsTableDirty || window._nsPrefetchDirty) {
+        _imageRefreshResult({committed: false, message: 'Save or discard Namespace edits before compacting the saved image.'});
+        return;
+    }
     if (_imageRefreshBusy) return;
     if (_imageRefreshOperation()) {
         document.getElementById('namespaceImageStatus').hidden = false;
@@ -447,7 +467,7 @@ async function refreshNamespaceImage() {
             _imageRefreshOperation('');
             document.getElementById('namespaceImageStatus').hidden = true;
         }
-        if (data.committed === true) await refreshBootCapacity();
+        if (data.committed === true) await _reloadCompactedNamespace(data);
     } catch (error) {
         _imageRefreshResult({
             committed: commitSent ? null : false,

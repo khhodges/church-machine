@@ -27332,8 +27332,9 @@ def _describe_protected_change(payload):
         with _lump_history_transition_lock(LUMPS_DIR):
             record, _ = _image_refresh_store().reviewed(payload["operationId"], _image_refresh_owner())
         return [
-            "Refresh Image replaces only the stored generic image and matching provenance.",
-            "Saved Namespace assignments, configuration and LUMP files remain unchanged.",
+            "Refresh Image compacts RAM LUMPs in slot order and commits Namespace addresses, image and provenance together.",
+            "Slots, artifact selections, device addresses, configuration and LUMP files remain unchanged.",
+            *record.get("relocations", []),
             "No simulator activation/reset, hardware upload/flash or physical memory erasure.",
             "Generic/simulator validation only; not hardware certification. Approved history is preserved.",
             "Frozen Namespace: " + record["namespace_fingerprint"],

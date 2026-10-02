@@ -1,4 +1,4 @@
-"""Saved-only generic image reconstruction. No catalog, relocation or activation."""
+"""Saved-only image reconstruction and reviewed slot-order compaction."""
 import copy
 import hashlib
 import json
@@ -49,7 +49,7 @@ def design_thread_slots(rows, config):
                   and row.get("name") in names))}
 
 
-def reconstruct(config, rows, directory):
+def reconstruct(config, rows, directory, *, compact=False):
     """Two independent passes: numeric slots, then every address including gaps."""
     validate_namespace_rows(rows)
     rows = sorted(copy.deepcopy(rows), key=lambda row: row["slot"])
@@ -89,12 +89,14 @@ def reconstruct(config, rows, directory):
     by_slot = {binding["slot"]: binding for binding in bindings}
     if entry not in by_slot:
         raise ValueError(f"Boot marker NS[{entry}] requires an exact selected executable")
-    header = boot.encode_namespace_header(0, total, slots, integer(selected[entry]["location"]) * 4)
+    header = boot.encode_namespace_header(
+        0, total, slots, 16 * 4 if compact else integer(selected[entry]["location"]) * 4)
     table = total - slots * 4
     mem = [0] * total
     mem[:16] = header
     claims = [(0, 16, "Namespace header"), (table, total, "Namespace table")]
-    results, derivatives = [], []
+    results, derivatives, relocations = [], [], []
+    next_body = 16
     entry_gt = boot.create_gt(integer(selected[entry]["seq"]), entry, {"E": 1}, 1)
     for row in rows:
         slot = row["slot"]
@@ -164,12 +166,22 @@ def reconstruct(config, rows, directory):
         if not 0 <= seq <= 511 or not 0 <= limit <= 0x1FFFFF or g not in (0, 1) or f != 0:
             raise ValueError(f"{label}: invalid sequence, limit, G or F (free) descriptor")
         if body is not None:
+            if compact:
+                old_location = location
+                location = next_body
+                row["location"] = f"0x{location:08X}"
+                if old_location != location:
+                    relocations.append(f"NS[{slot}] {row.get('name', '')}: "
+                                       f"0x{old_location:X} → 0x{location:X} ({len(body)} words)")
+                next_body += len(body)
             end = location + len(body)
             if location < 16 or end > table:
                 raise ValueError(f"{label}: complete allocation [0x{location:X},0x{end:X}) is outside body RAM")
             claims.append((location, end, label))
             mem[location:end] = body
         boot.write_ns_entry(mem, total, 4, slot, location, limit, 0, g, 1, seq, 0, token)
+        if compact:
+            row["seal"] = f"0x{mem[total - (slot + 1) * 4 + 2]:08X}"
         results.append(f"{label}: {kind}; word 0x{location:X}" +
                        (f"–0x{location + len(body) - 1:X}; {len(body)} words" if body else ""))
     # Do not use the order above to infer placement, and never trust access limits
@@ -191,6 +203,8 @@ def reconstruct(config, rows, directory):
             base = total - (slot + 1) * 4
             if any(mem[base:base + 4]):
                 raise ValueError(f"Removed/unselected NS[{slot}] retained a descriptor")
+    mem[:16] = boot.encode_namespace_header(
+        0, total, slots, integer(selected[entry]["location"]) * 4)
     image = struct.pack(f"<{total}I", *mem)
     boot.validate_boot_image(image, saved_namespace_only=True)
     validate_simulator_resident_inventory(image)
@@ -199,6 +213,7 @@ def reconstruct(config, rows, directory):
         "namespace_fingerprint": namespace_fingerprint(rows),
         "image_sha256": sha(image), "bootEntrySlot": entry,
         "artifactBindings": derivatives,
+        **({"compactedRows": rows, "relocations": relocations} if compact else {}),
         "stages": ["Frozen saved Namespace/configuration and exact artifacts",
                    "Reconstructed numeric slots from zero-initialized memory",
                    "Validated complete allocations independently in address order",
@@ -239,7 +254,7 @@ def json_bytes(value):
 
 class RefreshStore:
     """Caller holds Namespace + library locks. Journal recovery is rollback-only
-    until the durable commit marker; only these two outputs ever change."""
+    until the durable commit marker; Namespace, image and provenance commit together."""
     def __init__(self, directory, state_path, config_path):
         self.directory = Path(directory)
         self.root = self.directory / ".image-refresh"
@@ -256,20 +271,25 @@ class RefreshStore:
 
     def prepare(self, owner):
         before = self.inputs()
-        rows = json.loads(self.state_path.read_bytes())["abstractions"]
+        state = json.loads(self.state_path.read_bytes())
+        rows = state["abstractions"]
         cfg = json.loads(self.config_path.read_bytes())
-        image, evidence = reconstruct(cfg, rows, self.directory)
-        evidence["namespace_fingerprint"] = namespace_fingerprint(rows)
+        image, evidence = reconstruct(cfg, rows, self.directory, compact=True)
+        state["abstractions"] = evidence.pop("compactedRows")
+        state_bytes = json_bytes(state)
+        evidence["namespace_sha256"] = sha(state_bytes)
         evidence["origin"] = "generic-refresh"
         evidence["sourceInputs"] = {
             path: digest for path, digest in before.items()
             if Path(path).name not in ("boot-image.bin", "boot-image.provenance.json")}
+        evidence["sourceInputs"][str(self.state_path)] = sha(state_bytes)
         if self.inputs() != before:
             raise ValueError("Saved inputs changed during reconstruction; prepare a fresh review")
         key = uuid.uuid4().hex
         record = dict(evidence, operationId=key, owner=owner, inputs=before,
                       expires=time.time() + 1800, status="prepared", committed=False)
         atomic(self.root / key / "image.bin", image)
+        atomic(self.root / key / "namespace.json", state_bytes)
         atomic(self.root / key / "record.json", json_bytes(record))
         return self.public(record)
 
@@ -302,6 +322,10 @@ class RefreshStore:
         image = (self.root / key / "image.bin").read_bytes()
         if sha(image) != record["image_sha256"]:
             raise ValueError("Staged image hash differs from review")
+        if not record.get("namespace_sha256"):
+            raise ValueError("Refresh review predates compaction; prepare a fresh review")
+        if sha((self.root / key / "namespace.json").read_bytes()) != record["namespace_sha256"]:
+            raise ValueError("Staged Namespace hash differs from review")
         return record, image
 
     def public(self, record):
@@ -311,18 +335,19 @@ class RefreshStore:
         record, image = self.reviewed(key, owner)
         evidence = self.public(record)
         evidence.update(status="committed", committed=True)
-        outputs = {"boot-image.bin": image,
+        outputs = {"ns-state.json": (self.root / key / "namespace.json").read_bytes(),
+                   "boot-image.bin": image,
                    "boot-image.provenance.json": json_bytes(evidence)}
         journal = {"operationId": key, "phase": "pending", "previous": {}}
         for name in outputs:
-            path = self.directory / name
+            path = self.state_path if name == "ns-state.json" else self.directory / name
             journal["previous"][name] = path.exists()
             if path.exists():
                 atomic(self.root / key / (name + ".before"), path.read_bytes())
         atomic(self.root / "journal.json", json_bytes(journal))
         try:
             for name, raw in outputs.items():
-                atomic(self.directory / name, raw)
+                atomic(self.state_path if name == "ns-state.json" else self.directory / name, raw)
             journal["phase"] = "committed"
             atomic(self.root / "journal.json", json_bytes(journal))
         except Exception:
@@ -341,8 +366,10 @@ class RefreshStore:
             raise ValueError("Refresh journal is invalid; publication blocked")
         committed = journal["phase"] == "committed"
         if not committed:
-            for name in ("boot-image.bin", "boot-image.provenance.json"):
-                target = self.directory / name
+            for name in journal["previous"]:
+                if name not in ("ns-state.json", "boot-image.bin", "boot-image.provenance.json"):
+                    raise ValueError("Unknown refresh journal output")
+                target = self.state_path if name == "ns-state.json" else self.directory / name
                 if journal["previous"][name]:
                     atomic(target, (self.root / key / (name + ".before")).read_bytes())
                 elif target.exists():

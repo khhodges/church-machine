@@ -168,7 +168,8 @@ def test_thread_petname_does_not_install_lazy_inform(tmp_path):
     service = store(tmp_path)
     plan = service.prepare("owner")
     service.commit(plan["operationId"], "owner")
-    report = capacity_report(rows, actual, str(tmp_path), config=cfg)
+    saved = json.loads((tmp_path / "ns-state.json").read_bytes())["abstractions"]
+    report = capacity_report(saved, (tmp_path / "boot-image.bin").read_bytes(), str(tmp_path), config=cfg)
     assert report["trusted"], report["warnings"]
 
 
@@ -222,11 +223,22 @@ def test_commit_capacity_and_preserved_inputs(tmp_path):
     result = service.commit(plan["operationId"], "owner")
     assert result["committed"] is True
     image = (tmp_path / "boot-image.bin").read_bytes()
-    report = capacity_report(rows, image, str(tmp_path), config=cfg)
+    saved = json.loads((tmp_path / "ns-state.json").read_bytes())["abstractions"]
+    report = capacity_report(saved, image, str(tmp_path), config=cfg)
     assert report["trusted"], report["warnings"]
     assert report["imageMatchesNamespaceRevision"]
     assert report["allocatedWords"] == 16 + 256 + 256 + 64
-    assert {name: (tmp_path / name).read_bytes() for name in protected} == protected
+    assert {name: (tmp_path / name).read_bytes() for name in protected if name != "ns-state.json"} == {
+        name: raw for name, raw in protected.items() if name != "ns-state.json"}
+    by_slot = {r["slot"]: r for r in saved}
+    assert refresh.integer(by_slot[20]["location"]) == 16
+    assert refresh.integer(by_slot[23]["location"]) == 80
+    assert by_slot[3]["location"] == rows[3]["location"]
+    assert struct.unpack("<8192I", image)[4] == 16 * 4
+    assert refresh.reconstruct(cfg, saved, tmp_path)[0] == image
+    second = service.prepare("owner")
+    assert second["relocations"] == []
+    assert (service.root / second["operationId"] / "image.bin").read_bytes() == image
     with pytest.raises(ValueError, match="already resolved"):
         service.commit(plan["operationId"], "owner")
 
@@ -243,8 +255,44 @@ def test_stale_review(tmp_path, filename):
     assert not (tmp_path / "boot-image.bin").exists()
 
 
+def test_compaction_repairs_old_overlap_without_changing_sources(tmp_path):
+    cfg, rows = fixture(tmp_path)
+    rows[2]["location"] = rows[1]["location"]
+    before = copy.deepcopy(rows)
+    image, evidence = refresh.reconstruct(cfg, rows, tmp_path, compact=True)
+    assert rows == before
+    compacted = {r["slot"]: r for r in evidence["compactedRows"]}
+    assert refresh.integer(compacted[20]["location"]) == 16
+    assert refresh.integer(compacted[23]["location"]) == 80
+    words = struct.unpack("<8192I", image)
+    assert not any(words[336:7936])
+    assert words[8192 - 10 * 4:8192 - 9 * 4] == (0, 0, 0, 0)
+
+
+def test_compaction_overflow_preserves_namespace(tmp_path):
+    cfg, rows = fixture(tmp_path)
+    rows[1]["allocationWords"] = 8192
+    before = copy.deepcopy(rows)
+    with pytest.raises(ValueError, match="outside body RAM"):
+        refresh.reconstruct(cfg, rows, tmp_path, compact=True)
+    assert rows == before
+
+
+def test_staged_namespace_tampering_blocks_commit(tmp_path):
+    fixture(tmp_path)
+    service = store(tmp_path)
+    original = service.state_path.read_bytes()
+    plan = service.prepare("owner")
+    (service.root / plan["operationId"] / "namespace.json").write_text("{}")
+    with pytest.raises(ValueError, match="Staged Namespace hash"):
+        service.commit(plan["operationId"], "owner")
+    assert service.state_path.read_bytes() == original
+    assert not (tmp_path / "boot-image.bin").exists()
+
+
 def test_transaction_failure_and_restart_recovery(tmp_path, monkeypatch):
     fixture(tmp_path)
+    old_state = (tmp_path / "ns-state.json").read_bytes()
     service = store(tmp_path)
     (tmp_path / "boot-image.bin").write_bytes(b"old-image")
     (tmp_path / "boot-image.provenance.json").write_bytes(b"old-provenance")
@@ -263,6 +311,7 @@ def test_transaction_failure_and_restart_recovery(tmp_path, monkeypatch):
     assert (tmp_path / "boot-image.bin").read_bytes() == b"old-image"
     assert (tmp_path / "boot-image.provenance.json").read_bytes() == b"old-provenance"
     assert service.read(plan["operationId"], "owner")["status"] == "rolled_back"
+    assert (tmp_path / "ns-state.json").read_bytes() == old_state
     monkeypatch.setattr(refresh, "atomic", original)
     plan = service.prepare("owner")
     failed = False
@@ -276,6 +325,7 @@ def test_transaction_failure_and_restart_recovery(tmp_path, monkeypatch):
         service.commit(plan["operationId"], "owner")
     monkeypatch.setattr(refresh, "atomic", original)
     store(tmp_path).recover()
+    assert (tmp_path / "ns-state.json").read_bytes() == old_state
     assert (tmp_path / "boot-image.bin").read_bytes() == b"old-image"
     assert (tmp_path / "boot-image.provenance.json").read_bytes() == b"old-provenance"
 
