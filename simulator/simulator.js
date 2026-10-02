@@ -9022,13 +9022,15 @@ class ChurchSimulator {
         const presetCode = d.imm & 0xF;
         const presetMasks = this.tpermPresetMasks;
 
-        // TPERM EXACT (preset 14): pure 32-bit GT comparison, never a BIND assertion.
+        // TPERM EXACT (preset 14): pure 32-bit word0 comparison, not a BIND assertion.
+        // Mode encoding, B variants and NULL precedence remain separate contract questions.
         if (presetMasks[presetCode] === 'EXACT') {
             const crdGT = this.cr[d.crDst].word0 >>> 0;
             const crsGT = this.cr[d.crSrc].word0 >>> 0;
             // General TPERM flag convention: N=!Z, C=0, V=0.
-            this.flags.Z = crdGT === crsGT; this.flags.N = !this.flags.Z; this.flags.C = false; this.flags.V = false;
-            const descExact = `TPERM CR${d.crDst} EXACT [14]: credential ${this.flags.Z ? 'match' : 'mismatch'} — Z=${Number(this.flags.Z)}`;
+            const matches = crdGT === crsGT;
+            this.flags.Z = matches; this.flags.N = !matches; this.flags.C = false; this.flags.V = false;
+            const descExact = `TPERM CR${d.crDst} EXACT [14]: credential ${matches ? 'match' : 'mismatch'} — Z=${matches ? 1 : 0}`;
             this.output += descExact + '\n';
             this.pc++;
             this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);

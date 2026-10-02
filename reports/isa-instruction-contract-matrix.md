@@ -34,6 +34,22 @@ No row is fully accepted yet. A passing sample is not an instruction-wide pass.
 IoT exclusions are tested as rejections; they do not exempt the Full profile.
 No existing binary is implicitly certified, migrated, or rewritten.
 
+### Scoped TPERM correction (2026-10-02)
+
+T03 non-NULL EXACT word0 equality/mismatch is corrected in simulator and
+Amaranth source: Z=1/0 respectively, no BIND mismatch fault, no capability
+rewrite. Full simulator execution and Full/IoT core issue-to-retirement
+checks pass, including false predicates and preserved state. See
+`reports/tperm-exact-source-verification-2026-10-02.md` for commands and limits.
+This supersedes only the EXACT non-NULL failure in the historical table below.
+It is not an instruction-wide pass.
+
+**Blocked on D3:** mode/preset encoding and offsets, attenuation sentinel,
+B-modifier variants (including special presets), and NULL versus special-preset
+precedence. The existing low-imm=14 execution route is tested, not ratified as
+the canonical encoding. No change here resolves those questions.
+Generated RTL and released physical hardware remain **U** for this correction.
+
 ## Common contract to apply to every row
 
 | Dimension | Required contract / evidence |

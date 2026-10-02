@@ -167,7 +167,7 @@ class ChurchTperm(Elaboratable):
                 m.next = "CHECK_EXACT"
 
             with m.State("CHECK_EXACT"):
-                # EXACT is a comparison, not an authority assertion.
+                # EXACT is a pure comparison of all 32 GT bits, never a write.
                 m.d.sync += z_result_reg.eq(target_view.word0_gt == ref_view.word0_gt)
                 m.next = "COMPLETE"
 

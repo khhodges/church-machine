@@ -2,9 +2,20 @@
 
 from hardware.wukong_trace_symbols import (
     _BOOT_WORDS,
+    _WUKONG_CALLHOME_FALLBACK_WORDS,
     boot_disassembly,
     trace_metadata,
 )
+
+
+def test_callhome_fallback_matches_canonical_compact_load_words():
+    from hardware.boot_rom import WUKONG_NUC_PROGRAM
+
+    # Literal compact operands: immediate row 5/6 in bits 13:4, DR0 index.
+    assert _WUKONG_CALLHOME_FALLBACK_WORDS[:2] == (0x071B0050, 0x07230060)
+    assert _WUKONG_CALLHOME_FALLBACK_WORDS == tuple(WUKONG_NUC_PROGRAM)
+    assert trace_metadata(0x1204)["map_instr_word"] == 0x071B0050
+    assert trace_metadata(0x1208)["map_instr_word"] == 0x07230060
 
 
 def test_boot_instruction_metadata_uses_word_offset():
@@ -55,13 +66,18 @@ def test_wukong_callhome_dwrite_and_loop_branch_have_distinct_identity():
     assert branch["disasm"] == "BRANCH -69"
 
 
-def test_selftest_register_arithmetic_names_selected_dr():
+def test_selftest_register_arithmetic_names_selected_dr(monkeypatch):
+    # Test decoding, not the layout of whichever SelfTest is currently saved.
+    monkeypatch.setattr("hardware.wukong_trace_symbols.WUKONG_SELFTEST_WORDS",
+                        (0xF8000000, 0xB7000000))
     item = trace_metadata(0x00000604)
     assert item["nia_label"] == "SelfTest.1"
     assert item["disasm"] == "ISUB DR0, DR0, DR0"
 
 
-def test_selftest_immediate_arithmetic_strips_marker():
+def test_selftest_immediate_arithmetic_strips_marker(monkeypatch):
+    monkeypatch.setattr("hardware.wukong_trace_symbols.WUKONG_SELFTEST_WORDS",
+                        (0xF8000000, 0, 0, 0, 0xAF08C00B))
     item = trace_metadata(0x00000610)
     assert item["nia_label"] == "SelfTest.4"
     assert item["disasm"] == "IADD DR1, DR1, #11"
