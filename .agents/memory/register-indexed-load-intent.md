@@ -18,6 +18,15 @@ Immediate-only and register-only forms are special cases, not different
 semantic models. This is a target ISA requirement, not a claim of implemented
 support.
 
+On 2026-10-02, when presented with the multiword IDX1 packet-fetching
+proposal, the user corrected it: "one instruction only for idx instructions."
+Do not treat the existing multiword IDX1 software/specification as approval
+of the intended hardware encoding. Reconcile the single-instruction encoding
+constraint before implementing packet fetching or extending that design.
+
+**Why:** The user explicitly rejected the packet proposal as not what was intended;
+existing implementation is not authority over that requirement.
+
 **Why:** The user explicitly corrected an explanation that treated a parser's
 immediate-only restriction as the intended architecture.
 The user subsequently expanded the requirement to all indexed instructions,
