@@ -139,3 +139,14 @@ conformance to the authoritative specification.
 **How to apply:** Separate measured mismatches, source-level findings,
 specification ambiguities, and untested cases. Do not silently resolve
 contradictory requirements by copying one implementation into the other.
+
+The acceptance rule is instruction-by-instruction functional agreement across
+the ISA, assembler/compiler, simulator, Amaranth, and generated RTL.
+
+**Why:** The user explicitly requires all layers to match each instruction's
+function, not just pass independent regression suites.
+
+**How to apply:** Compare encoding, outputs, flags, control flow, permissions,
+faults, and architecturally visible side effects from equivalent initial states.
+Internal cycle counts may differ unless the ISA specifies timing. Generated
+RTL and released hardware require their own evidence, not source-level inference.
