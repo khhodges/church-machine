@@ -132,7 +132,7 @@ function loadViaSlot(slot) {
 {
     const compiler = new CLOOMCCompiler();
     // A simple 3-instruction assembly program (3 source lines → 3 code words)
-    const src = 'RETURN\nRETURN\nRETURN\n';
+    const src = '; Abstraction: RciFixture\nRETURN\nRETURN\nRETURN\n';
     const result = compiler.compileAssembly(src, []);
 
     assert('RCI4 compileAssembly succeeds with no errors',
@@ -142,27 +142,27 @@ function loadViaSlot(slot) {
 
     const wordCount = result.methods.length > 0 ? result.methods[0].code.length : 0;
     assert('RCI4 lineNums length equals word count',
-        result.lineNums.length === wordCount,
-        `lineNums.length=${result.lineNums.length}, words=${wordCount}`);
+        Array.isArray(result.lineNums) && result.lineNums.length === wordCount && wordCount === 3,
+        `lineNums.length=${result.lineNums?.length}, words=${wordCount}`);
 }
 
 // ── RCI5: compileAssembly lineNums values are correct 1-based line numbers ─────
 {
     const compiler = new CLOOMCCompiler();
-    // Three instructions on lines 1, 2, 3 respectively
-    const src = 'RETURN\nRETURN\nRETURN\n';
+    // The declaration occupies line 1; instructions retain their source lines.
+    const src = '; Abstraction: RciFixture\nRETURN\nRETURN\nRETURN\n';
     const result = compiler.compileAssembly(src, []);
 
     assert('RCI5 compileAssembly succeeds',
         result.errors.length === 0, result.errors.map(e => e.message).join('; '));
 
     const ln = result.lineNums;
-    assert('RCI5 lineNums[0] = 1 (first instruction on line 1)',
-        Array.isArray(ln) && ln[0] === 1, ln ? String(ln[0]) : '–');
-    assert('RCI5 lineNums[1] = 2 (second instruction on line 2)',
-        Array.isArray(ln) && ln[1] === 2, ln ? String(ln[1]) : '–');
-    assert('RCI5 lineNums[2] = 3 (third instruction on line 3)',
-        Array.isArray(ln) && ln[2] === 3, ln ? String(ln[2]) : '–');
+    assert('RCI5 lineNums[0] = 2 (first instruction on line 2)',
+        Array.isArray(ln) && ln[0] === 2, ln ? String(ln[0]) : '–');
+    assert('RCI5 lineNums[1] = 3 (second instruction on line 3)',
+        Array.isArray(ln) && ln[1] === 3, ln ? String(ln[1]) : '–');
+    assert('RCI5 lineNums[2] = 4 (third instruction on line 4)',
+        Array.isArray(ln) && ln[2] === 4, ln ? String(ln[2]) : '–');
 
     // Also verify the lineNums on the method object is the same array content
     const methodLn = result.methods.length > 0 ? result.methods[0].lineNums : null;

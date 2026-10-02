@@ -57,8 +57,6 @@
                 { label: 'SWITCH CR15 CR6 #row',  instr: 'SWITCH', ops: 'CR15 CR6 #row' },
                 { label: 'TPERM CRd preset',      instr: 'TPERM',  ops: 'CRd preset' },
                 { label: 'LAMBDA CRd',            instr: 'LAMBDA', ops: 'CRd' },
-                { label: 'ELOADCALL CRd CRs #row', instr: 'ELOADCALL', ops: 'CRd CRs #row' },
-                { label: 'XLOADLAMBDA CRd CRs #row', instr: 'XLOADLAMBDA', ops: 'CRd CRs #row' },
             ]
         },
         {

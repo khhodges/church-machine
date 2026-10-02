@@ -35,25 +35,53 @@ Editor-backed compaction regressions additionally reassemble numeric and
 `DR0 + magnitude` expressions (decimal, hex, and binary) and check their words
 against the compacted memory image, retaining predicates and comments.
 
-## Remaining broad-suite failures
+## Broad-suite regression verification
 
-- `npm test`: the monolithic assembler test reports 217 failed assertions
-  (207 distinct assertion labels) and stops at its SC5 access to an absent
-  method. Comparing the original assembler/compiler at HEAD showed every
-  remaining distinct failure already existed; many expect retired fused
-  ELOADCALL/XLOADLAMBDA behavior. Later npm commands consequently do not run.
-- `node simulator/test_rci_threading.js`: static compact row checks pass;
-  RCI4 fails because its compiler fixture has no abstraction declaration,
-  then dereferences missing `lineNums`.
-- `node simulator/test_lazy_resolve_pending.js`: T007b/T007c still expect
-  retired ELOADCALL to resolve/load a target. The old LOAD row-11 fixture
-  has been updated, restoring T008.
+- The assembler suite now reaches its summary rather than crashing at SC5.
+  Positive fixtures use explicit indexed CALL or LOAD/LAMBDA, retaining row,
+  selector, permission, and source-diagnostic checks. High-level constructs
+  that still generate retired instructions are tested for explicit rejection.
+- `npm test` passes the full chain: the monolithic assembler suite has 2,096
+  passing assertions and capability-index coverage has 42 passing cases.
+  Inline examples match their canonical compiled words; retired picker entries
+  are removed; dynamically generated method snippets preserve CALL rows/selectors.
+  Unsupported high-level call generation fails explicitly instead of producing
+  partial executable methods. Missing abstraction fixtures declare their owner.
+- The saved-LUMP guard exercises the current volatile installation boundary:
+  inspected-byte hash, awaited metadata, and C-list validation before boot/load.
+  Negative cases and deliberate await/validation bypasses demonstrate sensitivity.
+  Raw SELF without compiler provenance stays rejected; raw malformed bytes remain
+  inspectable without fabricated labels. Root-frame runtime diagnostics replace
+  the obsolete blanket boot-entry RETURN warning.
+- `node simulator/test_rci_threading.js` passes with an explicit abstraction
+  declaration and adjusted source-line assertions (55 assertions).
+- `node simulator/test_lazy_resolve_pending.js` passes (71 assertions).
+  The supported sequence explicitly LOADs to resolve the declared E capability
+  before indexed CALL checks for the absent body. Indexed CALL itself does not
+  resolve an empty C-list row.
 - `node simulator/test_editor_restore_containment.js`: expects `server source`
   but receives the owned `draft`.
 - `node simulator/test_null_clist_rows.js`: stale source-pattern assertion
   expects the old portable/materialized capability dispatch expression.
 
-These failures are reported, not hidden by changing their semantic assertions.
+The last two observations are outside the npm chain and were not changed.
+
+### Source regressions versus live catalog audits
+
+`npm test` runs the declaration guard with explicit `--source-only`, then runs
+`scripts/test_build_lump_embedded_content.js` against private temporary output
+directories. That suite retains malformed/current-mismatch rejection tests.
+CapabilityTest's expected embedded text accounts for the builder's existing
+programmer-facing SELF/public-name projection; the remaining text must match
+exactly.
+
+`npm run check:capabilities` and the configured `check-capabilities-blocks`
+workflow retain the original fail-closed live-catalog audits, including
+`audit_clist.py`. The live embedded-content check still fails on
+`CapabilityTest.1.3f7e1c54.lump`: its source frame is compressed, which the guard
+currently decodes as plain UTF-8, and its inflated source is a different saved
+revision from the canonical example. No historical artifact was rewritten or
+reclassified to clear this failure. Regression success is not release approval.
 
 ## Release boundaries
 

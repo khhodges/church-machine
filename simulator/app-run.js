@@ -8108,34 +8108,32 @@ abstraction NoteGPublishedBug {
 ; Description:  Church Machine capability test -- LOAD, TPERM, CALL
 ;               using the real hardware boot namespace.
 ; Author:       Church Machine Educational Platform
-; Version:      3.0
-; Created:      2026-08-12
+; Version:      2.0
+; Created:      2026-08-03
 ; Language:     Assembly
 ; ============================================================
 ; Single source of truth for the CapabilityTest abstraction (NS slot 10).
 ; The lump is built from this file by scripts/build_capability_test_lump.js,
 ; which supplies hardware GT words for each declared capability.
 ;
-; C-list layout (CapabilityTest's own 8-entry c-list):
-;   [0] SELF       E    (NS 10)  0x4A00000A -- CapabilityTest identity
-;   [1] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
-;   [2] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
-;   [3] UART_DEV   RW   (NS  2)  0x32000002 -- hardware UART TX/STATUS/RX
-;   [4] BTN_DEV    R    (NS  4)  0x12000004 -- hardware button state
-;   [5] TIMER_DEV  RW   (NS  5)  0x32000005 -- hardware timer registers
-;   [6] M_BIT_DEV  RW   (NS 13)  0x3200000D -- isolated-register M-bit control
-;   [7] WukongCallHome E (NS  7) 0x4A000007 -- call-home continuation
+; C-list layout (CapabilityTest's own 7-entry c-list, injected at load):
+;   [0] SelfTest   E    (NS  6)  0x4A000006 -- entry-callable abstraction
+;   [1] LED_DEV    RW   (NS  3)  0x32000003 -- hardware LED register file
+;   [2] UART_DEV   RW   (NS  2) 0x32000002 -- hardware UART TX/STATUS/RX
+;   [3] BTN_DEV    R    (NS  4) 0x12000004 -- hardware button state
+;   [4] TIMER_DEV  RW   (NS  5) 0x32000005 -- hardware timer registers
+;   [5] M_BIT_DEV RW (NS 13) 0x3200000D -- isolated-register M-bit control
+;   [6] WukongCallHome.hw E (NS 7) 0x4A000007 -- hardware continuation
 ; ============================================================
 
 capabilities {
-    SELF E,
     SelfTest E,
     LED_DEV RW,
     UART_DEV RW,
     BTN_DEV R,
     TIMER_DEV RW,
     M_BIT_DEV RW,
-    WukongCallHome E
+    WukongCallHome.hw E
 }
 
 Start:
@@ -8198,11 +8196,11 @@ SHL  DR4, DR4, 3      ; DR4 = 8
 SHR  DR4, DR4, 1      ; DR4 = 4
 
 ; ============================================================
-; TEST 8: ELOADCALL -- continue to the hardware call-home abstraction
+; TEST 8: CALL through CR6 -- continue to the hardware call-home abstraction
 ; ============================================================
 ; SelfTest already ran before Starter/CapabilityTest. Calling it again here
 ; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
-ELOADCALL CR0, WukongCallHome.hw, 0
+CALL CR6[WukongCallHome.hw], #0
 
 ; If call-home returns, rerun the capability checks without re-entering SelfTest.
 BRANCH Start
@@ -9662,7 +9660,7 @@ HALT`,
         'constants_dot': `; ============================================================
 ; Abstraction:  ConstantsDot
 ; Description:  Named method selectors (dot-notation form) — CALL AbstrName.Method
-;               and ELOADCALL with two-operand shorthand + named method selectors
+;               and indexed CALL through the active C-list
 ; Author:       Church Machine Educational Platform
 ; Version:      1.1
 ; Created:      2026-05-12
@@ -9680,8 +9678,8 @@ capabilities {
 ;     LOAD   CR11, Constants      ; bind CR11 to the abstraction
 ;     CALL   Constants.Pi         ; call method by name via CR11
 ;
-;   Style B — fused single instruction (ELOADCALL two-operand shorthand + named method selectors):
-;     ELOADCALL CR8, Constants, Pi    ; load + TPERM + call in one op
+;   Style B — indexed CALL through the active C-list:
+;     CALL CR6[Constants], Pi
 ;
 ; Both styles resolve method names automatically from
 ; METHOD_REGISTER_CONVENTIONS — no raw numeric offsets needed.
@@ -9715,29 +9713,26 @@ MCMP   DR1, DR0          ; DR1 vs 0 → Z=0 (π is non-zero)
 BRANCHNE style_b         ; take branch — π ≠ 0 confirmed
 
 ; ══════════════════════════════════════════════════════════
-; Style B: ELOADCALL CRd, AbstrName, Method  (fused, recommended)
+; Style B: CALL CR6[AbstrName], Method
 ; ══════════════════════════════════════════════════════════
-; ELOADCALL fuses three operations into one instruction:
-;   1. LOAD  — fetch the E-GT from the namespace by name
-;   2. TPERM — verify E permission (faults if absent)
-;   3. CALL  — enter the method's lambda body
+; Indexed CALL obtains the E-GT from the declared C-list row.
+; Normal CALL authority and method-selector checks still apply.
 ;
 ; This is the recommended style when you call a method only
 ; once and don't need to hold the capability in a CR register.
 ; It is also one instruction shorter than the two-step form.
 ;
-; Note: use CR0–CR11 as destination; CR12–CR15 are reserved
-; for microcode (Thread, Nucleus, Current-Lump, Namespace).
+; No scratch capability register is needed for this form.
 
 style_b:
-ELOADCALL CR8, Constants, Pi    ; DR1 <- π  (load+check+call in 1 op)
-ELOADCALL CR8, Constants, E     ; DR1 <- e
-ELOADCALL CR8, Constants, Phi   ; DR1 <- φ  (golden ratio)
-ELOADCALL CR8, Constants, Zero  ; DR1 <- 0.0
-ELOADCALL CR8, Constants, One   ; DR1 <- 1.0
+CALL CR6[Constants], Pi    ; DR1 <- π
+CALL CR6[Constants], E     ; DR1 <- e
+CALL CR6[Constants], Phi   ; DR1 <- φ  (golden ratio)
+CALL CR6[Constants], Zero  ; DR1 <- 0.0
+CALL CR6[Constants], One   ; DR1 <- 1.0
 
-; ── Confirm π from fused path equals π from two-step path ───
-ELOADCALL CR8, Constants, Pi    ; DR1 <- π  (fused path)
+; ── Confirm π from indexed path is nonzero ──────────────────
+CALL CR6[Constants], Pi    ; DR1 <- π  (indexed path)
 MCMP   DR1, DR0                  ; Z=0 → π ≠ 0
 BRANCHNE done
 

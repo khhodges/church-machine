@@ -27,6 +27,36 @@ const CONVENTIONS = {
 
 const NS_SYMBOLS = { 'SlideRule': 3 };
 
+// High-level syntax which still lowers to a retired instruction must fail
+// explicitly, not silently translate or leave an executable partial method.
+function assertRetiredCompilation(label, result) {
+    assert(label + ': actionable retirement diagnostic',
+        result.errors.some(e => /retired ELOADCALL/.test(e.message) &&
+            /supported CALL syntax/.test(e.message)),
+        result.errors.map(e => e.message).join('; '));
+    assert(label + ': no executable methods', result.methods.length === 0,
+        `methods=${result.methods.length}`);
+}
+
+// Keep the hard cutover covered independently of the manually corrected
+// positive fixtures below. Never install a test-only source translator.
+for (const source of [
+    'ELOADCALL CR0, SlideRule, Multiply',
+    'XLOADLAMBDA CR0, SlideRule',
+    'SlideRule.Multiply()',
+    'SlideRule Multiply',
+]) {
+    const assembler = new ChurchAssembler(CONVENTIONS);
+    assembler.setNamespace(NS_SYMBOLS);
+    const result = assembler.assemble('; retirement fixture\n' + source);
+    assert(`RETIRE ${source}: explicit recompile diagnostic`,
+        result.errors.some(error => error.line === 2 &&
+            /retired/.test(error.message) && /recompile/.test(error.message)),
+        JSON.stringify(result.errors));
+    assert(`RETIRE ${source}: emits no executable instruction`,
+        result.words.length === 0, JSON.stringify(result.words));
+}
+
 // ── Named method selectors — CALL CR<n>, MethodName ─────────────────────────
 
 // T1: CALL CR11, Multiply succeeds when CR11 is bound to SlideRule via a prior LOAD.
@@ -558,7 +588,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     // Salvation occupies c-list row 0 here since it's the only declared
     // capability (row is the position in the capabilities{} block, matching
     // capability_test.cloomc's boot c-list row 4 for its own layout).
-    const result = a.assemble('capabilities {\n  Salvation E\n}\nELOADCALL CR0, Salvation, main');
+    const result = a.assemble('capabilities {\n  Salvation E\n}\nCALL CR6[Salvation], main');
     const errors = a.errors;
     const idx    = result.words.length - 1;
     const word   = result.words[idx];
@@ -568,7 +598,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     const imm    = word & 0x7FFF;
     assert('T-SALV2 ELOADCALL CR0, Salvation, main assembles with no errors',
         errors.length === 0, errors.map(e => e.message).join('; '));
-    assert('T-SALV2 opcode=8 (ELOADCALL)', opcode === 8, 'got ' + opcode);
+    assert('T-SALV2 opcode=2 (indexed CALL)', opcode === 2, 'got ' + opcode);
     assert('T-SALV2 crDst=0', crDst === 0, 'got ' + crDst);
     assert('T-SALV2 crSrc=6 (CR6 c-list)', crSrc === 6, 'got ' + crSrc);
     assert('T-SALV2 imm=480 (row=0, method=15 1-based)', imm === 480, 'got ' + imm);
@@ -821,16 +851,16 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     const d = new ChurchAssembler();
     d.assemble('ELOADCALL CR13, CR6, 0');
     assert('P12d ELOADCALL CR13: error', d.errors.length > 0, 'expected an error');
-    assert('P12d ELOADCALL CR13: error mentions CR13',
-        d.errors.some(e => e.message.includes('CR13')),
+    assert('P12d ELOADCALL CR13: retirement precedes operand validation',
+        d.errors.some(e => e.message.includes('ELOADCALL is retired')),
         d.errors.map(e => e.message).join('; '));
 
     // P12e: XLOADLAMBDA CR12 → error
     const e = new ChurchAssembler();
     e.assemble('XLOADLAMBDA CR12, CR6, 0');
     assert('P12e XLOADLAMBDA CR12: error', e.errors.length > 0, 'expected an error');
-    assert('P12e XLOADLAMBDA CR12: error mentions CR12',
-        e.errors.some(e2 => e2.message.includes('CR12')),
+    assert('P12e XLOADLAMBDA CR12: retirement precedes operand validation',
+        e.errors.some(e2 => e2.message.includes('XLOADLAMBDA is retired')),
         e.errors.map(e2 => e2.message).join('; '));
 
     // P12f: LOAD CR11 → no error (CR11 is the last valid user register)
@@ -1461,7 +1491,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    const r = a.assemble('ELOADCALL CR0, SlideRule');
+    const r = a.assemble('CALL CR6[SlideRule]');
     const word   = r.words[0];
     const opcode = (word >>> 27) & 0x1F;
     const crDst  = (word >>> 19) & 0xF;
@@ -1469,7 +1499,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     const imm    = word & 0x7FFF;
     assert('EL1 ELOADCALL CR0, SlideRule: no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('EL1 opcode = 8 (ELOADCALL)', opcode === 8, 'got ' + opcode);
+    assert('EL1 opcode = 2 (indexed CALL)', opcode === 2, 'got ' + opcode);
     assert('EL1 crDst = 0', crDst === 0, 'got ' + crDst);
     assert('EL1 crSrc = 6 (default namespace register)', crSrc === 6, 'got ' + crSrc);
     assert('EL1 imm = 0x0003 (row=3, method=0)', imm === 0x0003, 'got 0x' + imm.toString(16));
@@ -1480,7 +1510,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    const r = a.assemble('ELOADCALL CR0, SlideRule, Multiply');
+    const r = a.assemble('CALL CR6[SlideRule], Multiply');
     const word = r.words[0];
     const imm  = word & 0x7FFF;
     assert('EL2 ELOADCALL CR0, SlideRule, Multiply: no errors',
@@ -1494,7 +1524,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    const r = a.assemble('ELOADCALL CR0, SlideRule, Divide');
+    const r = a.assemble('CALL CR6[SlideRule], Divide');
     const word = r.words[0];
     const imm  = word & 0x7FFF;
     assert('EL3 ELOADCALL CR0, SlideRule, Divide: no errors',
@@ -1508,7 +1538,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    const r = a.assemble('ELOADCALL CR0, SlideRule, 0');
+    const r = a.assemble('CALL CR6[SlideRule], 0');
     const word = r.words[0];
     const imm  = word & 0x7FFF;
     assert('EL4 ELOADCALL CR0, SlideRule, 0 (numeric): no errors',
@@ -1521,7 +1551,8 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //      crDst=0, crSrc=11, imm = 0x0005 (row=5, method=0)
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    const r = a.assemble('ELOADCALL CR0, CR11, #5');
+    a.setNamespace({ Target: 5 });
+    const r = a.assemble('CALL CR6[Target]');
     const word   = r.words[0];
     const crDst  = (word >>> 19) & 0xF;
     const crSrc  = (word >>> 15) & 0xF;
@@ -1529,7 +1560,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     assert('EL5 ELOADCALL CR0, CR11, #5 (explicit, no method): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('EL5 crDst = 0', crDst === 0, 'got ' + crDst);
-    assert('EL5 crSrc = 11', crSrc === 11, 'got ' + crSrc);
+    assert('EL5 crSrc = 6', crSrc === 6, 'got ' + crSrc);
     assert('EL5 imm = 0x0005 (row=5, method=0)', imm === 0x0005, 'got 0x' + imm.toString(16));
 }
 
@@ -1538,13 +1569,14 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //      R-type split: imm = (3<<5)|5 = 0x0065  (method=3 in bits[11:5], row=5 in bits[4:0])
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    const r = a.assemble('ELOADCALL CR0, CR11, #5, 2');
+    a.setNamespace({ Target: 5 });
+    const r = a.assemble('CALL CR6[Target], 2');
     const word  = r.words[0];
     const crSrc = (word >>> 15) & 0xF;
     const imm   = word & 0x7FFF;
     assert('EL6 ELOADCALL CR0, CR11, #5, 2 (explicit with method): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('EL6 crSrc = 11', crSrc === 11, 'got ' + crSrc);
+    assert('EL6 crSrc = 6', crSrc === 6, 'got ' + crSrc);
     assert('EL6 imm = 0x0065 (method 2→1-based 3 in bits[11:5], row=5 in bits[4:0])',
         imm === 0x0065, 'got 0x' + imm.toString(16));
 }
@@ -1553,7 +1585,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    a.assemble('ELOADCALL CR0, SlideRule, UnknownOp');
+    a.assemble('CALL CR6[SlideRule], UnknownOp');
     assert('EL7 ELOADCALL unknown method: produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL7 error says "not a known method" and mentions UnknownOp',
@@ -1568,7 +1600,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler({});   // empty conventions
     a.setNamespace(NS_SYMBOLS);
-    a.assemble('ELOADCALL CR0, SlideRule, Multiply');
+    a.assemble('CALL CR6[SlideRule], Multiply');
     assert('EL8 ELOADCALL no conventions: produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL8 error mentions "No method conventions"',
@@ -1581,12 +1613,12 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    const r   = a.assemble('ELOADCALL CR0, SlideRule');
+    const r   = a.assemble('CALL CR6[SlideRule]');
     const dis = a.disassemble(r.words[0]);
-    assert('EL9 disassemble ELOADCALL (no method): includes ELOADCALL',
-        dis.includes('ELOADCALL'), 'got: ' + dis);
-    assert('EL9 disassemble ELOADCALL (no method): includes CR0',
-        dis.includes('CR0'), 'got: ' + dis);
+    assert('EL9 disassemble indexed CALL (no method): includes CALL',
+        dis.includes('CALL') && !dis.includes('ELOADCALL'), 'got: ' + dis);
+    assert('EL9 disassemble indexed CALL (no method): includes CR6',
+        dis.includes('CR6'), 'got: ' + dis);
     assert('EL9 disassemble ELOADCALL (no method): does not include a trailing method index',
         !/, \d+$/.test(dis.trim()), 'got: ' + dis);
 }
@@ -1598,12 +1630,12 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    const r   = a.assemble('ELOADCALL CR0, SlideRule, Multiply');
+    const r   = a.assemble('CALL CR6[SlideRule], Multiply');
     const dis = a.disassemble(r.words[0]);
-    assert('EL10 disassemble ELOADCALL (with method): includes ELOADCALL',
-        dis.includes('ELOADCALL'), 'got: ' + dis);
+    assert('EL10 disassemble indexed CALL (with method): includes CALL',
+        dis.includes('CALL') && !dis.includes('ELOADCALL'), 'got: ' + dis);
     assert('EL10 disassemble ELOADCALL (with method): ends with ", 0" (0-based Multiply index)',
-        dis.trim().endsWith(', 0'), 'got: ' + dis);
+        dis.trim().endsWith(', #0'), 'got: ' + dis);
 }
 
 // EL11: c-list row = 256 is out of range → error (simple Name form).
@@ -1611,7 +1643,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 256 });
-    a.assemble('ELOADCALL CR0, SlideRule');
+    a.assemble('CALL CR6[SlideRule]');
     assert('EL11 ELOADCALL row=256: produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL11 error says "out of range" and shows 256',
@@ -1624,7 +1656,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace(NS_SYMBOLS);
-    a.assemble('ELOADCALL CR0, SlideRule, 127');
+    a.assemble('CALL CR6[SlideRule], 127');
     assert('EL12 ELOADCALL numeric method=127: produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL12 error says "out of range" and shows 127',
@@ -1645,7 +1677,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     };
     const a = new ChurchAssembler(convWith127);
     a.setNamespace(NS_SYMBOLS);
-    a.assemble('ELOADCALL CR0, SlideRule, Transcendent');
+    a.assemble('CALL CR6[SlideRule], Transcendent');
     assert('EL13 ELOADCALL named method index=127: produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL13 error says "out of range" and shows 127',
@@ -1657,12 +1689,13 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //       ELOADCALL CR0, CR11, #5, BadName — the 4th field must be a numeric 0-based index.
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    a.assemble('ELOADCALL CR0, CR11, #5, BadName');
+    a.setNamespace({ SlideRule: 5 });
+    a.assemble('CALL CR6[SlideRule], BadName');
     assert('EL14 ELOADCALL explicit non-numeric method: produces an error',
         a.errors.length > 0, 'expected at least one error');
-    assert('EL14 error mentions "4th operand" or "numeric" and "BadName"',
+    assert('EL14 error identifies the unknown method "BadName"',
         a.errors.some(e =>
-            (e.message.includes('4th operand') || e.message.includes('numeric')) &&
+            e.message.includes('not a known method') &&
             e.message.includes('BadName')),
         a.errors.map(e => e.message).join('; '));
 }
@@ -1671,7 +1704,8 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //       ELOADCALL CR0, CR11, #256 — slot must be 0–255.
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    a.assemble('ELOADCALL CR0, CR11, #256');
+    a.setNamespace({ Target: 256 });
+    a.assemble('CALL CR6[Target]');
     assert('EL15 ELOADCALL explicit row=256 (no method): produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL15 error says "out of range" and shows 256',
@@ -1683,7 +1717,8 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //       ELOADCALL CR0, CR11, #256, 0 — slot must be 0–31 even when method index is present.
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    a.assemble('ELOADCALL CR0, CR11, #256, 0');
+    a.setNamespace({ Target: 256 });
+    a.assemble('CALL CR6[Target], 0');
     assert('EL16 ELOADCALL explicit row=256 (with method): produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL16 error says "out of range" and shows 256',
@@ -1698,14 +1733,14 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 32 });
-    a.assemble('ELOADCALL CR0, SlideRule');
+    a.assemble('CALL CR6[SlideRule]');
     assert('EL17 ELOADCALL row=32 (Name form): produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL17 error says "out of range" and shows 32',
         a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
         a.errors.map(e => e.message).join('; '));
-    assert('EL17 error mentions 5-bit field',
-        a.errors.some(e => e.message.includes('5-bit')),
+    assert('EL17 error specifies row limit',
+        a.errors.some(e => e.message.includes('0–31')),
         a.errors.map(e => e.message).join('; '));
 }
 
@@ -1713,7 +1748,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 {
     const a = new ChurchAssembler(CONVENTIONS);
     a.setNamespace({ 'SlideRule': 31 });
-    a.assemble('ELOADCALL CR0, SlideRule');
+    a.assemble('CALL CR6[SlideRule]');
     assert('EL18 ELOADCALL row=31 (Name form): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
 }
@@ -1722,14 +1757,15 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //       ELOADCALL CR0, CR11, #32 — the 5-bit rs2 field cannot encode row 32.
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    a.assemble('ELOADCALL CR0, CR11, #32');
+    a.setNamespace({ Target: 32 });
+    a.assemble('CALL CR6[Target]');
     assert('EL19 ELOADCALL explicit row=32 (no method): produces an error',
         a.errors.length > 0, 'expected at least one error');
     assert('EL19 error says "out of range" and shows 32',
         a.errors.some(e => e.message.includes('out of range') && e.message.includes('32')),
         a.errors.map(e => e.message).join('; '));
-    assert('EL19 error mentions 5-bit field',
-        a.errors.some(e => e.message.includes('5-bit')),
+    assert('EL19 error specifies row limit',
+        a.errors.some(e => e.message.includes('0–31')),
         a.errors.map(e => e.message).join('; '));
 }
 
@@ -1737,10 +1773,11 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
 //       Verifies the boundary: row 31 must assemble cleanly (fits in 5 bits).
 {
     const a = new ChurchAssembler(CONVENTIONS);
-    a.assemble('ELOADCALL CR0, CR11, #31');
+    a.setNamespace({ Target: 31 });
+    a.assemble('CALL CR6[Target]');
     assert('EL20 ELOADCALL explicit row=31 (boundary): no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    const word = a.assemble('ELOADCALL CR0, CR11, #31').words[0];
+    const word = a.assemble('CALL CR6[Target]').words[0];
     const encodedRow = word & 0x1F;
     assert('EL20 encoded row field is 31',
         encodedRow === 31, 'got ' + encodedRow);
@@ -1788,10 +1825,10 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     {
         const a = new ChurchAssembler(CONVENTIONS);
         a.setNamespace(NS_SYMBOLS);
-        const r = a.assemble('ELOADCALL CR0, SlideRule');
+        const r = a.assemble('CALL CR6[SlideRule]');
         assert('EL-RT-A assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
         const d = sim.decodeInstruction(r.words[0]);
-        assert('EL-RT-A opcode=8 (ELOADCALL)', d.opcode === 8, `got ${d.opcode}`);
+        assert('EL-RT-A opcode=2 (indexed CALL)', d.opcode === 2, `got ${d.opcode}`);
         const rtRow    = d.imm & 0x1F;
         const rtMethod = (d.imm >>> 5) & 0x7F;
         assert('EL-RT-A row=3 (SlideRule NS slot)', rtRow === 3, `got row=${rtRow}`);
@@ -1802,7 +1839,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     {
         const a = new ChurchAssembler(CONVENTIONS);
         a.setNamespace(NS_SYMBOLS);
-        const r = a.assemble('ELOADCALL CR0, SlideRule, Divide');
+        const r = a.assemble('CALL CR6[SlideRule], Divide');
         assert('EL-RT-B assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
         const d = sim.decodeInstruction(r.words[0]);
         const rtRow    = d.imm & 0x1F;
@@ -1817,7 +1854,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     {
         const a = new ChurchAssembler(CONVENTIONS);
         a.setNamespace(NS_SYMBOLS);
-        const r = a.assemble('ELOADCALL CR0, SlideRule, Sqrt');
+        const r = a.assemble('CALL CR6[SlideRule], Sqrt');
         assert('EL-RT-C assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
         const d = sim.decodeInstruction(r.words[0]);
         const rtRow    = d.imm & 0x1F;
@@ -1831,7 +1868,8 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     // Variant D: high method index — explicit form ELOADCALL CR0, CR11, #7, 15 → method_1based=16, row=7
     {
         const a = new ChurchAssembler(CONVENTIONS);
-        const r = a.assemble('ELOADCALL CR0, CR11, #7, 15');
+        a.setNamespace({ Target: 7 });
+        const r = a.assemble('CALL CR6[Target], 15');
         assert('EL-RT-D assemble OK', a.errors.length === 0, a.errors.map(e=>e.message).join('; '));
         const d = sim.decodeInstruction(r.words[0]);
         const rtRow    = d.imm & 0x1F;
@@ -1960,31 +1998,13 @@ const CLOOMCCompiler = require('./cloomc_compiler.js');
     };
 
     const canonical = compileWukongCall('WukongCallHome.Main()');
-    const canonicalWord = canonical.methods[0] && canonical.methods[0].code[0];
-    assert('WCH5 CLOOMC WukongCallHome.Main() compiles from shared conventions',
-        canonical.errors.length === 0, canonical.errors.map(e => e.message).join('; '));
-    assert('WCH5 direct CLOOMC frontend keeps its declared ELOADCALL row 0, Main selector 1',
-        canonicalWord !== undefined &&
-        ((canonicalWord >>> 27) & 0x1F) === 8 &&
-        (canonicalWord & 0x1F) === 0 &&
-        ((canonicalWord >>> 5) & 0x7F) === 1,
-        canonicalWord === undefined ? 'no code' : `word=0x${(canonicalWord >>> 0).toString(16)}`);
+    assertRetiredCompilation('WCH5 CLOOMC WukongCallHome.Main()', canonical);
 
     const normalized = compileWukongCall('WUKONGCALLHOME.Main()');
-    assert('WCH6 CLOOMC normalized WUKONGCALLHOME.Main() compiles',
-        normalized.errors.length === 0, normalized.errors.map(e => e.message).join('; '));
-    assert('WCH6 normalized CLOOMC call emits the same capability-call sequence',
-        normalized.methods[0] &&
-        normalized.methods[0].code[0] === canonicalWord,
-        `canonical=${canonicalWord}, normalized=${normalized.methods[0] && normalized.methods[0].code[0]}`);
+    assertRetiredCompilation('WCH6 normalized WUKONGCALLHOME.Main()', normalized);
 
     const explicitCall = compileWukongCall('CALL WukongCallHome.Main()');
-    assert('WCH7 CLOOMC CALL WukongCallHome.Main() compiles',
-        explicitCall.errors.length === 0, explicitCall.errors.map(e => e.message).join('; '));
-    assert('WCH7 explicit CLOOMC CALL emits the same capability-call sequence',
-        explicitCall.methods[0] &&
-        explicitCall.methods[0].code[0] === canonicalWord,
-        `canonical=${canonicalWord}, explicit=${explicitCall.methods[0] && explicitCall.methods[0].code[0]}`);
+    assertRetiredCompilation('WCH7 CLOOMC CALL WukongCallHome.Main()', explicitCall);
 
     const missingCapability = compileWukongCall('WukongCallHome.Main()', 'Other E');
     assert('WCH8 CLOOMC missing capability emits exactly one error',
@@ -2234,22 +2254,7 @@ function findSHR(words) {
     }
 }`;
     const result = cc.compileJS(src);
-    assert('CC11 CALL Scheduler.pause(10) — no errors',
-        result.errors.length === 0,
-        result.errors.map(e => e.message).join('; '));
-    const words = (result.methods[0] || {}).code || [];
-    const eloadWord = words.find(w => ((w >>> 27) & 0x1F) === 8);
-    assert('CC11 CALL Scheduler.pause(10) — ELOADCALL (opcode 8) is emitted',
-        eloadWord !== undefined, 'no ELOADCALL found in ' + JSON.stringify(words));
-    if (eloadWord !== undefined) {
-        const imm = eloadWord & 0x7FFF;
-        const row    = imm & 0x1F;
-        const method = (imm >>> 5) & 0x7F;
-        assert('CC11 direct compiler frontend — declared Scheduler row=0',
-            row === 0, `got row=${row}`);
-        assert('CC11 CALL Scheduler.pause(10) — method=5 (pause index 4, 1-based)',
-            method === 5, `got method=${method}`);
-    }
+    assertRetiredCompilation('CC11 CALL Scheduler.pause(10)', result);
 }
 
 // CC12: CALL UnknownAbs.Method() — abstraction not in capabilities → compiler error.
@@ -2288,20 +2293,7 @@ function findSHR(words) {
     }
 }`;
     const result = cc.compileJS(src);
-    assert('CC13 Scheduler.pause(10) bare dot-notation — no errors',
-        result.errors.length === 0,
-        result.errors.map(e => e.message).join('; '));
-    const words = (result.methods[0] || {}).code || [];
-    const eloadWord = words.find(w => ((w >>> 27) & 0x1F) === 8);
-    assert('CC13 Scheduler.pause(10) bare dot-notation — ELOADCALL (opcode 8) emitted',
-        eloadWord !== undefined, 'no ELOADCALL found in ' + JSON.stringify(words));
-    if (eloadWord !== undefined) {
-        const imm = eloadWord & 0x7FFF;
-        assert('CC13 direct compiler frontend — declared Scheduler row=0',
-            (imm & 0x1F) === 0, `got row=${imm & 0x1F}`);
-        assert('CC13 bare dot-notation — method=5 (pause index 4, 1-based)',
-            ((imm >>> 5) & 0x7F) === 5, `got method=${(imm >>> 5) & 0x7F}`);
-    }
+    assertRetiredCompilation('CC13 Scheduler.pause(10)', result);
 }
 
 // CC14: capabilities { } block with 33 entries → assembler error explaining the
@@ -3844,12 +3836,12 @@ CALL   Constants.Pi
 MCMP   DR1, DR0
 BRANCHNE style_b
 style_b:
-ELOADCALL CR8, Constants, Pi
-ELOADCALL CR8, Constants, E
-ELOADCALL CR8, Constants, Phi
-ELOADCALL CR8, Constants, Zero
-ELOADCALL CR8, Constants, One
-ELOADCALL CR8, Constants, Pi
+CALL CR6[Constants], Pi
+CALL CR6[Constants], E
+CALL CR6[Constants], Phi
+CALL CR6[Constants], Zero
+CALL CR6[Constants], One
+CALL CR6[Constants], Pi
 MCMP   DR1, DR0
 BRANCHNE done
 done:
@@ -3897,10 +3889,10 @@ HALT`;
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('CD6 ELOADCALL CR8, Constants, Pi — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
-        assert('CD7 ELOADCALL CR8, Constants, Pi — crDst=8',
-            crDst === 8, `got crDst=${crDst}`);
+        assert('CD6 indexed CALL Constants, Pi — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
+        assert('CD7 indexed CALL Constants, Pi — unused crDst=0',
+            crDst === 0, `got crDst=${crDst}`);
         assert('CD8 ELOADCALL CR8, Constants, Pi — crSrc=6 (c-list root)',
             crSrc === 6, `got crSrc=${crSrc}`);
         assert('CD9 ELOADCALL CR8, Constants, Pi — c-list row=18 (namespace slot, independent of nsLoaded)',
@@ -3974,8 +3966,8 @@ HALT`;
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('CD23 ELOADCALL CR8, Constants, E — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('CD23 indexed CALL Constants, E — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('CD24 ELOADCALL CR8, Constants, E — c-list row=18 (namespace slot, independent of nsLoaded)',
             row === 18, `got row=${row}`);
         assert('CD25 ELOADCALL CR8, Constants, E — method=2 (E index 1, stored 1-based)',
@@ -3991,8 +3983,8 @@ HALT`;
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('CD26 ELOADCALL CR8, Constants, One — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('CD26 indexed CALL Constants, One — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('CD27 ELOADCALL CR8, Constants, One — c-list row=18 (namespace slot, independent of nsLoaded)',
             row === 18, `got row=${row}`);
         assert('CD28 ELOADCALL CR8, Constants, One — method=5 (One index 4, stored 1-based)',
@@ -4008,8 +4000,8 @@ HALT`;
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('CD29 ELOADCALL CR8, Constants, Phi — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('CD29 indexed CALL Constants, Phi — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('CD30 ELOADCALL CR8, Constants, Phi — c-list row=18 (namespace slot, independent of nsLoaded)',
             row === 18, `got row=${row}`);
         assert('CD31 ELOADCALL CR8, Constants, Phi — method=3 (Phi index 2, stored 1-based)',
@@ -4025,8 +4017,8 @@ HALT`;
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('CD32 ELOADCALL CR8, Constants, Zero — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('CD32 indexed CALL Constants, Zero — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('CD33 ELOADCALL CR8, Constants, Zero — c-list row=18 (namespace slot, independent of nsLoaded)',
             row === 18, `got row=${row}`);
         assert('CD34 ELOADCALL CR8, Constants, Zero — method=4 (Zero index 3, stored 1-based)',
@@ -4048,7 +4040,7 @@ HALT`;
     for (const cr of ['CR0', 'CR3']) {
         const a = new ChurchAssembler(conventions);
         a.setNamespace(ns);
-        const result = a.assemble(`LOAD ${cr}, Constants\nELOADCALL CR8, Constants, Pi`);
+        const result = a.assemble(`LOAD ${cr}, Constants\nCALL CR6[Constants], Pi`);
         const word = result.words[1] >>> 0;
         assert(`C3430 ${cr} prior LOAD does not replace ELOADCALL row`,
             result.errors.length === 0 && (word & 0x1F) === 18,
@@ -4058,7 +4050,7 @@ HALT`;
     for (const cr of ['CR0', 'CR3', 'CR7']) {
         const a = new ChurchAssembler();
         const result = a.assemble(
-            `capabilities { SELF E, SelfTest E }\nLOAD ${cr}, SelfTest\nELOADCALL CR1, SelfTest`
+            `capabilities { SELF E, SelfTest E }\nLOAD ${cr}, SelfTest\nCALL CR6[SelfTest]`
         );
         const word = result.words[1] >>> 0;
         assert(`C3430 ${cr} prior LOAD preserves declared SelfTest row 1`,
@@ -4069,10 +4061,11 @@ HALT`;
     {
         const a = new ChurchAssembler();
         a.setNamespace(ns);
-        const result = a.assemble('LOAD CR3, Constants\nXLOADLAMBDA CR8, Constants');
+        const result = a.assemble('LOAD CR3, Constants\nLOAD CR8, CR6[Constants]\nLAMBDA CR8');
         const word = result.words[1] >>> 0;
-        assert('C3430 prior LOAD does not replace XLOADLAMBDA row',
-            result.errors.length === 0 && (word & 0x7FFF) === 18,
+        assert('C3430 prior LOAD does not replace explicit LOAD/LAMBDA row',
+            result.errors.length === 0 && (word & 0x7FFF) === (18 << 4) &&
+                ((result.words[2] >>> 27) & 0x1F) === 7,
             result.errors.map(e => e.message).join('; '));
     }
 
@@ -4103,23 +4096,23 @@ HALT`;
     {
         const a = new ChurchAssembler(conventions);
         a.setNamespace(ns);
-        a.assemble('ELOADCALL CR0, Constants, 126');
+        a.assemble('CALL CR6[Constants], 126');
         assert('C3430 ELOADCALL accepts maximum method index 126',
             a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     }
     {
         const a = new ChurchAssembler(conventions);
         a.setNamespace(ns);
-        a.assemble('ELOADCALL CR0, Constants, 127');
+        a.assemble('CALL CR6[Constants], 127');
         assert('C3430 ELOADCALL rejects method index 127',
             a.errors.some(e => e.message.includes('0–126')),
             a.errors.map(e => e.message).join('; '));
     }
     {
         const a = new ChurchAssembler();
-        a.assemble('XLOADLAMBDA CR0, CR6, 32768');
-        assert('C3430 XLOADLAMBDA rejects c-list offset 32768',
-            a.errors.some(e => e.message.includes('0–32767')),
+        a.assemble('LOAD CR0, CR6, 1024\nLAMBDA CR0');
+        assert('C3430 explicit LOAD/LAMBDA rejects compact offset 1024',
+            a.errors.some(e => e.message.includes('1023')),
             a.errors.map(e => e.message).join('; '));
     }
 }
@@ -4248,7 +4241,7 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
     // BC1–BC9: Tunnel.Connect(Mum) — single CR argument expansion
     const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_NS_BC);
-    const result = a.assemble('Tunnel.Connect(Mum)\nHALT');
+    const result = a.assemble('LOAD CR2, Mum\nCALL CR6[Tunnel], Connect\nHALT');
 
     assert('BC1 Tunnel.Connect(Mum) assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4281,8 +4274,8 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC7 Tunnel.Connect(Mum) word[1] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC7 explicit Tunnel Connect word[1] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC8 Tunnel.Connect(Mum) word[1] ELOADCALL — crDst=0 (scratch CR0)',
             crDst === 0, `got crDst=${crDst}`);
         assert('BC9 Tunnel.Connect(Mum) word[1] ELOADCALL — crSrc=6 (c-list root)',
@@ -4299,15 +4292,15 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
     const a = new ChurchAssembler(TUNNEL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_NS_BC);
     // CR2 is explicitly supplied — no LOAD should be emitted; result is 2 words
-    const result = a.assemble('Tunnel.Connect(CR2)\nHALT');
+    const result = a.assemble('CALL CR6[Tunnel], Connect\nHALT');
     assert('BC12 Tunnel.Connect(CR2) assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC13 Tunnel.Connect(CR2) skips LOAD — 2 words (ELOADCALL + HALT)',
         result.words.length === 2, `got ${result.words.length}`);
     {
         const w = result.words[0] >>> 0;
-        assert('BC14 Tunnel.Connect(CR2) word[0] is ELOADCALL — opcode=8',
-            ((w >>> 27) & 0x1F) === 8, `got opcode=${(w >>> 27) & 0x1F}`);
+        assert('BC14 explicit Tunnel Connect word[0] is indexed CALL — opcode=2',
+            ((w >>> 27) & 0x1F) === 2, `got opcode=${(w >>> 27) & 0x1F}`);
     }
 }
 
@@ -4390,7 +4383,7 @@ const SCHED_NS_BC = {
     //     word = (8<<27)|(14<<23)|(0<<19)|(6<<15)|0x0068 = 0x47030068
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
-    const result = a.assemble('Scheduler.Wait(flag_GT)\nHALT');
+    const result = a.assemble('LOAD CR2, flag_GT\nCALL CR6[Scheduler], Wait\nHALT');
 
     assert('BC18 Scheduler.Wait(flag_GT) assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4413,8 +4406,8 @@ const SCHED_NS_BC = {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC23 Scheduler.Wait(flag_GT) word[1] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC23 explicit Scheduler Wait word[1] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC24 Scheduler.Wait(flag_GT) word[1] ELOADCALL — row=8 (Scheduler NS slot)',
             row === 8, `got row=${row}`);
         assert('BC25 Scheduler.Wait(flag_GT) word[1] ELOADCALL — method=3 (Wait index 2, 1-based)',
@@ -4428,7 +4421,7 @@ const SCHED_NS_BC = {
     //   ELOADCALL — Yield index=0 → 1-based=1; Scheduler slot=8; R-type: imm=(1<<5)|8=0x0028=40
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
-    const result = a.assemble('Scheduler.Yield()\nHALT');
+    const result = a.assemble('CALL CR6[Scheduler], Yield\nHALT');
 
     assert('BC26 Scheduler.Yield() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4441,8 +4434,8 @@ const SCHED_NS_BC = {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC28 Scheduler.Yield() word[0] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC28 explicit Scheduler Yield word[0] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC29 Scheduler.Yield() word[0] ELOADCALL — method=1 (Yield index 0, 1-based)',
             method === 1, `got method=${method}`);
     }
@@ -4454,7 +4447,7 @@ const SCHED_NS_BC = {
     //   ELOADCALL — Signal index=1 → 1-based=2; DijkstraFlag slot=10; R-type: imm=(2<<5)|10=0x004A=74
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
-    const result = a.assemble('DijkstraFlag.Signal()\nHALT');
+    const result = a.assemble('CALL CR6[DijkstraFlag], Signal\nHALT');
 
     assert('BC30 DijkstraFlag.Signal() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4467,8 +4460,8 @@ const SCHED_NS_BC = {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC32 DijkstraFlag.Signal() word[0] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC32 explicit DijkstraFlag Signal word[0] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC33 DijkstraFlag.Signal() word[0] ELOADCALL — row=10 (DijkstraFlag NS slot)',
             row === 10, `got row=${row}`);
         assert('BC34 DijkstraFlag.Signal() word[0] ELOADCALL — method=2 (Signal index 1, 1-based)',
@@ -4482,7 +4475,7 @@ const SCHED_NS_BC = {
     //   ELOADCALL — Read index=0 → 1-based=1; Button slot=13; R-type: imm=(1<<5)|13=0x002D=45
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
-    const result = a.assemble('Button.Read()\nHALT');
+    const result = a.assemble('CALL CR6[Button], Read\nHALT');
 
     assert('BC35 Button.Read() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4495,8 +4488,8 @@ const SCHED_NS_BC = {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC37 Button.Read() word[0] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC37 explicit Button Read word[0] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC38 Button.Read() word[0] ELOADCALL — row=13 (Button NS slot)',
             row === 13, `got row=${row}`);
         assert('BC39 Button.Read() word[0] ELOADCALL — method=1 (Read index 0, 1-based)',
@@ -4566,15 +4559,15 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Stack.Push()\nHALT');
+    const r = a.assemble('CALL CR6[Stack], Push\nHALT');
     assert('BC43 Stack.Push() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC43 Stack.Push() emits ELOADCALL (2 words: ELOADCALL + HALT)',
         r.words.length === 2, `got ${r.words.length}`);
     {
         const w = r.words[0] >>> 0;
-        assert('BC43 Stack.Push() word[0] opcode=8 (ELOADCALL)',
-            ((w >>> 27) & 0x1F) === 8, `got opcode=${(w >>> 27) & 0x1F}`);
+        assert('BC43 explicit Stack Push word[0] opcode=2 (indexed CALL)',
+            ((w >>> 27) & 0x1F) === 2, `got opcode=${(w >>> 27) & 0x1F}`);
         const row    = w & 0x1F;
         const method = (w >>> 5) & 0x7F;
         assert('BC43 Stack.Push() ELOADCALL row=9 (Stack NS slot)',
@@ -4587,7 +4580,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Stack.Pop()\nHALT');
+    const r = a.assemble('CALL CR6[Stack], Pop\nHALT');
     assert('BC44 Stack.Pop() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC44 Stack.Pop() emits ELOADCALL (2 words)',
@@ -4603,7 +4596,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Stack.Peek()\nHALT');
+    const r = a.assemble('CALL CR6[Stack], Peek\nHALT');
     assert('BC45 Stack.Peek() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC45 Stack.Peek() emits ELOADCALL (2 words)',
@@ -4613,7 +4606,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Stack.Depth()\nHALT');
+    const r = a.assemble('CALL CR6[Stack], Depth\nHALT');
     assert('BC46 Stack.Depth() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC46 Stack.Depth() emits ELOADCALL (2 words)',
@@ -4630,7 +4623,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('UART.Send()\nHALT');
+    const r = a.assemble('CALL CR6[UART], Send\nHALT');
     assert('BC47 UART.Send() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC47 UART.Send() emits ELOADCALL (2 words)',
@@ -4649,7 +4642,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('UART.Receive()\nHALT');
+    const r = a.assemble('CALL CR6[UART], Receive\nHALT');
     assert('BC48 UART.Receive() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC48 UART.Receive() emits ELOADCALL (2 words)',
@@ -4659,7 +4652,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('UART.SetBaud()\nHALT');
+    const r = a.assemble('CALL CR6[UART], SetBaud\nHALT');
     assert('BC49 UART.SetBaud() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC49 UART.SetBaud() emits ELOADCALL (2 words)',
@@ -4676,7 +4669,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('LED.Set()\nHALT');
+    const r = a.assemble('CALL CR6[LED], Set\nHALT');
     assert('BC50 LED.Set() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC50 LED.Set() emits ELOADCALL (2 words)',
@@ -4695,7 +4688,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('LED.Clear()\nHALT');
+    const r = a.assemble('CALL CR6[LED], Clear\nHALT');
     assert('BC51 LED.Clear() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC51 LED.Clear() emits ELOADCALL (2 words)',
@@ -4705,7 +4698,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('LED.Toggle()\nHALT');
+    const r = a.assemble('CALL CR6[LED], Toggle\nHALT');
     assert('BC52 LED.Toggle() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC52 LED.Toggle() emits ELOADCALL (2 words)',
@@ -4715,7 +4708,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('LED.State()\nHALT');
+    const r = a.assemble('CALL CR6[LED], State\nHALT');
     assert('BC53 LED.State() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC53 LED.State() emits ELOADCALL (2 words)',
@@ -4732,7 +4725,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Display.Write()\nHALT');
+    const r = a.assemble('CALL CR6[Display], Write\nHALT');
     assert('BC54 Display.Write() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC54 Display.Write() emits ELOADCALL (2 words)',
@@ -4751,7 +4744,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Display.Clear()\nHALT');
+    const r = a.assemble('CALL CR6[Display], Clear\nHALT');
     assert('BC55 Display.Clear() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC55 Display.Clear() emits ELOADCALL (2 words)',
@@ -4767,7 +4760,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('Display.Scroll()\nHALT');
+    const r = a.assemble('CALL CR6[Display], Scroll\nHALT');
     assert('BC56 Display.Scroll() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC56 Display.Scroll() emits ELOADCALL (2 words)',
@@ -4788,15 +4781,15 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
     // BC57: Stack.Push(val) — pre-load DR1 with IADD, then Push()
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('IADD DR1, DR1, #42\nStack.Push()\nHALT');
+    const r = a.assemble('IADD DR1, DR1, #42\nCALL CR6[Stack], Push\nHALT');
     assert('BC57 Stack.Push(val) pre-load pattern — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC57 Stack.Push(val) emits 3 words (IADD + ELOADCALL + HALT)',
         r.words.length === 3, `got ${r.words.length}`);
     {
         const w1 = r.words[1] >>> 0;
-        assert('BC57 Stack.Push(val) word[1] is ELOADCALL (opcode=8)',
-            ((w1 >>> 27) & 0x1F) === 8, `got opcode=${(w1 >>> 27) & 0x1F}`);
+        assert('BC57 explicit Stack Push word[1] is indexed CALL (opcode=2)',
+            ((w1 >>> 27) & 0x1F) === 2, `got opcode=${(w1 >>> 27) & 0x1F}`);
     }
 }
 
@@ -4804,15 +4797,15 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
     // BC58: UART.Send(byte) — pre-load DR1 with IADD, then Send()
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('IADD DR1, DR1, #0x41\nUART.Send()\nHALT');
+    const r = a.assemble('IADD DR1, DR1, #0x41\nCALL CR6[UART], Send\nHALT');
     assert('BC58 UART.Send(byte) pre-load pattern — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC58 UART.Send(byte) emits 3 words (IADD + ELOADCALL + HALT)',
         r.words.length === 3, `got ${r.words.length}`);
     {
         const w1 = r.words[1] >>> 0;
-        assert('BC58 UART.Send(byte) word[1] is ELOADCALL (opcode=8)',
-            ((w1 >>> 27) & 0x1F) === 8, `got opcode=${(w1 >>> 27) & 0x1F}`);
+        assert('BC58 explicit UART Send word[1] is indexed CALL (opcode=2)',
+            ((w1 >>> 27) & 0x1F) === 2, `got opcode=${(w1 >>> 27) & 0x1F}`);
     }
 }
 
@@ -4820,15 +4813,15 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
     // BC59: Display.Write(char) — pre-load DR1 with IADD, then Write()
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('IADD DR1, DR1, #0x48\nDisplay.Write()\nHALT');
+    const r = a.assemble('IADD DR1, DR1, #0x48\nCALL CR6[Display], Write\nHALT');
     assert('BC59 Display.Write(char) pre-load pattern — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC59 Display.Write(char) emits 3 words (IADD + ELOADCALL + HALT)',
         r.words.length === 3, `got ${r.words.length}`);
     {
         const w1 = r.words[1] >>> 0;
-        assert('BC59 Display.Write(char) word[1] is ELOADCALL (opcode=8)',
-            ((w1 >>> 27) & 0x1F) === 8, `got opcode=${(w1 >>> 27) & 0x1F}`);
+        assert('BC59 explicit Display Write word[1] is indexed CALL (opcode=2)',
+            ((w1 >>> 27) & 0x1F) === 2, `got opcode=${(w1 >>> 27) & 0x1F}`);
         const row    = w1 & 0x1F;
         const method = (w1 >>> 5) & 0x7F;
         assert('BC59 Display.Write(char) ELOADCALL row=15 (Display NS slot)',
@@ -4843,7 +4836,7 @@ const NEW_ABS_NS_BC = { 'Stack': 9, 'UART': 11, 'LED': 12, 'Display': 15 };
     // Note: 115200 > 14-bit immediate (max 8191); use a smaller sentinel (9600).
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const r = a.assemble('IADD DR1, DR1, #9600\nUART.SetBaud()\nHALT');
+    const r = a.assemble('IADD DR1, DR1, #9600\nCALL CR6[UART], SetBaud\nHALT');
     assert('BC60 UART.SetBaud(rate) pre-load pattern — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC60 UART.SetBaud(rate) emits 3 words (IADD + ELOADCALL + HALT)',
@@ -4889,7 +4882,7 @@ const SMM_NS_BC = {
     //   ELOADCALL — Allocate index=0 → 1-based=1; Memory slot=7; imm=(1<<8)|7=0x0107
     const a = new ChurchAssembler(SMM_CONVENTIONS_BC);
     a.setNamespace(SMM_NS_BC);
-    const result = a.assemble('Memory.Allocate(pool_GT)\nHALT');
+    const result = a.assemble('LOAD CR2, pool_GT\nCALL CR6[Memory], Allocate\nHALT');
 
     assert('BC61 Memory.Allocate(pool_GT) assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4912,8 +4905,8 @@ const SMM_NS_BC = {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC66 Memory.Allocate(pool_GT) word[1] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC66 explicit Memory Allocate word[1] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC67 Memory.Allocate(pool_GT) word[1] ELOADCALL — row=7 (Memory NS slot)',
             row === 7, `got row=${row}`);
         assert('BC68 Memory.Allocate(pool_GT) word[1] ELOADCALL — method=1 (Allocate index 0, 1-based)',
@@ -4929,7 +4922,7 @@ const SMM_NS_BC = {
     //   ELOADCALL — Encode index=0 → 1-based=1; Mint slot=6; imm=(1<<8)|6=0x0106
     const a = new ChurchAssembler(SMM_CONVENTIONS_BC);
     a.setNamespace(SMM_NS_BC);
-    const result = a.assemble('Mint.Encode(mem_GT)\nHALT');
+    const result = a.assemble('LOAD CR2, mem_GT\nCALL CR6[Mint], Encode\nHALT');
 
     assert('BC69 Mint.Encode(mem_GT) assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4952,8 +4945,8 @@ const SMM_NS_BC = {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC74 Mint.Encode(mem_GT) word[1] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC74 explicit Mint Encode word[1] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC75 Mint.Encode(mem_GT) word[1] ELOADCALL — row=6 (Mint NS slot)',
             row === 6, `got row=${row}`);
         assert('BC76 Mint.Encode(mem_GT) word[1] ELOADCALL — method=1 (Encode index 0, 1-based)',
@@ -4985,7 +4978,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     //   ELOADCALL      — Connect index=5 → 1-based=6; Tunnel slot=31
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
-    const result = a.assemble('Tunnel.Connect(Mem)\nHALT');
+    const result = a.assemble('LOAD CR2, Mem\nCALL CR6[Tunnel], Connect\nHALT');
 
     assert('BC61 Tunnel.Connect(Mem) assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -4997,8 +4990,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC63 Tunnel.Connect(Mem) word[1] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC63 explicit Tunnel Connect word[1] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC63 Tunnel.Connect(Mem) word[1] ELOADCALL — row=31 (Tunnel NS slot)',
             row === 31, `got row=${row}`);
         assert('BC63 Tunnel.Connect(Mem) word[1] ELOADCALL — method=6 (Connect index 5, 1-based)',
@@ -5011,7 +5004,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     //   ELOADCALL — Send index=1 → 1-based=2; Tunnel slot=31; imm=(2<<8)|31=0x021F
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
-    const result = a.assemble('Tunnel.Send()\nHALT');
+    const result = a.assemble('CALL CR6[Tunnel], Send\nHALT');
 
     assert('BC64 Tunnel.Send() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -5034,7 +5027,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     //   ELOADCALL — Receive index=2 → 1-based=3; Tunnel slot=31; imm=(3<<8)|31=0x031F
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
-    const result = a.assemble('Tunnel.Receive()\nHALT');
+    const result = a.assemble('CALL CR6[Tunnel], Receive\nHALT');
 
     assert('BC66 Tunnel.Receive() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -5057,7 +5050,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     //   ELOADCALL — Register index=0 → 1-based=1; Tunnel slot=31; imm=(1<<8)|31=0x011F
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
-    const result = a.assemble('Tunnel.Register()\nHALT');
+    const result = a.assemble('CALL CR6[Tunnel], Register\nHALT');
 
     assert('BC68 Tunnel.Register() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -5080,7 +5073,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     //   ELOADCALL — Fault index=3 → 1-based=4; Tunnel slot=31; imm=(4<<8)|31=0x041F
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
-    const result = a.assemble('Tunnel.Fault()\nHALT');
+    const result = a.assemble('CALL CR6[Tunnel], Fault\nHALT');
 
     assert('BC69 Tunnel.Fault() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -5105,7 +5098,7 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
     //   ELOADCALL — Fetch index=4 → 1-based=5; Tunnel slot=31; R-type: imm=(5<<5)|31=0x00BF=191
     const a = new ChurchAssembler(TUNNEL_FULL_CONVENTIONS_BC);
     a.setNamespace(TUNNEL_FULL_NS_BC);
-    const result = a.assemble('Tunnel.Fetch()\nHALT');
+    const result = a.assemble('CALL CR6[Tunnel], Fetch\nHALT');
 
     assert('BC70 Tunnel.Fetch() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -5117,8 +5110,8 @@ const TUNNEL_FULL_NS_BC = { 'Tunnel': 31, 'Mem': 7 };
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC72 Tunnel.Fetch() ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC72 explicit Tunnel Fetch indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC72 Tunnel.Fetch() ELOADCALL — row=31 (Tunnel NS slot)',
             row === 31, `got row=${row}`);
         assert('BC72 Tunnel.Fetch() ELOADCALL — method=5 (Fetch index 4, 1-based)',
@@ -5153,7 +5146,7 @@ SC_COMPILER.methodConventions = {
 function symCompile(body, caps) {
     const src = (caps && caps.length)
         ? `abstraction Test {\n  capabilities { ${caps.join(', ')} }\n  method run() {\n${body}\n  }\n}`
-        : `method run() {\n${body}\n}`;
+        : `abstraction Test {\nmethod run() {\n${body}\n}\n}`;
     const compiler = new CLOOMCCompiler();
     compiler.methodConventions = SC_COMPILER.methodConventions;
     const result = compiler.compileSymbolic(src, []);
@@ -5195,39 +5188,19 @@ function symCompile(body, caps) {
 {
     // SC5: Circle.Area(r) via general Abs.Method handler — DR arg, ELOADCALL emitted
     const r = symCompile('K = Circle.Area(r)', ['Circle']);
-    assert('SC5 Circle.Area(r) general handler — no errors',
-        r.errors.length === 0, r.errors.map(e => e.message).join('; '));
-    // ELOADCALL opcode = 8
-    const code = r.methods[0].code;
-    const hasEloadcall = code.some(w => ((w >>> 27) & 0x1F) === 8);
-    assert('SC5 Circle.Area(r) emits at least one ELOADCALL (opcode 8)',
-        hasEloadcall, `words: ${code.map(w => ((w >>> 27) & 0x1F)).join(',')}`);
+    assertRetiredCompilation('SC5 Circle.Area(r)', r);
 }
 
 {
     // SC6: Tunnel.Connect(Mum) — Mum is a capability in c-list, loaded into CR2
     const r = symCompile('K = Tunnel.Connect(Mum)', ['Tunnel', 'Mum']);
-    assert('SC6 Tunnel.Connect(Mum) — no errors',
-        r.errors.length === 0, r.errors.map(e => e.message).join('; '));
-    const code = r.methods[0].code;
-    // Should contain a LOAD (opcode 0) for the CR2 capability and an ELOADCALL (opcode 8)
-    const hasLoad     = code.some(w => ((w >>> 27) & 0x1F) === 0);
-    const hasEloadcall = code.some(w => ((w >>> 27) & 0x1F) === 8);
-    assert('SC6 Tunnel.Connect(Mum) emits LOAD for Mum capability',
-        hasLoad, `words: ${code.map(w => ((w >>> 27) & 0x1F)).join(',')}`);
-    assert('SC6 Tunnel.Connect(Mum) emits ELOADCALL',
-        hasEloadcall, `words: ${code.map(w => ((w >>> 27) & 0x1F)).join(',')}`);
+    assertRetiredCompilation('SC6 Tunnel.Connect(Mum)', r);
 }
 
 {
     // SC7: Tunnel.Send(a, b) — DR args, ELOADCALL emitted
     const r = symCompile('Tunnel.Send(V1, V2)', ['Tunnel']);
-    assert('SC7 Tunnel.Send(V1, V2) — no errors',
-        r.errors.length === 0, r.errors.map(e => e.message).join('; '));
-    const code = r.methods[0].code;
-    const hasEloadcall = code.some(w => ((w >>> 27) & 0x1F) === 8);
-    assert('SC7 Tunnel.Send(V1, V2) emits ELOADCALL',
-        hasEloadcall, `words: ${code.map(w => ((w >>> 27) & 0x1F)).join(',')}`);
+    assertRetiredCompilation('SC7 Tunnel.Send(V1, V2)', r);
 }
 
 {
@@ -5421,7 +5394,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('UART.Send()\nHALT');
+    const result = a.assemble('CALL CR6[UART], Send\nHALT');
     assert('BC77 UART.Send() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC77 UART.Send() emits 2 words (ELOADCALL + HALT)',
@@ -5432,8 +5405,8 @@ function symCompile(body, caps) {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC77 UART.Send() ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC77 explicit UART Send indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC77 UART.Send() ELOADCALL — row=11 (UART NS slot)',
             row === 11, `got row=${row}`);
         assert('BC77 UART.Send() ELOADCALL — method=1 (Send index 0, 1-based)',
@@ -5445,7 +5418,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('UART.Receive()\nHALT');
+    const result = a.assemble('CALL CR6[UART], Receive\nHALT');
     assert('BC78 UART.Receive() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC78 UART.Receive() emits 2 words (ELOADCALL + HALT)',
@@ -5466,7 +5439,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('IADD DR1, DR1, #0x41\nUART.Send()\nHALT');
+    const result = a.assemble('IADD DR1, DR1, #0x41\nCALL CR6[UART], Send\nHALT');
     assert('BC79 UART.Send(byte) pre-load pattern — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC79 UART.Send(byte) emits 3 words (IADD + ELOADCALL + HALT)',
@@ -5477,8 +5450,8 @@ function symCompile(body, caps) {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC79 UART.Send(byte) word[1] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC79 explicit UART Send word[1] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC79 UART.Send(byte) word[1] ELOADCALL — row=11 (UART NS slot)',
             row === 11, `got row=${row}`);
         assert('BC79 UART.Send(byte) word[1] ELOADCALL — method=1 (Send index 0, 1-based)',
@@ -5490,7 +5463,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('LED.Set()\nHALT');
+    const result = a.assemble('CALL CR6[LED], Set\nHALT');
     assert('BC80 LED.Set() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC80 LED.Set() emits 2 words (ELOADCALL + HALT)',
@@ -5501,8 +5474,8 @@ function symCompile(body, caps) {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC80 LED.Set() ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC80 explicit LED Set indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC80 LED.Set() ELOADCALL — row=12 (LED NS slot)',
             row === 12, `got row=${row}`);
         assert('BC80 LED.Set() ELOADCALL — method=1 (Set index 0, 1-based)',
@@ -5514,7 +5487,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('LED.Toggle()\nHALT');
+    const result = a.assemble('CALL CR6[LED], Toggle\nHALT');
     assert('BC81 LED.Toggle() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC81 LED.Toggle() emits 2 words (ELOADCALL + HALT)',
@@ -5535,7 +5508,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('Display.Write()\nHALT');
+    const result = a.assemble('CALL CR6[Display], Write\nHALT');
     assert('BC82 Display.Write() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC82 Display.Write() emits 2 words (ELOADCALL + HALT)',
@@ -5546,8 +5519,8 @@ function symCompile(body, caps) {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC82 Display.Write() ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC82 explicit Display Write indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC82 Display.Write() ELOADCALL — row=15 (Display NS slot)',
             row === 15, `got row=${row}`);
         assert('BC82 Display.Write() ELOADCALL — method=1 (Write index 0, 1-based)',
@@ -5559,7 +5532,7 @@ function symCompile(body, caps) {
 {
     const a = new ChurchAssembler(NEW_ABS_CONVENTIONS_BC);
     a.setNamespace(NEW_ABS_NS_BC);
-    const result = a.assemble('Display.Clear()\nHALT');
+    const result = a.assemble('CALL CR6[Display], Clear\nHALT');
     assert('BC83 Display.Clear() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC83 Display.Clear() emits 2 words (ELOADCALL + HALT)',
@@ -5588,7 +5561,7 @@ function symCompile(body, caps) {
     // BC84–BC88: Scheduler.pause() bare-call
     const a = new ChurchAssembler(SCHED_CONVENTIONS_BC);
     a.setNamespace(SCHED_NS_BC);
-    const result = a.assemble('Scheduler.pause()\nHALT');
+    const result = a.assemble('CALL CR6[Scheduler], pause\nHALT');
 
     assert('BC84 Scheduler.pause() assembles without errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
@@ -5601,8 +5574,8 @@ function symCompile(body, caps) {
         const imm    = w & 0x7FFF;
         const row    = imm & 0x1F;
         const method = (imm >>> 5) & 0x7F;
-        assert('BC86 Scheduler.pause() word[0] ELOADCALL — opcode=8',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC86 explicit Scheduler pause word[0] indexed CALL — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC87 Scheduler.pause() word[0] ELOADCALL — row=8 (Scheduler NS slot)',
             row === 8, `got row=${row}`);
         assert('BC88 Scheduler.pause() word[0] ELOADCALL — method=5 (pause index 4, 1-based)',
@@ -5711,8 +5684,8 @@ function symCompile(body, caps) {
             const imm   = w & 0x7FFF;
             assert('BC97 LOAD CR5, UART — crSrc=6 (c-list root)',
                 crSrc === 6, `got crSrc=${crSrc}`);
-            assert('BC97 LOAD CR5, UART — imm=2 (UART boot c-list slot)',
-                imm === 2, `got imm=${imm}`);
+            assert('BC97 LOAD CR5, UART — compact row=2, DR0 index',
+                imm === (2 << 4), `got imm=${imm}`);
         }
     }
 
@@ -5725,8 +5698,8 @@ function symCompile(body, caps) {
         {
             const w   = r.words[0] >>> 0;
             const imm = w & 0x7FFF;
-            assert('BC98 LOAD CR1, BTN — imm=4 (BTN boot c-list slot)',
-                imm === 4, `got imm=${imm}`);
+            assert('BC98 LOAD CR1, BTN — compact row=4, DR0 index',
+                imm === (4 << 4), `got imm=${imm}`);
         }
     }
 
@@ -5750,8 +5723,8 @@ function symCompile(body, caps) {
         {
             const w   = r.words[0] >>> 0;
             const imm = w & 0x7FFF;
-            assert('BC100 LOAD CR3, Timer — imm=5 (Timer boot c-list slot)',
-                imm === 5, `got imm=${imm}`);
+            assert('BC100 LOAD CR3, Timer — compact row=5, DR0 index',
+                imm === (5 << 4), `got imm=${imm}`);
         }
     }
 
@@ -5798,7 +5771,7 @@ const SALVATION_NS_BC = { 'Salvation': 4 };
     // BC102: ELOADCALL CR0, Salvation, main — method=15 (index 14, 1-based), row=4
     const a = new ChurchAssembler(SALVATION_CONV_BC);
     a.setNamespace(SALVATION_NS_BC);
-    const r = a.assemble('ELOADCALL CR0, Salvation, main\nHALT');
+    const r = a.assemble('CALL CR6[Salvation], main\nHALT');
     assert('BC102 ELOADCALL CR0, Salvation, main — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC102 ELOADCALL CR0, Salvation, main emits 2 words (ELOADCALL + HALT)',
@@ -5808,8 +5781,8 @@ const SALVATION_NS_BC = { 'Salvation': 4 };
         const opcode = (w >>> 27) & 0x1F;
         const row    = w & 0x1F;
         const method = (w >>> 5) & 0x7F;
-        assert('BC102 ELOADCALL CR0, Salvation, main — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC102 indexed CALL Salvation, main — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC102 ELOADCALL CR0, Salvation, main — row=4 (Salvation NS slot)',
             row === 4, `got row=${row}`);
         assert('BC102 ELOADCALL CR0, Salvation, main — method=15 (main index 14, 1-based)',
@@ -5861,7 +5834,7 @@ const NAVANA_NS_BC = { 'Navana': 5 };
     // BC104: ELOADCALL CR0, Navana, main — method=8 (index 7, 1-based), row=5
     const a = new ChurchAssembler(NAVANA_CONV_BC);
     a.setNamespace(NAVANA_NS_BC);
-    const r = a.assemble('ELOADCALL CR0, Navana, main\nHALT');
+    const r = a.assemble('CALL CR6[Navana], main\nHALT');
     assert('BC104 ELOADCALL CR0, Navana, main — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC104 ELOADCALL CR0, Navana, main emits 2 words (ELOADCALL + HALT)',
@@ -5871,8 +5844,8 @@ const NAVANA_NS_BC = { 'Navana': 5 };
         const opcode = (w >>> 27) & 0x1F;
         const row    = w & 0x1F;
         const method = (w >>> 5) & 0x7F;
-        assert('BC104 ELOADCALL CR0, Navana, main — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC104 indexed CALL Navana, main — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC104 ELOADCALL CR0, Navana, main — row=5 (Navana NS slot)',
             row === 5, `got row=${row}`);
         assert('BC104 ELOADCALL CR0, Navana, main — method=8 (main index 7, 1-based)',
@@ -5915,7 +5888,7 @@ const MINT_NS_BC = { 'Mint': 6 };
     // BC106: ELOADCALL CR0, Mint, main — method=5 (index 4, 1-based), row=6
     const a = new ChurchAssembler(MINT_CONV_BC);
     a.setNamespace(MINT_NS_BC);
-    const r = a.assemble('ELOADCALL CR0, Mint, main\nHALT');
+    const r = a.assemble('CALL CR6[Mint], main\nHALT');
     assert('BC106 ELOADCALL CR0, Mint, main — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC106 ELOADCALL CR0, Mint, main emits 2 words (ELOADCALL + HALT)',
@@ -5925,8 +5898,8 @@ const MINT_NS_BC = { 'Mint': 6 };
         const opcode = (w >>> 27) & 0x1F;
         const row    = w & 0x1F;
         const method = (w >>> 5) & 0x7F;
-        assert('BC106 ELOADCALL CR0, Mint, main — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC106 indexed CALL Mint, main — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC106 ELOADCALL CR0, Mint, main — row=6 (Mint NS slot)',
             row === 6, `got row=${row}`);
         assert('BC106 ELOADCALL CR0, Mint, main — method=5 (main index 4, 1-based)',
@@ -5970,7 +5943,7 @@ const MEMORY_NS_BC = { 'Memory': 7 };
     // BC108: ELOADCALL CR0, Memory, main — method=6 (index 5, 1-based), row=7
     const a = new ChurchAssembler(MEMORY_CONV_BC);
     a.setNamespace(MEMORY_NS_BC);
-    const r = a.assemble('ELOADCALL CR0, Memory, main\nHALT');
+    const r = a.assemble('CALL CR6[Memory], main\nHALT');
     assert('BC108 ELOADCALL CR0, Memory, main — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     assert('BC108 ELOADCALL CR0, Memory, main emits 2 words (ELOADCALL + HALT)',
@@ -5980,8 +5953,8 @@ const MEMORY_NS_BC = { 'Memory': 7 };
         const opcode = (w >>> 27) & 0x1F;
         const row    = w & 0x1F;
         const method = (w >>> 5) & 0x7F;
-        assert('BC108 ELOADCALL CR0, Memory, main — opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BC108 indexed CALL Memory, main — opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
         assert('BC108 ELOADCALL CR0, Memory, main — row=7 (Memory NS slot)',
             row === 7, `got row=${row}`);
         assert('BC108 ELOADCALL CR0, Memory, main — method=6 (main index 5, 1-based)',
@@ -6026,7 +5999,7 @@ SHL DR4, DR4, 3
 SHR DR4, DR4, 1
 LOAD CR0, CR6, 4
 CALL CR0, 0xF
-ELOADCALL CR0, CR6, 4
+CALL CR0
 HALT
 `;
     const a = new ChurchAssembler({});
@@ -6173,7 +6146,7 @@ HALT
         const imm    = w & 0x7FFF;
         assert('EX4a salvation word[0] LOAD — opcode=0', opcode === 0, `got ${opcode}`);
         assert('EX4a salvation word[0] LOAD — crDst=0', crDst === 0, `got ${crDst}`);
-        assert('EX4a salvation word[0] LOAD — imm=4 (Salvation NS slot)', imm === 4, `got ${imm}`);
+        assert('EX4a salvation word[0] LOAD — compact row=4, DR0 index', imm === (4 << 4), `got ${imm}`);
     }
     // EX4b: CALL Salvation.main encodes CALL (opcode=2) with imm=16 (index 15 → 1-based 16 = 0x10)
     // This matches the raw form "CALL CR0, 0xF" which also stores imm=16 (0xF+1, assembler 1-bases it).
@@ -7288,31 +7261,28 @@ HALT
     };
     const compiled = compiler.compile(src, []);
 
-    assert('EX-JDF-RUN-C1: CLOOMCCompiler compiles dijkstra_flag.cloomc without errors',
-        compiled.errors.length === 0,
-        compiled.errors.map(e => e.message || JSON.stringify(e)).join('; '));
+    assertRetiredCompilation('EX-JDF-RUN-C1 historical DijkstraFlag source', compiled);
 
     assert('EX-JDF-RUN-C2: compiled abstraction name is FlagSync',
         compiled.abstractionName === 'FlagSync',
         `got "${compiled.abstractionName}"`);
 
-    const runSeqMethod = compiled.methods.find(m => m.name === 'RunSequence');
-    assert('EX-JDF-RUN-C3: RunSequence method is present in compiled output',
-        runSeqMethod !== undefined, 'RunSequence not found in compiled methods');
-
-    const ELOADCALL_OPCODE = 8;
-    const eloadWords = runSeqMethod
-        ? (runSeqMethod.code || []).filter(w => ((w >>> 27) & 0x1F) === ELOADCALL_OPCODE)
-        : [];
-    assert('EX-JDF-RUN-C4: RunSequence contains exactly 6 ELOADCALL words (one per DijkstraFlag call)',
-        eloadWords.length === 6,
-        `got ${eloadWords.length} ELOADCALL word(s)`);
-
-    // Row zero is the resident self identity; source capabilities begin at row one.
-    const allRow1 = eloadWords.every(w => (w & 0x1F) === 1);
-    assert('EX-JDF-RUN-C5: all 6 ELOADCALL words target C-list row 1 (DijkstraFlag)',
-        allRow1,
-        `rows: ${eloadWords.map(w => w & 0x1F).join(', ')}`);
+    // The corrected assembly counterpart retains row and method-selector
+    // coverage without silently translating historical high-level source.
+    const corrected = new ChurchAssembler({
+        DijkstraFlag: { Wait: { index: 0 }, Signal: { index: 1 },
+            Reset: { index: 2 }, Test: { index: 3 } }
+    });
+    const sequence = ['Test', 'Signal', 'Test', 'Wait', 'Reset', 'Test'];
+    const calls = corrected.assemble('capabilities { SELF E, DijkstraFlag E }\n' +
+        sequence.map(method => `CALL CR6[DijkstraFlag], ${method}`).join('\n'));
+    assert('EX-JDF-RUN-C3 corrected sequence compiles', calls.errors.length === 0,
+        JSON.stringify(calls.errors));
+    assert('EX-JDF-RUN-C4 corrected sequence has six CALL instructions',
+        calls.words.length === 6 && calls.words.every(w => (w >>> 27) === 2));
+    assert('EX-JDF-RUN-C5 corrected sequence preserves row and method order',
+        calls.words.every((w, i) => (w & 0x1F) === 1 &&
+            ((w >>> 15) & 15) === 6 && ((w >>> 5) & 127) === [4, 2, 4, 1, 3, 4][i]));
 
     // ── Phase B: DijkstraFlag binding trace ──────────────────────────────────
     // Create a minimal sim wired to SystemAbstractions (DijkstraFlag at slot 10).
@@ -7422,27 +7392,7 @@ abstraction VlcTest {
         Object.assign(compiler.methodConventions, CONVENTIONS);
         const compiled = compiler.compile(BASE_SRC(kw), []);
 
-        assert(`EX-VLC-${kw}: compiles without errors`,
-            compiled.errors.length === 0,
-            compiled.errors.map(e => e.message || JSON.stringify(e)).join('; '));
-
-        const runMethod = compiled.methods && compiled.methods.find(m => m.name === 'Run');
-        assert(`EX-VLC-${kw}: Run method present`,
-            runMethod !== undefined, 'Run method not found');
-
-        const eloadWords = runMethod
-            ? (runMethod.code || []).filter(w => ((w >>> 27) & 0x1F) === ELOADCALL_OPCODE)
-            : [];
-        assert(`EX-VLC-${kw}: Run emits exactly 1 ELOADCALL`,
-            eloadWords.length === 1,
-            `got ${eloadWords.length} ELOADCALL word(s)`);
-
-        if (eloadWords.length === 1) {
-            const methodIdx = (eloadWords[0] >>> 5) & 0x7F;
-            assert(`EX-VLC-${kw}: ELOADCALL targets Test (method index 4, 1-based)`,
-                methodIdx === 4,
-                `got methodIdx=${methodIdx}`);
-        }
+        assertRetiredCompilation(`EX-VLC-${kw}`, compiled);
     }
 }
 
@@ -7675,6 +7625,9 @@ abstraction VlcTest {
             assert(tag + ': inline source assembles without errors',
                 inlineErr.length === 0,
                 inlineErr.map(e => 'L' + e.line + ': ' + e.message).join('; '));
+            assert(tag + ': canonical source assembles without errors',
+                fileErr.length === 0,
+                fileErr.map(e => 'L' + e.line + ': ' + e.message).join('; '));
         }
 
         assert(tag + ': inline word count equals canonical word count',
@@ -8801,7 +8754,7 @@ abstraction VlcTest {
 {
     const cc = new CLOOMCCompiler();
     const src = 'SlideRule.BadMethod(3, 4)';
-    const result = cc.compileSymbolic(src);
+    const result = cc.compileSymbolic('abstraction Test {\nmethod run() {\n' + src + '\n}\n}');
     const e = result.errors.find(x => x.message.includes('BadMethod'));
     assert('SC-COL-1: unknown SlideRule method produces an error', e != null);
     const expectedStart = src.indexOf('BadMethod');
@@ -8813,7 +8766,7 @@ abstraction VlcTest {
 {
     const cc = new CLOOMCCompiler();
     const src = 'end';
-    const result = cc.compileSymbolic(src);
+    const result = cc.compileSymbolic('abstraction Test {\nmethod run() {\n' + src + '\n}\n}');
     const e = result.errors.find(x => x.message.includes("'end' without"));
     assert('SC-COL-2: end-without-repeat produces an error', e != null);
     assert('SC-COL-2: colStart is 0', e && e.colStart === 0, e ? 'colStart=' + e.colStart : 'no error');
@@ -8824,7 +8777,7 @@ abstraction VlcTest {
 {
     const cc = new CLOOMCCompiler();
     const src = '    @bad@statement';
-    const result = cc.compileSymbolic(src);
+    const result = cc.compileSymbolic('abstraction Test {\nmethod run() {\n' + src + '\n}\n}');
     const e = result.errors.find(x => x.message.includes('Cannot parse symbolic'));
     assert('SC-COL-3: bad symbolic statement produces an error', e != null);
     const token = '@bad@statement';
@@ -9390,7 +9343,7 @@ Add a method called Run
     const a = new ChurchAssembler(CONV);
     a.setNamespace(NS);
     // capabilities block declares Navana E but NOT Salvation.
-    a.assemble('capabilities { Navana E }\nELOADCALL CR0, Salvation, run');
+    a.assemble('capabilities { Navana E }\nCALL CR6[Salvation], run');
     const capErr = a.errors.find(e => e.message.includes('Salvation') && e.message.includes('not declared'));
     assert('CAP-V4: ELOADCALL with name absent from capabilities block produces error',
         capErr != null,
@@ -9626,7 +9579,7 @@ Add a method called Run
 // This exercises the res8 path (path 3.2 resolution) in the ELOADCALL encoder.
 {
     const a = new ChurchAssembler({});
-    a.assemble('capabilities { Navana E }\nELOADCALL CR0, UART, 0\nRETURN');
+    a.assemble('capabilities { Navana E }\nCALL CR6[UART], 0\nRETURN');
     const capErr = a.errors.find(e => e.message.includes('UART') && e.message.includes('not declared'));
     assert('CAP-V22: ELOADCALL UART with cap block that omits UART produces not-declared error',
         capErr != null,
@@ -9767,6 +9720,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     const factory = new Function('document', 'Node',
         `
         "use strict";
+        const window = document.defaultView;
         // ── State controlled by the test harness ─────────────────────────────
         // NOTE: _absSearchQuery is declared by the extracted renderAbsSrc below
         // (it lives at app-abstractions.js line 388, inside the 387-475 slice) —
@@ -10444,7 +10398,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
 {
     // BC109: XLOADLAMBDA LED0 absent from capabilities block → error.
     const a = new ChurchAssembler();
-    const r = a.assemble('capabilities { Salvation E }\nXLOADLAMBDA CR3, LED0\nHALT');
+    const r = a.assemble('capabilities { Salvation E }\nLOAD CR3, LED0\nLAMBDA CR3\nHALT');
     assert('BC109 XLOADLAMBDA with undeclared device name → error',
         a.errors.length >= 1,
         `expected >=1 error, got ${a.errors.length}: ${a.errors.map(e => e.message).join('; ')}`);
@@ -10464,8 +10418,8 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     const errMsg = a.errors[0] ? a.errors[0].message : '';
     assert('BC110 _parseImm error mentions the device name',
         /LED0/.test(errMsg), `error message was: "${errMsg}"`);
-    assert('BC110 _parseImm error mentions boot slot',
-        /boot slot/.test(errMsg), `error message was: "${errMsg}"`);
+    assert('BC110 _parseImm error requests a capability declaration',
+        /not declared.*capabilities block/.test(errMsg), `error message was: "${errMsg}"`);
 }
 
 {
@@ -10496,8 +10450,8 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     {
         const w   = r.words[0] >>> 0;
         const imm = w & 0x7FFF;
-        assert('BC112 LOAD CR3,LED1 — imm=1 (cap-block position 1, not boot slot 9)',
-            imm === 1, `got imm=${imm}`);
+        assert('BC112 LOAD CR3,LED1 — compact row=1, DR0 index',
+            imm === 16, `got imm=${imm}`);
     }
 }
 
@@ -10513,8 +10467,8 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     {
         const w   = r.words[0] >>> 0;
         const imm = w & 0x7FFF;
-        assert('BC113 LOAD CR3,LED0 — imm=3 (cap-block position 3, not boot slot 8)',
-            imm === 3, `got imm=${imm}`);
+        assert('BC113 LOAD CR3,LED0 — compact row=3, DR0 index',
+            imm === 48, `got imm=${imm}`);
     }
 }
 
@@ -10543,14 +10497,14 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     // BC115: ELOADCALL CR0, LED0 — capabilities block with LED0 at position 0.
     // Two-operand form; assembler must encode row=0 (cap-block position).
     const a = new ChurchAssembler();
-    const r = a.assemble('capabilities { LED0 RW }\nELOADCALL CR0, LED0\nHALT');
+    const r = a.assemble('capabilities { LED0 RW }\nCALL CR6[LED0]\nHALT');
     assert('BC115 ELOADCALL with LED0 at cap-block position 0 — no assembler errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     {
         const w   = r.words[0] >>> 0;
         const opc = (w >>> 27) & 0x1F;
         const row = w & 0x1F;
-        assert('BC115 ELOADCALL CR0,LED0 — opcode=8 (ELOADCALL)', opc === 8, `got opcode=${opc}`);
+        assert('BC115 indexed CALL LED0 — opcode=2', opc === 2, `got opcode=${opc}`);
         assert('BC115 ELOADCALL CR0,LED0 — row=0 (cap-block position 0, not boot slot 8)',
             row === 0, `got row=${row}`);
     }
@@ -10561,16 +10515,17 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     // The newly-added _checkCapDeclared must NOT fire (name IS declared).
     // imm must be 0 (cap-block position), not 8 (boot slot).
     const a = new ChurchAssembler();
-    const r = a.assemble('capabilities { LED0 RW }\nXLOADLAMBDA CR3, LED0\nHALT');
+    const r = a.assemble('capabilities { LED0 RW }\nLOAD CR3, LED0\nLAMBDA CR3\nHALT');
     assert('BC116 XLOADLAMBDA with LED0 at cap-block position 0 — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
-    assert('BC116 XLOADLAMBDA with LED0 at cap-block position 0 — emits 2 words',
-        r.words.length === 2, `got ${r.words.length}`);
+    assert('BC116 explicit LOAD/LAMBDA with LED0 — emits 3 words',
+        r.words.length === 3, `got ${r.words.length}`);
     {
         const w   = r.words[0] >>> 0;
         const opc = (w >>> 27) & 0x1F;
         const imm = w & 0x7FFF;
-        assert('BC116 XLOADLAMBDA CR3,LED0 — opcode=9 (XLOADLAMBDA)', opc === 9, `got opcode=${opc}`);
+        assert('BC116 explicit LOAD/LAMBDA opcodes',
+            opc === 0 && ((r.words[1] >>> 27) & 31) === 7, `got opcode=${opc}`);
         assert('BC116 XLOADLAMBDA CR3,LED0 — imm=0 (cap-block position 0, not boot slot 8)',
             imm === 0, `got imm=${imm}`);
     }
@@ -10581,15 +10536,15 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     //        LED0 at position 2.
     const a = new ChurchAssembler();
     const r = a.assemble(
-        'capabilities {\n Salvation E,\n Navana E,\n LED0 RW\n}\nXLOADLAMBDA CR3, LED0\nHALT'
+        'capabilities {\n Salvation E,\n Navana E,\n LED0 RW\n}\nLOAD CR3, LED0\nLAMBDA CR3\nHALT'
     );
     assert('BC117 XLOADLAMBDA with LED0 at cap-block position 2 — no errors',
         a.errors.length === 0, a.errors.map(e => e.message).join('; '));
     {
         const w   = r.words[0] >>> 0;
         const imm = w & 0x7FFF;
-        assert('BC117 XLOADLAMBDA CR3,LED0 — imm=2 (cap-block position 2, not boot slot 8)',
-            imm === 2, `got imm=${imm}`);
+        assert('BC117 explicit LOAD/LAMBDA — compact row=2, DR0 index',
+            imm === 32 && ((r.words[1] >>> 27) & 31) === 7, `got imm=${imm}`);
     }
 }
 
@@ -10696,21 +10651,21 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     sim.memory[codeBase + 2] = words[63];
     const manifests = { 7: { _caps: built.resolvedCaps } };
     const resolvePetName = resolverFactory(sim, manifests, CapabilityTokens, lumps);
-    assert('CAP-GT-8: Code view labels c-list row 0 as LED0',
-        resolvePetName(codeBase, 0, 7) === 'LED0',
+    assert('CAP-GT-8: unverified metadata does not override raw row 0 evidence',
+        resolvePetName(codeBase, 0, 7) === 'GT 0x32000003',
         `got ${resolvePetName(codeBase, 0, 7)}`);
-    assert('CAP-GT-9: Code view labels c-list row 1 as UART_TX',
-        resolvePetName(codeBase, 1, 7) === 'UART_TX',
+    assert('CAP-GT-9: unverified metadata does not override raw row 1 evidence',
+        resolvePetName(codeBase, 1, 7) === 'GT 0x22000002',
         `got ${resolvePetName(codeBase, 1, 7)}`);
     sim.memory[codeBase] = 0x0AC8F3D7;
     const badLabel = resolvePetName(codeBase, 0, 7);
-    assert('CAP-GT-10: malformed LED0 row has safe diagnostic, never bogus NS/M-Elev label',
-        badLabel === 'Invalid LED0 GT' && !/NS\[62423\]|M-Elev/.test(badLabel),
+    assert('CAP-GT-10: malformed bytes stay inspectable without a fabricated petname',
+        badLabel === 'GT 0x0AC8F3D7' && !/NS\[62423\]|M-Elev/.test(badLabel),
         `got ${badLabel}`);
     sim.memory[codeBase] = (words[61] | 0x80000000) >>> 0;
     const bSetLabel = resolvePetName(codeBase, 0, 7);
-    assert('CAP-GT-10b: Code view rejects B-set LED0 token safely',
-        bSetLabel === 'Invalid LED0 GT',
+    assert('CAP-GT-10b: Code view preserves B-set evidence without endorsing it',
+        bSetLabel === 'GT 0xB2000003',
         `got ${bSetLabel}`);
 
     // Exercise the shared gate used by both raw Assembly and CLOOMC++ Run paths.
@@ -10753,11 +10708,9 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
             : rawUnknown.errors.join('; '));
     const rawSelf = materializeForRun(
         [{ name: 'SELF', rights: ['E'] }], 'Run');
-    assert('CAP-GT-13b: raw Run treats SELF as contextual row-zero authority',
-        rawSelf.ok &&
-            rawSelf.capabilities.length === 1 &&
-            rawSelf.capabilities[0].compiler_owned_self === true &&
-            (rawSelf.capabilities[0].token >>> 0) === 0xFEED5E1F,
+    assert('CAP-GT-13b: raw Run rejects SELF without compiler-owned provenance',
+        !rawSelf.ok && rawSelf.errors.some(error =>
+            /SELF row 0 requires compiler-owned provenance/.test(error)),
         rawSelf.ok ? JSON.stringify(rawSelf.capabilities) : rawSelf.errors.join('; '));
     const misplacedSelf = CapabilityTokens.resolveCapabilities([
         { name: 'LED0', rights: ['R', 'W'] },
@@ -10794,7 +10747,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     {
         const a = new ChurchAssembler(BARE_SPACE_CONV);
         a.setNamespace(BARE_SPACE_NS);
-        const result = a.assemble('SelfTest Run');
+        const result = a.assemble('CALL CR6[SelfTest], Run');
         assert('BS1 "SelfTest Run" produces no errors',
             result.errors.length === 0,
             result.errors.map(e => e.message).join('; '));
@@ -10802,21 +10755,21 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
             result.words.length === 1,
             `got ${result.words.length} words`);
         const opcode = (result.words[0] >>> 27) & 0x1F;
-        assert('BS1 "SelfTest Run" opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BS1 explicit SelfTest Run opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
     }
 
     // BS2: "Scheduler pause" — second known two-token pair.
     {
         const a = new ChurchAssembler(BARE_SPACE_CONV);
         a.setNamespace(BARE_SPACE_NS);
-        const result = a.assemble('Scheduler pause');
+        const result = a.assemble('CALL CR6[Scheduler], pause');
         assert('BS2 "Scheduler pause" produces no errors',
             result.errors.length === 0,
             result.errors.map(e => e.message).join('; '));
         const opcode = (result.words[0] >>> 27) & 0x1F;
-        assert('BS2 "Scheduler pause" opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BS2 explicit Scheduler pause opcode=2 (CALL)',
+            opcode === 2, `got opcode=${opcode}`);
     }
 
     // BS3: unknown method on a known abstraction → targeted error listing known methods.
@@ -10860,7 +10813,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         const a = new ChurchAssembler(BARE_SPACE_CONV);
         a.setNamespace(BARE_SPACE_NS);
         // The capabilities block exists (Scheduler is declared) but SelfTest is absent.
-        const result = a.assemble('capabilities {\n  Scheduler E\n}\nSelfTest Run');
+        const result = a.assemble('capabilities {\n  Scheduler E\n}\nCALL CR6[SelfTest], Run');
         assert('BS6 "SelfTest Run" with capabilities block missing SelfTest produces an error',
             result.errors.length > 0, 'expected at least one error');
         const msg = result.errors.length > 0 ? result.errors[0].message : '';
@@ -10873,13 +10826,13 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     {
         const a = new ChurchAssembler(BARE_SPACE_CONV);
         a.setNamespace(BARE_SPACE_NS);
-        const result = a.assemble('capabilities {\n  SelfTest E\n}\nSelfTest Run');
+        const result = a.assemble('capabilities {\n  SelfTest E\n}\nCALL CR6[SelfTest], Run');
         assert('BS6b "SelfTest Run" with SelfTest declared in capabilities: no cap-declared error',
             result.errors.length === 0,
             result.errors.map(e => e.message).join('; '));
         const opcode = result.words.length > 0 ? (result.words[0] >>> 27) & 0x1F : -1;
-        assert('BS6b "SelfTest Run" with declared capability: opcode=8 (ELOADCALL)',
-            opcode === 8, `got opcode=${opcode}`);
+        assert('BS6b explicit SelfTest Run with declared capability: opcode=2',
+            opcode === 2, `got opcode=${opcode}`);
     }
 }
 
@@ -10905,7 +10858,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     {
         const a = new ChurchAssembler(BS_ARG_CONV);
         a.setNamespace(BS_ARG_NS);
-        const result = a.assemble('SelfTest Check SlideRule');
+        const result = a.assemble('LOAD CR2, SlideRule\nCALL CR6[SelfTest], Check');
         assert('BS6 "SelfTest Check SlideRule" produces no errors',
             result.errors.length === 0,
             result.errors.map(e => e.message).join('; '));
@@ -10915,14 +10868,14 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         const opcode0 = (result.words[0] >>> 27) & 0x1F;
         const opcode1 = (result.words[1] >>> 27) & 0x1F;
         assert('BS6 word[0] opcode=0 (LOAD)', opcode0 === 0, `got opcode=${opcode0}`);
-        assert('BS6 word[1] opcode=8 (ELOADCALL)', opcode1 === 8, `got opcode=${opcode1}`);
+        assert('BS6 word[1] opcode=2 (CALL)', opcode1 === 2, `got opcode=${opcode1}`);
     }
 
     // BS7: "SelfTest Check CR5" — explicit CRn supplied → no LOAD emitted, just ELOADCALL.
     {
         const a = new ChurchAssembler(BS_ARG_CONV);
         a.setNamespace(BS_ARG_NS);
-        const result = a.assemble('SelfTest Check CR5');
+        const result = a.assemble('CALL CR6[SelfTest], Check');
         assert('BS7 "SelfTest Check CR5" (explicit CR) produces no errors',
             result.errors.length === 0,
             result.errors.map(e => e.message).join('; '));
@@ -10930,7 +10883,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
             result.words.length === 1,
             `got ${result.words.length} words`);
         const opcode = (result.words[0] >>> 27) & 0x1F;
-        assert('BS7 word[0] opcode=8 (ELOADCALL)', opcode === 8, `got opcode=${opcode}`);
+        assert('BS7 word[0] opcode=2 (CALL)', opcode === 2, `got opcode=${opcode}`);
     }
 
     // BS8: "SelfTest Write 42" — DR numeric arg → targeted pre-load error (same hint as dot-paren).
@@ -10950,7 +10903,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     {
         const a = new ChurchAssembler(BS_ARG_CONV);
         a.setNamespace(BS_ARG_NS);
-        const result = a.assemble('SelfTest Send SlideRule Scheduler');
+        const result = a.assemble('LOAD CR2, SlideRule\nLOAD CR3, Scheduler\nCALL CR6[SelfTest], Send');
         assert('BS9 "SelfTest Send SlideRule Scheduler" produces no errors',
             result.errors.length === 0,
             result.errors.map(e => e.message).join('; '));
@@ -10962,170 +10915,28 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         const opcode2 = (result.words[2] >>> 27) & 0x1F;
         assert('BS9 word[0] opcode=0 (LOAD)', opcode0 === 0, `got opcode=${opcode0}`);
         assert('BS9 word[1] opcode=0 (LOAD)', opcode1 === 0, `got opcode=${opcode1}`);
-        assert('BS9 word[2] opcode=8 (ELOADCALL)', opcode2 === 8, `got opcode=${opcode2}`);
+        assert('BS9 word[2] opcode=2 (CALL)', opcode2 === 2, `got opcode=${opcode2}`);
     }
 }
 
 // ── Boot-entry RETURN warning: [BOOT-RETURN] ─────────────────────────────────
 //
-// _checkBootEntryReturn() in app-compile.js fires a [BOOT-RETURN] warning when:
-//   - the abstraction being compiled IS the current boot entry (NS slot + name)
-//   - the assembled code contains at least one RETURN word (opcode 3)
-//
-// At hardware boot there is no caller frame, so RETURN faults and wipes all
-// registers (fault LED ON). The IDE must warn the programmer before they flash.
-//
-// The IIFE closes over: sim, absName, allCode, allLineNums, _showAsmWarnings
-// (all available in the compileAndBuild scope just before codeRegion is built).
+// Fresh Threads have a protected poison-root frame. The obsolete static warning
+// incorrectly rejected RETURN even inside a method entered through CALL.
 {
     const fs   = require('fs');
     const path = require('path');
-    const compileLines = fs.readFileSync(
-        path.join(__dirname, 'app-compile.js'), 'utf8').split('\n');
-    // Pattern-based extraction — locates the IIFE by its known first-line
-    // signature and its closing `})();` so the test survives future edits.
-    const { src: berSrc } = _srcExtract(
-        compileLines,
-        '(function _checkBootEntryReturn()',
-        '})();',
-        0,
-        '_checkBootEntryReturn IIFE in app-compile.js');
-
-    assert('BER-SRC1: extracted _checkBootEntryReturn IIFE from app-compile.js',
-        berSrc.includes('(function _checkBootEntryReturn()') &&
-        berSrc.includes('[BOOT-RETURN]'),
-        'Pattern "(function _checkBootEntryReturn()" not found in app-compile.js — check _srcExtract');
-
-    // Helper: run the IIFE in a controlled context; returns what _showAsmWarnings
-    // received, or null if it was never called.
-    function runBerCheck({ bootSlot, absName, registryAbstractions, allCode, allLineNums }) {
-        let captured = null;
-        const sim = {
-            bootEntrySlot: bootSlot,
-            abstractionRegistry: registryAbstractions != null
-                ? { abstractions: registryAbstractions }
-                : null
-        };
-        const _showAsmWarnings = (warns) => { captured = warns; };
-        const fn = new Function(
-            'sim', 'absName', 'allCode', 'allLineNums', '_showAsmWarnings',
-            'bootEntrySlot',
-            '"use strict";\n' + berSrc
-        );
-        fn(sim, absName, allCode || [], allLineNums || [], _showAsmWarnings,
-            bootSlot);
-        return captured;
-    }
-
-    // Church opcode 3 (RETURN) lives in bits[31:27].
-    const RETURN_WORD = (3 << 27) >>> 0;   // 0x06000000
-    const BRANCH_WORD = (23 << 27) >>> 0;  // 0xB8000000  (not RETURN)
-
-    // BER-1: SelfTest is the boot entry and its code contains RETURN → warning fires
-    const _ber1reg = { 6: { index: 6, name: 'SelfTest' } };
-    const ber1 = runBerCheck({
-        bootSlot: 6, absName: 'SelfTest',
-        registryAbstractions: _ber1reg,
-        allCode: [BRANCH_WORD, RETURN_WORD],
-        allLineNums: [1, 2]
-    });
-    assert('BER-1: RETURN in boot-entry abstraction fires a warning',
-        Array.isArray(ber1) && ber1.length === 1,
-        `captured=${JSON.stringify(ber1)}`);
-    assert('BER-1: warning message contains [BOOT-RETURN]',
-        (ber1 && ber1[0] && ber1[0].message || '').includes('[BOOT-RETURN]'),
-        ber1 && ber1[0]?.message?.slice(0, 70));
-    assert('BER-1: warning message names the abstraction',
-        (ber1 && ber1[0]?.message || '').includes('SelfTest'),
-        '');
-    assert('BER-1: warning message cites the boot slot',
-        (ber1 && ber1[0]?.message || '').includes('6'),
-        '');
-
-    // BER-2: boot entry, but code has NO RETURN → no warning
-    const ber2 = runBerCheck({
-        bootSlot: 6, absName: 'SelfTest',
-        registryAbstractions: _ber1reg,
-        allCode: [BRANCH_WORD, BRANCH_WORD],
-        allLineNums: [1, 2]
-    });
-    assert('BER-2: no RETURN in boot-entry abstraction → no warning',
-        ber2 === null,
-        `captured=${JSON.stringify(ber2)}`);
-
-    // BER-3: RETURN present, but abstraction name does NOT match boot entry → no warning
-    const ber3 = runBerCheck({
-        bootSlot: 6, absName: 'MyOtherAbstraction',
-        registryAbstractions: _ber1reg,   // slot 6 = SelfTest, not MyOtherAbstraction
-        allCode: [RETURN_WORD],
-        allLineNums: [1]
-    });
-    assert('BER-3: RETURN in non-boot-entry abstraction → no warning',
-        ber3 === null,
-        `captured=${JSON.stringify(ber3)}`);
-
-    // BER-4: bootEntrySlot = -1 (no boot entry configured) → no warning
-    const ber4 = runBerCheck({
-        bootSlot: -1, absName: 'SelfTest',
-        registryAbstractions: null,
-        allCode: [RETURN_WORD],
-        allLineNums: [1]
-    });
-    assert('BER-4: bootEntrySlot=-1 → no warning even with RETURN',
-        ber4 === null,
-        `captured=${JSON.stringify(ber4)}`);
-
-    // BER-5: multiple RETURN words → single warning with plural wording + both locations
-    const ber5 = runBerCheck({
-        bootSlot: 6, absName: 'SelfTest',
-        registryAbstractions: _ber1reg,
-        allCode: [RETURN_WORD, BRANCH_WORD, RETURN_WORD],
-        allLineNums: [1, 2, 3]
-    });
-    assert('BER-5: multiple RETURNs → exactly one warning object',
-        Array.isArray(ber5) && ber5.length === 1,
-        `captured=${JSON.stringify(ber5)}`);
-    assert('BER-5: warning uses plural "instructions"',
-        (ber5 && ber5[0]?.message || '').includes('instructions'),
-        ber5 && ber5[0]?.message?.slice(0, 90));
-    assert('BER-5: warning cites source line 1 and line 3',
-        (ber5 && ber5[0]?.message || '').includes('line 1') &&
-        (ber5 && ber5[0]?.message || '').includes('line 3'),
-        ber5 && ber5[0]?.message?.slice(0, 120));
-
-    // BER-6: name comparison is case-insensitive
-    const ber6 = runBerCheck({
-        bootSlot: 6, absName: 'SELFTEST',
-        registryAbstractions: { 6: { index: 6, name: 'selftest' } },
-        allCode: [RETURN_WORD],
-        allLineNums: [null]
-    });
-    assert('BER-6: name match is case-insensitive → warning still fires',
-        Array.isArray(ber6) && ber6.length === 1,
-        `captured=${JSON.stringify(ber6)}`);
-
-    // BER-7: null source-line info → warning falls back to "word N" notation
-    const ber7 = runBerCheck({
-        bootSlot: 6, absName: 'SelfTest',
-        registryAbstractions: _ber1reg,
-        allCode: [RETURN_WORD],
-        allLineNums: [null]
-    });
-    assert('BER-7: null line-number → location reported as "word 1"',
-        (ber7 && ber7[0]?.message || '').includes('word 1'),
-        ber7 && ber7[0]?.message?.slice(0, 90));
-
-    // BER-8: warning advises replacing RETURN with a loop or CALL
-    const ber8 = runBerCheck({
-        bootSlot: 6, absName: 'SelfTest',
-        registryAbstractions: _ber1reg,
-        allCode: [RETURN_WORD],
-        allLineNums: [5]
-    });
-    assert('BER-8: warning message advises infinite loop or CALL alternative',
-        (ber8 && ber8[0]?.message || '').includes('infinite loop') ||
-        (ber8 && ber8[0]?.message || '').includes('CALL'),
-        ber8 && ber8[0]?.message?.slice(0, 120));
+    const compileSource = fs.readFileSync(
+        path.join(__dirname, 'app-compile.js'), 'utf8');
+    assert('BER: no obsolete blanket warning for boot-entry RETURN',
+        !compileSource.includes('[BOOT-RETURN]'));
+    // A RETURN in a called method is valid; only the runtime root-frame
+    // boundary can distinguish it from an unmatched return.
+    const check = require('child_process').spawnSync(process.execPath,
+        [path.join(__dirname, 'test_task3529_control_flow_diagnostics.js')],
+        { encoding: 'utf8' });
+    assert('BER: protected CALL/RETURN and poison-root diagnostics',
+        check.status === 0, check.stdout + check.stderr);
 }
 
 // ── Summary ──────────────────────────────────────────────────────────────────
@@ -11138,7 +10949,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         '  Alpha E Beta RX,\n' +
         '  Gamma E\n' +
         '}\n' +
-        'ELOADCALL CR1, Beta, 0\n' +
+        'CALL CR6[Beta], 0\n' +
         'RETURN'
     );
     const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
@@ -11179,7 +10990,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         '  TIMER_DEV RW\n' +
         '  WukongCallHome E\n' +
         '}\n' +
-        'ELOADCALL CR1, WukongCallHome, 0\n' +
+        'CALL CR6[WukongCallHome], 0\n' +
         'RETURN'
     );
     const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
@@ -11208,7 +11019,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         '  TIMER_DEV RW,\n' +
         '  WukongCallHome E\n' +
         '}\n' +
-        'ELOADCALL CR1, WukongCallHome, 0\n' +
+        'CALL CR6[WukongCallHome], 0\n' +
         'RETURN'
     );
     assert('CAP-MC4 comma-separated multiline declarations compile unchanged',
@@ -11238,7 +11049,7 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
     const a = new ChurchAssembler({});
     const result = a.assemble(
         'capabilities {\n  LED0\n  WukongCallHome E\n}\n' +
-        'ELOADCALL CR1, WukongCallHome, 0\nRETURN'
+        'CALL CR6[WukongCallHome], 0\nRETURN'
     );
     const separatorErrors = result.errors.filter(e => /missing comma/i.test(e.message));
     assert('CAP-MC6 mixed declaration forms report the adjacent boundary',

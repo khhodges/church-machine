@@ -5,7 +5,7 @@ global.ChurchAssembler = require('./assembler.js');
 const CLOOMCCompiler = require('./cloomc_compiler.js');
 
 function compile(source, authorities) {
-    return new CLOOMCCompiler().compileAssembly(source, [], {
+    return new CLOOMCCompiler().compileAssembly('; Abstraction: Caller\n' + source, [], {
         callApiAuthorities: authorities || {},
     });
 }
@@ -36,7 +36,7 @@ assert(result.errors.some(e => e.code === 'CALL_API_METHOD_INVALID'),
 
 result = compile('capabilities { SELF E, Future E }\nCALL CR6[Future]', {});
 assert(result.warnings.some(w =>
-    w.code === 'CALL_API_UNAVAILABLE' && w.line === 2 && w.petname === 'Future'),
+    w.code === 'CALL_API_UNAVAILABLE' && w.line === 3 && w.petname === 'Future'),
     'unavailable API must warn with source line and pet name');
 assert.equal(result.errors.length, 0, 'unavailable API warning must not block compile');
 

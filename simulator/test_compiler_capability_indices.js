@@ -62,7 +62,7 @@ function capabilityNames(capabilities) {
 function eloadcallWords(result) {
     return result.methods
         .flatMap(method => Array.isArray(method.code) ? method.code : [])
-        .filter(word => ((word >>> 27) & 0x1F) === 8);
+        .filter(word => ((word >>> 27) & 0x1F) === 2 && ((word >>> 15) & 15) === 6);
 }
 
 function decodeEloadcall(word) {
@@ -96,21 +96,21 @@ const SOURCE_ORDER_SOURCE = `abstraction Caller {
         Tail E
     }
     method Run() {
-        Foo.Run()
-        Bar.Other()
+        CALL CR6[Foo], Run
+        CALL CR6[Bar], Other
     }
 }`;
 
 const EMPTY_CAPABILITY_SOURCE = `abstraction Caller {
     method Run() {
-        Foo.Run()
-        Bar.Other()
+        CALL CR6[Foo], Run
+        CALL CR6[Bar], Other
     }
 }`;
 
 const FOO_ONLY_SOURCE = `abstraction Caller {
     method Run() {
-        Foo.Run()
+        CALL CR6[Foo], Run
     }
 }`;
 
@@ -267,7 +267,7 @@ const SELF_ALIAS_SOURCE = `abstraction Caller {
         Bar E
     }
     method Run() {
-        Foo.Run()
+        CALL CR6[Foo], Run
     }
 }`;
 
@@ -332,7 +332,7 @@ check('a concrete non-SELF upload at row zero faults without moving rows', () =>
     const source = `abstraction Caller {
         capabilities { Foo E }
         method Run() {
-            Foo.Run()
+            CALL CR6[Foo], Run
         }
     }`;
     const result = new CLOOMCCompiler().compile(source, [
@@ -355,8 +355,8 @@ check('invalid concrete upload skeleton faults and preserves its NULL hole', () 
             Bar E
         }
         method Run() {
-            Foo.Run()
-            Bar.Other()
+            CALL CR6[Foo], Run
+            CALL CR6[Bar], Other
         }
     }`;
     const uploads = [
@@ -430,7 +430,7 @@ check('parallel source and uploaded NULL entries deduplicate to one hole', () =>
             Foo E
         }
         method Run() {
-            Foo.Run()
+            CALL CR6[Foo], Run
         }
     }`;
     const uploads = [null, { name: 'Foo', rights: ['E'] }];
@@ -468,7 +468,7 @@ check('final capability limit is checked after a 32-row merge', () => {
         /Final capabilities list has 33 entries/.test(error.message)));
 });
 
-check('symbolic frontend shares capability-row and ELOADCALL decoding', () => {
+check('symbolic frontend rejects retired call generation while retaining source rows', () => {
     const source = `abstraction Caller {
         capabilities { Foo Bar }
         method Run() {
@@ -476,14 +476,15 @@ check('symbolic frontend shares capability-row and ELOADCALL decoding', () => {
             return value
         }
     }`;
-    const result = compileOrThrow(new CLOOMCCompiler(), source, [
+    const result = new CLOOMCCompiler().compileSymbolic(source, [
         { target: 'Bar', grants: ['E'] },
         { name: 'Foo', grants: ['E'] },
-    ], 'compileSymbolic');
+    ]);
 
     assert.deepStrictEqual(capabilityNames(result.capabilities), ['Foo', 'Bar']);
     assert.strictEqual(result.capabilities[0].name, 'Foo');
-    assertEloadTargets(result, [{ name: 'Foo', selector: 4 }]);
+    assert(result.errors.some(error => /retired ELOADCALL/.test(error.message)));
+    assert.strictEqual(result.methods.length, 0);
 });
 
 for (const frontend of ['compileHaskell', 'compileLambda']) {
@@ -503,7 +504,7 @@ for (const frontend of ['compileHaskell', 'compileLambda']) {
     });
 }
 
-check('English frontend compiles a real capability call when conventions are supplied', () => {
+check('English frontend rejects retired call generation with actionable diagnostics', () => {
     const source = `ENGLISH abstraction Caller {
         capabilities { Foo, Bar }
         Run():
@@ -513,11 +514,11 @@ check('English frontend compiles a real capability call when conventions are sup
         Foo: { Run: { index: 4 } },
         Bar: { Other: { index: 2 } },
     });
-    const result = compileOrThrow(englishCompiler, source, [], 'compileEnglish');
+    const result = englishCompiler.compileEnglish(source, []);
 
     assert.deepStrictEqual(capabilityNames(result.capabilities), ['foo', 'bar']);
-    assertEloadTargets(result, [{ name: 'foo', selector: 4 }]);
-    assert.strictEqual(decodeEloadcall(eloadcallWords(result)[0]).row, 0);
+    assert(result.errors.some(error => /retired ELOADCALL/.test(error.message)));
+    assert.strictEqual(result.methods.length, 0);
 });
 
 function checkAssemblyCase(label, source, expectedNames, expectedRow) {
@@ -539,8 +540,9 @@ function checkAssemblyCase(label, source, expectedNames, expectedRow) {
 }
 
 check('assembly faults when row zero is not SELF', () => {
-    const source = `capabilities { Foo E }
-ELOADCALL CR0, CR6, #0, 4`;
+    const source = `; Abstraction: Caller
+capabilities { Foo E }
+CALL CR6[Foo], 4`;
     const assembled = new ChurchAssembler().assemble(source);
     assert.deepStrictEqual(assembled.errors, []);
     const compiled = new CLOOMCCompiler().compile(source);
@@ -550,6 +552,7 @@ ELOADCALL CR0, CR6, #0, 4`;
 
 check('compiler assembly frontend uses an active C-list map without leaking it', () => {
     const source = [
+        '; Abstraction: Caller',
         'SWITCH CR12, Thread.1',
         'SWITCH CR15, Boot.Thread',
     ].join('\n');
@@ -576,8 +579,9 @@ check('compiler assembly frontend uses an active C-list map without leaking it',
 
 checkAssemblyCase(
     'assembly SELF/Foo at row one',
-    `capabilities { SELF E, Foo E }
-ELOADCALL CR0, CR6, #1, 4`,
+    `; Abstraction: Caller
+capabilities { SELF E, Foo E }
+CALL CR6[Foo], 4`,
     ['SELF', 'Foo'],
     1,
 );
@@ -622,7 +626,7 @@ check('fixed concrete C-list faults when row zero is not SELF', () => {
     assert.deepStrictEqual(capabilityNames(result.capabilities), ['Pinned', 'Foo', 'Bar']);
 });
 
-check('unchanged embedded Alice source compiles with one owned SELF and unresolved private row', () => {
+check('unchanged embedded Alice source preserves SELF and CR5 private storage', () => {
     const original = fs.readFileSync(path.join(__dirname,
         '../server/lumps/ide.Alice.1.1e49ecb5.lump'));
     const originalHash = crypto.createHash('sha256').update(original).digest('hex');
@@ -639,36 +643,36 @@ check('unchanged embedded Alice source compiles with one owned SELF and unresolv
         (sourceLenIndex + 1) * 4 + sourceLen);
     const sourceBytes = zlib.inflateRawSync(compressed);
     const source = sourceBytes.toString('utf8');
-    assert.match(source, /capabilities\s*\{\s*SELF E,\s*SECRET_DATA RW\s*\}/);
+    assert.match(source, /capabilities\s*\{\s*SELF E\s*\}/);
+    assert.match(source, /DWRITE DR1, CR5, #9/);
+    assert.match(source, /DREAD DR1, CR5, #9/);
     const compile = text => JSON.parse(execFileSync('node',
         [path.join(__dirname, '../server/compile_worker.js')],
         { input: JSON.stringify({ source: text, language: 'assembly' }) }).toString());
     const actual = compile(source);
     assert.strictEqual(actual.ok, true, actual.error);
     assert.strictEqual(actual.words.length, 512);
-    assert.strictEqual(actual.compiler_record.cw, 10);
-    assert.strictEqual(actual.compiler_record.cc, 2);
-    assert.deepStrictEqual(actual.words.slice(-2), [0, 0]);
-    assert.deepStrictEqual(actual.capabilities.map(c => c.name), ['SELF', 'SECRET_DATA']);
-    assert.deepStrictEqual(actual.capabilities.map(c => c.rights), [['E'], ['R', 'W']]);
+    assert.strictEqual(actual.compiler_record.cw, 9);
+    assert.strictEqual(actual.compiler_record.cc, 1);
+    assert.deepStrictEqual(actual.words.slice(-1), [0]);
+    assert.deepStrictEqual(actual.capabilities.map(c => c.name), ['SELF']);
+    assert.deepStrictEqual(actual.capabilities.map(c => c.rights), [['E']]);
     assert.strictEqual(actual.capabilities[0].compiler_owned_self, true);
     assert.strictEqual(actual.capabilities[0].pending_symbolic, false);
-    assert.strictEqual(actual.capabilities[1].compiler_owned_self, false);
-    assert.strictEqual(actual.capabilities[1].pending_symbolic, true);
     assert.strictEqual(actual.compiler_record.source_hash,
         crypto.createHash('sha256').update(sourceBytes).digest('hex'));
-    const historical = compile(source.replace(/\bSELF E,/, '__SELF__ E,'));
+    const historical = compile(source.replace(/\bSELF E\b/, '__SELF__ E'));
     assert.strictEqual(historical.ok, true, historical.error);
     assert.deepStrictEqual(historical.words.slice(1, 1 + cw), actual.words.slice(1, 1 + cw));
     assert.deepStrictEqual(historical.capabilities.map(c => c.rights),
         actual.capabilities.map(c => c.rights));
     assert.strictEqual(historical.capabilities[0].compiler_owned_self, true);
     assert.strictEqual(crypto.createHash('sha256').update(original).digest('hex'), originalHash);
-    assert.strictEqual(cc, 2);
+    assert.strictEqual(cc, 1);
 });
 
 check('assembly rejects duplicate or misplaced SELF without shifting rows or narrowing rights', () => {
-    const compile = source => new CLOOMCCompiler().compileAssembly(source, []);
+    const compile = source => new CLOOMCCompiler().compileAssembly('; Abstraction: Caller\n' + source, []);
     for (const source of [
         'capabilities { SELF E, __SELF__ E }\nRETURN',
         'capabilities { External E, SELF E }\nRETURN',
@@ -693,7 +697,9 @@ check('assembly rejects duplicate or misplaced SELF without shifting rows or nar
 check('generated compiler preserves authored SELF permissions for both spellings', () => {
     const build = spelling => `abstraction Owner {
         capabilities { ${spelling} RW, Foo E }
-        method Run() { Foo.Run() }
+        method Run() {
+            CALL CR6[Foo], Run
+        }
     }`;
     const publicSelf = compileOrThrow(new CLOOMCCompiler(), build('SELF'), []);
     const internalSelf = compileOrThrow(new CLOOMCCompiler(), build('__SELF__'), []);

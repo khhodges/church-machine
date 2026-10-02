@@ -14,6 +14,8 @@ const supported = new Set([
     ...Object.keys(new ChurchAssembler().opcodes),
     ...pseudoMnemonics,
 ]);
+supported.delete('ELOADCALL');
+supported.delete('XLOADLAMBDA');
 const concreteForms = {
     'LOAD\0CRd CRs #row': 'LOAD CR1, CR6, #1',
     'SAVE\0CRd CRs #row': 'SAVE CR1, CR6, #1',
@@ -64,6 +66,30 @@ const pickerCatalogs = pickerPaths.map((relativePath) => ({
     relativePath,
     entries: pickerEntries(fs.readFileSync(path.join(root, relativePath), 'utf8')),
 }));
+
+// Exercise the dynamic method picker as well as its static catalog.
+{
+    const source = fs.readFileSync(path.join(root, pickerPaths[0]), 'utf8');
+    const start = source.indexOf('    function refreshCListItems()');
+    const end = source.indexOf('    // Populate the Namespace category', start);
+    const categories = [{ name: 'C-List', items: [] }];
+    const conventions = { Echo: { Ping: { index: 4 } } };
+    new Function('INSTR_CATEGORIES', 'METHOD_REGISTER_CONVENTIONS', 'rebuildSourceIndex',
+        source.slice(start, end) + '\nrefreshCListItems();')(categories, conventions, () => {});
+    const calls = categories[0].items.filter(item => item.instr === 'CALL');
+    if (calls.length !== 1) fail('dynamic method picker must offer one supported CALL');
+    else {
+        const result = new ChurchAssembler(conventions).assemble(
+            'capabilities { SELF E, Echo E }\n' + calls[0].instr + ' ' + calls[0].ops);
+        if (result.errors.length || result.words.length !== 1 ||
+                (result.words[0] >>> 27) !== 2 ||
+                (result.words[0] & 31) !== 1 ||
+                ((result.words[0] >>> 5) & 127) !== 5)
+            fail('dynamic method picker must preserve indexed CALL row and selector');
+    }
+    if (categories[0].items.some(item => /^(ELOADCALL|XLOADLAMBDA)$/.test(item.instr)))
+        fail('dynamic method picker offers a retired instruction');
+}
 
 for (const catalog of pickerCatalogs) {
     if (!catalog.entries.length) fail(`${catalog.relativePath} has no static picker entries`);

@@ -94,7 +94,16 @@ for (const [script, sourceName] of builds) {
             throw new Error(`expected one binary and no per-LUMP JSON; got ${files.join(', ')}`);
         }
         const content = inspect(path.join(dir, binaries[0]));
-        const expected = fs.readFileSync(path.join(ROOT, sourceName), 'utf8');
+        let expected = fs.readFileSync(path.join(ROOT, sourceName), 'utf8');
+        if (script === 'build_capability_test_lump.js') {
+            // The builder deliberately embeds its programmer-facing projection:
+            // compiler-owned SELF plus public dependency names, not the runtime
+            // installation alias. Keep the rest of the source byte-for-byte.
+            expected = expected.replace(/capabilities\s*\{[\s\S]*?\}/,
+                'capabilities {\n    SELF E,\n    SelfTest E,\n    LED_DEV RW,\n' +
+                '    UART_DEV RW,\n    BTN_DEV R,\n    TIMER_DEV RW,\n' +
+                '    M_BIT_DEV RW,\n    WukongCallHome E\n}');
+        }
         if (!content.api || !Array.isArray(content.api.methods) || content.source !== expected) {
             throw new Error('embedded API/source mismatch');
         }

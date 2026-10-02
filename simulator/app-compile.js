@@ -4232,10 +4232,10 @@ Add a method called Pack4 that takes ch0 and ch1 and ch2 and ch3
 Set a to ch0 shifted left by 24
 Set b to ch1 shifted left by 16
 Set c to ch2 shifted left by 8
-Set word to a plus b
-Set word to word plus c
-Set word to word plus ch3
-Return word
+Set packed to a plus b
+Set packed to packed plus c
+Set packed to packed plus ch3
+Return packed
 
 -- Unpack: extract one character by position (0-3).
 -- pos=0 gives bits 31:24, pos=1 gives bits 23:16,

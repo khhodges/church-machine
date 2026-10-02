@@ -539,8 +539,8 @@ console.log('\n--- T006: NULL GT named slot → free-list reservation via LOAD -
     }
 }
 
-// ELOADCALL resolves the name, then requires the actual body.
-console.log('\n--- T007: ELOADCALL resolves but fails to load absent body ---');
+// Explicit LOAD resolves the name; indexed CALL requires the actual body.
+console.log('\n--- T007: LOAD resolves, CALL fails to load absent body ---');
 {
     resetPendingRegistry();
 
@@ -554,20 +554,27 @@ console.log('\n--- T007: ELOADCALL resolves but fails to load absent body ---');
         sim.memory[500] = 0;
         sim.programCapabilities = [{ name: 'AlphaService', rights: ['E'] }];
 
-        // ELOADCALL opcode = 8; use encodeInstruction to include cond=0xE (always).
-        // encodeInstruction(opcode, cond, crDst, crSrc, imm) — imm[7:0] = ecRow.
-        const ELOADCALL_OPCODE = 8;
+        const cr14 = sim.cr[14];
+        sim.memory[cr14.word1 + 1] = sim.encodeInstruction(0, 0xE, 2, 6, 0);
+        sim.pc = 0;
+        sim.halted = false;
+        const loadResult = sim.step();
+        check('T007-load: explicit LOAD resolves the declared E capability',
+            loadResult !== null && !sim.halted && sim.memory[500] !== 0 &&
+            sim.parseGT(sim.memory[500]).permissions.E);
+
+        // CALL opcode = 2; CR6 selects indexed mode, imm[4:0] is the row.
+        const CALL_OPCODE = 2;
         const ecRow = 0;
-        const instr = sim.encodeInstruction(ELOADCALL_OPCODE, 0xE /* AL */, 0, 6, ecRow);
-        const cr14  = sim.cr[14];
-        sim.memory[cr14.word1 + 1] = instr >>> 0;
-        sim.pc     = 0;
+        const instr = sim.encodeInstruction(CALL_OPCODE, 0xE /* AL */, 0, 6, ecRow);
+        sim.memory[cr14.word1 + 2] = instr >>> 0;
+        sim.pc     = 1;
         sim.halted = false;
 
         const faultCountBefore = sim.faultLog.length;
         const result = sim.step();
 
-        check('T007a: ELOADCALL fails when the actual target body is absent',
+        check('T007a: indexed CALL fails when the actual target body is absent',
             result === null);
 
         check('T007b: the attempted target call faults CODE_NOT_RESIDENT',

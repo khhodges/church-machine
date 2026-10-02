@@ -22,6 +22,7 @@
 //   node scripts/check-capabilities-blocks.js                        # scan simulator/examples (default)
 //   node scripts/check-capabilities-blocks.js dir1 dir2 ...          # scan specific directories
 //   node scripts/check-capabilities-blocks.js --glob '**/*.cloomc'   # scan whole repo tree
+//   node scripts/check-capabilities-blocks.js --source-only          # source checks, without live catalog audits
 //   node scripts/check-capabilities-blocks.js --help                 # show this message
 //
 // Exclusions:
@@ -118,7 +119,8 @@ function collectCloomcFiles(dir) {
 
 // ── argument parsing ──────────────────────────────────────────────────────────
 
-const argv = process.argv.slice(2);
+const sourceOnly = process.argv.includes('--source-only');
+const argv = process.argv.slice(2).filter(arg => arg !== '--source-only');
 
 // Extract --glob <pattern> if present.
 let globPattern = null;
@@ -301,6 +303,10 @@ if (violations > 0) {
 }
 
 // ── embedded binary content guard ─────────────────────────────────────────────
+if (sourceOnly) {
+    console.log('Source-only check: live catalog audits are separate (npm run check:capabilities).');
+    process.exit(0);
+}
 const contentResult = spawnSync(
     'node',
     [path.join(ROOT, 'scripts', 'check-lump-embedded-content.js')],

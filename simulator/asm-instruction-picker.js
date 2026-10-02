@@ -21,8 +21,6 @@
                 { label: 'SWITCH CR15 CR6 #row',  instr: 'SWITCH', ops: 'CR15 CR6 #row' },
                 { label: 'TPERM CRd preset',      instr: 'TPERM',  ops: 'CRd preset' },
                 { label: 'LAMBDA CRd',            instr: 'LAMBDA', ops: 'CRd' },
-                { label: 'ELOADCALL CRd CRs #row', instr: 'ELOADCALL', ops: 'CRd CRs #row' },
-                { label: 'XLOADLAMBDA CRd CRs #row', instr: 'XLOADLAMBDA', ops: 'CRd CRs #row' },
             ]
         },
         {
@@ -113,7 +111,7 @@
                 ops: 'CR0, ' + absName,
                 _clistAbs: absName
             });
-            // One ELOADCALL entry per method, sorted by method index
+            // One indexed CALL entry per method, sorted by method index
             var methods = conv[absName];
             var methodNames = Object.keys(methods).sort(function (a, b) {
                 return ((methods[a] && methods[a].index) || 0) - ((methods[b] && methods[b].index) || 0);
@@ -124,8 +122,8 @@
                 if (mc && mc.input && mc.input !== 'none') hint = '  \u2190 ' + mc.input;
                 clistCat.items.push({
                     label: absName + '.' + mName + hint,
-                    instr: 'ELOADCALL',
-                    ops: 'CR0, ' + absName + ', ' + mName,
+                    instr: 'CALL',
+                    ops: 'CR6[' + absName + '], ' + mName,
                     _clistAbs: absName
                 });
             });

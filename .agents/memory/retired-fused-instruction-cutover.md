@@ -26,3 +26,26 @@ instruction that runtime rejected.
 **How to apply:** Exercise the high-level compiler with known method conventions
 and real generated calls; inspect emitted opcodes as well as diagnostics.
 Assembly-only coverage cannot certify compiler-wide retirement.
+
+When reconciling old regression fixtures, manually correct positive assembly
+fixtures and separately retain rejection tests for retired mnemonics and
+high-level syntax that still generates them.
+
+**Why:** Treating all old successful-compilation assertions as rejection tests
+would lose supported CALL row, selector, permission, and diagnostic coverage.
+Conversely, silently translating input in the harness would mask the cutover.
+
+**How to apply:** Preserve those semantic assertions against explicit supported
+source; report unrelated example or UI regressions separately rather than
+changing their expected result merely to make the suite pass.
+
+Keep source regression verification separate from audits of the programmer's
+live saved catalog; neither a green regression suite nor source-only declaration
+checks establish that the catalog is current or release-ready.
+
+**Why:** A retired-instruction fixture repair must not implicitly replace saved
+programs or approve a new Namespace merely to make a general test command green.
+
+**How to apply:** Exercise binary guard rejection behavior with isolated fixtures,
+and keep the live catalog guard fail-closed as an explicit separate check. Report
+its failures separately; never silently reclassify active saved artifacts as history.
