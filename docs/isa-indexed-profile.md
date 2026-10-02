@@ -9,7 +9,8 @@ Status: **existing software profile and prior packet proposal; encoding approval
 is not established by the corrected indexing requirement** (2026-10-02).
 
 The required behavior is the indexed instruction's own calculation of
-`DR[r] + immediate`, as specified in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+`DR[r] + immediate`, as specified in the [master ISA indexing rule](instruction-set.md#uniform-indexed-operands).
+Church Machine Instruction Set is authoritative; this profile description defers to it.
 Do not infer a required packet format, 20-bit magnitude or fixed instruction
 word count. Packet-specific contracts below describe this separate design;
 they are not instructions to extend Amaranth to match it.

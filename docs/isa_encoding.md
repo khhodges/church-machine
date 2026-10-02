@@ -1,5 +1,8 @@
 # Church Machine ISA Encoding Reference
 
+**Authority:** [Church Machine Instruction Set](instruction-set.md) is the master
+ISA document. This supporting encoding record must defer to it.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
@@ -8,7 +11,7 @@ This document records the baseline encoding previously compared against
 of current cross-engine equivalence.
 
 **Indexed-operand correction (2026-10-02):** the authoritative semantic rule is
-in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics):
+in the [master ISA indexing rule](instruction-set.md#uniform-indexed-operands):
 the instruction adds a selected DR's runtime value to the immediate.
 The baseline bit fields below do not yet specify that uniformly. Do not infer
 approval of a multiword IDX1 packet, a new immediate range, or a replacement

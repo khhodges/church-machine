@@ -8,11 +8,12 @@
 > is permitted. This cutover does not add hardware IDX1 support.
 
 **Version 2.0 — June 2026**
-**Machine-readable core authority: [`shared/architecture_contracts.json`](../shared/architecture_contracts.json)**
+**Machine-readable contracts: [`shared/architecture_contracts.json`](../shared/architecture_contracts.json) — must conform to the master ISA.**
 
-This document is the single definitive specification for all 20 Church Machine
-instructions. Where existing documents conflict with what is stated here, this
-document takes precedence. Simulator/hardware deviations are called out
+This is a supporting technical reference. The master ISA document is
+[Church Machine Instruction Set](instruction-set.md); it takes precedence when
+these documents conflict. This reference does not independently authorize
+encoding changes. Simulator/hardware deviations are called out
 explicitly; see `docs/HARDWARE-DEVIATIONS.md` for the full deviation register.
 
 GT and NS Word 1 fields are shared across targets. Memory placement, address
@@ -50,6 +51,10 @@ infinite loop, or by not returning from a top-level CALL.
 ---
 
 ### 1.1 Uniform indexed operands — required semantics
+
+The controlling rule is in the master document's
+[Uniform indexed operands](instruction-set.md#uniform-indexed-operands) section.
+The following is a supporting summary, not a separate source of authority.
 
 For every instruction operand that denotes an index, the instruction itself
 computes:

@@ -1,7 +1,8 @@
 # IDX1 indexed-operand containment contract
 
 **Indexing clarification (2026-10-02):** the controlling operand semantics are
-in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+in the [master ISA indexing rule](instruction-set.md#uniform-indexed-operands),
+which takes precedence over this supporting contract.
 Packet-specific rules below belong to the prior IDX1 design, not an approved
 encoding requirement for the Amaranth upgrade. Permission checks, containment
 and no-side-effect rejection remain required regardless of the eventual encoding.

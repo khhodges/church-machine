@@ -3,6 +3,17 @@ name: Uniform indexed operand intent
 description: User requires register-plus-immediate indexing across all indexed instructions, not just LOAD.
 ---
 
+The user explicitly confirmed on 2026-10-02 that **Church Machine Instruction
+Set** is the master ISA text; other references and implementation descriptions
+must defer to it.
+
+**Why:** Earlier indexing corrections went into a different reference that also
+claimed to be definitive, leaving the user's intended master uncorrected.
+
+**How to apply:** Change the master first when correcting ISA requirements,
+then reconcile supporting references. Do not elevate existing implementation
+or an earlier proposal above the user's confirmed semantics.
+
 `LOAD CR1, CR6, DR11` is intended to load into CR1 the capability at
 the index held in DR11, relative to the C-list addressed by CR6.
 

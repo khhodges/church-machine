@@ -2,7 +2,7 @@
 
 **Scope correction (2026-10-02):** the user clarified that indexed instructions
 must themselves add the data-register value to the immediate. See
-[ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+[the master ISA indexing rule](instruction-set.md#uniform-indexed-operands).
 The prior multiword IDX1 design is not established as the intended encoding.
 IDX1 gaps recorded below describe implementation differences; they are not
 authority to implement its packet format in Amaranth. Reconcile the encoding
@@ -21,7 +21,8 @@ changed during this audit. No synthesis or flashing was performed.
 
 ## Authority and scope
 
-The baseline reference is `docs/isa_reference.md`, with encoding details in
+The master authority is `docs/instruction-set.md`. The supporting baseline
+reference is `docs/isa_reference.md`, with encoding details in
 `docs/isa_encoding.md`. The newer indexed profile is defined separately in
 `docs/isa-indexed-profile.md` and `docs/isa-indexed-encoding.md`.
 

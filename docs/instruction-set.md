@@ -1,5 +1,64 @@
 # Church Machine Instruction Set
 
+## Document authority
+
+This is the **master ISA document**. Its requirements take precedence over
+`isa_reference.md`, `isa_encoding.md`, the `isa-indexed-*` proposals, derived
+PDFs and implementation descriptions. Those documents support this master;
+assembler, simulator or hardware behavior does not override it.
+
+The previously approved retirement of **ELOADCALL (opcode 8)** and
+**XLOADLAMBDA (opcode 9)** remains in force. Descriptions of those encodings
+below are historical only; they do not authorize execution or automatic
+translation of saved programs.
+
+The indexed-operand correction below is authoritative. Existing encoding
+tables and repeated instruction descriptions elsewhere in this document remain
+baseline records pending reconciliation; they do not override this correction
+or establish a new indexed-operand layout.
+
+## Uniform indexed operands
+
+Every instruction operand that denotes an index uses the selected data register's
+runtime value added to the immediate, within the indexed instruction itself:
+
+```text
+effective_index = DR[r] + immediate
+```
+
+* Any data register may supply the runtime value. Use its contents, not its
+  register number.
+* The instruction performs the calculation itself; no separate ADD instruction
+  is required.
+* Register-only indexing uses immediate zero. Immediate-only indexing uses DR0,
+  whose value is zero.
+* Subtractive offsets use `DR[r] - magnitude`, the negative-offset form.
+* For example, DR11 containing 7 plus immediate 3 selects index 10—not 14 and
+  not 3.
+* The operand retains its defined units and meaning (for example, a c-list row
+  or data-word offset). Non-index immediates are not changed by this rule.
+
+Indexing grants no additional authority. Existing permission, type and bounds
+checks apply to the resulting access or target. Arithmetic overflow, underflow
+and out-of-range indices must not wrap into a permitted access. Reject before
+an unauthorized read, write or control transfer.
+
+**Encoding remains to be reconciled.** This rule does not allocate a register
+field, opcode, profile, immediate width or instruction word count. The prior
+two-/three-word IDX1 packet proposal is not approved by this requirement;
+neither is an exactly-one-32-bit-word constraint imposed by it. The eventual
+encoding must explicitly state the representable immediate range and must not
+silently truncate values.
+
+The ordinary DREAD/DWRITE indexed forms already implement register-plus-immediate
+addition within their existing field limits. Immediate-only LOAD/SAVE c-list
+encodings are gaps relative to the uniform requirement, not exceptions.
+Assembler, simulator and Amaranth must follow the same reconciled encoding.
+This documentation correction does not authorize rewriting saved programs,
+Namespace contents or boot images, or reinterpreting existing binaries.
+
+## Baseline instruction descriptions
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

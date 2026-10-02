@@ -3,7 +3,7 @@
 Status: **prior implementation proposal; not approval of the packet encoding
 for the corrected indexing requirement** (2026-10-02).
 
-The controlling requirement is now stated in [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics):
+The controlling requirement is stated in the [master ISA indexing rule](instruction-set.md#uniform-indexed-operands):
 an indexed instruction adds the selected DR's runtime value to its immediate.
 This does not settle the encoding or instruction word count. The packet choices
 and implementation checkpoint below are historical design records, not a mandate

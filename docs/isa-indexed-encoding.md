@@ -4,7 +4,8 @@ Status: **prior multiword encoding proposal, not authority for the corrected
 indexing requirement** (2026-10-02).
 
 The confirmed rule is that the instruction computes the selected DR's runtime
-value plus the immediate; see [ISA reference §1.1](isa_reference.md#11-uniform-indexed-operands--required-semantics).
+value plus the immediate; see the [master ISA indexing rule](instruction-set.md#uniform-indexed-operands).
+Church Machine Instruction Set is authoritative; this proposal defers to it.
 That rule does not approve this packet format or its 20-bit magnitude.
 The layout below is retained to describe the existing proposal and associated
 software, not to prescribe the next simulator or Amaranth implementation.
