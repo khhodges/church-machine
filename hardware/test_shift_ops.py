@@ -232,6 +232,79 @@ def test_conditional_shr_asr():
         0xFFFFFFFF, (1, 0, 0, 0))
 
 
+def test_skipped_shift_continuous_stream():
+    """A skipped shift must not stall or drop the immediately following op."""
+    dut = ChurchCore(iot_profile=True)
+
+    async def testbench(ctx):
+        await boot_core(ctx, dut)
+        for encoder in (
+            lambda cond: encode_shl(2, 1, 1, cond=cond),
+            lambda cond: encode_shr(2, 1, 1, cond=cond),
+            lambda cond: encode_shr(2, 1, 1, asr=True, cond=cond),
+        ):
+            for zero in (True, False):
+                await _exec(ctx, dut, encode_isub(1, 0, 2))
+                await _exec(ctx, dut, encode_iadd(2, 0, 0x123))
+                if zero:
+                    await _exec(ctx, dut, encode_isub(3, 0, 0))
+                    before_flags = (0, 1, 1, 0)
+                else:
+                    # Preserve nonzero N/V as well as Z/C on the skipped op.
+                    await _exec(ctx, dut, encode_iadd(3, 0, 1))
+                    await _exec(ctx, dut, encode_shl(3, 3, 31))
+                    await _exec(ctx, dut, encode_isub(3, 3, 1))
+                    await _exec(ctx, dut, encode_iadd(3, 3, 1))
+                    before_flags = (1, 0, 0, 1)
+                assert _get_flags(ctx, dut) == before_flags
+                before_dr = [ctx.get(word) for word in dut.debug_dr_words]
+                nia = ctx.get(dut.nia)
+                skipped = encoder(CondCode.NE if zero else CondCode.EQ)
+                # Aliasing increment exposes both skipped-op writes and any
+                # lost/duplicated successor write-back without a probe op.
+                successor = encode_iadd(2, 2, 1)
+                expected_dr = before_dr.copy()
+                expected_dr[2] = 0x124
+
+                ctx.set(dut.imem_valid, 1)
+                ctx.set(dut.imem_data, skipped)
+                assert not ctx.get(dut.fault_valid)
+                assert not ctx.get(dut.retire_fault_valid)
+                assert ctx.get(dut.retire_valid), "Skipped shift must retire"
+                assert ctx.get(dut.retire_instr) == skipped
+                assert ctx.get(dut.retire_nia) == nia
+                await ctx.tick()
+
+                # No invalid cycle or wait for busy between these instructions.
+                ctx.set(dut.imem_data, successor)
+                assert ctx.get(dut.nia) == nia + 4
+                assert [ctx.get(word) for word in dut.debug_dr_words] == before_dr
+                assert _get_flags(ctx, dut) == before_flags
+                assert not ctx.get(dut.fault_valid)
+                assert not ctx.get(dut.retire_fault_valid)
+                assert ctx.get(dut.retire_valid), "Successor must retire without a bubble"
+                assert ctx.get(dut.retire_instr) == successor
+                assert ctx.get(dut.retire_nia) == nia + 4
+                await ctx.tick()
+                ctx.set(dut.imem_valid, 0)
+
+                # Check commit, normal successor stall, and return to idle.
+                for cycle in range(3):
+                    assert not ctx.get(dut.fault_valid)
+                    assert not ctx.get(dut.retire_fault_valid)
+                    assert not ctx.get(dut.retire_valid), "Stream instruction retired twice"
+                    assert ctx.get(dut.nia) == nia + 8, "Each instruction advances NIA once"
+                    assert [ctx.get(word) for word in dut.debug_dr_words] == expected_dr
+                    assert _get_flags(ctx, dut) == (0, 0, 0, 0)
+                    if cycle < 2:
+                        await ctx.tick()
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
+
 def test_arithmetic_setup_encoding():
     """Pin literal ISA words so the result oracle cannot hide helper drift."""
     assert encode_iadd(1, 0, 3) == 0xAF084003
@@ -782,6 +855,7 @@ def test_shl_alternating_bits():
 # ---------------------------------------------------------------------------
 
 _ALL_TESTS = (
+    test_skipped_shift_continuous_stream,
     test_conditional_shl,
     test_conditional_shr_lsr,
     test_conditional_shr_asr,
