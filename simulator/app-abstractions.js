@@ -473,11 +473,6 @@ function renderAbstractions() {
     html += `<span class="abs-search-count">${filtered.length}\u202f/\u202f${all.length}</span>`;
     html += `</div>`;
 
-        // Simulation review is independent of shared-image publication status.
-        // The same private flow is available from Namespace and Abstractions.
-        html += '<div id="simulationPreparationAbstractionsPanel">' +
-            (window.SimulationPreparation ? window.SimulationPreparation.markup() :
-                'Simulation preparation is unavailable. Reload the IDE to retry.') + '</div>';
         const bootDesignEntry = window._nsState && Array.isArray(window._nsState.abstractions)
             ? window._nsState.abstractions.find(row => row && row.boot === true) : null;
         const bootTargetName = bootDesignEntry && bootDesignEntry.name || '';

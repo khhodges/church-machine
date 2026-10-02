@@ -40,6 +40,11 @@ touch hardware as part of one-click Run.
 **Why:** The user explicitly approved replacing mandatory preparation/approval/
 activation clicks with one-click Run of the already saved image.
 
+Optional private review belongs in the Namespace view's collapsed Advanced
+section, never in the Abstraction Catalog.
+**Why:** The user approved removing confusing setup controls from the catalog;
+they must not appear to be prerequisites for normal Run.
+
 **Why:** The saved design must remain unchanged while a programmer experiments
 with a proposed combined layout; test evidence applies only to that configuration.
 

@@ -81,7 +81,7 @@
             '<small>Simulation only—not hardware certification. Review and approval do not activate or execute. Activation does not start Run.</small>';
     }
     function render() {
-        for (const id of ['simulationPreparationPanel', 'simulationPreparationAbstractionsPanel']) {
+        for (const id of ['simulationPreparationPanel']) {
             const panel = document.getElementById(id);
             if (panel) panel.innerHTML = markup();
         }

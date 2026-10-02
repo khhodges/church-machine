@@ -3221,7 +3221,9 @@ function _showBootPreparationBlocked(context, reason) {
         prepare.textContent = 'Prepare for Simulation';
         prepare.onclick = () => {
             overlay.remove();
-            if (typeof switchView === 'function') switchView('abstractions');
+            if (typeof switchView === 'function') switchView('namespace');
+            const advanced = document.getElementById('simulationAdvanced');
+            if (advanced) advanced.open = true;
             if (window.SimulationPreparation) void window.SimulationPreparation.prepare();
         };
         actions.appendChild(prepare);
