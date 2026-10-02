@@ -20,8 +20,8 @@ for (const mnemonic of ['DREAD', 'DWRITE']) {
     assert.match(describe(mnemonic, (9 << 4) | 7), /word offset #9 \+ DR7/);
     assert.match(describe(mnemonic, 0x7FFF), /word offset #16383/);
 }
-assert.match(describe('LOAD', 4), /C-list row #4 through CR5 into CR2/);
-assert.match(describe('SAVE', 4), /CR2 into C-list row #4 through CR5/);
+assert.match(describe('LOAD', 0x40), /C-list row unsigned32\(DR0\) \+ 4 through CR5 into CR2/);
+assert.match(describe('SAVE', 0x40), /CR2 into C-list row unsigned32\(DR0\) \+ 4 through CR5/);
 assert.match(describe('CALL', (3 << 5) | 7, 3, 6), /CR6\[7\], method index #3/);
 assert.doesNotMatch(describe('CALL', (3 << 5) | 7, 3, 6), /CR6\[103\]|CR3/);
 assert.match(describe('ELOADCALL', (127 << 5) | 31), /row #31.*method #127/);
@@ -32,7 +32,7 @@ for (const mnemonic of ['DREAD','BFEXT','BFINS','IADD','ISUB','SHL','SHR']) {
 }
 assert.doesNotMatch(describe('DWRITE', 1, 0), /discarded/);
 assert.match(describe('TPERM', 13), /FRAME/);
-assert.match(describe('TPERM', 14), /EXACT.*BIND/);
+assert.match(describe('TPERM', 14), /EXACT.*match Z=1, mismatch Z=0, no fault/);
 assert.match(describe('TPERM', 0x7FFF), /Attenuate CR2/);
 assert.match(describe('BFINS', 0), /BOUNDS fault if executed/);
 assert.match(describe('CHANGE', 0, 14), /Thread-context switch/);

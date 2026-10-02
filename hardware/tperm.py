@@ -26,7 +26,7 @@ class ChurchTperm(Elaboratable):
         # Semantics by path:
         #   CLEAR / exact permission preset → 1
         #   same-domain permission mismatch → 0 (no write, no fault)
-        #   EXACT (CHECK_EXACT)        → 1 (word0s matched; mismatch takes FAULT path)
+        #   EXACT (CHECK_EXACT)        → word0 equality, without fault or write
         #   FRAME (CHECK_FRAME)        → stack_has_frame (1 if real return frame exists)
         # Valid only when tperm_complete is high.
         self.tperm_z_result = Signal()
@@ -167,13 +167,9 @@ class ChurchTperm(Elaboratable):
                 m.next = "CHECK_EXACT"
 
             with m.State("CHECK_EXACT"):
-                # EXACT: fault BIND if CRd.word0_gt != CRs.word0_gt (all 32 bits).
-                with m.If(target_view.word0_gt != ref_view.word0_gt):
-                    m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.BIND)]
-                    m.next = "FAULT"
-                with m.Else():
-                    m.d.sync += z_result_reg.eq(1)
-                    m.next = "COMPLETE"
+                # EXACT is a comparison, not an authority assertion.
+                m.d.sync += z_result_reg.eq(target_view.word0_gt == ref_view.word0_gt)
+                m.next = "COMPLETE"
 
             with m.State("APPLY"):
                 # Reached only for an exact ordinary permission-set match → Z=1.

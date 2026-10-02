@@ -3381,7 +3381,7 @@ function _instrSymbolicMeaning(decoded) {
             if (imm === 0x7FFF) return 'Attenuate CR' + dst + ' to permissions requested by CR' + src + '; no expansion allowed.';
             var preset = imm & 15;
             if (preset === 13) return 'FRAME: query whether a return frame exists; flags unavailable.';
-            if (preset === 14) return 'EXACT: assert CR' + dst + '.GT equals CR' + src + '.GT; mismatch faults BIND.';
+            if (preset === 14) return 'EXACT: compare CR' + dst + '.GT with CR' + src + '.GT; match Z=1, mismatch Z=0, no fault.';
             var presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
             return 'TPERM CR' + dst + ' ' + (presets[preset] || 'reserved preset (fault if executed)') +
                 (preset === 0 ? ': validate non-NULL capability, not permission removal.' : preset < 10 ? ': test exact permissions.' : '.') +

@@ -20,7 +20,7 @@ WUKONG_CALLHOME_PET_NAME = "WukongCallHome"
 # Amaranth-backed boot_rom module.  The normal server/test path imports the
 # canonical WUKONG_NUC_PROGRAM below and asserts that the two stay identical.
 _WUKONG_CALLHOME_FALLBACK_WORDS = (
-    0x071B0005, 0x07230006, 0xAF084001, 0x8F098000,
+    0x071B0050, 0x07230060, 0xAF084001, 0x8F098000,
     0xAF284043, 0x8F2A0000, 0x87320001, 0xB73B4001,
     0xB8007FFE, 0xAF28404D, 0x8F2A0000, 0x87320001,
     0xB73B4001, 0xB8007FFE, 0xAF28403A, 0x8F2A0000,
@@ -110,7 +110,13 @@ def _disassemble_word(word):
         src_reg   = f"CR{src}" if direction == 0 else f"DR{src}"
         gated_str = ",GATED" if gated else ""
         return f"{mnemonic} CR{dst}, {src_reg}, #0x{sel:02X} [{dir_str}{gated_str}]"
-    if opcode in (0, 1, 2, 4, 5, 8, 9):
+    if opcode in (0, 1):
+        register, magnitude = imm & 15, (imm >> 4) & 1023
+        sign = "-" if imm & 0x4000 else "+"
+        operand = (f"DR{register} {sign} {magnitude}" if register
+                   else f"{'-' if imm & 0x4000 else ''}0x{magnitude:04X}")
+        return f"{mnemonic} CR{dst}, CR{src}[{operand}]"
+    if opcode in (2, 4, 5, 8, 9):
         return f"{mnemonic} CR{dst}, CR{src}[0x{imm:04X}]"
     if opcode in (16, 17):
         if imm & 0x4000:

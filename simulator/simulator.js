@@ -157,7 +157,7 @@ class ChurchSimulator {
         // Exposed as an instance property so tests can inject non-standard
         // presets to exercise the domain-purity fault path.
         // null  = reserved preset  → _execTperm faults TPERM_RSV.
-        // 'EXACT' = preset 14, identity check CRd.word0 === CRs.word0; faults BIND on mismatch (credential pinning assertion, not a comparison).
+        // 'EXACT' = preset 14, pure CRd.word0 === CRs.word0 comparison; mismatch gives Z=0.
         // 'FRAME' = preset 13, call-stack query: Z=1 if a real return frame exists (RETURN would not underflow). No GT is read.
         // Codes 10-12 (RSV3, RSV4, RSV5) are unconditionally reserved → null (TPERM_RSV).
         this.tpermPresetMasks = [
@@ -7217,7 +7217,7 @@ class ChurchSimulator {
 
         // An ordinary executable LUMP's first c-list word is its Namespace
         // identity credential.  SAVE must never be able to replace it: doing so
-        // turns a later TPERM EXACT/BIND check into a delayed, misleading fault.
+        // turns a later TPERM EXACT check into a misleading credential mismatch.
         // Architectural c-lists are exempt by header type.
         if (d.imm === 0) {
             const targetEntry = this.readNSEntry(clistCheck.parsed.index);
@@ -9022,19 +9022,13 @@ class ChurchSimulator {
         const presetCode = d.imm & 0xF;
         const presetMasks = this.tpermPresetMasks;
 
-        // TPERM EXACT (preset 14): credential-pinning assertion — 32-bit identity check CRd.word0 === CRs.word0.
-        // Match: sets Z=1 and continues (credential confirmed).
-        // Mismatch: hard fault BIND — same semantics as mLoad permission failure.
-        // There is no Z=0 path; EXACT has no alternative meaning.
+        // TPERM EXACT (preset 14): pure 32-bit GT comparison, never a BIND assertion.
         if (presetMasks[presetCode] === 'EXACT') {
             const crdGT = this.cr[d.crDst].word0 >>> 0;
             const crsGT = this.cr[d.crSrc].word0 >>> 0;
-            if (crdGT !== crsGT) {
-                this.fault('BIND', `TPERM CR${d.crDst} EXACT [14]: credential mismatch — 0x${crdGT.toString(16).padStart(8,'0')} vs CR${d.crSrc} 0x${crsGT.toString(16).padStart(8,'0')} — BIND fault`);
-                return null;
-            }
-            this.flags.Z = true; this.flags.N = false; this.flags.C = false; this.flags.V = false;
-            const descExact = `TPERM CR${d.crDst} EXACT [14]: credential match — Z=1`;
+            // General TPERM flag convention: N=!Z, C=0, V=0.
+            this.flags.Z = crdGT === crsGT; this.flags.N = !this.flags.Z; this.flags.C = false; this.flags.V = false;
+            const descExact = `TPERM CR${d.crDst} EXACT [14]: credential ${this.flags.Z ? 'match' : 'mismatch'} — Z=${Number(this.flags.Z)}`;
             this.output += descExact + '\n';
             this.pc++;
             this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);

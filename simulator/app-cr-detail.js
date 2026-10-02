@@ -2464,7 +2464,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
         const presets = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS'];
         const p = imm & 15;
         if (p === 13) return out(`tperm${cc} FRAME: query return frame`);
-        if (p === 14) return out(`tperm${cc} EXACT: assert CR${crDst}.GT = CR${crSrc}.GT; mismatch faults BIND`);
+        if (p === 14) return out(`tperm${cc} EXACT: compare CR${crDst}.GT with CR${crSrc}.GT; match Z=1, mismatch Z=0, no fault`);
         return out(`tperm${cc} CR${crDst} ${presets[p] || 'reserved preset (fault if executed)'}${p === 0 ? ': validate non-NULL capability (not permission removal)' : p < 10 ? ': test exact permissions' : ''}${imm & 16 ? '; clear B on successful test' : ''}`);
     }
     return out(`reserved opcode ${opcode} (fault if executed)`);
