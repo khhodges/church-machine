@@ -42,6 +42,30 @@ def store(root):
     return refresh.RefreshStore(root, root / "ns-state.json", root / "config.json")
 
 
+def test_saved_thread_design_generates_only_assigned_instances(tmp_path):
+    cfg, rows = fixture(tmp_path)
+    cfg["step1"]["threadCount"] = 3
+    rows[1].update(name="Thread.2", type="Inform")  # not a fixed legacy slot
+    before = copy.deepcopy(rows)
+    image, evidence = refresh.reconstruct(cfg, rows, tmp_path)
+    words = struct.unpack("<8192I", image)
+    assert (words[512] >> 8) & 3 == 2
+    assert words[8192 - 24 * 4] == 512
+    assert words[8192 - 2 * 4] == 0  # no implied Boot.Thread
+    assert words[8192 - 13 * 4] == 0  # no implied Thread.3
+    assert rows == before
+    report = capacity_report(rows, image, str(tmp_path), config=cfg)
+    assert report["namespaceWarnings"] == []
+
+
+def test_thread_name_outside_saved_design_is_not_synthesized(tmp_path):
+    cfg, rows = fixture(tmp_path)
+    cfg["step1"]["threadCount"] = 1
+    rows[1].update(name="Thread.2", type="Inform", load_policy="Resident")
+    with pytest.raises(ValueError, match="no exact LUMP selected"):
+        refresh.reconstruct(cfg, rows, tmp_path)
+
+
 def test_capacity_never_requires_legacy_catalog(tmp_path, monkeypatch):
     cfg, rows = fixture(tmp_path)
     def forbidden(*args, **kwargs):

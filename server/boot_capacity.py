@@ -92,8 +92,9 @@ def _saved_cost(row, lumps_dir):
 
 def _namespace_problems(rows, lumps_dir, config):
     """Current assignments only; never take their geometry from an old image."""
-    from server.namespace_image_refresh import integer
+    from server.namespace_image_refresh import integer, design_thread_slots
     problems, claims = [], [("Namespace header", 0, 16)]
+    thread_slots = design_thread_slots(rows, config or {})
     step = (config or {}).get("step1", {})
     if step.get("totalNamespaceWords") and step.get("nsSlotsMax"):
         total, slots = int(step["totalNamespaceWords"]), int(step["nsSlotsMax"])
@@ -103,7 +104,7 @@ def _namespace_problems(rows, lumps_dir, config):
                 or row.get("symbolic") or row.get("implementationMissing")
                 or row.get("type") in ("Device", "IO")):
             continue
-        if not row.get("filename") and row.get("type") != "Thread":
+        if not row.get("filename") and row.get("slot") not in thread_slots:
             continue
         try:
             slot, start = row["slot"], integer(row["location"])

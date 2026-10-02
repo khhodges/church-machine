@@ -9,7 +9,7 @@ Refresh capacity and Refresh Image must follow this same saved-slot authority, n
 
 **Why:** The user explicitly rejected legacy rules after clearing slots left the capacity report demanding Tunnel and Ethernet.
 
-**How to apply:** Validate the selected slot LUMPs and their real allocations. If a saved row lacks an exact artifact, report that missing selection rather than guessing from its name or historical slot.
+**How to apply:** Validate the selected slot LUMPs and their real allocations. Saved Namespace/Thread design definitions are valid generated-body sources (see thread-lump-placement.md); otherwise report missing exact artifact selections rather than guessing from historical slots or catalog entries.
 
 Every new or changed physical allocation must pass the same full-range check
 under the Namespace commit lock, including replacement, growth, movement and

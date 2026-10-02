@@ -30,6 +30,25 @@ def integer(value):
     return int(value, 0) if isinstance(value, str) else value
 
 
+def design_thread_slots(rows, config):
+    """Match saved design instances, without adding slots or assigning addresses.
+
+    The design page serializes Thread instances as Inform descriptors. Their
+    body type comes from the saved Thread design, not that descriptor type.
+    An explicitly selected immutable file always takes precedence.
+    """
+    step = config.get("step1", {})
+    names = set()
+    if "threadCount" in step:
+        count = boot.configured_thread_count(step)
+        names = {"Boot.Thread"} | {f"Thread.{n}" for n in range(2, count + 1)}
+    return {row["slot"] for row in rows
+            if not row.get("symbolic") and not row.get("implementationMissing")
+            and (row.get("type") == "Thread" or
+                 (not row.get("filename") and row.get("type") == "Inform"
+                  and row.get("name") in names))}
+
+
 def reconstruct(config, rows, directory):
     """Two independent passes: numeric slots, then every address including gaps."""
     validate_namespace_rows(rows)
@@ -46,8 +65,8 @@ def reconstruct(config, rows, directory):
     # Thread is a body type, never an address/slot convention. Exact saved
     # bodies win; only explicitly saved body-less Thread rows use geometry.
     installed_rows = [row for row in rows if not row.get("symbolic") and not row.get("implementationMissing")]
-    thread_rows = [row for row in installed_rows if row.get("type") == "Thread"]
-    thread_slots = {row["slot"] for row in thread_rows}
+    thread_slots = design_thread_slots(installed_rows, config)
+    thread_rows = [row for row in installed_rows if row["slot"] in thread_slots]
     missing = [row for row in installed_rows
                if row["slot"] not in thread_slots
                and boot.image_artifact_selected(row) and not row.get("filename")]
