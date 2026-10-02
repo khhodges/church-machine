@@ -374,3 +374,17 @@ mtime_ms = 1790975347135
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/92f92bdf-3143-4dfb-bd8e-b93f783f5e1a/ced35232-11dd-40b7-976a-e6a90f0bb646"
 storage_version_token = "1790975381854083"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "A2uYk3Eef9eye6UpLDDYu"
+uri = "file://reports/isa-instruction-contract-matrix.md"
+type = "text"
+title = "Instruction-contract matrix"
+description = "Per-instruction requirements, open ISA decisions, five-layer evidence status, and acceptance gates."
+logical_id = "6448962b-a88b-4eab-9ca0-24467594769b"
+content_hash = "sha256:51e05bb0ead03501a3ff7860e8c0a0eefbc3eafb9d454d62110d125a70799b0d"
+size = 17367
+mtime_ms = 1790975775054
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6448962b-a88b-4eab-9ca0-24467594769b/106c57a3-c7f3-4df9-a7cb-c704a3eae3ce"
+storage_version_token = "1790975812481692"
+content_type = "text/markdown"
