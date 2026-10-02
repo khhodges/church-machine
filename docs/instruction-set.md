@@ -43,19 +43,60 @@ checks apply to the resulting access or target. Arithmetic overflow, underflow
 and out-of-range indices must not wrap into a permitted access. Reject before
 an unauthorized read, write or control transfer.
 
-**Encoding remains to be reconciled.** This rule does not allocate a register
-field, opcode, profile, immediate width or instruction word count. The prior
-two-/three-word IDX1 packet proposal is not approved by this requirement;
-neither is an exactly-one-32-bit-word constraint imposed by it. The eventual
-encoding must explicitly state the representable immediate range and must not
-silently truncate values.
+### Compact indexed LOAD/SAVE operand
+
+The selected LOAD/SAVE encoding keeps one 32-bit instruction and reduces the
+index immediate to a **10-bit unsigned magnitude**, with a separate sign bit
+and a four-bit data-register selector in the existing 15-bit operand field:
+
+| Instruction bits | Field | Meaning |
+|---|---|---|
+| 14 | S | 0 adds the magnitude; 1 subtracts it |
+| 13:4 | M | Immediate magnitude, 0–1023 |
+| 3:0 | R | Index register, DR0–DR15 |
+
+```text
+operand15 = (S << 14) | (M << 4) | R
+effective_index = unsigned32(DR[R]) + (S ? -M : M)
+```
+
+The immediate offset range is **−1023 through +1023**, not a signed 10-bit
+two's-complement range. M=0 uses S=0 canonically; assemblers normalize `DRr - 0`
+to `DRr`. The effective index is not restricted to ten bits: the selected DR
+supplies a full 32-bit value. Perform the calculation without wraparound and
+apply the access checks above. Reject source magnitudes greater than 1023,
+rather than truncating or emitting a separate arithmetic instruction.
+
+Examples of the operand field (not complete instruction words):
+
+| Index expression | Operand field |
+|---|---|
+| `DR11 + 3` | `0x003B` |
+| `DR11 - 3` | `0x403B` |
+| `DR15 + 1023` | `0x3FFF` |
+| `DR15 - 1023` | `0x7FFF` |
+| `DR0 + 3` (immediate-only) | `0x0030` |
+
+No prefix or extension word is required for this operand. The earlier multiword
+IDX1/20-bit-magnitude proposal is not the selected LOAD/SAVE encoding.
+This decision does not narrow non-index immediates such as IADD's arithmetic
+immediate. Other indexed operand roles still require their explicit field mapping.
+
+**Direct ISA cutover:** backward compatibility does not constrain this layout.
+Use it directly for LOAD/SAVE; do not add a legacy decoding mode, packet format
+or compatibility profile merely to preserve earlier encodings. For example,
+operand `0x0003` now means DR3 with immediate zero, not immediate 3.
+Previously compiled binaries are not assumed compatible and may require
+recompilation. This is not permission to delete or automatically rewrite saved
+files. Assembler and simulator changes and conformance tests remain outstanding.
 
 The ordinary DREAD/DWRITE indexed forms already implement register-plus-immediate
 addition within their existing field limits. Immediate-only LOAD/SAVE c-list
 encodings are gaps relative to the uniform requirement, not exceptions.
 Assembler, simulator and Amaranth must follow the same reconciled encoding.
-This documentation correction does not authorize rewriting saved programs,
-Namespace contents or boot images, or reinterpreting existing binaries.
+This documentation correction does not itself rewrite saved programs,
+Namespace contents or boot images. Existing binaries are not compatibility
+requirements for the new ISA.
 
 ## Baseline instruction descriptions
 

@@ -81,13 +81,14 @@ negative-offset form.
   out-of-range results must not wrap into a permitted access. Rejection must
   occur before an unauthorized read, write or control transfer.
 
-**Encoding boundary:** this establishes the operand calculation, not a new
-immediate width, register-field allocation, opcode, profile or instruction word
-count. "Any immediate value" does not authorize silent truncation or a newly
-invented range; the representable range must be stated in the eventual encoding.
-The two-/three-word IDX1 packet format in the companion documents is a prior
-proposal/implementation, not the approved consequence of this requirement.
-The user has not imposed an exactly-one-32-bit-word constraint either.
+**Encoding boundary:** the master now selects a compact LOAD/SAVE operand:
+bit14 sign, bits13:4 unsigned 10-bit magnitude, bits3:0 index DR. Offsets are
+±1023 within one 32-bit instruction; no extension word or separate ADD.
+See the [master field layout](instruction-set.md#compact-indexed-loadsave-operand).
+This supersedes the prior multiword IDX1 proposal for these operations.
+The master specifies a direct LOAD/SAVE cutover without a legacy mode. Other
+indexed operand layouts and implementation remain outstanding. Saved files
+are not automatically rewritten; unrelated immediate fields are unchanged.
 
 **Implementation status:** the ordinary DREAD/DWRITE indexed forms already
 express register-plus-immediate addition within their existing field limits.
@@ -97,10 +98,10 @@ not exceptions to it. The separate IDX1 implementation is not proof that the
 ordinary instruction set or Amaranth matches the requirement. The assembler,
 simulator and hardware must be reconciled against the same explicit encoding.
 
-The per-instruction syntax and bit fields below remain the baseline encoding
-record until that reconciliation; they must not silently reinterpret existing
-saved binaries. This text does not authorize recompilation, migration, or
-replacement of saved programs, Namespace contents, or boot images.
+The per-instruction syntax and bit fields below remain baseline records, not
+constraints on the master's new encoding. Existing binaries may require
+recompilation. This text does not automatically migrate or replace saved
+programs, Namespace contents, or boot images.
 
 ## 2. Condition Codes
 

@@ -40,9 +40,28 @@ existing implementation is not authority over that requirement.
 
 In the subsequent clarification, the user declined the proposed constraint
 "exactly one 32-bit word, no extensions" and specified: "The instruction uses
-a data register added to any immediate value." Treat runtime DR-plus-immediate
-index calculation as the confirmed requirement. Do not infer a fixed word count,
-approval of the existing packet format, or a new immediate-width limit from it.
+a data register added to any immediate value." That initial clarification
+settled semantics only. The later explicit choice below settles the
+LOAD/SAVE immediate-width tradeoff and supersedes that earlier uncertainty.
+
+The user subsequently chose "Reduce the immediate to 10 bits" after being
+offered 4 DR-selection bits, 1 sign bit and 10 magnitude bits within the
+existing 32-bit LOAD/SAVE instruction. Preserve this compact choice, including
+addition/subtraction; do not restore the multiword proposal to retain a wider
+immediate.
+
+**Why:** This is the user's explicit tradeoff after the field-budget explanation,
+not an inferred approval of the earlier packet design.
+
+The user then said "Ignore any existing stuff" in response to compatibility
+constraints. For this ISA cutover, backward compatibility must not block the
+compact LOAD/SAVE layout or introduce a legacy mode/profile. Existing binaries
+may require recompilation; this does not authorize deleting or rewriting saved
+files automatically. This overrides older compatibility-preservation statements
+in this note for this cutover.
+
+**Why:** Repeated compatibility concerns were preventing the requested simulator
+correction after the user had already selected the immediate-width tradeoff.
 
 **Why:** The user explicitly corrected an explanation that treated a parser's
 immediate-only restriction as the intended architecture.
@@ -59,7 +78,7 @@ Specify encoding, immediate signedness, addition overflow, index units, and
 out-of-range behavior before implementation. Preserve capability checks and
 do not narrow a computed index in a way that wraps it into authorized bounds.
 
-The user approved the compact encoding direction for detailed specification:
+Historical, superseded by the 10-bit LOAD/SAVE choice: the prior direction was
 two words for one indexed operand, three for two; any 32-bit DR plus/minus
 a 20-bit unsigned magnitude. Existing supported literal instructions retain
 their meanings. This approves a design direction, not a released encoding or

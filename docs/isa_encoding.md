@@ -13,9 +13,13 @@ of current cross-engine equivalence.
 **Indexed-operand correction (2026-10-02):** the authoritative semantic rule is
 in the [master ISA indexing rule](instruction-set.md#uniform-indexed-operands):
 the instruction adds a selected DR's runtime value to the immediate.
-The baseline bit fields below do not yet specify that uniformly. Do not infer
-approval of a multiword IDX1 packet, a new immediate range, or a replacement
-binary layout from this rule. The revised encoding remains to be reconciled.
+The selected compact LOAD/SAVE operand is specified in the
+[master field layout](instruction-set.md#compact-indexed-loadsave-operand):
+bit14 is sign, bits13:4 are a 10-bit magnitude, and bits3:0 select DR0–DR15.
+It fits one 32-bit instruction; offsets are ±1023. The baseline tables below
+remain legacy records. The master specifies a direct LOAD/SAVE cutover, not a
+compatibility profile. Older binaries may require recompilation; implementation
+and conformance tests are pending.
 
 ---
 
