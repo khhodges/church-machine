@@ -5281,10 +5281,60 @@ except ImportError:
 # partially published artifact, Namespace row, manifest, or evidence record.
 # Startup is observational: a retained admission journal blocks catalogue
 # access below, rather than modifying user artifacts without review.
+@contextlib.contextmanager
 def _namespace_commit_guard():
     """Cross-process, re-entrant lock for the committed Namespace file pair."""
     from server.namespace_allocation import namespace_guard
-    return namespace_guard(NS_STATE_PATH)
+    with namespace_guard(NS_STATE_PATH):
+        _image_refresh_store().recover()
+        yield
+
+
+def _image_refresh_store():
+    from server.namespace_image_refresh import RefreshStore
+    return RefreshStore(LUMPS_DIR, NS_STATE_PATH, BOOT_CONFIG_PATH)
+
+
+def _image_refresh_owner():
+    return session.setdefault("_image_refresh_owner", secrets.token_urlsafe(32))
+
+
+@app.route("/api/namespace/image-refresh/prepare", methods=["POST"])
+def namespace_image_refresh_prepare():
+    try:
+        if request.get_json(silent=True) != {}:
+            raise ValueError("Refresh accepts no browser Namespace, config or artifact overrides")
+        with _lump_history_transition_lock(LUMPS_DIR):
+            return jsonify(_image_refresh_store().prepare(_image_refresh_owner()))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return jsonify(error=str(exc), committed=False, dataChanged=False,
+                       message="Reconstruction failed; stored image, provenance and saved inputs unchanged. Resolve the reported saved-input issue, then review again."), 409
+
+
+@app.route("/api/namespace/image-refresh/commit", methods=["POST"])
+def namespace_image_refresh_commit():
+    try:
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or set(payload) != {"operationId"}:
+            raise ValueError("Expected operationId only")
+        with _lump_history_transition_lock(LUMPS_DIR):
+            result = _image_refresh_store().commit(payload["operationId"], _image_refresh_owner())
+        return jsonify(result)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        # Recovery can itself fail (e.g. a full/unavailable disk). Never claim
+        # unchanged data until the journal has been durably resolved.
+        return jsonify(error=str(exc), committed=None,
+                       dataChanged=None,
+                       message="Publication not confirmed. Check this operation's commit status before any new refresh."), 409
+
+
+@app.route("/api/namespace/image-refresh/status/<operation_id>", methods=["GET"])
+def namespace_image_refresh_status(operation_id):
+    try:
+        with _namespace_commit_guard():
+            return jsonify(_image_refresh_store().status(operation_id, _image_refresh_owner()))
+    except (OSError, ValueError, KeyError) as exc:
+        return jsonify(error=str(exc), committed=None), 409
 
 
 def _boot_config_freshness_digest(cfg):
@@ -5524,6 +5574,12 @@ def _boot_image_preparation_status(image_bytes, cfg=None, authority_rows=None):
     must expose that discrepancy rather than silently minting a replacement
     CR0 home from the local default.
     """
+    if _boot_image_provenance_origin() == "generic-refresh":
+        return {
+            "status": "generic-only",
+            "reason": "Saved Namespace image validated; no simulator activation or hardware certification.",
+            "hardwareCertified": False, "purpose": "generic-simulator-image",
+        }
     info = _boot_image_gen.read_boot_entry_info(image_bytes)
     configured_slot = (
         _validate_namespace_boot_marker(authority_rows)
@@ -5587,6 +5643,13 @@ def _boot_image_provenance_origin():
     except (OSError, ValueError, TypeError):
         pass
     return None
+
+
+def _validate_stored_image(image):
+    """Read-only generic admission never grants hardware certification."""
+    generic = _boot_image_provenance_origin() == "generic-refresh"
+    _boot_image_gen.validate_boot_image(image, saved_namespace_only=generic)
+    return generic
 
 
 def _prepare_selected_boot_image(image_bytes, cfg, slot):
@@ -5887,7 +5950,7 @@ def boot_image_download():
         # Exports preserve the exact historical/imported bytes.  Config/image
         # disagreement is reported below, not "fixed" by selecting a default
         # memory size or a newer artifact revision.
-        _boot_image_gen.validate_boot_image(_image_bytes)
+        _validate_stored_image(_image_bytes)
         _preparation = _boot_image_preparation_status(
             _image_bytes, None if _cfg_err else _cfg)
     except ValueError as _e:
@@ -5921,6 +5984,16 @@ def _boot_image_is_stale():
     """
     if not os.path.isfile(BOOT_IMAGE_PATH):
         return False
+    if _boot_image_provenance_origin() == "generic-refresh":
+        try:
+            with open(BOOT_IMAGE_PROVENANCE_PATH, encoding="utf-8") as source:
+                provenance = json.load(source)
+            sources = provenance.get("sourceInputs")
+            return not isinstance(sources, dict) or any(
+                not os.path.isfile(path) or _file_sha256(path) != digest
+                for path, digest in sources.items())
+        except (OSError, ValueError, TypeError):
+            return True
     try:
         with open(BOOT_IMAGE_PATH, "rb") as _image_file:
             _image_bytes = _image_file.read()
@@ -5939,6 +6012,11 @@ def _boot_image_is_stale():
                 if (_provenance.get("image_sha256") !=
                         hashlib.sha256(_image_bytes).hexdigest()):
                     return True
+                if _provenance.get("origin") == "generic-refresh":
+                    sources = _provenance.get("sourceInputs")
+                    return not isinstance(sources, dict) or any(
+                        not os.path.isfile(path) or _file_sha256(path) != digest
+                        for path, digest in sources.items())
                 if (_provenance.get("origin") == "generated"
                         or "boot_config_sha256" in _provenance):
                     if (_provenance.get("boot_config_sha256") !=
@@ -6035,7 +6113,7 @@ def boot_image_binary():
     try:
         # Geometry disagreement is freshness, not a malformed-image error:
         # validate structure before returning the explicit-Prepare 409 below.
-        _boot_image_gen.validate_boot_image(_existing_image_bytes)
+        _validate_stored_image(_existing_image_bytes)
     except ValueError as _e:
         logging.error("boot_image_binary: stale or invalid boot image on disk: %s", _e)
         return jsonify({"error": f"Boot image on disk is stale or invalid: {_e}"}), 500
@@ -6063,7 +6141,8 @@ def boot_image_binary():
         _image_bytes = _f.read()
     try:
         _boot_image_gen.validate_boot_image(
-            _image_bytes, None if simulator_read else _configured_words)
+            _image_bytes, None if simulator_read else _configured_words,
+            saved_namespace_only=_origin == "generic-refresh")
         _preparation = _boot_image_preparation_status(
             _image_bytes, None if _cfg_err else _cfg)
     except ValueError as _e:
@@ -6072,6 +6151,7 @@ def boot_image_binary():
     resp = send_file(io.BytesIO(_image_bytes), mimetype="application/octet-stream")
     resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     resp.headers["Pragma"] = "no-cache"
+    resp.headers["X-Image-Purpose"] = "generic-simulator-image" if _origin == "generic-refresh" else "boot-image"
     resp.headers["X-Boot-Preparation"] = _preparation["status"]
     resp.headers["X-Boot-Image-Origin"] = _origin or "unknown"
     if simulator_read:
@@ -6092,7 +6172,7 @@ def boot_image_exists():
     try:
         with open(BOOT_IMAGE_PATH, "rb") as source:
             image_bytes = source.read()
-        _boot_image_gen.validate_boot_image(image_bytes)
+        _validate_stored_image(image_bytes)
         preparation = _boot_image_preparation_status(
             image_bytes, None if cfg_err else cfg)
     except (OSError, ValueError) as exc:
@@ -21281,6 +21361,22 @@ def api_compile():
     # serialized words, not merely to source/name metadata.
     if isinstance(result, dict) and result.get("ok") and isinstance(result.get("words"), list):
         _compile_words = [int(word) & 0xFFFFFFFF for word in result["words"]]
+        # Decode references from emitted bytes, not caller/browser metadata.
+        # Recheck on every request, including compiler-cache hits.
+        try:
+            from server.compile_reference_verification import verify_pinned_references, UnsupportedReferenceError
+            _reference_api = (_parse_intrinsic_lump_content(_compile_words) or {}).get("api_definition") or {}
+            result["verified_references"] = verify_pinned_references(
+                _reference_api.get("capabilities") or [], LUMPS_DIR)
+        except (OSError, ValueError, TypeError) as exc:
+            return jsonify({
+                "ok": False, "error": f"Reference verification failed: {exc}",
+                "unchanged_data": True,
+                "reference_verification": {
+                    "status": "unsupported" if isinstance(exc, UnsupportedReferenceError) else "failed",
+                    "reason": str(exc),
+                },
+            }), 200
         _compile_raw = struct.pack(f">{len(_compile_words)}I", *_compile_words)
         _compile_digest = hashlib.sha256(_compile_raw).hexdigest()
         try:
@@ -27216,6 +27312,20 @@ def _describe_protected_change(payload):
     if not isinstance(payload, dict):
         return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
     root = Path(__file__).resolve().parent.parent
+    if request.path == "/api/namespace/image-refresh/commit":
+        if set(payload) != {"operationId"}:
+            raise ValueError("Expected operationId only")
+        with _lump_history_transition_lock(LUMPS_DIR):
+            record, _ = _image_refresh_store().reviewed(payload["operationId"], _image_refresh_owner())
+        return [
+            "Refresh Image replaces only the stored generic image and matching provenance.",
+            "Saved Namespace assignments, configuration and LUMP files remain unchanged.",
+            "No simulator activation/reset, hardware upload/flash or physical memory erasure.",
+            "Generic/simulator validation only; not hardware certification. Approved history is preserved.",
+            "Frozen Namespace: " + record["namespace_fingerprint"],
+            "Image SHA-256: " + record["image_sha256"],
+            *record["stages"], *record["slotResults"], *record["addressResults"],
+        ]
     if request.path == "/api/namespace/save-table":
         state, rows = _namespace_table_candidate(payload)
         before = {row["slot"]: row for row in state["abstractions"]}

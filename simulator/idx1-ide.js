@@ -127,12 +127,17 @@
         });
     }
     function compile(assembler, source) {
+        const declaration = source.match(/^\s*;\s*(?:Abstraction:|@abstraction)\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*$/im);
+        if (!declaration) return {words: [], abstractionName: '', errors: [
+            {line: 0, message: 'No abstraction declaration found. Add: ; @abstraction YourName and recompile.'},
+        ]};
         if (/^\s*constants\s*\{/im.test(source))
             return { words: [], errors: [{ line: 0, message:
                 'IDX1 constants blocks are not yet supported; use explicit WORD data and typed layout.' }] };
         const result = assembler.assemble(source, {
             profile: 'IDX1', sourceLayout: { fastEntry: 1, dispatch: [] },
         });
+        result.abstractionName = declaration[1];
         if (!result.errors.length) {
             try { Runtime.requireSupported(result.words, result.layout.instructionStarts.map(w => w - 1)); }
             catch (error) { result.errors.push({ line: 0, message: error.message }); }
@@ -140,6 +145,8 @@
         return result;
     }
     async function admitLocalCandidate(sim, Simulator, candidate, slot) {
+        if (typeof candidate.abstraction !== 'string' || !candidate.abstraction.trim())
+            throw new Error('IDX1 candidate has no declared abstraction name; correct the source and recompile.');
         if (!candidate || candidate.isaProfile !== 'IDX1' || typeof candidate.source !== 'string')
             throw new Error('Missing IDX1 local compiler evidence');
         const assembled = compile(new Assembler(), candidate.source);
@@ -155,7 +162,7 @@
         for (let i = 0; i < header.lumpSize; i++) view.setUint32(i * 4, sim.memory[base + i]);
         const envelope = await Envelope.frame(payload, assembled.layout);
         sim.registerSlotIdentity(slot, {
-            dotName: candidate.abstraction || 'LocalIDX1', issueN: 1,
+            dotName: candidate.abstraction, issueN: 1,
             identityHash: envelope.executionDigest, binaryHash: envelope.metadata.payloadSha256,
             executionDigest: envelope.executionDigest, authorized: true,
             gtSeq: sim.parseNSWord1(entry.word1_limit).gtSeq,

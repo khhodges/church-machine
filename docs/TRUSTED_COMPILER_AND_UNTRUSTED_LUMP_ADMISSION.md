@@ -26,6 +26,13 @@ The static/dynamic boundary is:
 
 ## Trusted compiler path
 
+The normative [Standalone Compiler Output Contract](CM_LUMP_SPECIFICATION.md#standalone-compiler-output-contract)
+governs this path. A successful conforming compile produces a complete,
+Namespace-independent LUMP. Its declared capability PetNames, immutable IDs,
+and authored rights must survive in the integrity-covered artifact.
+Local C-list row numbers are not Namespace slot assignments. Referenced API
+and identity evidence may be needed, but local installation is not.
+
 For a locally compiled LUMP, Compile owns:
 
 - syntax, instruction, operand, and entry-point validation;
@@ -35,8 +42,13 @@ For a locally compiled LUMP, Compile owns:
 - static type, permission, and reachability checks;
 - binary and identity hashes;
 - source and portable-content seals supported by the active trust regime;
-- destination binding when the programmer explicitly chooses a destination;
 - an integrity-protected output record naming the compiler identity and version.
+
+Destination binding is a separate, explicitly requested operation after
+compilation, never a prerequisite for compilation or Save LUMP. It must not
+rewrite the original artifact or mint its immutable identity from a local slot.
+A LUMP missing a PetName requires programmer recompilation; no automatic
+naming, patching, or source replacement is permitted.
 
 A successful compiler result may still fail at runtime under the Church
 Machine's dynamic ISA rules. It must not be rejected later merely because a
@@ -161,7 +173,7 @@ The Church Machine continues to enforce dynamic ISA rules, including:
 - capability type and permissions;
 - bounds;
 - generation validity;
-- NULL and unavailable capabilities;
+- NULL numeric encodings and unavailable destination bindings;
 - dynamic Namespace resolution;
 - CALL and RETURN context;
 - row-zero and structural-register protection;
@@ -169,6 +181,13 @@ The Church Machine continues to enforce dynamic ISA rules, including:
 
 Static admission does not replace runtime enforcement, and runtime enforcement
 must not silently repair, redirect, approve, or substitute an artifact.
+
+Capabilities are never INVALID. When an INFORM binding is lost, the reference
+becomes OUTSFORM while its PetName and ID remain immutable. Generation checks
+protect local bindings from resolving to a different slot occupant; they do not
+erase identity. Clearing a slot preserves the saved LUMP for later placement.
+This model does not grant authority to forged or corrupt bytes: admission and
+runtime checks still enforce the applicable integrity and access rules.
 
 ## Persistence and delivery
 
@@ -198,3 +217,8 @@ Implementation work following this agreement must:
 6. Implement the Gate 0–5 admission pipeline for unknown uploads.
 7. Keep uploaded bytes inert until Mint admits them.
 8. Preserve dynamic Church Machine ISA enforcement.
+9. Remove live Namespace lookup/materialization from pre-save compilation;
+   changing console wording alone is not sufficient.
+10. Verify standalone output with an empty and a differently populated Namespace,
+    preserving all other compiler inputs, and check exact references through
+    saving and later assignment to another slot.

@@ -984,6 +984,33 @@ function _isCompilerSelfCapability(cap) {
         (name === 'SELF' || name === '__SELF__'));
 }
 
+function _readCompiledCandidateCapabilities(words) {
+    const api = typeof LumpContentFrame !== 'undefined' &&
+        typeof LumpContentFrame.lumpDecodeContentFrameApi === 'function'
+        ? LumpContentFrame.lumpDecodeContentFrameApi(words) : null;
+    const cc = words[0] & 0xFF;
+    if (!api || !Array.isArray(api.capabilities) || api.capabilities.length !== cc) {
+        throw new Error('Authenticated artifact is missing a complete embedded C-list definition.');
+    }
+    return api.capabilities.map((cap, row) => {
+        if (!cap || typeof cap.name !== 'string' || !cap.name.trim() ||
+                !Array.isArray(cap.rights)) {
+            throw new Error(`Embedded C-list row ${row} has no declared name or rights array.`);
+        }
+        // Copy identity locks as well as declarations from the bytes. Never
+        // supplement them from live Namespace, catalog or browser compilation.
+        const item = JSON.parse(JSON.stringify(cap));
+        delete item.nsIndex;
+        delete item.ns_slot;
+        item.nsIndex = null;
+        item.relocation_row = row;
+        item.grants = cap.rights.slice();
+        item.compiler_owned_self = row === 0 && _isCompilerSelfCapability(cap);
+        item.symbolic_self = item.compiler_owned_self;
+        return item;
+    });
+}
+
 function _validateCompiledCandidateClist(words, clistStart, resolvedCaps, compilerRecord) {
     const binary = Array.from(words || [], word => Number(word) >>> 0);
     const caps = Array.isArray(resolvedCaps) ? resolvedCaps : [];
@@ -1009,7 +1036,7 @@ function _validateCompiledCandidateClist(words, clistStart, resolvedCaps, compil
     } else if (headerCount === caps.length && binaryClistStart === clistStart) {
         const validation = CapabilityTokens.validateClist(
             binary, clistStart, caps,
-            { sim: typeof sim !== 'undefined' ? sim : null,
+            { sim: null,
                 allowCompilerSelfPlaceholder: true,
                 compilerPendingRows: compilerRecord &&
                     Array.isArray(compilerRecord.capability_rows)
@@ -1670,7 +1697,37 @@ async function _readCompileJsonResponse(response) {
     return body;
 }
 
+function _formatCandidateReferenceReport(capabilities, evidence) {
+    const lines = ['Reference verification (not installation or execution readiness):'];
+    const verified = Array.isArray(evidence) ? evidence : [];
+    let references = 0;
+    (capabilities || []).forEach((cap, row) => {
+        if (row === 0 && ['SELF', '__SELF__'].includes(String(cap.name).toUpperCase())) {
+            lines.push(`  Row ${row} ${cap.name}: SELF — containing artifact, not an external reference.`);
+            return;
+        }
+        references++;
+        const supplied = ['N', 'T', 'token', 'binary_hash', 'identity_hash', 'identity_string']
+            .some(key => Object.prototype.hasOwnProperty.call(cap, key));
+        if (!supplied) {
+            lines.push(`  Row ${row} ${cap.name}: SYMBOLIC — valid declared PetName; its target need not exist yet.`);
+            return;
+        }
+        const expected = {N: cap.N || cap.identity_string, T: cap.T || cap.token,
+            binary_hash: cap.binary_hash, identity_hash: cap.identity_hash};
+        const matches = verified.filter(item => item && item.row === row &&
+            Object.entries(expected).every(([key, value]) =>
+                typeof value === 'string' && value.length > 0 && item[key] === value));
+        lines.push(`  Row ${row} ${cap.name}: ` + (matches.length === 1
+            ? `VERIFIED — ${expected.N}; exact target bytes and issued identity checked.`
+            : 'UNVERIFIED — no matching server evidence for this candidate reference.'));
+    });
+    if (!references) lines.push('  No external references declared; no external identity verification claimed.');
+    return lines.join('\n');
+}
+
 async function compileAndBuild(options) {
+    let _referenceVerificationSnapshot = null;
     const _compileOptions = options && typeof options === 'object' ? options : {};
     const editor = document.getElementById('asmEditor');
     if (!editor || !cloomcCompiler) {
@@ -1762,6 +1819,15 @@ async function compileAndBuild(options) {
                 };
             }
             if (!_compileResponse.ok || !_serverCompile || _serverCompile.ok === false) {
+                if (_serverCompile && _serverCompile.reference_verification) {
+                    const _verification = _serverCompile.reference_verification;
+                    const _status = _verification.status === 'unsupported' ? 'UNSUPPORTED' : 'FAILED';
+                    const _message = `Reference verification: ${_status}\n${_verification.reason || _serverCompile.error}\n` +
+                        'No new candidate was produced. Saved data and the previous candidate are unchanged.';
+                    if (con) { con.textContent = _message; con.scrollTop = 0; }
+                    showNextSteps('error');
+                    return {ok: false, kind: 'cloomc', error: _message};
+                }
                 throw new Error((_serverCompile && _serverCompile.error) ||
                     'server compiler rejected the source');
             }
@@ -1800,6 +1866,11 @@ async function compileAndBuild(options) {
                 return { ok: false, kind: 'cloomc', error: errText, errors: result.errors };
             }
         }
+        _referenceVerificationSnapshot = {
+            words: _serverCompile.words.slice(),
+            evidence: Array.isArray(_serverCompile.verified_references)
+                ? _serverCompile.verified_references.map(item => ({...item})) : [],
+        };
         // Reproduce the browser byte array through the attestation endpoint;
         // the signed record, rather than browser-local compilation, remains
         // the authority for save admission.
@@ -1847,7 +1918,6 @@ async function compileAndBuild(options) {
 
     const absName = result.abstractionName || 'Unnamed';
     const caps = result.capabilities || [];
-    _autoFillCapRights(caps);
     const cc = caps.length;
     const profile = result.profile || 'IoT';
 
@@ -1880,50 +1950,8 @@ async function compileAndBuild(options) {
         }
     }
 
-    // ── Boot-entry RETURN check ────────────────────────────────────────────
-    // If this abstraction is the currently-selected boot entry, any RETURN
-    // instruction is a semantic error: there is no caller frame at hardware
-    // boot. The machine will fall through to a zero word, fault, wipe all
-    // CRs to NULL GT, and loop with a dead namespace — fault LED ON.
-    (function _checkBootEntryReturn() {
-        const _bootSlot = (typeof bootEntrySlot !== 'undefined' &&
-            Number.isInteger(bootEntrySlot)) ? bootEntrySlot : -1;
-        if (_bootSlot < 0) return;
-        // Check whether this abstraction IS the boot entry (name match in registry).
-        let _isBootEntry = false;
-        if (sim && sim.abstractionRegistry) {
-            const _allAbs = sim.abstractionRegistry.abstractions || {};
-            for (const _j of Object.keys(_allAbs)) {
-                const _a = _allAbs[_j];
-                if (_a && Number(_a.index) === _bootSlot &&
-                    _a.name && _a.name.toUpperCase() === absName.toUpperCase()) {
-                    _isBootEntry = true;
-                    break;
-                }
-            }
-        }
-        if (!_isBootEntry) return;
-        // Scan assembled words for RETURN (Church opcode 3, bits[31:27] === 3).
-        const _returnHits = [];
-        for (let _wi = 0; _wi < allCode.length; _wi++) {
-            if (((allCode[_wi] >>> 27) & 0x1F) === 3) {
-                _returnHits.push({ word: _wi + 1, line: allLineNums[_wi] });
-            }
-        }
-        if (_returnHits.length === 0) return;
-        const _locs = _returnHits.map(h => h.line != null ? `line ${h.line}` : `word ${h.word}`).join(', ');
-        const _warn = {
-            line: _returnHits[0].line,
-            message: `[BOOT-RETURN] "${absName}" is the boot entry (slot ${_bootSlot}) ` +
-                `and contains ${_returnHits.length} RETURN instruction` +
-                `${_returnHits.length !== 1 ? 's' : ''} (${_locs}). ` +
-                `At hardware boot there is no caller — RETURN will fault and wipe all ` +
-                `registers (fault LED ON). Replace with an infinite loop or a CALL to ` +
-                `another abstraction.`
-        };
-        if (typeof _showAsmWarnings === 'function') _showAsmWarnings([_warn]);
-    })();
-    // ─────────────────────────────────────────────────────────────────────────
+    // Boot-entry suitability belongs to explicit image preparation, not to
+    // standalone compilation. Do not inspect the currently selected boot slot.
 
     const codeRegion = [...allCode];
     let cw = codeRegion.length;
@@ -2013,81 +2041,6 @@ async function compileAndBuild(options) {
         lumpWords[_frameStart + i] = _frameWords[i] >>> 0;
     }
     let clistStart = lumpSize - cc;
-    const _capContext = {
-        sim: (typeof sim !== 'undefined' ? sim : null),
-        lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
-            ? _lumpsCache
-            : [],
-        // Compilation is independent of whichever resident currently occupies
-        // the eventual destination. The save/install transaction binds SELF
-        // after the programmer chooses a Namespace slot.
-        bootstrapResidentSlot: null,
-    };
-    // Portable artifacts intentionally keep destination-local GTs unresolved.
-    // Legacy builds, however, are validated and saved against the active
-    // Namespace, so they must carry both the resolved nsIndex metadata and the
-    // matching Inform GT in each non-NULL C-List row.
-    const _capMaterialized = result.portableMode === 'portable'
-        ? _serializePortableLumpCapabilities(caps, lumpWords, clistStart)
-        : _materializeLumpCapabilities(caps, lumpWords, clistStart, _capContext);
-    if (!_capMaterialized.ok) {
-        const _capErrors = (_capMaterialized.errors || []).map(message => ({
-            line: null,
-            message,
-        }));
-        if (con) {
-            con.textContent = 'Capability validation failed — code not applied:\n' +
-                (_capMaterialized.errors || []).join('\n');
-            con.scrollTop = 0;
-        }
-        if (typeof _showAsmErrors === 'function') {
-            const _newDotNames = Array.from(new Set((_capMaterialized.errors || []).map(message => {
-                const match = String(message).match(/^Capability "([^"]+\.[^"]+)" has no declared permissions\.$/);
-                return match ? match[1] : null;
-            }).filter(Boolean))).filter(name => {
-                if (!sim || !sim.nsLabels) return true;
-                return !Object.values(sim.nsLabels).some(label =>
-                    String(label || '').toLowerCase() === String(name).toLowerCase());
-            });
-            const _addDotNames = _newDotNames.length ? {
-                label: `Add ${_newDotNames.length} new dot-name${_newDotNames.length === 1 ? '' : 's'} to Namespace`,
-                onClick: async function(button) {
-                    button.disabled = true;
-                    button.textContent = 'Adding…';
-                    const added = [];
-                    try {
-                        for (const name of _newDotNames) {
-                            const created = sim.defineSymbolicAbstraction(name, null);
-                            added.push(`${created.name} → NS[${created.slot}]`);
-                        }
-                        if (typeof _setNsDirty === 'function') _setNsDirty(true);
-                        if (typeof updateNamespace === 'function') updateNamespace();
-                        if (typeof window._nsTableSave === 'function') {
-                            const saved = await window._nsTableSave(null);
-                            if (!saved) throw new Error('The rows were added locally but could not be persisted. Use Namespace Save to retry.');
-                        }
-                        button.textContent = `Added ${added.length} row${added.length === 1 ? '' : 's'}`;
-                        if (con) {
-                            con.textContent = `Added to Namespace:\n${added.join('\n')}\n\nAdd explicit permissions (for example E) to each capability declaration, then compile again.`;
-                            con.scrollTop = 0;
-                        }
-                    } catch (error) {
-                        button.disabled = false;
-                        button.textContent = 'Retry adding dot-names';
-                        if (con) con.textContent = `Namespace update failed: ${error && error.message ? error.message : error}`;
-                    }
-                }
-            } : null;
-            _showAsmErrors(_capErrors, 'Capability validation failed — code not applied', _addDotNames);
-        }
-        showNextSteps('error');
-        return {
-            ok: false,
-            kind: 'cloomc',
-            error: (_capMaterialized.errors || []).join('\n') ||
-                'Capability validation failed.',
-        };
-    }
     // Do not serialize a second browser-reconstructed candidate.  The server
     // compiler's full LUMP is the byte sequence covered by its HMAC and is
     // carried unchanged through preflight and save.
@@ -2127,7 +2080,18 @@ async function compileAndBuild(options) {
         cw = _signedLayout.cw;
         clistStart = _signedLayout.clistStart;
     }
-    const resolvedCaps = _capMaterialized.resolvedCaps;
+    let resolvedCaps;
+    try {
+        if (!Array.isArray(result.words) || !result.compiler_record) {
+            throw new Error('No authenticated server artifact was supplied.');
+        }
+        resolvedCaps = _readCompiledCandidateCapabilities(lumpWords);
+    } catch (error) {
+        const message = `Compile failed — ${error.message}\nNo candidate or saved data changed. Recompile; if this repeats, report the compiler artifact error.`;
+        if (con) con.textContent = message;
+        showNextSteps('error');
+        return { ok: false, kind: 'integration', error: message };
+    }
     const _candidateCLOOMCLump = {
         words: Array.from(lumpWords),
         clistStart,
@@ -2149,7 +2113,7 @@ async function compileAndBuild(options) {
             'The source compiled, but a declared dependency did not match the authenticated compiler rows or current binding policy.\n' +
             `Technical detail: ${_candidateClistValidation.errors.join('\n')}\n\n` +
             'No candidate was created or persisted. Your draft and the previous runnable candidate are unchanged.\n' +
-            'Check the capability name/rights and Namespace binding, then build again. Do not discard the draft.';
+            'Check the declared capability name/rights, then build again. No Namespace assignment is required. Do not discard the draft.';
         if (con) {
             con.textContent = _candidateMessage;
             con.scrollTop = 0;
@@ -2268,34 +2232,12 @@ async function compileAndBuild(options) {
         }
     }
 
-    let resolvedNsSlot = null;
-    if (sim && sim.abstractionRegistry) {
-        // See note above: abstractions is a plain object keyed by numeric
-        // index, not an array — must use Object.keys(), not .length/[j].
-        const allAbs = sim.abstractionRegistry.abstractions || {};
-        for (const j of Object.keys(allAbs)) {
-            if (allAbs[j] && allAbs[j].name && allAbs[j].name.toUpperCase() === absName.toUpperCase()) {
-                resolvedNsSlot = Number(j);
-                break;
-            }
-        }
-    }
+    const resolvedNsSlot = null; // No destination is selected by compilation.
 
     const lumpWordsArray = Array.from(lumpWords);
     // Keep the attempted binary local until all validation/audit checks pass.
     // A failed compile must not replace the registry's last valid candidate.
-    const _compiledCapabilities = resolvedCaps.map(rc => ({
-        name: rc.name,
-        rights: Array.isArray(rc.rights) ? rc.rights.slice() : [],
-        grants: Array.isArray(rc.grants) ? rc.grants.slice() : [],
-        nsIndex: rc.nsIndex,
-        null_row: rc.null_row === true,
-        ...(rc.compiler_owned_self === true
-            ? { compiler_owned_self: true } : {}),
-        ...(rc.placeholder === true ? { placeholder: true } : {}),
-        ...(rc.identity_contract
-            ? { identity_contract: rc.identity_contract } : {}),
-    }));
+    const _compiledCapabilities = resolvedCaps.map(rc => JSON.parse(JSON.stringify(rc)));
     // The server-authenticated LUMP is authoritative, including its dispatch
     // prefix. Never republish the browser compiler's preliminary body-only
     // region as though it were the admitted candidate.
@@ -2378,34 +2320,42 @@ async function compileAndBuild(options) {
 
 
     let listing = `═══════════════════════════════════════════════════\n`;
-    listing += `  LUMP BUILT — "${absName}" [${langLabel}]\n`;
+    listing += `  UNSAVED COMPILE CANDIDATE — "${absName}" [${langLabel}]\n`;
     listing += `═══════════════════════════════════════════════════\n\n`;
     listing += `  Header:    0x${(header >>> 0).toString(16).padStart(8, '0')}\n`;
     listing += `  Lump Size: ${lumpSize} words (2^${Math.log2(lumpSize)})\n`;
     listing += `  Code:      ${cw} words (${numMethods} method${numMethods !== 1 ? 's' : ''} concatenated)\n`;
     listing += `  C-List:    ${cc} slot${cc !== 1 ? 's' : ''} (cc)\n`;
-    listing += `  Freespace: ${freespace} words\n`;
+    const _reportLayout = typeof _getLumpFieldSizeLayout === 'function'
+        ? _getLumpFieldSizeLayout(lumpWordsArray) : null;
+    listing += `  Data region: ${freespace} words (embedded definition/source plus unused space)\n`;
+    if (_reportLayout) {
+        listing += `  Embedded:  ${_reportLayout.api} API/frame words + ${_reportLayout.source} source words\n`;
+        listing += `  Unused:    ${_reportLayout.empty} words\n`;
+    } else {
+        listing += `  Unused:    not established — embedded layout could not be verified\n`;
+    }
     listing += `  Profile:   ${profile}\n`;
-    listing += `  Binding:   ${_portableStatus === 'portable-pinned' ? 'Portable (destination-local GTs unresolved)' : 'Legacy/unpinned (explicit trust required)'}\n`;
-    listing += `  MTBF:      ${mtbfClean}/${mtbfTotal} clean runs (${mtbfStatus})\n`;
+    listing += `  Binding:   ${_portableStatus === 'portable-pinned' ? 'Pinned dependency metadata' : 'Dependency identity locks not established'}; compilation does not establish destination bindings\n`;
 
     // Identity line: show the full dot pet name stamped into this LUMP.
     // When no petname is set, remind the programmer how to set one.
     if (_savePetname) {
         const _identStr = _portableOwner;
-        listing += `  Identity:  ${_identStr}\n`;
+        listing += `  Proposed owner: ${_identStr} (not a saved artifact identity)\n`;
     } else {
-        listing += `  Identity:  ${absName}#${_saveIssueNumber}  ` +
-                   `\u26a0 No petname — open IDE Settings to set one\n`;
+        listing += `  Owner identity: not established by this report; distinct from the declared capability PetNames below\n`;
     }
-    const _nameWasInferred = !/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_.]*/mi.test(source);
-    if (_nameWasInferred) {
-        listing += `  Name:      ${absName} was inferred for this read-only candidate view.\n`;
-        listing += `             Add an explicit abstraction declaration to choose its saved identity.\n`;
-    }
+    const _referenceReport = _formatCandidateReferenceReport(resolvedCaps,
+        _referenceVerificationSnapshot &&
+        _referenceVerificationSnapshot.words.length === lumpWordsArray.length &&
+        _referenceVerificationSnapshot.words.every((word, index) =>
+            (word >>> 0) === (lumpWordsArray[index] >>> 0))
+            ? _referenceVerificationSnapshot.evidence : null);
+    listing += '\n  ' + _referenceReport + '\n';
 
     if (Object.keys(drPetNames).length > 0 || Object.keys(crPetNames).length > 0) {
-        listing += `\n  Pet Names:\n`;
+        listing += `\n  Register aliases (separate from capability PetNames):\n`;
         for (const [reg, name] of Object.entries(drPetNames)) {
             listing += `    ${reg} = ${name}\n`;
         }
@@ -2415,14 +2365,18 @@ async function compileAndBuild(options) {
     }
 
     if (cc > 0) {
-        listing += `\n  Capabilities (C-List):\n`;
+        listing += `\n  Declared capability PetNames (C-List row order):\n`;
         for (let i = 0; i < resolvedCaps.length; i++) {
             const rc = resolvedCaps[i];
-            const status = `NS[${rc.nsIndex}]`;
+            const _reportWord = lumpWordsArray[clistStart + i] >>> 0;
+            const status = `word=0x${_reportWord.toString(16).padStart(8, '0')}` +
+                (_reportWord === 0 ? ' — unresolved numeric placeholder' : ' — encoded candidate word');
             const _rcRightsStr = rc.rights && rc.rights.length > 0 ? ` [${rc.rights.join('')}]` : '';
             listing += `    [${i}] ${rc.name}${_rcRightsStr} → ${status}\n`;
         }
     }
+    listing += `  Numeric placeholders do not erase PetNames or establish INFORM/OUTSFORM resolution.\n`;
+    listing += `  No Namespace assignment or runtime capability binding is asserted by this report.\n`;
 
     listing += `\n  Methods:\n`;
     for (let i = 0; i < methodMeta.length; i++) {
@@ -2432,20 +2386,17 @@ async function compileAndBuild(options) {
         const drNote = Object.keys(drMap).length > 0
             ? '  [' + Object.entries(drMap).sort(([a],[b]) => parseInt(a)-parseInt(b)).map(([k,v]) => `DR${k}=${v}`).join(', ') + ']'
             : '';
-        listing += `    [${i}] ${m.name.padEnd(20)} offset=${m.offset.toString().padStart(4)}  length=${m.length}${aliasNote}${drNote}\n`;
+        listing += `    [${i}] ${m.name.padEnd(20)} body-relative offset=${m.offset.toString().padStart(4)}  length=${m.length}${aliasNote}${drNote}\n`;
     }
 
-    listing += `\n  Deployment:\n`;
-    listing += `    Target Board: QMTECH Wukong XC7A100T (Artix-7)\n`;
-    listing += `    Profile:      ${profile}\n`;
-    listing += `    MTBF Status:  ${mtbfStatus.toUpperCase()}${mtbfClean >= 5 ? ' (deployment-ready)' : mtbfTotal === 0 ? ' (unknown — needs testing)' : ' (needs more clean runs)'}\n`;
+    listing += `\n  Scope: compilation only — not saved, installed, execution-tested, or hardware-certified.\n`;
 
     listing += `\n  Lump Layout:\n`;
     listing += `    ┌─────────────────────────────────────────────┐\n`;
     listing += `    │ Word 0:  Header   0x${(header >>> 0).toString(16).padStart(8, '0')}             │\n`;
     listing += `    │ Words 1..${cw}:  Code region (${cw} words)${' '.repeat(Math.max(0, 9 - cw.toString().length))}│\n`;
     listing += `    │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │\n`;
-    listing += `    │ Freespace: ${freespace} words${' '.repeat(Math.max(0, 24 - freespace.toString().length))}│\n`;
+    listing += `    │ Data region: ${freespace} words (not all unused) │\n`;
     listing += `    │ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │\n`;
     listing += `    │ C-List:  ${cc} slots (offset ${clistStart})${' '.repeat(Math.max(0, 19 - cc.toString().length - clistStart.toString().length))}│\n`;
     listing += `    └─────────────────────────────────────────────┘\n`;
@@ -2454,13 +2405,19 @@ async function compileAndBuild(options) {
     if (_auditResults.length > 0) {
         listing += `\n  Pre-build Audit:\n`;
         for (const r of _auditResults) {
+            if (r.ruleId === 'RNC') {
+                listing += `    ⚠ [RNC] Referenced numeric C-list rows remain unresolved in these candidate bytes.\n`;
+                listing += `      Declared PetNames are listed above. This does not establish executable destination bindings;\n`;
+                listing += `      it does not prove that capabilities lost their identities or will automatically resolve at load time.\n`;
+                continue;
+            }
             const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
             listing += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
         }
         if (_auditWarns.length > 0) {
-            listing += `\n  \u26a0 Audit: ${_auditWarns.length} warning${_auditWarns.length !== 1 ? 's' : ''} \u2014 review before deploying.\n`;
+            listing += `\n  \u26a0 Candidate audit: ${_auditWarns.length} warning${_auditWarns.length !== 1 ? 's' : ''} — binding and execution readiness are separate checks.\n`;
         } else {
-            listing += `\n  \u2713 Audit passed \u2014 all checks OK.\n`;
+            listing += `\n  \u2713 Reported structural checks passed — not proof of resolved identity or execution readiness.\n`;
         }
     }
 
@@ -2507,6 +2464,11 @@ async function compileAndBuild(options) {
         window.LumpRegistry.setCurrent(_compiledToken);
         window._pendingLumpData = null;
     }
+    // Consumers of the rich compiler result must see the same byte-derived
+    // declarations as the candidate, registry and save payload.
+    result = Object.assign({}, result, {
+        capabilities: _compiledCapabilities.map(cap => JSON.parse(JSON.stringify(cap))),
+    });
     window._lastCLOOMCResult = result;
     window._lastCLOOMCLump = _candidateCLOOMCLump;
 
@@ -2515,13 +2477,14 @@ async function compileAndBuild(options) {
     if (_compileOptions.candidateOnly !== false) {
         if (con) {
             con.innerHTML = _capRightsHTML(listing +
-                '\n\n  Candidate ready — use Save LUMP, Export LUMP, or Run to install it.');
+                '\n\n  Unsaved candidate ready. Save LUMP persists an artifact; Export LUMP downloads a file. Neither installs it or changes Namespace assignments.');
             con.scrollTop = 0;
         }
         if (typeof window._showCompiledCandidateBesideSource === 'function') {
             window._showCompiledCandidateBesideSource(lumpWordsArray, {
                 abstraction: absName,
                 methodCount: _candidateMethods.length,
+                referenceReport: _referenceReport,
             });
         }
         showNextSteps('compiled');

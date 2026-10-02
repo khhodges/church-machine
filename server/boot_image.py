@@ -920,7 +920,7 @@ def validate_boot_body_ranges(words, physical):
 
 
 def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout=True,
-                        simulation_only=False):
+                        simulation_only=False, saved_namespace_only=False):
     """Inspect the NS table inside a boot image and raise ValueError early.
 
     Checks that the format-version tag at mem[ns_table_base - 1] equals
@@ -971,7 +971,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
     ns_table_base = physical["table_base"]
     ns_table_reserve = physical["table_words"]
 
-    for slot in ((0, 1) if simulation_only else _MANDATORY_NS_SLOTS):
+    for slot in ((0,) if saved_namespace_only else (0, 1) if simulation_only else _MANDATORY_NS_SLOTS):
         base = n_words - (slot + 1) * NS_ENTRY_WORDS
         if base + 1 >= n_words:
             raise ValueError(
@@ -999,7 +999,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
     # heuristic.
     thread_count = _encoded_thread_count(words, physical["slots"])
     ns_capacity = physical["slots"]
-    if not 1 <= thread_count <= MAX_THREAD_COUNT:
+    if not saved_namespace_only and not 1 <= thread_count <= MAX_THREAD_COUNT:
         raise ValueError(
             f"validate_boot_image: encoded Thread count {thread_count} is outside "
             f"1..{MAX_THREAD_COUNT}")
@@ -1025,12 +1025,14 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
         if candidate_slot != ARCH_BOOT["minimalSlots"]["M_BIT_DEV"]:
             expected_thread_slots.append(candidate_slot)
         candidate_slot += 1
-    if resident_thread_slots != expected_thread_slots:
+    if not saved_namespace_only and resident_thread_slots != expected_thread_slots:
         raise ValueError(
             "validate_boot_image: Thread descriptors have a malformed gap or "
             f"duplicate root (found {resident_thread_slots}, "
             f"expected {expected_thread_slots})")
-    thread_slots = expected_thread_slots
+    # Generic saved-image inspection treats Thread headers exactly like other
+    # LUMP headers: the saved descriptor locates them. Hardware remains positional.
+    thread_slots = resident_thread_slots if saved_namespace_only else expected_thread_slots
     gt_fields = ARCH_GT_WORD0["fields"]
     gt_type_lsb = field_lsb(gt_fields["gt_type"])
     gt_seq_lsb = field_lsb(gt_fields["gt_seq"])
@@ -1071,7 +1073,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
         perm_lsb = field_lsb(gt_fields["perm"])
         perm = (identity >> perm_lsb) & _field_mask(gt_fields["perm"])
         dom = (identity >> field_lsb(gt_fields["dom"])) & _field_mask(gt_fields["dom"])
-        if dom != 1 or perm != 0b100:
+        if dom != 1 or (not (perm & 0b100) if saved_namespace_only else perm != 0b100):
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} CHURCH frame does not contain an Enter E-GT")
         code_auth = words[code_ns + 1]
         if code_seq != _ns_word1_get(code_auth, "gt_seq"):
@@ -1080,7 +1082,9 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
         code_cw = ((words[code_loc] >> 10) & 0x1FFF) if code_loc < n_words else 0
         resume_nia = (packed_resume >> 13) & 0x7FFF
         if (code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F
-                or code_cw == 0 or resume_nia != 0x7FFF):
+                or code_cw == 0
+                or (resume_nia != 0x7FFF and
+                    (not saved_namespace_only or resume_nia >= code_cw))):
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has non-executable CHURCH Enter identity")
         saved_sto = packed_resume & 0xFFF
         if ((packed_resume >> 12) & 1) != 1 or (
@@ -1094,7 +1098,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
         # denied home (the CALL gate reports that fault), but a different slot,
         # generation, or type is stale frame state.
         cr0_home = words[thread_loc + layout["caps_start"]]
-        if cr0_home:
+        if cr0_home and not saved_namespace_only:
             home_type = (cr0_home >> gt_type_lsb) & _field_mask(gt_fields["gt_type"])
             home_slot = (cr0_home >> gt_slot_lsb) & _field_mask(gt_fields["slot_id"])
             home_seq = (cr0_home >> gt_seq_lsb) & _field_mask(gt_fields["gt_seq"])
@@ -1108,7 +1112,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
         # restores it with CHANGE CR12 and CALL consumes it.  Derive the offset
         # from the Thread header rather than assuming the historical 256-word
         # layout (where this happened to be +244).
-        if thread_slot == 1:
+        if thread_slot == 1 and not saved_namespace_only:
             cr0_index = thread_loc + layout["caps_start"]
             cr0_home = words[cr0_index]
             expected_cr0 = create_gt(

@@ -16,3 +16,14 @@ transferable artifact and bypasses destination policy.
 derive candidates from verified bytes plus live Namespace records, bind on a
 private copy, and commit only after every relocation succeeds. Catalog/API
 projections must preserve explicit grants, type, and authorization fail-closed.
+
+LUMPs without a PetName must be recompiled by the programmer.
+
+**Why:** The user explicitly requires programmer-owned recompilation, rather
+than automatic migration of artifacts that lack a PetName.
+
+**How to apply:** Do not invent a PetName from a filename, catalog entry, or
+old slot, patch the original, or automatically recompile it. Preserve the
+original for inspection and report that programmer recompilation is required
+before assignment/reloading. Destination-local binding is not a substitute
+for this requirement.

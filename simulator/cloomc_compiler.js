@@ -524,15 +524,8 @@ class CLOOMCCompiler {
         // normalization collisions without entering the shared registry.
         this._applyCallApiConventions(options);
         const errors = [];
-        // Auto-wrap code that has no abstraction/method declaration
-        if (!/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/m.test(source)) {
-            const hasMethod = /^\s*(?:public\s+|private\s+)?method\s+\w+/m.test(source);
-            const nameMatch = source.match(/^\s*(?:public\s+|private\s+)?method\s+(\w+)/m);
-            const autoName = nameMatch ? nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1) + 'Abstraction' : 'MyAbstraction';
-            source = hasMethod
-                ? `abstraction ${autoName} {\n${source}\n}`
-                : `abstraction ${autoName} {\n    method run() {\n${source}\n    }\n}`;
-        }
+        // The programmer supplies the abstraction identity. Never wrap unnamed
+        // source in a generated RunAbstraction/MyAbstraction declaration.
         const parsed = this._parseAbstraction(source, errors);
         if (errors.length > 0) {
             return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
@@ -1280,10 +1273,16 @@ class CLOOMCCompiler {
     }
 
     compileAssembly(source, capabilities, options) {
+        const declaration = source.match(/^\s*;\s*(?:Abstraction:|@abstraction)\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*$/im);
+        if (!declaration) return {
+            abstractionName: '', language: 'assembly', methods: [], capabilities: [],
+            errors: [{line: 0, message: 'No abstraction declaration found. Add: ; @abstraction YourName and recompile.'}],
+            warnings: [],
+        };
         const asm = (typeof ChurchAssembler !== 'undefined') ? new ChurchAssembler() : null;
         if (!asm) {
             return {
-                abstractionName: 'Assembly',
+                abstractionName: declaration[1],
                 language: 'assembly',
                 methods: [],
                 capabilities: [],
@@ -1364,7 +1363,7 @@ class CLOOMCCompiler {
                     : { line: (e && e.line) || 0, message: String((e && e.message) || e) }
             );
             return {
-                abstractionName: 'Assembly',
+                abstractionName: declaration[1],
                 language: 'assembly',
                 methods: [],
                 capabilities: [],
@@ -1374,30 +1373,7 @@ class CLOOMCCompiler {
             };
         }
 
-        // Extract abstraction name: try specific "Name NS[..." header first,
-        // then any first meaningful ; comment line, then first label, then default.
-        let absName = 'Assembly';
-        const abstractionHeader = source.match(/^\s*;\s*Abstraction:\s*([^\r\n]+?)\s*$/im);
-        const headerMatch = source.match(/^;\s*(?:Disassembly\s+of\s+\S+\s+)?([^\n@]+?)\s+(?:NS\[|\@\s*0x)/m);
-        if (abstractionHeader) {
-            absName = abstractionHeader[1].trim();
-        } else if (headerMatch) {
-            absName = headerMatch[1].trim();
-        } else {
-            // First meaningful ; comment line — skip separator-only lines (===, ---, ***, etc.)
-            // and lines whose content is entirely non-alphanumeric punctuation/whitespace.
-            const commentLines = [];
-            const commentRe = /^;\s*(.+?)\s*$/mg;
-            let cm;
-            while ((cm = commentRe.exec(source)) !== null) { commentLines.push(cm[1]); }
-            const meaningfulComment = commentLines.find(c => /[A-Za-z0-9]/.test(c));
-            if (meaningfulComment) {
-                absName = meaningfulComment.slice(0, 64).trim();
-            } else {
-                const firstLabel = Object.keys(result.labels || {})[0];
-                if (firstLabel) absName = firstLabel;
-            }
-        }
+        const absName = declaration[1];
 
         const caps = result.capabilities || [];
         const words = Array.from(result.words || []);
@@ -1664,18 +1640,6 @@ class CLOOMCCompiler {
     }
 
     _parseAbstraction(source, errors) {
-        // Auto-wrap code that has no abstraction declaration
-        if (!/^\s*abstraction\s+[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*/m.test(source)) {
-            const hasMethod = /^\s*method\s+\w+/m.test(source);
-            const nameMatch = source.match(/^\s*method\s+(\w+)/m);
-            const autoName = nameMatch ? nameMatch[1].charAt(0).toUpperCase() + nameMatch[1].slice(1) + 'Abstraction' : 'MyAbstraction';
-            if (hasMethod) {
-                source = `abstraction ${autoName} {\n${source}\n}`;
-            } else {
-                // No method keyword either — wrap statements in method run()
-                source = `abstraction ${autoName} {\n    method run() {\n${source}\n    }\n}`;
-            }
-        }
         const result = { name: '', capabilities: [], methods: [] };
         const lines = source.split('\n');
         let i = 0;
@@ -3964,22 +3928,7 @@ class CLOOMCCompiler {
         }
 
         if (!hasAbstraction) {
-            result.name = 'Symbolic';
-            const stmts = [];
-            for (let j = 0; j < lines.length; j++) {
-                const line = lines[j].trim();
-                if (!line || line.startsWith('--') || line.startsWith('//') || line.startsWith(';')) continue;
-                stmts.push({ line: j + 1, text: line, rawLine: lines[j] });
-            }
-            if (stmts.length > 0) {
-                const hasKeyword = stmts.some(s => /^(let|method|public|private)\s/.test(s.text));
-                const isPureEquation = !hasKeyword && stmts.every(s => /^\w+\s*=/.test(s.text));
-                if (isPureEquation) {
-                    errors.push({ line: stmts[0].line, message: 'Symbolic programs need an abstraction { } block. For example:\n  abstraction MyName {\n    let add x y = x + y\n  }' });
-                } else {
-                    result.methods.push({ name: 'compute', params: [], body: stmts });
-                }
-            }
+            errors.push({line: 0, message: 'No abstraction declaration found. Use: abstraction YourName { ... } and recompile.'});
         }
 
         return result;
@@ -4749,11 +4698,7 @@ class CLOOMCCompiler {
         }
 
         if (!result.name) {
-            if (result.methods.length > 0) {
-                result.name = result.methods[0].name || 'English';
-            } else {
-                errors.push({ line: 0, message: 'No abstraction name found. Try: "Create an abstraction called MyName"' });
-            }
+            errors.push({ line: 0, message: 'No abstraction declaration found. Use: "Create an abstraction called YourName" and recompile.' });
         }
 
         if (result.methods.length === 0) {

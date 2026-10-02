@@ -48,22 +48,31 @@ def select_bootstrap_residents(lumps):
     and its CapabilityTest binding may point to an archived publication.
     Neither is part of this bootstrap-only fixture.
     """
+    assert lumps.resolve() != (Path(__file__).resolve().parents[2] / "server/lumps").resolve(), \
+        "Bootstrap fixture selection must never change the live library"
     state_path = lumps / "ns-state.json"
     state = json.loads(state_path.read_text())
     manifest = json.loads((lumps / "manifest.json").read_text())
     approvals = json.loads((lumps / "approvals.json").read_text())["approvals"]
+    draft_names = {"ide.Alice", "ide.Mallory"}
     drafts = [row for row in state["abstractions"]
-              if row.get("slot") in (14, 15)]
-    assert {(row["slot"], row["name"]) for row in drafts} == {
-        (14, "ide.Alice"), (15, "ide.Mallory"),
-    }
+              if row.get("name") in draft_names]
     assert all(row.get("boot_resident") is not True for row in drafts)
     # These are unrelated IDE designs, not approved legacy bootstrap bodies.
     # Keep their immutable files/history but omit their Namespace placements
     # from this bootstrap-only copy so the strict image validator sees none.
     state["abstractions"] = [row for row in state["abstractions"]
-                             if row.get("slot") not in (14, 15)]
+                             if row.get("name") not in draft_names]
     for row in state["abstractions"]:
+        # This historical fixture constructs its foundational objects from
+        # architecture geometry, not from selected executable library LUMPs.
+        # An Inform+Resident row incorrectly asks the artifact loader to find a
+        # filename. Make the generated object's type explicit in the copy.
+        if row.get("slot") == 0 and row.get("name") == "Boot.NS":
+            row["type"] = "Namespace"
+        if (row.get("slot"), row.get("name")) in {
+                (1, "Boot.Thread"), (11, "Thread.2"), (12, "Thread.3")}:
+            row.update(type="Thread", allocationWords=256, stackWords=32)
         if row.get("name") in {"Tunnel", "Ethernet"}:
             for field in ("token", "filename", "binary_hash"):
                 row.pop(field, None)

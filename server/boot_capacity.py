@@ -150,6 +150,7 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
     report["namespaceFingerprint"] = boot_image.namespace_fingerprint(rows)
     report["namespaceWarnings"] = _namespace_problems(rows, lumps_dir, config)
     report["imageMatchesNamespaceRevision"] = False
+    generic = False
     if image_bytes is not None:
         try:
             with open(os.path.join(lumps_dir, "boot-image.provenance.json"), encoding="utf-8") as source:
@@ -158,13 +159,26 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
                 isinstance(provenance, dict) and
                 provenance.get("namespace_fingerprint") == report["namespaceFingerprint"] and
                 provenance.get("image_sha256") == hashlib.sha256(image_bytes).hexdigest())
+            generic = (report["imageMatchesNamespaceRevision"] and
+                       provenance.get("profile") == "clean-saved-namespace-v1" and
+                       provenance.get("purpose") == "generic-simulator-image")
         except (OSError, ValueError, TypeError):
             pass
         if not report["imageMatchesNamespaceRevision"]:
             warnings.append("Stored image is not proven to implement this approved Namespace revision; image ranges are diagnostic evidence only.")
     try:
-        boot_image.validate_resident_boot_profile(rows)
+        if not generic:
+            boot_image.validate_resident_boot_profile(rows)
         boot_image.namespace_boot_marker_slot(rows)
+        if generic:
+            from server.namespace_image_refresh import reconstruct
+            rebuilt, _ = reconstruct(config, rows, lumps_dir)
+            if rebuilt != image_bytes:
+                raise ValueError("Stored generic image differs from exact saved reconstruction")
+            # The saved-only walk has validated all authorized ranges. Legacy
+            # allocation diagnostics infer Threads from names/slots; those
+            # conventions are not authority for this profile.
+            report["namespaceWarnings"] = []
     except (ValueError, TypeError) as error:
         report["namespaceWarnings"].append(str(error))
     words = None
@@ -178,9 +192,10 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
                 raise ValueError("Boot image length is not word aligned")
             # Forensic reporting needs intact descriptors and known saved
             # allocations even when the composite placement is invalid.
-            boot_image.validate_boot_image(image_bytes, check_layout=False)
+            validation_options = {"saved_namespace_only": True} if generic else {}
+            boot_image.validate_boot_image(image_bytes, check_layout=False, **validation_options)
             try:
-                boot_image.validate_boot_image(image_bytes)
+                boot_image.validate_boot_image(image_bytes, **validation_options)
             except ValueError as layout_error:
                 warnings.append("Committed image layout invalid: " + str(layout_error))
             header = boot_image.read_namespace_header_info(image_bytes)
@@ -291,6 +306,8 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
             continue
         generated = (slot == 1 or row.get("type") == "Thread" or
                      (not row.get("filename") and str(row.get("name", "")).startswith("Thread.")))
+        if generic:
+            generated = row.get("type") == "Thread"
         if not generated and not boot_image.image_artifact_selected(row):
             item.update(entryKind="unselected", status="Not selected for the image — no installed LUMP claimed")
             if words is not None and slot < (total - table_start) // 4:
@@ -314,14 +331,14 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
         base = total - (slot + 1) * 4
         location = words[base]
         try:
-            selected_location = int(row.get("location"), 0)
+            selected_location = int(str(row.get("location")), 0)
         except (ValueError, TypeError):
             selected_location = None
         if selected_location != location:
             fail("Committed Namespace location differs from installed image descriptor")
             continue
         try:
-            selected_limit = int(row.get("limit"), 0)
+            selected_limit = int(str(row.get("limit")), 0)
         except (ValueError, TypeError):
             selected_limit = None
         if selected_limit != boot_image._ns_word1_get(

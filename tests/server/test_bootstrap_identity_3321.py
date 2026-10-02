@@ -192,6 +192,14 @@ def test_every_frozen_resident_manifest_approval_row0_and_boot_w3_share_t():
         },
     }, str(lumps))
     words = __import__("struct").unpack(f"<{len(image) // 4}I", image)
+    # The foundational Thread is constructed from the fixture's declared
+    # geometry, not selected by an invented artifact filename.
+    thread = next(row for row in state["abstractions"] if row["slot"] == 1)
+    assert thread["type"] == "Thread"
+    thread_location = words[len(words) - 2 * 4]
+    thread_header = words[thread_location]
+    assert (thread_header >> 8) & 3 == 2
+    assert 1 << (((thread_header >> 23) & 15) + 6) == thread["allocationWords"]
     approvals = read_approvals(str(lumps / "approvals.json"))
     expected = {"SelfTest": 0x4A000006, "WukongCallHome": 0x4A000007,
                 "CapabilityTest": 0x4A00000A}
@@ -405,8 +413,8 @@ def test_active_bootstrap_history_groups_all_legacy_manifest_records_read_only(
     assert all(row["read_only"] is True for row in historical)
 
 
-def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
-    """A content token must not turn a programmer-owned slot into a protected slot."""
+def test_save_plan_rejects_slot7_replacement_with_content_token_hint():
+    """A content token is not Namespace deployment authority."""
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000007
     capabilities = [{
@@ -425,12 +433,13 @@ def test_programmer_can_plan_slot7_replacement_with_content_token_hint():
                 "grants": ["E"],
         })
 
-    assert response.status_code == 201, response.get_data(as_text=True)
-    assert response.get_json()["consequence"] in {"create", "replace"}
+    assert response.status_code == 422, response.get_data(as_text=True)
+    assert response.json["artifact_only_required"] is True
+    assert response.json["committed"] is False
 
 
-def test_programmer_can_replace_frozen_slot2_with_compiler_owned_lump():
-    """The selected slot binds SELF; the old resident name does not own it."""
+def test_save_plan_rejects_slot2_replacement_even_with_compiler_owned_self():
+    """Compiler-owned SELF does not authorize deployment through Save LUMP."""
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0xFEED5E1F
     with app_module.app.test_client() as client:
@@ -447,18 +456,13 @@ def test_programmer_can_replace_frozen_slot2_with_compiler_owned_lump():
                 "grants": ["E"],
         })
 
-    assert response.status_code == 201, response.get_data(as_text=True)
-    result = response.get_json()
-    assert result["consequence"] in {"create", "replace"}
-    canonical_words = list(words)
-    canonical_words[-1] = 0x4A000002
-    canonical_bytes = __import__("struct").pack(">64I", *canonical_words)
-    assert result["digest"] == __import__("hashlib").sha256(
-        canonical_bytes).hexdigest()
+    assert response.status_code == 422, response.get_data(as_text=True)
+    assert response.json["artifact_only_required"] is True
+    assert response.json["committed"] is False
 
 
-def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
-    """A serialized browser GT cannot override a compiler-owned SELF row."""
+def test_save_plan_never_rebinds_stale_browser_self_to_a_selected_slot():
+    """Obsolete clients must use explicit Namespace adoption, not silent repair."""
     words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
     words[-1] = 0x4A000006
     with app_module.app.test_client() as client:
@@ -473,12 +477,9 @@ def test_stale_browser_self_is_rebound_to_programmer_selected_slot():
                 "grants": ["E"],
         })
 
-    assert response.status_code == 201, response.get_data(as_text=True)
-    canonical_words = list(words)
-    canonical_words[-1] = 0x4A000002
-    canonical_bytes = __import__("struct").pack(">64I", *canonical_words)
-    assert response.get_json()["digest"] == __import__("hashlib").sha256(
-        canonical_bytes).hexdigest()
+    assert response.status_code == 422, response.get_data(as_text=True)
+    assert response.json["artifact_only_required"] is True
+    assert response.json["committed"] is False
 
 
 @pytest.mark.parametrize("mutation", ["slot", "seq", "token"])
@@ -566,144 +567,101 @@ def isolated_bootstrap_repository(tmp_path, monkeypatch):
     return lumps
 
 
-def _bootstrap_save_payload(
-        client, *, sequence=0, enforce=True, candidate_token="4a00000a"):
-    words = [(0x1F << 27) | (1 << 10) | 1, 0] + [0] * 62
-    words[-1] = 0x4A000006  # stale browser SELF from the former slot 6
+def _artifact_save_payload(client):
+    """Compile/finalize an artifact without borrowing a resident's authority."""
+    source = "; @abstraction BootstrapPublicationFixture\nIADD DR1, DR0, #42\nRETURN\n"
+    response = client.post("/api/compile", json={
+        "source": source, "language": "assembly"})
+    assert response.status_code == 200 and response.json["ok"], response.json
+    compiled = response.json
     metadata = {
-        "abstraction": "CapabilityTest",
-        "ns_slot": 10,
-        "namespace_sequence": sequence,
-        "token": candidate_token,
-        "content_type": "code",
-        "capabilities": [{
-            "name": "__SELF__", "rights": ["E"], "compiler_owned_self": True,
-        }],
-        "grants": ["E"],
+        "abstraction": "BootstrapPublicationFixture",
+        "dot_name": "BootstrapPublicationFixture", "issue_n": 1,
+        "source": source, "language": "assembly",
+        "trust_origin": compiled["trust_origin"],
+        "compiler_identity": compiled["compiler_identity"],
+        "compiler_version": compiled["compiler_version"],
+        "compiler_record": compiled["compiler_record"],
     }
-    if enforce:
-        metadata["enforce_bootstrap_identity"] = True
-    plan_response = _save_plan(client, words, metadata)
-    assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
-    plan = plan_response.get_json()
-    canonical = list(words)
-    canonical[-1] = 0x4A00000A
-    assert plan["digest"] == __import__("hashlib").sha256(
-        struct.pack(">64I", *canonical)).hexdigest()
-    intent_response = client.post("/api/lumps/approval-intent", json={
-        "digest": plan["digest"], "action": plan["action"],
-        "plan_id": plan["plan_id"], "confirmation": True,
-        "approval": {"grants": ["E"], "capability_type": "inform"},
+    response = client.post("/api/lumps/finalize", json={
+        "binary": compiled["words"], "metadata": metadata,
     })
-    assert intent_response.status_code == 201
+    assert response.status_code == 201, response.json
+    finalized = response.json
     metadata.update({
-        "save_plan_id": plan["plan_id"],
-        "approval_intent": intent_response.get_json()["intent"],
+        "compiler_record": finalized["compiler_record"],
+        "save_plan": finalized["plan"],
     })
-    # The save plan canonicalizes compiler-owned SELF. Commit the exact
-    # finalized binary rather than the stale browser buffer.
-    return {"binary": plan["final_binary"], "metadata": metadata}
+    return {"binary": finalized["final_binary"], "metadata": metadata}
 
 
-def test_final_bootstrap_gate_rejects_before_any_repository_mutation(
-        isolated_bootstrap_repository, monkeypatch):
-    original = app_module._validate_bootstrap_candidate
-    calls = {"count": 0}
-
-    def injected_failure(*args, **kwargs):
-        calls["count"] += 1
-        if calls["count"] == 3:
-            raise ValueError("injected final validation failure")
-        return original(*args, **kwargs)
-
+def test_final_artifact_gate_rejects_tampering_without_repository_mutation(
+        isolated_bootstrap_repository):
     with app_module.app.test_client() as client:
-        payload = _bootstrap_save_payload(client)
+        payload = _artifact_save_payload(client)
+        payload["binary"][1] ^= 1
         before = _repository_snapshot(isolated_bootstrap_repository)
-        monkeypatch.setattr(
-            app_module, "_validate_bootstrap_candidate", injected_failure)
         response = reviewed_post(client, "/api/lumps/save", payload)
 
-    assert response.status_code == 422
-    assert "IDE refused" in response.get_json()["error"]
-    assert "before changing any data" in response.get_json()["error"]
+    assert response.status_code == 409, response.json
+    assert response.json["plan_binary_mismatch"] is True
+    assert response.json["committed"] is False
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
-def test_valid_slot2_bootstrap_save_commits_exact_sealed_self(
+def test_valid_artifact_save_preserves_exact_bytes_and_namespace(
         isolated_bootstrap_repository):
+    namespace = (isolated_bootstrap_repository / "ns-state.json").read_bytes()
     with app_module.app.test_client() as client:
-        payload = _bootstrap_save_payload(client)
+        payload = _artifact_save_payload(client)
         response = reviewed_post(client, "/api/lumps/save", payload)
     assert response.status_code == 200, response.get_data(as_text=True)
     saved = (
-        isolated_bootstrap_repository / response.get_json()["lump"]
+        isolated_bootstrap_repository / response.get_json()["filename"]
     ).read_bytes()
-    header = int.from_bytes(saved[:4], "big")
-    allocation = 1 << (((header >> 23) & 0xF) + 6)
-    cc = header & 0xFF
-    row0 = int.from_bytes(
-        saved[(allocation - cc) * 4:(allocation - cc + 1) * 4], "big")
+    assert saved == struct.pack(f">{len(payload['binary'])}I", *payload["binary"])
     digest = __import__("hashlib").sha256(saved).hexdigest()
     approvals = read_approvals(
         str(isolated_bootstrap_repository / "approvals.json"))
-    assert row0 == 0x4A00000A
-    assert response.get_json()["token"] == "4a00000a"
     assert approvals[digest]["binary_hash"] == digest
-    assert approvals[digest]["bootstrap_runtime_gt"] == row0
-    assert approvals[digest]["bootstrap_t"] == "4a00000a"
+    assert "bootstrap_t" not in approvals[digest]
+    assert (isolated_bootstrap_repository / "ns-state.json").read_bytes() == namespace
 
 
-def test_resident_replacement_derives_approval_and_keeps_namespace_save_usable(
+def test_published_artifact_requires_separate_reviewed_namespace_adoption(
         isolated_bootstrap_repository):
-    state = json.loads(
-        (isolated_bootstrap_repository / "ns-state.json").read_text())
-    resident = next(
-        row for row in state["abstractions"]
-        if row.get("name") == "CapabilityTest" and row.get("slot") == 10)
-    manifest_path = isolated_bootstrap_repository / "manifest.json"
-    manifest = json.loads(manifest_path.read_text())
-    selected = next(
-        row for row in manifest
-        if row.get("filename") == resident["filename"]
-        and row.get("archived") is not True)
-    selected["token"] = resident["token"]
-    for row in manifest:
-        if (row is not selected and row.get("archived") is True
-                and row.get("token") == resident["token"]):
-            row["token"] = hashlib.sha256(
-                row["filename"].encode("utf-8")).hexdigest()[:8]
-    manifest_path.write_text(json.dumps(manifest))
-
+    state_path = isolated_bootstrap_repository / "ns-state.json"
+    original = state_path.read_bytes()
     with app_module.app.test_client() as client:
-        payload = _bootstrap_save_payload(
-            client, enforce=False, candidate_token="4c35bef2")
+        payload = _artifact_save_payload(client)
         response = reviewed_post(client, "/api/lumps/save", payload)
-        reopened = client.get(
-            f"/api/lump/{response.get_json()['token']}/words")
-
-    assert response.status_code == 200, response.get_data(as_text=True)
-    # The browser's content-derived token is provisional. The response must
-    # report the exact active manifest/Namespace token so Open and Audit work
-    # immediately without exposing localization internals to the programmer.
-    assert response.get_json()["token"] == resident["token"]
-    assert reopened.status_code == 200, reopened.get_data(as_text=True)
-    saved = (
-        isolated_bootstrap_repository / response.get_json()["lump"]
-    ).read_bytes()
-    digest = hashlib.sha256(saved).hexdigest()
-    approvals = read_approvals(
-        str(isolated_bootstrap_repository / "approvals.json"))
-    assert approvals[digest]["bootstrap_t"] == "4a00000a"
-    assert approvals[digest]["bootstrap_runtime_gt"] == 0x4A00000A
-
-    image = generate_boot_image({
-        "step1": {
-            "totalNamespaceWords": 16384,
-            "namespaceLumpWords": 1024,
-            "threadLumpWords": 256,
-        },
-    }, str(isolated_bootstrap_repository))
-    assert image
+        assert response.status_code == 200, response.json
+        assert state_path.read_bytes() == original
+        saved = response.json
+        rows = json.loads(original)["abstractions"]
+        slot = next(n for n in range(14, 64)
+                    if n not in {row["slot"] for row in rows})
+        proposed = rows + [dict(
+            slot=slot, name="BootstrapPublicationFixture",
+            filename=saved["filename"], token=saved["token"],
+            binary_hash=hashlib.sha256(
+                (isolated_bootstrap_repository / saved["filename"]).read_bytes()).hexdigest(),
+            seq=0, location="0x00002000", limit="0x0003F", f=0, g=0,
+            type="Inform", resident=False, load_policy="Lazy")]
+        adoption = dict(namespaceFingerprint=app_module._namespace_state_fingerprint(rows),
+                        ns_state={"abstractions": proposed})
+        before = _repository_snapshot(isolated_bootstrap_repository)
+        review = client.post("/api/namespace/save-table", json=adoption)
+        assert review.status_code == 428, review.json
+        assert _repository_snapshot(isolated_bootstrap_repository) == before
+        committed = client.post("/api/namespace/save-table", json=adoption, headers={
+            "X-Change-Confirmation": review.json["change_confirmation"]["id"]})
+        assert committed.status_code == 200, committed.json
+        assert committed.json["imageRebuilt"] is False
+        assert json.loads(state_path.read_text())["abstractions"] == proposed
+        after = _repository_snapshot(isolated_bootstrap_repository)
+        assert {k: v for k, v in before.items() if k != "ns-state.json"} == {
+            k: v for k, v in after.items() if k != "ns-state.json"}
 
 
 def test_only_fixed_nonportable_publications_receive_bootstrap_authority():
@@ -728,7 +686,8 @@ def test_bootstrap_sequence_mismatch_is_rejected_without_mutation(
                 "grants": ["E"],
         })
     assert response.status_code == 422
-    assert "IDE refused" in response.get_json()["error"]
+    assert response.json["artifact_only_required"] is True
+    assert response.json["committed"] is False
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
@@ -746,42 +705,49 @@ def test_bootstrap_token_mismatch_is_rejected_without_mutation(
                 "grants": ["E"],
         })
     assert response.status_code == 422
-    assert "canonical token differs" in response.get_json()["error"]
+    assert response.json["artifact_only_required"] is True
+    assert response.json["committed"] is False
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
-def test_bootstrap_namespace_bind_failure_never_enters_commit(
+def test_namespace_adoption_validation_failure_never_enters_commit(
         isolated_bootstrap_repository, monkeypatch):
+    rows = json.loads((isolated_bootstrap_repository / "ns-state.json").read_text())["abstractions"]
+    payload = dict(namespaceFingerprint=app_module._namespace_state_fingerprint(rows),
+                   ns_state={"abstractions": rows})
     with app_module.app.test_client() as client:
-        payload = _bootstrap_save_payload(client)
         before = _repository_snapshot(isolated_bootstrap_repository)
         commit_called = {"value": False}
 
         def fail_prepare(*_args, **_kwargs):
-            raise ValueError("injected Namespace bind validation failure")
+            raise ValueError("injected Namespace allocation validation failure")
 
         def observe_commit(*_args, **_kwargs):
             commit_called["value"] = True
             raise AssertionError("commit must not run")
 
         monkeypatch.setattr(
-            app_module, "_prepare_saved_lump_ns_state", fail_prepare)
+            app_module, "_check_namespace_allocation", fail_prepare)
         monkeypatch.setattr(
-            app_module, "_commit_lump_history_transition", observe_commit)
-        response = reviewed_post(client, "/api/lumps/save", payload)
+            app_module, "_atomic_write_json", observe_commit)
+        response = client.post("/api/namespace/save-table", json=payload)
 
-    assert response.status_code == 422
-    assert "Namespace binding is invalid" in response.get_json()["error"]
+    assert response.status_code == 409, response.json
+    assert response.json["error"] == "change_preflight_failed"
+    assert "injected Namespace allocation" in response.json["message"]
     assert commit_called["value"] is False
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
-def test_namespace_change_before_final_lock_preserves_repository_and_authorization(
+def test_namespace_change_after_adoption_review_requires_fresh_review(
         isolated_bootstrap_repository):
     with app_module.app.test_client() as client:
-        payload = _bootstrap_save_payload(client)
         state_path = isolated_bootstrap_repository / "ns-state.json"
         state = json.loads(state_path.read_text())
+        payload = dict(namespaceFingerprint=app_module._namespace_state_fingerprint(
+            state["abstractions"]), ns_state={"abstractions": state["abstractions"]})
+        review = client.post("/api/namespace/save-table", json=payload)
+        assert review.status_code == 428, review.json
         row = next(item for item in state["abstractions"]
                    if item.get("name") == "CapabilityTest"
                    and item.get("slot") == 10)
@@ -789,20 +755,14 @@ def test_namespace_change_before_final_lock_preserves_repository_and_authorizati
         row["token"] = "4a01000a"
         state_path.write_text(json.dumps(state))
         before = _repository_snapshot(isolated_bootstrap_repository)
-        plan_id = payload["metadata"]["save_plan_id"]
-        intent_id = payload["metadata"]["approval_intent"]
+        response = client.post("/api/namespace/save-table", json=payload, headers={
+            "X-Change-Confirmation": review.json["change_confirmation"]["id"]})
 
-        response = reviewed_post(client, "/api/lumps/save", payload)
-
-        assert plan_id in app_module._LUMP_SAVE_PLANS
-        assert intent_id in app_module._LUMP_APPROVAL_INTENTS
-
-    assert response.status_code == 409
-    assert "Namespace changed since review" in response.get_json()["error"]
+    assert response.status_code == 409, response.json
     assert _repository_snapshot(isolated_bootstrap_repository) == before
 
 
-def test_selftest_source_identity_change_between_reads_is_rejected(
+def test_selftest_save_rejects_deployment_before_namespace_rebinding(
         isolated_bootstrap_repository, monkeypatch):
     state_path = isolated_bootstrap_repository / "ns-state.json"
     state = json.loads(state_path.read_text())
@@ -843,35 +803,9 @@ def test_selftest_source_identity_change_between_reads_is_rejected(
         before = _repository_snapshot(isolated_bootstrap_repository)
         response = _save_plan(client, words, metadata)
 
-    assert response.status_code == 409, response.get_data(as_text=True)
-    assert "SelfTest Namespace slot changed" in response.get_json()["error"]
-    assert response.get_json()["failure_owner"] == "ide"
+    assert response.status_code == 422, response.get_data(as_text=True)
+    assert response.json["artifact_only_required"] is True
     assert response.get_json()["committed"] is False
-    assert response.get_json()["safe_retry"] is True
-    # Internal recovery repeats canonical planning and approval against the
-    # Namespace state committed by the competing writer. The programmer's
-    # source/settings are unchanged and no second confirmation is required.
-    with app_module.app.test_client() as client:
-        plan_response = _save_plan(client, words, metadata)
-        assert plan_response.status_code == 201, plan_response.get_data(as_text=True)
-        plan = plan_response.get_json()
-        intent_response = client.post("/api/lumps/approval-intent", json={
-            "digest": plan["digest"],
-            "action": plan["action"],
-            "plan_id": plan["plan_id"],
-            "confirmation": True,
-            "approval": {"grants": ["E"], "capability_type": "inform"},
-        })
-        assert intent_response.status_code == 201
-        recovered_metadata = dict(metadata)
-        recovered_metadata.update({
-            "save_plan_id": plan["plan_id"],
-            "approval_intent": intent_response.get_json()["intent"],
-        })
-        recovered = reviewed_post(client, "/api/lumps/save", {
-            "binary": words,
-            "metadata": recovered_metadata,
-        })
-    assert recovered.status_code == 200, recovered.get_data(as_text=True)
+    assert changed["done"] is False
     after = _repository_snapshot(isolated_bootstrap_repository)
-    assert after != before
+    assert after == before

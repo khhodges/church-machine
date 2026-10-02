@@ -64,8 +64,8 @@ assert.match(text, /\[0002\].*18000000.*WORD_18000000/i,
 assert(dom.window.document.querySelector('.editor-layout')
     .classList.contains('compiled-candidate-editor-layout'));
 assert.equal(dom.window.getComputedStyle(
-    dom.window.document.querySelector('.console-panel')).display, 'none',
-    'successful compile prioritizes disassembly, not the console');
+    dom.window.document.querySelector('.console-panel')).display, 'flex',
+    'successful compile retains diagnostics beneath the disassembly');
 assert.equal(dom.window.getComputedStyle(
     dom.window.document.querySelector('.editor-layout')).gridTemplateColumns,
     'minmax(0, 1fr) minmax(0, 1fr)', 'success has two equally usable panes');
@@ -99,9 +99,59 @@ assert.match(dom.window.document.getElementById('disassemblyPresentationStatus')
 const compileSource = fs.readFileSync(path.join(__dirname, 'app-compile.js'), 'utf8');
 assert(compileSource.includes('const _registeredCodeWords = lumpWordsArray.slice(1, 1 + cw)'),
     'published candidate uses authenticated server code region');
-assert(compileSource.includes('was inferred for this read-only candidate view'),
-    'inferred RunAbstraction identity is explicitly reported');
+assert(!compileSource.includes('was inferred for this read-only candidate view'),
+    'candidate reports no longer normalize inferred identities');
 assert(!compileSource.includes('_candidateExecutionWords.push(_method.visibility'),
     'browser does not rewrite authenticated dispatch words');
 
 console.log('CLOOMC candidate presentation tests passed');
+// Exercise the real server compiler: name edits change embedded binary data,
+// not necessarily code or numeric placeholders. Never use display metadata as
+// a replacement for names decoded from these exact bytes.
+const { spawnSync } = require('child_process');
+context.TextDecoder = TextDecoder;
+function compileNamedCandidate(name) {
+    const draft = `abstraction DeclaredCandidate {\ncapabilities {\n SELF E\n ${name} E\n}\nmethod Run {\n LOAD CR0, ${name}\n RETURN\n}\n}`;
+    const processResult = spawnSync(process.execPath,
+        [path.join(__dirname, '..', 'server', 'compile_worker.js')], {
+            input: JSON.stringify({source: draft, language: 'auto', tier: 2}),
+            encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+        });
+    assert.equal(processResult.status, 0, processResult.stderr);
+    const result = JSON.parse(processResult.stdout);
+    assert.equal(result.ok, true, result.error);
+    return result.words;
+}
+const firstNamed = compileNamedCandidate('FirstTarget');
+const secondNamed = compileNamedCandidate('SecondTarget');
+const codeEnd = 1 + ((firstNamed[0] >>> 10) & 8191);
+assert.deepEqual(firstNamed.slice(1, codeEnd), secondNamed.slice(1, codeEnd));
+assert.deepEqual(firstNamed.slice(-2), secondNamed.slice(-2));
+assert.notDeepEqual(firstNamed, secondNamed);
+context._showCompiledCandidateBesideSource(firstNamed,
+    {abstraction: 'RunAbstraction', methodCount: 1, inferredName: true});
+assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    /"name": "FirstTarget"/);
+context._showCompiledCandidateBesideSource(secondNamed,
+    {abstraction: 'RunAbstraction', methodCount: 1, inferredName: true});
+const namedText = dom.window.document.getElementById('savedLumpDisassembly').textContent;
+assert.match(namedText, /"name": "SecondTarget"/);
+assert.doesNotMatch(namedText, /FirstTarget/);
+assert.doesNotMatch(namedText, /label was inferred/);
+assert.match(namedText, /zero placeholders/);
+const malformed = secondNamed.slice();
+malformed[codeEnd] = 0xABFFFFFF;
+context._showCompiledCandidateBesideSource(malformed, {});
+assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    /Cannot decode embedded definition/);
+assert.equal(dom.window.document.getElementById('asmEditor').value,
+    'method Run() { return(1) }', 'inspection preserves the programmer draft');
+console.log('Embedded candidate name inspection tests passed');
+const beforeReport = JSON.stringify(secondNamed);
+context._showCompiledCandidateBesideSource(secondNamed, {
+    referenceReport: 'Reference verification:\n  Row 1 <img src=x>: SYMBOLIC — valid declared PetName; its target need not exist yet.',
+});
+assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    /Row 1 <img src=x>: SYMBOLIC/);
+assert.equal(dom.window.document.getElementById('savedLumpDisassembly').querySelector('img'), null);
+assert.equal(JSON.stringify(secondNamed), beforeReport, 'report rendering never changes words');

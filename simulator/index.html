@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Church Machine IDE — Capability-Based Secure Computing</title>
     <script src="/simulator/browser_diagnostics.js?v=sha256-269c2a52ac49"></script>
-    <script src="/simulator/change-confirmation.js?v=sha256-b81d48671c5e"></script>
+    <script src="/simulator/change-confirmation.js?v=sha256-413968bf0b72"></script>
     <meta name="description" content="Church Machine IDE: browser-based FPGA simulator, assembler, and CLOOMC compiler with capability-based secure computing. Supports English, JavaScript, Haskell, and Lambda Calculus front-ends.">
     <meta name="robots" content="index, follow">
     <link rel="canonical" href="https://lab.cloomc.org/simulator/">
@@ -1172,7 +1172,11 @@
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <strong>Boot capacity — committed image</strong>
                     <button type="button" class="btn btn-sm" id="bootCapacityRefresh" onclick="refreshBootCapacity()">Refresh capacity</button>
+                    <button type="button" class="btn btn-sm" id="namespaceImageRefresh" onclick="refreshNamespaceImage()">Refresh Image</button>
+                    <button type="button" class="btn btn-sm" id="namespaceImageStatus" onclick="checkNamespaceImageRefresh()" hidden>Check commit status</button>
                 </div>
+                <p>Refresh Image rebuilds the stored generic image from saved assignments and exact selected LUMPs. It preserves those inputs and does not activate the simulator or upload/flash hardware.</p>
+                <pre id="namespaceImageRefreshResult" role="status" aria-live="polite" style="white-space:pre-wrap;max-height:320px;overflow:auto;"></pre>
                 <div id="bootCapacityReport" role="status" aria-live="polite" style="margin-top:8px;">Refresh to inspect the committed image. This report never installs a LUMP.</div>
             </section>
             <div id="namespaceTable"></div>
@@ -3585,7 +3589,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="save_diagnostics.js?v=sha256-30ae2f8ff63e"></script>
     <link rel="stylesheet" href="namespace-inspector.css">
     <script src="namespace-inspector.js"></script>
-    <script src="app-memory.js?v=sha256-ccd28bca4c8a"></script>
+    <script src="app-memory.js?v=sha256-1e33c8bacc50"></script>
     <script src="lump_admission.js?v=sha256-15ac2cd84941"></script>
     <script src="app-abstractions.js?v=sha256-52dbfcb4e2ea"></script>
     <script src="app-ns-dna.js"></script>

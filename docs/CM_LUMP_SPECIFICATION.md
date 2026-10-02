@@ -20,6 +20,141 @@ compiles to exactly one lump.
 
 ---
 
+## Standalone Compiler Output Contract
+
+**Normative requirement, clarified 2026-10-02.** Compilation produces a complete,
+standalone LUMP, independent of the compiling machine's Namespace. This is a
+binary-and-metadata requirement, not a console-formatting convention.
+
+### Identity and capability references
+
+- The `capabilities` declarations supply the C-list **PetNames**, in local row
+  order, including SELF. They are distinct from the containing abstraction's
+  name, an IDE owner setting, and register aliases.
+- The emitted artifact must preserve the declared PetNames, immutable identity
+  references, and authored rights in its integrity-covered representation.
+  Required identity information must not exist only in a browser registry,
+  catalog, sidecar, or the compiling machine's Namespace.
+- A declared PetName may reference an idea whose target does not yet exist and
+  might never exist. Such symbolic references are valid; they do not require an
+  existing artifact, immutable target ID, or binary hash to compile or save.
+  Preserve supplied identity claims exactly and check them when present, but
+  never invent them for a symbolic declaration.
+- Operands index the LUMP's local C-list. For example, row `[1] SelfTest` does
+  not mean Namespace slot 6. SELF does not require a destination slot at compile
+  time.
+- Capabilities are never INVALID. Loss of an INFORM binding means a transition
+  to **OUTSFORM** (called *Outform* elsewhere in this document); the PetName and
+  ID remain immutable references. A slot-generation mismatch concerns the local
+  binding, not destruction or replacement of that identity.
+- A LUMP without a PetName must be recompiled **by the programmer**. The IDE must
+  not invent a name from a filename, catalog entry, old slot, or inferred wrapper,
+  nor automatically patch or recompile the artifact. Preserve it for inspection
+  and report the required programmer action.
+
+### Compilation, saving, and destination resolution
+
+Compilation and Save LUMP must not require referenced objects to be installed,
+assigned, or resident in any local Namespace. Necessary referenced API/type and
+identity evidence must be supplied independently of destination placement.
+Missing required evidence must be reported explicitly, not guessed from a slot.
+
+Compilation must not consult live Namespace assignments to mint destination GTs,
+choose slots, or decide whether an otherwise complete standalone LUMP may exist.
+Save LUMP persists the exact artifact; Export LUMP transfers it. Neither action
+assigns slots, resolves destination bindings, activates a simulator, or uploads
+hardware.
+
+Later, an explicitly selected destination resolves the same immutable references
+using the INFORM/OUTSFORM model. Clearing an assignment must preserve the LUMP
+and its references for later loading in another available, architecturally valid
+slot. Reusing the old slot must not redirect them to a different object.
+Destination-local materialization must not rewrite the original standalone LUMP.
+Threads follow the same artifact/assignment separation; names and historical
+slots do not establish Thread membership or placement.
+
+Standalone means the artifact is complete without a particular placement.
+References to other objects do not create a compile-time installation
+requirement. Ordinary runtime type, permission, bounds, and resolution checks
+still apply when operations execute; they do not justify incomplete compiler
+output or an additional hidden compiler-output approval gate. Unknown uploads
+remain subject to the separate admission rules.
+
+### Required pre-save reporting
+
+Report the exact unsaved candidate: emitted header and geometry, local C-list
+rows and PetNames, embedded identity evidence, and actual numeric words.
+Separate embedded API/source occupancy from verified unused words.
+Do not show `NS[null]`, infer destination assignments, or claim installation,
+hardware certification, or execution results from compilation.
+
+A zero numeric C-list word is not proof that its PetName was lost, nor proof of
+an OUTSFORM encoding or complete identity resolution. Inspect the full artifact,
+including embedded definitions. Structural checks and identity/reference
+claims must be reported separately. A valid symbolic reference without a
+concrete target identity is not an identity-completeness defect.
+
+### Implementation status and conformance checks
+
+This contract is the requirement, not a claim that all existing paths comply.
+The pre-save CLOOMC candidate path no longer materializes Namespace GTs or
+retains browser-derived bindings: it decodes capability metadata from the exact
+authenticated binary and validates without live Namespace access. Missing
+embedded C-list definitions fail without replacing the previous candidate.
+Focused handoff tests cover forbidden Namespace access, stale browser
+declarations, preserved identity fields and bytes, and malformed definitions.
+This is not yet an end-to-end claim for every frontend, save, or activation path.
+The shared API-definition builder rejects unnamed capability rows with a
+programmer-recompilation error. The worker now fails rather than returning a
+legacy binary if self-definition construction fails. A byte-roundtrip regression
+checks preservation of supplied PetNames and identity fields. Name-only
+references are valid symbolic declarations, not a remaining completeness gap.
+Supplied identity fields now undergo strict syntax, alias-consistency, and
+external-reference completeness checks in the shared definition builder.
+An external partial lock is rejected rather than silently dropping or filling
+fields. Name-only declarations remain valid symbolic references without claiming
+verification of an existing target. SELF is not required to embed its own whole-binary
+hash. Syntax checks alone do not establish authority. The compile endpoint now
+also reads the exact repository target selected by T and its pinned hash, checks its full
+binary hash, and verifies the issued name, token and identity hash through the
+existing canonical integrity verifier. References come from emitted definitions,
+not browser metadata. Verification runs before attestation, including on compiler
+cache hits, and does not use Namespace placement as evidence.
+
+Hash-indexed archived records are supported without restoring or rewriting them.
+Archive verification checks the actual bytes against their original hash-bound
+identity evidence, canonical content token, and exact original or standard `_vN`
+archive filename. The active successor cannot supply identity evidence for the
+archive. Duplicate/ambiguous matches fail rather than choosing a record.
+
+Symbolic references require no existing target verification. For explicitly
+pinned references, archives lacking an exact hash-indexed
+record, bootstrap runtime-GT identities, and unsupported trust evidence still
+fail explicitly. No newer revision or name-based alternative is substituted.
+Returned reference evidence is not a grant of destination permissions or proof
+of execution readiness.
+Some legacy binaries and candidate encodings also need identity-completeness
+verification; zero placeholders plus declaration names alone are not sufficient
+evidence of conformance.
+
+Required checks:
+
+1. With source, compiler version/options, and explicit dependency identity/API
+   inputs fixed, changing or emptying the local Namespace must not change the
+   standalone artifact or prevent compilation.
+2. All declared PetNames and immutable identity references survive compile,
+   save, export, and inspection in another Namespace, in the correct row order.
+3. Clear and reload in a different slot preserve those identities; a different
+   occupant of the previous slot cannot acquire their references.
+4. Missing PetNames require programmer recompilation, never automatic repair.
+5. Compile/save/export do not mutate Namespace assignments, running machines,
+   source, or existing immutable LUMPs.
+
+See [compile API](compile-api.md) and
+[trusted compiler and upload admission](TRUSTED_COMPILER_AND_UNTRUSTED_LUMP_ADMISSION.md).
+Older destination-layout examples below describe installed images, not permission
+to make standalone compilation depend on those layouts.
+
 ## Lump Size Rule
 
 Lump size is always a power of 2, minimum 64 words, maximum 32 768 words
@@ -114,9 +249,10 @@ are entirely unchanged. Only the parties that need the new version are given the
 callers holding the old GT continue calling the old version uninterrupted; they are unaware
 that a new version exists.
 
-A version is removed only by explicit withdrawal — a deliberate act that revokes the GT and
-frees the binary. Until withdrawal, all versions coexist independently and callers are
-unaffected by versions they do not hold a GT for.
+A version's live assignment is removed only by explicit withdrawal. References
+retain their immutable PetName and ID and become OUTSFORM when their INFORM
+binding is lost. Clearing an assignment does not delete its saved LUMP. Explicit
+artifact deletion is a separate operation.
 
 Category scope: the "new slot" clause applies to versions with a configuration-assigned
 slot (Resident / Lazy-load) — the new version's slot is a new assignment in the
@@ -657,31 +793,32 @@ authorities, never from a legacy sidecar.
 
 ### Bootstrap Boundary and Portable Activation
 
-Within the bootstrap, no token crosses a boundary: there is one machine and
-the resident base is frozen. The local identifier is the literal 32-bit
-runtime GT (`T === GT`, formatted `0x%08X`), not a hash or slot-derived value.
+Historical bootstrap profiles used a frozen resident base and treated a local
+runtime GT as their bootstrap identifier. That convention is not the standalone
+compiler identity contract and must not impose fixed slots on new compiler output.
 
-At the first dynamic rebind or cross-machine reach, the deferred portable
-token `hash(name || genotype_binary)` and its portability seals activate. That
-portable token is machine-independent; a local GT remains a local authority
-binding and must not be presented as portable identity.
+A standalone LUMP carries its immutable identity references from compilation.
+A destination-local GT is a binding, never a substitute for portable identity.
+Unavailable integrity/seal mechanisms must be reported as such, not silently
+deferred while claiming the artifact satisfies every standalone requirement.
 
 **Cross-region sharing is logical, not physical.** The exchange protocol is:
 
 ```
-Export:  pet name  +  source (extracted from lump freespace, Tier 1 or Tier 2)
-Import:  verify portable token and seals  →  bind a local GT  →  index in local manifest
+Export:  exact standalone LUMP with its PetNames and immutable identity references
+Import:  verify/admit the artifact under the applicable trust rules
+Assign:  explicit destination selection → destination-local resolution
 ```
 
-Pet names are hardware-neutral, owner-neutral, and human-meaningful. They name the idea;
-the deferred portable token identifies the portable content, while each
-machine mints its own local GT binding.
+PetNames and IDs remain immutable across placement changes. Importing or moving
+an artifact must not substitute destination-local identity for those references.
 
 > **Transition note — source extraction status.** The freespace layout for embedded
 > source is now specified (Freespace Content and Self-Definition, Tier 1/2). For legacy
 > binaries (all-zero freespace) require separately supplied source before recompilation.
-> Legacy sidecars are audit evidence only, never a source fallback. The exchange model itself (pet name +
-> source out, local compile + local token in) is unchanged by this transition.
+> Legacy sidecars are audit evidence only, never a source fallback. A legacy LUMP
+> missing a PetName requires programmer recompilation. A conforming standalone
+> LUMP does not require recompilation merely because the destination changes.
 
 ---
 
@@ -710,11 +847,11 @@ authority.
      binary — except NS slot assignment, which is deployment configuration and must be
      supplied by the recipient's own configuration, never read from the binary (see
      Manifest Architecture).
-   - **Across regions** (different hardware target or cyberspace region): the binary does
-     not travel. The exchange is pet name + source (see "Why Tokens Do Not Cross
-     Cyberspace Boundaries"): the recipient compiles locally, obtains a locally-valid
-      token and binary, derives its own manifest entry from that local binary,
-     and assigns any NS slot from its own deployment configuration.
+   - **Across regions:** the standalone binary remains the transferable artifact;
+     its identity references do not change. The recipient verifies compatibility
+     and admission separately, then explicitly selects placement. An incompatible
+     ISA/target may require programmer recompilation, but a different Namespace
+     or slot alone does not.
 
 `POST /api/lumps/save` publishes the binary and records eligible explicit user decisions
 in `approvals.json` under that binary's SHA-256. It does not create a legacy companion
@@ -794,15 +931,12 @@ not yet self-defining. Legacy is a transitional state resolved by recompilation 
 "Legacy lumps" below. The self-definition statement above is the normative rule for all
 newly compiled `typ=lump` binaries.)
 
-Source code may additionally be embedded in freespace to make the lump portable across
-cyberspace regions (enabling the recipient to recompile it locally). Three tiers govern
-what freespace contains.
-
-A lump's token identifies it within a local cyberspace region. Crossing a region boundary
-requires the source — because each region compiles its own binary and derives its own token
-(see Manifest Architecture and "Why Tokens Do Not Cross Cyberspace Boundaries"). The API
-definition enables callers to compile against the abstraction; the source enables the
-recipient region to recompile it.
+Source may additionally be embedded for inspection and programmer-controlled
+recompilation. Three tiers govern its inclusion. Standalone identity and
+reference completeness are required regardless of source tier: omitting source
+does not authorize omitting PetNames or immutable IDs. The API supports compilation
+against the abstraction without requiring it to be installed locally. Changing
+Namespace or slot does not itself require source exchange or recompilation.
 
 ### The Three Storage Tiers
 
@@ -1116,9 +1250,12 @@ Physical base address copied from resident NS Word 0 after validation.
 +──┴──┴───────────┴────────────────────────────+
 ```
 
-**Revocation:** Mint increments gt_seq in the Object NS slot. On LOAD,
-hardware checks Word 0 gt_seq against Word 2 gt_seq — a mismatch means the
-GT has been revoked and the LOAD faults and the GT is set to NULL.
+**Local binding retirement:** A slot sequence change prevents a previous
+binding from accessing a different occupant. Under the standalone contract,
+loss of the INFORM binding transitions the reference to OUTSFORM while
+preserving its PetName and ID. Legacy paths that fault and replace the numeric
+word with NULL must not be treated as the normative identity model; their
+behavior remains an implementation gap requiring explicit reconciliation.
 
 NS `integrity32` is checked during resolution/LOAD but is not copied into the
 CR. NS W3 cache `T` is likewise absent from ordinary CRs. M-elevated hardware
@@ -1584,9 +1721,9 @@ requires:
   memory manager from the namespace's memory)
 - **GTs** in any c-list that needs to reference it
 
-All three are dynamic — minted when the object is created, evolving as the
-object changes, referenced from one or many threads simultaneously, and
-revoked when the object goes away.
+All three are dynamic and can be referenced from one or many threads. When
+an object's local binding goes away, its references become OUTSFORM; their
+PetNames and IDs are not destroyed or reassigned to another object.
 
 When a digital object is **exported** — packaged as a lump and moved
 offline (written to disk, sent over the network, archived) — it leaves the
@@ -1606,7 +1743,7 @@ The garbage collector runs without IDE involvement.
 of capability sets is the domain of runtime Mint operations, not the boot
 image. A c-list is strictly an array of 32-bit GT words — one GT per slot;
 no raw address, scalar, or data word may occupy a c-list slot (a null word
-`0x00000000` is a valid GT encoding meaning empty/invalid). The hardware
+`0x00000000` is a NULL numeric encoding, not an immutable capability identity). The hardware
 and simulator refuse to load anything but a validated GT from a c-list
 slot.
 
@@ -1708,7 +1845,7 @@ bug.
 
 | Property | Mechanism |
 |----------|-----------|
-| Tamper detection | Mint binds GT to exact zip bytes — any modification invalidates the GT |
+| Tamper detection | Verify the exact authorized zip bytes; altered bytes fail integrity checks and cannot be substituted under the original identity |
 | Type safety | `typ` field in header word and NS slot |
 | Slot isolation | MintCL issues a fresh, empty c-list — no leftover capabilities |
 | Install authority | NamespaceWrite E-GT held only by Locator |

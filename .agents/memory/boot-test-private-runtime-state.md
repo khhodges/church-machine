@@ -14,3 +14,28 @@ Subprocess isolation must also disable external startup services, not just redir
 **Why:** A disposable Flask server otherwise inherits the normal scheduler and hardware listener, so a browser test with private LUMPs can still contact external integrations or contend with the live board bridge.
 
 **How to apply:** Use explicit isolated-process mode and private configuration, approval, database, and snapshot storage. Reject production paths and existing-server reuse before allowing browser writes.
+
+Bootstrap regression fixtures must not assume that the current user Namespace
+still contains historical draft names at fixed slots. Prefer explicitly
+constructed fixture assignments; when filtering copied drafts, preserve unrelated
+occupants and guard fixture-writing helpers against the live library path.
+
+**Why:** Changes to ordinary saved drafts prevented unrelated bootstrap tests
+from collecting. Restoring those drafts in live state would conceal a fixture
+dependency rather than fix the tested behavior.
+
+**How to apply:** Keep save-only publication tests separate from explicit
+Namespace-adoption tests. Do not restore retired save-and-install behavior merely
+to satisfy legacy test expectations.
+
+Historical fixtures must distinguish architecture-generated Threads from
+artifact-selected Inform residents explicitly.
+
+**Why:** A legacy generated Thread labeled Inform+Resident triggers the exact
+artifact-locator gate, even though its bytes are supposed to be constructed from
+geometry. Inventing a filename or relaxing the gate hides that classification
+error.
+
+**How to apply:** Declare generated Thread types and geometry in isolated
+fixtures and assert the resulting body header. Keep real selected artifacts
+bound to their exact saved files and hashes.

@@ -152,7 +152,7 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(
         app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
-    source = "IADD DR1, DR0, #42\nRETURN\n"
+    source = "; @abstraction CompilerRouteFixture\nIADD DR1, DR0, #42\nRETURN\n"
 
     with app_module.app.test_client() as client:
         compiled_response = client.post("/api/compile", json={
@@ -160,6 +160,7 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
         })
         assert compiled_response.status_code == 200
         compiled = compiled_response.get_json()
+        assert compiled["ok"] is True, compiled
         verified_response = client.post("/api/compile/attest", json={
             "words": compiled["words"],
             "compiler_record": compiled["compiler_record"],

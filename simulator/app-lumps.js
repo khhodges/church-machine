@@ -2104,6 +2104,11 @@ function _showCompiledCandidateBesideSource(words, details) {
         '; Abstraction: ' + String(details.abstraction || 'Unnamed'),
         _formatLumpHeaderDisassembly(header)
     ];
+    if (typeof details.referenceReport === 'string') {
+        lines.push('', ...details.referenceReport.split('\n').map(line => '; ' + line), '');
+    } else {
+        lines.push('; Reference verification: unavailable — no status supplied for this view.');
+    }
     for (var i = 1; i <= cw && i < binary.length; i++) {
         var word = binary[i] >>> 0;
         var decoded = '';
@@ -2116,8 +2121,49 @@ function _showCompiledCandidateBesideSource(words, details) {
             word.toString(16).padStart(8, '0').toUpperCase() +
             (decoded ? '  ' + decoded : ''));
     }
+    // Interpret only the authenticated binary, never the mutable editor or
+    // browser capability metadata. Name-only edits can change this region
+    // while leaving the instruction words and numeric C-list unchanged.
+    var frameStart = cw + 1;
+    var frameEnd = binary.length - cc;
+    var frameHeader = binary[frameStart] >>> 0;
+    lines.push('', '; Embedded definition (read from exact candidate bytes)');
+    if (frameStart < frameEnd && (frameHeader >>> 24) === 0xAB) {
+        try {
+            var apiLength = frameHeader & 0xFFFF;
+            var apiWords = Math.ceil(apiLength / 4);
+            var flags = (frameHeader >>> 16) & 255;
+            if (!apiLength || ![0, 1, 3, 5, 7].includes(flags) ||
+                    frameStart + 1 + apiWords > frameEnd) {
+                throw new Error('definition framing exceeds its allocated region');
+            }
+            var packed = new Uint8Array(apiWords * 4);
+            for (var a = 0; a < apiWords; a++) {
+                var packedWord = binary[frameStart + 1 + a] >>> 0;
+                packed.set([packedWord >>> 24, (packedWord >>> 16) & 255,
+                    (packedWord >>> 8) & 255, packedWord & 255], a * 4);
+            }
+            var api = JSON.parse(new TextDecoder('utf-8', {fatal: true})
+                .decode(packed.subarray(0, apiLength)));
+            if (!api || typeof api !== 'object' || Array.isArray(api)) {
+                throw new Error('definition is not a JSON object');
+            }
+            lines.push('; Frame/API words ' + frameStart + '–' +
+                (frameStart + apiWords) + '; ' + apiLength + ' JSON bytes.',
+                '; Decoded metadata is inspection evidence, not saved-identity approval.',
+                JSON.stringify(api, null, 2));
+        } catch (error) {
+            lines.push('; Cannot decode embedded definition: ' + error.message);
+        }
+    } else {
+        lines.push('; No embedded definition frame found; no PetNames inferred.');
+    }
     if (cc > 0) {
         lines.push('', '; C-list (exact authenticated words)');
+        if (binary.slice(-cc).every(function(value) { return value === 0; })) {
+            lines.push('; Numeric rows are zero placeholders; inspect the embedded names above.',
+                '; Unchanged instruction/row words do not mean the complete binary is unchanged.');
+        }
         for (var c = Math.max(cw + 1, binary.length - cc); c < binary.length; c++) {
             lines.push('[' + String(c).padStart(4, '0') + ']  0x' +
                 (binary[c] >>> 0).toString(16).padStart(8, '0').toUpperCase());

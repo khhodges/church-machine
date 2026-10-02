@@ -1,10 +1,29 @@
 ---
 name: Three-LUMP resident profile
-description: The boot core has a named fixed-map profile for the three executable residents and remains extensible above the core.
+description: Validate the three initial abstractions before slot-lifecycle changes; historical boot profiles do not impose catalog reservations.
 ---
 
-The resident boot core is an explicit policy, not an inference from whichever manifest rows happen to be marked resident. The current core is SelfTest at slot 6, WukongCallHome at slot 7, and CapabilityTest at slot 10; slots 0–13 retain their fixed Namespace identities, while capacity above slot 13 remains available for extension.
+The three initial abstractions must be confirmed valid before implementing
+changes to clearing, reassignment, and reloading.
 
-**Why:** Manifest entries include immutable history and can contain duplicate or newer-looking locators. Selecting from that history implicitly can replace a deployed executable or silently reinterpret a fixed slot.
+**Why:** The user explicitly requested this prerequisite for removing legacy
+slot restrictions. A correct initial set must be established first, not
+assumed from catalog membership.
 
-**How to apply:** Validate the complete fixed Namespace map and exactly three resident executable bindings before allocation. Resolve each selected body from the exact Namespace-state token and filename, require its approval, and keep the image/provenance transition atomic.
+**How to apply:** Identify the exact initial artifacts from authoritative saved
+configuration, then inspect their PetNames, immutable identities, bytes,
+structure, and required bindings without modifying them. Missing PetNames
+require programmer recompilation. Report evidence and blockers before
+continuing; this validates LUMPs, not a capability-invalid state.
+
+An explicit approved boot profile remains distinct from catalog-derived
+membership. Historical fixed-slot boot profiles are not a general restriction
+on the requested clear/reload lifecycle.
+
+**Why:** Manifest history can contain duplicate or newer-looking artifacts;
+neither that history nor old fixed-map conventions may silently choose or
+reserve the next Namespace's assignments.
+
+**How to apply:** Preserve exact saved selections and historical approvals.
+Keep architecture/hardware profile requirements explicit and separate from
+generic Namespace editing.

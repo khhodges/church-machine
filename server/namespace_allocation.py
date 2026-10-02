@@ -84,8 +84,8 @@ def _range(row, directory, config, pending):
         start = _integer(row.get("location", 16) if slot == 1 else row["location"])
         if start < 0:
             raise ValueError("negative address")
-        if _signature(row)[-1]:
-            size = _integer(config.get("step1", {}).get("threadLumpWords"))
+        if _signature(row)[-1] and not row.get("filename"):
+            size = _integer(row.get("allocationWords", config.get("step1", {}).get("threadLumpWords")))
             if size < 64 or size & (size - 1):
                 raise ValueError("invalid configured Thread allocation")
         else:

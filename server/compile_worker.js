@@ -164,7 +164,7 @@ if (isMainThread) {
             executionLayout = assembled.layout;
             compileResult = {
                 ...assembled, language, methods: [],
-                abstractionName: ((source.match(/^\s*;\s*@abstraction\s+(\S+)/m) || [])[1] || 'LocalIDX1'),
+                abstractionName: assembled.abstractionName || '',
                 capabilities: [{ name: '__SELF__', rights: ['E'],
                     compiler_owned_self: true, symbolic_self: true },
                     ...(assembled.capabilities || []).filter(c => !['SELF', '__SELF__'].includes(c.name))],
@@ -263,18 +263,16 @@ if (isMainThread) {
 
     // ── V1.3 self-definition: embed API JSON (+ source) in freespace ────────
     // Tier 2 (full source + comments) is the default; callers may pass
-    // tier=0/1 explicitly. On failure, fall back to a legacy (all-zero
-    // freespace) binary with a warning rather than failing the compile.
+    // tier=0/1 explicitly. Missing or malformed definitions must fail closed:
+    // never claim successful standalone output for a legacy fallback.
     const tier = Number.isInteger(payload.tier) ? payload.tier : 2;
     try {
         const api = buildApiDefinition(compileResult, words);
         words = embedSelfDefinition(words, api, source, tier);
     } catch (err) {
-        if (executionLayout) {
-            parentPort.postMessage({ ok: false, language, error: `IDX1 source embedding failed: ${err.message}` });
-            return;
-        }
-        warnings.push({ message: `self-definition not embedded: ${err.message}` });
+        parentPort.postMessage({ ok: false, language,
+            error: `LUMP self-definition failed: ${err.message}. No standalone candidate was produced; no saved data changed.` });
+        return;
     }
 
     // Encode as big-endian binary (Church Machine native byte order)

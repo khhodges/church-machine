@@ -2,7 +2,27 @@
 
 **`POST /api/compile`**
 
-Compiles CLOOMC source text (any supported front-end language) into a ready-to-deploy Lump binary. The response includes both the raw 32-bit word array and a base64-encoded binary for direct download or upload.
+Compiles CLOOMC source text into an **unsaved standalone LUMP candidate**. The
+response includes the word array and the same bytes encoded as base64.
+Compilation does not install an artifact or assign a Namespace slot.
+
+## Standalone output requirement
+
+The [Standalone Compiler Output Contract](CM_LUMP_SPECIFICATION.md#standalone-compiler-output-contract)
+is normative. Output must preserve declared capability PetNames, immutable
+identity references, authored rights, and local C-list row order without relying
+on the compiling machine's Namespace. References need not be installed locally.
+Save and Export preserve the artifact; destination resolution is separate.
+Capabilities retain PetName and ID through INFORM/OUTSFORM transitions.
+LUMPs missing PetNames require **programmer recompilation**, not automatic repair.
+
+**Implementation status:** the pre-save CLOOMC candidate path now derives
+capability metadata from authenticated binary definitions, without destination
+materialization or live Namespace validation. Other frontend/save/activation
+paths still need end-to-end conformance checks. Zero numeric placeholders do
+not establish standalone conformance. A successful HTTP
+response or structural audit alone is not proof that every required identity
+reference was preserved. See the contract's conformance checks.
 
 ---
 
@@ -31,16 +51,18 @@ Without a valid token the server returns **HTTP 401**. When `COMPILE_API_TOKEN` 
 |---|---|---|---|
 | `source` | string | **yes** | Raw source text. Must be non-empty. |
 | `language` | string | no | Front-end language hint. Auto-detected from source when omitted or empty. Must be one of the six canonical values if supplied (see below). |
-| `abstraction_name` | string | no | Override the abstraction name embedded in the source. Useful when the source doesn't declare one. |
-| `namespace_hint` | object | no | Hints to the Lump builder (see below). |
+| `abstraction_name` | string | no | Legacy field; do not rely on it to supply missing PetNames. The current worker does not implement this override. |
+| `namespace_hint` | object | no | Legacy-named packing hints only; not a Namespace assignment or a source of capability identity. |
 
 #### `namespace_hint` sub-fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `gt_type` | string | `"inform"` | Golden Token type for the allocated Lump. |
-| `allocation_words` | integer | next power-of-2 ≥ code size | Total Lump size in 32-bit words. Must be a power of two and large enough to hold the compiled code + header. |
-| `clist_slots` | integer | derived from source | Number of C-List slots to reserve. |
+| `allocation_words` | integer | derived from complete emitted content | Packing-size hint. The complete allocation must fit header, dispatch/code, embedded content, and C-list. It is not a memory address. |
+
+Historical `gt_type` and nested `clist_slots` fields must not be interpreted as
+establishing an INFORM capability or a destination slot; the current worker does
+not use them to assign authority. The C-list comes from compiler declarations.
 
 ### Supported languages
 
@@ -61,9 +83,7 @@ When `language` is omitted the compiler runs all detectors and picks the best ma
 {
   "source": "IADD DR1, DR0, #42\nHALT\n",
   "language": "assembly",
-  "abstraction_name": "Add42",
   "namespace_hint": {
-    "gt_type": "inform",
     "allocation_words": 64
   }
 }
@@ -73,7 +93,8 @@ When `language` is omitted the compiler runs all detectors and picks the best ma
 
 ## Response
 
-**HTTP status is always 200.** Check the `ok` field in the JSON body to distinguish success from failure.
+Compiler results normally use HTTP 200; request, authorization, and service
+failures can return other statuses. Check both HTTP status and the JSON `ok` field.
 
 ### Success (`ok: true`)
 
@@ -89,11 +110,54 @@ When `language` is omitted the compiler runs all detectors and picks the best ma
 
 | Field | Type | Description |
 |---|---|---|
-| `ok` | `true` | Compile succeeded. |
+| `ok` | `true` | The compiler reports success for this candidate; see the standalone requirement and implementation-gap notice above. |
 | `language` | string | The language that was detected or used. |
 | `words` | number[] | The complete Lump binary as an array of unsigned 32-bit integers (big-endian word order). `words[0]` is the Lump header word encoding `cw` (code words) and `cc` (C-List slots). |
 | `lump_binary` | string | Base64-encoded form of the same binary. `base64decode(lump_binary)` equals `words` packed as big-endian uint32s. Size is always `len(words) * 4` bytes. |
-| `warnings` | string[] | Soft warnings — typically lazy-resolve notices for symbols not yet in the namespace. Empty when none. A non-empty list does **not** mean the compile failed; the Lump is valid and ready to deploy. |
+| `warnings` | array | Compiler diagnostics; entries may be structured objects. Neither an empty list nor `ok: true` establishes destination binding, installation, hardware certification, or execution success. |
+| `verified_references` | array | Per-row exact reference evidence (`row`, `N`, `T`, `binary_hash`, `identity_hash`) checked against actual target bytes and canonical identity before compiler attestation. An empty array does not mean name-only references have been verified. |
+
+Pinned reference verification is rechecked even when compilation is cached.
+A missing, ambiguous, altered, or identity-mismatched target produces `ok: false`
+with `unchanged_data: true`, without returning an attested candidate or selecting
+another revision. It supports active records and exact hash-indexed canonical
+archives, including standard `_vN` archive filenames backed by the original
+hash-bound identity evidence. Archived bootstrap runtime-GT identities and
+unindexed history files remain unsupported. Historical bytes and approval
+records are never changed. It never requires Namespace assignment.
+
+Reference failures include `reference_verification: {status, reason}` with status
+`failed` or `unsupported`. The pre-save console renders this separately from a
+server connection failure and retains the previous candidate.
+Successful CLOOMC candidate reports label each external row VERIFIED, SYMBOLIC,
+or UNVERIFIED. VERIFIED requires one exact matching row/name/token/hash evidence
+record from the compile response and unchanged candidate words. Missing evidence
+is never treated as verification; SELF and an empty external-reference list do
+not claim external identity verification. These labels are presentation only and
+are not embedded in, or used to rewrite, the LUMP bytes.
+
+SYMBOLIC is a valid programmer-declared PetName, not an incomplete or invalid
+capability. It may refer to an idea whose target has not been created and might
+never be created. Neither compilation nor saving requires that target to exist.
+Explicit identity/hash claims are checked when supplied; they are not required
+for every symbolic declaration. Runtime use still requires the appropriate
+authority. This differs from inventing a name for the containing abstraction.
+
+Pre-save reports must label this result **UNSAVED COMPILE CANDIDATE**, display
+declared capability PetNames and local row numbers, and distinguish embedded
+API/source from unused space. They must not print inferred `NS[...]` assignments,
+conflate an abstraction-owner setting with declaration PetNames, or claim that
+Save/Export installs the artifact. Zero numeric rows must not be described as
+destroyed identities or as proof that names are missing; inspect the full binary.
+
+Abstraction names must be explicitly declared. CLOOMC/JavaScript, Symbolic,
+Lambda and Haskell use their `abstraction Name` syntax; English accepts its
+explicit abstraction declaration (for example, `Create an abstraction called Name`).
+Assembly and IDX1 require `; @abstraction Name` or `; Abstraction: Name`.
+Method names, arbitrary comments, labels and disassembly location headers do not
+declare an abstraction identity. Missing declarations fail compilation without
+rewriting source or producing a candidate. Names such as `Assembly`, `Symbolic`,
+`English`, or `LocalIDX1` remain valid when explicitly declared.
 
 #### Decoding `words[0]` — the Lump header
 
@@ -142,6 +206,11 @@ These are returned **before** the compiler runs when the request itself is inval
 ---
 
 ## Examples
+
+The short assembly examples below demonstrate transport and instruction
+compilation only. They do not by themselves demonstrate the complete PetName/ID
+contract. Do not treat an unnamed example candidate as a conforming standalone
+artifact; the programmer must supply the required declarations and recompile.
 
 ### curl
 
@@ -234,9 +303,9 @@ The compiler subprocess is given **30 seconds**. If it exceeds that, the respons
 
 ## Related
 
-- `simulator/compile_worker.js` — the Node.js subprocess that runs the compiler
+- `server/compile_worker.js` — the Node.js subprocess that runs the compiler
 - `server/compile_api.py` — Python wrapper that spawns the worker
 - `simulator/cloomc_compiler.js` — the multi-language CLOOMC++ compiler
 - `simulator/assembler.js` — the CLOOMC assembly assembler
 - `simulator/lump_builder.js` — packs compiler output into the binary Lump format
-- `tests/server/test_compile_api.py` — full test suite (24 tests + 1 xfail)
+- `tests/server/test_compile_api.py` — compile API regression tests; not evidence that all standalone requirements are implemented

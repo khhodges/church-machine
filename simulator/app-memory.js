@@ -376,6 +376,97 @@ async function refreshBootCapacity() {
 }
 window.refreshBootCapacity = refreshBootCapacity;
 
+var _imageRefreshBusy = false;
+function _imageRefreshOperation(value) {
+    if (value !== undefined) sessionStorage.setItem('namespaceImageRefreshOperation', value);
+    return sessionStorage.getItem('namespaceImageRefreshOperation');
+}
+function _imageRefreshResult(data) {
+    const root = document.getElementById('namespaceImageRefreshResult');
+    root.textContent = [
+        data.committed === true ? 'Publication confirmed. Stored image and provenance replaced; saved inputs and running machines unchanged.' :
+            data.status === 'prepared' ? 'Reconstruction validated. Stored image unchanged; awaiting protected review.' :
+            data.committed === false ? 'Not committed. Previous image/provenance and saved inputs unchanged.' :
+            'Commit status unknown. Do not rebuild or retry publication; check status.',
+        ...(data.stages || []), ...(data.slotResults || []), ...(data.addressResults || []),
+        data.error || '', data.message || '',
+    ].filter(Boolean).join('\n');
+}
+async function checkNamespaceImageRefresh() {
+    const key = _imageRefreshOperation();
+    if (!key || _imageRefreshBusy) return;
+    _imageRefreshBusy = true;
+    const button = document.getElementById('namespaceImageRefresh');
+    button.disabled = true;
+    try {
+        const response = await fetch('/api/namespace/image-refresh/status/' + encodeURIComponent(key), {cache: 'no-store'});
+        const data = await response.json();
+        _imageRefreshResult(data);
+        if (response.ok && typeof data.committed === 'boolean') {
+            _imageRefreshOperation('');
+            document.getElementById('namespaceImageStatus').hidden = true;
+            button.disabled = false;
+            if (data.committed) await refreshBootCapacity();
+        }
+    } catch (_) {
+        _imageRefreshResult({message: 'Status request interrupted. Use Check commit status again; no publication was retried.'});
+    } finally { _imageRefreshBusy = false; }
+}
+async function refreshNamespaceImage() {
+    if (_imageRefreshBusy) return;
+    if (_imageRefreshOperation()) {
+        document.getElementById('namespaceImageStatus').hidden = false;
+        await checkNamespaceImageRefresh();
+        return;
+    }
+    _imageRefreshBusy = true;
+    const button = document.getElementById('namespaceImageRefresh');
+    button.disabled = true;
+    let commitSent = false;
+    try {
+        document.getElementById('namespaceImageRefreshResult').textContent =
+            'Reconstructing and validating a private candidate from saved server inputs… Stored image unchanged.';
+        let response = await fetch('/api/namespace/image-refresh/prepare', {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: '{}',
+        });
+        let data = await response.json();
+        _imageRefreshResult(data);
+        if (!response.ok) return;
+        _imageRefreshOperation(data.operationId);
+        document.getElementById('namespaceImageStatus').hidden = false;
+        commitSent = true;
+        // change-confirmation.js performs exactly one request-bound review and
+        // one approved commit. Network failure never triggers another POST.
+        response = await fetch('/api/namespace/image-refresh/commit', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({operationId: data.operationId}),
+        });
+        data = await response.json();
+        _imageRefreshResult(data);
+        if (typeof data.committed === 'boolean') {
+            _imageRefreshOperation('');
+            document.getElementById('namespaceImageStatus').hidden = true;
+        }
+        if (data.committed === true) await refreshBootCapacity();
+    } catch (error) {
+        _imageRefreshResult({
+            committed: commitSent ? null : false,
+            message: commitSent ? 'Response interrupted. Use Check commit status; do not rebuild or retry.' :
+                'Candidate request failed: ' + error.message + '. Stored image unchanged.',
+        });
+    } finally {
+        _imageRefreshBusy = false;
+        button.disabled = !!_imageRefreshOperation();
+    }
+}
+window.refreshNamespaceImage = refreshNamespaceImage;
+window.checkNamespaceImageRefresh = checkNamespaceImageRefresh;
+// Restore interruption recovery after a reload without sending a mutation.
+if (typeof sessionStorage !== 'undefined' && _imageRefreshOperation()) {
+    const statusButton = document.getElementById('namespaceImageStatus');
+    if (statusButton) statusButton.hidden = false;
+}
+
 // Pending Prepare/Run pins are browser intent only until the atomic server CAS
 // succeeds. They never mutate the loaded simulator image or committed state.
 window._prepareRunArtifactPins = window._prepareRunArtifactPins || {};

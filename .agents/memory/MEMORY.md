@@ -1,11 +1,11 @@
+- [Declared abstraction identity](declared-abstraction-identity.md) — missing names require programmer correction, never generated fallback identities.
 - [Save diagnostic evidence](save-diagnostic-evidence.md) — shared safe error codes and occurrence times must survive ingestion; missing logs never prove rejection
 - [Review session cookie races](review-session-cookie-races.md) — initialize independent nonce bindings before parallel requests; late signed-cookie responses can overwrite a newer review session.
 - [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
 - [NULL GT type canonicalisation](null-gt-type-canon.md) — isNullGT checks bits[26:25]===0b00; only replace ===0 with isNullGT at hardware gates (mLoad, _fetchInstruction); UI presence checks (CR6 in resolvePendingSlot) must stay ===0
-- [Wukong single-step trace architecture](wukong-trace-arch.md) — 11-byte 0xAA packets; F3 UART; 4-bit NZCV; step mode guarantees TraceUnit is idle
-- [TraceUnit per-event packet format](trace-unit-per-event-format.md) — 12-byte per-event packets; multi-event queue (1–3 per retire); trace_stall backpressure; ELOADCALL/RETURN-CR14 known gaps
+- [Hardware trace protocols](hardware-trace-index.md) — protocol generations, packet framing and disassembly limits.
 - [Amaranth sync-domain self-deadlocking reset](amaranth-sync-reset-deadlock.md) — rst_sr in sync domain driving ResetSignal("sync") locks reset HIGH forever; use reset_less=True + GSR instead
 - [Sapphire/Ti60 build lessons](sapphire-ti60-index.md) — ROM bus conflicts, Efinity BRAM initialization, MAP placeholders, and full firmware pipeline constraints.
 - [LUMP binary is big-endian](lump-binary-big-endian.md) — raw .lump file words are big-endian; ad-hoc LE reads/writes silently corrupt header/c-list, verify with lump-audit.js (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
@@ -29,10 +29,8 @@
 - [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
-- [UART magic-byte frame resync](uart-frame-resync.md) — 0xAA-framed streams slip on mid-stream attach/dropped bytes; validate candidate frames (aligned NIA, known ev, sane flags) and advance 1 byte on failure
 - [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
 - [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics
-- [Wukong trace disassembly](wukong-trace-disassembly.md) — current packets carry NIA but no instruction word; exact labels/mnemonics require a matching source map or a versioned packet extension
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
 - [Wukong poll rejection containment](wukong-poll-rejection-containment.md) — async hardware polling must contain state-update failures, not only fetch failures
 - [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
@@ -157,3 +155,4 @@
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
 - [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
+- [Thread LUMP placement](thread-lump-placement.md) — Threads are LUMPs, not special-address reservations; saved descriptors control generic placement.

@@ -182,7 +182,50 @@ function stripComments(src) {
  * Never includes `token` or `issue` — identity lives outside the binary
  * (embedding the token would be a circular fixed point).
  */
+function validateSuppliedIdentity(cap, row) {
+    const fields = ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token'];
+    const supplied = fields.filter(key => Object.prototype.hasOwnProperty.call(cap, key));
+    if (!supplied.length) return; // Name-only is not a claim of pinned identity.
+    const fail = message => {
+        throw new Error(`C-list row ${row} (${cap.name}): ${message}. Correct the supplied identity and recompile; no values were inferred.`);
+    };
+    for (const key of supplied) {
+        if (typeof cap[key] !== 'string' || !cap[key] || cap[key] !== cap[key].trim()) {
+            fail(`${key} must be a nonempty, unpadded string`);
+        }
+        if (['T', 'token'].includes(key) && !/^[0-9a-f]{8}$/.test(cap[key])) {
+            fail(`${key} must be exactly 8 lowercase hexadecimal characters`);
+        }
+        if (['binary_hash', 'identity_hash'].includes(key) &&
+                !/^[0-9a-f]{64}$/.test(cap[key])) {
+            fail(`${key} must be exactly 64 lowercase hexadecimal characters`);
+        }
+        if (['N', 'identity_string'].includes(key)) {
+            try { require('./portable_lump_binding.js').canonicalName(cap[key]); }
+            catch (_) { fail(`${key} must be an exact name#issue identity`); }
+        }
+    }
+    if (cap.N && cap.identity_string && cap.N !== cap.identity_string) {
+        fail('N and identity_string disagree');
+    }
+    if (cap.T && cap.token && cap.T !== cap.token) fail('T and token disagree');
+    // SELF identifies the containing artifact, not an external dependency.
+    // Do not require its own whole-binary hash inside itself (a circular hash).
+    const self = row === 0 && ['SELF', '__SELF__'].includes(cap.name.toUpperCase());
+    if (!self && (!(cap.N || cap.identity_string) || !(cap.T || cap.token) ||
+            !cap.binary_hash || !cap.identity_hash)) {
+        fail('partial identity lock: provide N (or identity_string), T (or token), binary_hash and identity_hash together');
+    }
+    // Syntactic completeness is NOT verification of the referenced artifact.
+}
+
 function buildApiDefinition(result, words) {
+    for (const [row, cap] of (result.capabilities || []).entries()) {
+        if (!cap || typeof cap.name !== 'string' || !cap.name.trim()) {
+            throw new Error(`C-list row ${row} has no PetName. The programmer must supply the declaration and recompile; no name was inferred or repaired.`);
+        }
+        validateSuppliedIdentity(cap, row);
+    }
     const methods = result.methods || [];
     const api = {
         name: result.abstractionName || '',

@@ -97,7 +97,8 @@
     function needsReview(url) {
         if (url.origin !== window.location.origin) return false;
         var path = url.pathname;
-        if (['/api/lumps/save-plan', '/api/lumps/finalize',
+        if (['/api/namespace/image-refresh/prepare',
+            '/api/lumps/save-plan', '/api/lumps/finalize',
             '/api/lumps/save-diagnostics', '/api/lumps/approval-intent',
             '/api/lumps/deploy-authorize'].includes(path) ||
             path.startsWith('/api/lumps/lease')) return false;
