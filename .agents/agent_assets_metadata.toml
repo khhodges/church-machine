@@ -346,3 +346,17 @@ mtime_ms = 1790780694940
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/902780ea-7b3b-498d-bf9c-1ddcbbe14b6e/3926ec76-5d18-4747-ae91-c719fdecfaf2"
 storage_version_token = "1790780714902313"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Qn2J5EyqVbESDFlhHlLC0"
+uri = "file://docs/isa-amaranth-compatibility-audit.md"
+type = "text"
+title = "Amaranth ISA compatibility audit"
+description = "Instruction-by-instruction checklist, confirmed compatibility gaps, test evidence, and remaining release gates. No hardware or saved programs changed."
+logical_id = "30d4e32f-edd5-4ced-b89c-02c92d41ae7d"
+content_hash = "sha256:98eb67d8d14cf92fc7861bb029ee5d3d28088f2254ccca68dc43fdcaec5526ce"
+size = 10662
+mtime_ms = 1790964169180
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/30d4e32f-edd5-4ced-b89c-02c92d41ae7d/4593fcda-42b0-47e0-8029-3c32d52f2bf9"
+storage_version_token = "1790964179548459"
+content_type = "text/markdown"
