@@ -2,13 +2,14 @@
   "addressResults": [
     "0x0\u20130xF: Namespace header",
     "0x10\u20130x10F: NS[1] Boot.Thread",
-    "0x110\u20130x90F: NS[6] SelfTest",
-    "0x910\u20130xD0F: NS[7] WukongCallHome",
-    "0xD10\u20130x110F: NS[10] CapabilityTest",
-    "0x1110\u20130x120F: NS[11] Thread.2",
-    "0x1210\u20130x130F: NS[12] Thread.3",
+    "0x110\u20130x50F: NS[7] WukongCallHome",
+    "0x590\u20130x98F: NS[10] CapabilityTest",
+    "0x990\u20130x118F: NS[6] SelfTest",
+    "0x1190\u20130x128F: NS[11] Thread.2",
+    "0x1290\u20130x138F: NS[12] Thread.3",
     "0x3F00\u20130x3FFF: Namespace table",
-    "0x1310\u20130x3EFF: verified zero, unclaimed"
+    "0x510\u20130x58F: verified zero, unclaimed",
+    "0x1390\u20130x3EFF: verified zero, unclaimed"
   ],
   "artifactBindings": [
     {
@@ -39,14 +40,12 @@
   "bootEntrySlot": 10,
   "committed": true,
   "hardwareCertified": false,
-  "image_sha256": "20f25a3ca1909963b08fa11f1674b810f68ea77e673ab126b9f5b0d822f4ee01",
-  "namespace_fingerprint": "4007fc89a199e63b35b745fc3192ab18b43581f1211f4f43649f9ac67d6609d2",
-  "namespace_sha256": "1468c75131add20ef323994a3531eced4420d380be6b4c072380286cd89ff670",
-  "operationId": "cb19e8d2abe8460f9cbd7019f85ae646",
+  "image_sha256": "a17144dd2c51d1431da0d298ba5f1385e6a32638992410025f69fc0e5da926ec",
+  "namespace_fingerprint": "2a5a474c553ee9279b09e79781dc6c3475782f828d415bbf29156d9d392ba1f4",
+  "operationId": "5e0e22a9ec7845ca9f40561d86dc303e",
   "origin": "generic-refresh",
   "profile": "clean-saved-namespace-v1",
   "purpose": "generic-simulator-image",
-  "relocations": [],
   "slotResults": [
     "NS[0] Boot.NS: Namespace header; word 0x0",
     "NS[1] Boot.Thread: Generated Thread; word 0x10\u20130x10F; 256 words",
@@ -54,11 +53,11 @@
     "NS[3] LED_DEV: MMIO; no ordinary RAM body; word 0x40000000",
     "NS[4] BTN_DEV: MMIO; no ordinary RAM body; word 0x40000028",
     "NS[5] TIMER_DEV: MMIO; no ordinary RAM body; word 0x4000002C",
-    "NS[6] SelfTest: SelfTest.1.8b19abd7.lump; word 0x110\u20130x90F; 2048 words",
-    "NS[7] WukongCallHome: WukongCallHome.1.7fe59019.lump; word 0x910\u20130xD0F; 1024 words",
-    "NS[10] CapabilityTest: CapabilityTest.1.39f77d6e.lump; word 0xD10\u20130x110F; 1024 words",
-    "NS[11] Thread.2: Generated Thread; word 0x1110\u20130x120F; 256 words",
-    "NS[12] Thread.3: Generated Thread; word 0x1210\u20130x130F; 256 words",
+    "NS[6] SelfTest: SelfTest.1.8b19abd7.lump; word 0x990\u20130x118F; 2048 words",
+    "NS[7] WukongCallHome: WukongCallHome.1.7fe59019.lump; word 0x110\u20130x50F; 1024 words",
+    "NS[10] CapabilityTest: CapabilityTest.1.39f77d6e.lump; word 0x590\u20130x98F; 1024 words",
+    "NS[11] Thread.2: Generated Thread; word 0x1190\u20130x128F; 256 words",
+    "NS[12] Thread.3: Generated Thread; word 0x1290\u20130x138F; 256 words",
     "NS[13] M_BIT_DEV: MMIO; no ordinary RAM body; word 0xFFFFFF1C"
   ],
   "sourceInputs": {
@@ -479,7 +478,7 @@
     "/home/runner/workspace/server/lumps/ide.testMbit.1.d5046b90.json": "834adc263db9e2265464efa040fde3783428cda5b7296b3f3b15f996b3ae702b",
     "/home/runner/workspace/server/lumps/ide.testMbit.1.d5046b90.lump": "7f7049a605ce9ebdeb1ed2bf61ec33dec1cb1fe4a3aaf51be0e72791e57e051e",
     "/home/runner/workspace/server/lumps/manifest.json": "961ff3fbe5521951ca0b79ebd2d8f9eae6dbf33515cd41431c80cb335dfc96e1",
-    "/home/runner/workspace/server/lumps/ns-state.json": "1468c75131add20ef323994a3531eced4420d380be6b4c072380286cd89ff670",
+    "/home/runner/workspace/server/lumps/ns-state.json": "136d223a94950d79efd0ec62bd84fc086a025cd8fe246264c09ec2a29a0bb8e6",
     "/home/runner/workspace/server/lumps/server_managed_tokens.json": "b93d3f7ade317116229547f041014788913f8237cf73e3af2ef143f001362c0b"
   },
   "stages": [

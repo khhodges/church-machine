@@ -42,11 +42,17 @@
   "image_sha256": "20f25a3ca1909963b08fa11f1674b810f68ea77e673ab126b9f5b0d822f4ee01",
   "namespace_fingerprint": "4007fc89a199e63b35b745fc3192ab18b43581f1211f4f43649f9ac67d6609d2",
   "namespace_sha256": "1468c75131add20ef323994a3531eced4420d380be6b4c072380286cd89ff670",
-  "operationId": "cb19e8d2abe8460f9cbd7019f85ae646",
+  "operationId": "d7b179f64bab4ecbb33bbd249fdd33db",
   "origin": "generic-refresh",
   "profile": "clean-saved-namespace-v1",
   "purpose": "generic-simulator-image",
-  "relocations": [],
+  "relocations": [
+    "NS[6] SelfTest: 0x990 \u2192 0x110 (2048 words)",
+    "NS[7] WukongCallHome: 0x110 \u2192 0x910 (1024 words)",
+    "NS[10] CapabilityTest: 0x590 \u2192 0xD10 (1024 words)",
+    "NS[11] Thread.2: 0x1190 \u2192 0x1110 (256 words)",
+    "NS[12] Thread.3: 0x1290 \u2192 0x1210 (256 words)"
+  ],
   "slotResults": [
     "NS[0] Boot.NS: Namespace header; word 0x0",
     "NS[1] Boot.Thread: Generated Thread; word 0x10\u20130x10F; 256 words",
