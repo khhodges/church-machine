@@ -16,6 +16,17 @@ synthesis defect.
 failures. Check the actual release emission pipeline before granting release
 confidence; never silently initialize unknown bits to force a passing replay.
 
+Do not infer that the board release must switch to SystemVerilog from this
+failure alone.
+
+**Why:** The bare converter and the Wukong release converter use different
+lowering stages. The inspected board output had continuous constant assignments
+where the bare output had empty-sensitivity blocks. That inspected output was
+stale, so it was evidence of the distinction, not proof of current conformance.
+
+**How to apply:** Replay through the actual release conversion stages using
+fresh temporary inputs before recommending an emitter or dialect change.
+
 Replay instrumentation must use the same elaborated design as the model run.
 
 **Why:** Re-elaboration creates fresh internal signals, while debug observations
