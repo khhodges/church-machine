@@ -27,6 +27,12 @@ constraint before implementing packet fetching or extending that design.
 **Why:** The user explicitly rejected the packet proposal as not what was intended;
 existing implementation is not authority over that requirement.
 
+In the subsequent clarification, the user declined the proposed constraint
+"exactly one 32-bit word, no extensions" and specified: "The instruction uses
+a data register added to any immediate value." Treat runtime DR-plus-immediate
+index calculation as the confirmed requirement. Do not infer a fixed word count,
+approval of the existing packet format, or a new immediate-width limit from it.
+
 **Why:** The user explicitly corrected an explanation that treated a parser's
 immediate-only restriction as the intended architecture.
 The user subsequently expanded the requirement to all indexed instructions,
