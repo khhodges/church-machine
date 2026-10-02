@@ -402,3 +402,17 @@ mtime_ms = 1790977504045
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5370c456-8bae-49e9-a75c-8d9766a2a69e/729fd9f4-1540-4d91-8a02-a92ea88fd1d2"
 storage_version_token = "1790977516475187"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Vh2t4--1KwiVjos7lYgvq"
+uri = "file://reports/isa-amaranth-corrections-2026-10-02.md"
+type = "text"
+title = "MCMP and LOAD/SAVE corrections"
+description = "Implemented source corrections, passing checks, remaining coverage gaps, and the unchanged hardware-release boundary."
+logical_id = "9d69301b-43b4-4380-ac37-0a3dac0e4e47"
+content_hash = "sha256:ee1d50444c57566772718a6e1f433f1e914d0002dbd239dec2f9976054283bce"
+size = 3524
+mtime_ms = 1790978322465
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9d69301b-43b4-4380-ac37-0a3dac0e4e47/57fef984-25a0-4c0c-9afb-048391b154c7"
+storage_version_token = "1790978404074582"
+content_type = "text/markdown"

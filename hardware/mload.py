@@ -38,7 +38,7 @@ class ChurchMLoad(Elaboratable):
         self.sub_start = Signal()
         self.sub_cr_src = Signal(4)
         self.sub_cr_dst = Signal(4)
-        self.sub_index = Signal(16)
+        self.sub_index = Signal(32)
         self.sub_direct = Signal()
         self.sub_direct_gt = Signal(32)
         self.sub_m_elevated = Signal()
@@ -102,7 +102,7 @@ class ChurchMLoad(Elaboratable):
 
         cr_src_reg = Signal(4)
         cr_dst_reg = Signal(4)
-        index_reg = Signal(16)
+        index_reg = Signal(32)
         direct_mode = Signal()
         validate_only_reg = Signal()
         direct_gt_reg = Signal(32)

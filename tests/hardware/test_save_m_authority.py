@@ -129,6 +129,17 @@ def test_each_isolated_source_register_uses_its_own_m_consumption_target():
         assert result["consume_targets"] == [source_reg - 12]
 
 
+def test_large_runtime_save_index_cannot_truncate_to_authorized_row():
+    for index in (65537, 0xffffffff):
+        result = _run_save(
+            source_m=1, index=index,
+            source_gt=make_gt(GT_TYPE_INFORM, 0, slot_id=3, b_flag=1))
+        assert result["fault"] == FaultType.BOUNDS
+        assert not result["complete"]
+        assert not any(result["writes"])
+        assert not any(result["consume"])
+
+
 def test_ordinary_save_still_rejects_far_export():
     result = _run_save(
         source_m=0,

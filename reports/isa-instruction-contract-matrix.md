@@ -3,6 +3,13 @@
 Prepared 2026-10-02. **Draft acceptance matrix, not an ISA amendment or a
 compatibility certificate.**
 
+Implementation update (2026-10-02): MCMP and compact LOAD/SAVE Amaranth
+corrections have since been applied; see
+`reports/isa-amaranth-corrections-2026-10-02.md` for scoped verification.
+The evidence tables below remain the original audit baseline, not a claim
+that every listed failure is still present or that corrected instructions
+are fully certified.
+
 Authority: `docs/instruction-set.md`. Evidence:
 `reports/isa-compatibility-audit-2026-10-02.md`.
 The audited master, assembler, simulator and hardware files have no diff

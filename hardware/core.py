@@ -420,6 +420,9 @@ class ChurchCore(Elaboratable):
         exec_enable = u_decoder.exec_enable
 
         cond_exec_enable = Signal()
+        compact_index_fault = Signal()
+        compact_index = Signal(33)
+        compact_index_selected = Signal()
         fetch_bounds_fault = Signal()   # combinatorial; gates cond_exec_enable and drives fault
         # fetch_bounds_fault is assigned below (after any_unit_busy is defined).
         # Including ~fetch_bounds_fault here ensures that NO instruction can start in the
@@ -1037,7 +1040,7 @@ class ChurchCore(Elaboratable):
             & ~(lambda_start_sig if not self.iot_profile else 0)
             & ~(eloadcall_start_sig if not self.iot_profile else 0)
             & ~(xloadlambda_start_sig if not self.iot_profile else 0)
-            & ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
+            & ~fetch_bounds_fault & ~compact_index_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
             # CALL and RETURN must NOT advance the PC on their issue cycles.
@@ -1431,13 +1434,13 @@ class ChurchCore(Elaboratable):
         ]
 
         m.d.comb += save_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SAVE) & ~any_unit_busy
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SAVE) & ~any_unit_busy & ~compact_index_fault
         )
         m.d.comb += [
             u_save.save_start.eq(save_start_sig),
             u_save.cr_src.eq(cr_src),
             u_save.cr_dst.eq(cr_dst),
-            u_save.index.eq(cap_index),
+            u_save.index.eq(compact_index[:32]),
             u_save.source_m.eq(
                 Mux(cr_dst == 12, u_regs.isolated_m_flags[0],
                     Mux(cr_dst == 13, u_regs.isolated_m_flags[1],
@@ -1504,7 +1507,7 @@ class ChurchCore(Elaboratable):
         # when the imm[14] immediate marker is clear.
         m.d.comb += u_regs.dr_rd_addr2.eq(
             Mux(u_dwrite.busy, u_dwrite.dr_rd_addr,
-                Mux(bfins_start_sig, cr_dst,
+                Mux(bfins_start_sig | mcmp_start_sig, cr_dst,
                     Mux((iadd_start_sig | isub_start_sig) &
                         ~u_decoder.immediate[14],
                         u_decoder.immediate[:4], 0)))
@@ -1547,13 +1550,23 @@ class ChurchCore(Elaboratable):
         # Source DR read port 1 — shared by DREAD/DWRITE (indexed DRx), IADD/ISUB,
         # SHL/SHR/BFEXT/BFINS/MCMP.  dread/dwrite busy is mutually exclusive with
         # all arithmetic ops (any_unit_busy prevents their simultaneous dispatch).
+        m.d.comb += [
+            compact_index_selected.eq(
+                is_church_op & ((church_op == ChurchOpcode.LOAD) |
+                                (church_op == ChurchOpcode.SAVE)) & ~any_unit_busy),
+            compact_index.eq(Mux(u_decoder.immediate[14],
+                Cat(u_regs.dr_rd_data1, C(0, 1)) - u_decoder.immediate[4:14],
+                Cat(u_regs.dr_rd_data1, C(0, 1)) + u_decoder.immediate[4:14])),
+            compact_index_fault.eq(cond_exec_enable & compact_index_selected & compact_index[32]),
+        ]
         m.d.comb += u_regs.dr_rd_addr1.eq(
             Mux(u_dread.busy, u_dread.dr_rd_addr,
                 Mux(u_dwrite.busy, u_dwrite.dr_rd_addr2,
+                    Mux(compact_index_selected, u_decoder.immediate[:4],
                     Mux(iadd_start_sig | isub_start_sig |
                         shl_start_sig | shr_start_sig |
                         bfext_start_sig | bfins_start_sig | mcmp_start_sig,
-                        cr_src, 0)))
+                        cr_src, 0))))
         )
 
         # 33-bit results. IADD bit 32 is carry-out. For ISUB the ISA follows
@@ -1709,21 +1722,23 @@ class ChurchCore(Elaboratable):
 
         # ── MCMP ─────────────────────────────────────────────────────────────
         # Compare (flags-only subtract, no register write).
-        # flags = flags_of(DR[src] - sign_extend(imm))
+        # flags = flags_of(DR[dst] - DR[src]); no result is stored.
         # Equivalent to ISUB but discards the result.
-        # Flags: N = result[31], Z = (result==0), C = borrow-out, V = 0.
+        # Flags follow ISUB: C means no borrow; V is signed overflow.
 
         m.d.comb += mcmp_start_sig.eq(cond_exec_enable & is_mcmp_op & ~any_unit_busy)
         m.d.sync += mcmp_busy_reg.eq(mcmp_start_sig & ~mcmp_busy_reg)
 
-        m.d.comb += mcmp_result.eq(u_regs.dr_rd_data1 - arith_imm_sx)
+        m.d.comb += mcmp_result.eq(u_regs.dr_rd_data2 - u_regs.dr_rd_data1)
 
         mcmp_flags_view = View(COND_FLAGS_LAYOUT, mcmp_flags_sig)
         m.d.comb += [
             mcmp_flags_view.N.eq(mcmp_result[31]),
             mcmp_flags_view.Z.eq(mcmp_result[:32] == 0),
-            mcmp_flags_view.C.eq(mcmp_result[32]),
-            mcmp_flags_view.V.eq(0),
+            mcmp_flags_view.C.eq(~mcmp_result[32]),
+            mcmp_flags_view.V.eq(
+                (u_regs.dr_rd_data2[31] ^ u_regs.dr_rd_data1[31]) &
+                (mcmp_result[31] ^ u_regs.dr_rd_data2[31])),
         ]
 
         # ── BRANCH ───────────────────────────────────────────────────────────
@@ -1743,7 +1758,7 @@ class ChurchCore(Elaboratable):
         )
 
         m.d.comb += load_start_sig.eq(
-            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LOAD) & ~any_unit_busy
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LOAD) & ~any_unit_busy & ~compact_index_fault
         )
         # One-cycle busy shadow: u_load.load_busy rises a cycle after
         # load_start (IDLE→START_SUB is a sync transition), leaving a gap in
@@ -1755,7 +1770,7 @@ class ChurchCore(Elaboratable):
             u_load.load_start.eq(load_start_sig),
             u_load.cr_src.eq(cr_src),
             u_load.cr_dst.eq(cr_dst),
-            u_load.index.eq(cap_index),
+            u_load.index.eq(compact_index[:32]),
         ]
 
         # Multi-cycle instructions own the fetched instruction and its NIA from
@@ -2685,6 +2700,8 @@ class ChurchCore(Elaboratable):
             ((nia_reg < code_lo_reg) | (nia_reg >= code_hi_reg))
         )
         with m.If(fetch_bounds_fault):
+            m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
+        with m.Elif(compact_index_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
         # Decoder/perm faults are combinational functions of the currently
         # fetched word.  While a multi-cycle unit owns the shared DMEM bus the

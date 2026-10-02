@@ -157,7 +157,8 @@ while len(BOOT_PROGRAM) < 256:
 
 NUC_PROGRAM = [
     # 0: load LED_DEV capability into CR3 from c-list slot 5 (via CR6)
-    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=5),
+    # Compact operand: DR0 + 5; encode_church packs raw operand bits.
+    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=(5 << 4)),
     # 1: DR1 = 1 (DWRITE "on" value)
     encode_turing(TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1),
     # ── LED0 ON phase ──────────────────────────────────────────────────────────
@@ -1010,9 +1011,9 @@ _WUKONG_BANNER = b"CM:WUKONG\r\n"
 WUKONG_NUC_PROGRAM = [
     # ── Setup (indices 0-2) — one-time capability loads ──────────────────────
     # 0: load LED_DEV capability into CR3 (c-list slot 5)
-    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=5),
+    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=3, cr_src=6, imm=(5 << 4)),
     # 1: load UART_DEV capability into CR4 (c-list slot 6)
-    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=4, cr_src=6, imm=6),
+    encode_church(ChurchOpcode.LOAD, CondCode.AL, cr_dst=4, cr_src=6, imm=(6 << 4)),
     # 2: DR1 = 1  (LED "on" value)
     encode_turing(TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=0, imm=1),
     # ── Loop top (index 3) — repeated every ~1 Hz ────────────────────────────

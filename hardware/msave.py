@@ -13,7 +13,7 @@ class ChurchMSave(Elaboratable):
         self.sub_start = Signal()
         self.sub_dst_cap = Signal(CAP_REG_LAYOUT)
         self.sub_src_gt = Signal(32)
-        self.sub_index = Signal(16)
+        self.sub_index = Signal(32)
         # Accepted per-register M authority permits exporting an isolated CR
         # without the ordinary source B/F export gates. Destination S and all
         # Namespace integrity/version checks remain mandatory.
@@ -43,7 +43,7 @@ class ChurchMSave(Elaboratable):
 
         dst_cap_reg = Signal(CAP_REG_LAYOUT)
         src_gt_reg = Signal(32)
-        index_reg = Signal(16)
+        index_reg = Signal(32)
         immutable_row0_reg = Signal()
         src_m_elevated_reg = Signal()
         fault_type_reg = Signal(5)
