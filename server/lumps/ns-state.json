@@ -110,36 +110,6 @@
       "type": "Inform"
     },
     {
-      "binary_hash": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5",
-      "f": 0,
-      "filename": "Tunnel.1.9381d362.lump",
-      "g": 0,
-      "limit": "0x0003F",
-      "location": "0x00000510",
-      "lump_version": 1,
-      "name": "Tunnel",
-      "seal": "0xDEA8D6EF",
-      "seq": 0,
-      "slot": 8,
-      "token": "00001f00",
-      "type": "Inform"
-    },
-    {
-      "binary_hash": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb",
-      "f": 0,
-      "filename": "Ethernet.1.fc72b0e3.lump",
-      "g": 0,
-      "limit": "0x0003F",
-      "location": "0x00000550",
-      "lump_version": 1,
-      "name": "Ethernet",
-      "seal": "0xDEA8F6EF",
-      "seq": 0,
-      "slot": 9,
-      "token": "b169bba4",
-      "type": "Inform"
-    },
-    {
       "binary_hash": "094fd4de8634a5d6255b4d066f6a7378b8c4255110fc4fc0a3b5eb5043ce0ec7",
       "boot": true,
       "boot_resident": true,
@@ -199,5 +169,9 @@
     }
   ],
   "generated_at": 1790775537.516451,
-  "save_mode": "table-only"
+  "save_mode": "table-only",
+  "freeSlotSequences": {
+    "8": 1,
+    "9": 1
+  }
 }
