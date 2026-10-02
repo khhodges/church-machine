@@ -105,7 +105,7 @@ if (result.errors.length > 0) {
 const words = result.words.map(word => {
     const op = (word >>> 27) & 0x1F;
     const crSrc = (word >>> 15) & 0xF;
-    return (crSrc === 6 && [0, 1, 8, 9].includes(op))
+    return (crSrc === 6 && [0, 1, 2, 8, 9].includes(op))
         ? ((word & ~0x1F) | ((word + 1) & 0x1F)) >>> 0 : word;
 });
 console.log(`Assembled ${words.length} instruction words.`);

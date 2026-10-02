@@ -172,6 +172,9 @@ register_suite "check-sha32-collisions" \
 register_suite "assembler-tests" \
     'npm test'
 
+register_suite "retired-opcode-tests" \
+    'node simulator/test_retired_opcodes.js && python3 -m pytest hardware/test_retired_opcodes.py -q'
+
 register_suite "fault-recovery-tests" \
     'node simulator/test_fault_recovery.js'
 

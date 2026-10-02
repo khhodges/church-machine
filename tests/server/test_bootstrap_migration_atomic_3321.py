@@ -151,6 +151,16 @@ def test_capability_rebuild_archives_displaced_bytes_and_approvals(tmp_path):
     active = [row for row in after if row.get("abstraction") == "CapabilityTest"
               and not row.get("archived", False)]
     assert len(active) == 1
+    raw = (catalog / active[0]["filename"]).read_bytes()
+    words = [int.from_bytes(raw[i:i + 4], "big") for i in range(0, len(raw), 4)]
+    cw = (words[0] >> 10) & 0x1FFF
+    code = words[1:1 + cw]
+    assert not any(word >> 27 in (8, 9) for word in code)
+    # SELF insertion moves WukongCallHome from declaration row 6 to row 7.
+    # Method zero encodes as selector one in imm[14:5]; row is imm[4:0].
+    assert any(word >> 27 == 2 and (word >> 15) & 15 == 6
+               and (word >> 19) & 15 == 0 and word & 0x7FFF == (1 << 5) | 7
+               for word in code)
     assert all(row.get("archived", False) for row in after
                if row.get("abstraction") == "CapabilityTest"
                and row["filename"] != active[0]["filename"])

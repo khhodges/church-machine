@@ -52,8 +52,8 @@ or change the ISA to make the implementations agree.
 | 5 | SWITCH | Legacy unit/dispatch present; independent semantic parity not established. IDX1 SWITCH is not currently enabled in software. |
 | 6 | TPERM | Targeted TPERM and permission-check tests pass. This does not certify all interactions with every caller and fault path. |
 | 7 | LAMBDA | Hardware target-capability/X-permission path present. No independently demonstrated coverage of every approved extended form or caller-scope/frame invariant. IDX1 LAMBDA is unavailable in current software. |
-| 8 | ELOADCALL | **Retirement enforced:** compilation returns an error; simulator and hardware reject before execution, including false conditions. Historical decoding remains available. |
-| 9 | XLOADLAMBDA | **Retirement enforced:** compilation returns an error; simulator and hardware reject before execution, including false conditions. Historical decoding remains available. |
+| 8 | ELOADCALL | **Targeted retirement pass:** explicit assembly and four formerly generating capability-call paths report errors; simulator and hardware reject before execution, including false conditions. Public compiler regressions cover the repaired paths. Historical decoding remains available. |
+| 9 | XLOADLAMBDA | **Targeted retirement pass:** explicit assembly errors; simulator/hardware reject before execution. No generated opcode-9 emitter found in CLOOMCCompiler; exhaustive frontend coverage is not claimed. Historical decoding remains available. |
 | 10 | IDX1 introducer | **Gap:** live hardware decoder rejects it with fault code 11. No hardware IDX1 packet/profile implementation was found. |
 | 16 | DREAD | Legacy unit/dispatch present. Full result, permissions, MMIO and containment parity unverified. IDX1 runtime DR±immediate packet mode absent. |
 | 17 | DWRITE | Legacy unit/dispatch present. Full write/permission/alias containment parity unverified. IDX1 packet mode absent. |
@@ -63,8 +63,8 @@ or change the ISA to make the implementations agree.
 | 21 | IADD | Core dispatch exists; scheduler tests use arithmetic incidentally. Full carry/overflow and operand-edge parity unverified. |
 | 22 | ISUB | Core dispatch exists. Full borrow/overflow and operand-edge parity unverified. |
 | 23 | BRANCH | Condition truth table and resumed-Thread condition tests passed in the earlier scheduler suite. All signed displacement/bounds cases unverified; IDX1 packet mode absent. |
-| 24 | SHL | **Targeted pass:** corrected test encodings and boot handshake; original result/flag assertions pass, including zero/large shifts and alternating-bit patterns. |
-| 25 | SHR | **Targeted pass:** original LSR/ASR, sign-extension, carry and zero/large-shift assertions pass after correcting test setup. Full cross-engine equivalence remains unverified. |
+| 24 | SHL | **Targeted pass:** corrected ISA setup encodings; direct result and NZCV checks pass for zero, one, large shifts and alternating patterns. See shift diagnosis below; not exhaustive equivalence. |
+| 25 | SHR | **Targeted pass:** LSR/ASR results and NZCV pass for positive/negative inputs and zero/one/large shifts. Acceptance, single retirement and stable writeback checked. |
 
 Other reserved/data encodings were not exhaustively swept in this audit.
 Acceptance of a decoded opcode alone does not prove correct execution.
@@ -105,7 +105,7 @@ evidence.
 | CALL/RETURN protected frame and authority | Focused frame, indexed CALL, mask and SAVE tests pass. No complete three-thread image differential trace collected. |
 | Thread flags and switching | Earlier 51-test scheduler suite passes, including NZCV truth table and resumed branches. |
 | Seals and permissions | 27 additional tests across M-window seal handling, permission checks and Namespace headers pass. |
-| Mode-2 abstract/outform behavior | Three unit tests pass; core integration fails before boot completes, so ingress behavior is not certified end-to-end. |
+| Mode-2 abstract/outform behavior | All four focused tests pass after the fault-aware boot handshake correction, including core integration. Not exhaustive ingress certification. |
 | Boot and IRQ integration | Broader run including boot/IRQ did not finish within five minutes. No pass or precise timeout attribution claimed. |
 | M-bit I/O and MMIO | Definitions are present; this audit did not establish full simulator/hardware equivalence for side effects. |
 | Saved tested image | Not downloaded, rebuilt, changed or run against RTL in this audit. User-reported published simulation success remains distinct evidence. |
@@ -121,7 +121,7 @@ Earlier checks retained as evidence (not rerun unnecessarily):
 * 51 passes: `hardware/test_wukong_thread_scheduler_contract.py`.
 * 18 passes: hardware readiness and readiness-launcher tests.
 
-New completed runs:
+Initial completed runs (superseded for shifts and Mode-2 by the follow-ups below):
 
 * 27 passes: `hardware/test_mwin_seal.py`, `test_perm_check.py`,
   `test_namespace_header_v2.py`.
@@ -145,8 +145,9 @@ Core dispatch inspection confirmed the active opcode-8/9 execution paths.
    and the stale active instruction reference. Do not silently translate code.
 2. Decide and record the candidate's supported execution profiles. A legacy-only
    candidate cannot be called full new-ISA hardware.
-3. Repair the boot prerequisites in instruction/integration tests, preserving
-   their substantive assertions.
+3. Apply fault-aware boot prerequisites to any remaining instruction/integration
+   tests that still assume fixed delays. Shift and Mode-2 suites are corrected,
+   preserving their substantive assertions.
 4. Implement the missing approved semantics with identical-byte differential
    tests, including permission failures, arithmetic overflow, out-of-range
    indices, illegal packet boundaries and no-side-effect rejection.
@@ -171,38 +172,68 @@ complete the boot-helper test with exactly CR12's M bit set. The 14 shift tests
 then reached their instruction/result assertions but failed. The subsequent
 diagnosis below supersedes that failure status. The ISA release verdict remains HOLD.
 
-## Follow-up: shift result failures resolved without hardware changes
 
-A first-case trace showed that the old setup word `0xAF080003` selects the
-register form of IADD (DR3), not immediate 3. With DR3 initially zero, it
-initialized the shift source to zero. The correct immediate word `0xAF084003`
-produces the expected source and subsequent SHR carry. Each instruction was
-observed retiring without a fault.
+## Follow-up: shift setup encoding and retirement verified
 
-The test helper now sets the unsigned-immediate selector and rejects values
-outside 0–16383. Negative source constants and subtractive result checks use
-explicit ISUB immediates, as specified in the ISA, rather than obsolete signed
-IADD encodings. The execution helper asserts exact instruction retirement
-and absence of faults instead of assuming a supplied word executed.
+The remaining shift failures were test encoding errors, not demonstrated shift
+hardware mismatches. `docs/isa_reference.md` IADD/ISUB specifies bit 14 as the
+immediate selector and bits 13:0 as an **unsigned** payload (0–16383).
+Negative values must be constructed by subtraction, not signed imm15.
+SHL/SHR use bits 4:0 for the amount and SHR bit 5 for ASR.
 
-Verification: `python3 -m pytest hardware/test_shift_ops.py -q --tb=short`
-reports **15 passed**: all 14 original shift tests with unchanged expected
-results/flags, plus an exact-word and immediate-range regression test.
-No production hardware, assembler, ISA, LUMP, Namespace or boot-image changes
-were needed. This resolves the shift-test evidence gap, not the separately
-identified retired-opcode and IDX1 release blockers.
+First LSR case, isolated Amaranth trace:
 
+| Stage | Old test | Corrected test |
+|---|---|---|
+| Boot | Completes at clock 9, no fault | Same bounded fault-aware handshake |
+| Setup decode | `0xAF080003`: IADD DR1, DR0, **DR3** (initially zero) | `0xAF084003`: IADD DR1, DR0, **#3** |
+| Setup acceptance/retirement | `retire_valid=1`, issuer NIA=0; next edge NIA=4 | Same single-edge acceptance and NIA advance |
+| Setup writeback | DR1=0; NZCV=(0,1,0,0) | DR1=3; NZCV=(0,0,0,0) |
+| SHR decode | `0xCF108001`: SHR DR2, DR1, #1, LSR | Identical word |
+| SHR acceptance/retirement | Issuer NIA=4; next edge NIA=8 | Same |
+| SHR writeback | DR2=0; NZCV=(0,1,0,0), correct for actual source zero | DR2=1; NZCV=(0,0,1,0), correct for source three |
+| Stall/idle | No second retirement or state change | Same, now asserted for every setup/shift |
+
+The old `0x7FFF` arithmetic payload also meant **+16383**, not −1.
+The tests now encode positive IADD immediates with `0x4000 | k` and explicitly
+use ISUB #1/#2 for negative setup and subtraction-based result probes. No
+timing change was needed beyond the earlier boot fix: the existing two-tick
+execution helper correctly covers the writeback edge and one-cycle stall.
+
+Regression evidence:
+
+* All original 14 shift cases retain their result and flag assertions.
+* Each instruction additionally checks fault-free acceptance, issuer word/NIA,
+  one NIA advance, direct destination value, and stable DR/flags after the
+  stall. Each shift checks all NZCV bits against an independent Python oracle.
+* Literal encoding tests pin the immediate selector, bounds, reference example,
+  ISUB negative construction, and SHR mode bit; invalid immediates are rejected.
+* A dedicated regression executes the old words with DR3=9 to demonstrate the
+  register-form distinction, verifies +16383, then verifies source 3 → LSR
+  result 1, the zero-result probe, and actual −1/−2 construction.
+
+Verified command:
+
+```sh
+python3 -m pytest hardware/test_shift_ops.py hardware/test_outform_mode2.py hardware/test_sim_boot_helpers.py -q
+```
+
+**25 passed**: 16 shift/encoding/retirement tests (14 original plus two
+regressions), four Mode-2 tests, five boot-helper cases.
+Only tests and this audit changed. No core arithmetic, ISA definitions, saved
+LUMPs, Namespace, boot images, synthesis, or flashing changed.
+The broader release verdict remains **HOLD** for the unrelated gaps above.
 ## Follow-up: approved opcode retirement enforced
 
 With explicit approval of the compatibility consequence for saved post-flash
-tests, opcodes 8/9 now reject in the normal compiler diagnostics, simulator
+tests, explicit opcode-8/9 mnemonics now reject in assembly diagnostics, simulator
 execution (including direct helper entry points), and both hardware decoder
 profiles. Core start signals for the legacy fused units are tied inactive.
 Disassembly is retained and no saved artifacts were rewritten or translated.
 
 New evidence:
 
-* `node simulator/test_retired_opcodes.js`: public compilation errors, suffixed
+* `node simulator/test_retired_opcodes.js`: public assembler errors, suffixed
   mnemonics, direct execution helper rejection, and actual step-path rejection
   with unchanged CR/DR/PC/STO, including false-condition words.
 * `hardware/test_retired_opcodes.py`: all 16 condition encodings reject in both
@@ -217,3 +248,64 @@ The reference and indexed-profile notes now clarify the hard retirement.
 Historical positive tests for fused execution are not authority to restore it.
 The whole repository suite has not been certified by this focused verification.
 **Release remains on hold for IDX1 and the other unverified audit items.**
+
+## Completion blocker isolation
+
+The findings in this section describe the state before the separately authorized
+repairs recorded below.
+
+Comparing against the main project confirms that the deployment configuration,
+assembler, high-level compiler, simulator, CapabilityTest source, bootstrap
+migration tests and publish-configuration tests are unchanged by the shift work.
+The following failures must not be attributed to shift arithmetic:
+
+* **Publish configuration:** the October 2, 2026, 17:31 UTC publishing commit
+  changed `.replit` from `deploymentTarget = "vm"` to `"cloudrun"`. The guard
+  added August 24 still requires `"vm"`. This is a repository configuration
+  mismatch, not evidence of current production availability or lost state.
+* **Bootstrap test prerequisites:** two tests in
+  `tests/server/test_bootstrap_migration_atomic_3321.py` invoke
+  `scripts/build_capability_test_lump.js` against disposable directories.
+  Assembly fails on `simulator/examples/capability_test.cloomc` line 98,
+  `ELOADCALL CR0, WukongCallHome.hw, 0`, under the incoming retirement guard.
+  The log also reports an out-of-range branch after that assembly failure.
+  These tests never reach their intended archive/collision assertions.
+* **Generated compiler gap:** `simulator/test_retired_opcodes.js` invokes
+  `ChurchAssembler.assemble`, not the high-level `CLOOMCCompiler.compile`
+  generation paths. With conventions `{Foo: {Run: {index: 0}}}`, a multiline
+  abstraction declaring `Foo L` and a method calling `Foo.Run(); return(0);`
+  compiles without errors and emits opcode 8 first. Runtime rejects it.
+  Explicit-mnemonic rejection therefore does not establish end-to-end compiler
+  retirement. Generated instruction paths need their own diagnostics and
+  public-compiler regressions before that claim is justified.
+
+Resolving these issues requires separate scope: reconciling the intended publish
+target, correcting the programmer-owned CapabilityTest source explicitly, and
+closing the generated-compiler retirement gap. Do not restore retired execution,
+weaken the guards, translate saved artifacts, or modify live Namespace/boot
+images merely to clear the shift task's completion checks.
+
+## Authorized completion-blocker repairs
+
+The user subsequently authorized compiler/source repairs and restoring the VM
+repository configuration, without publishing or changing saved/runtime artifacts.
+
+* `.replit` again specifies `vm`; the existing publish guard passes. No deploy
+  was performed, and no claim is made about the current production target.
+* The three statement-call generation paths and the symbolic call-expression
+  path now issue actionable errors instead of emitting retired ELOADCALL.
+  This is rejection, not automatic translation. Public `compile` regressions
+  cover bare calls, CALL-prefixed calls, wrapped calls and symbolic expressions,
+  plus a supported explicit CALL control case.
+* CapabilityTest's source was explicitly corrected to
+  `CALL CR6[WukongCallHome.hw], #0`. Its offline builder relocates opcode-2
+  CR6 c-list selectors when inserting compiler-owned SELF. A temporary rebuild
+  regression verifies method zero, row seven, and absence of retired opcodes.
+* The shared test runner now includes `retired-opcode-tests`, explicitly declared
+  script-only in its sync configuration. Served-script cache keys were refreshed.
+
+The combined bootstrap identity/migration, primary publish configuration, shift,
+Mode-2 and boot-helper run passed **75 tests**. This supersedes the earlier
+bootstrap and publish failures; broader ISA release certification remains HOLD.
+No saved LUMPs, live Namespace, boot images, generated RTL, or physical hardware
+were changed by these repairs.

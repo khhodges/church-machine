@@ -2457,7 +2457,7 @@ class CLOOMCCompiler {
         }
 
         // CALL Abstraction.Method(args) — uppercase keyword form; alias for call(Abstraction.Method(args))
-        // Compiles to ELOADCALL exactly like the lowercase wrapper form.
+        // This legacy form used ELOADCALL; reject until source is corrected.
         const callDotMatch = text.match(/^CALL\s+(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)$/i);
         if (callDotMatch && !/^CR\d+$/i.test(callDotMatch[1])) {
             const absName    = callDotMatch[1].toUpperCase();
@@ -2502,13 +2502,11 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callDotMatch[1]}' is out of range (0–31).` });
                 return;
             }
-            const eloadcallImm = (eloadcallMethodIdx << 5) | clistOffset;
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${callDotMatch[1]}.${methodName}` });
-            code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
+            errors.push({ line: stmt.lineNum, message: 'This capability-call syntax generates retired ELOADCALL. Correct the source explicitly using supported CALL syntax and recompile; automatic translation is not supported.' });
             return;
         }
 
-        // Abstraction.Method(args) — bare dot-notation; CALL is implied by the compiler.
+        // Abstraction.Method(args) — legacy fused call; reject, do not translate.
         // The most natural CLOOMC++ form: Scheduler.pause(10), Salvation.main(), etc.
         const bareDotMatch = text.match(/^(\w+)\.(\w+)\s*\(\s*(.*?)\s*\)$/);
         if (bareDotMatch && !/^recall$/i.test(bareDotMatch[1]) && !/^relambda$/i.test(bareDotMatch[1])) {
@@ -2554,9 +2552,7 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${bareDotMatch[1]}' is out of range (0–31).` });
                 return;
             }
-            const eloadcallImm = (eloadcallMethodIdx << 5) | clistOffset;
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${bareDotMatch[1]}.${methodName} (implied call)` });
-            code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
+            errors.push({ line: stmt.lineNum, message: 'This capability-call syntax generates retired ELOADCALL. Correct the source explicitly using supported CALL syntax and recompile; automatic translation is not supported.' });
             return;
         }
 
@@ -2669,9 +2665,7 @@ class CLOOMCCompiler {
                 errors.push({ line: stmt.lineNum, message: `C-list row ${clistOffset} for '${callMatch[2]}' is out of range (0–31 allowed for ELOADCALL).` });
                 return;
             }
-            const eloadcallImm = (eloadcallMethodIdx << 5) | clistOffset;
-            manifest.push({ src: stmt.lineNum, addr: code.length, desc: `ELOADCALL CR0, CR6[${clistOffset}], method=${eloadcallMethodIdx} -> ${callMatch[2]}.${methodName}` });
-            code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadcallImm));
+            errors.push({ line: stmt.lineNum, message: 'This capability-call syntax generates retired ELOADCALL. Correct the source explicitly using supported CALL syntax and recompile; automatic translation is not supported.' });
 
             if (resultVar) {
                 const dr = this._allocLocal(resultVar, locals, errors, stmt.lineNum);
@@ -4231,9 +4225,7 @@ class CLOOMCCompiler {
                         emitExpr(arg, targetDR, lineNum);
                     }
                 }
-                const eloadImm = ((methodIdx + 1) << 5) | (clistSlot & 0x1F);
-                code.push(this.encode(this.opcodes.ELOADCALL, 14, 0, 6, eloadImm));
-                manifest.push({ line: lineNum, instr: `ELOADCALL CR0, CR6[${clistSlot}], method=${methodIdx + 1}`, comment: `${absName}.${mName}(${argsStr}) → DR1` });
+                errors.push({ line: lineNum, message: 'This capability-call expression generates retired ELOADCALL. Correct the source explicitly using supported CALL syntax and recompile; automatic translation is not supported.' });
                 const resultDR = this.DR_ARGS_START;
                 if (dstDR !== resultDR) {
                     code.push(this.encode(this.opcodes.IADD, 14, dstDR, resultDR, 0));

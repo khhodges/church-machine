@@ -10,7 +10,6 @@ Run with:  python -m hardware.test_shift_ops
 """
 
 from amaranth.sim import Simulator
-import pytest
 
 from .core import ChurchCore
 from .hw_types import TuringOpcode, CondCode
@@ -39,14 +38,14 @@ def _enc(opcode, cond, dr_dst, dr_src, imm15):
 
 
 def encode_iadd(dr_dst, dr_src, imm):
-    """IADD immediate: bit 14 selects unsigned imm14, not a sign bit."""
+    """IADD immediate: bit 14 selects an unsigned 14-bit payload."""
     if not 0 <= imm <= 0x3FFF:
         raise ValueError("IADD immediate must be unsigned 14-bit")
     return _enc(TuringOpcode.IADD, CondCode.AL, dr_dst, dr_src, 0x4000 | imm)
 
 
 def encode_isub(dr_dst, dr_src, imm):
-    """ISUB immediate; DR0 minus a magnitude constructs negative constants."""
+    """ISUB immediate; subtract from DR0 to construct negative values."""
     if not 0 <= imm <= 0x3FFF:
         raise ValueError("ISUB immediate must be unsigned 14-bit")
     return _enc(TuringOpcode.ISUB, CondCode.AL, dr_dst, dr_src, 0x4000 | imm)
@@ -98,19 +97,104 @@ async def _exec(ctx, dut, instr):
     """
     ctx.set(dut.imem_valid, 1)
     ctx.set(dut.imem_data,  instr)
-    assert ctx.get(dut.retire_valid), "Test instruction was not accepted"
-    assert ctx.get(dut.retire_instr) == instr
-    assert not ctx.get(dut.fault_valid), f"Instruction fault {ctx.get(dut.fault)}"
+    nia = ctx.get(dut.nia)
+    assert not ctx.get(dut.fault_valid)
     assert not ctx.get(dut.retire_fault_valid)
+    assert ctx.get(dut.retire_valid), "Instruction was not accepted"
+    assert ctx.get(dut.retire_instr) == instr
+    assert ctx.get(dut.retire_nia) == nia
+    # Independent ISA oracle checks every setup and shift result directly.
+    opcode = (instr >> 27) & 0x1F
+    dst, src = (instr >> 19) & 15, (instr >> 15) & 15
+    value = ctx.get(dut.debug_dr_words[src])
+    imm = instr & 0x7FFF
+    if opcode in (TuringOpcode.IADD, TuringOpcode.ISUB):
+        rhs = (imm & 0x3FFF) if imm & 0x4000 else ctx.get(dut.debug_dr_words[imm & 15])
+        expected = value + rhs if opcode == TuringOpcode.IADD else value - rhs
+    else:
+        amount = imm & 31
+        if opcode == TuringOpcode.SHL:
+            expected = value << amount
+            carry = (value >> (32 - amount)) & 1 if amount else 0
+        else:
+            assert opcode == TuringOpcode.SHR
+            signed_value = value - (1 << 32) if imm & 0x20 and value & 0x80000000 else value
+            expected = signed_value >> amount
+            carry = (value >> (amount - 1)) & 1 if amount else 0
+    expected &= 0xFFFFFFFF
     await ctx.tick()
     ctx.set(dut.imem_valid, 0)
+    assert not ctx.get(dut.fault_valid)
+    assert ctx.get(dut.nia) == nia + 4
+    assert ctx.get(dut.debug_dr_words[dst]) == (expected if dst else 0)
+    if opcode in (TuringOpcode.SHL, TuringOpcode.SHR):
+        assert _get_flags(ctx, dut) == (expected >> 31, int(expected == 0), carry, 0)
+    flags = _get_flags(ctx, dut)
+    assert not ctx.get(dut.retire_valid)
     await ctx.tick()
-    assert not ctx.get(dut.fault_valid), f"Post-instruction fault {ctx.get(dut.fault)}"
+    assert not ctx.get(dut.fault_valid)
+    assert not ctx.get(dut.retire_valid)
+    assert ctx.get(dut.nia) == nia + 4
+    assert ctx.get(dut.debug_dr_words[dst]) == (expected if dst else 0)
+    assert _get_flags(ctx, dut) == flags
 
 
 # ---------------------------------------------------------------------------
 # Test cases
 # ---------------------------------------------------------------------------
+
+def test_arithmetic_setup_encoding():
+    """Pin literal ISA words so the result oracle cannot hide helper drift."""
+    assert encode_iadd(1, 0, 3) == 0xAF084003
+    assert encode_iadd(2, 1, 10) == 0xAF10C00A  # ISA reference example
+    assert encode_iadd(1, 0, 0) == 0xAF084000
+    assert encode_iadd(1, 0, 16383) == 0xAF087FFF
+    assert encode_isub(1, 0, 1) == 0xB7084001
+    assert encode_shr(2, 1, 1) == 0xCF108001
+    assert encode_shr(2, 1, 1, asr=True) == 0xCF108021
+    for encoder in (encode_iadd, encode_isub):
+        assert encoder(1, 0, 0) & 0x7FFF == 0x4000
+        assert encoder(1, 0, 0x3FFF) & 0x7FFF == 0x7FFF
+        for invalid in (-1, 16384, 0x7FFF):
+            try:
+                encoder(1, 0, invalid)
+            except ValueError:
+                pass
+            else:
+                raise AssertionError(f"Accepted non-ISA immediate {invalid}")
+
+
+def test_first_shr_setup_and_retirement():
+    """Reproduce old words, then prove the intended setup/SHR/writeback."""
+    dut = ChurchCore(iot_profile=True)
+
+    async def testbench(ctx):
+        await _boot(ctx, dut)
+        # Old 'immediate 3' was register DR3. Make the distinction observable.
+        await _exec(ctx, dut, encode_iadd(3, 0, 9))
+        await _exec(ctx, dut, 0xAF080003)
+        assert ctx.get(dut.debug_dr_words[1]) == 9
+        # Old '-1' was actually the largest positive immediate.
+        await _exec(ctx, dut, 0xAF087FFF)
+        assert ctx.get(dut.debug_dr_words[1]) == 16383
+        await _exec(ctx, dut, encode_iadd(1, 0, 3))
+        assert ctx.get(dut.debug_dr_words[1]) == 3
+        await _exec(ctx, dut, encode_shr(2, 1, 1))
+        assert ctx.get(dut.debug_dr_words[2]) == 1
+        assert _get_flags(ctx, dut) == (0, 0, 1, 0)
+        await _exec(ctx, dut, encode_isub(3, 2, 1))
+        assert ctx.get(dut.debug_dr_words[3]) == 0
+        assert _get_flags(ctx, dut) == (0, 1, 1, 0)
+        await _exec(ctx, dut, encode_isub(1, 0, 1))
+        assert ctx.get(dut.debug_dr_words[1]) == 0xFFFFFFFF
+        await _exec(ctx, dut, encode_isub(1, 0, 2))
+        assert ctx.get(dut.debug_dr_words[1]) == 0xFFFFFFFE
+
+    sim = Simulator(dut)
+    sim.add_clock(1e-6)
+    sim.add_testbench(testbench)
+    sim.run()
+
 
 def test_shr_lsr_c_set():
     """SHR LSR — C = last bit shifted out = 1.
@@ -129,7 +213,6 @@ def test_shr_lsr_c_set():
         assert N == 0, f"SHR LSR C-set: expected N=0, got N={N}"
         assert Z == 0, f"SHR LSR C-set: expected Z=0, got Z={Z}"
         # Direct result check: DR2 + (-1) should be 0 → Z=1
-        # Unsigned immediate subtraction checks the result without a signed encoding.
         await _exec(ctx, dut, encode_isub(3, 2, 1))  # DR3 = DR2 - 1
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, f"SHR LSR C-set: result check failed — DR2 should be 1, got Z2={Z2} (DR2+(-1) ≠ 0)"
@@ -175,7 +258,7 @@ def test_shr_lsr_c_clear():
 def test_shr_asr_negative_result():
     """SHR ASR — sign-extension of a negative value.
 
-    Source = -1 (0xFFFFFFFF), constructed with ISUB from DR0.
+    Source = -1 (0xFFFFFFFF), constructed with ISUB DR1, DR0, #1.
     Shift right by 1 with ASR (imm[5]=1).
     Expected: result = 0xFFFFFFFF (-1), N=1, C=1 (bit 0 of src was 1).
     LSR of -1 would give 0x7FFFFFFF (N=0), so N=1 distinguishes ASR from LSR.
@@ -214,7 +297,7 @@ def test_shr_asr_negative_result():
 def test_shr_asr_c_clear():
     """SHR ASR — C = 0 when the bit shifted out is 0.
 
-    Source = -2 (0xFFFFFFFE), constructed with ISUB from DR0.
+    Source = -2 (0xFFFFFFFE), constructed with ISUB DR1, DR0, #2.
     Shift right by 1 with ASR.
     Expected: result = 0xFFFFFFFF (-1), N=1, C=0 (bit 0 of src was 0).
     """
@@ -300,7 +383,7 @@ def test_shl_c_clear():
             f"got C={C} (N={N} Z={Z} V={V})")
         assert N == 0, f"SHL C-clear: expected N=0, got N={N}"
         assert Z == 0, f"SHL C-clear: expected Z=0, got Z={Z}"
-        # Direct result check: DR2 + (-2) should be 0 → Z=1  (result = 2; -2 = imm15 0x7FFE)
+        # Direct result check: DR2 - 2 should be 0 → Z=1 (result = 2).
         await _exec(ctx, dut, encode_isub(3, 2, 2))  # DR3 = DR2 - 2
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, (
@@ -518,7 +601,7 @@ def test_shr_asr_positive_no_sign_extend():
         assert C == 0, (
             f"SHR ASR positive: expected C=0 (src bit-0 of 4 is 0), "
             f"got C={C} (N={N} Z={Z} V={V})")
-        # Direct result check: DR2 + (-2) should be 0 → Z=1  (result = 2; -2 = imm15 0x7FFE)
+        # Direct result check: DR2 - 2 should be 0 → Z=1 (result = 2).
         await _exec(ctx, dut, encode_isub(3, 2, 2))  # DR3 = DR2 - 2
         _, Z2, _, _ = _get_flags(ctx, dut)
         assert Z2 == 1, (
@@ -545,9 +628,8 @@ def test_shl_alternating_bits():
       Bit 31 of 0xAAAAAAAA = 1  → C = 1.
       Result = 0x55555554        → N = 0 (bit 31 = 0), Z = 0.
 
-    Both values are built register-by-register since they exceed the 15-bit
-    immediate range.  The test verifies the C and N flags only; an incorrect
-    carry would corrupt bit 31 and flip N.
+    Both values are built register-by-register since they exceed the unsigned
+    14-bit immediate range. Direct result and NZCV checks cover every shift.
     """
     dut = ChurchCore(iot_profile=True)
 
@@ -555,7 +637,7 @@ def test_shl_alternating_bits():
         await _boot(ctx, dut)
 
         # Build 0x55555555 in DR7 using byte-at-a-time construction.
-        # 0x55 = 85 fits in imm15; shifting and adding builds the full pattern.
+        # 0x55 = 85 fits in unsigned imm14; shifts and adds build the pattern.
         await _exec(ctx, dut, encode_iadd(1, 0, 0x55))   # DR1 = 0x00000055
         await _exec(ctx, dut, encode_shl(2, 1, 8))        # DR2 = 0x00005500
         await _exec(ctx, dut, encode_iadd(2, 2, 0x55))    # DR2 = 0x00005555
@@ -577,7 +659,7 @@ def test_shl_alternating_bits():
         print("  PASS: SHL (shift_amt=1, src=0x55555555) → N=1, Z=0, C=0 (no carry leakage)")
 
         # Build 0xAAAAAAAA in DR8 using byte-at-a-time construction.
-        # 0xAA = 170 fits in imm15.
+        # 0xAA = 170 fits in unsigned imm14.
         await _exec(ctx, dut, encode_iadd(6, 0, 0xAA))   # DR6 = 0x000000AA
         await _exec(ctx, dut, encode_shl(7, 6, 8))        # DR7 = 0x0000AA00
         await _exec(ctx, dut, encode_iadd(7, 7, 0xAA))    # DR7 = 0x0000AAAA
@@ -610,18 +692,9 @@ def test_shl_alternating_bits():
 # Entry point
 # ---------------------------------------------------------------------------
 
-def test_setup_arithmetic_encoding_matches_isa():
-    assert encode_iadd(1, 0, 3) == 0xAF084003
-    assert encode_isub(1, 0, 1) == 0xB7084001
-    for encode in (encode_iadd, encode_isub):
-        assert encode(1, 0, 0) & 0x7FFF == 0x4000
-        assert encode(1, 0, 0x3FFF) & 0x7FFF == 0x7FFF
-        for invalid in (-1, 0x4000, 0x7FFF):
-            with pytest.raises(ValueError):
-                encode(1, 0, invalid)
-
 _ALL_TESTS = (
-    test_setup_arithmetic_encoding_matches_isa,
+    test_arithmetic_setup_encoding,
+    test_first_shr_setup_and_retirement,
     test_shr_lsr_c_set,
     test_shr_lsr_c_clear,
     test_shr_asr_negative_result,

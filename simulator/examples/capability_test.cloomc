@@ -91,11 +91,11 @@ SHL  DR4, DR4, 3      ; DR4 = 8
 SHR  DR4, DR4, 1      ; DR4 = 4
 
 ; ============================================================
-; TEST 8: ELOADCALL -- continue to the hardware call-home abstraction
+; TEST 8: CALL through CR6 -- continue to the hardware call-home abstraction
 ; ============================================================
 ; SelfTest already ran before Starter/CapabilityTest. Calling it again here
 ; creates the unbounded SelfTest → CapabilityTest → SelfTest frame cycle.
-ELOADCALL CR0, WukongCallHome.hw, 0
+CALL CR6[WukongCallHome.hw], #0
 
 ; If call-home returns, rerun the capability checks without re-entering SelfTest.
 BRANCH Start

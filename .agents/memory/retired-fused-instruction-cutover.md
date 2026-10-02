@@ -15,3 +15,14 @@ do not translate or replace them automatically.
 
 **Why:** Keeping an older test executable is not an exception to the hard cutover.
 Programmer source correction and rebuilding remain explicit actions.
+
+Retirement evidence must distinguish explicit assembly rejection from
+high-level compiler-generated instructions.
+
+**Why:** An assembler test described as “public compilation” did not cover
+capability-call lowering, so successful compilation could still produce an
+instruction that runtime rejected.
+
+**How to apply:** Exercise the high-level compiler with known method conventions
+and real generated calls; inspect emitted opcodes as well as diagnostics.
+Assembly-only coverage cannot certify compiler-wide retirement.
