@@ -360,3 +360,17 @@ mtime_ms = 1790964169180
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/30d4e32f-edd5-4ced-b89c-02c92d41ae7d/4593fcda-42b0-47e0-8029-3c32d52f2bf9"
 storage_version_token = "1790964179548459"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "IgfxI4mqSAquN7iop_Mtu"
+uri = "file://reports/isa-compatibility-audit-2026-10-02.md"
+type = "text"
+title = "ISA compatibility audit"
+description = "Findings across the full opcode inventory, measured simulator/RTL differences, specification conflicts, and reproduction commands."
+logical_id = "92f92bdf-3143-4dfb-bd8e-b93f783f5e1a"
+content_hash = "sha256:f62e4c079f6986276c6d34f146068afc0830c51ce378f74347220e36df867128"
+size = 14779
+mtime_ms = 1790975347135
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/92f92bdf-3143-4dfb-bd8e-b93f783f5e1a/ced35232-11dd-40b7-976a-e6a90f0bb646"
+storage_version_token = "1790975381854083"
+content_type = "text/markdown"

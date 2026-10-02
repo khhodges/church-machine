@@ -127,3 +127,15 @@ reference analysis still deletes capabilities needed by the new instructions.
 **How to apply:** Include zero-unreferenced, compaction, and row-rewrite paths
 in any indexed-encoding change; block destructive transformations when their
 reachable rows cannot be established.
+
+ISA compatibility reviews must compare both simulator and Amaranth against
+the master ISA, not treat either implementation as the oracle.
+
+**Why:** The user approved an evidence-based, full-ISA audit before RTL
+correction rather than assuming the LOAD/SAVE discrepancy was the only issue.
+Shared implementation behavior and passing regressions do not establish
+conformance to the authoritative specification.
+
+**How to apply:** Separate measured mismatches, source-level findings,
+specification ambiguities, and untested cases. Do not silently resolve
+contradictory requirements by copying one implementation into the other.
