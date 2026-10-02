@@ -7,7 +7,8 @@
     let revision = 0;
     let history = [];
     let historySelection = '';
-    let message = 'No simulation activated. Save the Namespace Table, then prepare, approve and activate a private simulation configuration.';
+    let message = 'Press Run to validate and run the saved image. Private configuration review is optional.';
+    let savedImageLoad = null;
     const freeze = value => {
         if (value && typeof value === 'object') {
             Object.values(value).forEach(freeze);
@@ -74,7 +75,9 @@
                 (review.approvedRevisionId ? '<br>Approved simulation revision: <code>' +
                     escape(review.approvedRevisionId) + '</code>' : '') + '</p>' : '') +
             (active ? '<p>Loaded simulation / execution evidence configuration: <code>' + escape(active.configurationHash) +
-                '</code><br>Frozen Namespace: <code>' + escape(active.sourceNamespaceFingerprint) + '</code></p>' : '') +
+                '</code><br>' + (active.origin === 'saved-image'
+                    ? 'Exact saved image · software simulation only'
+                    : 'Frozen Namespace: <code>' + escape(active.sourceNamespaceFingerprint) + '</code>') + '</p>' : '') +
             '<small>Simulation only—not hardware certification. Review and approval do not activate or execute. Activation does not start Run.</small>';
     }
     function render() {
@@ -96,6 +99,48 @@
                 data.nextAction].filter(Boolean).join(' '));
         }
         return data;
+    }
+    async function activateSavedImage() {
+        if (sim.simulationConfiguration && sim._bootImageLoaded === true) return true;
+        if (savedImageLoad) return savedImageLoad;
+        if (busy) throw new Error('A private configuration operation is in progress. Wait for it to finish, then press Run.');
+        busy = true;
+        savedImageLoad = (async () => {
+            idle();
+            const machine = sim;
+            const response = await fetch('/api/boot-image/binary?simulator=1', {cache: 'no-store'});
+            if (!response.ok) {
+                const data = await response.json().catch(() => ({}));
+                throw new Error(data.error || `Saved image could not be read (${response.status}).`);
+            }
+            const image = await response.arrayBuffer();
+            const digest = await crypto.subtle.digest('SHA-256', image);
+            const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+            idle();
+            if (sim !== machine) throw new Error('Simulator changed while loading. Press Run again.');
+            // Another explicit activation wins; never replace a paused configuration.
+            if (sim.simulationConfiguration && sim._bootImageLoaded === true) return true;
+            if (!window.TargetState.authorize('simulator', {id: 'simulator-state'}).ok) {
+                throw new Error('Target changed while loading. Select Simulator and press Run again.');
+            }
+            // Uses detached-machine validation, exact-byte binding and retained
+            // reset bytes. This is not a fabricated approval or hardware release.
+            sim.activateSimulationConfiguration(image, {
+                preparationId: 'saved-image:' + hash,
+                configurationHash: hash, imageHash: hash,
+                origin: 'saved-image', approved: false, hardwareCertified: false,
+            });
+            message = 'Saved image loaded for simulation. Unsaved edits were not applied.';
+            const output = document.getElementById('editorConsole');
+            if (output) output.textContent += '\n[SAVED IMAGE] SHA-256: ' + hash +
+                '\nRunning the saved image; editor and Namespace drafts are unchanged.' +
+                (response.headers.get('X-Simulator-Image-Stale') === 'true'
+                    ? '\nWarning: saved inputs have changed since this image was built; running the existing bytes.' : '');
+            if (typeof updateDashboard === 'function') updateDashboard();
+            return true;
+        })();
+        try { return await savedImageLoad; }
+        finally { savedImageLoad = null; busy = false; render(); }
     }
     async function refreshHistory() {
         if (busy) return false;
@@ -219,6 +264,7 @@
         }
     }
     window.SimulationPreparation = {
+        activateSavedImage,
         prepare: () => perform('prepare'),
         approve: () => perform('approve'),
         activate: () => perform('activate'),

@@ -2189,6 +2189,18 @@ async function _applyPendingSimLoad() {
 async function runSimGo(preserveView, options) {
     if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    if (!_bootHasCommittedImage()) {
+        try {
+            await window.SimulationPreparation.activateSavedImage();
+        } catch (error) {
+            _showBootPreparationBlocked('Run', {
+                message: error.message || String(error),
+                nextAction: 'The saved image could not be loaded. Resolve the reported error, then press Run again. No image was rebuilt and no saved data was changed.',
+            });
+            return;
+        }
+    }
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Run')) return;
     // Guard: if a run batch loop is already active (either mid-batch where
     // sim.running is true, or between setTimeout(runBatch) ticks where

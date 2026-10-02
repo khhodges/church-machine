@@ -30,6 +30,7 @@ const context = {
     pipelineViz: { setNIA() {}, reset() {} },
     faultAlertOff() {}, switchView() {}, _clearLumpPetNames() {}, updateDashboard() {},
     _blockBootForMissingCommittedImage(name) { calls.push(name); return false; },
+    _showBootPreparationBlocked(name) { calls.push(name); },
     fetch() { throw new Error('unexpected fetch'); },
     console, Promise,
 };

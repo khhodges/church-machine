@@ -31,6 +31,15 @@ and artifact bytes. It must never choose a newer revision or publish normalized
 rows. Review, configuration approval, and activation are distinct actions.
 Simulation configuration approval is not hardware executable admission.
 
+Run may bypass that optional private-review workflow: when nothing is active,
+read and validate the exact saved image, bind its digest as saved-image execution
+evidence (not an approval), and start. Resume an existing active machine without
+reloading it. Never rebuild, publish, change drafts, select newer artifacts, or
+touch hardware as part of one-click Run.
+
+**Why:** The user explicitly approved replacing mandatory preparation/approval/
+activation clicks with one-click Run of the already saved image.
+
 **Why:** The saved design must remain unchanged while a programmer experiments
 with a proposed combined layout; test evidence applies only to that configuration.
 

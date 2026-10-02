@@ -1676,7 +1676,7 @@ function init() {
     // views must not probe, load or run a shared repository image.
     const startupConsole = document.getElementById('editorConsole');
     if (startupConsole) startupConsole.textContent +=
-        '\nNo simulation activated. Prepare, approve and activate a Namespace configuration.';
+        '\nReady. Press Run to validate and run the saved image. Unsaved edits will not be applied.';
     sim.on('programLoaded', () => {
         if (currentView === 'namespace') updateNamespace();
         if (currentView === 'abstractions') renderAbstractions();
