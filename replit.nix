@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.iverilog
     pkgs.zip
     pkgs.chromium
     pkgs.libdrm
