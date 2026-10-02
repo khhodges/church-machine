@@ -13,7 +13,7 @@ def _fixture(tmp_path, monkeypatch, *, size=128, thread=False, second=False):
     # Replace only external boot validation in this small deterministic
     # geometry fixture; the production report still calls the real validators.
     monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image",
-                        lambda _image, *, check_layout=True: None)
+                        lambda _image, *, check_layout=True, saved_namespace_only=False: None)
     monkeypatch.setattr(boot_capacity.boot_image, "validate_resident_boot_profile",
                         lambda _: None)
     monkeypatch.setattr(boot_capacity.boot_image, "namespace_boot_marker_slot",
@@ -124,7 +124,7 @@ def test_source_length_and_compression_follow_content_frame_contract(tmp_path, m
 
 def test_invalid_image_still_lists_hash_verified_saved_cost(tmp_path, monkeypatch):
     rows, image = _fixture(tmp_path, monkeypatch)
-    def invalid(_image, *, check_layout=True):
+    def invalid(_image, *, check_layout=True, saved_namespace_only=False):
         raise ValueError("invalid boot image")
     monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", invalid)
     report = boot_capacity.capacity_report(rows, image, str(tmp_path))
@@ -137,7 +137,7 @@ def test_invalid_image_still_lists_hash_verified_saved_cost(tmp_path, monkeypatc
 
 def test_invalid_layout_retains_verified_installed_size(tmp_path, monkeypatch):
     rows, image = _fixture(tmp_path, monkeypatch)
-    def layout_only(_image, *, check_layout=True):
+    def layout_only(_image, *, check_layout=True, saved_namespace_only=False):
         if check_layout:
             raise ValueError("overlapping bodies")
     monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", layout_only)
@@ -296,7 +296,7 @@ def test_duplicate_image_overlap_is_one_diagnostic(tmp_path, monkeypatch):
     words = list(struct.unpack("<1280I", image))
     words[64] = words[300]
     words[1280 - 3 * 4] = 64
-    def validate(_, *, check_layout=True):
+    def validate(_, *, check_layout=True, saved_namespace_only=False):
         if check_layout:
             raise ValueError("validate_boot_image: NS slot 1 [16, 144) overlaps NS slot 2 [64, 192)")
     monkeypatch.setattr(boot_capacity.boot_image, "validate_boot_image", validate)

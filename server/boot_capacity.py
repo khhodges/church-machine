@@ -92,24 +92,44 @@ def _saved_cost(row, lumps_dir):
 
 def _namespace_problems(rows, lumps_dir, config):
     """Current assignments only; never take their geometry from an old image."""
-    from server.namespace_allocation import _physical, _range
+    from server.namespace_image_refresh import integer
     problems, claims = [], [("Namespace header", 0, 16)]
     step = (config or {}).get("step1", {})
     if step.get("totalNamespaceWords") and step.get("nsSlotsMax"):
         total, slots = int(step["totalNamespaceWords"]), int(step["nsSlotsMax"])
         claims.append(("Namespace table", total - slots * 4, total))
     for row in rows:
-        if not isinstance(row, dict) or row.get("slot") == 0 or not _physical(row):
+        if (not isinstance(row, dict) or row.get("slot") == 0
+                or row.get("symbolic") or row.get("implementationMissing")
+                or row.get("type") in ("Device", "IO")):
             continue
-        # Without architecture config, generated Thread geometry is unknown.
-        if not config and (row.get("slot") == 1 or not row.get("filename")):
+        if not row.get("filename") and row.get("type") != "Thread":
             continue
         try:
-            slot, start, end = _range(row, lumps_dir, config or {}, {})
+            slot, start = row["slot"], integer(row["location"])
+            if row.get("filename"):
+                from pathlib import Path
+                from server.simulation_preparation import _validate_body
+                filename = row["filename"]
+                if not isinstance(filename, str) or Path(filename).name != filename:
+                    raise ValueError(f"NS[{slot}]: invalid saved artifact filename")
+                raw = (Path(lumps_dir) / filename).read_bytes()
+                expected = row.get("binary_hash") or row.get("binaryHash")
+                if not isinstance(expected, str) or hashlib.sha256(raw).hexdigest() != expected.lower():
+                    raise ValueError(f"NS[{slot}]: exact saved artifact hash mismatch")
+                size = len(_validate_body(raw))
+            else:
+                if not config and "allocationWords" not in row:
+                    continue
+                size = integer(row.get("allocationWords", step.get("threadLumpWords")))
+                if not boot_image.thread_layout(size, integer(row.get(
+                        "stackWords", step.get("threadStackWords", 32))))["valid"]:
+                    raise ValueError(f"NS[{slot}]: invalid saved Thread geometry")
+            end = start + size
             claims.append((f"NS[{slot}] {row.get('name', '')}", start, end))
             if step.get("totalNamespaceWords") and end > int(step["totalNamespaceWords"]):
                 problems.append(f"NS[{slot}] allocation exceeds configured Namespace memory. Review its placement.")
-        except ValueError as error:
+        except (OSError, ValueError, TypeError, KeyError) as error:
             problems.append(str(error))
     for i, (name, start, end) in enumerate(claims):
         for other, left, right in claims[i + 1:]:
@@ -167,12 +187,15 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
         if not report["imageMatchesNamespaceRevision"]:
             warnings.append("Stored image is not proven to implement this approved Namespace revision; image ranges are diagnostic evidence only.")
     try:
-        if not generic:
-            boot_image.validate_resident_boot_profile(rows)
         boot_image.namespace_boot_marker_slot(rows)
-        if generic:
-            from server.namespace_image_refresh import reconstruct
+        # Saved assignments, never an old resident catalog, define membership.
+        # Validate the same candidate as Refresh Image even before provenance
+        # exists, so the report shows actual rebuild blockers.
+        from server.namespace_image_refresh import reconstruct
+        rebuilt = None
+        if config is not None or generic:
             rebuilt, _ = reconstruct(config, rows, lumps_dir)
+        if generic:
             if rebuilt != image_bytes:
                 raise ValueError("Stored generic image differs from exact saved reconstruction")
             # The saved-only walk has validated all authorized ranges. Legacy
@@ -192,7 +215,7 @@ def capacity_report(rows, image_bytes, lumps_dir, *, target_board=None, config=N
                 raise ValueError("Boot image length is not word aligned")
             # Forensic reporting needs intact descriptors and known saved
             # allocations even when the composite placement is invalid.
-            validation_options = {"saved_namespace_only": True} if generic else {}
+            validation_options = {"saved_namespace_only": True}
             boot_image.validate_boot_image(image_bytes, check_layout=False, **validation_options)
             try:
                 boot_image.validate_boot_image(image_bytes, **validation_options)

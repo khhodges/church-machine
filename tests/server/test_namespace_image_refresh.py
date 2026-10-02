@@ -42,6 +42,44 @@ def store(root):
     return refresh.RefreshStore(root, root / "ns-state.json", root / "config.json")
 
 
+def test_capacity_never_requires_legacy_catalog(tmp_path, monkeypatch):
+    cfg, rows = fixture(tmp_path)
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Legacy catalog must not select Namespace membership")
+    monkeypatch.setattr(refresh.boot, "validate_resident_boot_profile", forbidden)
+    report = capacity_report(rows, None, str(tmp_path), config=cfg)
+    assert not any("missing fixed Namespace" in warning for warning in report["warnings"])
+    assert report["namespaceWarnings"] == []
+
+
+def test_capacity_uses_saved_only_validation_even_for_old_image(tmp_path, monkeypatch):
+    cfg, rows = fixture(tmp_path)
+    image, _ = refresh.reconstruct(cfg, rows, tmp_path)
+    original = refresh.boot.validate_boot_image
+    calls = []
+    def validate(*args, **kwargs):
+        calls.append(kwargs)
+        assert kwargs.get("saved_namespace_only") is True
+        return original(*args, **kwargs)
+    monkeypatch.setattr(refresh.boot, "validate_boot_image", validate)
+    report = capacity_report(rows, image, str(tmp_path), config=cfg)
+    assert calls
+    assert report["namespaceWarnings"] == []
+    assert not any("missing fixed Namespace" in warning for warning in report["warnings"])
+
+
+def test_refresh_reports_all_unbound_slots_without_substitution(tmp_path):
+    cfg, rows = fixture(tmp_path)
+    for slot in (1, 11, 12):
+        rows.append(dict(slot=slot, name=f"Unbound{slot}", type="Inform",
+                         location=2048, limit=255, seq=0, load_policy="Resident"))
+    with pytest.raises(ValueError) as error:
+        refresh.reconstruct(cfg, rows, tmp_path)
+    for slot in (1, 11, 12):
+        assert f"NS[{slot}]" in str(error.value)
+    assert "stored image unchanged" in str(error.value)
+
+
 def test_zero_reconstruction_and_full_allocation(tmp_path):
     cfg, rows = fixture(tmp_path)
     # An old image has stale descriptors and stale bytes, including memory

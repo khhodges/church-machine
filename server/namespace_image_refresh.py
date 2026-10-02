@@ -48,6 +48,15 @@ def reconstruct(config, rows, directory):
     installed_rows = [row for row in rows if not row.get("symbolic") and not row.get("implementationMissing")]
     thread_rows = [row for row in installed_rows if row.get("type") == "Thread"]
     thread_slots = {row["slot"] for row in thread_rows}
+    missing = [row for row in installed_rows
+               if row["slot"] not in thread_slots
+               and boot.image_artifact_selected(row) and not row.get("filename")]
+    if missing:
+        labels = ", ".join(f"NS[{row['slot']}] {row.get('name', '')}" for row in missing)
+        raise ValueError(
+            f"Saved Namespace assignments have no exact LUMP selected: {labels}. "
+            "Assign an exact saved LUMP to each listed slot before refreshing. "
+            "No catalog substitute or old-image body was used; stored image unchanged.")
     bindings = artifact_bindings([row for row in rows if row["slot"] not in thread_slots], directory)
     for row in thread_rows:
         if row.get("filename"):

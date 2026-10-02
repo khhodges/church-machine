@@ -5,6 +5,12 @@ description: The serialized Namespace Table, not the catalog manifest or loose f
 
 The Namespace Table is the sole authoritative source of LUMPs and their metadata in a bitstream. Truth is ordered as: (1) the Namespace Table, then (2) the assigned slots and LUMPs represented by that table. The manifest is not authoritative for membership, metadata, identity, version, slot, size, or any other property.
 
+Refresh capacity and Refresh Image must follow this same saved-slot authority, never require legacy catalog occupants or recover omitted bodies from the old image.
+
+**Why:** The user explicitly rejected legacy rules after clearing slots left the capacity report demanding Tunnel and Ethernet.
+
+**How to apply:** Validate the selected slot LUMPs and their real allocations. If a saved row lacks an exact artifact, report that missing selection rather than guessing from its name or historical slot.
+
 Every new or changed physical allocation must pass the same full-range check
 under the Namespace commit lock, including replacement, growth, movement and
 promotion to Resident. A client-side free-space check is advisory only.
