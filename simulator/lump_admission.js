@@ -116,6 +116,11 @@ function chooseArtifact(selection, revisions) {
  */
 async function admitUploadPhaseTwo(upload, choices, approvalIntent, fetchImpl) {
     choices = choices || {};
+    if (typeof choices.namespaceFingerprint !== 'string' || !choices.namespaceFingerprint ||
+            (choices.resident === true && (!Number.isSafeInteger(choices.location) || choices.location < 0))) {
+        return result(false, 'An explicitly reviewed Namespace fingerprint and Resident word address are required; no automatic placement or refresh.',
+            { code: 'EXPLICIT_PLACEMENT_REQUIRED' });
+    }
     const required = ['revision', 'destination_slot', 'replace', 'resident', 'boot'];
     if (!approvalIntent || required.some(key => choices[key] === undefined) ||
             !required.slice(2).every(key => typeof choices[key] === 'boolean')) {

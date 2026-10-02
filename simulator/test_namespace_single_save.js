@@ -158,6 +158,37 @@ function harness() {
     assert.strictEqual(await h.win._nsTableSave(), false);
     assert.strictEqual(h.calls.length, 0, 'never fall back to an enriched projection');
 
+    for (const message of [
+        'NS[15] [0x400,0x500) overlaps NS[7] [0x110,0x510) (word addresses, full allocations)',
+        'Namespace revision changed; review the current revision',
+    ]) {
+        h = harness();
+        const draft = {slot: 15, name: 'PendingAdd', filename: 'Pending.exact.lump',
+            token: '12345678', binary_hash: 'b'.repeat(64), resident: true,
+            load_policy: 'Resident', location: '0x400', limit: '0x9',
+            seq: 0, seal: '0x12345678', type: 'Inform', f: 0, g: 0};
+        h.win._nsExplicitArtifactBindings = {'15': clone(draft)};
+        h.context.error = new Error(message);
+        const beforeState = clone(h.win._nsState);
+        const beforeMemory = Array.from(h.sim.memory);
+        assert.strictEqual(await h.win._nsTableSave(), false);
+        assert.deepStrictEqual(h.win._nsExplicitArtifactBindings['15'], draft);
+        assert.deepStrictEqual(h.win._nsState, beforeState);
+        assert.deepStrictEqual(Array.from(h.sim.memory), beforeMemory);
+        assert(h.note.textContent.includes(message), 'show exact conflicting slots and full ranges');
+        assert(h.note.textContent.includes('draft is retained'));
+        assert.strictEqual(h.calls.length, 1, 'no implicit retry or refreshed CAS');
+        assert.deepStrictEqual(JSON.parse(h.calls[0].options.body).ns_state.abstractions.at(-1), draft);
+    }
+    const addCode = source.slice(source.indexOf('function _nsTableAddConfirm()'),
+        source.indexOf('// Explicit recovery for an unsaved executable Add'));
+    for (const forbidden of ['sim.writePersistentWord(', 'sim.writeNSEntry(',
+        'sim.registerSlotIdentity(', 'sim._tokenSlotMap.set(', 'sim.lazyManifest',
+        'sim.allocOrFindNsSlot(', 'updateNamespace()']) {
+        assert(!addCode.includes(forbidden), `Add must not optimistically mutate runtime: ${forbidden}`);
+    }
+    assert(addCode.includes("locationInput.value = '0x'"), 'retry retains proposed address');
+    assert(addCode.includes('slotInputEl.value = String(slot)'), 'retry retains proposed slot');
     assert.ok(!saveCode.includes('generate:'));
     assert.ok(!saveCode.includes('data_b64'));
     assert.ok(!saveCode.includes('boot_config:'));

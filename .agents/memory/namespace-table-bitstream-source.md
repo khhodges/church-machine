@@ -5,6 +5,18 @@ description: The serialized Namespace Table, not the catalog manifest or loose f
 
 The Namespace Table is the sole authoritative source of LUMPs and their metadata in a bitstream. Truth is ordered as: (1) the Namespace Table, then (2) the assigned slots and LUMPs represented by that table. The manifest is not authoritative for membership, metadata, identity, version, slot, size, or any other property.
 
+Every new or changed physical allocation must pass the same full-range check
+under the Namespace commit lock, including replacement, growth, movement and
+promotion to Resident. A client-side free-space check is advisory only.
+
+**Why:** Add could install bytes before Save, while table-only Save checked
+serialization rather than physical ranges, allowing overlapping assignments.
+
+**How to apply:** Preserve rejected drafts without runtime installation. Size
+from exact LUMP headers or architectural geometry, not access limits. Reserve
+header/table/Thread space; do not invent absent catalog occupants. Permit
+unchanged legacy defects during unrelated edits, but never new intersections.
+
 Conflicting Namespace state must be inspectable and correctable by the user
 through a general reviewed interface, not hidden behind symbolic-row labels
 or repaired only through agent-written JSON. Clear/re-add is not an equivalent

@@ -110,3 +110,31 @@ def test_explicit_generated_thread_and_header_layout(saved):
     rows[0]["location"] = "0x400"
     with pytest.raises(ValueError, match="architectural header"):
         stage_image(cfg, rows, root, 6)
+
+
+@pytest.mark.parametrize("thread_count", [1, 2])
+def test_absent_catalog_has_no_allocation_or_descriptor(saved, thread_count):
+    from server import boot_image
+
+    root, rows, cfg, raw = with_alice(saved)
+    cfg["step1"]["threadCount"] = thread_count
+    # Root Thread occupies [0x10,0x110). This next region is free in the
+    # saved Namespace, although the historical hardware catalog reserves it.
+    rows[1]["location"] = "0x10"
+    rows[-1]["location"] = "0x110"
+    before = copy.deepcopy(rows), snapshot(root)
+    image, prepared, _ = stage_image(cfg, rows, root, 6)
+    words = struct.unpack(f"<{len(image)//4}I", image)
+    present = {
+        slot for slot in range(cfg["step1"]["nsSlotsMax"])
+        if any(words[len(words) - (slot + 1) * 4:len(words) - slot * 4])
+    }
+    assert present == ({0, 1, 6, 14} | ({11} if thread_count == 2 else set()))
+    assert words[-60] == 0x110
+    assert words[0x110:0x210] == struct.unpack(">256I", raw)
+    assert prepared[-1]["location"] == "0x00000110"
+    boot_image.validate_boot_image(image, simulation_only=True)
+    # Private Namespace admission must not weaken hardware certification.
+    with pytest.raises(ValueError, match="mandatory NS slot 2"):
+        boot_image.validate_boot_image(image)
+    assert (rows, snapshot(root)) == before

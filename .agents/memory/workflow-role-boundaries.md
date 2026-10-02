@@ -122,12 +122,17 @@ This supersedes treating design placement as an exceptional recovery action.
 
 Ordinary Namespace Save is a table-only boundary, not an image approval.
 Preserve the selected artifact identities and requested fields; row-format
-checks and stale-write protection remain, while executable admission and
-combined memory-layout validation belong to explicit preparation/build.
+checks and stale-write protection remain. New or changed physical allocations
+must also be checked atomically against full occupied/reserved ranges before
+commit. Executable admission and whole-image certification still belong to
+explicit preparation/build. Unchanged historical defects must not block
+unrelated design edits, removals, or conversion to design-only.
 
 **Why:** The user authorized separating Namespace persistence after an unrelated
 historical artifact's missing compiler evidence blocked an Alice/Mallory table
 repair. Image-wide uncertainty must not invalidate independently verified row facts.
+The user subsequently required allocation protection at every placement write
+after Add and table-only Save allowed overlapping physical assignments.
 
 **How to apply:** Do not rebuild images, normalize other rows, or activate the
 simulator during table Save. Keep old built outputs unchanged and distinguish

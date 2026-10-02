@@ -58,11 +58,17 @@ def test_published_portable_a_is_privately_bound_without_rewriting_source(
     assert int.from_bytes(original[-4:], "big") == 0xFEED5E1F
     assert json.loads((root / "ns-state.json").read_text())["abstractions"] == rows
     before_rows = copy.deepcopy(rows)
+    # Pack immediately after the configured root Thread, inside the region
+    # formerly claimed by absent hardware catalog placeholders.
+    bootstrap_location = 16 + cfg["step1"]["threadLumpWords"]
+    user_location = bootstrap_location + len((root / bootstrap["filename"]).read_bytes()) // 4
     rows.append({"slot": 6, "name": "SelfTest", "type": "Inform",
+                 "location": bootstrap_location,
                  "seq": 0, "boot": False, "resident": True, "load_policy": "Resident",
                  "filename": bootstrap["filename"], "token": bootstrap["token"],
                  "binary_hash": bootstrap["binary_hash"]})
     rows.append({"slot": 14, "name": "PortableHandoff", "type": "Inform",
+                 "location": user_location,
                  "seq": 3, "boot": True, "resident": False, "load_policy": "Lazy",
                  "filename": saved["filename"], "token": saved["token"],
                  "binary_hash": saved["binary_hash"]})
@@ -118,6 +124,8 @@ def test_published_portable_a_is_privately_bound_without_rewriting_source(
     assert active.status_code == 200, active.json
     words = active.json["words"]
     location, authority, seal, token = words[-60:-56]
+    assert location == user_location
+    assert words[-28] == bootstrap_location
     assert token == 0x4A03000E
     original_words = list(struct.unpack(f">{len(original) // 4}I", original))
     expected = copy.deepcopy(original_words)

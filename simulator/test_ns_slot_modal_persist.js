@@ -105,9 +105,13 @@ try {
         src.includes('<option value="" selected disabled>Pick an abstraction…</option>') &&
         src.includes('sel.selectedIndex - 1') &&
         src.includes('privateDataRows: _nsDeclaredPrivateDataRows('));
-    check('Add LUMP copies the full allocated body, including 512-word c-list tail',
+    const add = src.slice(src.indexOf('function _nsTableAddConfirm()'),
+        src.indexOf('// Explicit recovery for an unsaved executable Add'));
+    check('Add LUMP validates full allocation but stages no body before commit',
         src.includes('sim.findFreeLumpRange(hdr.lumpSize)') &&
-        src.includes('wi < hdr.lumpSize; wi++') &&
+        add.includes('words.length < hdr.lumpSize') &&
+        add.includes('location: draftHex(lumpBase)') &&
+        !add.includes('sim.writePersistentWord(') &&
         !src.includes('Math.min(words.length, EXTENDED_STRIDE)'));
 }
 

@@ -919,7 +919,8 @@ def validate_boot_body_ranges(words, physical):
                 f"overlaps {right[2]} [{right[0]}, {right[1]})")
 
 
-def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout=True):
+def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout=True,
+                        simulation_only=False):
     """Inspect the NS table inside a boot image and raise ValueError early.
 
     Checks that the format-version tag at mem[ns_table_base - 1] equals
@@ -939,6 +940,10 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
 
     Foundational slots (0, 1, 6=Boot.Abstr) and MMIO device slots
     (2=UART_DEV, 3=LED_DEV, 4=BTN_DEV, 5=TIMER_DEV) are all checked.
+    ``simulation_only=True`` admits the private Namespace projection instead:
+    only the architectural Namespace, root Thread, and header-selected boot
+    target are mandatory. Historical hardware catalog membership is not a
+    simulator requirement. All structural, Thread, and allocation checks remain.
 
     Raises:
         ValueError: if the format-version tag is wrong, any mandatory slot
@@ -966,7 +971,7 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
     ns_table_base = physical["table_base"]
     ns_table_reserve = physical["table_words"]
 
-    for slot in _MANDATORY_NS_SLOTS:
+    for slot in ((0, 1) if simulation_only else _MANDATORY_NS_SLOTS):
         base = n_words - (slot + 1) * NS_ENTRY_WORDS
         if base + 1 >= n_words:
             raise ValueError(
@@ -2785,6 +2790,16 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
             {"R": 0, "W": 0, "X": 0, "L": 0, "S": 0, "E": 1},
             False,
         )
+    if honor_namespace_layout:
+        # Historical catalog defaults are hardware conveniences, not saved
+        # Namespace allocations. Absent services/devices must neither claim
+        # RAM nor acquire descriptors/capabilities in a private simulation.
+        # NS[0] is the architectural header and NS[1] the configured root
+        # Thread; secondary configured Threads are generated separately.
+        catalog = [
+            entry if slot in _state_by_slot or slot in (0, 1) else None
+            for slot, entry in enumerate(catalog)
+        ]
     _RESERVED_SLOTS = ({0, 1, _selftest_slot}
                        | {slot for slot, entry in enumerate(DEFAULT_ABSTRACTION_CATALOG)
                           if entry is not None}
@@ -3565,7 +3580,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
 
     # Pre-flight sanity check: catch a zeroed mandatory NS slot now rather
     # than waiting for the simulator to fault at runtime.
-    validate_boot_image(image, total)
+    validate_boot_image(image, total, simulation_only=honor_namespace_layout)
 
     return image
 

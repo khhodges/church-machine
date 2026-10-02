@@ -155,7 +155,8 @@ def routes(data):
     state.write_text(json.dumps({"abstractions": rows}))
     (root / "boot-image.bin").write_bytes(b"unchanged image")
     names = {"_read_namespace_design_document", "_namespace_table_candidate", "namespace_save_table",
-             "_atomic_write_json", "_describe_protected_change", "namespace_inspect", "namespace_resolve_preview"}
+             "_atomic_write_json", "_atomic_write_json_unchecked", "_check_namespace_allocation",
+             "_describe_protected_change", "namespace_inspect", "namespace_resolve_preview"}
     tree = ast.parse(Path("server/app.py").read_text())
     nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
     for node in nodes:

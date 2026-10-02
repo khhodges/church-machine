@@ -210,6 +210,24 @@ function setup() {
         assert.strictEqual(calls.filter(c => c.url.endsWith('save-table')).length, 0);
     }
     {
+        const { w, calls } = setup();
+        await w.NamespaceInspector.open(15);
+        const action = w.document.querySelector('[data-action]');
+        action.value = 'edit-geometry'; action.onchange();
+        w.document.querySelector('[name="location"]').value = '0x400';
+        w.document.querySelector('[name="limit"]').value = '0x9';
+        const original = w.fetch;
+        const conflict = 'NS[15] [0x400,0x500) overlaps NS[7] [0x110,0x510)';
+        w.fetch = (url, init) => url.endsWith('resolve-preview')
+            ? Promise.resolve({ok: false, json: async () => ({error: conflict})}) : original(url, init);
+        await w.document.querySelector('[data-preview]').onclick();
+        assert(w.document.querySelector('[data-status]').textContent.includes(conflict));
+        assert.strictEqual(w.document.querySelector('[name="location"]').value, '0x400');
+        assert.strictEqual(w.document.querySelector('[name="limit"]').value, '0x9');
+        assert(w.document.querySelector('[data-apply]').disabled);
+        assert.strictEqual(calls.filter(call => call.url.endsWith('save-table')).length, 0);
+    }
+    {
         const { w } = setup();
         let opened;
         w.openLumpInEditor = async (token, options) => { opened = { token, options }; };

@@ -14,6 +14,67 @@ if (process.env.CHURCH_TEST_ISOLATED_MODE !== '1' || keys.some(key =>
 const hash = file => fs.existsSync(file)
     ? crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
 
+test('overlapping move is refused without discarding the proposal; explicit safe move commits', async ({ page }) => {
+    const directory = process.env.CHURCH_TEST_LUMPS_DIR;
+    const stateFile = path.join(directory, 'ns-state.json');
+    const state = JSON.parse(fs.readFileSync(stateFile));
+    const config = JSON.parse(fs.readFileSync(process.env.CHURCH_TEST_BOOT_CONFIG_PATH));
+    const isThread = r => r.symbolic !== true && r.implementationMissing !== true &&
+        (r.slot === 1 || r.type === 'Thread' || (String(r.name).startsWith('Thread.') && !r.filename));
+    const preserved = state.abstractions.filter(r => ![14, 16].includes(r.slot));
+    const threads = preserved.filter(isThread);
+    // Keep the exact copied architecture, including every explicitly placed
+    // generated Thread. Dropping NS[11]/NS[12] while retaining threadCount=3
+    // correctly fails the real allocation guard before any overlap is tested.
+    if (threads.length !== Number(config.step1.threadCount) ||
+            threads.some(r => r.location == null || !Number.isSafeInteger(Number(r.location)))) {
+        throw new Error('Private placement fixture requires the original complete, explicitly placed Thread rows matching boot config; recreate the isolated fixture before retrying.');
+    }
+    const bytes = Buffer.alloc(64 * 4);
+    bytes.writeUInt32BE(((31 << 27) | (1 << 10) | 1) >>> 0, 0);
+    bytes.writeUInt32BE(0x4a00000e, 63 * 4);
+    const filename = 'InspectorPlacement.1.' +
+        crypto.createHash('sha256').update('InspectorPlacement').update(bytes).digest('hex').slice(0, 8) + '.lump';
+    fs.writeFileSync(path.join(directory, filename), bytes);
+    const row = {slot: 14, name: 'InspectorPlacement', type: 'Inform', seq: 0, f: 0, g: 0,
+        filename, binary_hash: crypto.createHash('sha256').update(bytes).digest('hex'),
+        token: '12345678', location: '0x2000', limit: '0x3F', seal: '0xDEADBEEF',
+        resident: true, load_policy: 'Resident'};
+    state.abstractions = preserved.concat(row,
+        {...row, slot: 16, name: 'OtherPlacement', location: '0x2100'});
+    fs.writeFileSync(stateFile, JSON.stringify(state));
+    const before = hash(stateFile);
+    const protectedFiles = ['boot-image.bin', 'boot-image.provenance.json']
+        .map(name => path.join(directory, name)).concat(process.env.CHURCH_TEST_BOOT_CONFIG_PATH);
+    const protectedHashes = protectedFiles.map(hash);
+    await page.route('**/*', route => /(hardware|wukong|fpga|serial|usb|flash)/i.test(route.request().url())
+        ? route.abort() : route.continue());
+    await page.goto('/simulator/index.html#namespace');
+    await page.waitForFunction(() => !!window.NamespaceInspector);
+    await page.evaluate(() => NamespaceInspector.open(14));
+    const inspector = page.locator('#namespaceInspector');
+    await inspector.locator('summary').filter({hasText: /^Other changes$/}).click();
+    await inspector.locator('[data-action]').selectOption('edit-geometry');
+    await inspector.locator('[name="location"]').fill('0x2100');
+    await inspector.locator('[name="limit"]').fill('0x3F');
+    await inspector.locator('[data-preview]').click();
+    await expect(inspector.locator('[data-status]')).toContainText('NS[16]');
+    await expect(inspector.locator('[name="location"]')).toHaveValue('0x2100');
+    await expect(inspector.locator('[data-apply]')).toBeDisabled();
+    expect(hash(stateFile)).toBe(before);
+    await inspector.locator('[name="location"]').fill('0x2200');
+    await inspector.locator('[data-preview]').click();
+    await expect(inspector.locator('[data-apply]')).toBeEnabled();
+    await inspector.locator('[data-apply]').click();
+    await page.getByRole('button', {name: 'Confirm this change', exact: true}).click();
+    await expect(inspector.locator('[data-status]')).toContainText('Namespace table change saved');
+    const after = JSON.parse(fs.readFileSync(stateFile)).abstractions;
+    expect(after.find(r => r.slot === 14)).toEqual({...row, location: '0x2200'});
+    expect(after.filter(r => r.slot !== 14)).toEqual(state.abstractions.filter(r => r.slot !== 14));
+    expect(protectedFiles.map(hash)).toEqual(protectedHashes);
+    expect(hash(path.join(directory, filename))).toBe(row.binary_hash);
+});
+
 test('inspect and cancel are read-only; reviewed design correction preserves slot and other deliverables', async ({ page }, testInfo) => {
     test.setTimeout(90000);
     const stateFile = path.join(process.env.CHURCH_TEST_LUMPS_DIR, 'ns-state.json');

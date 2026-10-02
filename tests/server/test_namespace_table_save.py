@@ -23,7 +23,8 @@ def isolated(tmp_path):
     root = Path(__file__).resolve().parents[2]
     names = {
         "_read_namespace_design_document", "_namespace_table_candidate",
-        "namespace_save_table", "_atomic_write_json", "_describe_protected_change",
+        "namespace_save_table", "_atomic_write_json", "_atomic_write_json_unchecked",
+        "_check_namespace_allocation", "_describe_protected_change",
         "boot_image_ns_state",
         "_ensure_ns_state", "_validate_namespace_boot_marker",
         "_project_effective_thread_policies", "_thread_slots_from_namespace_rows",
@@ -44,6 +45,13 @@ def isolated(tmp_path):
     for name in ("boot-image.bin", "boot-image.provenance.json", "boot-config.json",
                  "manifest.json", "ide.Alice.1.a91d33f7.lump", "source.cloomc"):
         (tmp_path / name).write_bytes(b"synthetic immutable test artifact")
+    # A physical move now needs real size evidence, but not compiler approval.
+    raw = struct.pack(">256I", (31 << 27) | (2 << 23) | (1 << 10), *([0] * 255))
+    (tmp_path / rows[0]["filename"]).write_bytes(raw)
+    rows[0]["binary_hash"] = hashlib.sha256(raw).hexdigest()
+    state.write_text(json.dumps({"abstractions": rows, "committed_raw_fingerprint": "old"}))
+    (tmp_path / "boot-config.json").write_text(json.dumps({"step1": {
+        "totalNamespaceWords": 16384, "nsSlotsMax": 64, "threadLumpWords": 256}}))
     scope = dict(app=app, request=request, jsonify=jsonify, json=json, os=os,
                  re=re, tempfile=tempfile, logging=logging, copy=copy, struct=struct,
                  hashlib=hashlib,

@@ -12,6 +12,35 @@ import os
 import re
 import tempfile
 from copy import deepcopy
+from functools import wraps
+from server.namespace_allocation import namespace_guard, read_config, validate_document
+from server.namespace_authority import namespace_fingerprint
+
+
+def _check_admission_allocation(state_path, rows, lumps_dir, pending, gates=None):
+    config_path = os.environ.get("CHURCH_TEST_BOOT_CONFIG_PATH") or os.path.join(
+        os.path.dirname(os.path.abspath(lumps_dir)), "boot-config.json")
+    try:
+        validate_document(state_path, rows, lumps_dir,
+                          lambda: read_config(config_path), pending=pending)
+    except ValueError as exc:
+        raise AdmissionError(str(exc), gates, status=409) from exc
+
+
+def _locked_publication(function):
+    @wraps(function)
+    def wrapped(self, **kwargs):
+        with namespace_guard(kwargs["state_path"]):
+            path = kwargs["state_path"]
+            rows = json.load(open(path, encoding="utf-8"))["abstractions"]
+            expected = kwargs.pop("expected_namespace_fingerprint", None)
+            if expected != namespace_fingerprint(rows):
+                raise AdmissionError("Namespace changed or review fingerprint is missing; review admission again.", status=409)
+            _check_admission_allocation(
+                path, kwargs["state"]["abstractions"], kwargs["lumps_dir"],
+                {kwargs["destination"]["filename"]: kwargs["raw"]})
+            return function(self, **kwargs)
+    return wrapped
 
 
 GATES = ("gate0", "gate1", "gate2", "gate3", "gate4", "gate5")
@@ -92,6 +121,7 @@ class NavanaService:
         _fsync_directory(lumps_dir)
         return True
 
+    @_locked_publication
     def publish(self, *, raw, destination, manifest, state, evidence,
                 lumps_dir, manifest_path, state_path, evidence_path,
                  approvals_path, approvals, original_raw=None,
@@ -426,7 +456,8 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
           name, revision, destination_slot, replace, resident, boot,
           authorization, requested, granted, lock, portable_binding=None,
           portable_seal=None, navana=None, namespace_capacity=256,
-          protected_slots=PROTECTED_NAMESPACE_SLOTS):
+          protected_slots=PROTECTED_NAMESPACE_SLOTS,
+          expected_namespace_fingerprint=None, location=None):
     """Verify, mint and publish one exact admission under ``lock``."""
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
         raise AdmissionError("exact artifact revision is required", status=400)
@@ -454,7 +485,7 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
             "a boot entry must also be explicitly resident", status=400)
     mint = MintService()
     navana = navana or NavanaService()
-    with lock:
+    with namespace_guard(state_path), lock:
         with open(quarantine_path, "rb") as stream:
             raw = stream.read()
         gates = verify_gates(raw, token=token, expected_digest=expected_digest,
@@ -464,6 +495,9 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
         rows = state.get("abstractions")
         if not isinstance(rows, list):
             raise AdmissionError("Namespace state is invalid", gates)
+        reviewed_fingerprint = namespace_fingerprint(rows)
+        if expected_namespace_fingerprint != reviewed_fingerprint:
+            raise AdmissionError("Namespace changed or review fingerprint is missing; review admission again.", gates, 409)
         matches = [row for row in rows if isinstance(row, dict) and
                    row.get("slot") == destination_slot]
         if len(matches) > 1 or (matches and not replace):
@@ -534,6 +568,8 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
                "ns_slot_policy": "static" if resident else "dynamic",
                "load_policy": "Resident" if resident else "Dynamic",
                "type": "Inform", "admission": "bootstrap-authorized"}
+        if location is not None:
+            row["location"] = location
         if boot:
             row["boot"] = True
         row["binary_hash"] = digest
@@ -544,6 +580,9 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
         state["abstractions"] = [r for r in state["abstractions"]
                                  if r.get("slot") != destination_slot] + [row]
         state["revision"] = int(state.get("revision", 0)) + 1
+        _check_admission_allocation(
+            state_path, state["abstractions"], lumps_dir,
+            {filename: derivative_raw}, gates)
         validate_active_manifest_selections(
             state["abstractions"], manifest, lumps_dir,
             pending_artifacts={filename: derivative_raw})
@@ -586,6 +625,7 @@ def admit(*, quarantine_path, lumps_dir, state_path, manifest_path, token,
             evidence["portable_binding"] = portable_binding
             evidence["approval_record"]["portable_binding"] = portable_binding
         navana.publish(
+            expected_namespace_fingerprint=reviewed_fingerprint,
             raw=derivative_raw, destination={"filename": filename}, manifest=manifest,
             state=state, evidence=evidence, lumps_dir=lumps_dir,
             manifest_path=manifest_path, state_path=state_path,

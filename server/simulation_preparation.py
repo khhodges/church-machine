@@ -236,7 +236,7 @@ def stage_image(cfg, rows, directory, entry_slot):
         (stage / "approvals.json").write_text(
             '{"version":1,"algorithm":"sha256","approvals":{}}')
         image = boot_image.generate_simulation_image(cfg, private, entry_slot)
-        boot_image.validate_boot_image(image)
+        boot_image.validate_boot_image(image, simulation_only=True)
         validate_simulator_resident_inventory(image)
         # The generator's resident inventory validates what exists, not that
         # every frozen assignment was included. Prove the reverse direction

@@ -55,3 +55,21 @@ write valid but unrequested Namespace changes.
 Historical invalid data requires a reviewed correction describing the exact
 affected slots, artifact choices, and placements. Do not relocate objects,
 reassign device slots, or alter source merely to make this gate pass.
+
+## Preventing new allocation conflicts
+
+Table-only saves do not generate images or install runtime bytes. They do check
+new or changed physical allocations under the same cross-process Namespace lock
+as the revision check and publication. Adds, replacements, moves, growth and
+Resident-policy changes must fit the complete LUMP allocation, not merely its
+access limit. Architectural header, table and Thread reservations also count.
+
+Unchanged historical overlaps do not block unrelated metadata edits or removing
+an allocation. Missing or malformed design-only selections remain editable.
+An unknown physical size cannot prove free memory and must be resolved before
+adding a new physical allocation.
+
+Rejected proposals remain drafts; the IDE neither relocates them automatically
+nor installs them into a simulator. Upload installation approval includes the
+exact Namespace fingerprint and proposed word address. A concurrent change
+requires a fresh review, not an automatic retry with the previous consent.

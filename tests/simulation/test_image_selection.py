@@ -84,8 +84,12 @@ def test_unselected_not_read_resolved_embedded_or_in_provenance(saved, monkeypat
     assert image_rows[-1] == excluded
     words = struct.unpack(f"<{len(image)//4}I", image)
     assert words[-9 * 4:-8 * 4] == (0, 0, 0, 0)
-    provenance = bi.build_boot_image_provenance(image, str(root))
-    assert [b["slot"] for b in provenance["resident_bindings"]] == [6]
+    # Private simulation provenance is the exact stage bindings, not hardware
+    # image certification (which deliberately still requires its full catalog).
+    assert [b["slot"] for b in bindings] == [6]
+    bi.validate_boot_image(image, simulation_only=True)
+    with pytest.raises(ValueError, match="mandatory NS slot 2"):
+        bi.build_boot_image_provenance(image, str(root))
     assert rows == original and snapshot(root) == before
 
 

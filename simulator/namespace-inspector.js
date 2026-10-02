@@ -175,7 +175,7 @@
             '</select></label><p data-library-status>Catalog entries are choices only. The server verifies the exact selected bytes before review.</p><label>Exact filename<input name="filename" required></label><label>Artifact token<input name="token" required></label><label>Binary SHA-256<input name="binaryHash" required></label>';
         if (action === 'set-policy' || action === 'select-artifact')
             html += '<label>Loading policy<select name="policy"><option value="Lazy">Lazy — not selected as a resident image body</option><option value="Resident">Resident — include in preparation</option><option value="Preload">Preload</option><option value="Empty">Empty</option></select></label>';
-        if (action === 'edit-geometry') html = '<p>Declared Namespace geometry only. Image allocations are separately validated; no relocation or image rebuild is performed.</p><label>Location (word address; decimal or 0x hexadecimal)<input name="location" required></label><label>Access limit (not allocation size)<input name="limit" required></label>';
+        if (action === 'edit-geometry') html = '<p>Changed physical allocations are checked at review and again at Save against the current Namespace. Unchanged legacy problems may remain. No automatic relocation or image rebuild is performed.</p><label>Location (word address; decimal or 0x hexadecimal)<input name="location" required></label><label>Access limit (not allocation size)<input name="limit" required></label>';
         dialog.querySelector('[data-fields]').innerHTML = html;
         dialog.querySelector('[data-intention]').textContent = action
             ? `Your proposed choice: ${labels[action] || action}. Not saved until you review and apply.`
@@ -273,7 +273,13 @@
                 if (current(id)) status(`Namespace table change saved, but persisted state and remaining diagnostics were not checked: ${error.message} Close and reopen to inspect. No automatic retry.`);
             }
         } catch (error) {
-            if (current(id)) { invalidate(); status(`${error.message} No automatic retry. Close and reopen before another review.`); }
+            if (current(id)) {
+                // Keep the before/after review and typed proposal for correction,
+                // but never reuse its approval or retry a stale baseline.
+                proposal = null;
+                dialog.querySelector('[data-apply]').disabled = true;
+                status(`${error.message} Your proposal is retained above. No automatic retry or relocation. Edit and review again; if the Namespace changed, reopen to review its current revision.`);
+            }
         } finally { if (current(id)) { busy = saving = false; lockControls(false); } }
     }
     async function open(slot) {

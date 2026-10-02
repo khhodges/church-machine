@@ -4076,7 +4076,7 @@ function updateNamespace() {
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace rows only; built images and simulation remain unchanged">\u{1F4BE} Save Namespace Table</button>`;
     if (window.SimulationPreparation) html += '<section id="simulationPreparationPanel" style="flex-basis:100%;padding:8px 0">' + window.SimulationPreparation.markup() + '</section>';
-    html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save records Namespace rows and explicit policy choices only. It does not normalize layout, generate or replace an image, or activate simulation. A changed table may differ from the unchanged built image; validate and prepare separately.</div>';
+    html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save checks changed physical allocations against the current Namespace before committing. Unchanged legacy problems remain inspectable. It does not relocate entries, rebuild an image, or activate simulation.</div>';
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -5147,6 +5147,11 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
                     <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Blank = auto (first free slot ≥ 11)</div>
                 </div>
                 <div>
+                    <span style="${sLabel}">Proposed location (word address)</span>
+                    <input id="_nsAddLocationInput" placeholder="Propose a free range" style="${sInput}">
+                    <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Full allocation checked again at Save. A refused proposal stays here for review.</div>
+                </div>
+                <div>
                     <span style="${sLabel}">Slot Policy</span>
                     <select id="_nsSlotPolicy" style="${sSelect}">
                         <option value="static"  ${policy === 'static'  ? 'selected' : ''}>Static</option>
@@ -5205,8 +5210,16 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
     }
 }
 
+function _nsFindDraftSlot() {
+    const rows = _nsTableRowsForSave(window._nsState);
+    const assigned = new Set(rows.map(row => Number(row.slot)));
+    for (let slot = sim.firstUserNsSlot(); slot < sim.MAX_NS_ENTRIES; slot++) {
+        if (!assigned.has(slot) && !sim.isNSEntryValid(slot)) return slot;
+    }
+    return null;
+}
+
 function _nsTableAddConfirm() {
-    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Install Namespace artifact')) return false;
     const sel = document.getElementById('_nsAddSelect');
     const errEl = document.getElementById('_nsAddError');
     const confirmBtn = document.getElementById('_nsAddConfirmBtn');
@@ -5237,7 +5250,6 @@ function _nsTableAddConfirm() {
     // ── Read editable field values ────────────────────────────────────────────
     const loadPolicyEl  = document.getElementById('_nsLoadPolicy');
     const loadPolicy    = loadPolicyEl ? loadPolicyEl.value : 'Lazy';
-    const loadMode      = loadPolicy === 'Resident' ? 'resident' : 'lazy';
     const slotInputEl   = document.getElementById('_nsSlotInput');
     const slotInputVal  = slotInputEl ? slotInputEl.value.trim() : '';
     const gtTypeEl      = document.getElementById('_nsGtType');
@@ -5247,7 +5259,7 @@ function _nsTableAddConfirm() {
 
     // ── NS slot validation (only for static policy with explicit slot) ─────────
     let userSlot = null;
-    if (slotPolicy !== 'dynamic' && slotInputVal !== '') {
+    if (slotInputVal !== '') {
         userSlot = parseInt(slotInputVal, 10);
         const firstUserSlot = sim.firstUserNsSlot();
         if (isNaN(userSlot) || userSlot < firstUserSlot || userSlot >= sim.MAX_NS_ENTRIES) {
@@ -5321,18 +5333,19 @@ function _nsTableAddConfirm() {
         }
         if (userSlot === null && matchingSymbolicSlot !== null) {
             slot = matchingSymbolicSlot;
+        } else if (userSlot !== null) {
+            slot = userSlot;
         } else if (slotPolicy === 'dynamic') {
             // Probe for a free slot without reserving this token yet.  The
             // identity and Outform preflight below can still reject the LUMP;
             // reserving early would make the picker hide a failed install as
             // though it were already present.
-            slot = sim.allocOrFindNsSlot(null, name, 'ns-add:' + token);
-        } else if (userSlot !== null) {
-            slot = userSlot;
+            slot = _nsFindDraftSlot();
         } else {
-            slot = sim.allocOrFindNsSlot(null, name, 'ns-add:' + token);
+            slot = _nsFindDraftSlot();
         }
         if (slot === null) return Promise.reject(new Error('Namespace table is full'));
+        if (slotInputEl) slotInputEl.value = String(slot);
 
         // The Namespace slot number is not a physical address. Allocate the
         // complete declared extent against resident and lazy body intervals,
@@ -5342,11 +5355,19 @@ function _nsTableAddConfirm() {
             return Promise.reject(new Error(
                 'LUMP size, body, or c-list bounds are malformed; nothing was installed.'));
         }
-        const lumpBase = sim.findFreeLumpRange(hdr.lumpSize);
+        const locationInput = document.getElementById('_nsAddLocationInput');
+        const explicitLocation = locationInput && locationInput.value.trim();
+        const lumpBase = explicitLocation ? Number(explicitLocation) : sim.findFreeLumpRange(hdr.lumpSize);
+        if (lumpBase !== null && (!Number.isSafeInteger(lumpBase) || lumpBase < 0)) {
+            throw new Error('Choose a non-negative whole word address (decimal or 0x hexadecimal).');
+        }
         if (lumpBase === null) {
             return Promise.reject(new Error(
                 `No non-overlapping ${hdr.lumpSize}-word LUMP allocation fits below the Namespace table; nothing was installed.`));
         }
+        // Hold this proposed address stable across refusal/review, not a fresh
+        // automatic allocation on retry.
+        if (locationInput) locationInput.value = '0x' + lumpBase.toString(16).toUpperCase();
 
         // Ordinary code LUMPs are checked and minted on a private copy before
         // *any* simulator mutation.  This prevents a stale self GT, wrong
@@ -5404,7 +5425,6 @@ function _nsTableAddConfirm() {
                 'without a saved, compiler-approved artifact for that exact SHA-256. ' +
                 'Use Add to Namespace (design); no Namespace or saved-library bytes were changed.');
         }
-        if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Install Namespace artifact')) return false;
         words = _identity.words;
 
         // limit17: always hdr.cw (real grant interval) regardless of load mode.
@@ -5494,55 +5514,22 @@ function _nsTableAddConfirm() {
         //   • secure Outform → cache tag T (cacheToken32) — the canonical W3.
         //   • Inform / legacy → cache token when available, else 0.  W3 no longer
         //     carries an Abstract GT (Task #2862 W3=cache_token migration).
-        const w3CacheToken = (cacheToken32 != null) ? (cacheToken32 >>> 0) : 0;
         const slotGtSeq = sim._nsSequenceForWrite(slot);
 
-        // Register trusted identity outside the 4-word NS entry BEFORE the entry
-        // is written, so receiveLump() can verify against it on resolution.  Only
-        // a SECURE Outform gets a secure identity record (which enforces the
-        // canonical-field requirements in registerSlotIdentity).
-        if (typeof sim.registerSlotIdentity === 'function' && isSecureOutform) {
-            // Canonical NS ABI: W1 is authority only — packNSWord1(limit, gtSeq,
-            // gBit, fFlag). Type + c-list count are NOT W1 fields (side-tables /
-            // resident header). W2 is the integrity32 of {W0, W1}. These opaque
-            // words must match exactly what writeNSEntry() writes below.
-            const _w1 = sim.packNSWord1(limit17, slotGtSeq, 0, 0) >>> 0;
-            const _w2 = sim.makeVersionSeals(slotGtSeq, lumpBase, limit17) >>> 0;
-            sim.registerSlotIdentity(slot, {
-                cacheToken:   w3CacheToken,
-                dotName:      dotName,
-                issueN:       issueN,
-                identityHash: identityHash,   // canonical 64-hex string
-                binaryHash:   binaryHash,     // canonical 64-hex string
-                grants:       Array.isArray(_idMeta.grants) ? _idMeta.grants : [],
-                capabilityType: effectiveGtType,
-                authorized:   _idMeta.authorized === true,
-                outformWords: [_w1, _w2, w3CacheToken],
-                gtSeq:        slotGtSeq,
-            }, { secure: true });
-        }
-
-        // All validation has now succeeded.  Only now may the LUMP body or
-        // token map mutate, so a rejected install leaves no hidden picker entry
-        // and no orphaned body in programmable memory.
-        for (let wi = 0; wi < hdr.lumpSize; wi++) {
-            sim.writePersistentWord(lumpBase + wi, words[wi]);
-        }
-
-        // Write NS entry with the verified identity type. W3 = cache token (T).
-        sim.withNamespaceWrite('manual Namespace Add', function() {
-            sim.writeNSEntry(slot, lumpBase, limit17, 0, 0, effectiveGtType,
-                _identity.ordinary ? _identity.entry.seq : slotGtSeq, hdr.cc,
-                _identity.ordinary ? _identity.entry.cacheToken : w3CacheToken);
-        });
-        if (sim._nsSymbolicEntries) delete sim._nsSymbolicEntries[slot];
-        if (sim._tokenSlotMap) sim._tokenSlotMap.set(token, slot);
-        sim.nsLabels[slot] = name;
+        // Stage only a descriptor proposal. The locked server commit rechecks
+        // complete allocations; even successful table Save does not install it.
+        const draftSeq = _identity.ordinary ? _identity.entry.seq : slotGtSeq;
+        const draftHex = value => '0x' + (value >>> 0).toString(16).toUpperCase().padStart(8, '0');
         window._nsExplicitArtifactBindings[String(slot)] = Object.assign(
             {}, listed, _idMeta, {
                 name,
                 slot,
-                seq: _identity.ordinary ? _identity.entry.seq : slotGtSeq,
+                seq: draftSeq,
+                location: draftHex(lumpBase),
+                limit: draftHex(limit17),
+                seal: draftHex(sim.makeVersionSeals(draftSeq, lumpBase, limit17)),
+                type: ['Null', 'Inform', 'Outform', 'Abstract'][effectiveGtType],
+                f: 0, g: 0,
                 token,
                 filename: selectedFilename,
                 binary_hash: actualBinaryHash,
@@ -5607,55 +5594,20 @@ function _nsTableAddConfirm() {
             delete _row.identityHash;
         }
 
-        // The copied binary's C-List is authoritative. Approval metadata never
-        // rewrites or authorizes capability rows at runtime.
-        sim._compilerOwnedSelfSlots = sim._compilerOwnedSelfSlots || {};
-        if (_identity.ordinary) sim._compilerOwnedSelfSlots[slot] = true;
-        else delete sim._compilerOwnedSelfSlots[slot];
-
-        // ── Lazy Load: zero header word + register manifest entry ─────────────
-        // Mode 1 (Restore) fires when CALL/LOAD finds magic=0 at lumpBase.
-        // Code words at lumpBase+1..+hdr.cw and c-list GTs at the tail are
-        // left in place; lazyLoad() rewrites the header + code section only and
-        // reseals word2. limit17 = hdr.cw was already written above, so the
-        // grant interval and seal are correct after restore.
-        if (loadMode === 'lazy') {
-            sim.writePersistentWord(lumpBase, 0);   // magic=0 ≠ 0x1F → not resident
-            if (!sim.lazyManifest) sim.lazyManifest = {};
-            const _lazyCode = Array.from(words.slice(1, 1 + hdr.cw));
-            sim.lazyManifest[slot] = {
-                label:     name,
-                source:    'ns-add',
-            priority:  'warm',
-            loadPolicy,
-                size:      hdr.lumpSize,
-                allocBase: lumpBase,
-                allocSize: hdr.lumpSize,
-                loaded:    false,
-                loadCount: 0,
-                bootUpload: {
-                    methods:      [{ code: _lazyCode }],
-                    data_words:   [],
-                    // null placeholders preserve the cc count so lazyLoad re-packs
-                    // the correct cc into the header without overwriting existing
-                    // c-list GTs (only self-data-R entries are handled by lazyLoad).
-                    capabilities: new Array(hdr.cc).fill(null),
-                },
-            };
-        }
-
-        const _overlay = document.getElementById('_nsAddModalOverlay');
-        if (_overlay) _overlay.remove();
         _setNsDirty(true);
-        if (typeof updateNamespace === 'function') updateNamespace();
-
-        // Adding a row is a complete user action, not a draft edit. Commit it
-        // immediately so a newly installed LUMP cannot disappear on reload
-        // while waiting for a separate manual save.
+        // Keep the picker and exact proposal visible until server acceptance.
+        // No body, descriptor, lazy cache, or runtime identity is installed.
         const saveBtn = document.getElementById('nsSaveBtn');
         if (typeof window._nsTableSave === 'function') {
+            window._nsTableSaveError = null; // explicit new review, never an automatic retry
             const saved = await window._nsTableSave(saveBtn);
-            if (!saved) {
+            if (saved) {
+                const overlay = document.getElementById('_nsAddModalOverlay');
+                if (overlay) overlay.remove();
+            } else {
+                if (errEl) errEl.textContent = window._nsTableSaveError ||
+                    'Not saved. Your allocation proposal is retained; review it before retrying.';
+                if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = 'Review allocation again'; }
                 console.warn('[_nsTableAddConfirm] new Namespace row remains unsaved; retry with Save for next build');
             }
         } else {
@@ -5860,6 +5812,18 @@ function _nsTableRowsForSave(state) {
     for (const key of Object.keys(drafts)) {
         const slot = Number(key);
         const draft = drafts[key];
+        if (draft.location != null && draft.limit != null && draft.seal != null) {
+            const index = rows.findIndex(saved => saved.slot === slot);
+            const row = Object.assign({}, index < 0 ? {} : rows[index], clone(draft), {slot});
+            if (draft.filename && draft.symbolic !== true) {
+                delete row.symbolic;
+                delete row.implementationMissing;
+                delete row.selection;
+            }
+            if (index < 0) rows.push(row);
+            else rows[index] = row;
+            continue;
+        }
         const symbolic = sim && typeof sim.symbolicEntryAt === 'function'
             ? sim.symbolicEntryAt(slot) : null;
         const entry = sim && sim.readNSEntry(slot);
@@ -5938,7 +5902,7 @@ window._nsTableSave = async function(btn) {
         }
         _setNsDirty(newerDraft);
         const note = document.getElementById('nsSaveLayoutNote');
-        if (note) note.textContent = 'Namespace table saved. Built image, bitstream, and active simulation unchanged. The built image has not been rebuilt or certified against this saved table; prepare and validate separately.';
+        if (note) note.textContent = 'Namespace table saved. Changed physical allocations were checked at commit. Built image, bitstream, and active simulation unchanged; unchanged legacy layout problems may still need review.';
         if (btn) {
             btn.textContent = newerDraft
                 ? 'Earlier table saved — newer edits unsaved'
@@ -5953,6 +5917,9 @@ window._nsTableSave = async function(btn) {
         } else {
             window._nsTableSaveError = String(error.message || error);
         }
+        const note = document.getElementById('nsSaveLayoutNote');
+        if (note) note.textContent = (window._nsTableSaveError || 'Save cancelled.') +
+            ' Your draft is retained; no automatic relocation or retry was performed.';
         _setNsDirty(window._nsTableDirty);
         return false;
     } finally {

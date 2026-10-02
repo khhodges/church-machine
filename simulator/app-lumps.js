@@ -6607,13 +6607,34 @@ async function _submitLumpImport() {
         // Namespace, or run path merely because parsing/import succeeded.
         let detailToken = result.token;
         if (ct === 'lump') {
+            if (!confirm('Admit this quarantined upload into Namespace now?\n\nCancel keeps only the inert upload; no Namespace slot or memory is allocated.')) {
+                errEl.textContent = 'Upload retained in quarantine only. No Namespace slot or memory was allocated.';
+                return;
+            }
+            // Capture the programmer's already inspected revision once. Never
+            // fetch a fresher fingerprint behind the approval or infer placement.
+            const namespaceFingerprint = window._nsState && window._nsState.namespaceFingerprint;
+            if (typeof namespaceFingerprint !== 'string' || !namespaceFingerprint ||
+                    window._nsTableDirty || window._nsTableSaveInFlight) {
+                throw new Error('Admission stopped: explicitly review the saved Namespace first, with no pending table edits. The upload remains quarantined.');
+            }
             // Upload is only quarantine.  Collect every placement decision and
             // obtain a server-issued, one-use intent before phase two.
             const revision = Number(prompt('Exact artifact revision:', '1'));
-            const destination_slot = Number(prompt('Exact Namespace slot:', '0'));
+            const slotText = prompt('Exact Namespace slot:', '');
+            const destination_slot = slotText == null || !slotText.trim() ? NaN : Number(slotText);
             const replace = confirm('Replace the existing Namespace entry if occupied?');
             const resident = confirm('Make this artifact resident?');
             const boot = confirm('Make this artifact the boot entry?');
+            const placement = {namespaceFingerprint, location: null};
+            if (resident) {
+                const locationText = prompt('Explicit physical location (word address; decimal or 0x hexadecimal). No automatic placement:', '');
+                const location = locationText == null || !locationText.trim() ? NaN : Number(locationText);
+                if (!Number.isSafeInteger(location) || location < 0) {
+                    throw new Error('Admission stopped: Resident admission requires an explicit non-negative whole word address. The upload remains quarantined.');
+                }
+                placement.location = location;
+            }
             const derivedRights = Array.isArray(result.required_rights)
                 ? result.required_rights : [];
             const grantText = prompt(
@@ -6625,6 +6646,14 @@ async function _submitLumpImport() {
                     !Number.isInteger(destination_slot) || destination_slot < 0) {
                 throw new Error('Admission stopped: exact revision and Namespace slot are required.');
             }
+            if (!confirm(`Review exact Namespace admission:\n${name}, revision ${revision}, NS[${destination_slot}]\n` +
+                    `Resident: ${resident}; replace: ${replace}; boot: ${boot}\n` +
+                    (resident ? `Location: 0x${placement.location.toString(16).toUpperCase()} (word address)\n` : '') +
+                    `Namespace revision: ${namespaceFingerprint}\n\n` +
+                    'Full allocations are checked at commit. Refusal does not relocate or retry this proposal.')) {
+                errEl.textContent = 'Admission cancelled. Upload remains quarantined; Namespace unchanged.';
+                return;
+            }
             const intentResp = await fetch('/api/lumps/approval-intent', {
                 method: 'POST', credentials: 'same-origin',
                 headers: {'Content-Type': 'application/json'},
@@ -6635,6 +6664,7 @@ async function _submitLumpImport() {
                         admission: {
                             name,
                             ...choices,
+                            ...placement,
                             capabilities: result.required_capabilities || [],
                         },
                     },
@@ -6648,7 +6678,7 @@ async function _submitLumpImport() {
                  granted_capabilities: grants,
                  binary_hash: result.binary_hash,
                  approved_capabilities: result.required_capabilities || []},
-                choices, intentData.intent);
+                {...choices, ...placement}, intentData.intent);
             if (!phase.ok) {
                 // Keep the server response available for read-only inspection,
                 // but never make it a current/live artifact.

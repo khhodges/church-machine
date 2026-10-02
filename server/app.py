@@ -252,6 +252,26 @@ def _lump_lease_update_for_plan(plan, stage):
 
 
 def _atomic_write_json(path: str, data) -> None:
+    """Publish authoritative geometry only under the shared allocation lock."""
+    state_path = globals().get("NS_STATE_PATH")
+    config_path = globals().get("BOOT_CONFIG_PATH")
+    if state_path and config_path and os.path.abspath(path) in (
+            os.path.abspath(state_path), os.path.abspath(config_path)):
+        from server.namespace_allocation import namespace_guard, read_config, validate_document
+        with namespace_guard(state_path):
+            if os.path.abspath(path) == os.path.abspath(state_path):
+                validate_document(state_path, data["abstractions"], LUMPS_DIR,
+                                  lambda: read_config(config_path))
+            else:
+                config = read_config(config_path)
+                state = _read_namespace_design_document()
+                validate_document(state_path, state["abstractions"], LUMPS_DIR, data,
+                                  before_config=config)
+            return _atomic_write_json_unchecked(path, data)
+    return _atomic_write_json_unchecked(path, data)
+
+
+def _atomic_write_json_unchecked(path: str, data) -> None:
     """Write *data* as JSON to *path* atomically.
 
     Serialises to a sibling temp file first, then calls os.replace() so the
@@ -4893,7 +4913,15 @@ def _namespace_table_candidate(payload):
     state = _read_namespace_design_document()
     if _namespace_state_fingerprint(state["abstractions"]) != expected:
         raise ValueError("Namespace changed since review; reload before saving")
+    _check_namespace_allocation(rows)
     return state, rows
+
+
+def _check_namespace_allocation(rows, pending=None, config=None, before_config=None):
+    from server.namespace_allocation import read_config, validate_document
+    validate_document(NS_STATE_PATH, rows, LUMPS_DIR,
+                      config if config is not None else lambda: read_config(BOOT_CONFIG_PATH),
+                      pending=pending, before_config=before_config)
 
 
 from server.simulation_preparation import PreparationStore as _SimulationPreparationStore
@@ -5024,6 +5052,7 @@ def namespace_resolve_preview():
         with _namespace_commit_guard():
             rows = _read_namespace_design_document()["abstractions"]
             result = preview_resolution(rows, request.get_json(silent=True), LUMPS_DIR)
+            _check_namespace_allocation(result["savePayload"]["ns_state"]["abstractions"])
         return jsonify(result)
     except (OSError, ValueError, TypeError, KeyError) as exc:
         return jsonify(ok=False, error=str(exc), dataChanged=False), 409
@@ -5252,37 +5281,10 @@ except ImportError:
 # partially published artifact, Namespace row, manifest, or evidence record.
 # Startup is observational: a retained admission journal blocks catalogue
 # access below, rather than modifying user artifacts without review.
-_namespace_commit_lock = threading.RLock()
-_namespace_commit_state = threading.local()
-
-
 def _namespace_commit_guard():
     """Cross-process, re-entrant lock for the committed Namespace file pair."""
-    import contextlib
-    import fcntl
-
-    @contextlib.contextmanager
-    def _guard():
-        with _namespace_commit_lock:
-            depth = getattr(_namespace_commit_state, "depth", 0)
-            if depth:
-                _namespace_commit_state.depth = depth + 1
-                try:
-                    yield
-                finally:
-                    _namespace_commit_state.depth -= 1
-                return
-            lock_path = os.path.join(os.path.dirname(NS_STATE_PATH), ".namespace-commit.lock")
-            os.makedirs(os.path.dirname(lock_path), exist_ok=True)
-            with open(lock_path, "a+") as lock_file:
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
-                _namespace_commit_state.depth = 1
-                try:
-                    yield
-                finally:
-                    _namespace_commit_state.depth = 0
-                    fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-    return _guard()
+    from server.namespace_allocation import namespace_guard
+    return namespace_guard(NS_STATE_PATH)
 
 
 def _boot_config_freshness_digest(cfg):
@@ -5446,22 +5448,17 @@ def _commit_boot_selection_transaction(cfg, image_bytes):
 
 def _invalidate_ns_state_raw_binding():
     """Mark decoded metadata unavailable after a raw-only boot-image write."""
-    if not os.path.isfile(NS_STATE_PATH):
-        return
-    with open(NS_STATE_PATH, encoding="utf-8") as state_file:
-        state = json.load(state_file)
-    if not isinstance(state, dict):
-        raise ValueError("Namespace metadata is invalid")
-    # Avoid rewriting semantically unchanged state.  Besides unnecessary I/O,
-    # touching this authoritative generator input after writing boot-image.bin
-    # would make the new image immediately appear stale again.
-    if "committed_raw_fingerprint" not in state:
-        return
-    state.pop("committed_raw_fingerprint", None)
-    tmp_state = NS_STATE_PATH + ".tmp"
-    with open(tmp_state, "w", encoding="utf-8") as state_file:
-        json.dump(state, state_file, indent=2)
-    os.replace(tmp_state, NS_STATE_PATH)
+    with _namespace_commit_guard():
+        if not os.path.isfile(NS_STATE_PATH):
+            return
+        with open(NS_STATE_PATH, encoding="utf-8") as state_file:
+            state = json.load(state_file)
+        if not isinstance(state, dict):
+            raise ValueError("Namespace metadata is invalid")
+        if "committed_raw_fingerprint" not in state:
+            return
+        state.pop("committed_raw_fingerprint", None)
+        _atomic_write_json(NS_STATE_PATH, state)
 
 # Canonical list of server-managed tokens — excluded from the /api/lumps browser
 # listing and exempt from the R3 manifest-presence check in test_lump_consistency.py.
@@ -5793,7 +5790,7 @@ def boot_image_generate():
                         artifact_pins=body.get("artifactPins"))
                     blob = _stage_prepare_run_boot_image(
                         cfg, prepared_rows, entry_slot, for_hardware)
-                    _write_ns_state(prepared_rows)
+                    _write_ns_state(prepared_rows, allocation_config=cfg)
                     _write_boot_image_bytes(blob)
                     next_fingerprint = _namespace_state_fingerprint(prepared_rows)
                     execution_freshness = _boot_execution_freshness(
@@ -7607,6 +7604,10 @@ def boot_image_save_ns(_review_only=False):
             # fail with an internal manifest error instead of the recoverable
             # "Namespace changed" result.
             _validate_active_namespace_lumps(_ns_entries)
+            from server.namespace_allocation import read_config
+            _check_namespace_allocation(
+                _ns_entries, config=cfg,
+                before_config=read_config(BOOT_CONFIG_PATH))
             def _snapshot_file(_path):
                 try:
                     with open(_path, "rb") as _source:
@@ -7645,7 +7646,7 @@ def boot_image_save_ns(_review_only=False):
                 with open(_stage_path, "wb") as _stage_file:
                     _stage_file.write(_img_bytes)
                 os.replace(_stage_path, BOOT_IMAGE_PATH)
-                _write_ns_state(_ns_entries)
+                _write_ns_state(_ns_entries, allocation_config=cfg)
                 if _boot_config_candidate is not None:
                     _atomic_write_json(BOOT_CONFIG_PATH, cfg)
                 # This makes the final image timestamp newer than ns-state
@@ -11028,6 +11029,20 @@ def _attest_idx1_browser_candidate(metadata, words, execution):
                 compiler_version=record["compiler_version"])
 
 
+def _normalize_admission_location(value, resident):
+    """Canonical word address shared by approval and its one-use echo."""
+    if value is None and resident is False:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        if not re.fullmatch(r"(?:0[xX][0-9a-fA-F]+|[0-9]+)", text):
+            raise ValueError("admission location must be an explicit nonnegative word address")
+        value = int(text, 16 if text.lower().startswith("0x") else 10)
+    if type(value) is not int or not 0 <= value <= 0xFFFFFFFF:
+        raise ValueError("admission location must be an explicit nonnegative 32-bit word address")
+    return value
+
+
 @app.route("/api/lumps/approval-intent", methods=["POST"])
 def create_lump_approval_intent():
     """Issue a one-time, session-bound approval intent after UI confirmation.
@@ -11054,7 +11069,7 @@ def create_lump_approval_intent():
             return jsonify({"error": "import approval requires exact admission choices"}), 400
         required_fields = {
             "name", "revision", "destination_slot", "replace", "resident",
-            "boot", "capabilities",
+            "boot", "capabilities", "namespaceFingerprint", "location",
         }
         if set(operation) != required_fields:
             return jsonify({"error": "import approval choices are incomplete or ambiguous"}), 400
@@ -11070,6 +11085,14 @@ def create_lump_approval_intent():
                            for key in ("replace", "resident", "boot"))
                 or not isinstance(operation["capabilities"], list)):
             return jsonify({"error": "import approval choices are invalid"}), 400
+        if (not isinstance(operation["namespaceFingerprint"], str)
+                or not re.fullmatch(r"[0-9a-f]{64}", operation["namespaceFingerprint"])):
+            return jsonify({"error": "import approval requires an exact Namespace fingerprint"}), 400
+        try:
+            approved_location = _normalize_admission_location(
+                operation["location"], operation["resident"])
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
         try:
             from lump_admission_service import derive_capability_targets
             quarantine_path = os.path.join(
@@ -11092,6 +11115,7 @@ def create_lump_approval_intent():
             **operation,
             "name": operation["name"].strip(),
             "capabilities": exact_targets,
+            "location": approved_location,
         }
     session_id = session.setdefault("_lump_approval_session", secrets.token_urlsafe(24))
     plan_id = payload.get("plan", payload.get("plan_id"))
@@ -11498,11 +11522,12 @@ def _build_ns_state_document(entries):
     return state
 
 
-def _write_ns_state(entries):
+def _write_ns_state(entries, allocation_config=None):
     """Write ns-state.json atomically — rich list of NS row objects."""
     _validate_namespace_publication(entries)
     _tmp = NS_STATE_PATH + ".tmp"
     with _namespace_commit_guard():
+        _check_namespace_allocation(entries, config=allocation_config)
         _state = _build_ns_state_document(entries)
         try:
             with open(_tmp, "w") as _fh:
@@ -18075,6 +18100,11 @@ def admit_quarantined_lump():
             raise AdmissionError(
                 "approval intent is not bound to an exact admission operation",
                 status=403)
+        try:
+            echoed_location = _normalize_admission_location(
+                payload.get("location"), payload.get("resident"))
+        except ValueError as exc:
+            raise AdmissionError(str(exc), status=403) from exc
         echoed = {
             "name": str(payload.get("name") or ""),
             "revision": payload.get("revision", payload.get("issue")),
@@ -18082,6 +18112,8 @@ def admit_quarantined_lump():
             "replace": payload.get("replace"),
             "resident": payload.get("resident"),
             "boot": payload.get("boot"),
+            "namespaceFingerprint": payload.get("namespaceFingerprint"),
+            "location": echoed_location,
             "capabilities": payload.get("approved_capabilities"),
         }
         if echoed != operation:
@@ -18117,6 +18149,8 @@ def admit_quarantined_lump():
                 portable_binding=payload.get("portable_binding"),
                 portable_seal=payload.get("portable_seal"),
                 namespace_capacity=namespace_capacity,
+                expected_namespace_fingerprint=operation["namespaceFingerprint"],
+                location=operation["location"],
                 lock=_lumps_manifest_lock)
         # The quarantine bytes are portable input, not executable output.  The
         # admission service publishes a derivative after minting the local
@@ -26377,7 +26411,7 @@ def _commit_lump_history_transition(
     manifest_entry.pop("archived", None)
     os.makedirs(lumps_dir, exist_ok=True)
 
-    with _lump_history_transition_lock(lumps_dir):
+    with _namespace_commit_guard(), _lump_history_transition_lock(lumps_dir):
         locked_manifest = _read_manifest_safe(manifest_path)
         # Historical revisions may intentionally share the destination token.
         # CAS must compare the one active row reserved by the save, never the
@@ -26686,6 +26720,17 @@ def _commit_lump_history_transition(
                 if not isinstance(additional_json, dict):
                     raise ValueError("additional_json_builder must return a mapping")
                 namespace_document = additional_json.get(NS_STATE_PATH)
+                candidate_config = additional_json.get(BOOT_CONFIG_PATH)
+                if namespace_document is not None or candidate_config is not None:
+                    from server.namespace_allocation import read_config
+                    _check_namespace_allocation(
+                        (namespace_document if namespace_document is not None else
+                         _read_namespace_design_document()).get("abstractions", []),
+                        pending={binary_filename: binary_bytes}
+                        if binary_filename is not None and binary_bytes is not None else {},
+                        config=candidate_config,
+                        before_config=read_config(BOOT_CONFIG_PATH)
+                        if candidate_config is not None else None)
                 if namespace_document is not None:
                     namespace_rows = namespace_document.get("abstractions")
                     if not isinstance(namespace_rows, list):
