@@ -41,6 +41,17 @@ window._nsState.savedAbstractions.push(...[2,3,4,5,7].map(slot => ({slot, name: 
 assert.strictEqual(run('_nsFindDraftSlot()'), 8, 'normal allocator offers empty catalog slot');
 sim.simulationConfiguration = {};
 assert.strictEqual(run('_nsTableClear(8)'), false);
+// A frozen running image must not prevent editing the separate saved design.
+window._nsState = {savedAbstractions: rows, abstractions: rows,
+    namespaceFingerprint: 'c'.repeat(64)};
+window._nsDeletedSlots = {};
+assert.strictEqual(run('_nsTableClear(8)'), true);
+assert(!run('_nsTableRowsForSave(window._nsState)').some(row => row.slot === 8));
+assert.strictEqual(run('_nsTableClear(6)'), false, 'saved boot entry stays protected');
+assert.strictEqual(Buffer.from(sim.memory.buffer).toString('hex'), memory);
+assert.strictEqual(rows.length, 4, 'frozen design edits preserve saved inputs');
+window._nsState = null;
+assert.strictEqual(run('_nsTableClear(8)'), false, 'legacy live-memory edits remain blocked');
 console.log('Namespace design Clear protections, retained generation, allocation and machine isolation passed');
 
 const local = new Simulator();

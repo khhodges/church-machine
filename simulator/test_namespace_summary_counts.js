@@ -183,4 +183,25 @@ entries.set(17, { label: 'stale', word0_location: 0 });
 current = snapshot();
 assert.strictEqual(current.slots[17].entry.label, 'ide.Draft');
 assert.strictEqual(current.slots[16].entry, null);
+// Staged removal hides both saved and runtime evidence immediately, including
+// obsolete draft bindings, without modifying the running image or saved rows.
+const savedRowsBeforeClear = JSON.stringify(context.window._nsState.abstractions);
+const liveBeforeClear = JSON.stringify(Array.from(entries));
+const assignedBeforeClear = current.counts.assigned;
+context.window._nsDeletedSlots = {14: true};
+context.window._nsExplicitArtifactBindings = {14: {slot: 14, name: 'Stale draft'}};
+context.sim._nsFreeSequences[14] = 2;
+current = snapshot();
+assert.strictEqual(current.slots[14].entry, null);
+assert.strictEqual(current.slots[14].classification, 'free');
+assert.strictEqual(current.slots[14].clearedGeneration, null);
+assert.strictEqual(current.counts.assigned, assignedBeforeClear - 1);
+assert.strictEqual(JSON.stringify(context.window._nsState.abstractions), savedRowsBeforeClear);
+assert.strictEqual(JSON.stringify(Array.from(entries)), liveBeforeClear);
+// Discarding the draft restores the saved row, not a permanent hidden filter.
+context.window._nsDeletedSlots = {};
+context.window._nsExplicitArtifactBindings = {};
+delete context.sim._nsFreeSequences[14];
+current = snapshot();
+assert.strictEqual(current.slots[14].entry.label, 'ide.Alice');
 console.log('namespace summary authority and counts: passed');

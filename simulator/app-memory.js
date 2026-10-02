@@ -1129,13 +1129,14 @@ function _namespaceSummarySnapshot() {
     const slots = [];
     const counts = { max, assigned: 0, resident: 0, lazy: 0, garbage: 0, free: 0 };
     for (let slot = 0; slot < displayCount; slot++) {
-        const assigned = authorityRows.find(row => row && Number(row.slot) === slot);
-        const staged = stagedRows[String(slot)];
+        const deleted = !!(window._nsDeletedSlots || {})[String(slot)];
+        const assigned = deleted ? null : authorityRows.find(row => row && Number(row.slot) === slot);
+        const staged = deleted ? null : stagedRows[String(slot)];
         if (assigned || staged) counts.assigned++;
         const liveEntry = sim.readNSEntry(slot);
         const entry = (assigned || staged) && liveEntry
             ? Object.assign({}, liveEntry, { label: (staged || assigned).name }) : null;
-        const hasClearedGeneration = !entry && !assigned && !staged &&
+        const hasClearedGeneration = !deleted && !entry && !assigned && !staged &&
             Object.prototype.hasOwnProperty.call(freeSequences, String(slot)) &&
             Number.isInteger(freeSequences[slot]);
         let classification = 'free';
@@ -5865,7 +5866,6 @@ async function _nsKeepPendingAsPlacement(slot) {
 // Revokes all existing GTs for the slot by bumping the gt_seq cycle count,
 // then zeroes the entry. Any pre-Clear GT will fail GT validation on next use.
 function _nsTableClear(slot) {
-    if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Clear Namespace descriptor')) return false;
     if (!sim) return;
     if (!Number.isInteger(slot) || slot < 2 || slot >= sim.MAX_NS_ENTRIES) return false;
     const saved = window._nsState;
@@ -5885,6 +5885,9 @@ function _nsTableClear(slot) {
         if (typeof updateNamespace === 'function') updateNamespace();
         return true;
     }
+    // Only the legacy live-memory path is forbidden for frozen simulations.
+    // Saved-design staging above never writes the active machine.
+    if (sim.simulationConfiguration && _blockFrozenSimulationEdit('Clear Namespace descriptor')) return false;
     if (slot === sim.bootEntrySlot) return false;
 
     // A free entry must be all-zero so the shared allocator can reuse it.
