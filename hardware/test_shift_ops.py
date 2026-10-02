@@ -13,6 +13,7 @@ from amaranth.sim import Simulator
 
 from .core import ChurchCore
 from .hw_types import TuringOpcode, CondCode
+from .sim_boot_helpers import boot_core
 
 
 # ---------------------------------------------------------------------------
@@ -71,15 +72,8 @@ def _get_flags(ctx, dut):
 # ---------------------------------------------------------------------------
 
 async def _boot(ctx, dut):
-    """Boot ChurchCore — 6 clock edges."""
-    ctx.set(dut.imem_valid, 0)
-    ctx.set(dut.imem_data,  0)
-    ctx.set(dut.boot_start, 1)
-    await ctx.tick()
-    ctx.set(dut.boot_start, 0)
-    for _ in range(5):
-        await ctx.tick()
-    assert ctx.get(dut.boot_complete) == 1, "Boot did not complete"
+    """Await the full boot handshake, including Namespace.Init."""
+    await boot_core(ctx, dut)
 
 
 async def _exec(ctx, dut, instr):

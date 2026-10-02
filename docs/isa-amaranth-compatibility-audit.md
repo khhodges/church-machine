@@ -156,3 +156,17 @@ Core dispatch inspection confirmed the active opcode-8/9 execution paths.
 
 **Release status: HOLD.** This checklist locates confirmed blockers and missing
 evidence; it does not certify the unverified rows merely because legacy code exists.
+
+## Follow-up: first boot-prerequisite failure diagnosed
+
+The shift helper and Mode-2 integration test assumed boot completed in six
+clocks. An isolated core trace instead shows fault-free completion at clock
+nine: INIT_CLIST waits for Namespace.Init's private M-bit DWRITE handshake.
+The tests now wait for completion with a bounded timeout and fault checks,
+rather than injecting instructions before initialization finishes.
+
+After this test-only correction, all four Mode-2 tests pass. Both core profiles
+complete the boot-helper test with exactly CR12's M bit set. The 14 shift tests
+now reach their instruction/result assertions but still fail; their remaining
+encoding, execution-handshake and arithmetic issues have not been diagnosed
+by this narrow boot fix. The ISA release verdict remains HOLD.

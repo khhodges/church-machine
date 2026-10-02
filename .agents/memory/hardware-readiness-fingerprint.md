@@ -22,3 +22,11 @@ against the approved ISA changes.
 **Why:** Regenerated RTL passed its freshness gate while the decoder still
 accepted retired instructions and lacked a software-supported indexed profile.
 Passing tests for older semantics can coexist with missing ISA changes.
+
+Hardware instruction tests must wait for boot completion with a bounded,
+fault-aware handshake, not a fixed clock count.
+
+**Why:** Namespace initialization can add internal wait states without changing
+instruction semantics. Injecting a test instruction too early produces misleading
+ISA failures. Fixing that prerequisite does not justify relaxing later result
+or permission assertions.

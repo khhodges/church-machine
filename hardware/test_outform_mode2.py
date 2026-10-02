@@ -407,14 +407,9 @@ def test_mode2_core_integration():
         ctx.set(dut.dbg_outform_done_inject, 0)
         ctx.set(dut.dbg_outform_result_gt,   0)
 
-        # ── 1. Boot — takes 6 clock edges after boot_start ──────────────────
-        # IDLE →(boot_start=1)→ FAULT_RST → LOAD_NS → INIT_THRD →
-        # INIT_CLIST → LOAD_NUC → COMPLETE
-        ctx.set(dut.boot_start, 1)
-        await ctx.tick()   # IDLE → FAULT_RST
-        ctx.set(dut.boot_start, 0)
-        for _ in range(5):
-            await ctx.tick()   # remaining 5 transitions → COMPLETE
+        # Wait for Namespace.Init's private DWRITE before issuing CALL.
+        from hardware.sim_boot_helpers import boot_core
+        await boot_core(ctx, dut)
 
         results["boot_complete"] = ctx.get(dut.boot_complete)
 
