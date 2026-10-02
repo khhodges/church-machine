@@ -14,3 +14,11 @@ committed RTL copy is current; also run the committed-artifact freshness tests.
 **Why:** The build-directory gate passed after regeneration while a separate
 checked-in core copy still carried old RTL. Both checks are needed before
 describing the source snapshot as ready for synthesis.
+
+Source freshness does not establish ISA parity. Before a hardware release,
+separately check instruction acceptance, execution profiles, and semantics
+against the approved ISA changes.
+
+**Why:** Regenerated RTL passed its freshness gate while the decoder still
+accepted retired instructions and lacked a software-supported indexed profile.
+Passing tests for older semantics can coexist with missing ISA changes.
