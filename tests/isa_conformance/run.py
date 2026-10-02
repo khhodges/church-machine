@@ -11,16 +11,18 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
-from oracle import condition, judge, vectors
-from amaranth_adapter import run as run_amaranth
+from oracle import condition, judge as supplemental_judge, vectors as supplemental_vectors
+from amaranth_adapter import run as supplemental_amaranth
+from contracts import AUTHORITY, BLOCKED, judge, vectors
+from hardware_runner import Harness, run_amaranth, run_generated
 
 
 def collect():
-    cases = vectors()
+    cases = supplemental_vectors()
     js = json.loads(subprocess.check_output(
         ["node", str(Path(__file__).with_name("simulator.cjs"))],
         input=json.dumps(cases), text=True, cwd=ROOT, timeout=120))
-    hw = run_amaranth(cases)
+    hw = supplemental_amaranth(cases)
     rows = []
 
     def add(layer, case, status, **details):
@@ -42,7 +44,7 @@ def collect():
             scope = "literal instruction word"
         add("assembler", v["id"], "passing" if ok else "failing",
             scope=scope, observed=compiled, expected_word=v["word"])
-        issues = judge(v, observed)
+        issues = supplemental_judge(v, observed)
         if v["kind"] == "index":
             index = v["expected"]["index"]
             must_fault = v["expected"]["arithmetic_fault"] or not 0 <= index < 4 or (
@@ -86,7 +88,7 @@ def collect():
                 reason="Only decoder cap_index observed; requires equivalent full-core capability fixture",
                 expected=v["expected"], observed=observed)
         else:
-            issues = judge(v, observed)
+            issues = supplemental_judge(v, observed)
             add(layer, v["id"], "failing" if issues else "passing",
                 scope="MCMP equality/Z, DR preservation, normalized PC and memory writes",
                 issues=issues, expected=v["expected"], observed=observed)
@@ -115,7 +117,7 @@ def collect():
                 vectors=cases, summary=dict(Counter(r["status"] for r in rows)), results=rows)
 
 
-def main():
+def supplemental_main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--require-complete", action="store_true")
@@ -133,7 +135,106 @@ def main():
     args.output.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report.get("summary", report)), flush=True)
     return code
-
-
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", type=Path, default=Path("/tmp/isa-conformance"))
+    parser.add_argument("--only", help="Vector ID prefix for a focused rerun")
+    parser.add_argument("--observe", action="store_true",
+                        help="Return zero despite known conformance failures; results remain failing")
+    args = parser.parse_args()
+    out = args.output.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    cases = [v for v in vectors() if not args.only or v["id"].startswith(args.only)]
+    if not cases:
+        parser.error("No matching vectors")
+    (out / "vectors.json").write_text(json.dumps(cases, indent=2))
+    report = dict(scope="Initial subset only; NOT complete ISA conformance or hardware certification",
+                  authority=AUTHORITY,
+                  authority_sha256=hashlib.sha256((ROOT / AUTHORITY).read_bytes()).hexdigest(),
+                  units="PC compared in words; hardware byte addresses divided by four; raw retained",
+                  vectors=cases, results=[], evidence={})
+    report["source_sha256"] = {
+        str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in [ROOT / "simulator/simulator.js",
+                     *sorted((ROOT / "hardware").glob("*.py")),
+                     *sorted(Path(__file__).parent.glob("*.py")),
+                     Path(__file__).with_name("simulator.cjs")]
+    }
+    def add(layer, observations):
+        for v, result in zip(cases, observations, strict=True):
+            if result["id"] != v["id"]:
+                raise RuntimeError("Vector/result order mismatch")
+            failures = judge(v, result)
+            report["results"].append(dict(layer=layer, id=v["id"],
+                                          status="failing" if failures else "passing",
+                                          violations=failures, **{"observation": result}))
+    def unavailable(layer, reason, status="untested"):
+        for v in cases:
+            report["results"].append(dict(layer=layer, id=v["id"], status=status, reason=reason,
+                                          initial_requested=dict(dr=v["dr"], flags=v["flags"], pc_word=0),
+                                          final=None, forbidden_side_effects="not observed"))
+    # Layer failures are contained so one unavailable tool never hides the others.
+    try:
+        js = subprocess.run(["node", str(Path(__file__).with_name("simulator.cjs")),
+                             str(out / "vectors.json")], cwd=ROOT,
+                            text=True, capture_output=True, check=True, timeout=120)
+        add("simulator", json.loads(js.stdout))
+    except Exception as error:
+        unavailable("simulator", f"Adapter failed: {error}", "failing")
+    for iot in (False, True):
+        profile = "iot" if iot else "full"
+        try:
+            h = Harness(iot)
+            rows, trace = run_amaranth(h, cases)
+            add(f"amaranth-{profile}", rows)
+            (out / f"stimuli-{profile}.json").write_text(json.dumps(trace))
+        except Exception as error:
+            unavailable(f"amaranth-{profile}", f"Adapter failed: {error}", "failing")
+            unavailable(f"generated-rtl-{profile}", "Amaranth fixture could not produce stimuli")
+            continue
+        try:
+            rows, evidence = run_generated(Harness(iot), cases, trace, out / f"rtl-{profile}")
+            if rows is None:
+                unavailable(f"generated-rtl-{profile}", evidence)
+            else:
+                add(f"generated-rtl-{profile}", rows)
+                report["evidence"][profile] = evidence
+        except Exception as error:
+            unavailable(f"generated-rtl-{profile}", f"RTL generation/execution failed: {error!r}", "failing")
+    unavailable("assembler", "Literal execution vectors; source-to-word testing outside this initial runner")
+    unavailable("physical-hardware", "No board access, synthesis, flashing or release authorized")
+    for layer in ("simulator", "amaranth-full", "amaranth-iot",
+                  "generated-rtl-full", "generated-rtl-iot"):
+        for ident, reason in BLOCKED.items():
+            report["results"].append(dict(layer=layer, id=ident, status="blocked", reason=reason,
+                                          initial=None, final=None, forbidden_side_effects="not asserted"))
+    report["summary"] = {layer: dict(Counter(r["status"] for r in report["results"] if r["layer"] == layer))
+                         for layer in sorted({r["layer"] for r in report["results"]})}
+    (out / "results.json").write_text(json.dumps(report, indent=2))
+    lines = ["# Instruction conformance results", "", report["scope"], "",
+             f"Authority: `{AUTHORITY}` SHA-256 `{report['authority_sha256']}`", "",
+             "| Layer | Passing | Failing | Blocked | Untested |",
+             "|---|---:|---:|---:|---:|"]
+    for layer, counts in report["summary"].items():
+        lines.append(f"| {layer} | " + " | ".join(str(counts.get(k, 0)) for k in
+                     ("passing", "failing", "blocked", "untested")) + " |")
+    lines.extend(["", "## Non-passing findings", ""])
+    for r in report["results"]:
+        if r["status"] in ("failing", "blocked"):
+            lines.append(f"- **{r['status']}** {r['layer']} / {r['id']}: " +
+                         r.get("reason", ", ".join(r.get("violations", []))))
+    lines.extend(["", "Complete requested/observed states, bus effects and generated-source fingerprints: results.json.",
+                  "LOAD/SAVE vectors isolate index formation with NULL authority; they do not certify successful transfers.",
+                  "MCMP checks equality/Z and no stored result; exact C/V and unused bits remain blocked."])
+    (out / "summary.md").write_text("\n".join(lines) + "\n")
+    print(json.dumps(report["summary"], indent=2))
+    print(f"Detailed evidence: {out / 'results.json'}")
+    return 1 if not args.observe and any(r["status"] == "failing" for r in report["results"]) else 0
 if __name__ == "__main__":
-    sys.exit(main())
+    # Preserve the incoming single-JSON report CLI and its broader assembler/
+    # simulator vectors. Directory output selects the new multilayer runner.
+    output = next((arg.split("=", 1)[1] for arg in sys.argv[1:]
+                   if arg.startswith("--output=")), "")
+    if "--output" in sys.argv:
+        output = sys.argv[sys.argv.index("--output") + 1]
+    raise SystemExit(supplemental_main() if output.endswith(".json") else main())

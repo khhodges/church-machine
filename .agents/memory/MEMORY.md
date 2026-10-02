@@ -157,3 +157,4 @@
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
 - [Thread LUMP placement](thread-lump-placement.md) — Threads are LUMPs, not special-address reservations; saved descriptors control generic placement.
 - [Generated RTL replay](generated-rtl-replay.md) — constant-only Verilog blocks can leave unknown GT bits; distinguish dialect evidence and preserve the recorded elaboration.
+- [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
