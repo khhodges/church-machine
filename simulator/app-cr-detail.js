@@ -2437,11 +2437,14 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
     // Indexed CALL names retain the exact-allocation validation contract.
     if (opcode === 0 || opcode === 1 || opcode === 5 || opcode === 8 || opcode === 9) {
         const verb = {0:'load', 1:'save', 5:'switch', 8:'eloadcall', 9:'xloadlambda'}[opcode];
-        const row = opcode === 8 ? imm & 31 : imm;
-        const meaning = opcode === 1 ? `CR${crDst} → CR${crSrc}[${row}]`
-            : `CR${crDst} ← CR${crSrc}[${row}]`;
+        const compact = opcode <= 1;
+        const dynamic = compact && !!(imm & 0x400F);
+        const row = compact ? (imm >>> 4) & 1023 : opcode === 8 ? imm & 31 : imm;
+        const index = compact ? `unsigned32(DR${imm & 15}) ${imm & 0x4000 ? '−' : '+'} #${row}` : row;
+        const meaning = opcode === 1 ? `CR${crDst} → CR${crSrc}[${index}]`
+            : `CR${crDst} ← CR${crSrc}[${index}]`;
         // Never mutate the caller's aliases while rendering a static listing.
-        const target = crSrc === 6 && (opcode === 0 || opcode === 8 || opcode === 9)
+        const target = !dynamic && crSrc === 6 && (opcode === 0 || opcode === 8 || opcode === 9)
             ? ` (${_indexedCallTarget(callContext, row)})` : '';
         const method = (imm >>> 5) & 127;
         return out(`${verb}${cc} ${meaning}${target} if authorized${opcode === 5 ? '; destination M required and consumed on success' : ''}${opcode === 8 ? (method ? `; then call method #${method}` : '; then call fast path') : ''}${opcode === 9 ? '; then lambda' : ''}`);

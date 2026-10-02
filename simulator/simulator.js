@@ -6025,6 +6025,11 @@ class ChurchSimulator {
             crDst:  (instr >>> 19) & 0xF,
             crSrc:  (instr >>> 15) & 0xF,
             imm:    instr & 0x7FFF,
+            ...((instr >>> 27) <= 1 ? {
+                indexRegister: instr & 15,
+                indexMagnitude: (instr >>> 4) & 1023,
+                indexSubtract: !!(instr & 0x4000),
+            } : {}),
             raw:    instr,
         };
     }
@@ -6802,7 +6807,21 @@ class ChurchSimulator {
         }
     }
 
+    _resolveCompactIndex(d) {
+        if (d.indexRegister === undefined) return d;
+        const base = d.indexRegister === 0 ? 0 : this.dr[d.indexRegister] >>> 0;
+        const index = base + (d.indexSubtract ? -d.indexMagnitude : d.indexMagnitude);
+        if (index < 0 || index > 0xFFFFFFFF) {
+            this.fault('BOUNDS', 'LOAD/SAVE index arithmetic overflow or underflow');
+            return null;
+        }
+        const { indexRegister, indexMagnitude, indexSubtract, ...resolved } = d;
+        return { ...resolved, imm: index };
+    }
+
     _execLoad(d) {
+        d = this._resolveCompactIndex(d);
+        if (!d) return null;
         const clistGT = this.cr[d.crSrc].word0;
         const _loadOldGT = this.cr[d.crDst].word0 >>> 0;  // captured for LOAD_SHADOW before any _writeCR
         if (clistGT === 0) {
@@ -6822,7 +6841,11 @@ class ChurchSimulator {
             clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
             clistSize = (hdr.valid && hdr.cc > 0) ? hdr.cc : 1;
         }
-        const absAddr = (clistLoc + d.imm) >>> 0;
+        if (clistLoc + d.imm > 0xFFFFFFFF || d.imm >= clistSize) {
+            this.fault('NO_CAPABILITY', `LOAD: c-list index ${d.imm} is out of bounds`);
+            return null;
+        }
+        const absAddr = clistLoc + d.imm;
         const clistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
         if (d.crSrc === 6 && d.imm >= clistSize) {
             this.fault('NO_CAPABILITY',
@@ -7087,6 +7110,8 @@ class ChurchSimulator {
     }
 
     _execSave(d) {
+        d = this._resolveCompactIndex(d);
+        if (!d) return null;
         // ISA rule: row 0 of every c-list is the resident identity credential.
         // This must fault before any operand, M-bit, permission, Namespace, or
         // memory path can mask the violation.
@@ -7168,7 +7193,11 @@ class ChurchSimulator {
             clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
             clistSize = (hdr.valid && hdr.cc > 0) ? hdr.cc : 1;
         }
-        const saveAbsAddr = (clistLoc + d.imm) >>> 0;
+        if (clistLoc + d.imm > 0xFFFFFFFF || d.imm >= clistSize) {
+            this.fault('BOUNDS', `SAVE: c-list index ${d.imm} is out of bounds`);
+            return null;
+        }
+        const saveAbsAddr = clistLoc + d.imm;
         const saveClistRange = { base: clistLoc, upperBound: (clistLoc + clistSize - 1) >>> 0 };
         const clistCheck = this.mLoad(clistGT, 'S', d.crSrc, saveAbsAddr, saveClistRange);
         if (!clistCheck.ok) {

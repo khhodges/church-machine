@@ -4699,7 +4699,10 @@ function showFaultModal(f) {
         const _isLoadOrCall = (_op === 0 || _op === 2); // LOAD=0, CALL=2
         if (_isLoadOrCall) {
             const _crSrc = (word >>> 15) & 0xF;
-            if (_crSrc === 6 && word !== null) _faultCListSlot = word & 0x7FFF;
+            if (_crSrc === 6 && word !== null) {
+                if (_op === 2) _faultCListSlot = word & 31;
+                else if (!(word & 0x400F)) _faultCListSlot = (word >>> 4) & 1023;
+            }
         }
     }
 

@@ -119,6 +119,7 @@
             const match = /^(LOAD|SAVE|SWITCH|CHANGE|DREAD|DWRITE|BFEXT|BFINS|BRANCH|CALL)(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|NV)?\b\s*(.*)$/i.exec(line);
             if (!match) return false;
             const op = match[1].toUpperCase(), args = match[2].split(',').map(a => a.trim());
+            if (op === 'LOAD' || op === 'SAVE') return false;
             if (op === 'BRANCH') return args.some(arg => /^DR\d+\b/i.test(arg));
             if (op === 'CALL') return /\[\s*DR\d+\b/i.test(args[0]) ||
                 /^(?:selector\s*\(\s*)?DR\d+\b/i.test(args[1] || '');

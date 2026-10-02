@@ -502,7 +502,7 @@ const WUKONG_CALLHOME_CONVENTIONS = {
     };
     const selfTest = a.disassemble(0x17030021, slotNames);
     const callHome = a.disassemble(0x17030027, slotNames);
-    const loadSelfTest = a.disassemble(0x07030001, slotNames);
+    const loadSelfTest = a.disassemble(0x07030010, slotNames);
     assert('WCH4g SelfTest row 1 disassembles with its local pet name and method',
         selfTest.includes('CR6[SelfTest].Run') && selfTest.includes('; c-list[1]'),
         `selected="${selfTest}"`);
@@ -4269,7 +4269,7 @@ const TUNNEL_NS_BC = { 'Tunnel': 3, 'Mum': 5 };
         assert('BC5 Tunnel.Connect(Mum) word[0] LOAD — crSrc=6 (c-list root)',
             crSrc === 6, `got crSrc=${crSrc}`);
         assert('BC6 Tunnel.Connect(Mum) word[0] LOAD — imm=5 (Mum NS slot)',
-            imm === 5, `got imm=${imm}`);
+            imm === (5 << 4), `got imm=${imm}`);
     }
 
     // word[1] = ELOADCALL CR0, Tunnel, Connect
@@ -4404,7 +4404,7 @@ const SCHED_NS_BC = {
         assert('BC21 Scheduler.Wait(flag_GT) word[0] LOAD — crDst=2 (CR2 from input spec)',
             ((w >>> 19) & 0xF) === 2, `got crDst=${(w >>> 19) & 0xF}`);
         assert('BC22 Scheduler.Wait(flag_GT) word[0] LOAD — imm=10 (flag_GT NS slot)',
-            (w & 0x7FFF) === 10, `got imm=${w & 0x7FFF}`);
+            (w & 0x7FFF) === (10 << 4), `got imm=${w & 0x7FFF}`);
     }
 
     {
@@ -4903,7 +4903,7 @@ const SMM_NS_BC = {
         assert('BC64 Memory.Allocate(pool_GT) word[0] LOAD — crDst=2 (CR2 from input spec)',
             ((w >>> 19) & 0xF) === 2, `got crDst=${(w >>> 19) & 0xF}`);
         assert('BC65 Memory.Allocate(pool_GT) word[0] LOAD — imm=7 (pool_GT NS slot)',
-            (w & 0x7FFF) === 7, `got imm=${w & 0x7FFF}`);
+            (w & 0x7FFF) === (7 << 4), `got imm=${w & 0x7FFF}`);
     }
 
     {
@@ -4943,7 +4943,7 @@ const SMM_NS_BC = {
         assert('BC72 Mint.Encode(mem_GT) word[0] LOAD — crDst=2 (CR2 from input spec)',
             ((w >>> 19) & 0xF) === 2, `got crDst=${(w >>> 19) & 0xF}`);
         assert('BC73 Mint.Encode(mem_GT) word[0] LOAD — imm=20 (mem_GT NS slot)',
-            (w & 0x7FFF) === 20, `got imm=${w & 0x7FFF}`);
+            (w & 0x7FFF) === (20 << 4), `got imm=${w & 0x7FFF}`);
     }
 
     {

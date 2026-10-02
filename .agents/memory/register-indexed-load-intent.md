@@ -72,8 +72,9 @@ containment and no leakage in all cases.
 
 **How to apply:** Distinguish implementation gaps from intended semantics.
 Never replace the register with its compile-time value or invent an encoding.
-Any implementation must keep assembler, simulator, hardware, and audits
-consistent and preserve existing binary meanings.
+Implementation status must be reported separately for assembler, simulator,
+hardware, and audits. The later direct compact LOAD/SAVE cutover intentionally
+does not preserve old binary meanings.
 Specify encoding, immediate signedness, addition overflow, index units, and
 out-of-range behavior before implementation. Preserve capability checks and
 do not narrow a computed index in a way that wraps it into authorized bounds.
@@ -115,3 +116,14 @@ bypassing boot authority.
 canonical fixtures for execution tests when live boot state is invalid.
 State the browser verification boundary explicitly; never modify the user's
 Namespace or boot image merely to demonstrate the ISA feature.
+
+Runtime-selected indices also constrain destructive C-list optimization.
+Unknown runtime DR values must conservatively preserve all possible rows;
+the current paused DR value is not evidence that other rows are unused.
+
+**Why:** Execution and disassembly can be correct while a stale static
+reference analysis still deletes capabilities needed by the new instructions.
+
+**How to apply:** Include zero-unreferenced, compaction, and row-rewrite paths
+in any indexed-encoding change; block destructive transformations when their
+reachable rows cannot be established.

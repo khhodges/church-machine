@@ -606,7 +606,7 @@ console.log('\n--- T008: NULL GT no pet name → immediate NULL_CAP fault ---');
         // Leave programCapabilities empty → no pet name for slot 11.
         sim.programCapabilities = null;
 
-        const instr = sim.encodeInstruction(0, 0xE, 1, 6, 11);  // ecRow = 11
+        const instr = sim.encodeInstruction(0, 0xE, 1, 6, 11 << 4);  // ecRow = 11
         const cr14  = sim.cr[14];
         sim.memory[cr14.word1 + 1] = instr >>> 0;
         sim.pc     = 0;

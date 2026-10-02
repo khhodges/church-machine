@@ -1868,6 +1868,26 @@ class ChurchAssembler {
         return [((op << 27) | (cond << 23) | (a << 19) | (b << 15) | (imm & 0x7FFF)) >>> 0];
     }
 
+    _parseCompactIndex(text, lineNum) {
+        const named = this._resolveCListName(text.replace(/^#/, ''));
+        if (named !== null) {
+            this._checkCapDeclared(named.key, lineNum);
+            text = String(named.slot);
+        }
+        const literal = '(?:0x[0-9a-f]+|0b[01]+|\\d+)';
+        const reg = new RegExp(`^DR(\\d+)(?:\\s*([+-])\\s*#?(${literal}))?$`, 'i').exec(text);
+        const immediate = new RegExp(`^#?([+-]?)(${literal})$`, 'i').exec(text);
+        const r = reg ? Number(reg[1]) : 0;
+        const magnitude = reg ? Number(reg[3] || 0) : immediate ? Number(immediate[2]) : NaN;
+        const negative = reg ? reg[2] === '-' : immediate && immediate[1] === '-';
+        if ((!reg && !immediate) || r > 15 || magnitude > 1023 || !Number.isInteger(magnitude)) {
+            this.errors.push({ line: lineNum, message:
+                `Invalid LOAD/SAVE index "${text}": use DR0–DR15 plus/minus magnitude 0–1023, or an immediate from -1023 to 1023.` });
+            return 0;
+        }
+        return (negative && magnitude ? 0x4000 : 0) | (magnitude << 4) | r;
+    }
+
     _assembleLine(line, lineNum, addr) {
         this._currentLineText = (this._rawLines && this._rawLines[lineNum - 1]) || line;
         const parts = line.replace(/,/g, ' ').replace(/\[/g, ' ').replace(/\]/g, ' ').split(/\s+/).filter(Boolean);
@@ -1927,25 +1947,19 @@ class ChurchAssembler {
                     // the named row even when the name was previously loaded
                     // into CR0, CR3, or another register.
                     imm = res0.slot;
-                    if (!Number.isInteger(imm) || imm < 0 || imm > 0x7FFF) {
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 1023) {
                         this.errors.push({
                             line: lineNum,
                             ...this._tokenCols(this._currentLineText, res0.key),
-                            message: `LOAD c-list offset ${imm} is out of range (0–32767 allowed).`
+                            message: `LOAD c-list offset ${imm} is out of range (0–1023 allowed).`
                         });
                     }
+                    imm <<= 4;
                     this._recordNsLoaded(res0.key, crDst);
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'LOAD', lineNum);
-                    imm   = this._parseImm(parts[3], lineNum, 'LOAD');
-                    if (imm < 0 || imm > 0x7FFF) {
-                        this.errors.push({
-                            line: lineNum,
-                            ...this._tokenCols(this._currentLineText, parts[3] || ''),
-                            message: `LOAD c-list offset ${imm} is out of range (0–32767 allowed).`
-                        });
-                    }
+                    imm = this._parseCompactIndex(parts.slice(3).join(' '), lineNum);
                 }
                 break;
             }
@@ -1961,25 +1975,19 @@ class ChurchAssembler {
                     // As with LOAD, a named SAVE always addresses the named
                     // c-list row, not the destination CR recorded in nsLoaded.
                     imm = res1.slot;
-                    if (!Number.isInteger(imm) || imm < 0 || imm > 0x7FFF) {
+                    if (!Number.isInteger(imm) || imm < 0 || imm > 1023) {
                         this.errors.push({
                             line: lineNum,
                             ...this._tokenCols(this._currentLineText, res1.key),
-                            message: `SAVE c-list offset ${imm} is out of range (0–32767 allowed).`
+                            message: `SAVE c-list offset ${imm} is out of range (0–1023 allowed).`
                         });
                     }
+                    imm <<= 4;
                     this._recordNsLoaded(res1.key, crDst);
                 } else {
                     crSrc = this._parseCR(parts[2], lineNum);
                     this._checkPrivCR(crSrc, 'SAVE', lineNum);
-                    imm   = this._parseImm(parts[3], lineNum);
-                    if (imm < 0 || imm > 0x7FFF) {
-                        this.errors.push({
-                            line: lineNum,
-                            ...this._tokenCols(this._currentLineText, parts[3] || ''),
-                            message: `SAVE c-list offset ${imm} is out of range (0–32767 allowed).`
-                        });
-                    }
+                    imm = this._parseCompactIndex(parts.slice(3).join(' '), lineNum);
                 }
                 if (imm === 0) {
                     this.errors.push({
@@ -3052,15 +3060,6 @@ class ChurchAssembler {
         if (token.startsWith('#')) token = token.substring(1);
         if (token.startsWith('+')) token = token.substring(1);
 
-        if (context === 'LOAD' && /^DR\d+$/i.test(token)) {
-            this.errors.push({
-                line: lineNum,
-                ...this._tokenCols(this._currentLineText, token),
-                message: `"${token}" names a data register, not a c-list row. LOAD CRd, CRs, #row encodes a fixed 15-bit row (0–32767); it does not read the value in ${token} at runtime. This ISA has no register-indexed LOAD.`
-            });
-            return 0;
-        }
-
         if (this.labels[token] !== undefined) {
             return this.labels[token] & 0xFFFF;
         }
@@ -3327,20 +3326,18 @@ class ChurchAssembler {
 
         switch (opcode) {
             // LOAD CRd, CR6[offset]  — load GT from c-list
-            case 0: {
-                if (crSrc === 6) {
-                    const ref = cdNamed(imm);
-                    return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
-                }
-                return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
-            }
+            case 0:
             // SAVE CRd, CR6[offset]  — save GT to c-list
             case 1: {
-                if (crSrc === 6) {
-                    const ref = cdNamed(imm);
+                const register = imm & 15;
+                const magnitude = (imm >>> 4) & 1023;
+                const subtract = !!(imm & 0x4000);
+                if (crSrc === 6 && register === 0 && !subtract) {
+                    const ref = cdNamed(magnitude);
                     return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;
                 }
-                return `${mnemonic}  CR${crDst}, CR${crSrc}[${hexOff(imm)}]`;
+                const index = `DR${register}` + (magnitude ? ` ${subtract ? '-' : '+'} ${magnitude}` : '');
+                return `${mnemonic}  CR${crDst}, CR${crSrc}, ${index}`;
             }
             // CALL CRd[, MethodName]  — invoke capability via method-table dispatch
             case 2: {

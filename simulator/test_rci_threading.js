@@ -78,7 +78,7 @@ const RETURN_AL = encodeInstr(3, AL, 0, 0, 0);  // 0x1F000000
 
 // LOAD opcode=0, crSrc=6 (c-list access), slot=N
 function loadViaSlot(slot) {
-    return encodeInstr(0, AL, 0, 6, slot);
+    return encodeInstr(0, AL, 0, 6, slot << 4);
 }
 
 // ── RCI1: lumpAudit with lineNums → violations carry correct sourceLine ───────

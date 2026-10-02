@@ -6007,8 +6007,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             // Build symbolic annotation (capability arrow shown next to mnemonic)
             let ann = '';
             const _nsOrClistName = idx => _indexedCallTarget(_commentContext, idx);
-            if (op === 0 && crSrc === 6 && cc > 0) {
-                const nm = _nsOrClistName(imm);
+            if (op === 0 && crSrc === 6 && cc > 0 && !(imm & 0x400F)) {
+                const nm = _nsOrClistName((imm >>> 4) & 1023);
                 if (nm) ann = `<span class="lump-sym-ann">\u2190 ${e(nm)}</span>`;
             } else if ((op === 8 || op === 9) && crSrc === 6 && cc > 0) {
                 // ELOADCALL (op=8): imm15 = (methodIdx<<5)|row — slot is bits[4:0] only.

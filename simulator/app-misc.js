@@ -3282,8 +3282,11 @@ function _cmDecodeWord(word, wordAddr) {
 
     var operands = '';
     switch (opcode) {
-        case 0:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
-        case 1:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
+        case 0:
+        case 1:
+            operands = 'CR'+dst+', CR'+src+', DR'+(imm15 & 15) +
+                ((imm15 >>> 4 & 1023) ? ((imm15 & 0x4000) ? ' - ' : ' + ') + (imm15 >>> 4 & 1023) : '');
+            break;
         case 2:  operands = src === 6 ? 'CR6['+(imm15 & 31)+'], #'+((imm15 >>> 5) & 127) : (imm15 ? 'CR'+dst+', #'+imm15 : 'CR'+dst); break;
         case 3:  operands = imm15 ? '#0x'+(imm15).toString(16).toUpperCase() : ''; break;
         case 4:  operands = 'CR'+dst+', CR'+src+', #'+imm15; break;
@@ -3357,11 +3360,13 @@ function _instrSymbolicMeaning(decoded) {
     var sn  = (src !== null && src !== undefined) ? _crRoleName(src) : '';
     var dataOffset = (imm & 0x4000) ? '#' + (imm & 0x3FFF) :
         '#' + ((imm >>> 4) & 0x3FF) + ' + DR' + (imm & 15);
+    var capIndex = 'unsigned32(DR' + (imm & 15) + ')' +
+        ((imm & 0x4000) ? ' - ' : ' + ') + ((imm >>> 4) & 1023);
     switch (m) {
         case 'LOAD':
-            return 'Load C-list row #' + imm + ' through CR' + src + ' into CR' + dst + ' if authorized.';
+            return 'Load C-list row ' + capIndex + ' through CR' + src + ' into CR' + dst + ' if authorized; arithmetic must not wrap.';
         case 'SAVE':
-            return 'Save CR' + dst + ' into C-list row #' + imm + ' through CR' + src + ' if authorized.';
+            return 'Save CR' + dst + ' into C-list row ' + capIndex + ' through CR' + src + ' if authorized; arithmetic must not wrap.';
         case 'CALL':
             if (src === 6) return 'Call the capability in C-list row CR6[' + (imm & 31) + '], method index #' + ((imm >>> 5) & 127) + ' if authorized; target values unavailable.';
             return 'Call the capability held in CR' + dst + ' (' + dn + '), method index #' + imm + '.';

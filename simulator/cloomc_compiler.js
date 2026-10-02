@@ -299,6 +299,12 @@ class CLOOMCCompiler {
     }
 
     encode(opcode, cond, dst, src, imm) {
+        // Compiler-generated LOAD/SAVE indices are immediate-only (DR0).
+        if (opcode === 0 || opcode === 1) {
+            if (!Number.isInteger(imm) || Math.abs(imm) > 1023)
+                throw new Error('LOAD/SAVE immediate magnitude must be 0–1023');
+            imm = (imm < 0 ? 0x4000 : 0) | (Math.abs(imm) << 4);
+        }
         return (
             ((opcode & 0x1F) << 27) |
             ((cond & 0xF) << 23) |
@@ -2682,10 +2688,14 @@ class CLOOMCCompiler {
             const varName = loadCRAssign[1];
             const srcCR = this._parseCRFull(loadCRAssign[2]);
             const offset = parseInt(loadCRAssign[3]);
+            if (!Number.isInteger(offset) || offset > 1023) {
+                errors.push({ line: stmt.lineNum, message: 'LOAD immediate magnitude must be 0–1023.' });
+                return;
+            }
             const destCR = this._crAlloc.next++;
             this._crLocals[varName] = destCR;
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: `LOAD CR${destCR}, CR${srcCR}[${offset}] (${varName})` });
-            code.push(this.encode(this.opcodes.LOAD, 14, destCR, srcCR, offset & 0x7FFF));
+            code.push(this.encode(this.opcodes.LOAD, 14, destCR, srcCR, offset));
             return;
         }
 

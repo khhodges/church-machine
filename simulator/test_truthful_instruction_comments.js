@@ -72,7 +72,7 @@ const listing = vm.createContext({
 vm.runInContext(lumps.slice(autoStart, autoEnd).replace('const _autoComment = ', 'globalThis._autoComment = '), listing);
 const comment = w => listing._autoComment(w, (w >>> 27) & 31,
     (w >>> 19) & 15, (w >>> 15) & 15, w & 0x7FFF, (w >>> 23) & 15, {});
-assert(comment(word(1, 1, 2, 3)).includes('save CR1 → CR2[3]'));
+assert(comment(word(1, 1, 2, 3 << 4)).includes('save CR1 → CR2[unsigned32(DR0) + #3]'));
 assert(comment(word(16, 1, 2, 0x4001)).includes('[#1]'));
 assert(comment(word(17, 1, 2, 0x20 | 3)).includes('2 + DR3'));
 assert(comment(word(8, 1, 6, (2 << 5) | 1)).includes('method #2'));

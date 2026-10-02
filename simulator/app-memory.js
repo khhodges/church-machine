@@ -7371,7 +7371,8 @@ window.lumpSaveLump = async function(nsIdx) {
             const _ww    = (sim.memory[baseLoc + _wi] >>> 0);
             const _op    = (_ww >>> 27) & 0x1F;
             const _crSrc = (_ww >>> 15) & 0xF;
-            const _slot  = _ww & 0x1F;   // row lives in bits[4:0] for all clist ops
+            if (_op <= 1 && (_ww & 0x400F)) continue; // runtime index; not a static row
+            const _slot = _op <= 1 ? ((_ww >>> 4) & 1023) : _ww & 0x1F;
             if (_CLIST_OPS.has(_op) && _crSrc === 6 && _slot >= hdr.cc) {
                 checks.push(
                     `\u2717 LUMP CONSTRUCTION ERROR: code[${_wi}]=0x${_ww.toString(16).toUpperCase().padStart(8,'0')} ` +
@@ -7527,6 +7528,13 @@ window.__crdToggleFaultDetail = function(detailRowId, summaryRow) {
 // Only LOAD (opcode 0) modifies crDst as a register; the others only dereference crSrc.
 function _computeReferencedCListSlots(codeBase, codeCount) {
     const BRANCH_OPCODE = 23; // v2.0 ISA: BRANCH is opcode 23
+    // Unknown runtime indices must preserve every possible capability, not be
+    // treated as an unreferenced row or evaluated using today's DR contents.
+    let dynamicIndices = false;
+    for (let w = 0; w < codeCount; w++) {
+        const word = sim.memory[codeBase + w] >>> 0;
+        if ((word >>> 27) <= 1 && (word & 0x400F)) dynamicIndices = true;
+    }
 
     // ── Phase 1: Collect basic-block entry points ─────────────────────────────
     // Word 0 always starts a block.  Every branch target and every fall-through
@@ -7650,7 +7658,7 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
     // ── Phase 4: Final collection pass ───────────────────────────────────────
     // Walk each block using its fixpoint entry alias mask, collecting direct /
     // indirect slot references and clobber warnings.
-    const direct          = new Set();
+    const direct          = new Set([0]); // immutable SELF must never move or disappear
     const indirect        = new Set();
     const clobberWarnings = [];
 
@@ -7673,9 +7681,10 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
             const opcode = (word >>> 27) & 0x1F;
             const crDst  = (word >>> 19) & 0xF;
             const crSrc  = (word >>> 15) & 0xF;
-            const imm    = word & 0x7FFF;
+            const imm = opcode <= 1 ? (word >>> 4) & 1023
+                : (opcode === 2 || opcode === 8) ? word & 31 : word & 0x7FFF;
 
-            if (opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) {
+            if (opcode === 0 || opcode === 1 || opcode === 2 || opcode === 8 || opcode === 9) {
                 if (crSrc === 6) {
                     // Direct access via CR6 (c-list root).
                     direct.add(imm);
@@ -7704,7 +7713,8 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
         }
     }
 
-    return { direct, indirect, clobberWarnings };
+    if (dynamicIndices) for (let row = 0; row < 256; row++) direct.add(row);
+    return { direct, indirect, clobberWarnings, dynamicIndices };
 }
 
 // Zero a single c-list row in simulator memory (marks the GT as null/empty).
@@ -7794,7 +7804,12 @@ window.applyPOLA = async function(nsIdx) {
     for (let i = 0; i < cc; i++) oldGTs.push(sim.memory[clistBase + i] >>> 0);
 
     // ── Step 2: compute slots referenced via CR6 and via alias registers ──
-    const { direct: refSlots, indirect: indSlots } = _computeReferencedCListSlots(baseLoc + 1, cw);
+    const { direct: refSlots, indirect: indSlots, dynamicIndices } = _computeReferencedCListSlots(baseLoc + 1, cw);
+    if (dynamicIndices) {
+        if (typeof showPatchModal === 'function') showPatchModal(false, title,
+            'No data changed. Runtime-selected LOAD/SAVE indices prevent safe C-list zeroing or compaction. Keep the existing row layout.');
+        return false;
+    }
 
     // ── Step 3: zero unreferenced non-null GTs (skip indirect slots) ───────
     let zeroedCount = 0;
@@ -7844,7 +7859,7 @@ window.applyPOLA = async function(nsIdx) {
     const newGTs   = [];
     const oldToNew = new Map();
     for (let i = 0; i < cc; i++) {
-        if (oldGTs[i] !== 0) {
+        if (oldGTs[i] !== 0 || refSlots.has(i)) {
             oldToNew.set(i, newGTs.length);
             newGTs.push(oldGTs[i]);
         }
@@ -7900,13 +7915,18 @@ window.applyPOLA = async function(nsIdx) {
         const word    = sim.memory[addr] >>> 0;
         const opcode  = (word >>> 27) & 0x1F;
         const crSrcW  = (word >>> 15) & 0xF;
-        const oldSlot = word & 0x7FFF;
-        if ((opcode === 0 || opcode === 1 || opcode === 8 || opcode === 9) && crSrcW === 6) {
+        const oldSlot = opcode <= 1 ? (word >>> 4) & 1023
+            : (opcode === 2 || opcode === 8) ? word & 31 : word & 0x7FFF;
+        if ((opcode === 0 || opcode === 1 || opcode === 2 || opcode === 8 || opcode === 9) && crSrcW === 6) {
             if (oldToNew.has(oldSlot)) {
                 const newSlot = oldToNew.get(oldSlot);
                 if (newSlot !== oldSlot) {
-                    sim.writePersistentWord(addr,
-                        ((word & 0xFFFF8000) | (newSlot & 0x7FFF)) >>> 0);
+                    const rewritten = opcode <= 1
+                        ? (word & ~0x3FF0) | (newSlot << 4)
+                        : (opcode === 2 || opcode === 8)
+                            ? (word & ~31) | newSlot
+                            : (word & 0xFFFF8000) | newSlot;
+                    sim.writePersistentWord(addr, rewritten >>> 0);
                     rewriteCount++;
                 }
             }
@@ -7920,7 +7940,8 @@ window.applyPOLA = async function(nsIdx) {
         const word2   = sim.memory[addr] >>> 0;
         const opcode2 = (word2 >>> 27) & 0x1F;
         const crSrc2  = (word2 >>> 15) & 0xF;
-        const slot2   = word2 & 0x7FFF;
+        const slot2 = opcode2 <= 1 ? (word2 >>> 4) & 1023
+            : (opcode2 === 2 || opcode2 === 8) ? word2 & 31 : word2 & 0x7FFF;
         if ((opcode2 === 0 || opcode2 === 1 || opcode2 === 8 || opcode2 === 9) && crSrc2 !== 6) {
             if (oldToNew.has(slot2) && oldToNew.get(slot2) !== slot2) {
                 const newSlot2 = oldToNew.get(slot2);
@@ -8031,6 +8052,21 @@ window.applyPOLA = async function(nsIdx) {
 
             if (parts.length >= 4 && (_parseRegIdx(parts[2]) === 6 || _cr6Bound.has(parts[2]))) {
                 // ── 3-operand explicit form: MNEM CRd, CR6(or alias), slot ──
+                // DR0 +/- magnitude is immediate-only in the compact ISA.
+                // Rewrite the entire expression, not just its first token,
+                // so reassembly cannot restore the pre-compaction row.
+                const compactIndex = (baseOp === 'LOAD' || baseOp === 'SAVE')
+                    ? /^DR0(?:\s*([+-])\s*#?(0x[0-9a-f]+|0b[01]+|\d+))?$/i.exec(parts.slice(3).join(' '))
+                    : null;
+                if (compactIndex) {
+                    const magnitude = Number(compactIndex[2] || 0);
+                    const oldRow = compactIndex[1] === '-' ? -magnitude : magnitude;
+                    if (!oldToNew.has(oldRow) || oldToNew.get(oldRow) === oldRow) continue;
+                    const commentAt = rawLine.search(/;|--|\/\//);
+                    const comment = commentAt < 0 ? '' : ' ' + rawLine.slice(commentAt);
+                    const leading = rawLine.match(/^\s*/)[0];
+                    rewritten = `${leading}${parts[0]} ${parts[1]}, ${parts[2]}, DR0 + ${oldToNew.get(oldRow)}${comment}`;
+                } else {
                 const oldSlot = _parseImm(parts[3]);
                 if (isNaN(oldSlot) || !oldToNew.has(oldSlot) || oldToNew.get(oldSlot) === oldSlot) continue;
                 const newSlot = oldToNew.get(oldSlot);
@@ -8048,6 +8084,7 @@ window.applyPOLA = async function(nsIdx) {
                     `$1${newSlot}`
                 );
                 if (rewritten === rawLine) continue;
+                }
 
             } else if (parts.length === 3) {
                 // ── 2-operand NS shorthand: MNEM CRd, Name ──────────────────

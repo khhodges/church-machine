@@ -164,7 +164,7 @@ const dottedLoad = compile([
     '}',
     '}',
 ].join('\n'));
-assert.equal(dottedLoad.methods[0].code[0] & 0x7FFF, 1,
+assert.equal(dottedLoad.methods[0].code[0] & 0x7FFF, 1 << 4,
     'dotted named LOAD must resolve through the declared C-list');
 
 // Full compiler-pipeline regression for the screenshot failure: the live
@@ -207,7 +207,7 @@ assert.deepEqual(collisionWords.slice(0, 2).map(word => ({
 ], 'named CALL must use local C-list rows, never registry NS slots');
 assert.equal(collisionWords[2] & 0x7FFF, 3,
     'prior named SWITCH handoff must still use its local C-list row');
-assert.equal(collisionWords[3] & 0x7FFF, 3,
+assert.equal(collisionWords[3] & 0x7FFF, 3 << 4,
     'prior conditional named LOAD must still use its local C-list row');
 const unknownCollisionMethod = new CLOOMCCompiler().compile(
     registryCollisionSource.replace('WukongCallHome.Main', 'WukongCallHome.Missing'),

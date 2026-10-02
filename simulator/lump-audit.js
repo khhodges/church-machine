@@ -632,8 +632,9 @@ function lumpAudit(words, manifest, lineNums, opts) {
             const crSrc  = (ww >>> 15) & 0xF;
             // ELOADCALL imm15 R-type split: imm[4:0] = c-list row (5-bit, matches hardware rs2);
             //           imm[11:5] = method index (7-bit 1-based, matches hardware funct7).
-            // All other Church ops (LOAD/SAVE/XLOADLAMBDA) use the full imm15 as slot.
-            const slot   = op === 8 ? (ww & 0x1F) : (ww & 0x7FFF);
+            // Compact LOAD/SAVE: only DR0 plus magnitude is statically a row.
+            if (op <= 1 && (ww & 0x400F)) continue;
+            const slot = op <= 1 ? ((ww >>> 4) & 1023) : op === 8 ? (ww & 0x1F) : (ww & 0x7FFF);
             const codeIdx = wi - 1;   // 0-based index within the code section
 
             // Slot-bounds check only applies when the LUMP has its own c-list.
@@ -842,7 +843,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 const ww    = words[wi] >>> 0;
                 const op    = (ww >>> 27) & 0x1F;
                 const crSrc = (ww >>> 15) & 0xF;
-                const slot  =  ww         & 0x7FFF;
+                if (op <= 1 && (ww & 0x400F)) continue;
+                const slot = op <= 1 ? ((ww >>> 4) & 1023) : op === 8 ? (ww & 31) : (ww & 0x7FFF);
                 if (!_rpnChurchOps.has(op) || crSrc !== 6 || slot >= cc) continue;
                 if (!_rpnSlotName[slot]) _rpnUnnamedReferenced.add(slot);
             }
