@@ -388,3 +388,17 @@ mtime_ms = 1790975775054
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6448962b-a88b-4eab-9ca0-24467594769b/106c57a3-c7f3-4df9-a7cb-c704a3eae3ce"
 storage_version_token = "1790975812481692"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "KJAbS7UbhwUy-o7VIlW61"
+uri = "file://reports/isa-conformance-initial-results-2026-10-02.md"
+type = "text"
+title = "Initial ISA conformance results"
+description = "Measured results, reproduced MCMP failures, and explicit remaining coverage gaps."
+logical_id = "5370c456-8bae-49e9-a75c-8d9766a2a69e"
+content_hash = "sha256:37c1307d262f2902849dad6629ef5c1bf1a719d55f397c5f456905f553cffa2c"
+size = 3717
+mtime_ms = 1790977504045
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5370c456-8bae-49e9-a75c-8d9766a2a69e/729fd9f4-1540-4d91-8a02-a92ea88fd1d2"
+storage_version_token = "1790977516475187"
+content_type = "text/markdown"

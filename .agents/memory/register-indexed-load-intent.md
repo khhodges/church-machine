@@ -150,3 +150,15 @@ function, not just pass independent regression suites.
 faults, and architecturally visible side effects from equivalent initial states.
 Internal cycle counts may differ unless the ISA specifies timing. Generated
 RTL and released hardware require their own evidence, not source-level inference.
+
+Conformance observations must distinguish code fetch, operand validation,
+actual operand access, and retirement; an intermediate decode value is not
+an executed effective index.
+
+**Why:** Fetch legitimately precedes an indexed arithmetic fault. Counting
+fetch validation as a forbidden operand read produces false containment
+failures; treating decode-only evidence as execution produces false confidence.
+
+**How to apply:** Label the observation stage and coverage explicitly. Require
+an actual changed destination in successful transfer fixtures, and keep
+unexecuted layers untested rather than inferring their verdict from another layer.
