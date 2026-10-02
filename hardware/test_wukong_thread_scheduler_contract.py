@@ -626,9 +626,11 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
     taken = encode_turing(
         TuringOpcode.IADD, CondCode.AL, dr_dst=4, dr_src=4, imm=1)
     loop = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=0)
-    dmem[target_word] = pack_lump_header(5, target_word + 5, 1, 0)
-    dmem[target_word + 1:target_word + 6] = [
-        change_back, branch_on_restored_flag, fallthrough, loop, taken,
+    # The observation window continues after `taken` retires. Keep that path
+    # inside executable test code instead of falling through into the c-list.
+    dmem[target_word] = pack_lump_header(6, target_word + 6, 1, 0)
+    dmem[target_word + 1:target_word + 7] = [
+        change_back, branch_on_restored_flag, fallthrough, loop, taken, loop,
     ]
     target_thread_word = 0x7000 // 4
     target_layout = thread_layout(thread_body_words(2), 32)
