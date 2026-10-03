@@ -187,7 +187,8 @@ After boot:
 The [master CHANGE correction](instruction-set.md#change-one-gt-thread-activation)
 defines one input GT, written `CHANGE CRn`, with no destination/source pair or
 index. Boot performs only the incoming half into CR12. IRQ entry swaps CR12/CR13
-in hardware and is not CHANGE; return uses `CHANGE CR12`.
+in hardware; return performs the matching hidden swap back. Neither operation
+is CHANGE. The return trigger/encoding is not specified by this correction.
 
 The following format and variant table describe the **superseded implementation**,
 not valid ISA alternatives. The corrected bit-field mapping is not specified

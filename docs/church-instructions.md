@@ -166,8 +166,9 @@ CHANGE is not a protected instruction.
 **Mnemonic**: `CHANGE CRn`
 
 **Exceptions**: Boot performs only the incoming/back half, loading into CR12.
-IRQ entry is a hardware CR12/CR13 swap, **not CHANGE**; return uses
-`CHANGE CR12`. These exceptions do not change the general one-GT operand rule.
+IRQ entry is a hidden hardware CR12/CR13 swap; return performs the matching
+hidden swap back. **Neither uses CHANGE.** The return trigger/encoding remains
+unspecified. These exceptions do not change the general one-GT operand rule.
 This is a documentation correction, not an implementation or bitstream update.
 
 | Aspect | Detail |

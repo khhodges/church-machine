@@ -12,12 +12,14 @@ The user's architectural definition is: “CHANGE needs one GT to the new Thread
 **How to apply:** Treat the one-GT operation as authoritative across compiler, disassembler, simulator, and hardware. Keep loading the GT with SWITCH distinct from activating its Thread with CHANGE. Do not infer a correct binary encoding from legacy implementation round trips.
 
 The general programmatic case has two distinct hardware exceptions: boot is
-only the incoming/back half loaded into CR12; IRQ entry swaps CR12/CR13 and is
-not CHANGE, then uses `CHANGE CR12` to return.
+only the incoming/back half loaded into CR12; IRQ entry swaps CR12/CR13 and
+IRQ return performs the matching hidden swap back. Neither is CHANGE. The
+return trigger/encoding has not been specified.
 
-**Why:** The user explicitly distinguished these cases when requesting the ISA
-documentation correction. Treating the IRQ entry shortcut or boot initialization
-as general CHANGE caused the indexed/destination-register confusion.
+**Why:** The user explicitly corrected their earlier `CHANGE CR12` IRQ-return
+statement: a hidden-swap entry requires the same mechanism on return, not the
+general CHANGE path. Boot initialization is also distinct from the general
+programmatic case.
 
 **How to apply:** Follow the master one-GT correction in `docs/instruction-set.md`.
 Do not infer a complete encoding migration or hardware implementation from the

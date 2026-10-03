@@ -52,8 +52,11 @@ This special initialization path does not add operands to programmatic CHANGE.
 
 IRQ entry is **not a CHANGE instruction**. Hardware can swap CR12 and CR13
 directly, without the additional work of the general programmatic CHANGE path.
-Return from the IRQ uses **`CHANGE CR12`**, activating the Thread identified by
-the GT in CR12. Do not model IRQ entry as an ordinary `CHANGE CR13` instruction.
+IRQ return must perform the **matching hidden swap back**, not CHANGE. The
+entry and return operations are paired hardware exceptions; neither uses the
+general programmatic Thread-transition path. The earlier statement that IRQ
+return uses `CHANGE CR12` is withdrawn. The trigger or instruction encoding
+for the return operation is not specified by this correction.
 
 ### Encoding and implementation status
 

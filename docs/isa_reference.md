@@ -909,9 +909,10 @@ capability home and is not interpreted as the resume identity.
 **Boot exception:** Perform only the incoming/back half, loading the incoming
 Thread into CR12; there is no outgoing programmatic context to suspend.
 
-**IRQ exception:** IRQ entry is a hardware CR12/CR13 swap, not CHANGE. Return
-uses `CHANGE CR12`. The hardware entry shortcut does not redefine the general
-programmatic instruction.
+**IRQ exception:** IRQ entry is a hidden hardware CR12/CR13 swap. Return uses
+the matching hidden swap back, **not CHANGE**. The return trigger/encoding is
+not specified here. Neither exception redefines the general programmatic
+instruction.
 
 **Source example:**
 ```asm
