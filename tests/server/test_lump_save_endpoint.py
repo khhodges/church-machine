@@ -119,6 +119,7 @@ def isolated_lumps(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "ns-state.json"))
     monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(tmp_path / "boot-config.json"))
     monkeypatch.setattr(app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "legacy-boot-config.json"))
+    monkeypatch.setattr(app_module, "_BUILD_SNAPSHOTS_DIR", str(tmp_path / "frozen-builds"))
     # Include one synthetic boot row, but keep the provenance-test destination
     # dynamic. Never infer bootstrap identity from a developer's saved setup.
     (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": [

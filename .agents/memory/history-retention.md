@@ -14,13 +14,27 @@ cleanup from invalidating current execution or frozen downstream artifacts.
 
 **How to apply:** Use recorded revision timestamps, not filesystem mtime; keep
 approval evidence. Deletion is a protected write, never a side effect of a GET.
-The user subsequently approved automatic cleanup after successful approved
-saves; retain the explicit History action for retries. Cleanup failure must
-never invalidate or report failure for an already committed save.
+The approved policy also applies automatically after authorized successful
+saves, never during planning or review. Retain the explicit History action for
+retries. Cleanup failure must not undo or report failure for a committed save.
 
-**Why:** Retention is maintenance, not a condition for preserving new work.
-Interrupted deletion must leave durable evidence rather than unexplained gaps.
+**Why:** Archive maintenance is independent of publishing a new approved
+artifact; retrying a successful save because cleanup failed creates unintended
+revisions. A crash after unlink must not erase the evidence explaining a gap.
 
-**How to apply:** Record pending deletion before unlinking; reconcile an
-interrupted cleanup only during an authorized write, never startup or GET.
-Surviving files need fresh age, reference and integrity checks before deletion.
+**How to apply:** Persist deletion intent before unlink, and complete its
+manifest/ledger evidence on the next authorized cleanup, never startup or GET.
+If the archive still exists, recheck age, identity and current references instead
+of replaying deletion blindly. Check frozen artifact stores as well as Namespace
+references under the shared transition lock; retain approval evidence even after
+the archive is gone.
+
+Approval registries are audit evidence, not artifact-retention roots.
+
+**Why:** Hardware freezes retain the entire approval registry, including
+unselected artifacts. Treating every approval digest as a reference would
+permanently exempt otherwise-expired archives from the approved policy.
+
+**How to apply:** Preserve approval files without using their contents as
+reference roots. Frozen selections and retained artifact inventories still
+protect the exact binaries they name.
