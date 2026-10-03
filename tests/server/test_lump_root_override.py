@@ -40,7 +40,13 @@ watched = [isolated / "manifest.json", isolated / "approvals.json",
 watched += sorted(isolated.glob("*.lump"))
 before = {str(path): path.read_bytes() for path in watched}
 response = module.app.test_client().post("/api/lump/00000600/resize")
-assert response.status_code == 410, response.get_json()
+# The protected-change gate may reject an unapproved POST before routing.
+if response.status_code != 410:
+    assert response.status_code == 428
+    assert response.get_json().get("error") == "change_confirmation_required"
+# Even after that gate, the retired handler itself must refuse mutation.
+with module.app.test_request_context("/api/lump/00000600/resize", method="POST"):
+    assert module.app.make_response(module.resize_lump("00000600")).status_code == 410
 assert {str(path): path.read_bytes() for path in watched} == before
 assert hashlib.sha256(canonical.read_bytes()).hexdigest() == canonical_digest
 '''
@@ -50,14 +56,15 @@ assert hashlib.sha256(canonical.read_bytes()).hexdigest() == canonical_digest
             "CANONICAL_BOOT_IMAGE": str(CANONICAL_BOOT_IMAGE),
             "CANONICAL_BOOT_DIGEST": canonical_digest,
         })
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, "-c", probe],
             cwd=ROOT,
             env=env,
-            check=True,
+            check=False,
             text=True,
             capture_output=True,
         )
+        assert result.returncode == 0, "Isolated resize-retirement checks failed"
     assert hashlib.sha256(CANONICAL_BOOT_IMAGE.read_bytes()).hexdigest() == canonical_digest
 
 

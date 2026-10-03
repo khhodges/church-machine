@@ -29,3 +29,14 @@ incorrectly rejects valid compiler output and tempts unsafe byte rewriting.
 **How to apply:** At the authenticated artifact handoff, derive allocation,
 code extent, and C-list tail from the final header and byte length before
 candidate validation. Test the whole handoff, not only either compiler.
+
+Minimum-allocation reporting is advisory, not permission to resize saved bytes.
+Do not revive a retired in-place resize endpoint to make an obsolete UI action work.
+
+**Why:** Allocation and relocated C-list words are part of the hash-bound
+artifact. Even a smaller layout that preserves every payload field changes its
+identity and requires a new approved revision.
+
+**How to apply:** Include the complete verified API/source frame in estimates,
+fail closed for unknown payloads, and retain immutable originals and approval
+requirements for any future allocation-changing publication flow.

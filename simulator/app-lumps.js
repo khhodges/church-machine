@@ -155,7 +155,8 @@ function showLumpDetail(token) {
         _headerStrip += `<button class="lump-hs-resize-btn lump-hs-resize-disabled" ` +
             `id="lumpShrinkBtn_${_tk}" ` +
             `disabled title="Binary layout unavailable until exact words are inspected">` +
-            `Shrink unavailable</button>`;
+            `Minimum unavailable</button>` +
+            `<span id="lumpResizeNote_${_tk}" class="lump-hs-chip">Allocation changes require a new approved revision.</span>`;
     }
     if (_lumpAbsMatch) {
         _headerStrip += `<button class="lump-hs-btn lump-view-abs-btn" onclick="_goToAbstractionByName('${_e(lump.abstraction)}')" title="View Abstraction \u2014 Jump to the Abstraction Catalog entry">&#8599; Abstraction</button>`;
@@ -709,6 +710,18 @@ function _renderLumpFieldSizeSummary(layout) {
     ).join('');
 }
 
+function _getLumpMinimumAllocation(words, inspection) {
+    if (!inspection || !inspection.headerValid || !inspection.contentFrameValid ||
+            !words || words.length !== inspection.header.lumpSize ||
+            (((words[0] >>> 8) & 3) !== 0)) return null;
+    const layout = _getLumpFieldSizeLayout(words);
+    if (!layout) return null;
+    const used = 1 + layout.code + layout.api + layout.source + layout.clist;
+    let minimum = 64;
+    while (minimum < used) minimum *= 2;
+    return minimum <= words.length ? minimum : null;
+}
+
 function _updateLumpFieldSizeSummary(tk, words, inspection) {
     const el = document.getElementById(`lumpFieldSizes_${tk}`);
     if (!el || !inspection || !inspection.headerValid) return;
@@ -749,9 +762,11 @@ async function _patchCcFromBinary(token, lump, tk) {
         if (shrinkBtn) {
             shrinkBtn.disabled = true;
             shrinkBtn.onclick = null;
-            shrinkBtn.textContent = 'Shrink unavailable';
+            shrinkBtn.textContent = 'Minimum unavailable';
             shrinkBtn.title = message;
         }
+        const note = document.getElementById(`lumpResizeNote_${tk}`);
+        if (note) note.textContent = `Layout unavailable: ${message}. No resize is offered.`;
     };
     try {
         let words = [];
@@ -797,21 +812,16 @@ async function _patchCcFromBinary(token, lump, tk) {
         // ── Patch shrink button ──────────────────────────────────────────────
         const shrinkBtn = document.getElementById(`lumpShrinkBtn_${tk}`);
         if (shrinkBtn) {
-            const _curSize = hdr.lumpSize;
-            const _cw      = hdr.cw;
-            const _cc      = hdr.cc;
-            const _minCont = 1 + _cw + _cc;
-            let _minSize   = 64;
-            while (_minSize < _minCont) _minSize *= 2;
-            const _canShrink = _curSize > _minSize;
-            const _saved     = _curSize - _minSize;
-            shrinkBtn.className = `lump-hs-resize-btn${_canShrink ? '' : ' lump-hs-resize-disabled'}`;
-            shrinkBtn.disabled  = !_canShrink;
-            shrinkBtn.onclick   = _canShrink ? () => _resizeLump(lump.token) : null;
-            shrinkBtn.title     = _canShrink
-                ? `Remove unused freespace — shrink from ${_curSize}w to ${_minSize}w (save ${_saved}w)`
-                : `Already at minimum size (${_curSize}w)`;
-            shrinkBtn.textContent = `Shrink to ${_minSize}w ▼`;
+            const minimum = _getLumpMinimumAllocation(words, inspection);
+            shrinkBtn.className = 'lump-hs-resize-btn lump-hs-resize-disabled';
+            shrinkBtn.disabled = true;
+            shrinkBtn.onclick = null;
+            shrinkBtn.textContent = minimum === null ? 'Minimum unavailable' : `Minimum allocation: ${minimum}w`;
+            shrinkBtn.title = 'Read-only content allocation estimate. Saved hash-bound bytes cannot be resized in place.';
+            const note = document.getElementById(`lumpResizeNote_${tk}`);
+            if (note) note.textContent = minimum === null
+                ? 'Complete code/API/source layout could not be verified. No resize is offered.'
+                : 'Includes header, code, API, stored source and C-list. Allocation changes require a new approved revision.';
         }
 
     } catch (err) {
