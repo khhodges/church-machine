@@ -991,6 +991,11 @@ function lumpAuditHasWarnings(results) {
  * opts       — optional { collapsible: bool (default true), startOpen: bool (default false for pass, true for failures) }
  */
 function lumpAuditRenderPanel(container, results, opts) {
+    results = Array.isArray(results) ? results.slice() : [];
+    if (!results.length) results.push({
+        ruleId: 'AUDIT', severity: 'warn', message: 'No checks were reported',
+        detail: 'An empty audit is not a passing audit. Reload the LUMP and run Audit again.',
+    });
     const hasErrors   = lumpAuditHasErrors(results);
     const hasWarnings = lumpAuditHasWarnings(results);
     const allPass     = !hasErrors && !hasWarnings;
@@ -1012,8 +1017,8 @@ function lumpAuditRenderPanel(container, results, opts) {
     const summary = hasErrors
         ? `${results.filter(r => r.severity === 'error').length} check${results.filter(r => r.severity === 'error').length !== 1 ? 's' : ''} failed`
         : hasWarnings
-        ? `All checks passed with ${results.filter(r => r.severity === 'warn').length} warning${results.filter(r => r.severity === 'warn').length !== 1 ? 's' : ''}`
-        : 'All checks passed';
+        ? `${results.filter(r => r.severity === 'warn').length} audit warning${results.filter(r => r.severity === 'warn').length !== 1 ? 's' : ''} — review required`
+        : 'Reported checks passed — not execution approval';
 
     header.innerHTML = `<span class="lump-audit-icon">${icon}</span>` +
         `<span class="lump-audit-summary">${summary}</span>`;
@@ -1024,6 +1029,12 @@ function lumpAuditRenderPanel(container, results, opts) {
     }
 
     panel.appendChild(header);
+    const scope = document.createElement('div');
+    scope.className = 'lump-audit-scope';
+    scope.textContent = o.savedStatusIncluded
+        ? 'Binary checks and server-reported identity / activation status are listed separately below. This audit does not certify execution or hardware.'
+        : 'Binary checks only. Identity validity, destination binding and activation approval are not established by this audit.';
+    panel.appendChild(scope);
 
     const body = document.createElement('div');
     body.className = 'lump-audit-body';
@@ -1186,7 +1197,34 @@ async function lumpAuditFromServer(token, _manifest, container, opts) {
         // Do not pass the response envelope as a manifest: catalog metadata
         // must never become an authority or a second input channel.
         const results = lumpAudit(words, null, null);
-        return lumpAuditRenderPanel(container, results, opts);
+        // Separate server destination/approval evidence from byte-level checks.
+        // Never feed response metadata into the structural binary auditor.
+        const identity = data.bootstrap_identity;
+        if (identity && identity.applies === true) {
+            results.push({
+                ruleId: 'IDENTITY',
+                severity: identity.valid === false ? 'error' : identity.valid === true ? 'pass' : 'warn',
+                message: identity.valid === false ? 'Bootstrap identity invalid' :
+                    identity.valid === true ? 'Bootstrap identity valid' : 'Bootstrap identity not established',
+                detail: identity.valid === false
+                    ? 'These bytes do not match the authoritative bootstrap identity. Review correction options in History; structural checks do not make this revision activatable.'
+                    : 'Server-reported bootstrap identity status for this saved artifact; not execution certification.',
+            });
+        }
+        const eligibility = data.activation_eligibility || {};
+        const status = eligibility.status;
+        const reasons = Array.isArray(eligibility.reasons)
+            ? eligibility.reasons.map(reason => reason.message).filter(Boolean).join(' ') : '';
+        results.push({
+            ruleId: 'ACTIVATION',
+            severity: status === 'blocked' ? 'error' :
+                ['eligible', 'current'].includes(status) ? 'pass' : 'warn',
+            message: status === 'blocked' ? 'Activation blocked' :
+                status === 'eligible' ? 'Eligible for approval-backed activation' :
+                status === 'current' ? 'Server reports this revision as current' : 'Activation eligibility not established',
+            detail: reasons || 'Current or eligible status is not proof of successful execution. No revision was activated by this audit.',
+        });
+        return lumpAuditRenderPanel(container, results, Object.assign({}, opts, {savedStatusIncluded: true}));
     } catch (err) {
         const report = err && err.actionable
             ? err.message
