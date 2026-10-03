@@ -1597,5 +1597,23 @@
     "lump_version": 36,
     "compiled_at": 1791034729.0574746,
     "operation_id": "f055d22f-0591-46db-90c0-217e3d9cd115"
+  },
+  {
+    "token": "a207ecd1",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest_v37.lump",
+    "lump_version": 37,
+    "compiled_at": 1791045054.2706046,
+    "operation_id": "94ca4d7b-cb01-4334-a461-e6e9e2b8f079",
+    "archived": true,
+    "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f"
+  },
+  {
+    "token": "a207ecd1",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.ff2e3f35.lump",
+    "lump_version": 38,
+    "compiled_at": 1791045852.9079316,
+    "operation_id": "97846ecc-1d6b-4369-ba89-a405c43ff9bf"
   }
 ]
