@@ -893,6 +893,16 @@
       "filename": "CapabilityTest.1.a9237679.lump",
       "compiled_at": 1791033912.7021298,
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "5bfb4af7478af79b929403d9ef5b436a90091eec9cc6f66c64fb349a7f60d21c": {
+      "abstraction": "CapabilityTest",
+      "save_as_latest": true,
+      "binary_hash": "5bfb4af7478af79b929403d9ef5b436a90091eec9cc6f66c64fb349a7f60d21c",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.888f5960.lump",
+      "compiled_at": 1791034729.0574746,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     }
   }
 }
