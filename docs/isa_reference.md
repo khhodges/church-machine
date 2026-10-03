@@ -879,11 +879,12 @@ RETURN AL                 ; mask=0; zero CR0–CR4 and CR7–CR11, retain DRs
 ### CHANGE — Thread Context Switch (opcode 4, 0x04)
 
 ```
-Syntax:  CHANGE CR12, CR12, #idx
+Syntax:  CHANGE CRd, CRs, #idx
+         CHANGE CRd                  ; shorthand: CRs = CRd, idx = 0
 Encoding: op[4:0]=0x04 | cond[4] | CRd[4] | CRs[4] | idx[15]
 ```
 
-**Assembler restriction:** The assembler only permits `CRd = CR12` and `CRs = CR12` (both operands reference the thread-stack register). All other privilege-zone registers (CR13–CR15) are blocked at the assembler level. The hardware is broader: CRd may be any of CR12–CR15 and drives different behaviour.
+**Programmer access:** CHANGE is not a protected instruction. The assembler does not impose a privilege-zone ban on its operands: CR12–CR15 are accepted consistently, without a special CR12 exemption. Execution validates the destination and capability authority; successful compilation does not bypass those runtime checks.
 
 **Semantics by destination register (hardware):**
 - **CR12 or CR13** (system-wide): Load GT directly from c-list at `CRs[idx]`; no per-thread save/restore.
@@ -910,7 +911,7 @@ capability home and is not interpreted as the resume identity.
 | `PERM` | CRs lacks required permission for the target type |
 | `NULL_CAP` | Source c-list slot is NULL |
 
-**Example:** Switch to thread at NS index 7 (both operands are CR12 per assembler convention).
+**Encoding example:** Explicit CR12 operands and index 7 (not proof that execution is authorized).
 ```
 CHANGE AL, CR12, CR12, #7   ; opcode=4, cond=14, fld_a=12, fld_b=12, imm=7
                               ; encoding: 0x27660007
@@ -1642,7 +1643,7 @@ These questions are now resolved. Recorded here to prevent the decisions from be
 | E-1 | IADD / ISUB | Immediate is unsigned 0–16383. `#-1` cannot be encoded directly; use `ISUB DRd, DR0, #1`. **Closed.** |
 | E-2 | RETURN mask | Explicit keep-current semantics: bits 0–4/7–11 prevent clearing when set; zero bits directly zero descriptors. Bits 5/6 ignored; CR5 descriptor unchanged, CR6 reconstructed. No saved snapshot, frame extension, or boot-ROM cLoad bypass. |
 | E-3 | DREAD CR14 | X-in-place-of-R is CR14-specific only. No broader X→R substitution applies. **Closed.** |
-| E-4 | CHANGE operand restriction | Assembler convention only, not an ISA rule. Hardware `change.py` accepts any CR12–CR15 destination. The assembler restriction is a toolchain safety guard. **Closed.** |
+| E-4 | CHANGE operand restriction | The former CR12-only compiler exemption was incorrect and has been removed. CHANGE is available to programmer code; execution enforces capability authority. **Closed.** |
 
 **Deviation flags:** SWITCH (D-11, closed — simulator now matches hardware). SHR/SHL carry+ASR (D-12, closed). TPERM reserved-preset fault (D-3, closed). TPERM Mode 2 (C.3, Task #874, closed). All deviations closed.
 

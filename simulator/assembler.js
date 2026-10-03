@@ -2321,17 +2321,13 @@ class ChurchAssembler {
                 break;
             }
             case 4: {
-                // CHANGE is the microcode thread-switch instruction.
-                // It exclusively operates on CR12 (thread stack) — both the
-                // destination and source must be CR12, so CR12 is exempted from
-                // the normal privilege-zone block.  All other privilege-zone
-                // registers (CR13, CR14, CR15) remain blocked.
+                // CHANGE is available to programmer code. Isolated register
+                // operands are not a compile-time privilege violation;
+                // execution validates the operation and capability authority.
                 // 1-arg form: CHANGE CRx → CHANGE CRx, CRx, 0  (src defaults to dst)
                 crDst = this._parseCR(parts[1], lineNum);
-                if (crDst !== 12) this._checkPrivCR(crDst, 'CHANGE', lineNum);
                 if (parts[2] !== undefined) {
                     crSrc = this._parseCR(parts[2], lineNum);
-                    if (crSrc !== 12) this._checkPrivCR(crSrc, 'CHANGE', lineNum);
                 } else {
                     crSrc = crDst;
                 }

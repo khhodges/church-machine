@@ -884,18 +884,16 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     assert('P12h CALL CR0 CR13: no error (numeric selector, no priv-zone restriction)',
         h.errors.length === 0, h.errors.map(e => e.message).join('; '));
 
-    // P12i: CHANGE CR0, CR15 → error on crSrc
+    // P12i: CHANGE permits an isolated source, not just CR12.
     const i = new ChurchAssembler();
-    i.assemble('CHANGE CR0, CR15, 0');
-    assert('P12i CHANGE CR0 CR15: error', i.errors.length > 0, 'expected an error');
-    assert('P12i error mentions CR15', i.errors.some(e => e.message.includes('CR15')),
+    i.assemble('CHANGE CR12, CR15, 0');
+    assert('P12i CHANGE CR12 CR15: no compiler privilege error', i.errors.length === 0,
         i.errors.map(e => e.message).join('; '));
 
-    // P12j: CHANGE CR14, CR0 → error on crDst
+    // P12j: CHANGE permits CR14 as destination.
     const j = new ChurchAssembler();
     j.assemble('CHANGE CR14, CR0, 0');
-    assert('P12j CHANGE CR14 CR0: error', j.errors.length > 0, 'expected an error');
-    assert('P12j error mentions CR14', j.errors.some(e => e.message.includes('CR14')),
+    assert('P12j CHANGE CR14 CR0: no compiler privilege error', j.errors.length === 0,
         j.errors.map(e => e.message).join('; '));
 
     // P12k: SWITCH is the sole isolated-register LOAD form.
@@ -1006,27 +1004,23 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     assert('P12q DREAD DR0 CR14: no error (CR14 is RX)', q.errors.length === 0,
         q.errors.map(e => e.message).join('; '));
 
-    // P12r: CHANGE CR12, CR12, #1 → no error (CHANGE is the thread-switch instruction;
-    //       CR12 is its dedicated operand and is exempt from the privilege-zone block)
+    // P12r: CR12 is accepted without a special-case exemption.
     const r = new ChurchAssembler();
     r.assemble('CHANGE CR12, CR12, #1');
     assert('P12r CHANGE CR12 CR12: no error (thread switch)', r.errors.length === 0,
         r.errors.map(e => e.message).join('; '));
 
-    // P12s: CHANGE CR13 (not CR12) → still an error
+    // P12s: CR13 is accepted exactly like CR12.
     const s = new ChurchAssembler();
     s.assemble('CHANGE CR13, CR0, 0');
-    assert('P12s CHANGE CR13: error (only CR12 exempt)', s.errors.length > 0,
-        'expected an error for CR13 in CHANGE');
-    assert('P12s CHANGE CR13: error mentions CR13',
-        s.errors.some(e => e.message.includes('CR13')),
+    assert('P12s CHANGE CR13: no compiler privilege error', s.errors.length === 0,
         s.errors.map(e => e.message).join('; '));
 
-    // P12t: CHANGE CR14 as crDst → still an error (CR14 is not the thread register)
+    // P12t: CR14 is also available to programmer-authored CHANGE.
     const t = new ChurchAssembler();
     t.assemble('CHANGE CR14, CR0, 0');
-    assert('P12t CHANGE CR14 crDst: error', t.errors.length > 0,
-        'expected an error for CR14 as crDst in CHANGE');
+    assert('P12t CHANGE CR14 crDst: no compiler privilege error', t.errors.length === 0,
+        t.errors.map(e => e.message).join('; '));
 
     // P12u: another user-register destination is rejected.
     const u = new ChurchAssembler();
@@ -9958,6 +9952,25 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
 }
 
 // ── SYN2: CHANGE CRx (1-arg) — source defaults to destination ────────────────
+
+// No privilege-mode opt-in: all isolated destinations and all source CRs
+// assemble identically in shorthand, explicit, and disassembled forms.
+for (let dst = 12; dst <= 15; dst++) {
+    const a = new ChurchAssembler();
+    const expected = ((4 << 27) | (14 << 23) | (dst << 19) | (dst << 15)) >>> 0;
+    const one = a.assemble(`CHANGE CR${dst}`);
+    assert(`CHANGE CR${dst}: shorthand accepted`, a.errors.length === 0);
+    assert(`CHANGE CR${dst}: exact binary`, one.words[0] === expected);
+    for (let src = 0; src <= 15; src++) {
+        const word = ((4 << 27) | (14 << 23) | (dst << 19) | (src << 15) | 7) >>> 0;
+        for (const text of [`CHANGE CR${dst}, CR${src}, #7`, a.disassemble(word)]) {
+            const result = a.assemble(text);
+            assert(`${text}: accepted`, a.errors.length === 0,
+                a.errors.map(e => e.message).join('; '));
+            assert(`${text}: exact encoding`, result.words[0] === word);
+        }
+    }
+}
 
 // SYN2-a: CHANGE CR12 (1-arg) encodes same word as CHANGE CR12, CR12, 0
 {

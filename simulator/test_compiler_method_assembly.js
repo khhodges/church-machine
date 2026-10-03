@@ -39,6 +39,19 @@ function wrapSelfTest(rawSource) {
     ].join('\n');
 }
 
+// The IDE's structured source path must not reinstate a CHANGE privilege ban.
+for (const dst of [12, 13, 14, 15]) {
+    const result = compile(`abstraction ChangeOperands {
+capabilities { SELF E }
+method Run {
+    CHANGE CR${dst}
+}
+}`);
+    const expected = ((4 << 27) | (14 << 23) | (dst << 19) | (dst << 15)) >>> 0;
+    assert.equal(result.methods[0].code[0] >>> 0, expected,
+        `structured CHANGE CR${dst} retains the exact instruction`);
+}
+
 const snippet = [
     'abstraction MethodAssembly {',
     'capabilities { SELF E }',
