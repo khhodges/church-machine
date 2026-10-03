@@ -17347,8 +17347,14 @@ def delete_lump_history_revision(token, version):
     return _delete_lump_history_revision(token, version, request.get_json(silent=True) or {})
 
 
-def _delete_lump_history_revision(token, version, payload):
+def _delete_lump_history_revision(token, version, payload, *, retention_entry=None):
     import re as _re
+    import time
+    from server.history_retention import (
+        archive_references, archive_deletion_evidence, recover_retention,
+        recover_pending, durable_json, record_retention_intent, LEDGER,
+    )
+    from pathlib import Path
 
     raw = token.lower().replace("0x", "", 1)
     if not _re.fullmatch(r"[0-9a-f]{1,8}", raw):
@@ -17356,6 +17362,8 @@ def _delete_lump_history_revision(token, version, payload):
     if version < 0:
         return jsonify({"error": "Invalid history version"}), 400
     key8 = raw.zfill(8)
+    if not isinstance(payload, dict):
+        return jsonify({"error": "Invalid deletion request"}), 400
     archive_filename = payload.get("archive_filename")
     if archive_filename is not None and (
         not isinstance(archive_filename, str)
@@ -17368,6 +17376,18 @@ def _delete_lump_history_revision(token, version, payload):
     lumps_dir = LUMPS_DIR
     manifest_path = os.path.join(lumps_dir, "manifest.json")
     with _lump_history_transition_lock(lumps_dir):
+        try:
+            ledger_path = Path(lumps_dir) / LEDGER
+            ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
+            if not isinstance(ledger, dict) or any(
+                    not isinstance(entries, list) or any(
+                        not isinstance(entry, dict) for entry in entries)
+                    for entries in ledger.values()):
+                raise ValueError("Deletion ledger is invalid")
+            recover_pending(lumps_dir, durable_json)
+            recover_retention(lumps_dir)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return jsonify(error=f"Archive deletion recovery failed: {exc}. Repair deletion evidence before retrying."), 409
         try:
             manifest = _read_manifest_safe(manifest_path)
         except ValueError as exc:
@@ -17440,18 +17460,27 @@ def _delete_lump_history_revision(token, version, payload):
         if not os.path.isfile(selected_path):
             return jsonify({"error": "Archived revision is unavailable"}), 404
 
+        try:
+            documents = archive_references(
+                lumps_dir, frozen_root=globals().get("_BUILD_SNAPSHOTS_DIR"),
+                reference_paths=[globals().get(name) for name in (
+                    "NS_STATE_PATH", "BOOT_CONFIG_PATH", "BOOT_IMAGE_PROVENANCE_PATH")])
+            digest = archive_deletion_evidence(
+                lumps_dir, selected_filename, manifest, documents, key8)
+        except (OSError, ValueError, RuntimeError) as exc:
+            return jsonify(error=f"Archive was not deleted: {exc}. Remove saved references or repair unreadable reference files before retrying."), 409
+
+        entry = dict(retention_entry or {})
+        entry.update(version=version, filename=selected_filename,
+                     binary_hash=digest, deleted_at=time.time())
+        entry.setdefault("trigger", "manual")
+        record_retention_intent(lumps_dir, key8, entry)
         os.remove(selected_path)
-        remaining_manifest = [
-            row for row in manifest
-            if not (
-                isinstance(row, dict)
-                and row.get("archived") is True
-                and row.get("filename") == selected_filename
-                and str(row.get("abstraction") or "").casefold() == active_abstraction
-            )
-        ]
-        if remaining_manifest != manifest:
-            _atomic_write_json(manifest_path, remaining_manifest)
+        # Persist the unlink before clearing the durable intent. Recovery keeps
+        # approval registries and sidecars and finishes manifest/ledger together.
+        from server.history_retention import _sync_directory
+        _sync_directory(lumps_dir)
+        recover_retention(lumps_dir)
 
     print(f"[lumps] Deleted archived revision {selected_filename}", flush=True)
     return jsonify({
@@ -17489,8 +17518,8 @@ def _post_save_history_retention(token):
 
 def _prune_lump_history(token, *, trigger):
     from server.history_retention import (
-        expired_archives, recover_retention, record_retention_intent, JOURNAL, LEDGER,
-        reference_documents, recover_pending, durable_json,
+        expired_archives, recover_retention, LEDGER,
+        archive_references, archive_deletion_evidence, recover_pending, durable_json,
     )
     import time
     from pathlib import Path
@@ -17509,62 +17538,37 @@ def _prune_lump_history(token, *, trigger):
         ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
         if not isinstance(ledger, dict) or any(not isinstance(v, list) for v in ledger.values()):
             return jsonify(error="Retention stopped: deletion ledger is invalid. Repair the ledger before retrying cleanup."), 409
-        ledger_key = str(response.get_json().get("token") or token)
         # Preserve any artifact named by another saved object/configuration.
         # Missing dates, symlinks and unreadable references fail closed.
-        live = [row for row in manifest if row.get("archived") is not True]
         deleted, protected = list(recovered), []
         try:
-            documents = reference_documents(
-                root, excluded=("manifest.json", "approvals.json", JOURNAL, LEDGER))
-            # Includes legacy build snapshots and immutable Namespace/bitstream
-            # revisions (also used by frozen simulation preparations).
-            frozen_root = globals().get("_BUILD_SNAPSHOTS_DIR")
-            if frozen_root:
-                # Freezes retain the entire approval registry for audit, not
-                # just selected artifacts. Approval evidence is not a binary
-                # retention root; revision inventories and selections are.
-                documents.update(reference_documents(
-                    frozen_root, excluded=("approvals.json",)))
-            for name in ("NS_STATE_PATH", "BOOT_CONFIG_PATH", "BOOT_IMAGE_PROVENANCE_PATH"):
-                reference_path = globals().get(name)
-                if reference_path and Path(reference_path).exists():
-                    documents[str(reference_path)] = Path(reference_path).read_text(encoding="utf-8")
-            documents = {name: json.dumps(json.loads(text))
-                         for name, text in documents.items()}
+            documents = archive_references(
+                root, frozen_root=globals().get("_BUILD_SNAPSHOTS_DIR"),
+                reference_paths=[globals().get(name) for name in (
+                    "NS_STATE_PATH", "BOOT_CONFIG_PATH", "BOOT_IMAGE_PROVENANCE_PATH")])
         except (OSError, ValueError):
             return jsonify(error="Retention stopped: saved references could not be verified. No archives were deleted."), 409
         for row in candidates:
             filename = row.get("archive_filename") or row.get("record_filename")
-            path = root / filename
-            if (path.name != filename or not filename.endswith(".lump") or
-                    path.is_symlink() or not path.is_file() or path.stat().st_nlink > 1):
-                protected.append(filename)
-                continue
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            references = json.dumps(live) + "".join(
-                text for name, text in documents.items()
-                if name != str(path.with_suffix(".json")))
-            linked = any(other.is_symlink() and other.resolve() == path.resolve()
-                         for other in root.glob("*.lump"))
-            old_token = str(row.get("record_token") or "").lower()
-            historical_token_reference = (old_token and
-                old_token != str(response.get_json().get("token") or token).lower()
-                and old_token in references.lower())
-            if linked or filename in references or digest in references.lower() or historical_token_reference:
+            try:
+                digest = archive_deletion_evidence(
+                    root, filename, manifest, documents,
+                    str(response.get_json().get("token") or token))
+            except (OSError, ValueError, RuntimeError):
                 protected.append(filename)
                 continue
             # Persist intent first. If interrupted after unlink, recovery
             # completes manifest/ledger publication without another deletion.
-            record_retention_intent(root, ledger_key, {
+            entry = {
                 "version": int(row["version"]), "filename": filename,
                 "binary_hash": digest, "deleted_at": time.time(),
                 "compiled_at": row.get("compiled_at"), "trigger": trigger,
                 "policy": {"days": 30, "newest_versions": 3},
-            })
+            }
             # Reuse the existing exact-archive deletion validation and lock.
             result = app.make_response(_delete_lump_history_revision(
-                token, int(row["version"]), {"archive_filename": filename}))
+                token, int(row["version"]), {"archive_filename": filename},
+                retention_entry=entry))
             recover_retention(root)
             if result.status_code != 200:
                 return jsonify(error="Retention stopped while deleting an archive.",

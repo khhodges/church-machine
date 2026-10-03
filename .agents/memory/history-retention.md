@@ -38,3 +38,14 @@ permanently exempt otherwise-expired archives from the approved policy.
 **How to apply:** Preserve approval files without using their contents as
 reference roots. Frozen selections and retained artifact inventories still
 protect the exact binaries they name.
+
+Explicit single-revision deletion is exempt from age and newest-version policy,
+but never from reference, link, approval-evidence, or recovery protections.
+
+**Why:** Selecting a particular archive authorizes deleting that revision, not
+breaking a saved Namespace or frozen downstream artifact that still uses it.
+
+**How to apply:** Keep the same transition lock and deletion-evidence protocol
+for manual and policy cleanup. Recovery may finish an already missing archive's
+bookkeeping; it must not replay an unlink of a surviving archive without fresh
+reference validation.

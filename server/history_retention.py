@@ -10,6 +10,42 @@ import tempfile
 JOURNAL = ".history-retention-pending.json"
 LEDGER = "history-retention.json"
 
+def archive_references(root, *, frozen_root=None, reference_paths=()):
+    """Collect all retention roots; approval registries are audit evidence."""
+    documents = reference_documents(
+        root, excluded=("manifest.json", "approvals.json", JOURNAL, LEDGER))
+    if frozen_root:
+        documents.update(reference_documents(frozen_root, excluded=("approvals.json",)))
+    for path in reference_paths:
+        if path and Path(path).exists():
+            documents[str(path)] = Path(path).read_text(encoding="utf-8")
+    return {name: json.dumps(json.loads(text)) for name, text in documents.items()}
+
+
+def archive_deletion_evidence(root, filename, manifest, documents, token):
+    """Fail closed on aliases and saved references. Caller holds transition lock."""
+    root = Path(root)
+    path = root / filename
+    if (path.name != filename or not filename.endswith(".lump") or
+            path.is_symlink() or not path.is_file() or path.stat().st_nlink > 1):
+        raise ValueError("Archive is missing or linked to another file")
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    references = json.dumps([
+        row for row in manifest if row.get("archived") is not True
+    ]) + "".join(text for name, text in documents.items()
+                if name != str(path.with_suffix(".json")))
+    old_tokens = {
+        str(row.get("token") or "").lower() for row in manifest
+        if row.get("filename") == filename and row.get("archived") is True
+    }
+    linked = any(other.is_symlink() and other.resolve() == path.resolve()
+                 for other in root.glob("*.lump"))
+    if (linked or filename in references or digest in references.lower() or
+            any(old and old != token.lower() and old in references.lower()
+                for old in old_tokens)):
+        raise ValueError("Archive is referenced by a live or saved artifact")
+    return digest
+
 
 def recover_pending(root, write_json):
     """Complete deletion bookkeeping on an authorized write, never on a read.

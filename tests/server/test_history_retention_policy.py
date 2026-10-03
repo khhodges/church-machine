@@ -35,7 +35,7 @@ def retention_app(tmp_path):
     import time
     from contextlib import contextmanager
     from pathlib import Path
-    from flask import Flask, jsonify
+    from flask import Flask, jsonify, request
 
     app = Flask(__name__)
     locked = []
@@ -71,16 +71,19 @@ def retention_app(tmp_path):
                _read_manifest_safe=lambda path: json.loads(Path(path).read_text()),
                _atomic_write_json=lambda path, value: Path(path).write_text(json.dumps(value)),
                os=os, hashlib=hashlib, json=json,
-               logging=__import__("logging"))
+               logging=__import__("logging"), request=request)
     tree = ast.parse(Path("server/app.py").read_text())
     functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)
                  and node.name in {"prune_lump_history", "_prune_lump_history",
                                    "_post_save_history_retention",
+                                   "delete_lump_history_revision",
                                    "_delete_lump_history_revision"}]
     for node in functions:
         node.decorator_list = []
     exec(compile(ast.Module(body=functions, type_ignores=[]), "retention", "exec"), env)
     app.add_url_rule("/cleanup/<token>", view_func=env["prune_lump_history"], methods=["POST"])
+    app.add_url_rule("/history/<token>/<int:version>",
+                    view_func=env["delete_lump_history_revision"], methods=["DELETE"])
     return app, env, rows
 def test_cleanup_endpoint_deletes_only_unreferenced_old_archives(tmp_path, retention_app):
     app, env, rows = retention_app
@@ -266,16 +269,15 @@ def test_interrupted_retention_recovers_idempotently(tmp_path, retention_app, mo
     manifest.append({"archived": True, "filename": "Example_v1.lump",
                      "abstraction": "Example", "lump_version": 1})
     manifest_path.write_text(json.dumps(manifest))
-    original_delete = env["_delete_lump_history_revision"]
+    original_remove = env["os"].remove
     original_write = retention.durable_json
 
-    def interrupted_delete(*args):
+    def interrupted_remove(path):
         if failure == "before_unlink":
             raise OSError("interrupted before unlink")
+        original_remove(path)
         if failure == "after_unlink":
-            (tmp_path / "Example_v1.lump").unlink()
             raise OSError("interrupted after unlink")
-        return original_delete(*args)
 
     def interrupted_write(path, value):
         original_write(path, value)
@@ -283,14 +285,14 @@ def test_interrupted_retention_recovers_idempotently(tmp_path, retention_app, mo
                 or (failure == "after_ledger" and path.name == retention.LEDGER)):
             raise OSError("interrupted durable write")
 
-    env["_delete_lump_history_revision"] = interrupted_delete
+    monkeypatch.setattr(env["os"], "remove", interrupted_remove)
     monkeypatch.setattr(retention, "durable_json", interrupted_write)
     with app.test_request_context(method="POST"):
         result = env["_post_save_history_retention"]("12345678")
     assert not result["ok"]
     assert "saved successfully" in result["warning"]
     assert (tmp_path / retention.JOURNAL).exists()
-    env["_delete_lump_history_revision"] = original_delete
+    monkeypatch.setattr(env["os"], "remove", original_remove)
     monkeypatch.setattr(retention, "durable_json", original_write)
     with env["_lump_history_transition_lock"](str(tmp_path)):
         retention.recover_retention(tmp_path)
