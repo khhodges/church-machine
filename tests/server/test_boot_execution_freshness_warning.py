@@ -1,6 +1,6 @@
 import hashlib
 import json
-import shutil
+import inspect
 import copy
 from contextlib import contextmanager
 from pathlib import Path
@@ -8,6 +8,42 @@ from pathlib import Path
 import pytest
 
 import server.app as app_module
+
+
+@pytest.fixture(autouse=True)
+def private_endpoint_storage(tmp_path, tmp_path_factory, monkeypatch):
+    for attribute, name in (
+        ("LUMPS_DIR", "."),
+        ("LUMPS_MANIFEST_PATH", "manifest.json"),
+        ("NS_STATE_PATH", "ns-state.json"),
+        ("BOOT_CONFIG_PATH", "boot-config.json"),
+        ("BOOT_IMAGE_PATH", "boot-image.bin"),
+        ("BOOT_IMAGE_PROVENANCE_PATH", "boot-image.provenance.json"),
+    ):
+        monkeypatch.setattr(app_module, attribute, str(tmp_path / name))
+    # Keep the installed production review hook, with a disposable audit store.
+    hook = next(hook for hook in app_module.app.before_request_funcs[None]
+                if hook.__name__ == "review")
+    store = inspect.getclosurevars(hook).nonlocals["store"]
+    private_store = type(store)(
+        tmp_path_factory.mktemp("freshness-reviews") / "intents.sqlite")
+    monkeypatch.setattr(store, "path", private_store.path)
+
+
+def _reviewed_post(path, *, json):
+    client = app_module.app.test_client()
+    paths = [Path(getattr(app_module, name)) for name in (
+        "NS_STATE_PATH", "BOOT_IMAGE_PATH", "BOOT_IMAGE_PROVENANCE_PATH")]
+    def snapshot():
+        return [path.read_bytes() if path.exists() else None for path in paths]
+    before = snapshot()
+    review = client.post(path, json=json)
+    assert review.status_code == 428, review.get_json()
+    assert review.get_json()["committed"] is False
+    assert snapshot() == before, "Unconfirmed review changed shared state"
+    return client.post(path, json=json, headers={
+        "X-Change-Confirmation": review.get_json()["change_confirmation"]["id"],
+    })
 
 
 def _write_lump(directory, filename):
@@ -178,7 +214,7 @@ def test_prepare_generate_reports_selected_compiler_revision_current(
     monkeypatch.setattr(app_module, "_write_boot_image_bytes", lambda *_args: None)
     monkeypatch.setattr(app_module, "_boot_image_preparation_status",
                         lambda *_args: {"status": "prepared"})
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/generate", json={
             "prepareRun": True,
             "namespaceFingerprint": app_module._namespace_state_fingerprint(rows),
@@ -418,7 +454,7 @@ def test_update_to_latest_is_retired_without_mutating_repository(tmp_path, monke
     before = json.dumps({"abstractions": [{"name": "SelfTest", "slot": 6}]})
     (tmp_path / "ns-state.json").write_text(before)
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/update-to-latest",
         json={"abstraction": "SelfTest", "token": "4c35bef2"},
     )
@@ -502,7 +538,7 @@ def test_prepare_run_exact_pin_keeps_older_revision(tmp_path, monkeypatch):
     assert selected["artifact_pin"]["revision"] == 11
 
 
-def test_real_validator_binds_wukong_evidence_to_exact_digest(tmp_path):
+def _approved_wukong_catalog(tmp_path):
     # Self-contained immutable bootstrap fixture: never depend on the user's
     # accumulating live history or canonical-filename aliases.
     import struct
@@ -533,6 +569,11 @@ def test_real_validator_binds_wukong_evidence_to_exact_digest(tmp_path):
     row.update(filename="WukongCallHome.1.658e6ba8.lump", token="4a000007",
                lump_version=1, binary_hash=hashlib.sha256(
                    (tmp_path / "WukongCallHome.1.658e6ba8.lump").read_bytes()).hexdigest())
+    return row
+
+
+def test_real_validator_binds_wukong_evidence_to_exact_digest(tmp_path):
+    row = _approved_wukong_catalog(tmp_path)
     _, exact = app_module._prepare_run_candidate([row], str(tmp_path))
     assert exact["filename"] == row["filename"]
 
@@ -608,18 +649,24 @@ def test_prepare_run_keeps_selected_residents_and_preserves_per_row_pin(
 
 
 def _endpoint_fixture(tmp_path, monkeypatch):
-    # These route-level unit tests exercise the commit boundary after an
-    # authorized review; bypass only the review hook, never production policy.
-    monkeypatch.setitem(
-        app_module.app.before_request_funcs, None,
-        [hook for hook in app_module.app.before_request_funcs.get(None, [])
-         if hook.__name__ != "review"])
+    # Real staging copies the catalog, approval ledger and selected body.
+    # Candidate admission is isolated by the rollback tests, not review.
+    if not (tmp_path / "manifest.json").exists():
+        (tmp_path / "manifest.json").write_text(json.dumps([
+            {"abstraction": "Entry", "filename": f"Entry.{version}.lump",
+             "token": token, "lump_version": revision}
+            for version, token, revision in (("old", "e1", 1), ("new", "e2", 2))
+        ]))
+        (tmp_path / "approvals.json").write_text(json.dumps({
+            "version": 1, "algorithm": "sha256", "approvals": {}}))
+        for version in ("old", "new"):
+            _write_structural_lump(tmp_path, f"Entry.{version}.lump", 0x4A000006)
     state_path = tmp_path / "ns-state.json"
     image_path = tmp_path / "boot-image.bin"
     provenance_path = tmp_path / "boot-image.provenance.json"
     rows = [{"name": "Entry", "slot": 6, "boot": True,
              "filename": "Entry.old.lump", "token": "e1",
-             "lump_version": 1}]
+             "lump_version": 1, "location": "0x00000100"}]
     state_path.write_text(json.dumps({"abstractions": rows}, indent=2))
     image_path.write_bytes(b"previous-image")
     provenance_path.write_bytes(b"previous-provenance")
@@ -630,7 +677,11 @@ def _endpoint_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(
         app_module, "_read_saved_boot_config",
-        lambda: ({"bootEntrySlot": 6}, None))
+        lambda: ({
+            "bootEntrySlot": 6,
+            "step1": {"totalNamespaceWords": 16384, "nsSlotsMax": 64,
+                      "threadLumpWords": 64, "threadCount": 1},
+        }, None))
     monkeypatch.setattr(app_module, "_load_boot_abstr_lump", lambda: None)
     monkeypatch.setattr(app_module, "_load_boot_ns_lump", lambda: None)
     return rows, state_path, image_path, provenance_path
@@ -643,6 +694,16 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
     before = (state_path.read_bytes(), image_path.read_bytes(),
               provenance_path.read_bytes())
     lock_active = {"depth": 0}
+    restored = []
+    replace = app_module.os.replace
+
+    def replace_under_lock(source, destination):
+        if str(source).endswith(".prepare-run-rollback"):
+            assert lock_active["depth"] > 0
+            restored.append(destination)
+        return replace(source, destination)
+
+    monkeypatch.setattr(app_module.os, "replace", replace_under_lock)
 
     @contextmanager
     def guard():
@@ -661,7 +722,16 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
 
     def fail_generation(*_args, **_kwargs):
         assert lock_active["depth"] > 0
-        assert json.loads((Path(_args[1]) / "ns-state.json").read_text())[
+        stage = Path(_args[1])
+        assert stage != tmp_path
+        assert (stage / "manifest.json").read_bytes() == (
+            tmp_path / "manifest.json").read_bytes()
+        assert (stage / "approvals.json").read_bytes() == (
+            tmp_path / "approvals.json").read_bytes()
+        assert (stage / "Entry.new.lump").read_bytes() == (
+            tmp_path / "Entry.new.lump").read_bytes()
+        assert not (stage / "Entry.new.lump").is_symlink()
+        assert json.loads((stage / "ns-state.json").read_text())[
             "abstractions"][0]["filename"] == "Entry.new.lump"
         assert state_path.read_bytes() == before[0]
         raise ValueError("dependency NS[7] is missing")
@@ -670,10 +740,10 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
         app_module._boot_image_gen, "generate_boot_image", fail_generation)
     monkeypatch.setattr(
         app_module, "_write_ns_state",
-        lambda _rows: (_ for _ in ()).throw(
+        lambda _rows, **_kwargs: (_ for _ in ()).throw(
             AssertionError("generation must pass before shared Namespace write")))
     fingerprint = app_module._namespace_state_fingerprint(rows)
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/generate",
         json={"prepareRun": True, "namespaceFingerprint": fingerprint})
 
@@ -682,6 +752,7 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
     assert (state_path.read_bytes(), image_path.read_bytes(),
             provenance_path.read_bytes()) == before
     assert lock_active["depth"] == 0
+    assert set(restored) == {str(state_path), str(image_path), str(provenance_path)}
 
 
 def test_prepare_run_invalid_generated_image_never_writes_shared_state(
@@ -699,9 +770,9 @@ def test_prepare_run_invalid_generated_image_never_writes_shared_state(
                         lambda *_args, **_kwargs: b"invalid-image")
     monkeypatch.setattr(
         app_module, "_write_ns_state",
-        lambda _rows: (_ for _ in ()).throw(
+        lambda _rows, **_kwargs: (_ for _ in ()).throw(
             AssertionError("invalid image must not write shared Namespace state")))
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/generate", json={
             "prepareRun": True,
             "namespaceFingerprint": app_module._namespace_state_fingerprint(rows),
@@ -725,17 +796,19 @@ def test_prepare_run_endpoint_rolls_back_publication_failure(tmp_path, monkeypat
             [{"slot": 6, "abstraction": "Entry"}]))
     monkeypatch.setattr(
         app_module._boot_image_gen, "generate_boot_image",
-        lambda *_args, **_kwargs: b"generated-image")
+        lambda *_args, **_kwargs: bytes(256))
     monkeypatch.setattr(
         app_module._boot_image_gen, "validate_boot_image", lambda _image: None)
 
     def fail_publish(_blob):
+        assert json.loads(state_path.read_text())["abstractions"][0][
+            "filename"] == "Entry.new.lump"
         image_path.write_bytes(b"partial-new-image")
         provenance_path.write_bytes(b"partial-new-provenance")
         raise OSError("disk publication failed")
 
     monkeypatch.setattr(app_module, "_write_boot_image_bytes", fail_publish)
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/generate", json={
             "prepareRun": True,
             "namespaceFingerprint": app_module._namespace_state_fingerprint(rows),
@@ -758,7 +831,7 @@ def test_prepare_run_endpoint_rejects_stale_cas_before_generation(
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             AssertionError("candidate resolution must not run after stale CAS")))
 
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/generate", json={
             "prepareRun": True, "namespaceFingerprint": "stale",
         })
@@ -808,18 +881,7 @@ def test_ns_state_get_fingerprint_matches_authoritative_rows_not_projection(
 
 def test_prepare_run_endpoint_uses_real_exact_digest_validator_for_pin(
         tmp_path, monkeypatch):
-    source = Path(app_module.LUMPS_DIR)
-    for name in (
-        "manifest.json", "approvals.json",
-        "WukongCallHome.1.658e6ba8.lump",
-        "WukongCallHome.1.74c8ff97.lump",
-    ):
-        shutil.copy2(source / name, tmp_path / name)
-    row = next(
-        item for item in json.loads(
-            (source / "ns-state.json").read_text())["abstractions"]
-        if item["name"] == "WukongCallHome")
-    row["boot"] = True
+    row = _approved_wukong_catalog(tmp_path)
     state_path = tmp_path / "ns-state.json"
     image_path = tmp_path / "boot-image.bin"
     provenance_path = tmp_path / "boot-image.provenance.json"
@@ -834,7 +896,9 @@ def test_prepare_run_endpoint_uses_real_exact_digest_validator_for_pin(
         lambda: ({"bootEntrySlot": 7}, None))
     monkeypatch.setattr(
         app_module._boot_image_gen, "generate_boot_image",
-        lambda *_args, **_kwargs: b"generated-image")
+        lambda *_args, **_kwargs: bytes(256))
+    monkeypatch.setattr(
+        app_module._boot_image_gen, "validate_boot_image", lambda _image: None)
     monkeypatch.setattr(
         app_module, "_write_boot_image_bytes",
         lambda blob: image_path.write_bytes(blob))
@@ -844,7 +908,7 @@ def test_prepare_run_endpoint_uses_real_exact_digest_validator_for_pin(
     monkeypatch.setattr(app_module, "_load_boot_abstr_lump", lambda: None)
     monkeypatch.setattr(app_module, "_load_boot_ns_lump", lambda: None)
 
-    response = app_module.app.test_client().post(
+    response = _reviewed_post(
         "/api/boot-image/generate", json={
             "prepareRun": True,
             "namespaceFingerprint": app_module._namespace_state_fingerprint([row]),
@@ -859,4 +923,28 @@ def test_prepare_run_endpoint_uses_real_exact_digest_validator_for_pin(
     assert response.get_json()["selection"]["pinned"] is True
     assert response.get_json()["selection"]["filename"].endswith(
         "658e6ba8.lump")
-    assert image_path.read_bytes() == b"generated-image"
+    assert image_path.read_bytes() == bytes(256)
+    committed = json.loads(state_path.read_text())["abstractions"][0]
+    assert committed["binary_hash"] == row["binary_hash"]
+    assert committed["artifact_pin"]["revision"] == 1
+
+    # An approved digest must not authorize different bytes at the same name,
+    # even after a new explicit review of the request.
+    selected_path = tmp_path / row["filename"]
+    changed = bytearray(selected_path.read_bytes())
+    changed[16] ^= 1
+    selected_path.write_bytes(changed)
+    before = (state_path.read_bytes(), image_path.read_bytes())
+    monkeypatch.setattr(
+        app_module._boot_image_gen, "generate_boot_image",
+        lambda *_args, **_kwargs: pytest.fail(
+            "Digest rejection must precede image generation"))
+    rejected = _reviewed_post("/api/boot-image/generate", json={
+        "prepareRun": True,
+        "namespaceFingerprint": app_module._namespace_state_fingerprint([committed]),
+        "artifactPin": committed["artifact_pin"],
+    })
+    assert rejected.status_code == 409, rejected.get_json()
+    assert "exact SHA-256" in rejected.get_json()["error"]
+    assert rejected.get_json()["dataChanged"] is False
+    assert (state_path.read_bytes(), image_path.read_bytes()) == before

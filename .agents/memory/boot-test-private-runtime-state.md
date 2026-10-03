@@ -51,3 +51,16 @@ approval creates an internally inconsistent fixture, not a bootstrap test.
 **How to apply:** Resolve the fixture's destination GT to a unique approved
 bootstrap artifact in its private library, verify its exact digest and approval,
 and leave live selections and immutable history untouched.
+
+Rollback fixtures should retain real review confirmation and Namespace
+allocation checks, even when candidate resolution or image generation is
+stubbed. Supply self-contained catalog bytes, placement, and geometry.
+
+**Why:** Missing staging inputs or allocation geometry can reject a request
+before the injected failure, making a generic rejection assertion misleading.
+Removing the review hook also conceals a separate required authorization step.
+
+**How to apply:** Assert the initial unconfirmed request changes no shared
+state, replay its actual confirmation, and require the intended failure message
+and byte-for-byte restoration. For lock-sensitive rollback, observe restoration
+while the transaction lock is held, not only the generator's lock state.
