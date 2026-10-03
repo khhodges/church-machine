@@ -12993,18 +12993,24 @@ def save_lump():
             _sl_op  = (_sl_ww >> 27) & 0x1F
             _sl_crs = (_sl_ww >> 15) & 0xF
             # ELOADCALL (op=8) imm15 is split: bits[4:0]=c-list row, bits[11:5]=methodIdx.
-            # LOAD/SAVE/XLOADLAMBDA (ops 0,1,9) use the full 15-bit imm15 as slot index.
-            # Must match lump-audit.js RCI line: op===8 ? (ww & 0x1F) : (ww & 0x7FFF)
-            _sl_slt = _sl_ww & 0x1F if _sl_op == 8 else _sl_ww & 0x7FFF
+            # Compact LOAD/SAVE: magnitude=[13:4], subtract=[14], DR=[3:0].
+            # Only DR0 with addition is a statically known row. Runtime-indexed
+            # accesses still undergo capability/bounds checks during execution.
+            # Keep this decode aligned with the browser lump-audit.js RCI check.
+            if _sl_op <= 1 and (_sl_ww & 0x400F):
+                continue
+            _sl_slt = ((_sl_ww >> 4) & 1023) if _sl_op <= 1 else (
+                _sl_ww & 0x1F if _sl_op == 8 else _sl_ww & 0x7FFF)
             if _sl_op in _CLIST_SAVE_OPS and _sl_crs == 6 and _sl_slt >= _sl_cc:
                 return jsonify({
                     "error": (
                         f"Lump construction error: code[{_sl_wi}] references "
                         f"c-list slot {_sl_slt} but cc={_sl_cc} "
                         f"(valid range: 0\u2013{_sl_cc - 1}). "
-                        f"The code was assembled against a different c-list layout "
-                        f"than the one stored in the lump header. "
-                        f"Re-run POLA or reset cc before saving."
+                        f"The statically encoded row is outside the declared C-list. "
+                        f"Check the instruction operand and declared capability rows; "
+                        f"do not increase cc merely to bypass this check. "
+                        f"No data was committed."
                     ),
                     "clist_inconsistent": True,
                     "bad_code_word":      _sl_wi,
