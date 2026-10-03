@@ -93,9 +93,9 @@ function showLumpDetail(token) {
         const _bootstrapMismatchTitle =
             `Legacy bootstrap identity mismatch: Token 0x${_e(_bi.record_token || '????????')}; ` +
             `sealed row-zero GT 0x${_e(_bi.row0_gt || '????????')}; ` +
-            `expected GT 0x${_e(_bi.expected_gt || '????????')}. This archived revision cannot be active or restored.`;
+            `expected GT 0x${_e(_bi.expected_gt || '????????')}. Saved-record status does not establish valid identity or execution approval. Review correction options before activation.`;
         _headerStrip += `<span class="lump-malformed-chip" title="${_bootstrapMismatchTitle}">` +
-            `\u26a0 Archived \u2014 bootstrap identity invalid</span>`;
+            `\u26a0 ${_historicalReadOnly ? 'Archived / read-only \u2014 ' : ''}bootstrap identity invalid</span>`;
         if (lump.abstraction && lump.promotion_available === true) {
             _headerStrip += `<button class="lump-hs-btn lump-promote-latest-btn" ` +
                 `onclick="_showLatestCompilationPromotion('${_e(token)}')" ` +
@@ -3824,10 +3824,15 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         if (absName) fetches.push(fetch(`/api/lump/version-telemetry/${encodeURIComponent(absName)}`));
         const [histResp, telResp] = await Promise.all(fetches);
 
-        const histData = histResp.ok ? await histResp.json() : {};
+        if (!histResp.ok) throw new Error(`History could not be verified (HTTP ${histResp.status}). Reload History. No revision was changed.`);
+        const histData = await histResp.json();
         const telData  = (telResp  && telResp.ok)  ? await telResp.json()  : {};
 
         const history    = histData.history  || [];
+        // A current locator is not execution approval. Only this response can
+        // establish the saved head; telemetry and cached detail versions cannot.
+        const currentRows = history.filter(row => row.current === true);
+        const currentHistory = currentRows.length === 1 ? currentRows[0] : null;
         const missingVersions = histData.missing_versions || [];
         const telRows    = telData.versions  || [];
         const hasTel     = telRows.length > 0;
@@ -3864,9 +3869,14 @@ async function _fetchAndShowLumpTimeline(token, lump) {
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
         html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">';
-        html += 'Binary archive and fleet call-home telemetry. Use the This checkbox to make an approved archived revision current. Click a row to preview its source and hex.';
+        html += 'Current saved identifies the catalog record, not the running hardware or execution approval. Selecting an eligible archive creates a new approved live revision; it does not rewrite the archive. Click a row to preview its source and hex.';
         if (hasTel) html += ' Fault rates and device counts from FPGA hardware.';
         html += '</div>';
+        if (currentRows.length > 1) {
+            html += '<div class="lump-history-current-conflict" role="alert">Conflicting current records: no current revision is selected here. Reload History and resolve the catalog conflict before activating a revision. No data was changed.</div>';
+        } else if (!currentHistory || lump.archived === true || lump.read_only === true) {
+            html += '<div class="lump-history-current-unknown">No current saved revision is established for this record. Telemetry does not establish current status.</div>';
+        }
         if (missingVersions.length > 0) {
             html += `<div class="lump-history-provenance-note" style="font-size:0.75rem;color:#b45309;margin-bottom:0.5rem;">Archive gap: ${missingVersions.map(v => `v${e(String(v))}`).join(', ')} ${missingVersions.length === 1 ? 'is' : 'are'} not available.</div>`;
         }
@@ -3875,7 +3885,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
             html += '<div style="color:var(--text-secondary);font-style:italic;padding:0.5rem 0;">No archived versions yet. Each time you save a LUMP, the previous binary is automatically archived here.</div>';
         } else {
              html += `<table class="lump-detail-table lump-history-table" id="lumpHistoryTable_${tk}"><thead><tr>`;
-            html += '<th>Ver</th><th>This</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th>';
+            html += '<th>Ver</th><th>Current saved</th><th>Compiled</th><th>CW</th><th>CC</th><th>Size</th>';
              html += '<th colspan="3"></th>';
             if (hasTel) html += '<th></th>';
             html += '</tr></thead><tbody>';
@@ -3892,15 +3902,13 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                         Number(item.lump_version) === Number(ver))
                     : null;
                 const histInspection = _lumpBinaryInspection(hist || telemetryCurrent);
-                // "current" = the token this detail panel is showing
-                // History is authoritative when present: archived telemetry rows
-                // deliberately share the current abstraction token. A telemetry
-                // row can also identify a different active token created by a
-                // destination-bound correction; that exact record is selectable.
+                // Keep exact preview routing separate from the Current saved
+                // indicator: a telemetry cache match is a locator, not authority.
                 const isCurrent = hist
                     ? hist.current === true
-                    : Boolean(telemetryCurrent) ||
-                        (lump.lump_version != null && ver === lump.lump_version);
+                    : Boolean(telemetryCurrent);
+                const isSavedCurrent = Boolean(hist && hist === currentHistory &&
+                    !hist.historical_record && lump.archived !== true && lump.read_only !== true);
                 const compiledTs = hist ? hist.compiled_at
                     : (telemetryCurrent && telemetryCurrent.compiled_at) ||
                         (tel ? tel.compiled_at : null);
@@ -3953,7 +3961,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                 const previewUsable = Boolean(
                     (hist && hist.binary_available !== false) || telemetryCurrent);
                 const eligibility = _historyActivationEligibility(hist);
-                const activationUsable = Boolean(!isCurrent && previewUsable &&
+                const activationUsable = Boolean(currentRows.length <= 1 && !isCurrent && previewUsable &&
                     eligibility.status === 'eligible');
                 const previewToken = telemetryCurrent
                     ? telemetryCurrent.token : token;
@@ -3963,7 +3971,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
                     ? (hist.archive_filename || hist.record_filename || '')
                     : '';
 
-                let _rowStyle = isCurrent
+                let _rowStyle = isSavedCurrent
                     ? 'background:var(--bg-selected,rgba(99,102,241,0.08));'
                     : '';
                 let _rowAttrs = '';
@@ -3977,13 +3985,19 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
                 // Version and programmer-controlled active-version checkbox.
                 html += `<td><strong>v${ver}</strong>${metadataOnly ? ' <span title="Metadata survives, but no immutable binary is available" style="font-size:0.65rem;color:#b45309;">(metadata only)</span>' : ''}</td>`;
-                if (isCurrent) {
-                    html += `<td><input class="lump-history-current-checkbox" type="checkbox" checked disabled aria-label="v${ver} is the current LUMP" title="This is the current live LUMP"></td>`;
+                if (isSavedCurrent) {
+                    html += `<td><input class="lump-history-current-checkbox" type="checkbox" checked disabled aria-label="v${ver} is the current saved revision" title="Current saved catalog record; not execution approval">Current saved${bootstrapCorrectionAvailable ? ' — identity invalid' : ''}</td>`;
+                } else if (!hist) {
+                    html += '<td><span class="lump-history-telemetry-only">Telemetry record — not current authority</span></td>';
+                } else if (isCurrent) {
+                    html += '<td>Catalog record — current status unresolved</td>';
                 } else if (activationUsable) {
                     html += `<td><input class="lump-history-current-checkbox" type="checkbox" aria-label="Make v${ver} the current LUMP" title="Make v${ver} the current live LUMP" onclick="event.stopPropagation();" onchange="_setLumpHistoryCurrent(this,'${e(token)}',${ver})"></td>`;
                 } else {
-                    const disabledTitle = eligibility.reasons.map(item => item.message).join(' ') ||
-                        'Activation eligibility could not be determined. Reload History.';
+                    const disabledTitle = currentRows.length > 1
+                        ? 'Conflicting current records. Resolve the catalog conflict before activation.'
+                        : eligibility.reasons.map(item => item.message).join(' ') ||
+                            'Activation eligibility could not be determined. Reload History.';
                     html += `<td><input class="lump-history-current-checkbox" type="checkbox" disabled aria-label="v${ver} cannot become the current LUMP" title="${e(disabledTitle)}"></td>`;
                 }
 

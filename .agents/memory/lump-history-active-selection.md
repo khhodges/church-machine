@@ -3,7 +3,7 @@ name: LUMP History active selection
 description: How historical selection and bootstrap correction create a new live LUMP without rewriting immutable evidence.
 ---
 
-An archived LUMP revision becomes active through the History “This” checkbox,
+An archived LUMP revision becomes active through the History “Current saved” checkbox,
 which invokes the existing approval-backed restore transition. The live result is
 a fresh monotonic revision containing the selected immutable bytes; do not
 retag or overwrite an old version in place.
@@ -12,10 +12,18 @@ retag or overwrite an old version in place.
 version number as the live entry would collide with its archive, make later
 saves overwrite history, and weaken the integrity trail.
 
-**How to apply:** Show one checked disabled checkbox for the current live
-revision. Enable the checkbox only for validated, approved, non-historical
+**How to apply:** Show at most one checked disabled checkbox for the server-established
+current saved revision, never infer it from telemetry or a cached displayed version.
+“Current saved” denotes the catalog head, not identity validity or running hardware.
+Conflicting heads must remain visibly unresolved rather than arbitrarily selecting one.
+Enable the checkbox only for validated, approved, non-historical
 archives. Keep invalid or legacy records inspectable and deletable but unable to
 become live.
+
+**Why:** Hardware observations and saved catalog records can point to different
+tokens. A token usable for exact preview is not authority for another current
+checkbox. Likewise an identity-invalid saved head is not necessarily archived;
+show its identity failure independently without fabricating archival status.
 
 An archived bootstrap identity mismatch may be corrected only by issuing a new
 live revision through a server-derived, approval-bound plan. The repair may
