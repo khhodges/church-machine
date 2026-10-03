@@ -17,8 +17,13 @@ from server.idx1_profile import validate_execution, execution_fields, frame_enve
 @pytest.fixture
 def client(isolated_lumps, monkeypatch):
     monkeypatch.setenv("COMPILER_SIGNING_SECRET", "private-idx1-tests-" + "x" * 40)
+    state_path = isolated_lumps / "ns-state.json"
+    namespace_before = state_path.read_bytes()
     with app_module.app.test_client() as client:
         yield client
+    # Successful publication, rejected candidates and failed commits must all
+    # leave the existing engineer-owned assignments byte-for-byte unchanged.
+    assert state_path.read_bytes() == namespace_before
 
 
 def candidate(client, suffix="", tier=2):
@@ -31,7 +36,7 @@ def candidate(client, suffix="", tier=2):
     record = compiled["compiler_record"]
     return {"binary": compiled["words"], "metadata": {
         "abstraction": "PrivateIDX1", "language": "assembly", "content_type": "code",
-        "ns_slot": None, "capabilities": compiled["capabilities"],
+        "artifact_only": True, "capabilities": compiled["capabilities"],
         "submitted_source": source, "trust_origin": compiled["trust_origin"],
         "compiler_record": record, "compiler_identity": record["compiler_identity"],
         "compiler_version": record["compiler_version"], **execution_fields(compiled),
@@ -70,7 +75,7 @@ const Envelope = require('./simulator/idx1-execution-envelope.js');
  const envelope = await Envelope.frame(payload, assembled.layout);
  console.log(JSON.stringify({binary:words, metadata:{
    abstraction:'PrivateIDX1', language:'assembly', content_type:'code',
-   ns_slot:null, new_entry:true, ns_slot_policy:'dynamic', capabilities:caps,
+   artifact_only:true, capabilities:caps,
    compiler_owned_self:true, identity_contract:'dynamic-local',
    original_source:source, submitted_source:__PROFILE__ === 'compact'
      ? Frame.lumpFrameStripComments(source) : (__PROFILE__ === 'api' ? '' : source), original_binary:words,
@@ -149,6 +154,7 @@ def save(client, payload, prepare_only=False):
     planned = client.post("/api/lumps/save-plan", json=payload)
     assert planned.status_code == 201, planned.get_json()
     plan = planned.get_json()
+    assert plan["ns_slot"] is None
     intent = client.post("/api/lumps/approval-intent", json={
         "digest": plan["digest"], "action": plan["action"], "plan_id": plan["plan_id"],
         "confirmation": True, "approval": {"grants": ["E"], "capability_type": "inform"},
@@ -163,6 +169,7 @@ def save(client, payload, prepare_only=False):
         return commit, plan
     result = reviewed_post(client, "/api/lumps/save", commit)
     assert result.status_code == 200, result.get_json()
+    assert result.get_json().get("ns_slot") is None
     return result.get_json(), plan
 
 
@@ -209,8 +216,7 @@ def test_idx1_finalization_and_immutable_history(client, isolated_lumps):
     first = candidate(client)
     original = validate_execution(first["metadata"], bytes.fromhex(
         "".join(f"{word:08x}" for word in first["binary"])))
-    first["metadata"].update(new_entry=True, ns_slot_policy="dynamic",
-                             compiler_owned_self=True, identity_contract="dynamic-local")
+    first["metadata"].update(compiler_owned_self=True, identity_contract="dynamic-local")
     saved, plan = save(client, first)
     raw = (isolated_lumps / saved["filename"]).read_bytes()
     finalized = validate_execution(plan, raw)
@@ -220,7 +226,7 @@ def test_idx1_finalization_and_immutable_history(client, isolated_lumps):
     sidecar = isolated_lumps / saved["filename"].replace(".lump", ".json")
     before_sidecar = sidecar.read_bytes()
     second = candidate(client, "; second revision\n")
-    second["metadata"].update(ns_slot=saved["ns_slot"], replacement=True)
+    # Publish another artifact revision, not a replacement Namespace occupant.
     newer, _ = save(client, second)
     assert newer["lump_version"] > saved["lump_version"]
     manifest = json.loads((isolated_lumps / "manifest.json").read_text())
