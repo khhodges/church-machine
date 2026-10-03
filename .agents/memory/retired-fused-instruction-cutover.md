@@ -16,6 +16,15 @@ do not translate or replace them automatically.
 **Why:** Keeping an older test executable is not an exception to the hard cutover.
 Programmer source correction and rebuilding remain explicit actions.
 
+CapabilityTest SELF-row relocation compatibility with changed compact LOAD/SAVE
+encoding is programmer-owned correction, not an automatic compatibility project.
+
+**Why:** The user explicitly rejected that proposed compatibility work and
+stated that the programmer must solve it.
+
+**How to apply:** Do not revive that relocation migration proposal or implement
+it without a new explicit request.
+
 Retirement evidence must distinguish explicit assembly rejection from
 high-level compiler-generated instructions.
 
