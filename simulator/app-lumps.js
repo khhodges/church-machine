@@ -4938,6 +4938,34 @@ function _draftLsDel(token) {
     try { sessionStorage.removeItem('cm_editor_navigation:' + owner); } catch(_) {}
 }
 
+// Explicit discard is stricter than best-effort background draft cleanup:
+// verify persistence and never delete a replacement written during review.
+function _discardReviewedLumpDraft(token, reviewedSource) {
+    const key = _draftLsKey(token);
+    const current = localStorage.getItem(key);
+    if (current !== null && current !== reviewedSource) {
+        throw new Error('The browser copy changed during review. Nothing was deleted. Click Discard Draft again to review the current copy.');
+    }
+    const owner = 'lump:' + _lumpTokenIdentity(token);
+    const sessionKey = 'cm_editor_navigation:' + owner;
+    const sessionRaw = sessionStorage.getItem(sessionKey);
+    const sessionCopy = sessionRaw && JSON.parse(sessionRaw);
+    if (sessionCopy && sessionCopy.source === reviewedSource) {
+        sessionStorage.removeItem(sessionKey);
+        if (sessionStorage.getItem(sessionKey) !== null) {
+            throw new Error('Browser recovery storage could not be cleared. Nothing was deleted from the saved LUMP. Retry when browser storage is available.');
+        }
+    }
+    localStorage.removeItem(key);
+    if (localStorage.getItem(key) !== null) {
+        throw new Error('The browser draft could not be deleted. The saved LUMP is unchanged. Retry when browser storage is available.');
+    }
+    const memory = window._editorNavigationBuffers && window._editorNavigationBuffers[owner];
+    if (memory && memory.source === reviewedSource) delete window._editorNavigationBuffers[owner];
+    const identity = _lumpTokenIdentity(token);
+    if (_lumpEditorDraftText[identity] === reviewedSource) delete _lumpEditorDraftText[identity];
+}
+
 function _isRestoredSavedLumpOwner(token) {
     try {
         var raw = localStorage.getItem('church_editor_document_v1');
@@ -8347,20 +8375,48 @@ async function openLumpInEditor(token, options) {
             }
             if (_bannerDiscardBtn) {
                 _bannerDiscardBtn.addEventListener('click', async function() {
-                    if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
-                        title: 'Delete browser draft',
-                        reason: 'Discard permanently removes this browser recovery copy and restores the selected saved source.',
-                        changes: ['Copy to delete:\n' + _savedDraft,
-                            'Replacement:\n' + (window._editorOriginalDisasm || '')],
-                    })) return;
-                    if (_draftLsGet(token) !== _savedDraft) return;
-                    window._advanceEditorNavigationEpoch('discard saved LUMP draft');
-                    _draftLsDel(token);
-                    _setSavedLumpEditorSource(window._editorOriginalDisasm || '');
-                    if (typeof saveEditorState === 'function') saveEditorState();
-                    asmEd.classList.remove('cm-editor-draft');
-                    _draftBanner.remove();
-                    if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    if (_bannerDiscardBtn.disabled) return;
+                    _bannerDiscardBtn.disabled = true;
+                    const epoch = window._editorNavigationEpoch;
+                    const editorBefore = asmEd.value;
+                    const status = _draftBanner.querySelector('.lump-draft-copy');
+                    try {
+                        // Read afresh: an older banner closure may no longer
+                        // describe the copy actually stored in this browser.
+                        const reviewed = localStorage.getItem(_draftLsKey(token));
+                        if (reviewed !== null) {
+                            if (!window.confirmProtectedChange) throw new Error('Draft review is unavailable. Nothing was deleted. Reload the IDE and retry.');
+                            if (!await window.confirmProtectedChange({
+                                title: 'Delete browser draft',
+                                reason: 'Delete only this browser recovery copy. The saved LUMP will not change; newer editor text will be kept.',
+                                changes: ['Copy to delete:\n' + reviewed,
+                                    'Saved source (unchanged):\n' + _recoveredSource],
+                            })) return;
+                        }
+                        if (window._editorNavigationEpoch !== epoch || asmEd.value !== editorBefore ||
+                                window._editorOpenLumpToken !== token) {
+                            throw new Error('The editor changed during review. Nothing was deleted. Reopen the draft review for the current document.');
+                        }
+                        _discardReviewedLumpDraft(token, reviewed);
+                        if (reviewed !== null && asmEd.value === reviewed) {
+                            _setSavedLumpEditorSource(_recoveredSource);
+                        }
+                        window._advanceEditorNavigationEpoch('discard saved LUMP draft');
+                        // Replace the generic reload snapshot as well; otherwise
+                        // it can restore the very copy that was just discarded.
+                        if (typeof saveEditorState === 'function') saveEditorState();
+                        asmEd.classList.toggle('cm-editor-draft', asmEd.value !== _recoveredSource);
+                        _draftBanner.remove();
+                        if (typeof updateLineNumbers === 'function') updateLineNumbers();
+                    } catch (error) {
+                        if (status) {
+                            status.textContent = 'Discard did not complete: ' + error.message;
+                            status.title = status.textContent;
+                            status.setAttribute('role', 'alert');
+                        }
+                    } finally {
+                        _bannerDiscardBtn.disabled = false;
+                    }
                 });
             }
         } else {

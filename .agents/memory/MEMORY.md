@@ -1,6 +1,5 @@
 - [Declared abstraction identity](declared-abstraction-identity.md) — missing names require programmer correction, never generated fallback identities.
-- [Save diagnostic evidence](save-diagnostic-evidence.md) — shared safe error codes and occurrence times must survive ingestion; missing logs never prove rejection
-- [Review session cookie races](review-session-cookie-races.md) — initialize independent nonce bindings before parallel requests; late signed-cookie responses can overwrite a newer review session.
+- [Save and review safety](save-review-index.md) — consent, frozen snapshots, retry ownership, diagnostic evidence, review cookies, and approval replay.
 - [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions
 - [Dot pet name identity architecture](dot-pet-name-identity.md) — petname.Abstraction#n is global identity; two seals (identity_hash + binary_hash); self Inform GT at c-list row 0
 - [ns-state.json rich NS-entry format](ns-state-dot-name-format.md) — one rich object per occupied slot (name, slot, location, type, f, g, limit, seq, seal, boot?); no flat-name list or top-level boot_entry
@@ -107,8 +106,6 @@
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate
 - [Archived bootstrap identity](archived-bootstrap-identity.md) — keep historical bytes immutable, but audit and restore them against the live destination GT by abstraction ancestry
-- [Save retry ownership](save-retry-ownership.md) — retry IDE-owned saves only with explicit not-committed and safe-retry proof; never make programmers repair generated identity
-- [Save dialog snapshot](save-dialog-snapshot.md) — freeze source, compiled data, identity, and pending binary at dialog open; confirmation and retry must not read live editor state
 - [Boot-image byte-stream tests](boot-image-byte-stream-tests.md) — generators may print approval diagnostics; redirect stdout before treating output as a raw image
 - [Malformed LUMP inspection UI](lump-malformed-inspection-ui.md) — raw malformed bytes stay inspectable while audit, load, and runtime validation remain authoritative
 - [History preview archive identity](history-preview-archive-identity.md) — historical previews must resolve the exact immutable archive named by the history record
@@ -124,7 +121,6 @@
 - [Boot-entry UI authority](boot-entry-ui-authority.md) — default Code View follows the loaded image's boot slot, never a stale pending browser selection
 - [Bootstrap repair destination authority](bootstrap-repair-destination-authority.md) — an eligible non-resident occupant supplies sequence only; the approved frozen binding remains authoritative under the fresh Namespace lock
 - [CapabilityTest Namespace slot](capabilitytest-namespace-slot.md) — CapabilityTest stays at NS[10]; UART_DEV stays at NS[2] with hardware address/limit semantics
-- [Deployment approval replay binding](deployment-approval-replay.md) — consuming-path mismatches burn live intents; only explicit read-only preflight may retain them
 - [Church GT petname boundary](church-gt-petname-boundary.md) — resolve every CR-held GT to a petname; leave Turing data registers numeric and unnamed
 - [Retired fused instruction cutover](retired-fused-instruction-cutover.md) — manual source correction, hard compile errors, and only three boot-loaded LUMPs
 - [Thread root-frame invariant](thread-root-frame-invariant.md) — every fresh Thread image carries the canonical poison-root frame; direct runs activate it rather than creating one
@@ -138,7 +134,6 @@
 - [Live LUMP manifest uniqueness](live-lump-manifest-uniqueness.md) — publication retires conflicting live token/destination rows atomically while preserving immutable history
 - [Simulator Run availability](simulator-run-availability.md) — Run stays available like Step/Walk and executes the prepared LightningBolt LUMP, never an arbitrary editor candidate
 - [IDE configuration authorization](ide-browser-write-authorization.md) — ordinary Namespace configuration saves must not depend on REPORT_TOKEN; privileged hardware and deployment operations remain protected
-- [Save LUMP confirmation surface](save-lump-confirmation-surface.md) — happy-path review, destination, server consequence, and approval stay in one IDE modal; native dialogs are error-only
 - [Resident publication bootstrap approval](resident-publication-bootstrap-approval.md) — derive bootstrap metadata from validated fixed bindings and exact SELF bytes, never a browser flag
 - [Callable LUMP method-table prefix](callable-lump-method-table-prefix.md) — any LUMP entered through CALL method N needs canonical dispatch words before its source body
 - [Static path-write guard precision](static-path-write-guard-precision.md) — distinguish write destinations, lexical scope, temp roots, and env-backed fallbacks to avoid unsafe gaps or read-only false positives
@@ -146,10 +141,8 @@
 - [SelfTest status evidence](selftest-status-evidence.md) — discarded DR0 failure writes can mask test failures; inspect branch evidence independently of DR1 return status
 - [Namespace save layout versus identity](namespace-save-layout-identity.md) — regeneration may normalize descriptors without substituting artifacts; ordinary unchanged saves preserve layout
 - [Resident installation isolation](resident-install-execution-isolation.md) — background deployments must not splice a new c-list into running code; direct-run activation is explicit
-- [Programmer change consent](programmer-change-consent.md) — explain and confirm source, Namespace, and repository changes; browser/server differences never prove a copy was unsaved
 - [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
 - [RETURN incident evidence](return-incident-evidence.md) — distinguish reset, caller continuation, and trace mislabeling using protected frames and live identity, not post-stop flags
-- [Protected review audit boundary](protected-review-audit-boundary.md) — cancellation telemetry is not approval; persist safe server evidence, never source diffs or credentials
 - [Instruction commentary evidence](instruction-commentary-evidence.md) — static meaning stays symbolic; historical effects need exact immutable occurrence evidence, never live-register recomputation
 - [Uniform indexed operand intent](register-indexed-load-intent.md) — all indexed instructions should support runtime DR value plus immediate; parser limitations are not intended semantics.
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.

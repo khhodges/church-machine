@@ -10,3 +10,16 @@ The persisted editor document is the user-owned source buffer. Restore its bytes
 Successful builds and saves should prioritize source beside exact binary disassembly, with build diagnostics available separately. Candidate bytes must never be labeled as the saved artifact.
 
 **Why:** The user wants to inspect generated instructions, not have successful audit messages replace that view. Source preservation and binary inspection are independent requirements.
+
+Discard approval applies only to the reviewed recovery copy, not every buffer
+belonging to that document. Review current stored bytes, then revalidate them
+and the editor owner before deletion; report conflicts instead of silently
+returning.
+
+**Why:** A stale banner can repeatedly offer an obsolete snapshot while the
+stored copy has changed, making the safety check appear as a Discard loop.
+Newer editor text must not be sacrificed to dismiss a recovery banner.
+
+**How to apply:** Remove matching recovery copies across persistence layers,
+preserve divergent newer buffers, and verify reopening and reload without
+altering saved artifacts.
