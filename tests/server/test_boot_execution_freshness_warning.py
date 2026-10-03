@@ -687,12 +687,19 @@ def _endpoint_fixture(tmp_path, monkeypatch):
     return rows, state_path, image_path, provenance_path
 
 
+@pytest.mark.parametrize("mutate_staged_inputs", [False, True],
+                         ids=["read-only-generator", "input-writing-generator"])
 def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
-        tmp_path, monkeypatch):
+        tmp_path, monkeypatch, mutate_staged_inputs):
     rows, state_path, image_path, provenance_path = _endpoint_fixture(
         tmp_path, monkeypatch)
     before = (state_path.read_bytes(), image_path.read_bytes(),
               provenance_path.read_bytes())
+    saved_inputs = {
+        name: (tmp_path / name).read_bytes()
+        for name in ("Entry.new.lump", "manifest.json", "approvals.json")
+    }
+    stages = []
     lock_active = {"depth": 0}
     restored = []
     replace = app_module.os.replace
@@ -723,6 +730,7 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
     def fail_generation(*_args, **_kwargs):
         assert lock_active["depth"] > 0
         stage = Path(_args[1])
+        stages.append(stage)
         assert stage != tmp_path
         assert (stage / "manifest.json").read_bytes() == (
             tmp_path / "manifest.json").read_bytes()
@@ -734,6 +742,15 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
         assert json.loads((stage / "ns-state.json").read_text())[
             "abstractions"][0]["filename"] == "Entry.new.lump"
         assert state_path.read_bytes() == before[0]
+        if mutate_staged_inputs:
+            for name, original in saved_inputs.items():
+                # Write in place: replacing the file would not catch a future
+                # hardlink-based staging regression.
+                staged_path = stage / name
+                staged_path.write_bytes(original + b"\ngenerator mutation")
+                assert staged_path.read_bytes() != original
+            assert {name: (tmp_path / name).read_bytes()
+                    for name in saved_inputs} == saved_inputs
         raise ValueError("dependency NS[7] is missing")
 
     monkeypatch.setattr(
@@ -753,6 +770,11 @@ def test_prepare_run_endpoint_rolls_back_generation_failure_under_same_lock(
             provenance_path.read_bytes()) == before
     assert lock_active["depth"] == 0
     assert set(restored) == {str(state_path), str(image_path), str(provenance_path)}
+    assert {name: (tmp_path / name).read_bytes()
+            for name in saved_inputs} == saved_inputs
+    assert len(stages) == 1, "The confirmed request must reach the staged generator"
+    assert not stages[0].exists()
+    assert not stages[0].parent.exists(), "Temporary staging root leaked"
 
 
 def test_prepare_run_invalid_generated_image_never_writes_shared_state(
