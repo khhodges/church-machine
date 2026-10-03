@@ -6539,8 +6539,14 @@ def boot_image_upload():
 
 def _boot_execution_freshness(state, lumps_dir):
     """Report when committed Namespace bindings are not the newest compilations."""
+    from server.lump_approvals import read_approvals
+
     warnings = []
     failed_saves = []
+    try:
+        approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
+    except (OSError, ValueError):
+        approvals = {}
     manifest = _read_manifest_safe(os.path.join(lumps_dir, "manifest.json"))
     if not isinstance(manifest, list):
         return {"status": "unknown", "warnings": []}
@@ -6557,13 +6563,15 @@ def _boot_execution_freshness(state, lumps_dir):
             and os.path.isfile(os.path.join(lumps_dir, entry["filename"]))
         ]
         # A newer compilation for the same abstraction name is not necessarily
-        # an update for this resident binding. Static bootstrap residents are
-        # destination-specific: compare only artifacts whose embedded SELF row
-        # names the selected Namespace slot/generation. Keep unreadable fixtures
-        # in the legacy path so freshness diagnostics remain available.
+        # an update for this resident binding. Compiler admission is exact-byte
+        # authority independent of the legacy bootstrap SELF token. Only the
+        # bootstrap path requires that token to equal the destination GT.
         try:
             from server.bootstrap_identity import resident_inform_egt
-            expected_self = resident_inform_egt(selected)
+            try:
+                expected_self = resident_inform_egt(selected)
+            except ValueError:
+                expected_self = None
             compatible = []
             rejected = []
             inspected_any = False
@@ -6577,10 +6585,27 @@ def _boot_execution_freshness(state, lumps_dir):
                 if len(raw) != allocation * 4 or cc < 1:
                     continue
                 inspected_any = True
+                approval = approvals.get(hashlib.sha256(raw).hexdigest(), {})
+                if (approval.get("trust_origin") == "trusted-home-ide"
+                        and approval.get("bootstrap_t") is None
+                        and approval.get("bootstrap_runtime_gt") is None):
+                    # Reuse preparation's admission boundary, including HMAC,
+                    # canonical filename/name and exact serialized digest.
+                    # A label alone (or a broken attestation) is not evidence.
+                    try:
+                        _boot_image_gen._require_approved_executable_lump(
+                            os.path.join(lumps_dir, entry["filename"]),
+                            lumps_dir, name, bootstrap_binding=selected)
+                        if approval.get("dot_name") != name:
+                            continue
+                    except (OSError, ValueError):
+                        continue
+                    compatible.append(entry)
+                    continue
                 row0 = int.from_bytes(
                     raw[(allocation - cc) * 4:(allocation - cc + 1) * 4],
                     "big")
-                if row0 != expected_self:
+                if expected_self is not None and row0 != expected_self:
                     continue
                 words = [
                     int.from_bytes(raw[offset:offset + 4], "big")
@@ -6648,10 +6673,10 @@ def _boot_execution_freshness(state, lumps_dir):
         if not candidates:
             continue
         latest = max(candidates, key=lambda entry: (
-            entry.get("compiled_at")
-            if isinstance(entry.get("compiled_at"), (int, float)) else -1,
             entry.get("lump_version")
             if isinstance(entry.get("lump_version"), int) else -1,
+            entry.get("compiled_at")
+            if isinstance(entry.get("compiled_at"), (int, float)) else -1,
         ))
         if (latest.get("filename") == selected.get("filename")
                 and latest.get("token") == selected.get("token")):

@@ -1,8 +1,11 @@
 import hashlib
 import json
 import shutil
+import copy
 from contextlib import contextmanager
 from pathlib import Path
+
+import pytest
 
 import server.app as app_module
 
@@ -15,6 +18,180 @@ def _write_structural_lump(directory, filename, row0):
     words = [((31 << 27) | 1)] + [0] * 62 + [row0]
     (directory / filename).write_bytes(
         b"".join(word.to_bytes(4, "big") for word in words))
+
+
+@pytest.fixture(params=[0xA207ECD1, 0x4A00000A])
+def compiler_freshness_catalog(tmp_path, monkeypatch, request):
+    from server.lump_approvals import (
+        configured_compiler_tcb_key, sign_compiler_record, write_approvals,
+    )
+
+    monkeypatch.setenv("COMPILER_SIGNING_SECRET", "freshness-fixture-" + "x" * 32)
+    binding = {
+        "name": "CapabilityTest", "slot": 10, "seq": 0, "boot": True,
+        "resident": True, "boot_resident": True, "type": "Inform",
+        "load_policy": "Resident", "ns_slot_policy": "static",
+    }
+    entries = []
+    approvals = {}
+    for version, token, row0 in (
+            (34, "4a00000a", 0x4A00000A),
+            (39, "a207ecd1", request.param)):
+        filename = f"CapabilityTest.1.{version:08x}.lump"
+        words = [(31 << 27) | (1 << 10) | 1, 0x1F000000] + [0] * 61 + [row0]
+        raw = b"".join(word.to_bytes(4, "big") for word in words)
+        (tmp_path / filename).write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        entries.append({
+            "abstraction": "CapabilityTest", "filename": filename,
+            "token": token, "lump_version": version, "binary_hash": digest,
+            # Imported history may have a later timestamp than a new revision.
+            "compiled_at": 900 if version == 34 else 100,
+            "archived": version == 34,
+        })
+        if version == 39:
+            approvals[digest] = {
+                "binary_hash": digest, "filename": filename,
+                "dot_name": "CapabilityTest", "issue_n": 1,
+                "trust_origin": "trusted-home-ide",
+                "compiler_identity": "CLOOMC", "compiler_version": "fixture",
+                "compiler_record": sign_compiler_record(
+                    {"binary_hash": digest},
+                    signing_key=configured_compiler_tcb_key()),
+            }
+    state = {"abstractions": [{**binding, **{
+        key: value for key, value in entries[1].items()
+        if key not in ("abstraction", "archived", "compiled_at")
+    }}]}
+    (tmp_path / "manifest.json").write_text(json.dumps(entries))
+    (tmp_path / "ns-state.json").write_text(json.dumps(state))
+    write_approvals(str(tmp_path / "approvals.json"), approvals)
+    return state, entries
+
+
+@pytest.mark.parametrize("selected_version", [34, 39])
+def test_freshness_compiler_revision_and_exact_pin_are_informational(
+        tmp_path, compiler_freshness_catalog, selected_version):
+    state, entries = compiler_freshness_catalog
+    selected = next(row for row in entries if row["lump_version"] == selected_version)
+    state["abstractions"][0].update({
+        key: selected[key] for key in
+        ("filename", "token", "lump_version", "binary_hash")
+    })
+    state["abstractions"][0]["artifact_pin"] = {
+        "filename": selected["filename"], "token": selected["token"],
+        "revision": selected_version,
+    }
+    before = copy.deepcopy(state)
+    files = {path.name: path.read_bytes() for path in tmp_path.iterdir()}
+
+    result = app_module._boot_execution_freshness(state, str(tmp_path))
+
+    if selected_version == 39:
+        assert result == {"status": "current", "warnings": []}
+    else:
+        assert result["status"] == "stale"
+        assert result["warnings"][0]["selected"]["version"] == 34
+        assert result["warnings"][0]["latest"]["version"] == 39
+    assert state == before
+    assert {path.name: path.read_bytes() for path in tmp_path.iterdir()} == files
+
+
+@pytest.mark.parametrize("defect", ["signature", "bytes", "name"])
+def test_freshness_rejects_inexact_compiler_evidence(
+        tmp_path, compiler_freshness_catalog, defect):
+    state, entries = compiler_freshness_catalog
+    entry = entries[1]
+    ledger_path = tmp_path / "approvals.json"
+    ledger = json.loads(ledger_path.read_text())
+    approval = ledger["approvals"][entry["binary_hash"]]
+    if defect == "signature":
+        approval["compiler_record"]["signature"] = "0" * 64
+    elif defect == "name":
+        approval["dot_name"] = "Other"
+    else:
+        path = tmp_path / entry["filename"]
+        raw = bytearray(path.read_bytes())
+        raw[8] ^= 1
+        path.write_bytes(raw)
+    ledger_path.write_text(json.dumps(ledger))
+    state["abstractions"][0].update({
+        key: entries[0][key] for key in
+        ("filename", "token", "lump_version", "binary_hash")
+    })
+
+    result = app_module._boot_execution_freshness(state, str(tmp_path))
+    assert result["status"] == "current"
+    assert result["warnings"] == []
+
+
+def test_freshness_retains_invalid_bootstrap_history_diagnostic(
+        tmp_path, compiler_freshness_catalog):
+    state, entries = compiler_freshness_catalog
+    _write_structural_lump(tmp_path, "CapabilityTest.v40.lump", 0x4A00000A)
+    entries.append({
+        "abstraction": "CapabilityTest", "filename": "CapabilityTest.v40.lump",
+        "token": "00000600", "lump_version": 40, "archived": True,
+    })
+    (tmp_path / "manifest.json").write_text(json.dumps(entries))
+
+    result = app_module._boot_execution_freshness(state, str(tmp_path))
+
+    assert result["status"] == "current"
+    assert result["warnings"] == []
+    assert result["failedSaves"][0]["version"] == 40
+    assert result["failedSaves"][0]["reason"] == "generated-artifact-identity-invalid"
+
+
+def test_freshness_ranks_valid_bootstrap_history_by_revision(
+        tmp_path, compiler_freshness_catalog):
+    state, entries = compiler_freshness_catalog
+    _write_structural_lump(tmp_path, "CapabilityTest.v40.lump", 0x4A00000A)
+    entries.append({
+        "abstraction": "CapabilityTest", "filename": "CapabilityTest.v40.lump",
+        "token": "4a00000a", "lump_version": 40, "archived": True,
+    })
+    (tmp_path / "manifest.json").write_text(json.dumps(entries))
+    before = copy.deepcopy(state)
+
+    result = app_module._boot_execution_freshness(state, str(tmp_path))
+
+    assert result["status"] == "stale"
+    assert result["warnings"][0]["latest"]["version"] == 40
+    assert state == before
+
+
+def test_prepare_generate_reports_selected_compiler_revision_current(
+        tmp_path, monkeypatch, compiler_freshness_catalog):
+    state, entries = compiler_freshness_catalog
+    # Exercise the response after reviewed preparation with real exact-pin
+    # resolution and compiler admission; isolate image generation/publication.
+    _endpoint_fixture(tmp_path, monkeypatch)
+    rows = state["abstractions"]
+    (tmp_path / "ns-state.json").write_text(json.dumps(state))
+    monkeypatch.setattr(app_module, "_read_saved_boot_config",
+                        lambda: ({"bootEntrySlot": 10}, None))
+    monkeypatch.setattr(app_module, "_stage_prepare_run_boot_image",
+                        lambda *_args: b"prepared-fixture")
+    monkeypatch.setattr(app_module, "_write_ns_state",
+                        lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app_module, "_write_boot_image_bytes", lambda *_args: None)
+    monkeypatch.setattr(app_module, "_boot_image_preparation_status",
+                        lambda *_args: {"status": "prepared"})
+    response = app_module.app.test_client().post(
+        "/api/boot-image/generate", json={
+            "prepareRun": True,
+            "namespaceFingerprint": app_module._namespace_state_fingerprint(rows),
+            "artifactPin": {
+                "filename": entries[1]["filename"], "token": entries[1]["token"],
+                "revision": 39,
+            },
+        })
+    assert response.status_code == 200, response.get_json()
+    body = response.get_json()
+    assert body["selection"]["revision"] == 39
+    assert body["selection"]["pinned"] is True
+    assert body["executionFreshness"] == {"status": "current", "warnings": []}
 
 
 def test_namespace_response_recovers_exact_legacy_catalog_versions(tmp_path):
