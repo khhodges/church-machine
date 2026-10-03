@@ -2405,8 +2405,18 @@ async function compileAndBuild(options) {
     if (_auditResults.length > 0) {
         listing += `\n  Pre-build Audit:\n`;
         for (const r of _auditResults) {
-            if (r.ruleId === 'RNC') {
+            if (r.ruleId === 'RNC' && r.severity === 'warn') {
                 listing += `    ⚠ [RNC] Referenced numeric C-list rows remain unresolved in these candidate bytes.\n`;
+                const rows = [...new Set((r.violations || []).map(v => v.slot)
+                    .filter(slot => Number.isInteger(slot) && slot >= 0 && slot < cc))]
+                    .sort((a, b) => a - b);
+                for (const row of rows) {
+                    const cap = resolvedCaps[row];
+                    const name = cap && cap.name ? cap.name : '(no declared PetName)';
+                    const word = lumpWordsArray[clistStart + row] >>> 0;
+                    listing += `      [${row}] ${name} — word=0x${word.toString(16).padStart(8, '0')}\n`;
+                }
+                if (!rows.length) listing += `      Affected rows were not supplied by the audit; no row identities are inferred.\n`;
                 listing += `      Declared PetNames are listed above. This does not establish executable destination bindings;\n`;
                 listing += `      it does not prove that capabilities lost their identities or will automatically resolve at load time.\n`;
                 continue;
