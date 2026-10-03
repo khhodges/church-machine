@@ -36,3 +36,17 @@ Keep dynamic
 ISA checks at runtime. Report deferred or undefined checks as unsupported or
 unavailable, never passed. See
 docs/TRUSTED_COMPILER_AND_UNTRUSTED_LUMP_ADMISSION.md.
+
+Successful publication of a local compiler result must retain usable compiler
+authority even when Save is artifact-only. Retention without deployment is not
+permission to publish a compiler result that later appears to be an unknown
+upload. Saving and selecting the executable revision remain separate actions.
+
+**Why:** The user correctly identified successful compile/save followed by
+missing-provenance rejection as an IDE defect, not a source-program mistake.
+The resulting stale boot execution must not be blamed on their LOAD operands.
+
+**How to apply:** Verify both publication and downstream executable admission
+with the same immutable saved bytes. Never infer success from the Save response
+alone, and never repair missing authority by trusting a browser label or by
+silently replacing the currently selected Namespace revision.

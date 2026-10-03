@@ -1611,9 +1611,19 @@
   {
     "token": "a207ecd1",
     "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.ff2e3f35.lump",
+    "filename": "CapabilityTest_v38.lump",
     "lump_version": 38,
     "compiled_at": 1791045852.9079316,
-    "operation_id": "97846ecc-1d6b-4369-ba89-a405c43ff9bf"
+    "operation_id": "97846ecc-1d6b-4369-ba89-a405c43ff9bf",
+    "archived": true,
+    "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f"
+  },
+  {
+    "token": "a207ecd1",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.ff2e3f35.lump",
+    "lump_version": 39,
+    "compiled_at": 1791047127.5230067,
+    "operation_id": "f50f61b86f6b41dd9a048e79bdcb7ade"
   }
 ]

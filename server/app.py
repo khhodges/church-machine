@@ -11026,7 +11026,7 @@ def _trusted_compile_metadata(metadata, binary_hash, words):
     )
 
 
-def _attest_idx1_browser_candidate(metadata, words, execution):
+def _attest_idx1_browser_candidate(metadata, words, execution=None):
     """Reproduce compiler facts before attesting an exact browser content frame.
 
     Browser packing/compression and destination C-list materialization are not
@@ -11041,24 +11041,40 @@ def _attest_idx1_browser_candidate(metadata, words, execution):
         raise ValueError("IDX1 browser candidate requires the immutable original source")
     if len(source.encode("utf-8")) > 512 * 1024:
         raise ValueError("IDX1 candidate source exceeds the compilation limit")
-    if metadata.get("language", "assembly") != "assembly":
+    candidate_raw = (execution.payload if execution is not None
+                     else struct.pack(f">{len(words)}I", *words))
+    inspected = _inspect_lump_binary(candidate_raw)
+    # The legacy Save dialog can lose the source-language label and emits an
+    # assembly-labelled content frame even for structured CLOOMC. Use the
+    # authoritative compiler's normal auto-detection, not that display label.
+    if execution is not None and metadata.get("language", "assembly") != "assembly":
         raise ValueError("IDX1 browser candidate must be assembly")
-    compiled = run_compile({"source": source, "language": "assembly",
-                            "isa_profile": "IDX1", "tier": 2})
+    compile_input = {"source": source,
+                     "language": "assembly" if execution is not None else "auto", "tier": 2}
+    if execution is not None:
+        compile_input["isa_profile"] = "IDX1"
+    compiled = run_compile(compile_input)
     if not compiled.get("ok"):
-        raise ValueError("IDX1 compiler rejected candidate source: " +
+        raise ValueError("Compiler rejected candidate source: " +
                          str(compiled.get("error", "unknown compile error")))
+    language = compiled.get("language")
+    metadata = dict(metadata, language=language)
     compiled_raw = struct.pack(f'>{len(compiled["words"])}I', *compiled["words"])
-    compiler_execution = validate_execution(compiled, compiled_raw)
-    if compiler_execution is None:
-        raise ValueError("IDX1 compiler did not produce an execution artifact")
-    compiler_layout = json.loads(compiler_execution.metadata_bytes)["layout"]
-    if json.loads(execution.metadata_bytes)["layout"] != compiler_layout:
-        raise ValueError("IDX1 candidate layout differs from fresh compiler output")
-    code_end = 1 + compiler_execution.code_words
+    if execution is not None:
+        compiler_execution = validate_execution(compiled, compiled_raw)
+        if compiler_execution is None:
+            raise ValueError("IDX1 compiler did not produce an execution artifact")
+        compiler_layout = json.loads(compiler_execution.metadata_bytes)["layout"]
+        if json.loads(execution.metadata_bytes)["layout"] != compiler_layout:
+            raise ValueError("IDX1 candidate layout differs from fresh compiler output")
+        code_words = compiler_execution.code_words
+    else:
+        code_words = (compiled["words"][0] >> 10) & 0x1FFF
+        if ((words[0] >> 10) & 0x1FFF) != code_words or (words[0] >> 8) & 3:
+            raise ValueError("Browser candidate code extent/type differs from compiler output")
+    code_end = 1 + code_words
     if words[1:code_end] != compiled["words"][1:code_end]:
         raise ValueError("IDX1 candidate code differs from fresh compiler output")
-    inspected = _inspect_lump_binary(execution.payload)
     if inspected["content_frame_error"]:
         raise ValueError("IDX1 candidate content frame: " + inspected["content_frame_error"])
     profile = inspected["content_profile"]
@@ -11069,9 +11085,14 @@ def _attest_idx1_browser_candidate(metadata, words, execution):
     if profile not in ("full", "compact", "api") or inspected["source"] != expected_source:
         raise ValueError("IDX1 candidate embedded source differs from compiler source/profile")
     api = inspected["api_definition"]
+    compiler_api = _inspect_lump_binary(compiled_raw)["api_definition"]
+    allowed_methods = [[]] if execution is not None else [
+        [], (compiler_api or {}).get("methods", [])]
     if (not isinstance(api, dict) or api.get("name") != metadata.get("abstraction")
-            or api.get("language") != "assembly" or api.get("methods") != []
-            or api.get("isa_profile", "IDX1") != "IDX1"
+            or api.get("language") not in ("assembly", language)
+            or api.get("methods") not in allowed_methods
+            or (execution is not None and api.get("isa_profile", "IDX1") != "IDX1")
+            or (execution is None and api.get("isa_profile") is not None)
             or api.get("returnConvention") != {"register": "DR0", "description": "return value"}
             or set(api) - {"name", "language", "methods", "capabilities",
                            "returnConvention", "isa_profile"}):
@@ -11104,9 +11125,10 @@ def _attest_idx1_browser_candidate(metadata, words, execution):
     record = sign_compiler_record({
         "binary_hash": inspected["binary_hash"],
         "source_hash": hashlib.sha256(source.encode("utf-8")).hexdigest(),
-        "language": "assembly", "compiler_identity": "Trusted Home IDE compiler",
-        "compiler_version": "server-compile-v1", "isa_profile": "IDX1",
-        "execution_digest": execution.execution_digest,
+        "language": language, "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        **({"isa_profile": "IDX1", "execution_digest": execution.execution_digest}
+           if execution is not None else {}),
         "capability_rows": compiled["capabilities"],
     }, signing_key=_compiler_attestation_key())
     return dict(metadata, compiler_record=record, trust_origin="trusted-home-ide",
@@ -12807,14 +12829,16 @@ def save_lump():
                 "error": "submitted execution envelope does not equal the server-finalized save plan",
                 "plan_execution_mismatch": True, "committed": False,
             }), 409
-        if _early_plan.get("isa_profile") == "IDX1":
+        if (_early_plan.get("isa_profile") == "IDX1"
+                or _early_plan.get("compiler_record") is not None
+                or metadata.get("compiler_candidate") is True):
             _plan_evidence = _early_plan.get("compiler_record")
             if not isinstance(_plan_evidence, dict):
-                return jsonify({"error": "IDX1 save plan lacks compiler evidence",
+                return jsonify({"error": "save plan lacks compiler evidence",
                                 "committed": False}), 409
             if (metadata.get("compiler_record") is not None
                     and metadata["compiler_record"] != _plan_evidence):
-                return jsonify({"error": "IDX1 compiler evidence differs from save plan",
+                return jsonify({"error": "compiler evidence differs from save plan",
                                 "committed": False}), 409
             metadata = dict(metadata, compiler_record=_plan_evidence,
                             trust_origin="trusted-home-ide",
@@ -12882,13 +12906,17 @@ def save_lump():
                     "API-only/source-free IDX1 reload is unsupported")
         except ValueError as exc:
             return jsonify({"error": str(exc), "committed": False}), 400
-    if (_input_execution is not None and _is_preflight
+    if (_is_preflight
+            and (_input_execution is not None
+                 or metadata.get("compiler_candidate") is True
+                 or (metadata.get("language") in (None, "", "assembly", "javascript", "cloomc", "auto")
+                     and isinstance(metadata.get("original_source"), str)))
             and not metadata.get("compiler_record")
             and not metadata.get("trust_origin")):
         try:
             metadata = _attest_idx1_browser_candidate(metadata, words, _input_execution)
         except (ValueError, TypeError, RuntimeError) as exc:
-            return jsonify({"error": f"IDX1 candidate attestation failed: {exc}",
+            return jsonify({"error": f"Compiler candidate attestation failed: {exc}",
                             "compiler_evidence_invalid": True, "committed": False}), 403
     _trusted_input = False
     if (isinstance(metadata, dict)

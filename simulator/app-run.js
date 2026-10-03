@@ -17117,6 +17117,7 @@ async function confirmSaveToNamespace() {
                 content_type: 'code',
                 language:     _svLang,
                 artifact_only: true,
+                compiler_candidate: true,
                 save_as_copy: saveAsCopy,
                 capabilities: _caps,
                 // Keep the complete immutable editor snapshot visible to the
