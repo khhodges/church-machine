@@ -139,11 +139,24 @@ assert.match(namedText, /"name": "SecondTarget"/);
 assert.doesNotMatch(namedText, /FirstTarget/);
 assert.doesNotMatch(namedText, /label was inferred/);
 assert.match(namedText, /zero placeholders/);
+const clistText = namedText.slice(namedText.indexOf('; C-list (exact authenticated words)'));
+assert.match(clistText, /C-list\[0\] "SELF"\s+—\s+0x00000000/);
+assert.match(clistText, /C-list\[1\] "SecondTarget"\s+—\s+0x00000000/);
+assert.doesNotMatch(clistText, /inspect the embedded names above/);
+const boundWords = secondNamed.slice();
+boundWords[boundWords.length - 1] = 0x4a00000a;
+context._showCompiledCandidateBesideSource(boundWords, {});
+assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    /C-list\[1\] "SecondTarget"\s+—\s+0x4A00000A \(encoded word; binding not verified here\)/);
 const malformed = secondNamed.slice();
 malformed[codeEnd] = 0xABFFFFFF;
 context._showCompiledCandidateBesideSource(malformed, {});
 assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
     /Cannot decode embedded definition/);
+assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    /C-list\[1\] \(PetName unavailable in candidate bytes\)/);
+assert.doesNotMatch(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+    /SecondTarget/, 'never reuse names from a previous candidate');
 assert.equal(dom.window.document.getElementById('asmEditor').value,
     'method Run() { return(1) }', 'inspection preserves the programmer draft');
 console.log('Embedded candidate name inspection tests passed');

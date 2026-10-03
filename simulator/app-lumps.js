@@ -2127,6 +2127,7 @@ function _showCompiledCandidateBesideSource(words, details) {
     var frameStart = cw + 1;
     var frameEnd = binary.length - cc;
     var frameHeader = binary[frameStart] >>> 0;
+    var candidateCapabilities = [];
     lines.push('', '; Embedded definition (read from exact candidate bytes)');
     if (frameStart < frameEnd && (frameHeader >>> 24) === 0xAB) {
         try {
@@ -2148,6 +2149,7 @@ function _showCompiledCandidateBesideSource(words, details) {
             if (!api || typeof api !== 'object' || Array.isArray(api)) {
                 throw new Error('definition is not a JSON object');
             }
+            if (Array.isArray(api.capabilities)) candidateCapabilities = api.capabilities;
             lines.push('; Frame/API words ' + frameStart + '–' +
                 (frameStart + apiWords) + '; ' + apiLength + ' JSON bytes.',
                 '; Decoded metadata is inspection evidence, not saved-identity approval.',
@@ -2161,12 +2163,18 @@ function _showCompiledCandidateBesideSource(words, details) {
     if (cc > 0) {
         lines.push('', '; C-list (exact authenticated words)');
         if (binary.slice(-cc).every(function(value) { return value === 0; })) {
-            lines.push('; Numeric rows are zero placeholders; inspect the embedded names above.',
+            lines.push('; Numeric rows are zero placeholders; PetNames identify each declared capability below.',
                 '; Unchanged instruction/row words do not mean the complete binary is unchanged.');
         }
         for (var c = Math.max(cw + 1, binary.length - cc); c < binary.length; c++) {
-            lines.push('[' + String(c).padStart(4, '0') + ']  0x' +
-                (binary[c] >>> 0).toString(16).padStart(8, '0').toUpperCase());
+            var row = c - (binary.length - cc);
+            var capability = candidateCapabilities[row];
+            var petName = typeof capability === 'string' ? capability :
+                capability && typeof capability.name === 'string' ? capability.name : '';
+            lines.push('[' + String(c).padStart(4, '0') + ']  C-list[' + row + '] ' +
+                (petName.trim() ? JSON.stringify(petName) : '(PetName unavailable in candidate bytes)') +
+                '  —  0x' + (binary[c] >>> 0).toString(16).padStart(8, '0').toUpperCase() +
+                (binary[c] === 0 ? ' (unresolved numeric placeholder)' : ' (encoded word; binding not verified here)'));
         }
     }
     var panel = document.getElementById('savedLumpDisassemblyPanel');
