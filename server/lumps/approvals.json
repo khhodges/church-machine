@@ -883,6 +883,16 @@
       "filename": "ide.Alice.1.a91d33f7.lump",
       "compiled_at": 1790775537.4939208,
       "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843"
+    },
+    "682298ee35e8a4a024d6f6ade26098d91000baf8a9010d02268205aac28d6fc8": {
+      "abstraction": "CapabilityTest",
+      "save_as_latest": true,
+      "binary_hash": "682298ee35e8a4a024d6f6ade26098d91000baf8a9010d02268205aac28d6fc8",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "filename": "CapabilityTest.1.a9237679.lump",
+      "compiled_at": 1791033912.7021298,
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     }
   }
 }
