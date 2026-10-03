@@ -4938,32 +4938,51 @@ function _draftLsDel(token) {
     try { sessionStorage.removeItem('cm_editor_navigation:' + owner); } catch(_) {}
 }
 
-// Explicit discard is stricter than best-effort background draft cleanup:
-// verify persistence and never delete a replacement written during review.
-function _discardReviewedLumpDraft(token, reviewedSource) {
-    const key = _draftLsKey(token);
-    const current = localStorage.getItem(key);
-    if (current !== null && current !== reviewedSource) {
-        throw new Error('The browser copy changed during review. Nothing was deleted. Click Discard Draft again to review the current copy.');
+// Delete only copies of the reviewed bytes. Do not use the best-effort generic
+// delete helper here: explicit destructive actions must expose storage failures.
+function _discardReviewedLumpDraft(token, reviewed, replacement) {
+    const identity = _lumpTokenIdentity(token);
+    const owner = 'lump:' + identity;
+    const changes = [];
+    const add = (store, key, matches, replace) => {
+        const before = store.getItem(key);
+        if (before !== null && matches(before)) {
+            changes.push({ store, key, before, after: replace ? replace(before) : null });
+        }
+    };
+    add(localStorage, _draftLsKey(token), value => value === reviewed);
+    const raw = String(token);
+    // Lossy legacy keys cannot safely be attributed to this document.
+    if (raw !== raw.replace(/[^a-z0-9]/gi, '')) {
+        add(localStorage, _LEGACY_DRAFT_LS_PREFIX + raw, value => value === reviewed);
     }
-    const owner = 'lump:' + _lumpTokenIdentity(token);
-    const sessionKey = 'cm_editor_navigation:' + owner;
-    const sessionRaw = sessionStorage.getItem(sessionKey);
-    const sessionCopy = sessionRaw && JSON.parse(sessionRaw);
-    if (sessionCopy && sessionCopy.source === reviewedSource) {
-        sessionStorage.removeItem(sessionKey);
-        if (sessionStorage.getItem(sessionKey) !== null) {
-            throw new Error('Browser recovery storage could not be cleared. Nothing was deleted from the saved LUMP. Retry when browser storage is available.');
+    add(sessionStorage, 'cm_editor_navigation:' + owner,
+        value => JSON.parse(value).source === reviewed);
+    add(localStorage, 'church_editor_document_v1', value => {
+        const state = JSON.parse(value);
+        return state.owner && state.owner.type === 'lump' &&
+            state.owner.id === token && state.code === reviewed;
+    }, value => JSON.stringify(Object.assign(JSON.parse(value), { code: replacement })));
+    // The legacy session has no owner; touch it only when the typed document
+    // proves that it belongs to this reviewed recovery copy.
+    if (changes.some(change => change.key === 'church_editor_document_v1')) {
+        add(localStorage, 'church_editor_code', value => value === reviewed, () => replacement);
+    }
+    for (const change of changes) {
+        if (change.store.getItem(change.key) !== change.before) {
+            throw new Error('Browser recovery storage changed during discard.');
+        }
+        if (change.after === null) change.store.removeItem(change.key);
+        else change.store.setItem(change.key, change.after);
+        if (change.store.getItem(change.key) !== change.after) {
+            throw new Error('Browser storage did not retain the discard.');
         }
     }
-    localStorage.removeItem(key);
-    if (localStorage.getItem(key) !== null) {
-        throw new Error('The browser draft could not be deleted. The saved LUMP is unchanged. Retry when browser storage is available.');
+    const navigation = window._editorNavigationBuffers;
+    if (navigation && navigation[owner] && navigation[owner].source === reviewed) {
+        delete navigation[owner];
     }
-    const memory = window._editorNavigationBuffers && window._editorNavigationBuffers[owner];
-    if (memory && memory.source === reviewedSource) delete window._editorNavigationBuffers[owner];
-    const identity = _lumpTokenIdentity(token);
-    if (_lumpEditorDraftText[identity] === reviewedSource) delete _lumpEditorDraftText[identity];
+    if (_lumpEditorDraftText[identity] === reviewed) delete _lumpEditorDraftText[identity];
 }
 
 function _isRestoredSavedLumpOwner(token) {
@@ -8254,6 +8273,10 @@ async function openLumpInEditor(token, options) {
         if (_existingMissingBanner) _existingMissingBanner.remove();
         var _existingIntegrityBanner = document.getElementById('_lumpSourceIntegrityBanner');
         if (_existingIntegrityBanner) _existingIntegrityBanner.remove();
+        // A navigation-buffer reopen does not create a new recovery banner.
+        // Never leave a previous open's captured draft and handlers attached.
+        var _previousDraftBanner = document.getElementById('_lumpDraftBanner');
+        if (_previousDraftBanner) _previousDraftBanner.remove();
 
         // ── Always make the editor fully editable on LUMP-panel open ──────
         asmEd.readOnly = false;
@@ -8377,43 +8400,47 @@ async function openLumpInEditor(token, options) {
                 _bannerDiscardBtn.addEventListener('click', async function() {
                     if (_bannerDiscardBtn.disabled) return;
                     _bannerDiscardBtn.disabled = true;
+                    const before = asmEd.value;
                     const epoch = window._editorNavigationEpoch;
-                    const editorBefore = asmEd.value;
-                    const status = _draftBanner.querySelector('.lump-draft-copy');
+                    const requestId = window._savedLumpOpenRequestId;
+                    const report = function(message) {
+                        const copy = _draftBanner.querySelector('.lump-draft-copy');
+                        if (copy) { copy.textContent = message; copy.setAttribute('role', 'alert'); }
+                        if (typeof appendOutput === 'function') appendOutput(message, 'error');
+                    };
                     try {
-                        // Read afresh: an older banner closure may no longer
-                        // describe the copy actually stored in this browser.
-                        const reviewed = localStorage.getItem(_draftLsKey(token));
-                        if (reviewed !== null) {
-                            if (!window.confirmProtectedChange) throw new Error('Draft review is unavailable. Nothing was deleted. Reload the IDE and retry.');
-                            if (!await window.confirmProtectedChange({
-                                title: 'Delete browser draft',
-                                reason: 'Delete only this browser recovery copy. The saved LUMP will not change; newer editor text will be kept.',
-                                changes: ['Copy to delete:\n' + reviewed,
-                                    'Saved source (unchanged):\n' + _recoveredSource],
-                            })) return;
+                        if (!window.confirmProtectedChange) throw new Error('The confirmation dialog is unavailable.');
+                        if (!await window.confirmProtectedChange({
+                            title: 'Delete browser draft',
+                            reason: 'Delete only this reviewed browser recovery copy. Saved artifacts and other editor text remain unchanged.',
+                            changes: ['Copy to delete:\n' + _savedDraft,
+                                'If this copy is in the editor, restore:\n' + _recoveredSource],
+                        })) return;
+                        if (window._editorNavigationEpoch !== epoch ||
+                                window._editorOpenLumpToken !== token ||
+                                window._savedLumpOpenRequestId !== requestId ||
+                                asmEd.value !== before) {
+                            report('Draft discard stopped because the editor changed. Nothing was deleted. Reopen this LUMP to review its current browser copy.');
+                            return;
                         }
-                        if (window._editorNavigationEpoch !== epoch || asmEd.value !== editorBefore ||
-                                window._editorOpenLumpToken !== token) {
-                            throw new Error('The editor changed during review. Nothing was deleted. Reopen the draft review for the current document.');
-                        }
-                        _discardReviewedLumpDraft(token, reviewed);
-                        if (reviewed !== null && asmEd.value === reviewed) {
+                        _discardReviewedLumpDraft(token, _savedDraft, _recoveredSource);
+                        // A newer stored draft is not the reviewed copy. Preserve
+                        // it, but dismiss this stale review instead of looping.
+                        const newer = localStorage.getItem(_draftLsKey(token));
+                        if (before === _savedDraft) {
                             _setSavedLumpEditorSource(_recoveredSource);
+                            asmEd.classList.remove('cm-editor-draft');
                         }
                         window._advanceEditorNavigationEpoch('discard saved LUMP draft');
-                        // Replace the generic reload snapshot as well; otherwise
-                        // it can restore the very copy that was just discarded.
-                        if (typeof saveEditorState === 'function') saveEditorState();
-                        asmEd.classList.toggle('cm-editor-draft', asmEd.value !== _recoveredSource);
                         _draftBanner.remove();
+                        if (newer !== null && newer !== _savedDraft && newer !== _recoveredSource &&
+                                typeof appendOutput === 'function') {
+                            appendOutput('The reviewed browser copy was discarded. A different, newer browser draft was preserved; reopen the LUMP to review it.', 'info');
+                        }
                         if (typeof updateLineNumbers === 'function') updateLineNumbers();
                     } catch (error) {
-                        if (status) {
-                            status.textContent = 'Discard did not complete: ' + error.message;
-                            status.title = status.textContent;
-                            status.setAttribute('role', 'alert');
-                        }
+                        report('Draft discard could not finish: ' + error.message +
+                            ' Some matching recovery copies may already have been removed. Saved artifacts and other text were not changed. Check browser storage access, then retry.');
                     } finally {
                         _bannerDiscardBtn.disabled = false;
                     }

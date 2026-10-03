@@ -18,7 +18,6 @@
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
 - [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
-- [Editor-state migration coverage gap](editor-state-migration-coverage-gap.md) — a one-shot text migration must be wired into every independent save/restore path (keyed draft store AND generic "last session" snapshot), or the "fixed" bug reappears via the unpatched path
 - [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
 - [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
