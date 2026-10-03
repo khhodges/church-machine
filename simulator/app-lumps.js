@@ -3868,6 +3868,8 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
+        html += `<div class="lump-history-retention">Keep 30 days and the three newest versions. Current, referenced and undated archives are retained. ` +
+            `<button class="btn" onclick="_pruneLumpHistory('${e(token)}',this)">Delete expired archives…</button></div>`;
         html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">';
         html += 'Current saved identifies the catalog record, not the running hardware or execution approval. Selecting an eligible archive creates a new approved live revision; it does not rewrite the archive. Click a row to preview its source and hex.';
         if (hasTel) html += ' Fault rates and device counts from FPGA hardware.';
@@ -4109,6 +4111,23 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
                 dataChanged: null,
                 nextAction: 'Reload device status to verify versions before retrying.',
             }));
+    }
+}
+
+async function _pruneLumpHistory(token, button) {
+    if (!confirm('Permanently delete archives older than 30 days AND outside the three newest versions for this LUMP? Current, referenced and undated archives are retained. Deleted binaries cannot be restored.')) return;
+    button.disabled = true;
+    try {
+        const response = await fetch(`/api/lumps/${token}/history/retention`, {method:'POST'});
+        const data = await response.json();
+        if (!response.ok) throw new Error(`${data.error || 'Retention failed'} ${data.deleted?.length || 0} archives deleted. Reload History before retrying.`);
+        appendOutput(`History retention: ${data.deleted.length} archives permanently deleted; ${data.protected.length} eligible archives protected by references.`, 'info');
+        const lump = _lumpsCache.find(item => item.token === token);
+        if (lump) await _fetchAndShowLumpTimeline(token, lump);
+    } catch (error) {
+        appendOutput(`History cleanup: ${error.message}. Reload History to verify the result.`, 'error');
+    } finally {
+        button.disabled = false;
     }
 }
 

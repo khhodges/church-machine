@@ -17318,8 +17318,19 @@ def get_lump_history(token):
 
     entries.sort(key=lambda e: e["version"], reverse=True)
     versions = {entry["version"] for entry in entries}
+    retention_path = os.path.join(lumps_dir, "history-retention.json")
+    pruned_versions = set()
+    if os.path.isfile(retention_path):
+        try:
+            with open(retention_path, encoding="utf-8") as stream:
+                pruned_versions = {
+                    int(row["version"]) for row in json.load(stream).get(key8, [])
+                }
+        except (OSError, ValueError, TypeError, KeyError):
+            pass  # Unverified deletion evidence must not hide a missing archive.
     missing_versions = (
-        [ver for ver in range(min(versions), max(versions) + 1) if ver not in versions]
+        [ver for ver in range(min(versions), max(versions) + 1)
+         if ver not in versions and ver not in pruned_versions]
         if versions else []
     )
     return jsonify({
@@ -17332,6 +17343,10 @@ def get_lump_history(token):
 @app.route("/api/lumps/<token>/history/<int:version>", methods=["DELETE"])
 def delete_lump_history_revision(token, version):
     """Delete one immutable archived revision without touching the live LUMP."""
+    return _delete_lump_history_revision(token, version, request.get_json(silent=True) or {})
+
+
+def _delete_lump_history_revision(token, version, payload):
     import re as _re
 
     raw = token.lower().replace("0x", "", 1)
@@ -17340,7 +17355,6 @@ def delete_lump_history_revision(token, version):
     if version < 0:
         return jsonify({"error": "Invalid history version"}), 400
     key8 = raw.zfill(8)
-    payload = request.get_json(silent=True) or {}
     archive_filename = payload.get("archive_filename")
     if archive_filename is not None and (
         not isinstance(archive_filename, str)
@@ -17445,6 +17459,78 @@ def delete_lump_history_revision(token, version):
         "version": version,
         "deleted": [selected_filename],
     })
+
+
+@app.route("/api/lumps/<token>/history/retention", methods=["POST"])
+def prune_lump_history(token):
+    """Explicit protected write; browsing History never deletes data."""
+    from server.history_retention import expired_archives
+    import time
+    from pathlib import Path
+    with _lump_history_transition_lock(LUMPS_DIR):
+        response = app.make_response(get_lump_history(token))
+        if response.status_code != 200:
+            return response
+        history = response.get_json()["history"]
+        root = Path(LUMPS_DIR)
+        manifest = _read_manifest_safe(str(root / "manifest.json"))
+        candidates = expired_archives(history, time.time())
+        ledger_path = root / "history-retention.json"
+        ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
+        ledger_key = str(response.get_json().get("token") or token)
+        # Preserve any artifact named by another saved object/configuration.
+        # Missing dates, symlinks and unreadable references fail closed.
+        live = [row for row in manifest if row.get("archived") is not True]
+        deleted, protected = [], []
+        try:
+            documents = {
+                str(path): path.read_text(encoding="utf-8")
+                for path in root.rglob("*.json")
+                if path.name not in ("manifest.json", "approvals.json")
+            }
+            for name in ("NS_STATE_PATH", "BOOT_CONFIG_PATH", "BOOT_IMAGE_PROVENANCE_PATH"):
+                reference_path = globals().get(name)
+                if reference_path and Path(reference_path).exists():
+                    documents[str(reference_path)] = Path(reference_path).read_text(encoding="utf-8")
+            for text in documents.values():
+                json.loads(text)
+        except (OSError, ValueError):
+            return jsonify(error="Retention stopped: saved references could not be verified. No archives were deleted."), 409
+        for row in candidates:
+            filename = row.get("archive_filename") or row.get("record_filename")
+            path = root / filename
+            if (path.name != filename or not filename.endswith(".lump") or
+                    path.is_symlink() or not path.is_file()):
+                protected.append(filename)
+                continue
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            references = json.dumps(live) + "".join(
+                text for name, text in documents.items()
+                if name != str(path.with_suffix(".json")))
+            linked = any(other.is_symlink() and other.resolve() == path.resolve()
+                         for other in root.glob("*.lump"))
+            old_token = str(row.get("record_token") or "").lower()
+            historical_token_reference = (old_token and
+                old_token != str(response.get_json().get("token") or token).lower()
+                and old_token in references.lower())
+            if linked or filename in references or digest in references.lower() or historical_token_reference:
+                protected.append(filename)
+                continue
+            # Reuse the existing exact-archive deletion validation and lock.
+            result = app.make_response(_delete_lump_history_revision(
+                token, int(row["version"]), {"archive_filename": filename}))
+            if result.status_code != 200:
+                return jsonify(error="Retention stopped while deleting an archive.",
+                               deleted=deleted, protected=protected,
+                               reason=result.get_json()), 409
+            deleted.append(filename)
+            ledger.setdefault(ledger_key, []).append({
+                "version": int(row["version"]), "filename": filename,
+                "deleted_at": time.time(),
+            })
+            _atomic_write_json(str(ledger_path), ledger)
+        return jsonify(ok=True, deleted=deleted, protected=protected,
+                       policy={"days": 30, "newest_versions": 3})
 
 
 @app.route("/api/lump/<token>/fork-version", methods=["POST"])
