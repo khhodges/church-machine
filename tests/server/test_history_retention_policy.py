@@ -72,3 +72,71 @@ def test_cleanup_endpoint_deletes_only_unreferenced_old_archives(tmp_path):
     before = set(tmp_path.iterdir())
     assert app.test_client().post("/cleanup/12345678").status_code == 409
     assert set(tmp_path.iterdir()) == before
+
+
+def test_pending_cleanup_recovery_and_revalidation(tmp_path):
+    import hashlib
+    import json
+    import pytest
+    from server.history_retention import recover_pending
+
+    archive = tmp_path / "Example_v1.lump"
+    archive.write_bytes(b"original")
+    ledger_path = tmp_path / "history-retention.json"
+    entry = {"version": 1, "filename": archive.name, "status": "pending",
+             "binary_hash": hashlib.sha256(b"original").hexdigest()}
+    ledger_path.write_text(json.dumps({"12345678": [entry]}))
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps([
+        {"filename": archive.name, "archived": True},
+        {"filename": "Current.lump", "archived": False}]))
+    def write(path, value):
+        from pathlib import Path
+        Path(path).write_text(json.dumps(value))
+    # Crash before unlink: recovery alone must not delete anything.
+    assert recover_pending(tmp_path, write) == []
+    assert archive.read_bytes() == b"original"
+    archive.write_bytes(b"replacement")
+    with pytest.raises(ValueError, match="changed"):
+        recover_pending(tmp_path, write)
+    archive.write_bytes(b"original")
+    # Crash after unlink: finish manifest/ledger bookkeeping idempotently.
+    archive.unlink()
+    assert recover_pending(tmp_path, write) == ["Example_v1.lump"]
+    assert json.loads(manifest_path.read_text()) == [
+        {"filename": "Current.lump", "archived": False}]
+    assert json.loads(ledger_path.read_text())["12345678"][0]["status"] == "deleted"
+    assert recover_pending(tmp_path, write) == []
+
+
+def test_post_save_hook_keeps_commit_success_when_cleanup_fails():
+    import ast
+    from pathlib import Path
+    from flask import Flask, jsonify
+    app = Flask(__name__)
+    source = ast.parse(Path("server/app.py").read_text())
+    hook = next(n for n in source.body if isinstance(n, ast.FunctionDef)
+                and n.name == "_apply_history_retention_after_save")
+    save = next(n for n in source.body if isinstance(n, ast.FunctionDef)
+                and n.name == "save_lump")
+    assert any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+               and n.func.id == hook.name for n in ast.walk(save))
+    called = []
+    def fail(token):
+        called.append(token)
+        raise OSError("injected cleanup failure")
+    env = dict(app=app, prune_lump_history=fail)
+    exec(compile(ast.Module(body=[hook], type_ignores=[]), "hook", "exec"), env)
+    run = env[hook.name]
+    run({"ok": False, "committed": False})
+    run({"ok": True, "committed": False})
+    assert called == []
+    with app.app_context():
+        saved = {"ok": True, "committed": True, "token": "12345678", "warnings": []}
+        run(saved)
+        assert saved["ok"] and saved["committed"]
+        assert saved["warnings"][0]["code"] == "history_retention_incomplete"
+        env["prune_lump_history"] = lambda token: jsonify(ok=True, deleted=["old.lump"])
+        saved = {"ok": True, "committed": True, "token": "12345678"}
+        run(saved)
+        assert saved["history_retention"]["deleted"] == ["old.lump"]

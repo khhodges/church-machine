@@ -15121,6 +15121,7 @@ def save_lump():
             _early_plan.get("canonical_dot_name"),
             owner_key=_early_plan.get("lease_owner"))
         resp["lease_released"] = True
+    _apply_history_retention_after_save(resp)
     return jsonify(resp)
 
 @app.route("/api/lumps/save-wip", methods=["POST"])
@@ -17325,6 +17326,7 @@ def get_lump_history(token):
             with open(retention_path, encoding="utf-8") as stream:
                 pruned_versions = {
                     int(row["version"]) for row in json.load(stream).get(key8, [])
+                    if row.get("status", "deleted") == "deleted"
                 }
         except (OSError, ValueError, TypeError, KeyError):
             pass  # Unverified deletion evidence must not hide a missing archive.
@@ -17464,10 +17466,16 @@ def _delete_lump_history_revision(token, version, payload):
 @app.route("/api/lumps/<token>/history/retention", methods=["POST"])
 def prune_lump_history(token):
     """Explicit protected write; browsing History never deletes data."""
-    from server.history_retention import expired_archives
+    from server.history_retention import expired_archives, recover_pending
     import time
     from pathlib import Path
     with _lump_history_transition_lock(LUMPS_DIR):
+        try:
+            recovered = recover_pending(LUMPS_DIR, _atomic_write_json)
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            return jsonify(error=(
+                "Interrupted retention bookkeeping needs review. No additional "
+                f"binary deletion was attempted. Reason: {exc}")), 409
         response = app.make_response(get_lump_history(token))
         if response.status_code != 200:
             return response
@@ -17481,12 +17489,12 @@ def prune_lump_history(token):
         # Preserve any artifact named by another saved object/configuration.
         # Missing dates, symlinks and unreadable references fail closed.
         live = [row for row in manifest if row.get("archived") is not True]
-        deleted, protected = [], []
+        deleted, protected = list(recovered), []
         try:
             documents = {
                 str(path): path.read_text(encoding="utf-8")
                 for path in root.rglob("*.json")
-                if path.name not in ("manifest.json", "approvals.json")
+                if path.name not in ("manifest.json", "approvals.json", "history-retention.json")
             }
             for name in ("NS_STATE_PATH", "BOOT_CONFIG_PATH", "BOOT_IMAGE_PROVENANCE_PATH"):
                 reference_path = globals().get(name)
@@ -17517,6 +17525,18 @@ def prune_lump_history(token):
                 protected.append(filename)
                 continue
             # Reuse the existing exact-archive deletion validation and lock.
+            entries = ledger.setdefault(ledger_key, [])
+            pending = next((item for item in entries
+                            if item.get("filename") == filename and
+                            item.get("status") == "pending"), None)
+            if pending is None:
+                pending = {"version": int(row["version"]), "filename": filename,
+                           "binary_hash": digest, "status": "pending"}
+                entries.append(pending)
+            # Persist intent before the first unlink. On interruption, an
+            # authorized retry either revalidates surviving bytes or completes
+            # the manifest/ledger bookkeeping for an already-deleted archive.
+            _atomic_write_json(str(ledger_path), ledger)
             result = app.make_response(_delete_lump_history_revision(
                 token, int(row["version"]), {"archive_filename": filename}))
             if result.status_code != 200:
@@ -17524,13 +17544,30 @@ def prune_lump_history(token):
                                deleted=deleted, protected=protected,
                                reason=result.get_json()), 409
             deleted.append(filename)
-            ledger.setdefault(ledger_key, []).append({
-                "version": int(row["version"]), "filename": filename,
-                "deleted_at": time.time(),
-            })
+            pending.update(status="deleted", deleted_at=time.time())
             _atomic_write_json(str(ledger_path), ledger)
         return jsonify(ok=True, deleted=deleted, protected=protected,
                        policy={"days": 30, "newest_versions": 3})
+
+
+def _apply_history_retention_after_save(saved):
+    """Maintenance follows an approved commit; never rewrite its success."""
+    if saved.get("ok") is not True or saved.get("committed") is not True:
+        return
+    try:
+        response = app.make_response(prune_lump_history(saved["token"]))
+        result = response.get_json()
+        if response.status_code != 200 or not result or not result.get("ok"):
+            raise RuntimeError((result or {}).get("error", "Retention could not complete"))
+        saved["history_retention"] = result
+    except Exception as exc:
+        saved["history_retention"] = {"ok": False, "error": str(exc)}
+        saved.setdefault("warnings", []).append({
+            "code": "history_retention_incomplete",
+            "message": "LUMP saved successfully, but history cleanup did not complete. "
+                       "The saved revision is unchanged. Review History and retry "
+                       f"Delete expired archives. Reason: {exc}",
+        })
 
 
 @app.route("/api/lump/<token>/fork-version", methods=["POST"])

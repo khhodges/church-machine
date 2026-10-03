@@ -3868,7 +3868,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
-        html += `<div class="lump-history-retention">Keep 30 days and the three newest versions. Current, referenced and undated archives are retained. ` +
+        html += `<div class="lump-history-retention">After each approved save, keep 30 days and the three newest versions. Current, referenced and undated archives are retained. ` +
             `<button class="btn" onclick="_pruneLumpHistory('${e(token)}',this)">Delete expired archives…</button></div>`;
         html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">';
         html += 'Current saved identifies the catalog record, not the running hardware or execution approval. Selecting an eligible archive creates a new approved live revision; it does not rewrite the archive. Click a row to preview its source and hex.';
