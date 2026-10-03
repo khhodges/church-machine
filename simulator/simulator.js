@@ -3837,7 +3837,7 @@ class ChurchSimulator {
             this.output += 'BOOT LOAD CR15, CR15[0] — Namespace root established\n';
         } else if (index === 1) {
             this._setBootFaultContext(index, 15, this.cr[15].word0);
-            const result = this._execChange({
+            const result = this._execBootChangeCore({
                 opcode: 4, cond: 14, crDst: 12, crSrc: 15, imm: BOOT_NS_SLOT_THREAD,
                 mnemonic: 'CHANGE',
             }, this.pc);
@@ -5806,9 +5806,10 @@ class ChurchSimulator {
             return { ok: false, reason: `Configured target ${this.nsLabels[target] || target} has an invalid Thread descriptor` };
         }
 
-        const result = this._execChange({
-            crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE',
-        }, this.pc);
+        const targetGT = this.createGT(this.parseNSWord1(entry.word1_limit).gtSeq,
+            target, {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
+        const result = this._activateChangeThread(targetGT,
+            {crDst: 12, mnemonic: 'CHANGE'}, this.pc);
         if (!result) return { ok: false, reason: 'Thread switch was rejected' };
         // A successful manual CHANGE selects a runnable stopped context.  HALT
         // is an execution latch, not part of the saved Thread image, so carrying
@@ -8446,7 +8447,8 @@ class ChurchSimulator {
             return result;
         } catch (error) {
             thrown = error;
-            throw error;
+            this.fault('INVALID_OP', `CHANGE failed: ${error.message || error}`);
+            return null;
         } finally {
             this._recordControlFlowDiagnostic('CHANGE', 'post', {
                 ok: result !== null && result !== undefined,
@@ -8461,6 +8463,24 @@ class ChurchSimulator {
     }
 
     _execChangeCore(d, continuationPC) {
+        // Simulator compatibility with the existing one-operand assembler:
+        // both register fields repeat the input CR; the index must be zero.
+        // This does not approve a new hardware encoding or the IRQ proposal.
+        if (!Number.isInteger(d.crDst) || d.crDst < 0 || d.crDst > 15 ||
+                d.crSrc !== d.crDst || d.imm !== 0) {
+            this.fault('INVALID_OP', 'CHANGE requires one Thread GT register; indexed/two-register CHANGE is not supported');
+            return null;
+        }
+        return this._activateChangeThread(this.cr[d.crDst].word0 >>> 0, d, continuationPC);
+    }
+
+    _execBootChangeCore(d, continuationPC) {
+        // Internal boot entry only; an instruction cannot select this path.
+        if (!this.mElevation || this.bootComplete || d.crDst !== 12 ||
+                d.crSrc !== 15 || d.imm !== BOOT_NS_SLOT_THREAD) {
+            this.fault('INVALID_OP', 'Internal boot CHANGE invoked outside boot');
+            return null;
+        }
         // CHANGE CRd, CRs[idx]
         //   CRd  (d.crDst) — destination: must be a privileged register CR12–CR15.
         //   CRs  (d.crSrc) — source capability used to access the NS entry.
@@ -8646,6 +8666,33 @@ class ChurchSimulator {
             return { pc: this.pc - 1, instr: d, desc };
         }
 
+        this.fault('INVALID_OP', 'Invalid internal boot CHANGE destination');
+        return null;
+    }
+
+    _activateChangeThread(threadGT, d, continuationPC) {
+        const parsed = this.parseGT(threadGT);
+        if (ChurchSimulator.isNullGT(threadGT) || parsed.malformed || parsed.type !== 1) {
+            this.fault('TYPE', 'CHANGE requires a non-null Inform Thread GT');
+            return null;
+        }
+        if (Object.values(parsed.permissions).some(Boolean)) {
+            this.fault('PERM', 'CHANGE Thread GT must have no permissions set');
+            return null;
+        }
+        // Microcode resolves identity without demanding any permission.
+        const threadCheck = this.mLoad(threadGT, null, 12);
+        if (!threadCheck.ok) {
+            this.fault(threadCheck.fault, `CHANGE Thread GT: ${threadCheck.message}`);
+            return null;
+        }
+        const targetIdx = threadCheck.index;
+        const entry = threadCheck.entry;
+        if (this._liveThreadOwned && targetIdx === this._currentThreadSlot) {
+            this.fault('TYPE', 'CHANGE target is the active Thread, not a dormant incoming context');
+            return null;
+        }
+        const threadSwitch = true;
         // ── Thread CHANGE: dormant Thread entry ───────────────────────────────────
         // DR0–DR15 and CR0–CR11 live in fixed homes. Resume identity, NIA,
         // flags, and STO come only from the canonical CHURCH frame.
@@ -8667,15 +8714,6 @@ class ChurchSimulator {
         }
         const tBase = entry.word0_location;
         const threadSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
-        const threadGT = this.createGT(
-            threadSeq, targetIdx,
-            {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
-        const threadCheck = this.mLoad(threadGT, null, 12, tBase);
-        if (!threadCheck.ok) {
-            this.fault(threadCheck.fault,
-                `CHANGE Thread object NS[${targetIdx}]: ${threadCheck.message}`);
-            return null;
-        }
         const restoredRegs = [];
         for (let i = 0; i < 12; i++) {
             const gtWord = this.memory[tBase + targetLayout.capsStart + i] >>> 0;
@@ -8711,6 +8749,52 @@ class ChurchSimulator {
         }
         const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx);
         if (!resume) return null;
+        // Validate the actual C-List backing the saved executable context before
+        // suspending the outgoing Thread or publishing any incoming registers.
+        const codeBase = resume.checked.entry.word0_location;
+        const hdr = resume.codeHeader;
+        const clistBase = codeBase + hdr.lumpSize - hdr.cc;
+        if (!Number.isInteger(hdr.cc) || hdr.cc < 1 ||
+                resume.checked.entry.clistCount !== hdr.cc ||
+                hdr.cw + 1 > hdr.lumpSize - hdr.cc ||
+                codeBase + hdr.lumpSize > this.NS_TABLE_BASE) {
+            this.fault('BOUNDS', 'CHANGE incoming C-List has invalid geometry');
+            return null;
+        }
+        const clistGT = this.createGT(resume.parsed.gt_seq, resume.checked.index,
+            {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
+        // mLoad validates the object identity; its raw Namespace extent is the
+        // code view, not the tail-relative C-List view validated above.
+        const clistCheck = this.mLoad(clistGT, 'L', 6);
+        if (!clistCheck.ok) {
+            this.fault(clistCheck.fault, `CHANGE incoming C-List: ${clistCheck.message}`);
+            return null;
+        }
+        const selfGT = this.memory[clistBase] >>> 0;
+        const self = this.parseGT(selfGT);
+        if (self.malformed || self.type !== 1 || !self.permissions.E ||
+                self.index !== resume.checked.index || self.gt_seq !== resume.parsed.gt_seq) {
+            this.fault('TYPE', 'CHANGE incoming C-List SELF does not identify the resumed code');
+            return null;
+        }
+        for (let row = 0; row < hdr.cc; row++) {
+            const word = this.memory[clistBase + row] >>> 0;
+            if (ChurchSimulator.isNullGT(word)) continue; // unoccupied row
+            const cap = this.parseGT(word);
+            if (cap.malformed) {
+                this.fault('TYPE', `CHANGE incoming C-List row ${row} is malformed`);
+                return null;
+            }
+            // Abstract locks may legitimately be unresolved. Inform entries,
+            // however, must resolve without lazy allocation or repair.
+            if (cap.type === 1) {
+                const check = this.mLoad(word, null, 6);
+                if (!check.ok) {
+                    this.fault(check.fault, `CHANGE incoming C-List row ${row}: ${check.message}`);
+                    return null;
+                }
+            }
+        }
         if (IDX1_RUNTIME) IDX1_RUNTIME.preflightMemoryWrite(this, tBase + 1, tBase + 17);
         const codeParsed = resume.parsed;
         const codeEntry = resume.checked.entry;
@@ -12587,10 +12671,8 @@ class ChurchSimulator {
         // ── Hardware privilege fence ──────────────────────────────────────────────
         // CR12–CR15 are hardware-privileged; normal instructions may not name them.
         // Rule: fault = (reg >= 12) AND NOT (opcode ∈ {DREAD,DWRITE} AND reg == 14)
-        //   CHANGE (opcode 4): fully exempt from the decode fence — crDst is checked
-        //     inside _execChange (must be 12–15). crSrc is also unrestricted: the boot
-        //     sequence uses `CHANGE CR12, CR12, 1` where crSrc==12 (the only instruction
-        //     that may reach into the privileged bank as a source is CHANGE itself).
+        //   CHANGE (opcode 4): any CR may supply the permissionless Thread GT.
+        //     Its microcode validates identity, frame and C-List independently.
         //   DREAD (opcode 16) / DWRITE (opcode 17): may use CR14 as the source
         //     capability field to access read-only data packed after HALT in the
         //     code lump (`DREAD DR, CR14, offset` pattern).

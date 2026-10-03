@@ -69,6 +69,18 @@ it must not be interpreted as installing an interrupt-handler GT into CR13.
 
 ### Boot exception
 
+**Simulator implementation boundary:** General CHANGE now consumes the GT in
+the register named by the existing assembler's one-operand spelling. For
+software compatibility, that word repeats the register in both legacy fields
+and has zero immediate; no indexed lookup is performed. Other legacy indexed
+words are rejected. This is not approval of a new hardware encoding, migration
+of saved binaries, or implementation of the proposed IRQ-return trigger.
+The simulator checks the incoming frame, C-List geometry, matching executable
+SELF and resolvable Inform entries before publishing restored context.
+Unoccupied rows and unresolved Abstract locks retain their existing meanings.
+An already active Thread is not accepted as a dormant incoming context.
+The isolated regression is `node simulator/test_change_one_gt.js`.
+
 Boot uses the **back half** of the Thread transition: the incoming Thread is
 loaded into CR12. There is no outgoing programmatic Thread context to suspend.
 This special initialization path does not add operands to programmatic CHANGE.

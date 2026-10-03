@@ -3388,6 +3388,9 @@ class ChurchAssembler {
             }
             // CHANGE CRd, CR6[idx] / CRs[idx]
             case 4: {
+                // The simulator's general one-GT form uses the existing
+                // shorthand word. Keep legacy indexed words explicit.
+                if (crSrc === crDst && imm === 0) return `${mnemonic}  CR${crDst}`;
                 if (crSrc === 6) {
                     const ref = cdNamed(imm);
                     return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;

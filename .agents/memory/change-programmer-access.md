@@ -22,6 +22,19 @@ permissionless as NULL. Preserve identity/type/context validation. Distinguish
 the saved frame's executable Enter GT from the Thread GT supplied to CHANGE.
 Do not turn the proposed IRQ-return M gate into a general CHANGE prerequisite.
 
+The user authorized implementing the general CHANGE semantics in the simulator,
+not IRQ or hardware. Software compatibility with the existing one-operand
+assembler word does not settle the eventual hardware encoding.
+
+**Why:** The request was to make the simulator match the agreed permissionless
+GT, valid stack/C-List and hard-fault requirements while IRQ remained deferred.
+
+**How to apply:** Keep hardware, saved-binary migration and IRQ outside this
+authorization. Do not use simulator test success as proof of RTL conformance.
+When checking atomicity, distinguish Namespace access/G-bit updates from
+protected Thread-context writes: ordinary instruction fetch updates access
+metadata even when CHANGE subsequently faults.
+
 The user's architectural definition is: “CHANGE needs one GT to the new Thread.” In `CHANGE CR13`, CR13 holds the input GT identifying the Thread to activate; it is not a destination register or a C-list to index. There is no second register operand or implicit `[0]` lookup.
 
 **Why:** The user supplied this definition to resolve the contradictory local references after rejecting the emitted two-register/index form.
