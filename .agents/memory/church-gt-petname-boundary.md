@@ -18,3 +18,13 @@ compiled output; referring readers to names elsewhere is not sufficient.
 **How to apply:** Pair each row's PetName with its exact stored word and binding
 status. Read names from the same candidate's embedded definition, not mutable
 editor metadata. Explicitly mark missing names rather than inventing identities.
+
+Saved-binary disassembly has the same requirement. Names and method annotations
+must come from the exact inspected binary, never inferred from current source,
+catalog state, or the previous compile.
+
+**Why:** The user explicitly clarified that disassembly means disassembling the
+binary LUMP exactly, not composing a best guess.
+
+**How to apply:** Preserve raw words; decode embedded names; explicitly show
+missing or malformed metadata instead of supplying guessed labels.

@@ -2219,22 +2219,61 @@ function _formatCanonicalSavedLumpWords(words, details) {
     var cw = (header >>> 10) & 0x1FFF;
     var cc = header & 0xFF;
     var clistStart = Math.max(1, words.length - cc);
+    var embedded = null;
+    var definitionStatus = 'No embedded definition frame; PetNames unavailable in these bytes.';
+    var frameStart = cw + 1;
+    var frameHeader = words[frameStart] >>> 0;
+    if (frameStart < clistStart && (frameHeader >>> 24) === 0xAB) {
+        try {
+            var byteLength = frameHeader & 0xFFFF;
+            var packedLength = Math.ceil(byteLength / 4);
+            var flags = (frameHeader >>> 16) & 255;
+            if (!byteLength || ![0, 1, 3, 5, 7].includes(flags) ||
+                    frameStart + 1 + packedLength > clistStart) {
+                throw new Error('definition framing exceeds its allocated region');
+            }
+            var bytes = new Uint8Array(packedLength * 4);
+            for (var p = 0; p < packedLength; p++) {
+                var packed = words[frameStart + 1 + p] >>> 0;
+                bytes.set([packed >>> 24, (packed >>> 16) & 255,
+                    (packed >>> 8) & 255, packed & 255], p * 4);
+            }
+            var decodedDefinition = JSON.parse(new TextDecoder('utf-8', {fatal: true})
+                .decode(bytes.subarray(0, byteLength)));
+            if (!decodedDefinition || typeof decodedDefinition !== 'object' ||
+                    Array.isArray(decodedDefinition)) throw new Error('definition is not a JSON object');
+            embedded = decodedDefinition;
+            definitionStatus = 'PetNames below are decoded from this binary’s embedded definition.';
+        } catch (error) {
+            definitionStatus = 'Cannot decode embedded definition: ' + error.message +
+                '; no PetNames inferred.';
+        }
+    }
+    var caps = embedded && Array.isArray(embedded.capabilities) ? embedded.capabilities : [];
+    var embeddedMethods = embedded && Array.isArray(embedded.methods) ? embedded.methods : [];
     var lines = [
         '; SAVED BINARY — exact canonical server response',
         '; Source at left is unchanged. These are the exact fetched saved words.',
-        '; Abstraction: ' + String(details.abstraction || 'Unnamed') +
+        '; Artifact label (external metadata): ' + String(details.abstraction || 'Unnamed') +
             (details.token ? '  Token: ' + String(details.token) : ''),
         '; Saved word usage: ' + (details.wordUsage || 'word usage unavailable'),
-        _formatLumpHeaderDisassembly(header)
+        _formatLumpHeaderDisassembly(header),
+        '; ' + definitionStatus
     ];
     for (var i = 1; i < words.length; i++) {
         var word = words[i] >>> 0;
-        var annotation = _lumpDispatchAnnotation(words, i, details.methodCount);
+        var annotation = embeddedMethods.length
+            ? _lumpDispatchAnnotation(words, i, embeddedMethods.length) : '';
         if (!annotation && i <= cw && typeof assembler !== 'undefined' && assembler &&
                 typeof assembler.disassemble === 'function') {
             try { annotation = assembler.disassemble(word); } catch (_error) {}
         } else if (i >= clistStart && cc > 0) {
-            annotation = 'C-list[' + (i - clistStart) + ']';
+            var row = i - clistStart;
+            var cap = caps[row];
+            var name = typeof cap === 'string' ? cap :
+                cap && typeof cap.name === 'string' ? cap.name : '';
+            annotation = 'C-list[' + row + '] ' +
+                (name.trim() ? JSON.stringify(name) : '(PetName unavailable in saved bytes)');
         } else if (i > cw) {
             annotation = 'non-code data / embedded source / API frame';
         }
