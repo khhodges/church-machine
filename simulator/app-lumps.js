@@ -812,7 +812,8 @@ async function _patchCcFromBinary(token, lump, tk) {
         // ── Patch shrink button ──────────────────────────────────────────────
         const shrinkBtn = document.getElementById(`lumpShrinkBtn_${tk}`);
         if (shrinkBtn) {
-            const minimum = _getLumpMinimumAllocation(words, inspection);
+            const allocation = await LumpContentFrame.lumpMinimumAllocation(words);
+            const minimum = allocation.verified ? allocation.minimumWords : null;
             shrinkBtn.className = 'lump-hs-resize-btn lump-hs-resize-disabled';
             shrinkBtn.disabled = true;
             shrinkBtn.onclick = null;
@@ -820,7 +821,7 @@ async function _patchCcFromBinary(token, lump, tk) {
             shrinkBtn.title = 'Read-only content allocation estimate. Saved hash-bound bytes cannot be resized in place.';
             const note = document.getElementById(`lumpResizeNote_${tk}`);
             if (note) note.textContent = minimum === null
-                ? 'Complete code/API/source layout could not be verified. No resize is offered.'
+                ? `Layout unavailable: ${allocation.reason}. No resize is offered.`
                 : 'Includes header, code, API, stored source and C-list. Allocation changes require a new approved revision.';
         }
 

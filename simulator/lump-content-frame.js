@@ -329,6 +329,41 @@ async function lumpInspectContentFrame(serverWords) {
 }
 
 /**
+ * Conservative allocation advice only; never rewrites hash-bound artifact words.
+ * Unknown layouts/payload outside the frame are not disposable padding.
+ */
+async function lumpMinimumAllocation(words) {
+    var inspection = await lumpInspectContentFrame(words);
+    var unavailable = function(reason) { return { verified: false, reason: reason }; };
+    if (!inspection.headerValid || !inspection.contentFrameValid)
+        return unavailable(inspection.error || 'Content layout cannot be verified');
+    var h = inspection.header;
+    if (words.length !== h.lumpSize)
+        return unavailable('Exact binary length does not match its allocation');
+    if (((words[0] >>> 8) & 3) !== 0)
+        return unavailable('Only code LUMP content-frame layouts support shrink sizing');
+    if (!inspection.apiDefinition || typeof inspection.apiDefinition !== 'object' ||
+            Array.isArray(inspection.apiDefinition))
+        return unavailable('Embedded API definition must be an object');
+    var start = 1 + h.cw;
+    var frameHeader = words[start] >>> 0;
+    var end = start + 1 + Math.ceil((frameHeader & 0xFFFF) / 4);
+    if (inspection.sourceEmbedded) {
+        end += 1 + Math.ceil((words[end] >>> 0) / 4);
+    }
+    if (end > h.lumpSize - h.cc)
+        return unavailable('Embedded content overlaps the C-list');
+    for (var i = end; i < h.lumpSize - h.cc; i++) {
+        if (words[i] !== 0)
+            return unavailable('Nonzero words after the embedded frame are not verified padding');
+    }
+    var minimum = 64;
+    while (minimum < end + h.cc) minimum *= 2;
+    return { verified: true, minimumWords: minimum, currentWords: h.lumpSize,
+        frameWords: end - start, savedWords: h.lumpSize - minimum };
+}
+
+/**
  * Parse the 0xAB content frame from a complete LUMP word array and return the
  * embedded source string, or null when absent, malformed, or on any error.
  *
@@ -430,6 +465,7 @@ var _lcfExports = {
     lumpBuildContentFrame: lumpBuildContentFrame,
     lumpContentFrameProfile: lumpContentFrameProfile,
     lumpInspectContentFrame: lumpInspectContentFrame,
+    lumpMinimumAllocation: lumpMinimumAllocation,
     lumpInspectContentFrameSource: lumpInspectContentFrameSource,
     lumpDecodeContentFrameApi: lumpDecodeContentFrameApi,
     lumpDecodeContentFrame: lumpDecodeContentFrame,

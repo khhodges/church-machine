@@ -40,3 +40,7 @@ identity and requires a new approved revision.
 **How to apply:** Include the complete verified API/source frame in estimates,
 fail closed for unknown payloads, and retain immutable originals and approval
 requirements for any future allocation-changing publication flow.
+
+Unknown frame layouts or nonzero words outside a recognized frame must not be
+classified as disposable padding. Count stored compressed source bytes, not
+the decompressed source size, when calculating the complete frame extent.

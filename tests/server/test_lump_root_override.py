@@ -46,7 +46,9 @@ if response.status_code != 410:
     assert response.get_json().get("error") == "change_confirmation_required"
 # Even after that gate, the retired handler itself must refuse mutation.
 with module.app.test_request_context("/api/lump/00000600/resize", method="POST"):
-    assert module.app.make_response(module.resize_lump("00000600")).status_code == 410
+    rejection = module.app.make_response(module.resize_lump("00000600"))
+    assert rejection.status_code == 410
+    assert "new hash-approved revision" in rejection.get_json()["error"]
 assert {str(path): path.read_bytes() for path in watched} == before
 assert hashlib.sha256(canonical.read_bytes()).hexdigest() == canonical_digest
 '''
