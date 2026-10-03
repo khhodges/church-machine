@@ -47,6 +47,16 @@ A permissionless GT is not a NULL GT: identity, validity and the target Thread
 context still require validation. Internal access must not grant those
 microcode privileges to subsequent programmer instructions.
 
+**Mandatory acceptance checks:** Microcode must check that the supplied Thread
+GT has **no permissions set**, not merely accept zero permissions as optional.
+A GT with any permission set fails this requirement. It must also validate the
+incoming stack frame and a valid C-List usable by the restored context.
+**Any error is a hard fault.** Do not ignore errors, strip permissions to make
+the GT acceptable, substitute another frame/C-List, or continue with a partial
+transition. Microcode privileges enable access for the transition; they do not
+waive these checks. The detailed C-List validation algorithm and fault-code
+assignments are not specified by this semantic correction.
+
 This is distinct from validation of the executable Enter GT in a saved
 continuation frame. Do not transfer that frame's E-permission requirement to
 the permissionless Thread GT supplied to CHANGE. The proposed M-gated hidden

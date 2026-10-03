@@ -13,7 +13,11 @@ using microcode privileges, not permissions on that GT.
 the legacy indexed implementation. Programmer access to the instruction and
 microcode access to Thread state are different authority boundaries.
 
-**How to apply:** Do not require R/W/X/L/S/E on the input Thread GT or treat
+**How to apply:** Require no permissions set on the input Thread GT; any
+permission set is a hard fault. Require a valid stack frame and valid, usable
+C-List, with a hard fault on any error. The user explicitly confirmed these
+acceptance requirements; microcode privileges must not bypass them. Do not
+silently repair the input or partially activate a rejected context. Do not treat
 permissionless as NULL. Preserve identity/type/context validation. Distinguish
 the saved frame's executable Enter GT from the Thread GT supplied to CHANGE.
 Do not turn the proposed IRQ-return M gate into a general CHANGE prerequisite.

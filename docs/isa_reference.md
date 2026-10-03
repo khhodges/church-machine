@@ -898,6 +898,12 @@ Permissionless does not mean NULL or invalid. Continue to validate GT identity
 and Thread context. A saved frame's executable Enter GT is a separate
 capability; its E check must not be imposed on the input Thread GT.
 
+**Mandatory checks:** Require no permissions set on the supplied Thread GT,
+a valid incoming stack frame, and a valid C-List usable by the restored context.
+**Hard fault on any error.** Zero permissions are a checked requirement, not
+simply an allowed case. Do not repair, substitute or partially activate an
+invalid context. Microcode privileges do not bypass these checks.
+
 **General programmatic handoff:** Suspend the current Thread and activate the
 Thread identified by the supplied GT. Retain the established DR0–DR15 homes at +1…+16 and
   CR0–CR11 homes at `capsStart…capsStart+11`. CHURCH suspension writes the

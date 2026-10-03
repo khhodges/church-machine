@@ -164,10 +164,15 @@ input Thread GT. GT and Thread-context validity are still checked. This
 permissionless Thread GT is distinct from the executable Enter GT in a saved
 continuation frame.
 
+**Mandatory acceptance rule:** Check that the input Thread GT has no permissions
+set, the incoming stack frame is valid, and its C-List is valid and usable.
+**Any error causes a hard fault**, with no silent repair or partial activation.
+Microcode authority does not waive validation.
+
 **Operation**:
-1. Take the supplied GT from CRn, without a second register or implicit `[0]` lookup
+1. Take the supplied GT from CRn, without a second register or implicit `[0]` lookup; require no permissions set, otherwise hard fault
 2. Suspend the outgoing Thread through CHURCH: save DR0–DR15 and CR0–CR11 to their existing homes and push the canonical two-word Enter-GT plus packed-state frame on its private Stack
-3. Validate the incoming Thread and its top frame before exposing restored state
+3. Validate the incoming Thread, its top stack frame and C-List before exposing restored state; hard fault on any error
 4. Restore its existing CR/DR homes, then consume the frame with RETURN-equivalent validation to reconstruct CR6/CR14 and restore NIA/flags
 
 **Mnemonic**: `CHANGE CRn`
@@ -180,7 +185,7 @@ This is a documentation correction, not an implementation or bitstream update.
 
 | Aspect | Detail |
 |--------|--------|
-| **Validation** | Supplied GT and target Thread context; no indexed GT fetch |
+| **Validation** | No permissions on the supplied GT; valid stack frame and usable C-List; hard fault on any error |
 | **Transition authority** | Microcode privileges; the input Thread GT has no permissions |
 | **Per-Thread Saved/Restored** | Existing DR0–DR15 and CR0–CR11 homes; NIA/FLAGS/SZ/STO and current Enter GT through the canonical Stack frame |
 | **Resume identity** | Saved Enter GT, revalidated exactly as RETURN and used to reconstruct CR6/CR14 |
