@@ -58,6 +58,12 @@ general programmatic Thread-transition path. The earlier statement that IRQ
 return uses `CHANGE CR12` is withdrawn. The trigger or instruction encoding
 for the return operation is not specified by this correction.
 
+An [M-gated hidden-return proposal](irq-hidden-return-proposal.md) explores
+requiring both CR12.M and CR13.M and a candidate `CHANGE CR13, CR13` trigger.
+It is **discussion only**, not an approved extension to general CHANGE.
+The meaning of a hidden swap with an unchanged CR13, the back-half behavior,
+and the return authorization/consumption rules remain to be agreed.
+
 ### Encoding and implementation status
 
 This correction documents semantics only. It does not assign a new bit-field

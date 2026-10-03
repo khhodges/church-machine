@@ -25,6 +25,18 @@ programmatic case.
 Do not infer a complete encoding migration or hardware implementation from the
 semantic clarification alone.
 
+IRQ-return design discussion is documentation-only until explicit agreement.
+The user proposed both CR12.M and CR13.M plus a candidate
+`CHANGE CR13, CR13` trigger, with CR13 unchanged and back-half-only behavior.
+These details are proposals, not approved general CHANGE semantics.
+
+**Why:** The user explicitly required careful agreement before implementation;
+the unchanged-CR13 requirement still needs reconciliation with "hidden swap."
+
+**How to apply:** Use `docs/irq-hidden-return-proposal.md` to separate proposals,
+recommendations and open questions. Do not implement or promote the candidate
+syntax, encoding or M-bit consumption rules without agreement.
+
 **Why:** The user explicitly corrected the compiler's asymmetric rejection and the explanation that CHANGE was reserved for microcode. The programmer must be able to express the instruction; compilation is not the runtime authority boundary.
 
 **How to apply:** Keep operand encoding and runtime capability enforcement distinct. Removing a compiler privilege ban neither removes runtime checks nor establishes that a particular Thread or IRQ transition is implemented correctly.
