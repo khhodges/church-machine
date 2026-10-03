@@ -149,21 +149,30 @@ All Church instructions that access the namespace route through the **mLoad mast
 
 ### 5. CHANGE — Change Thread Context
 
-**Purpose**: Suspend the current thread and activate another — full atomic context swap. CHANGE indexes a Thread Abstraction GT from a C-List and performs the complete per-thread state exchange.
+**Purpose**: Suspend the current Thread and activate another using one supplied GT.
+The [master CHANGE correction](instruction-set.md#change-one-gt-thread-activation)
+is authoritative; the former indexed description is superseded.
 
-**Validation Path**: Indexes CRd at offset idx; verifies E permission on the Thread Abstraction GT.
+**Validation Path**: Validate the GT already held in the operand register and
+the Thread it identifies. The operand is not a destination or an indexed C-list.
+CHANGE is not a protected instruction.
 
 **Operation**:
-1. Index CRd at offset idx; verify the GT has E permission — FAULT on fail
+1. Take the supplied GT from CRn, without a second register or implicit `[0]` lookup
 2. Suspend the outgoing Thread through CHURCH: save DR0–DR15 and CR0–CR11 to their existing homes and push the canonical two-word Enter-GT plus packed-state frame on its private Stack
 3. Validate the incoming Thread and its top frame before exposing restored state
 4. Restore its existing CR/DR homes, then consume the frame with RETURN-equivalent validation to reconstruct CR6/CR14 and restore NIA/flags
 
-**Mnemonic**: `CHANGE CRd, idx`
+**Mnemonic**: `CHANGE CRn`
+
+**Exceptions**: Boot performs only the incoming/back half, loading into CR12.
+IRQ entry is a hardware CR12/CR13 swap, **not CHANGE**; return uses
+`CHANGE CR12`. These exceptions do not change the general one-GT operand rule.
+This is a documentation correction, not an implementation or bitstream update.
 
 | Aspect | Detail |
 |--------|--------|
-| **Permission Check** | E (Enter) on Thread Abstraction GT at CRd[idx] |
+| **Validation** | Supplied GT and target Thread context; no indexed GT fetch |
 | **Per-Thread Saved/Restored** | Existing DR0–DR15 and CR0–CR11 homes; NIA/FLAGS/SZ/STO and current Enter GT through the canonical Stack frame |
 | **Resume identity** | Saved Enter GT, revalidated exactly as RETURN and used to reconstruct CR6/CR14 |
 | **Thread +18** | First Heap word; never an executable-identity field |

@@ -879,16 +879,20 @@ RETURN AL                 ; mask=0; zero CR0–CR4 and CR7–CR11, retain DRs
 ### CHANGE — Thread Context Switch (opcode 4, 0x04)
 
 ```
-Syntax:  CHANGE CRd, CRs, #idx
-         CHANGE CRd                  ; shorthand: CRs = CRd, idx = 0
-Encoding: op[4:0]=0x04 | cond[4] | CRd[4] | CRs[4] | idx[15]
+Syntax:  CHANGE CRn
+Operand: the GT already held in CRn, identifying the new Thread
 ```
 
-**Programmer access:** CHANGE is not a protected instruction. The assembler does not impose a privilege-zone ban on its operands: CR12–CR15 are accepted consistently, without a special CR12 exemption. Execution validates the destination and capability authority; successful compilation does not bypass those runtime checks.
+**Authority:** See the [master one-GT CHANGE correction](instruction-set.md#change-one-gt-thread-activation).
+The indexed `CRd, CRs, idx` description is superseded, not an alternative form.
 
-**Semantics by destination register (hardware):**
-- **CR12 or CR13** (system-wide): Load GT directly from c-list at `CRs[idx]`; no per-thread save/restore.
-- **Thread handoff**: retain the established DR0–DR15 homes at +1…+16 and
+**Programmer access:** CHANGE is not a protected instruction. CRn supplies the
+input GT; it is not a destination register. There is no second register, index,
+or implicit `[0]` lookup. Validation of the GT and Thread context belongs to
+execution, not an asymmetric CR12-only compiler exemption.
+
+**General programmatic handoff:** Suspend the current Thread and activate the
+Thread identified by the supplied GT. Retain the established DR0–DR15 homes at +1…+16 and
   CR0–CR11 homes at `capsStart…capsStart+11`. CHURCH suspension writes the
   canonical two-word frame to the outgoing private stack. Incoming execution
   resumes by RETURN-equivalent validation of that frame's Enter GT, which
@@ -902,20 +906,22 @@ partially restored incoming state becomes visible. Initial dormant Threads
 therefore carry a valid initial CHURCH frame. CR0 is an ordinary persisted
 capability home and is not interpreted as the resume identity.
 
-**Flags:** N — Z — C — V (no flag writes)
+**Boot exception:** Perform only the incoming/back half, loading the incoming
+Thread into CR12; there is no outgoing programmatic context to suspend.
 
-**Faults:**
-| Fault | Condition |
-|-------|-----------|
-| `PRIV_REG` | CRd < 12 (destination is not a privileged register) |
-| `PERM` | CRs lacks required permission for the target type |
-| `NULL_CAP` | Source c-list slot is NULL |
+**IRQ exception:** IRQ entry is a hardware CR12/CR13 swap, not CHANGE. Return
+uses `CHANGE CR12`. The hardware entry shortcut does not redefine the general
+programmatic instruction.
 
-**Encoding example:** Explicit CR12 operands and index 7 (not proof that execution is authorized).
+**Source example:**
+```asm
+CHANGE CR13   ; activate the Thread identified by the GT already in CR13
 ```
-CHANGE AL, CR12, CR12, #7   ; opcode=4, cond=14, fld_a=12, fld_b=12, imm=7
-                              ; encoding: 0x27660007
-```
+
+**Implementation status:** Documentation correction only. The replacement
+bit-field layout is not specified here, and the legacy compiler/simulator/RTL
+behavior is not evidence of conformance. In particular, `0x276E8000` displayed
+as `CHANGE CR13, CR13[0x0000]` must not be presented as the corrected ISA form.
 
 ---
 
@@ -1580,7 +1586,7 @@ SHR AL, DR1, DR2, #3, ASR   ; ASR, mode=1; imm = (1 << 5) | 3 = 0x23
 | 1   | 0x01 | SAVE        | Church  | CRd(S) | CRs(B) | c-list row (0–32767)                   | —             | NULL, PERM, BOUNDS, SEAL | —        |
 | 2   | 0x02 | CALL        | Church  | CRs    | 0      | method index (0=fast, N+1=user N)      | —             | NULL, PERM, SEAL, PRIVATE_METHOD, STACK_OVERFLOW | — |
 | 3   | 0x03 | RETURN      | Church  | 0      | 0      | mask[11:0] — 1 keeps current CR, 0 zeros; bits 5/6 ignored | — | STACK_UNDERFLOW | — |
-| 4   | 0x04 | CHANGE      | Church  | CRd    | CRs    | NS index (0–32767)                     | —             | PRIV_REG, PERM, NULL  | —           |
+| 4   | 0x04 | CHANGE      | Church  | One input GT (CRn) | — | No index; corrected bit mapping not specified | — | GT/Thread validation | — |
 | 5   | 0x05 | SWITCH      | Church  | CR12–15 | CRs  | c-list row[14:0]                        | —             | PRIV_REG, INVALID_OP, LOAD faults | — |
 | 6   | 0x06 | TPERM       | Church  | CRd    | 0      | preset[4:0] (bit4=B-mod, [3:0]=code)   | N=!Z Z C=0 V=0 | TPERM_RSV            | D-3 (reserved presets) |
 | 7   | 0x07 | LAMBDA      | Church  | CRn    | 0      | 0 (unused)                             | —             | NULL, PERM, BOUNDS    | —           |

@@ -12,10 +12,58 @@ The previously approved retirement of **ELOADCALL (opcode 8)** and
 below are historical only; they do not authorize execution or automatic
 translation of saved programs.
 
-The indexed-operand correction below is authoritative. Existing encoding
-tables and repeated instruction descriptions elsewhere in this document remain
-baseline records pending reconciliation; they do not override this correction
-or establish a new indexed-operand layout.
+The one-GT CHANGE and indexed-operand corrections below are authoritative.
+Existing encoding tables and repeated instruction descriptions elsewhere in
+this document remain baseline records pending reconciliation; they do not
+override these corrections or establish a new encoding layout.
+
+## CHANGE: one-GT Thread activation
+
+**Normative correction — 2026-10-03.** This section supersedes the indexed
+CHANGE descriptions, privileged-register-write variants, and encoding tables
+elsewhere in this document and in derived references.
+
+### General programmatic case
+
+CHANGE takes **one GT identifying the new Thread**:
+
+```asm
+CHANGE CRn
+```
+
+CRn supplies the GT already held in that register. It is not a destination
+register or a C-list to index. CHANGE suspends the current Thread and activates
+the Thread identified by that GT. There is no second register operand,
+Namespace-slot operand, or implicit `[0]` lookup. CHANGE is not a protected
+instruction; CR13 must not be rejected while CR12 is specially exempted.
+Capability and Thread-context validation remain execution concerns.
+
+Loading a GT into a register with SWITCH and activating its Thread with CHANGE
+are distinct operations. `CHANGE CR13` is a programmatic use of the GT in CR13;
+it must not be interpreted as installing an interrupt-handler GT into CR13.
+
+### Boot exception
+
+Boot uses the **back half** of the Thread transition: the incoming Thread is
+loaded into CR12. There is no outgoing programmatic Thread context to suspend.
+This special initialization path does not add operands to programmatic CHANGE.
+
+### IRQ hardware exception
+
+IRQ entry is **not a CHANGE instruction**. Hardware can swap CR12 and CR13
+directly, without the additional work of the general programmatic CHANGE path.
+Return from the IRQ uses **`CHANGE CR12`**, activating the Thread identified by
+the GT in CR12. Do not model IRQ entry as an ordinary `CHANGE CR13` instruction.
+
+### Encoding and implementation status
+
+This correction documents semantics only. It does not assign a new bit-field
+layout, change the compiler/simulator/RTL, regenerate saved LUMPs, or approve a
+bitstream. The legacy `CRd, CRs, idx` implementation is not ISA authority.
+In particular, expanding `CHANGE CR13` to `CHANGE CR13, CR13[0x0000]` and emitting
+`0x276E8000` is not established as a conforming encoding by assembler/disassembler
+round-trip tests. Neither the corrected word nor a binary migration policy is
+specified here. Implementation conformance remains separate work.
 
 ## Uniform indexed operands
 

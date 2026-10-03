@@ -11,6 +11,18 @@ The user's architectural definition is: “CHANGE needs one GT to the new Thread
 
 **How to apply:** Treat the one-GT operation as authoritative across compiler, disassembler, simulator, and hardware. Keep loading the GT with SWITCH distinct from activating its Thread with CHANGE. Do not infer a correct binary encoding from legacy implementation round trips.
 
+The general programmatic case has two distinct hardware exceptions: boot is
+only the incoming/back half loaded into CR12; IRQ entry swaps CR12/CR13 and is
+not CHANGE, then uses `CHANGE CR12` to return.
+
+**Why:** The user explicitly distinguished these cases when requesting the ISA
+documentation correction. Treating the IRQ entry shortcut or boot initialization
+as general CHANGE caused the indexed/destination-register confusion.
+
+**How to apply:** Follow the master one-GT correction in `docs/instruction-set.md`.
+Do not infer a complete encoding migration or hardware implementation from the
+semantic clarification alone.
+
 **Why:** The user explicitly corrected the compiler's asymmetric rejection and the explanation that CHANGE was reserved for microcode. The programmer must be able to express the instruction; compilation is not the runtime authority boundary.
 
 **How to apply:** Keep operand encoding and runtime capability enforcement distinct. Removing a compiler privilege ban neither removes runtime checks nor establishes that a particular Thread or IRQ transition is implemented correctly.

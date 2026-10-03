@@ -1,5 +1,12 @@
 # IDX1 compact indexed-operand encoding
 
+**CHANGE correction:** Programmatic CHANGE takes one GT already in the operand
+register, not an indexed operand. All CHANGE indexing modes and byte examples
+below are superseded by the [master one-GT rule](instruction-set.md#change-one-gt-thread-activation).
+Boot uses only the incoming half into CR12; IRQ entry is a hardware CR12/CR13
+swap, not CHANGE, with `CHANGE CR12` used for return. This document does not
+authorize the old indexed CHANGE form.
+
 Status: **prior multiword encoding proposal, not authority for the corrected
 indexing requirement** (2026-10-02).
 

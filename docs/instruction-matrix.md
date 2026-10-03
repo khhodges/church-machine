@@ -182,7 +182,18 @@ After boot:
 [14:0]  = row   (c-list row)
 ```
 
-### CHANGE Format (32 bits)
+### CHANGE — corrected ISA versus historical encoding
+
+The [master CHANGE correction](instruction-set.md#change-one-gt-thread-activation)
+defines one input GT, written `CHANGE CRn`, with no destination/source pair or
+index. Boot performs only the incoming half into CR12. IRQ entry swaps CR12/CR13
+in hardware and is not CHANGE; return uses `CHANGE CR12`.
+
+The following format and variant table describe the **superseded implementation**,
+not valid ISA alternatives. The corrected bit-field mapping is not specified
+by this documentation-only correction.
+
+### Historical CHANGE format (not normative)
 ```
 [31:27] = 00100 (Opcode = 4)
 [26:23] = Cond  (4-bit condition code)
@@ -192,7 +203,7 @@ After boot:
 [14:0]  = Idx   (15-bit NS slot index)
 ```
 
-### CHANGE Variants
+### Historical CHANGE variants (not normative)
 
 | CRd [22:19] | Tgt [20:19] | Destination | Semantics |
 |:------------|:------------|:------------|:----------|
