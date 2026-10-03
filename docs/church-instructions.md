@@ -157,6 +157,13 @@ is authoritative; the former indexed description is superseded.
 the Thread it identifies. The operand is not a destination or an indexed C-list.
 CHANGE is not a protected instruction.
 
+**Authority**: The supplied Thread GT has **no permissions**, deliberately
+preventing programmer access to its protected state. CHANGE uses **microcode
+privileges** to perform the transition; it must not demand R/W/X/L/S/E on the
+input Thread GT. GT and Thread-context validity are still checked. This
+permissionless Thread GT is distinct from the executable Enter GT in a saved
+continuation frame.
+
 **Operation**:
 1. Take the supplied GT from CRn, without a second register or implicit `[0]` lookup
 2. Suspend the outgoing Thread through CHURCH: save DR0–DR15 and CR0–CR11 to their existing homes and push the canonical two-word Enter-GT plus packed-state frame on its private Stack
@@ -174,6 +181,7 @@ This is a documentation correction, not an implementation or bitstream update.
 | Aspect | Detail |
 |--------|--------|
 | **Validation** | Supplied GT and target Thread context; no indexed GT fetch |
+| **Transition authority** | Microcode privileges; the input Thread GT has no permissions |
 | **Per-Thread Saved/Restored** | Existing DR0–DR15 and CR0–CR11 homes; NIA/FLAGS/SZ/STO and current Enter GT through the canonical Stack frame |
 | **Resume identity** | Saved Enter GT, revalidated exactly as RETURN and used to reconstruct CR6/CR14 |
 | **Thread +18** | First Heap word; never an executable-identity field |

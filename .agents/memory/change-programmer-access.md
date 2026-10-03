@@ -1,9 +1,22 @@
 ---
 name: CHANGE programmer access
-description: CHANGE must not be blocked as a protected or microcode-only instruction.
+description: One-GT CHANGE is programmer-accessible but uses microcode authority on a permissionless Thread GT.
 ---
 
 CHANGE is not a protected instruction. Do not block CR13–CR15 at compilation while exempting CR12, or rewrite programmer-authored CHANGE into SWITCH.
+
+The valid input Thread GT has no permissions, deliberately preventing ordinary
+programmer access to protected Thread state. CHANGE performs the transition
+using microcode privileges, not permissions on that GT.
+
+**Why:** The user explicitly supplied this rule after the one-GT test exposed
+the legacy indexed implementation. Programmer access to the instruction and
+microcode access to Thread state are different authority boundaries.
+
+**How to apply:** Do not require R/W/X/L/S/E on the input Thread GT or treat
+permissionless as NULL. Preserve identity/type/context validation. Distinguish
+the saved frame's executable Enter GT from the Thread GT supplied to CHANGE.
+Do not turn the proposed IRQ-return M gate into a general CHANGE prerequisite.
 
 The user's architectural definition is: “CHANGE needs one GT to the new Thread.” In `CHANGE CR13`, CR13 holds the input GT identifying the Thread to activate; it is not a destination register or a C-list to index. There is no second register operand or implicit `[0]` lookup.
 

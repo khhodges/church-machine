@@ -891,6 +891,13 @@ input GT; it is not a destination register. There is no second register, index,
 or implicit `[0]` lookup. Validation of the GT and Thread context belongs to
 execution, not an asymmetric CR12-only compiler exemption.
 
+**Authority:** The valid input Thread GT has **no permissions**, preventing
+ordinary programmer access to protected Thread state. CHANGE uses **microcode
+privileges** for its internal transition, not R/W/X/L/S/E permissions on that GT.
+Permissionless does not mean NULL or invalid. Continue to validate GT identity
+and Thread context. A saved frame's executable Enter GT is a separate
+capability; its E check must not be imposed on the input Thread GT.
+
 **General programmatic handoff:** Suspend the current Thread and activate the
 Thread identified by the supplied GT. Retain the established DR0–DR15 homes at +1…+16 and
   CR0–CR11 homes at `capsStart…capsStart+11`. CHURCH suspension writes the

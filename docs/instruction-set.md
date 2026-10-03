@@ -38,6 +38,21 @@ Namespace-slot operand, or implicit `[0]` lookup. CHANGE is not a protected
 instruction; CR13 must not be rejected while CR12 is specially exempted.
 Capability and Thread-context validation remain execution concerns.
 
+**Thread GT permissions and microcode authority:** The GT supplied for a valid
+CHANGE has **no permissions**. This deliberately prevents programmer access to
+the protected Thread state through that GT. CHANGE performs its save/restore
+work using **microcode privileges**, not permissions granted by the operand GT.
+It must not require R, W, X, L, S, or E on that GT to perform the transition.
+A permissionless GT is not a NULL GT: identity, validity and the target Thread
+context still require validation. Internal access must not grant those
+microcode privileges to subsequent programmer instructions.
+
+This is distinct from validation of the executable Enter GT in a saved
+continuation frame. Do not transfer that frame's E-permission requirement to
+the permissionless Thread GT supplied to CHANGE. The proposed M-gated hidden
+IRQ return is also a separate operation, not an added prerequisite for general
+programmatic CHANGE.
+
 Loading a GT into a register with SWITCH and activating its Thread with CHANGE
 are distinct operations. `CHANGE CR13` is a programmatic use of the GT in CR13;
 it must not be interpreted as installing an interrupt-handler GT into CR13.
