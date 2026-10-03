@@ -439,75 +439,24 @@
     box-sizing: border-box;
 }
 
-.editor-layout.saved-lump-editor-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    grid-template-rows: minmax(0, var(--editor-diagnostics-top, 60fr)) 10px minmax(0, var(--editor-diagnostics-bottom, 40fr));
-    gap: 0.5rem;
-}
-
-.editor-layout.saved-lump-editor-layout > .editor-divider {
-    display: none;
-}
-.editor-layout.saved-lump-editor-layout > .editor-panel:not(.console-panel) {
-    grid-column: 1;
-    grid-row: 1 / 4;
-}
-.editor-layout.saved-lump-editor-layout > .editor-horizontal-divider {
-    display: block;
-    grid-column: 2;
-    grid-row: 2;
-}
-
-.editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
-    grid-column: 2;
-    grid-row: 1;
-    width: auto;
-    flex: 1;
-    min-height: 0;
-    max-height: none;
-    box-sizing: border-box;
-    overflow: hidden;
-    padding: 0;
-}
-
-/* Successful builds and saved binaries share the source / disassembly / console
-   split, keeping diagnostics visible without replacing the exact binary. */
-.editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-}
-
+/* Disassembly is a tab inside the shared output panel beside source. The
+   saved/candidate/diagnostics layout classes are retained as state markers
+   only; they no longer create a vertical disassembly/console split. */
 #editor .console-panel {
     display: flex;
     flex-direction: column;
     min-height: 0;
     overflow: hidden;
 }
-
-#editor .editor-layout.saved-lump-editor-layout > .console-panel {
-    display: flex;
-    grid-column: 2;
-    grid-row: 3;
+#editor .console-panel > .saved-lump-disassembly-panel {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+.editor-horizontal-divider {
+    display: none !important;
 }
 
-/* A failed build has diagnostics, not replacement machine words. Keep the
-   last exact disassembly above those diagnostics instead of hiding it. */
-#editor .editor-layout.disassembly-diagnostics-layout {
-    grid-template-rows: minmax(0, var(--editor-diagnostics-top, 60fr)) 10px minmax(0, var(--editor-diagnostics-bottom, 40fr));
-}
-#editor .editor-layout.disassembly-diagnostics-layout > .editor-panel:not(.console-panel) {
-    grid-column: 1;
-    grid-row: 1 / 4;
-}
-#editor .editor-layout.disassembly-diagnostics-layout > .editor-horizontal-divider {
-    display: block;
-    grid-column: 2;
-    grid-row: 2;
-}
-#editor .editor-layout.disassembly-diagnostics-layout > .console-panel {
-    display: flex;
-    grid-column: 2;
-    grid-row: 3;
-}
 .disassembly-presentation-status {
     flex: 0 0 auto;
     padding: 0.25rem 0.65rem;
@@ -613,46 +562,6 @@
 }
 
 @media (max-width: 768px) {
-    #editor .editor-layout.disassembly-diagnostics-layout > .editor-horizontal-divider {
-        display: none;
-    }
-    #editor .editor-layout.disassembly-diagnostics-layout {
-        grid-template-rows: minmax(10rem, 2fr) minmax(8rem, 2fr) minmax(6rem, 1fr);
-        overflow: auto;
-    }
-    #editor .editor-layout.disassembly-diagnostics-layout > .editor-panel:not(.console-panel) {
-        grid-column: 1;
-        grid-row: 1;
-    }
-    #editor .editor-layout.disassembly-diagnostics-layout > .console-panel {
-        grid-column: 1;
-        grid-row: 3;
-    }
-    #editor .editor-layout.disassembly-diagnostics-layout > .saved-lump-disassembly-panel {
-        grid-column: 1;
-        grid-row: 2;
-    }
-    .editor-layout.saved-lump-editor-layout,
-    .editor-layout.saved-lump-editor-layout.compiled-candidate-editor-layout {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: minmax(16rem, 1fr) minmax(16rem, 1fr) minmax(8rem, 1fr);
-        overflow: auto;
-    }
-    .editor-layout.saved-lump-editor-layout > .editor-panel:not(.console-panel) {
-        grid-column: 1;
-        grid-row: 1;
-    }
-    .editor-layout.saved-lump-editor-layout > .editor-horizontal-divider {
-        display: none;
-    }
-    .editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
-        grid-column: 1;
-        grid-row: 2;
-    }
-    #editor .editor-layout.saved-lump-editor-layout > .console-panel {
-        grid-column: 1;
-        grid-row: 3;
-    }
     .saved-lump-identity-panel {
         grid-template-columns: 1fr;
     }

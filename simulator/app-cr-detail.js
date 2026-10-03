@@ -589,10 +589,8 @@ function _clearAsmErrors() {
     _activeAsmErrors = [];
     _highlightAsmErrorLines([]);
     _hideCompileFailedBanner();
-    if (window._savedLumpEditorMode) {
-        var disassemblyPanel = document.getElementById('savedLumpDisassemblyPanel');
-        if (disassemblyPanel) disassemblyPanel.style.display = 'flex';
-    }
+    // Disassembly visibility is owned by the shared output tabs (switchCodeTab);
+    // clearing errors must not force a second, competing output pane open.
 }
 
 function _highlightAsmErrorLines(errors) {

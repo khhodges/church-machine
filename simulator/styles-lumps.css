@@ -3150,22 +3150,6 @@
         display: none;
     }
 
-    .editor-layout.saved-lump-editor-layout {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-rows: minmax(16rem, 1fr) minmax(16rem, 1fr) minmax(8rem, 1fr);
-        gap: 0.5rem;
-    }
-
-    .editor-layout.saved-lump-editor-layout > .editor-horizontal-divider {
-        display: none;
-    }
-
-    .editor-layout.saved-lump-editor-layout > .saved-lump-disassembly-panel {
-        grid-column: 1;
-        grid-row: 2;
-        min-height: 0;
-    }
-
     .repl-layout {
         flex-direction: column;
         height: auto;

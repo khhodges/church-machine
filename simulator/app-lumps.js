@@ -1958,7 +1958,6 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
         var el = document.getElementById(id);
         if (el) el.style.display = 'none';
     });
-    if (typeof switchCodeTab === 'function') switchCodeTab('console');
     if (typeof _renderSavedLumpIdentityPanel === 'function') {
         _renderSavedLumpIdentityPanel(lump, lookupToken, savedWords);
     }
@@ -1969,7 +1968,8 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
         _displayDisassembly += '\n\n' + inspection.appendText;
     }
     if (text) text.textContent = _displayDisassembly;
-    if (panel) panel.style.display = 'flex';
+    if (typeof switchCodeTab === 'function') switchCodeTab('disassembly');
+    else if (panel) panel.style.display = 'flex';
 }
 
 function _setDisassemblyPresentationStatus(message) {
@@ -1991,12 +1991,11 @@ function _showCompilerOutputBesideSource() {
     var layout = document.querySelector('#editor .editor-layout');
     if (hasBinary) {
         if (layout) layout.classList.add('saved-lump-editor-layout', 'disassembly-diagnostics-layout');
-        if (savedPanel) savedPanel.style.display = 'flex';
         _setDisassemblyPresentationStatus(
             (window._compiledCandidateEditorMode
                 ? 'Previous successful compile — UNSAVED candidate.'
                 : 'Exact saved binary.') +
-            ' Not the result of this compile attempt; may differ from editor source. See diagnostics below.');
+            ' Not the result of this compile attempt; may differ from editor source. See Console Output for diagnostics.');
     } else {
         if (layout) layout.classList.remove('saved-lump-editor-layout', 'disassembly-diagnostics-layout');
         if (savedPanel) savedPanel.style.display = 'none';
@@ -2005,12 +2004,13 @@ function _showCompilerOutputBesideSource() {
     if (details) details.open = false;
     var tabs = document.getElementById('codeSidebarTabs');
     if (tabs) tabs.style.display = '';
-    var consoleContent = document.getElementById('codeConsoleContent');
-    if (consoleContent) consoleContent.style.display = 'flex';
-    ['codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel'].forEach(function(id) {
-        var alternate = document.getElementById(id);
-        if (alternate) alternate.style.display = 'none';
-    });
+    // Diagnostics belong to the shared Console Output tab; the last exact
+    // disassembly stays one click away in the Disassembly tab.
+    if (typeof switchCodeTab === 'function') switchCodeTab('console');
+    else {
+        var consoleContent = document.getElementById('codeConsoleContent');
+        if (consoleContent) consoleContent.style.display = 'flex';
+    }
 }
 window._showCompilerOutputBesideSource = _showCompilerOutputBesideSource;
 
@@ -2189,7 +2189,7 @@ function _showCompiledCandidateBesideSource(words, details) {
     }
     var tabs = document.getElementById('codeSidebarTabs');
     if (tabs) tabs.style.display = '';
-    if (typeof switchCodeTab === 'function') switchCodeTab('console');
+    if (typeof switchCodeTab === 'function') switchCodeTab('disassembly');
     _setDisassemblyPresentationStatus('Successful compile — UNSAVED authenticated candidate. Not a saved LUMP; later source edits do not change these bytes.');
     window._compiledCandidateEditorMode = true;
     return true;
@@ -2296,8 +2296,8 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
     }
     var tabs = document.getElementById('codeSidebarTabs');
     if (tabs) tabs.style.display = '';
-    if (typeof switchCodeTab === 'function') switchCodeTab('console');
-    _setDisassemblyPresentationStatus(unavailable ? 'Saved binary unavailable — see details below.' :
+    if (typeof switchCodeTab === 'function') switchCodeTab('disassembly');
+    _setDisassemblyPresentationStatus(unavailable ? 'Saved binary unavailable — see Build & audit details.' :
         'Exact saved binary — source edits and restored drafts do not change these bytes.');
     var details = document.getElementById('savedLumpBuildDetails');
     if (details) details.open = false;
@@ -2450,6 +2450,7 @@ async function _presentPersonalSavedBinary(tab) {
               '; ' + message + '\n' + sourceRelation + '\n' +
               _formatCanonicalSavedLumpWords(words, descriptor)
             : '; SAVED BINARY UNAVAILABLE\n; ' + message;
+        if (typeof switchCodeTab === 'function') switchCodeTab('disassembly');
         var identity = document.getElementById('savedLumpIdentityPanel');
         if (identity) {
             identity.innerHTML = '';
@@ -2573,6 +2574,7 @@ function exitSavedLumpEditorMode() {
     if (panel) panel.style.display = 'none';
     if (text) text.textContent = '';
     if (identityPanel) identityPanel.innerHTML = '';
+    if (typeof switchCodeTab === 'function') switchCodeTab('console');
     ['_lumpSourceRestoredBanner', '_lumpSourceMissingBanner',
         '_lumpSourceIntegrityBanner',
         '_lumpMalformedBanner', '_lumpDraftBanner']

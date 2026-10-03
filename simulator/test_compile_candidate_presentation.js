@@ -66,9 +66,9 @@ assert(dom.window.document.querySelector('.editor-layout')
 assert.equal(dom.window.getComputedStyle(
     dom.window.document.querySelector('.console-panel')).display, 'flex',
     'successful compile retains diagnostics beneath the disassembly');
-assert.equal(dom.window.getComputedStyle(
-    dom.window.document.querySelector('.editor-layout')).gridTemplateColumns,
-    'minmax(0, 1fr) minmax(0, 1fr)', 'success has two equally usable panes');
+assert.doesNotMatch(dom.window.getComputedStyle(
+    dom.window.document.querySelector('.editor-layout')).gridTemplateRows || '',
+    /10px/, 'success never creates a vertical disassembly/console split');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 assert.match(html, /<details id="savedLumpBuildDetails"[^>]*>/,
     'build and audit output is available in an explicit disclosure');

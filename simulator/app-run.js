@@ -11562,6 +11562,17 @@ function switchCodeTab(tab) {
     const tabHistory = document.getElementById('codeTabHistory');
     const tabSyntax = document.getElementById('codeTabSyntax');
     const tabJs = document.getElementById('codeTabJs');
+    const disasmPanel = document.getElementById('savedLumpDisassemblyPanel');
+    const disasmText = document.getElementById('savedLumpDisassembly');
+    const tabDisasm = document.getElementById('codeTabDisassembly');
+    // The Disassembly tab exists only while exact/candidate words are loaded.
+    const hasDisasm = !!(disasmText && disasmText.textContent.trim() !== '');
+    if (tabDisasm) {
+        tabDisasm.style.display = hasDisasm ? '' : 'none';
+        tabDisasm.classList.remove('active');
+    }
+    if (disasmPanel) disasmPanel.style.display = 'none';
+    if (tab === 'disassembly' && !hasDisasm) tab = 'console';
 
     if (consoleContent) consoleContent.style.display = 'none';
     if (historyPanel) historyPanel.style.display = 'none';
@@ -11572,7 +11583,10 @@ function switchCodeTab(tab) {
     if (tabSyntax) tabSyntax.classList.remove('active');
     if (tabJs) tabJs.classList.remove('active');
 
-    if (tab === 'history') {
+    if (tab === 'disassembly') {
+        if (disasmPanel) disasmPanel.style.display = 'flex';
+        if (tabDisasm) tabDisasm.classList.add('active');
+    } else if (tab === 'history') {
         if (historyPanel) historyPanel.style.display = 'flex';
         if (tabHistory) tabHistory.classList.add('active');
         const area = document.getElementById('codeHistoryContent');

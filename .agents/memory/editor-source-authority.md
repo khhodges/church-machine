@@ -11,6 +11,15 @@ Successful builds and saves should prioritize source beside exact binary disasse
 
 **Why:** The user wants to inspect generated instructions, not have successful audit messages replace that view. Source preservation and binary inspection are independent requirements.
 
+Disassembly and Console Output belong in one shared tabbed output area beside
+the source, not separate vertically stacked panels.
+
+**Why:** The user repeated the request to combine them after showing a screenshot
+where the stacked console left only a few visible lines of disassembly.
+
+**How to apply:** Preserve access to diagnostics and the other output tabs, but
+give the selected output view the available panel height.
+
 Discard approval targets the reviewed document and exact recovery bytes, not
 whatever text happens to occupy the editor or canonical draft key afterward.
 Preserve differing copies; matching recovery state in other stores is still
