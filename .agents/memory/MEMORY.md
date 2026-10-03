@@ -152,3 +152,4 @@
 - [Generated RTL replay](generated-rtl-replay.md) — constant-only Verilog blocks can leave unknown GT bits; distinguish dialect evidence and preserve the recorded elaboration.
 - [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
 - [CHANGE programmer access](change-programmer-access.md) — CHANGE is not protected; never exempt CR12 while blocking CR13–CR15 at compile time.
+- [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.

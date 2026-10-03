@@ -147,6 +147,9 @@ register_suite "wukong-release-bundle" \
 register_suite "lump-consistency" \
     'python -m pytest tests/lump/test_lump_consistency.py -v'
 
+register_suite "capabilitytest-save-roundtrip-tests" \
+    'node simulator/test_capabilitytest_save_roundtrip.js'
+
 register_suite "lump-history-tests" \
     'python -m pytest tests/server/test_lump_history_integrity.py tests/server/test_lump_archive_fallback.py tests/server/test_version_telemetry.py -q'
 
