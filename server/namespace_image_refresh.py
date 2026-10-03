@@ -37,16 +37,10 @@ def design_thread_slots(rows, config):
     body type comes from the saved Thread design, not that descriptor type.
     An explicitly selected immutable file always takes precedence.
     """
-    step = config.get("step1", {})
-    names = set()
-    if "threadCount" in step:
-        count = boot.configured_thread_count(step)
-        names = {"Boot.Thread"} | {f"Thread.{n}" for n in range(2, count + 1)}
     return {row["slot"] for row in rows
-            if not row.get("symbolic") and not row.get("implementationMissing")
-            and (row.get("type") == "Thread" or
-                 (not row.get("filename") and row.get("type") == "Inform"
-                  and row.get("name") in names))}
+            if boot.generated_thread_assignment(row, config)
+            or (row.get("type") == "Thread"
+                and not row.get("symbolic") and not row.get("implementationMissing"))}
 
 
 def reconstruct(config, rows, directory, *, compact=False):

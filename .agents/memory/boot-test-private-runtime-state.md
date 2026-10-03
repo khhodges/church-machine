@@ -39,3 +39,15 @@ error.
 **How to apply:** Declare generated Thread types and geometry in isolated
 fixtures and assert the resulting body header. Keep real selected artifacts
 bound to their exact saved files and hashes.
+
+Bootstrap-only fixtures must select exact existing bootstrap-approved bytes
+independently of the live IDE revision. Never manufacture bootstrap approval
+fields for the currently selected compiler artifact.
+
+**Why:** A legitimate compiler publication may carry intrinsic SELF rather than
+a frozen bootstrap SELF GT. Copying live bytes and overwriting their token or
+approval creates an internally inconsistent fixture, not a bootstrap test.
+
+**How to apply:** Resolve the fixture's destination GT to a unique approved
+bootstrap artifact in its private library, verify its exact digest and approval,
+and leave live selections and immutable history untouched.

@@ -45,12 +45,12 @@ def store(root):
 def test_saved_thread_design_generates_only_assigned_instances(tmp_path):
     cfg, rows = fixture(tmp_path)
     cfg["step1"]["threadCount"] = 3
-    rows[1].update(name="Thread.2", type="Inform")  # not a fixed legacy slot
+    rows[1].update(slot=11, name="Renamed context", type="Inform")
     before = copy.deepcopy(rows)
     image, evidence = refresh.reconstruct(cfg, rows, tmp_path)
     words = struct.unpack("<8192I", image)
     assert (words[512] >> 8) & 3 == 2
-    assert words[8192 - 24 * 4] == 512
+    assert words[8192 - 12 * 4] == 512
     assert words[8192 - 2 * 4] == 0  # no implied Boot.Thread
     assert words[8192 - 13 * 4] == 0  # no implied Thread.3
     assert rows == before

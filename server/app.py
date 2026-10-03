@@ -5852,6 +5852,7 @@ def boot_image_generate():
                 try:
                     prepared_rows, changes = _prepare_run_candidates(
                         rows, LUMPS_DIR,
+                        config=cfg,
                         boot_pin=body.get("artifactPin"),
                         boot_pin_supplied="artifactPin" in body,
                         artifact_pins=body.get("artifactPins"))
@@ -6855,7 +6856,7 @@ def _prepare_run_candidate(rows, lumps_dir, *, pin=None):
 
 
 def _prepare_run_candidates(rows, lumps_dir, *, boot_pin=None,
-                            boot_pin_supplied=False, artifact_pins=None):
+                            boot_pin_supplied=False, artifact_pins=None, config=None):
     """Resolve every assigned executable participating in the generated image."""
     if artifact_pins is not None and not isinstance(artifact_pins, dict):
         raise ValueError("artifactPins must be an object keyed by Namespace slot")
@@ -6863,11 +6864,11 @@ def _prepare_run_candidates(rows, lumps_dir, *, boot_pin=None,
     prepared = [dict(row) for row in rows]
     changes = []
     for index, row in enumerate(rows):
-        if not _boot_image_gen.image_artifact_selected(row):
+        if not _boot_image_gen.image_artifact_selected(row, config):
             continue
         # Hardware/MMIO and generated Namespace/Thread rows do not name saved
         # executable artifacts. Assigned artifact rows do.
-        if row.get("type") in ("Device", "Thread", "Namespace"):
+        if row.get("type") in ("Device", "Namespace"):
             continue
         slot_key = str(row.get("slot"))
         if isinstance(artifact_pins, dict) and slot_key in artifact_pins:
@@ -7367,7 +7368,7 @@ def _stage_namespace_save_image(cfg, entries):
     _validate_namespace_publication(entries)
     with tempfile.TemporaryDirectory(prefix="namespace-save-") as directory:
         stage = Path(directory) / "lumps"
-        _boot_image_gen.copy_selected_image_inputs(LUMPS_DIR, stage, entries)
+        _boot_image_gen.copy_selected_image_inputs(LUMPS_DIR, stage, entries, cfg)
         rows = [dict(row) for row in entries]
         (stage / "ns-state.json").write_text(
             json.dumps({"abstractions": rows}), encoding="utf-8")
@@ -7400,7 +7401,7 @@ def _stage_prepare_run_boot_image(cfg, prepared_rows, entry_slot, for_hardware):
     _validate_namespace_publication(prepared_rows)
     with tempfile.TemporaryDirectory(prefix="prepare-run-") as directory:
         stage = Path(directory) / "lumps"
-        _boot_image_gen.copy_selected_image_inputs(LUMPS_DIR, stage, prepared_rows)
+        _boot_image_gen.copy_selected_image_inputs(LUMPS_DIR, stage, prepared_rows, cfg)
         (stage / "ns-state.json").write_text(
             json.dumps({"abstractions": prepared_rows}), encoding="utf-8")
         image = _boot_image_gen.generate_boot_image(
@@ -27640,6 +27641,9 @@ def _describe_protected_change(payload):
             prepare_run = payload.get("prepareRun") is True
             prepared = [dict(row) for row in rows]
             if prepare_run:
+                cfg, error = _read_saved_boot_config()
+                if error:
+                    raise ValueError(error)
                 expected_fingerprint = _expected_namespace_fingerprint(payload)
                 if expected_fingerprint is None:
                     raise ValueError(
@@ -27649,6 +27653,7 @@ def _describe_protected_change(payload):
                         "namespaceFingerprint does not match authoritative Namespace state")
                 prepared, _ = _prepare_run_candidates(
                     rows, LUMPS_DIR,
+                    config=cfg,
                     boot_pin=payload.get("artifactPin"),
                     boot_pin_supplied="artifactPin" in payload,
                     artifact_pins=payload.get("artifactPins"))

@@ -156,13 +156,46 @@ def isolated_boot_lumps(tmp_path_factory):
     approvals = {}
     with open(os.path.join(isolated_dir, "ns-state.json"), encoding="utf-8") as fh:
         state = json.load(fh)
+    # Test configs intentionally vary threadCount (and sometimes omit it).
+    # Carry the source design's explicit body type into this disposable
+    # inventory, rather than leaving filename-less Inform residents whose
+    # construction evidence lived only in the original configuration.
+    from server.boot_image import generated_thread_assignment
+    with open(LIVE_BOOT_CONFIG_PATH, encoding="utf-8") as fh:
+        source_config = json.load(fh)
+    for row in state.get("abstractions", []):
+        if generated_thread_assignment(row, source_config):
+            row["type"] = "Thread"
     # The checked-in LUMP library is historical evidence and deliberately is
     # not migrated in place.  Prepare the isolated execution fixture with the
     # explicit immutable bootstrap bindings required by the boot contract.
     bootstrap_tokens = {6: "4a000006", 7: "4a000007", 10: "4a00000a"}
+    with open(os.path.join(isolated_dir, "manifest.json"), encoding="utf-8") as fh:
+        bootstrap_manifest = json.load(fh)
     for row in state.get("abstractions", []):
         if not isinstance(row, dict) or row.get("slot") not in bootstrap_tokens:
             continue
+        token = bootstrap_tokens[row["slot"]]
+        candidates = []
+        for entry in bootstrap_manifest:
+            if (entry.get("abstraction") != row["name"]
+                    or entry.get("token") != token or entry.get("archived")):
+                continue
+            filename = entry.get("filename")
+            if not isinstance(filename, str) or os.path.basename(filename) != filename:
+                continue
+            with open(os.path.join(isolated_dir, filename), "rb") as binary:
+                digest = hashlib.sha256(binary.read()).hexdigest()
+            record = source_approvals.get(digest, {})
+            if (record.get("filename") == filename
+                    and record.get("bootstrap_t") == token
+                    and record.get("bootstrap_runtime_gt") == int(token, 16)):
+                candidates.append((entry, digest))
+        assert len(candidates) == 1, f"Expected one exact approved bootstrap artifact for NS[{row['slot']}]"
+        selected, digest = candidates[0]
+        row.update(filename=selected["filename"], binary_hash=digest,
+                   lump_version=selected.get("lump_version"))
+        row.pop("artifact_pin", None)
         row.update({
             "resident": True,
             "boot_resident": True,
@@ -221,16 +254,9 @@ def isolated_boot_lumps(tmp_path_factory):
         digest = hashlib.sha256(raw).hexdigest()
         record = source_approvals[digest]
         record = dict(record)
-        record.update({
-            "bootstrap_t": row["token"],
-            "bootstrap_runtime_gt": int(row["token"], 16),
-            "token": row["token"],
-        })
-        record.pop("identity_hash", None)
         assert record["filename"] == filename
         assert record["bootstrap_t"] == row["token"]
         assert record["bootstrap_runtime_gt"] == int(row["token"], 16)
-        assert "identity_hash" not in record
         approvals[digest] = record
     write_approvals(os.path.join(isolated_dir, "approvals.json"), approvals)
     boot_state_dir = str(tmp_path_factory.mktemp("boot_state"))

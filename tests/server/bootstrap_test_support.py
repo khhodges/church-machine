@@ -77,17 +77,24 @@ def select_bootstrap_residents(lumps):
             for field in ("token", "filename", "binary_hash"):
                 row.pop(field, None)
         if row.get("name") == "CapabilityTest" and row.get("slot") == 10:
+            from server.bootstrap_identity import resident_inform_egt
+            # The live selection can legitimately be a compiler revision.
+            # This bootstrap-only fixture selects the exact approved bootstrap
+            # authority, not whichever token happens to be live in the IDE.
+            bootstrap_token = f"{resident_inform_egt(row):08x}"
             active = [entry for entry in manifest
                       if entry.get("abstraction") == "CapabilityTest"
-                      and entry.get("token") == row["token"]
+                      and entry.get("token") == bootstrap_token
                       and entry.get("archived") is not True]
             assert len(active) == 1
             selected = active[0]
             body = (lumps / selected["filename"]).read_bytes()
             digest = hashlib.sha256(body).hexdigest()
             assert approvals[digest]["filename"] == selected["filename"]
-            assert approvals[digest]["bootstrap_t"] == row["token"]
-            assert approvals[digest]["bootstrap_runtime_gt"] == int(row["token"], 16)
+            assert approvals[digest]["bootstrap_t"] == bootstrap_token
+            assert approvals[digest]["bootstrap_runtime_gt"] == int(bootstrap_token, 16)
+            row["token"] = bootstrap_token
+            row.pop("artifact_pin", None)
             row["filename"] = selected["filename"]
             row["binary_hash"] = digest
             row["lump_version"] = selected["lump_version"]

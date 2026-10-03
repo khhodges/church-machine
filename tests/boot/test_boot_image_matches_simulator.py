@@ -554,6 +554,47 @@ def test_default_thread_count_remains_byte_compatible(tmp_path):
         explicit_single, str(tmp_path))
 
 
+def test_compiler_self_marker_is_bound_without_inheriting_bootstrap_authority(tmp_path):
+    from server.lump_integrity import compute_number
+    from server.lump_approvals import write_approvals
+    path, _ = _write_synthetic_boot_abstr_lump(str(tmp_path), cc=1)
+    words = list(struct.unpack(">64I", open(path, "rb").read()))
+    words[-1] = 0xFEED5E1F
+    raw = struct.pack(">64I", *words)
+    name = f"SelfTest.1.{compute_number('SelfTest', raw)}.lump"
+    (tmp_path / name).write_bytes(raw)
+    approval = _trusted_compiler_approval(raw, name, "SelfTest", 1)
+    digest = hashlib.sha256(raw).hexdigest()
+    write_approvals(str(tmp_path / "approvals.json"), {digest: approval})
+    state = json.loads((tmp_path / "ns-state.json").read_text())
+    row = state["abstractions"][0]
+    row.update(filename=name, binary_hash=digest, type="Inform")
+    # Static resident flags are allocation policy, not bootstrap provenance.
+    assert row["boot_resident"] and row["ns_slot_policy"] == "static"
+    state["abstractions"].extend(
+        dict(slot=slot, type="Inform", name="Renamed design context",
+             load_policy="Resident", seq=0)
+        for slot in (1, 11, 12))
+    (tmp_path / "ns-state.json").write_text(json.dumps(state))
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    manifest[0]["filename"] = name
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    cfg = _cfg_generated_threads(3)
+    image = generate_boot_image(cfg, str(tmp_path))
+    values = struct.unpack(f"<{len(image)//4}I", image)
+    location = values[len(values) - (BOOT_ABSTR_NS_SLOT + 1) * 4]
+    assert values[location + 63] == create_gt(0, BOOT_ABSTR_NS_SLOT, {"E": 1}, 1)
+    assert values[location:location + 63] == tuple(words[:63])
+    assert (tmp_path / name).read_bytes() == raw
+    for slot in (1, 11, 12):
+        base = values[len(values) - (slot + 1) * 4]
+        assert (values[base] >> 8) & 3 == 2
+    # The marker cannot confer authority without the exact compiler approval.
+    write_approvals(str(tmp_path / "approvals.json"), {})
+    with pytest.raises(ValueError, match="approval"):
+        generate_boot_image(cfg, str(tmp_path))
+
+
 def test_generated_threads_use_fixed_stack_boundary(tmp_path):
     """Every generated Thread starts with one canonical CHURCH root frame."""
     _write_synthetic_boot_abstr_lump(str(tmp_path))

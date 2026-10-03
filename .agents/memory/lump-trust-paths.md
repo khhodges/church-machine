@@ -50,3 +50,16 @@ The resulting stale boot execution must not be blamed on their LOAD operands.
 with the same immutable saved bytes. Never infer success from the Save response
 alone, and never repair missing authority by trusting a browser label or by
 silently replacing the currently selected Namespace revision.
+
+Residency policy is not bootstrap provenance. When an exact compiler-attested
+revision replaces a bootstrap artifact, inherited static/resident flags must
+not impose the old artifact's frozen SELF identity. The exact hash-bound
+approval determines whether bootstrap or compiler rules apply.
+
+**Why:** An approved compiler revision carrying the intrinsic SELF marker was
+accepted at admission but rejected by image generation as a frozen bootstrap
+artifact solely because its destination retained residency policy.
+
+**How to apply:** Revalidate exact bytes before materializing intrinsic SELF
+in a destination copy; preserve immutable source bytes and provenance. External
+portable relocations still require their verified binding contract.
