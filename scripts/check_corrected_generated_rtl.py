@@ -11,6 +11,20 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
+
+
+@contextmanager
+def replay_directory():
+    """Keep converter, compiler and runtime evidence on every failure."""
+    with tempfile.TemporaryDirectory(prefix="church-rtl-") as directory:
+        try:
+            yield directory
+        except BaseException as exc:
+            evidence = pathlib.Path(tempfile.mkdtemp(prefix="church-rtl-failure-"))
+            shutil.copytree(directory, evidence, dirs_exist_ok=True)
+            (evidence / "error.txt").write_text(str(exc))
+            raise RuntimeError(f"RTL replay failed: {exc}\nEvidence: {evidence}") from exc
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -131,7 +145,7 @@ class Recorder:
                         "dut u(" + ",".join(bindings) + ");", "initial begin",
                         *steps, '$display("RTL replay PASS"); $finish;',
                         "end endmodule"]))
-        with tempfile.TemporaryDirectory(prefix="church-rtl-") as directory:
+        with replay_directory() as directory:
             path = pathlib.Path(directory)
             if self.release_converter:
                 from hardware.gen_rtlil import _rtlil_to_verilog
@@ -150,11 +164,13 @@ class Recorder:
             (path / "tb.v").write_text(tb)
             compiled = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(path / "sim"),
                             str(path / "dut.v"), str(path / "tb.v")],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, timeout=600)
+            (path / "compile.log").write_text(compiled.stdout + compiled.stderr)
             if compiled.returncode:
                 raise AssertionError(compiled.stderr)
             result = subprocess.run(["vvp", str(path / "sim")], check=False,
                                     capture_output=True, text=True, timeout=60)
+            (path / "simulation.log").write_text(result.stdout + result.stderr)
             if result.returncode:
                 evidence = pathlib.Path(tempfile.mkdtemp(prefix="church-rtl-failure-"))
                 for filename in ("dut.v", "tb.v"):

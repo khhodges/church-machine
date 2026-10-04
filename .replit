@@ -1128,7 +1128,7 @@ isValidation = true
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python3 scripts/wukong_build_provenance.py --verify-release && python3 -m pytest scripts/test_wukong_build_provenance.py -q"
+args = "python3 scripts/check_method_dispatch_release.py --verify-bundle && python3 -m pytest scripts/test_wukong_build_provenance.py -q"
 
 [[workflows.workflow]]
 name = "wukong-health-strip-church-only-tests"

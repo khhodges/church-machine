@@ -14,3 +14,14 @@ remove hardware regressions from the aggregate release command.
 **How to apply:** When registering a suite, update its matching workflow or the
 explicit script-only list in the same change. Keep missing, malformed, invalid,
 and duplicate sync configuration as hard failures.
+
+Updating a validation workflow can automatically enroll it in the parent
+`all-tests` workflow, even when it was previously absent.
+
+**Why:** The validation-command upsert adds a parent workflow dependency, not
+just the requested shell command. That can accidentally make an expensive
+release-only replay run during ordinary testing.
+
+**How to apply:** Use the validation API for validation workflows (the ordinary
+workflow API rejects them), inspect the resulting parent dependencies, and
+keep release-only checks explicitly opt-in in both execution paths.

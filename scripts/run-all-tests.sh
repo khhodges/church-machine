@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# run-all-tests.sh — runs every CI test suite, independent suites in parallel.
+# run-all-tests.sh — runs CI suites, independent suites in parallel.
+# Expensive firmware release validation is opt-in: --group release.
 # Prints every suite's output followed by a full pass/fail summary.
 # Exits non-zero if any suite fails.
 #
@@ -142,7 +143,13 @@ register_suite "wukong-relay-deployment-guard" \
     'python -m pytest tests/server/test_primary_publish_config.py -v'
 
 register_suite "wukong-release-bundle" \
-    'python3 scripts/wukong_build_provenance.py --verify-release && python3 -m pytest scripts/test_wukong_build_provenance.py -q'
+    'python3 scripts/check_method_dispatch_release.py --verify-bundle && python3 -m pytest scripts/test_wukong_build_provenance.py -q'
+
+register_suite "method-dispatch-rtl" \
+    'python3 scripts/check_method_dispatch_release.py'
+
+register_suite "method-dispatch-gate-tests" \
+    'python3 -m pytest scripts/test_method_dispatch_release.py -q'
 
 register_suite "lump-consistency" \
     'python -m pytest tests/lump/test_lump_consistency.py -v'
@@ -503,6 +510,9 @@ register_suite "check-ide-intro-base-path" \
 
 declare -A ALL_GROUPS
 
+# Explicit release only: expensive four-state RTL compilation is not a quick check.
+ALL_GROUPS["release"]="wukong-release-bundle"
+
 ALL_GROUPS["boot"]="boot-image-matches-sim boot-image-loads-and-boots boot-image-upload-endpoint boot-image-serve-endpoints boot-layout-regression boot-entry-hw-image-tests three-instruction-boot-tests"
 
 ALL_GROUPS["lump"]="lump-consistency lump-history-tests lump-v13-freespace-tests lump-binary-tests wukong-callhome-hw-lump-tests lump-save-boundary-tests lump-roundtrip editor-roundtrip-tests lump-gt-display-tests update-lump-tests lump-meta-patch-validation-tests"
@@ -605,9 +615,14 @@ done
 unset _grp_name
 
 if [ "${#REQUESTED_SUITES[@]}" -eq 0 ]; then
-    # No filtering — run everything
-    SUITE_NAMES=("${ALL_SUITE_NAMES[@]}")
-    SUITE_CMDS=("${ALL_SUITE_CMDS[@]}")
+    # Release replays require explicit selection (or --group release).
+    for _idx in "${!ALL_SUITE_NAMES[@]}"; do
+        case "${ALL_SUITE_NAMES[$_idx]}" in
+            method-dispatch-rtl|wukong-release-bundle) continue ;;
+        esac
+        SUITE_NAMES+=("${ALL_SUITE_NAMES[$_idx]}")
+        SUITE_CMDS+=("${ALL_SUITE_CMDS[$_idx]}")
+    done
 else
     # Validate every requested name before launching anything
     INVALID=()
