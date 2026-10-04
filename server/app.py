@@ -15767,6 +15767,9 @@ def list_lumps():
             continue
         token8 = entry.get('token', '')
         row = dict(entry)
+        # A catalog locator is not seal evidence. Display only the identity
+        # from the approval bound to the bytes inspected below.
+        row.pop("identity_hash", None)
         path = os.path.join(lumps_dir, entry.get("filename") or f"{token8}.lump")
         try:
             inspected = _inspect_lump_binary(path)
@@ -15780,6 +15783,10 @@ def list_lumps():
                          "content_profile", "sourceStorageTier")})
             row["binary_valid"] = True
             row["approved"] = approval is not None
+            if isinstance(approval, dict):
+                seal = approval.get("identity_hash")
+                if isinstance(seal, str) and re.fullmatch(r"[0-9a-fA-F]{64}", seal):
+                    row["identity_hash"] = seal
             row["clist_entries"] = inspected["clist_entries"]
             row["has_source"] = bool(inspected["source"])
             bootstrap_identity = _bootstrap_snapshot_identity(

@@ -155,3 +155,38 @@ def test_identity_audit_uses_exact_provenance_not_resident_name(
     else:
         assert identity["applies"] is True
         assert identity["valid"] is False
+
+
+@pytest.mark.parametrize("evidence", ["valid", "missing", "missing-seal", "changed-bytes"])
+def test_catalog_seal_is_bound_to_exact_saved_bytes(candidate, isolated_lumps, evidence):
+    import json
+    metadata, words = candidate
+    metadata.update(content_type="code", grants=["E"], methods=[], artifact_only=True)
+    client = app_module.app.test_client()
+    saved = publish(client, {"binary": words, "metadata": metadata})
+    binary = isolated_lumps / saved["filename"]
+    digest = hashlib.sha256(binary.read_bytes()).hexdigest()
+    approval_path = isolated_lumps / "approvals.json"
+    approvals = json.loads(approval_path.read_text())
+    expected = approvals["approvals"][digest]["identity_hash"]
+    manifest_path = isolated_lumps / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    for row in manifest:
+        if row.get("filename") == saved["filename"]:
+            row["identity_hash"] = "d" * 64  # Never display stale locator metadata.
+    manifest_path.write_text(json.dumps(manifest))
+    if evidence == "missing":
+        approvals["approvals"].pop(digest)
+    elif evidence == "missing-seal":
+        approvals["approvals"][digest].pop("identity_hash")
+    elif evidence == "changed-bytes":
+        raw = bytearray(binary.read_bytes())
+        raw[8] ^= 1
+        binary.write_bytes(raw)
+    approval_path.write_text(json.dumps(approvals))
+    before = {p: p.read_bytes() for p in (binary, manifest_path, approval_path)}
+    response = client.get("/api/lumps/list")
+    assert response.status_code == 200, response.json
+    row = next(r for r in response.json if r.get("filename") == saved["filename"])
+    assert row.get("identity_hash") == (expected if evidence == "valid" else None)
+    assert {p: p.read_bytes() for p in before} == before, "Inspection must not rewrite saved evidence"
