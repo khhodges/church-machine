@@ -3,6 +3,12 @@ name: GT permission enforcement boundary
 description: Records that authored-permission policy belongs to runtime M-bit enforcement, not compilation.
 ---
 
+At first definition of a Pet name, the defining programmer must establish its permissions; others cannot change that definition.
+
+**Why:** The user explicitly stated that when a Pet name is first defined its permissions are fixed against changes by others. This is distinct from compiler-owned SELF, whose E permission is automatic.
+
+**How to apply:** Preserve the original permission definition when other programmers reference the Pet name. Do not interpret the runtime-enforcement guidance below as permission to redefine another owner's declaration. Keep definition ownership separate from runtime operations on a GT.
+
 Permission changes involving an existing Golden Token are a runtime M-bit concern. The compiler, capability materializer, and server save admission must not reject a program merely because declared permissions differ from known authored permissions. Permissionless Thread GTs remain valid for SWITCH/CHANGE. In `SWITCH CR12, Thread.1 ; CR6, #0`, the semicolon makes the remainder a comment: `Thread.1` is a pet name and must resolve through the active C-list to its current CR6 row.
 
 **Why:** Compile-time rejection applies runtime authority policy at the wrong boundary and prevents valid programs from compiling or being saved. Registry grants can still describe type envelopes and support diagnostics, but they are not a compile-time equality rule.

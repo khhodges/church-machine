@@ -5,6 +5,12 @@ description: Compiler admission and inspection policy for a C-list owner's Golde
 
 `SELF E` is the one canonical row-zero owner capability. It is not the abstraction PetName. New compiler output, review UI, and sealed/public metadata must use exactly `SELF`; compiler ownership also belongs in `compiler_owned_self`/`symbolic_self` flags. Legacy `__SELF__` artifacts remain readable without rewriting immutable bytes or approval hashes, but normalize that internal alias to `SELF` in new output.
 
+The compiler assigns SELF's E permission automatically; the programmer cannot change it. A bare source declaration of SELF must not require the programmer to add E manually to make saving work.
+
+**Why:** The user explicitly confirmed compiler ownership of SELF permissions. Requiring a manual permission edit contradicts that ownership.
+
+**How to apply:** Keep compilation and save validation consistent with compiler-assigned SELF E, without weakening checks on immutable artifacts.
+
 The compiler must fail closed if the finalized C-list does not establish `SELF` at row zero. It may insert its compiler-owned symbolic SELF row for new high-level source, but it must reject concrete layouts whose first row is another or unnamed capability. Complete assembly compilation must likewise reject an explicit capabilities block that does not begin with SELF. Every compile and recompile must rerun structural and token validation against the newly assembled candidate bytes before publishing candidate-ready state.
 
 Existing immutable artifacts remain inspectable without rewriting their bytes; inspection and historical evidence are separate from compiler admission.
