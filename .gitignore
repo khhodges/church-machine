@@ -62,3 +62,5 @@ server/lumps/save-runtime-diagnostics.jsonl*
 server/lumps/save-runtime-diagnostics.lock
 server/lumps/.lump-transition-journal.json
 server/lumps/.lump-transition-*
+# Provision each independent IDE separately; cloning must not copy ownership.
+server/ide-hierarchy.json
