@@ -4200,6 +4200,7 @@ let _lastFault = null;
 let _faultModalEditLineNum   = null;   // source line for the faulting instruction
 let _faultModalNsIdxForLump  = null;   // NS slot fallback when no line num
 let _faultModalInstrIdx      = null;   // instruction index within the faulting LUMP
+let _faultModalRawWord       = null;
 let _lastRetryLump = null;
 
 function faultAlertOn() {
@@ -4837,14 +4838,14 @@ function showFaultModal(f) {
     const _editLineNum = (() => {
         if (!locationNs || locationNs.offset === undefined ||
                 locationNs.offset < 1 || !assembler) return null;
-        const instrIdx = locationNs.offset - 1;
-        const lns = assembler.getLastLineNums ? assembler.getLastLineNums() : [];
-        const ln = lns[instrIdx];
-        return (typeof ln === 'number' && ln > 0) ? ln : null;
+        // The last assembler map can belong to an unrelated editor draft.
+        // Resolve only after opening and validating the target binary.
+        return null;
     })();
 
     // Expose to faultModalInvestigate() which runs after the modal is dismissed.
     _faultModalEditLineNum  = _editLineNum;
+    _faultModalRawWord = word;
     _faultModalNsIdxForLump = nsIdxForViewLump;
     _faultModalInstrIdx = (locationNs && Number.isInteger(locationNs.offset) &&
             locationNs.offset >= 1)
@@ -5115,7 +5116,7 @@ function showFaultModal(f) {
     const _instructionNavHint = _editLineNum
         ? `<span class="fault-instr-edit-hint">&#x270E;&nbsp;line&nbsp;${_editLineNum}</span>`
         : (nsIdxForViewLump != null
-            ? `<span class="fault-instr-edit-hint">&#x270E;&nbsp;view lump</span>`
+            ? `<span class="fault-instr-edit-hint">&#x270E;&nbsp;show instruction +${locationNs.offset}</span>`
             : '');
     const _traceFaultDetailsHtml = `
                 <div class="fault-detail-grid fault-trace-fault-details">
@@ -5174,7 +5175,7 @@ function showFaultModal(f) {
             : '');
     const _editBadge = _editLineNum
         ? `<span class="fault-edit-hint">&#x270E; line&nbsp;${_editLineNum}</span>`
-        : (nsIdxForViewLump != null ? `<span class="fault-edit-hint">&#x270E; view lump</span>` : '');
+        : (nsIdxForViewLump != null ? `<span class="fault-edit-hint">&#x270E; show instruction +${locationNs.offset}</span>` : '');
     const _msgClass = (_editLineNum || nsIdxForViewLump != null) ? 'fault-modal-message fault-msg-editable' : 'fault-modal-message';
     const _noteValue = typeof f.userNote === 'string'
         ? f.userNote
@@ -5198,8 +5199,8 @@ function showFaultModal(f) {
             <button class="btn btn-danger" onclick="faultModalReboot()">&#x21BA; Reboot</button>
             <button class="btn btn-warning" onclick="faultModalInvestigate()">&#x1F50D; Investigate</button>
             ${isOutformFault ? '<button class="btn btn-primary" onclick="faultModalRetryDownload()">&#x21BB; Retry Download</button>' : ''}
-            ${_editLineNum
-                ? '<button class="btn btn-primary" onclick="faultModalEditCode()" title="Open the assembly editor at the captured fault location">&#x270E; Edit Code</button>'
+            ${nsIdxForViewLump != null
+                ? '<button class="btn btn-primary" onclick="faultModalInvestigate()" title="Open and highlight the recorded instruction">&#x270E; Show faulting code</button>'
                 : '<button class="btn btn-muted" disabled title="No captured source location is available for this fault">&#x270E; Edit Code</button>'}
             <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state — stops the flashing alert">&#x2715; Clear</button>
         </div>
@@ -5263,32 +5264,33 @@ function faultModalToggleTrace(btn) {
 async function _faultModalOpenExecutedSource(lineNum) {
     const nsIdx = _faultModalNsIdxForLump;
     const instrIdx = _faultModalInstrIdx;
+    const rawWord = _faultModalRawWord;
     faultModalDismiss();
     if (nsIdx != null && typeof sim !== 'undefined' && sim &&
             typeof sim.lumpTokenAtSlot === 'function' &&
             typeof openLumpInEditor === 'function') {
         const token = sim.lumpTokenAtSlot(nsIdx);
         if (token) {
-            await openLumpInEditor(token);
-            let targetLine = lineNum;
-            if (!targetLine && Number.isInteger(instrIdx) &&
-                    typeof ChurchAssembler === 'function') {
-                const editor = document.getElementById('asmEditor');
-                if (editor) {
-                    const sourceMapAssembler = new ChurchAssembler();
-                    sourceMapAssembler.assemble(editor.value);
-                    const lineNums = sourceMapAssembler.getLastLineNums
-                        ? sourceMapAssembler.getLastLineNums()
-                        : [];
-                    targetLine = lineNums[instrIdx] || null;
-                }
+            try {
+                await openLumpInEditor(token);
+            } catch (error) {
+                if (typeof appendOutput === 'function') appendOutput(
+                    'Could not open the faulting LUMP: ' + error.message +
+                    '. Your draft is unchanged. Reopen the fault report and retry.', 'error');
+                return;
             }
-            if (targetLine) _jumpToAsmLine(targetLine);
+            if (String(window._editorOpenLumpToken) === String(token) &&
+                    typeof _revealFaultInstruction === 'function') {
+                _revealFaultInstruction(token,
+                    Number.isInteger(instrIdx) ? instrIdx + 1 : null, rawWord);
+            }
             return;
         }
     }
     switchView('editor');
-    if (lineNum) _jumpToAsmLine(lineNum);
+    if (typeof _setDisassemblyPresentationStatus === 'function') {
+        _setDisassemblyPresentationStatus('No matching fault artifact is available. No source line was selected.');
+    }
 }
 
 function faultModalOpenEditor(lineNum) {
@@ -5305,8 +5307,7 @@ function faultModalOpenBinaryLump(nsIdx) {
         token = sim.lumpTokenAtSlot(nsIdx);
     }
     if (token && typeof openLumpInEditor === 'function') {
-        openLumpInEditor(token);
-        return;
+        return _faultModalOpenExecutedSource(null);
     }
     // Last-resort fallback: open namespace view scrolled to the relevant slot.
     switchView('namespace');

@@ -1949,6 +1949,8 @@ function _renderSavedLumpWordUsage(panel, savedWords) {
 }
 
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection, savedWords) {
+    window._faultNavigationBinary = savedWords
+        ? { token: lookupToken, words: Array.from(savedWords) } : null;
     window._savedLumpEditorMode = true;
     window._compiledCandidateEditorMode = false;
     window._editorSavedBinaryReceipt = lump && lump.filename && lump.binary_hash
@@ -1986,6 +1988,67 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
 function _setDisassemblyPresentationStatus(message) {
     var status = document.getElementById('disassemblyPresentationStatus');
     if (status) status.textContent = message;
+}
+
+// Fault offsets include the header. Do not count lines in reconstructed
+// disassembly: method dispatch words and comments make that mapping lossy.
+function _revealFaultInstruction(token, offset, rawWord) {
+    const binary = window._faultNavigationBinary;
+    const output = document.getElementById('savedLumpDisassembly');
+    if (!output || !binary || String(binary.token) !== String(token) ||
+            !Number.isInteger(offset) || offset < 1 || rawWord == null ||
+            offset >= binary.words.length ||
+            (binary.words[offset] >>> 0) !== (rawWord >>> 0)) {
+        _setDisassemblyPresentationStatus(
+            'Exact fault location unavailable: the opened binary does not match the recorded instruction. No source line was selected.');
+        return false;
+    }
+    const words = binary.words;
+    const cw = Math.min((words[0] >>> 10) & 0x1FFF, words.length - 1);
+    if (offset > cw) {
+        _setDisassemblyPresentationStatus('The recorded offset is outside this LUMP’s code section. No source line was selected.');
+        return false;
+    }
+    output.textContent = '';
+    let target;
+    for (let i = 1; i <= cw; i++) {
+        const row = document.createElement('span');
+        row.style.display = 'block';
+        row.textContent = '+' + i + '  0x' + (words[i] >>> 0).toString(16).padStart(8, '0') +
+            '  ' + assembler.disassemble(words[i] >>> 0);
+        if (i === offset) {
+            row.className = 'fault-code-line-highlight';
+            row.setAttribute('aria-current', 'location');
+            target = row;
+        }
+        output.appendChild(row);
+    }
+    switchCodeTab('disassembly');
+    target.scrollIntoView({ block: 'center' });
+    _setDisassemblyPresentationStatus('Fault instruction at LUMP +' + offset +
+        ' highlighted — raw word matches the recorded fault. Source is unchanged.');
+
+    // Only a complete byte-for-byte source mapping can select editable text.
+    // A stale draft or an unsupported high-level language remains untouched.
+    const editor = document.getElementById('asmEditor');
+    if (editor && typeof ChurchAssembler === 'function') {
+        try {
+            const mapper = new ChurchAssembler();
+            const result = mapper.assemble(editor.value);
+            const code = result.words || [];
+            if (!(result.errors || []).length && code.length === cw &&
+                    code.every((word, i) => (word >>> 0) === (words[i + 1] >>> 0))) {
+                const line = mapper.getLastLineNums()[offset - 1];
+                if (Number.isInteger(line) && line > 0) {
+                    _jumpToAsmLine(line);
+                    const lines = editor.value.split('\n');
+                    const start = lines.slice(0, line - 1).reduce((n, text) => n + text.length + 1, 0);
+                    editor.setSelectionRange(start, start + lines[line - 1].length);
+                }
+            }
+        } catch (_) { /* Exact disassembly remains the navigation target. */ }
+    }
+    return true;
 }
 
 // Keep the last exact binary visible while compiling. Diagnostics must not
@@ -8639,6 +8702,9 @@ async function openLumpInEditor(token, options) {
                     !!(_exactResponseLump &&
                         _exactResponseLump._identityProvenance === 'unverified')
             }, _inMemoryLump ? null : serverWords);
+        // Unsaved compiled LUMPs also have exact code words for navigation.
+        window._faultNavigationBinary = serverWords
+            ? { token: token, words: Array.from(serverWords) } : null;
         window._editorOpenedBootInspectionToken =
             options && options.bootInspection ? token : null;
         window._editorOpenedBootInspectionKind =

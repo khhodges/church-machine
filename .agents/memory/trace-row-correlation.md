@@ -24,6 +24,17 @@ misleading diagnosis of M-bit authorization.
 pipeline explanations, and hardware views. Hardware comments must never borrow
 software simulator register values.
 
+Fault navigation must retain the header-inclusive LUMP offset and captured raw
+word. Never use the global last-assembly line map for a different opened LUMP;
+prefer a highlighted exact instruction when editable source cannot be verified.
+
+**Why:** A fault link opened the LUMP without its instruction offset, while the
+source shortcut could select a line from an unrelated compilation.
+
+**How to apply:** Await editor navigation, check the opened owner and instruction
+bytes, then scroll and highlight. Select source only with a byte-validated map;
+preserve divergent drafts and report unavailable mappings explicitly.
+
 **Why:** A stale address map paired a BRANCH label with a DWRITE word/effect,
 making the branch appear to write an LED.
 

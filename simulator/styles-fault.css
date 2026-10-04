@@ -2527,6 +2527,14 @@
     margin-right: 4px;
 }
 
+.fault-code-line-highlight {
+    background: rgba(239, 68, 68, .22);
+    color: #fecaca;
+    box-shadow: inset 3px 0 #f87171;
+    padding-left: 8px;
+    font-weight: 700;
+}
+
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
