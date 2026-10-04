@@ -13,24 +13,12 @@ import sys
 import tempfile
 from contextlib import contextmanager
 
-
-@contextmanager
-def replay_directory():
-    """Keep converter, compiler and runtime evidence on every failure."""
-    with tempfile.TemporaryDirectory(prefix="church-rtl-") as directory:
-        try:
-            yield directory
-        except BaseException as exc:
-            evidence = pathlib.Path(tempfile.mkdtemp(prefix="church-rtl-failure-"))
-            shutil.copytree(directory, evidence, dirs_exist_ok=True)
-            (evidence / "error.txt").write_text(str(exc))
-            raise RuntimeError(f"RTL replay failed: {exc}\nEvidence: {evidence}") from exc
-
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from amaranth import Elaboratable, Module, Signal, Value
 from amaranth.back import rtlil, verilog
 from amaranth.sim import Simulator as ModelSimulator
+from scripts.rtl_process_supervision import bounded_tool
 
 
 class ReplayDesign(Elaboratable):
@@ -60,6 +48,23 @@ class Recorder:
     write_verilog_opts = ("-sv",)
     release_converter = False
     release_rtl_cache = {}
+    compile_timeout = 180
+
+    @staticmethod
+    @contextmanager
+    def replay_directory():
+        with tempfile.TemporaryDirectory(prefix="church-rtl-") as directory:
+            path = pathlib.Path(directory)
+            try:
+                yield path
+            except BaseException as error:
+                evidence = pathlib.Path(tempfile.mkdtemp(prefix="church-rtl-failure-"))
+                for item in path.iterdir():
+                    if item.is_file() and item.name != "sim":
+                        shutil.copy2(item, evidence / item.name)
+                (evidence / "failure.txt").write_text(repr(error))
+                (evidence / "error.txt").write_text(repr(error))
+                raise RuntimeError(f"{error}\nEvidence: {evidence}") from error
 
     def __init__(self, core):
         self.core = core
@@ -145,8 +150,7 @@ class Recorder:
                         "dut u(" + ",".join(bindings) + ");", "initial begin",
                         *steps, '$display("RTL replay PASS"); $finish;',
                         "end endmodule"]))
-        with replay_directory() as directory:
-            path = pathlib.Path(directory)
+        with self.replay_directory() as path:
             if self.release_converter:
                 from hardware.gen_rtlil import _rtlil_to_verilog
                 key = hashlib.sha256(il.encode()).hexdigest()
@@ -162,23 +166,20 @@ class Recorder:
             else:
                 (path / "dut.v").write_text(rtl)
             (path / "tb.v").write_text(tb)
-            compiled = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(path / "sim"),
+            compiled = bounded_tool(["iverilog", "-g2012", "-s", "tb", "-o", str(path / "sim"),
                             str(path / "dut.v"), str(path / "tb.v")],
-                           capture_output=True, text=True, timeout=600)
+                           self.compile_timeout)
             (path / "compile.log").write_text(compiled.stdout + compiled.stderr)
             if compiled.returncode:
                 raise AssertionError(compiled.stderr)
-            result = subprocess.run(["vvp", str(path / "sim")], check=False,
-                                    capture_output=True, text=True, timeout=60)
+            result = bounded_tool(["vvp", str(path / "sim")], 60)
             (path / "simulation.log").write_text(result.stdout + result.stderr)
             if result.returncode:
-                evidence = pathlib.Path(tempfile.mkdtemp(prefix="church-rtl-failure-"))
-                for filename in ("dut.v", "tb.v"):
-                    shutil.copy2(path / filename, evidence / filename)
-                raise AssertionError(result.stdout + result.stderr +
-                                     "\nEvidence: " + str(evidence))
+                raise AssertionError(result.stdout + result.stderr)
             assert "RTL replay PASS" in result.stdout
 
+
+replay_directory = Recorder.replay_directory
 
 def load(name, filename):
     spec = importlib.util.spec_from_file_location(name, ROOT / filename)

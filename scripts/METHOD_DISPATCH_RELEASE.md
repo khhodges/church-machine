@@ -13,7 +13,7 @@ bash scripts/run-all-tests.sh --group release
 ```
 
 The `wukong-release-bundle` validation workflow uses the same gate. The default
-test run excludes the expensive RTL replay and includes only its fast negative
+test run excludes the expensive RTL replay and its negative
 tests. `--jobs 1` through `--jobs 4` bounds compiler concurrency.
 
 Each run creates a new `/tmp/method-dispatch-release-*` directory, builds an
@@ -26,8 +26,8 @@ execution. Candidate bytes have their own before/after hash check.
 Logs and JSON evidence remain in the printed temporary directory on success or
 failure. Recorder failures additionally retain RTL and testbench inputs under
 `/tmp/church-rtl-failure-*`. Yosys has a 120-second conversion limit, Icarus a
-600-second compilation limit, and each simulation a 60-second limit. The full
-replay has a three-hour ceiling (including single-worker runs); timeout kills
+180-second compilation limit, and each simulation a 60-second limit. The full
+replay has a one-hour ceiling (including single-worker runs); timeout kills
 its process group, including workers and compiler descendants.
 
 This is a prerequisite, not authority to release or install anything. It does
