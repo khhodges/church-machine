@@ -654,7 +654,7 @@ _DELAYED_FAULT_CASES = [
         "SAVE",
         encode_church(
             ChurchOpcode.SAVE, CondCode.AL,
-            cr_dst=12, cr_src=1, imm=0),
+            cr_dst=12, cr_src=1, imm=(1 << 4)),  # DR0 + 1, not protected row zero
         FaultType.PERM_L,
         make_gt(GT_TYPE_INFORM, PERM_MASK_R, slot_id=4),
         True,
@@ -685,7 +685,7 @@ _DELAYED_FAULT_CASES = [
         encode_church(
             ChurchOpcode.ELOADCALL, CondCode.AL,
             cr_dst=2, cr_src=6, imm=0),
-        FaultType.PERM_L,
+        FaultType.INVALID_OP,
         None,
         False,
         id="eloadcall-cr6-permission",
@@ -695,7 +695,7 @@ _DELAYED_FAULT_CASES = [
         encode_church(
             ChurchOpcode.XLOADLAMBDA, CondCode.AL,
             cr_dst=2, cr_src=6, imm=4),
-        FaultType.NULL_CAP,
+        FaultType.INVALID_OP,
         None,
         False,
         id="xloadlambda-null-cap",
@@ -794,8 +794,8 @@ def test_delayed_fault_retires_on_issuing_instruction(
     ), f"{name} exposed its successor before the delayed fault"
 
 
-def test_successful_xloadlambda_retires_once_and_clears_namespace_g_bit():
-    """A successful fused load commits once and preserves GC liveness."""
+def test_retired_xloadlambda_faults_without_clearing_namespace_g_bit():
+    """Retired opcode must not transfer control or mutate target liveness."""
     dmem = list(_DMEM_INIT)
     first_nia = _SELFTEST_ENTRY_NIA
     target_nia = 0x3000
@@ -823,6 +823,7 @@ def test_successful_xloadlambda_retires_once_and_clears_namespace_g_bit():
     observed = {"retires": [], "gbit_writes": []}
 
     async def testbench(ctx):
+        assert await _wait_boot_complete(ctx, dut)
         for _ in range(900):
             if ctx.get(dut.core.dmem_wr_en):
                 observed["gbit_writes"].append((
@@ -836,7 +837,8 @@ def test_successful_xloadlambda_retires_once_and_clears_namespace_g_bit():
                     bool(ctx.get(dut.core.retire_fault_valid)),
                 )
                 observed["retires"].append(retire)
-                if retire[0] == target_nia:
+                if retire[0] == first_nia and retire[2]:
+                    observed["fault_code"] = ctx.get(dut.core.retire_fault_code)
                     return
             await ctx.tick()
         observed["timeout"] = True
@@ -851,11 +853,13 @@ def test_successful_xloadlambda_retires_once_and_clears_namespace_g_bit():
         retire for retire in observed["retires"] if retire[0] == first_nia
     ]
     assert issuing_retires == [(
-        first_nia, dmem[first_nia // 4], False
+        first_nia, dmem[first_nia // 4], True
     )]
+    assert observed["fault_code"] == FaultType.INVALID_OP
+    assert not any(retire[0] == target_nia for retire in observed["retires"])
     assert observed["gbit_writes"].count((
         slot * 16 + 4, word1_without_g
-    )) == 1
+    )) == 0
 
 
 # ── Shared retire-collection helper for Tests 4/5 ─────────────────────────────

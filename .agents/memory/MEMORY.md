@@ -1,4 +1,5 @@
 - [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.
+- [Editor test contracts](editor-test-contracts.md) — guarded navigation needs stable editor identity and explicit consent; missing fixture state is not a runtime failure.
 - [Declared abstraction identity](declared-abstraction-identity.md) — missing names require programmer correction, never generated fallback identities.
 - [Save and review safety](save-review-index.md) — consent, frozen snapshots, retry ownership, diagnostic evidence, review cookies, and approval replay.
 - [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions

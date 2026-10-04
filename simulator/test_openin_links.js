@@ -92,6 +92,21 @@ const SAVED_LUMP_SOURCE_SRC = extractFunctionByName('app-lumps.js', '_resolveSav
 const SAVED_LUMP_ENTER_SRC  = extractFunctionByName('app-lumps.js', '_enterSavedLumpEditorMode');
 const SAVED_LUMP_EXIT_SRC   = extractFunctionByName('app-lumps.js', 'exitSavedLumpEditorMode');
 const OPEN_SAVED_LUMP_SRC   = extractFunctionByName('app-lumps.js', 'openLumpInEditor');
+
+// Load the real named helper closure of extracted LUMP functions. Preserve
+// explicit fixture doubles, but never invent a success-returning fallback.
+function loadLumpHelpers(context, code, seen = new Set()) {
+    const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+    for (const match of code.matchAll(/\b(_[A-Za-z0-9]+)\s*\(/g)) {
+        const name = match[1];
+        if (seen.has(name) || typeof context[name] === 'function') continue;
+        seen.add(name);
+        if (!source.includes('function ' + name + '(')) continue;
+        const helper = extractFunctionByName('app-lumps.js', name);
+        vm.runInContext(helper, context);
+        loadLumpHelpers(context, helper, seen);
+    }
+}
 const SWITCH_CODE_TAB_SRC   = extractFunctionByName('app-run.js', 'switchCodeTab');
 
 const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
@@ -145,6 +160,7 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
                     lumpsListHtmlId = 'lumpsListContent', fastTimers = false } = {}) {
     const dom = new JSDOM(
         '<!DOCTYPE html><body>' +
+        '<textarea id="asmEditor"></textarea>' +
         '<button id="editorJumpToLumpBtn" style="display:none;"></button>' +
         '<button id="editorJumpToAbsBtn" style="display:none;"></button>' +
         `<div id="${lumpsListHtmlId}"></div>` +
@@ -186,7 +202,9 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
         Promise,
         window: { _pseudoEditContext: null, _editorLastSavedToken: null, _editorJumpTargets: null,
                   _pendingLumpTab: null, _pendingLumpToken: null,
-                  LumpRegistry: _reg },
+                  LumpRegistry: _reg,
+                  // Template-open cases model explicit user consent.
+                  confirmSourceReplacement: async () => true },
         _lumpsCache: lumpsCache,
         _pendingLumpAbstractionName: null,
         _pendingLumpMethodName: null,
@@ -222,6 +240,13 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
         has() { return true; },
     }));
 
+    const shell = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
+    for (const name of ['_advanceEditorNavigationEpoch', '_captureEditorWriteGuard']) {
+        const start = shell.indexOf('window.' + name + ' = function(');
+        const end = shell.indexOf('\n};', start);
+        if (start < 0 || end < 0) throw new Error('Missing editor guard: ' + name);
+        vm.runInContext(shell.slice(start, end + 3), ctx);
+    }
     vm.runInContext(ALL_SRC, ctx, { filename: 'openin-links.js' });
 
     return { ctx, document, calls, sandbox };
@@ -1030,9 +1055,7 @@ trackAsync((async function t15() {
     });
 
     // Add #asmEditor textarea so the production code can populate it.
-    const asmEd = document.createElement('textarea');
-    asmEd.id = 'asmEditor';
-    document.body.appendChild(asmEd);
+    const asmEd = document.getElementById('asmEditor');
 
     await vm.runInContext('_absOpenInEditorByName("Circle")', ctx);
 
@@ -1109,9 +1132,7 @@ trackAsync((async function t15() {
         fetchImpl: async () => ({ ok: true, json: async () => [] }),
     });
 
-    const asmEd = document.createElement('textarea');
-    asmEd.id = 'asmEditor';
-    document.body.appendChild(asmEd);
+    const asmEd = document.getElementById('asmEditor');
 
     await vm.runInContext('_absOpenInEditorByName("Abacus")', ctx);
 
@@ -1302,8 +1323,8 @@ trackAsync((async function t21() {
     assert('T23 compiled disassembly is read-only semantic content',
         pre.getAttribute('aria-readonly') === 'true' &&
         pre.getAttribute('contenteditable') === null);
-    assert('T23 normal right-side tabs are replaced in split mode',
-        doc.getElementById('codeSidebarTabs').style.display === 'none' &&
+    assert('T23 right-side tabs remain available alongside disassembly',
+        doc.getElementById('codeSidebarTabs').style.display !== 'none' &&
         doc.getElementById('savedLumpDisassemblyPanel').style.display === 'flex');
     assert('T23 saved-LUMP workspace uses the source-left/disassembly-right layout',
         doc.querySelector('#editor .editor-layout').classList.contains('saved-lump-editor-layout'));
@@ -1397,6 +1418,15 @@ trackAsync((async function t25() {
         list() { return [entry]; },
     };
     vm.createContext(sandbox);
+    // Use the real navigation guards: this case verifies stale async completion.
+    const shellSource = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
+    for (const name of ['_advanceEditorNavigationEpoch', '_captureEditorWriteGuard']) {
+        const start = shellSource.indexOf('window.' + name + ' = function(');
+        if (start < 0) throw new Error('Missing editor guard: ' + name);
+        const end = shellSource.indexOf('\n};', start);
+        if (end < 0) throw new Error('Incomplete editor guard: ' + name);
+        vm.runInContext(shellSource.slice(start, end + 3), sandbox);
+    }
     vm.runInContext(SAVED_LUMP_EXIT_SRC + '\n' + OPEN_SAVED_LUMP_SRC, sandbox);
 
     const pendingOpen = vm.runInContext('openLumpInEditor("abc123")', sandbox);
@@ -1510,6 +1540,10 @@ trackAsync((async function t26() {
             },
         },
         _draftLsGet() { return null; },
+        // This fixture has an empty buffer and no owned draft to preserve.
+        _preserveEditorNavigationBuffer() {},
+        // Word-usage presentation is tested separately; no layout inspection here.
+        async _getSavedLumpWordUsageSummary() { return 'word usage unavailable'; },
         _migrateBfextBfinsSyntax(value) { return value; },
         _draftLsSet() {},
         _resolveSavedLumpEditorSource: undefined,
@@ -1532,8 +1566,19 @@ trackAsync((async function t26() {
         list() { return [{ sources: { server: saved } }]; },
         setCurrent() {},
     };
+    sandbox.document.querySelectorAll = () => [];
     vm.createContext(sandbox);
+    vm.runInContext(extractFunctionByName('app-lumps.js', '_selectSavedLumpCodeDisplay'), sandbox);
+    vm.runInContext(extractFunctionByName('app-lumps.js', '_formatLumpHeaderDisassembly'), sandbox);
     vm.runInContext(SAVED_LUMP_SOURCE_SRC + '\n' + OPEN_SAVED_LUMP_SRC, sandbox);
+    loadLumpHelpers(sandbox, OPEN_SAVED_LUMP_SRC);
+    const guardSource = fs.readFileSync(path.join(__dirname, 'app-shell.js'), 'utf8');
+    for (const name of ['_advanceEditorNavigationEpoch', '_captureEditorWriteGuard']) {
+        const start = guardSource.indexOf('window.' + name + ' = function(');
+        const end = guardSource.indexOf('\n};', start);
+        if (start < 0 || end < 0) throw new Error('Missing editor guard: ' + name);
+        vm.runInContext(guardSource.slice(start, end + 3), sandbox);
+    }
     await vm.runInContext('openLumpInEditor("' + saved.token + '")', sandbox);
 
     assert('T26 full-profile exact-response source populates the editor',

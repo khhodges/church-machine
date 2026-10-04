@@ -1,8 +1,7 @@
 // test_bare_space_ns_fallback.js — regression test for bare-space sugar NS fallback
 //
-// Verifies that "AbsName MethodName" on its own line compiles to
-// ELOADCALL CR0, AbsName, MethodName even when methodConventions[AbsName] is
-// absent (fresh page load / detail panel never opened).
+// Legacy "AbsName MethodName" lowering still requests retired ELOADCALL.
+// Namespace fallback and known method metadata must not bypass its hard error.
 //
 // Also verifies that when conventions ARE loaded, method-name validation still
 // fires for an unknown method name.
@@ -48,7 +47,7 @@ function hasWordComment(result, pattern) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Test 1: bare-space with no conventions, abstraction in namespace → zero errors
 // ─────────────────────────────────────────────────────────────────────────────
-console.log('\nTest 1: bare-space sugar emits ELOADCALL when conventions absent (with capabilities block)');
+console.log('\nTest 1: legacy bare-space lowering rejects retired ELOADCALL');
 {
     const asm = makeAsm({ 'SelfTest': 2 });
 
@@ -58,14 +57,13 @@ console.log('\nTest 1: bare-space sugar emits ELOADCALL when conventions absent 
 SelfTest Run`;
 
     const result = asm.assemble(src);
-    assert(result.errors.length === 0,
-        'no assembly errors');
-    // wordComments should include the bare-space comment "SelfTest Run"
-    assert(hasWordComment(result, /SelfTest\s+Run/),
-        'wordComments contain "SelfTest Run" (ELOADCALL was emitted)');
-    // Should produce at least one word (the ELOADCALL instruction word)
-    assert(result.words.length >= 1,
-        'at least one instruction word assembled');
+    assert(result.errors.some(e => /ELOADCALL is retired/.test(e.message)),
+        'legacy bare-space lowering is explicitly rejected');
+    // Retirement must leave neither an executable word nor a success annotation.
+    assert(!hasWordComment(result, /SelfTest\s+Run/),
+        'retired call is not emitted');
+    assert(result.words.length === 0,
+        'retired call produces no executable words');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,10 +74,10 @@ console.log('\nTest 2: NS fallback fires without an explicit capabilities block'
     const asm = makeAsm({ 'SelfTest': 2 });
 
     const result = asm.assemble('SelfTest Run');
-    assert(result.errors.length === 0,
-        'no assembly errors (no capabilities block)');
-    assert(hasWordComment(result, /SelfTest\s+Run/),
-        'ELOADCALL emitted even without capabilities block');
+    assert(result.errors.some(e => /ELOADCALL is retired/.test(e.message)),
+        'namespace fallback cannot bypass retirement');
+    assert(!hasWordComment(result, /SelfTest\s+Run/),
+        'no retired call emitted without capabilities block');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,10 +107,10 @@ console.log('\nTest 4: method-name validation fires when conventions ARE loaded'
         'Stop': { index: 1, input: '', output: '' },
     };
 
-    // Known method — no error.
+    // Known method metadata does not authorize a retired instruction.
     const r1 = asm.assemble(`capabilities { SelfTest E }\nSelfTest Run`);
-    assert(r1.errors.length === 0,
-        'known method compiles without error');
+    assert(r1.errors.some(e => /ELOADCALL is retired/.test(e.message)),
+        'known methods do not exempt legacy lowering from retirement');
 
     // Re-create to avoid state bleed.
     const asm2 = makeAsm({ 'SelfTest': 2 });

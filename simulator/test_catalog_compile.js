@@ -80,6 +80,11 @@ global.switchView            = function() {};
 global.updateLineNumbers     = function() {};
 global.updateSavePseudoBtn   = function() {};
 global.setTimeout            = function() {};
+// Navigation ownership is a separate subsystem; model its epoch, not a missing API.
+global.window._advanceEditorNavigationEpoch = function() {
+    return global.window._editorNavigationEpoch =
+        (global.window._editorNavigationEpoch || 0) + 1;
+};
 
 // cloomcCompiler is set per-test (see makeMockCompiler / makeErrorCompiler below).
 global.cloomcCompiler = null;

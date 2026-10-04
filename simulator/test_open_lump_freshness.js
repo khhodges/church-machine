@@ -63,7 +63,7 @@ function extractRedirectBlock() {
     // The `if (window.LumpRegistry) {` line follows within a few lines.
     let ifLineIdx = -1;
     for (let i = markerIdx; i < Math.min(markerIdx + 40, lines.length); i++) {
-        if (/^\s*if\s*\(window\.LumpRegistry\)/.test(lines[i])) {
+        if (/^\s*if\s*\(!_exactSelection && window\.LumpRegistry\)/.test(lines[i])) {
             ifLineIdx = i;
             break;
         }
@@ -99,7 +99,7 @@ function extractRedirectBlock() {
     // `lump` is declared but not used in assertions — it mirrors the production
     // variable that gets updated inside the block.
     return '(function doRedirect(token, window) {\n' +
-           '  var lump = null;\n' +
+           '  var lump = null; var _exactSelection = false;\n' +
            block + '\n' +
            '  return token;\n' +
            '})';
