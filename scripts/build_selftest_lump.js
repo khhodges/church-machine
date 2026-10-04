@@ -90,18 +90,17 @@ if (!/^\s*IADD\s+DR1\s*,\s*DR0\s*,\s*#0\s*;\s*DR1 = 0 \(all 81 tests passed/m.te
 const result = new ChurchAssembler().assemble(source);
 if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
 
-// CapabilityTest enters SelfTest through CALL method 1.  LUMP word 1 must
-// therefore be a canonical method-table BRANCH, not the first body
-// instruction.  The entry sits at logical PC 0 and branches over itself to
-// the source body at logical PC 1.
+// Simulator-format method table. Hardware compatibility must be verified:
+// the current hardware CALL consumer reads bare word offsets, not BRANCH words.
+// This builder's format comparison is not proof of runtime invalidity.
 const method1Dispatch = ((23 << 27) | (14 << 23) | 1) >>> 0;
 const compiledWords = [method1Dispatch, ...result.words.map(word => word >>> 0)];
 const cw = compiledWords.length;
 // SelfTest owns two capability rows:
 //   row 0 — canonical SELF E-GT
 //   row 1 — Next.GT, localized by boot_image.py to the LightningBolt target
-// The final handoff executes LOAD CR0, CR6[1] followed by CALL CR0, so emitting
-// only row 0 creates an artifact that necessarily faults at the handoff.
+// This is the builder's declared-row policy, not proof that the body uses Next.
+// The canonical source currently completes through RETURN.
 const cc = 2;
 const content = frame(source);
 const needed = 1 + cw + content.length + cc;
@@ -231,8 +230,8 @@ if (CHECK_ONLY) {
             JSON.stringify(activeWords) !== JSON.stringify(compiledWords)) {
         failures.push('active SelfTest binary does not contain the canonical compiled source');
         if (activeSource !== source) failures.push('embedded source differs from canonical source');
-        if (activeCc !== cc) failures.push(`capability rows: saved ${activeCc}, required ${cc} (SELF and Next)`);
-        if (activeWords?.[0] !== method1Dispatch) failures.push('method entry must be BRANCH +1 (0xbf000001)');
+        if (activeCc !== cc) failures.push(`capability rows: saved ${activeCc}, builder expects ${cc} (SELF and Next); this alone does not prove a runtime fault`);
+        if (activeWords?.[0] !== method1Dispatch) failures.push('method entry differs from builder BRANCH +1 format; verify target decoder compatibility before replacement');
         if (activeWords && JSON.stringify(activeWords.slice(1)) !== JSON.stringify(compiledWords.slice(1)))
             failures.push('source-body instruction words differ from current compiler output');
     }
