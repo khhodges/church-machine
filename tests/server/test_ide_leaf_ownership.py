@@ -36,6 +36,30 @@ def compile_candidate(client, declaration, extra=None):
     return source, response.get_json()
 
 
+def test_hierarchy_read_only_route_contract(setup):
+    client, root, config_path = setup
+    before = {p.name: p.read_bytes() for p in root.iterdir() if p.is_file()}
+    valid = json.loads(config_path.read_text())
+    response = client.get("/api/ide-hierarchy")
+    assert response.status_code == 200 and response.is_json
+    assert response.get_json() == valid
+    for name, content in before.items():
+        assert (root / name).read_bytes() == content
+    config_path.write_text("{bad")
+    response = client.get("/api/ide-hierarchy")
+    assert response.status_code == 422 and response.is_json
+    assert "Correct server/ide-hierarchy.json" in response.json["error"]
+    assert "no leaf ownership was inferred" in response.json["error"]
+    config_path.unlink()
+    response = client.get("/api/ide-hierarchy")
+    assert response.status_code == 200 and response.is_json
+    assert response.get_json() is None
+    assert not config_path.exists()
+    for name, content in before.items():
+        if name != config_path.name:
+            assert (root / name).read_bytes() == content
+
+
 def payload(source, compiled):
     record = compiled["compiler_record"]
     return {"binary": compiled["words"], "metadata": {

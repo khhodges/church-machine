@@ -66,7 +66,7 @@ async function _actionableJsonResponse(response, operation, options) {
             throw new Error(_formatActionableHttpError(operation, response.status, body, options));
         }
         throw new Error(
-            operation + ' failed. Reason: The server returned an invalid response. ' +
+            operation + ' failed (HTTP ' + response.status + '). Reason: The server returned an invalid response (expected JSON). ' +
             (options && options.dataChanged === false ? 'No data was changed. ' : 'Data-change status is unknown. ') +
             'Next: ' + ((options && options.nextAction) || 'Retry the operation, then inspect the server logs.')
         );

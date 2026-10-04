@@ -43,6 +43,8 @@ async function main() {
     const priorNames = ChurchSimulator.PENDING_GT_NAMES.slice();
     ChurchSimulator.PENDING_GT_NAMES = [];
     const run = {
+        ...require('./actionable_errors'),
+        fetch: async () => ({ ok: true, status: 200, json: async () => ({ node: 'test.ide' }) }),
         ChurchAssembler, ChurchSimulator, CapabilityTokens,
         assembler: new ChurchAssembler(), cloomcCompiler: new CLOOMCCompiler(),
         sim: { constructor: ChurchSimulator, nsLabels: {} },
@@ -230,8 +232,7 @@ async function main() {
         };
         elements.get('saveNSDialog').style.display = 'none';
         vm.runInContext(click[1], run);
-        await Promise.resolve();
-        await Promise.resolve();
+        for (let i = 0; i < 20 && !releaseFrame; i++) await Promise.resolve();
         assert(releaseFrame, 'actual click entered the asynchronous frame builder');
         editor.value = draft + '; edited while review was preparing\n';
         releaseFrame();
@@ -251,8 +252,8 @@ async function main() {
         vm.runInContext(click[1], run);
         const blocked = await savePromise;
         assert.equal(blocked.ok, false);
-        assert.match(alerts.at(-1), /Save LUMP did not open: Error: content frame unavailable/);
-        assert.match(elements.get('editorConsole').textContent, /No LUMP was saved/);
+        assert.match(alerts.at(-1), /Format LUMP preparation failed.*content frame unavailable/);
+        assert.match(alerts.at(-1), /No LUMP was saved/);
         assert.equal(reviewCount, 1);
         assert.equal(run._pendingLumpData, null);
 

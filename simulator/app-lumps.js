@@ -9222,6 +9222,9 @@ window._selectFormatLumpProfile = _selectFormatLumpProfile;
 // history, then opens the single Save LUMP dialog. Stores the binary on
 // window._pendingLumpData for confirmSaveToNamespace().
 window.showFormatLump = async function() {
+    window._pendingLumpData = null;
+    window._saveNSPreparedSnapshot = null;
+    try {
     const activeCandidate = window.IDEActionState && window.IDEActionState.get().candidate;
     const indexedView = window.ChurchIDX1IDE && window.ChurchIDX1IDE.saveView(activeCandidate);
     // Never leave an earlier reviewed binary available after a failed
@@ -9256,21 +9259,38 @@ window.showFormatLump = async function() {
         return { ok: false, error: _missingValidator, reported: true };
     }
     let ideHierarchy;
+    const hierarchyOperation = 'Format LUMP hierarchy lookup (/api/ide-hierarchy)';
+    const hierarchyOptions = {
+        dataChanged: false,
+        nextAction: 'Check the IDE connection and ask the operator to verify that the current Church Machine IDE server is running and provision server/ide-hierarchy.json from server/ide-hierarchy.example.json with the assigned node, exact aliases and trusted foreign definitions. Then retry Format LUMP.',
+    };
     try {
-        const response = await fetch('/api/ide-hierarchy', { cache: 'no-store' });
-        ideHierarchy = await response.json();
-        if (!response.ok) throw new Error(ideHierarchy.error || 'Unable to read IDE hierarchy.');
+        let response;
+        try {
+            response = await fetch('/api/ide-hierarchy', { cache: 'no-store' });
+        } catch (error) {
+            throw new Error(_formatActionableNetworkError(hierarchyOperation, error, hierarchyOptions));
+        }
+        ideHierarchy = await _actionableJsonResponse(response, hierarchyOperation, hierarchyOptions);
+        const configurationError = CapabilityTokens.hierarchyConfigurationError(ideHierarchy);
+        if (configurationError) throw new Error(
+            _formatActionableHttpError(hierarchyOperation, response.status,
+                { error: configurationError }, hierarchyOptions));
         for (let i = 0; i < _caps.length; i++) {
             const cap = _caps[i];
             const decision = CapabilityTokens.checkLeafOwnership(cap, ideHierarchy);
-            if (decision.error) throw new Error(decision.error);
+            if (decision.error) throw new Error(
+                _formatActionableHttpError(hierarchyOperation, response.status,
+                    { error: decision.error }, hierarchyOptions));
             if (decision.canonical) _caps[i] = {
                 ...(typeof cap === 'string' ? { name: cap } : cap),
                 canonical_leaf: decision.canonical,
             };
         }
     } catch (error) {
-        const message = 'Cannot format this LUMP: ' + error.message;
+        window._pendingLumpData = null;
+        window._saveNSPreparedSnapshot = null;
+        const message = 'Cannot format this LUMP: ' + error.message + ' No LUMP was saved.';
         alert(message);
         return { ok: false, error: message, reported: true };
     }
@@ -9606,6 +9626,16 @@ window.showFormatLump = async function() {
     // Format/audit and Namespace choices share one confirmation surface.
     showSaveToNamespace();
     return { ok: true };
+    } catch (error) {
+        window._pendingLumpData = null;
+        window._saveNSPreparedSnapshot = null;
+        const message = _formatActionableNetworkError('Format LUMP preparation', error, {
+            dataChanged: false,
+            nextAction: 'Compile the current draft and retry Format LUMP. If it fails again, report this reason to the IDE operator.',
+        }) + ' No LUMP was saved.';
+        alert(message);
+        return { ok: false, error: message, reported: true };
+    }
 };
 
 // ── GT Slot Picker ────────────────────────────────────────────────────────────

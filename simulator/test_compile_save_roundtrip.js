@@ -65,6 +65,7 @@ elements.get('saveNSDialog').querySelector = () => null;
 
 const localValues = new Map();
 const context = {
+    ...require('./actionable_errors'),
     console,
     window: {},
     document: {
@@ -108,6 +109,8 @@ const context = {
         abstractionRegistry: { abstractions: {} },
     },
     CapabilityTokens: {
+        hierarchyConfigurationError: require('./capability_tokens').hierarchyConfigurationError,
+        checkLeafOwnership: require('./capability_tokens').checkLeafOwnership,
         isContextualSelf(cap) {
             return !!cap && (cap.name === 'SELF' || cap.name === '__SELF__');
         },
@@ -219,6 +222,7 @@ vm.runInContext(
         'compiler candidate must place the embedded content frame after code');
 
     // Exercise the actual hamburger Save Lump handler and its real formatter.
+    context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ node: 'test.ide' }) });
     vm.runInContext(
         extractBlock(lumpsSource, 'window.showFormatLump = async function') + ';' +
         extractBlock(lumpsSource, 'window.editorSaveLump = function') + '\n' +

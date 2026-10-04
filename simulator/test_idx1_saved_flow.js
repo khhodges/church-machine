@@ -93,6 +93,8 @@ async function main() {
     };
     const context = {
         window, sim, ChurchSimulator: Simulator, CapabilityTokens, LumpContentFrame,
+        ...require('./actionable_errors'),
+        fetch: async () => ({ ok: true, status: 200, json: async () => ({ node: 'test.ide' }) }),
         console, crypto: crypto.webcrypto, TextEncoder, TextDecoder, Uint8Array, DataView,
         bootEntrySlot: 3,
         _lumpManifests: { 3: { _methods: [{ name: 'StaleBootMethod', pet_names: { DR: { 2: 'wrong' } } }] } },

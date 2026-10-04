@@ -82,6 +82,22 @@
         }
     }
 
+    function hierarchyConfigurationError(config) {
+        const path = value => typeof value === 'string' &&
+            /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(value);
+        const petName = value => typeof value === 'string' &&
+            /^[A-Za-z_][A-Za-z0-9_-]*(?:[.#][A-Za-z0-9_-]+)*$/.test(value);
+        const malformed = !config || typeof config !== 'object' || Array.isArray(config) ||
+            !path(config.node) ||
+            ['aliases', 'definitions'].some(key => config[key] != null &&
+                (typeof config[key] !== 'object' || Array.isArray(config[key]))) ||
+            Object.entries(config.aliases || {}).some(([key, value]) => !petName(key) || !path(value)) ||
+            Object.keys(config.definitions || {}).some(key => !path(key));
+        return malformed
+            ? 'IDE hierarchy is missing or malformed. Configure server/ide-hierarchy.json: ask the operator to provision it using server/ide-hierarchy.example.json with the assigned IDE node, exact aliases and trusted foreign definitions; no ownership was inferred.'
+            : null;
+    }
+
     // Exact path components, not textual prefixes or imported short names.
     // Only the server-provisioned alias/definition table is ownership evidence.
     function checkLeafOwnership(cap, config) {
@@ -97,19 +113,10 @@
         }
         const path = value => typeof value === 'string' &&
             /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(value);
-        // Alias keys are source PetNames, not canonical hierarchy paths.
-        // In particular Thread.1 and Thread#1 are supported legacy spellings.
-        const petName = value => typeof value === 'string' &&
-            /^[A-Za-z_][A-Za-z0-9_-]*(?:[.#][A-Za-z0-9_-]+)*$/.test(value);
-        const missing = () => ({ ownership: 'unconfigured',
-            error: 'IDE hierarchy is missing or malformed. Configure node, aliases and foreign definitions in server/ide-hierarchy.json; no ownership was inferred.' });
-        if (!config || !path(config.node) ||
-                (config.aliases != null && (typeof config.aliases !== 'object' || Array.isArray(config.aliases))) ||
-                (config.definitions != null && (typeof config.definitions !== 'object' || Array.isArray(config.definitions)))) return missing();
+        const configurationError = hierarchyConfigurationError(config);
+        if (configurationError) return { ownership: 'unconfigured', error: configurationError };
         const aliases = config.aliases || {};
         const definitions = config.definitions || {};
-        if (Object.entries(aliases).some(([key, value]) => !petName(key) || !path(value)) ||
-                Object.keys(definitions).some(key => !path(key))) return missing();
         const explicit = cap && typeof cap === 'object' && (cap.N || cap.identity_string || cap.canonical_leaf);
         const canonical = explicit ? String(explicit).replace(/#[1-9][0-9]*$/, '') :
             Object.prototype.hasOwnProperty.call(aliases, name) ? aliases[name] :
@@ -618,6 +625,7 @@
     }
 
     return {
+        hierarchyConfigurationError,
         normalizeRights,
         checkLeafOwnership,
         authoredRightsForName,
