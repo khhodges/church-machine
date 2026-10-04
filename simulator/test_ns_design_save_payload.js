@@ -98,6 +98,9 @@ const ctx = {
     bootEntrySlot: input.state.abstractions.find(row => row.boot === true).slot,
     document: { getElementById: name => elements[name] || null },
     fetch: async (url, opts) => {
+        if (url === '/api/namespace/review-upgrades') {
+            return {upgradeCheck: true};
+        }
         if (url === '/api/namespace/save-table') {
             payload = JSON.parse(opts.body);
             payloads.push(payload);
@@ -105,7 +108,8 @@ const ctx = {
         }
         throw new Error('Unexpected fetch: ' + url);
     },
-    _actionableJsonResponse: async () => {
+    _actionableJsonResponse: async response => {
+        if (response.upgradeCheck) return {upgrades: [], reviewFingerprint: 'fresh-catalog'};
         throw new Error('generate_boot_image: Namespace slot 14 exact hash-bound approval required: no compiler admission record matches the exact SHA-256');
     },
     _setNsDirty: () => {},

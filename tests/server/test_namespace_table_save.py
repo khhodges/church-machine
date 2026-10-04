@@ -29,6 +29,7 @@ def isolated(tmp_path):
         "_ensure_ns_state", "_validate_namespace_boot_marker",
         "_project_effective_thread_policies", "_thread_slots_from_namespace_rows",
         "_resolve_namespace_saved_artifacts", "_read_manifest_safe", "_file_sha256",
+        "namespace_review_upgrades", "_prepare_run_candidate",
     }
     tree = ast.parse((root / "server/app.py").read_text())
     nodes = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
@@ -66,6 +67,8 @@ def isolated(tmp_path):
     exec(compile(ast.Module(body=nodes, type_ignores=[]), "<table routes>", "exec"), scope)
     app.add_url_rule("/api/namespace/save-table",
                      view_func=scope["namespace_save_table"], methods=["POST"])
+    app.add_url_rule("/api/namespace/review-upgrades",
+                     view_func=scope["namespace_review_upgrades"], methods=["POST"])
     app.add_url_rule("/api/boot-image/ns-state",
                      view_func=scope["boot_image_ns_state"], methods=["GET"])
     paths = list(tmp_path.iterdir())

@@ -12,6 +12,15 @@ input or make an otherwise valid historical approval unusable.
 
 **How to apply:** Preserve independent byte copies and verify their hashes when
 consuming an approved revision. Selecting a newer upstream revision is explicit.
+At Namespace save time, the programmer requires separate, initially unchecked
+consent for each newer LUMP; accepting one row never accepts the others.
+
+**Why:** A newer catalog publication must not silently change a saved selection,
+and saving the Namespace must not imply activation of the running simulation.
+
+**How to apply:** Preserve unchecked artifacts and unsaved edits on cancellation;
+renew review if the draft, catalog identity, or selected bytes change.
+
 Do not silently rebuild from current files or relax existing hardware build gates
 when a frozen input is missing or mismatched.
 

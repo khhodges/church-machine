@@ -43,6 +43,11 @@ function harness() {
             return response.data;
         },
         async fetch(url, options) {
+            if (url === '/api/namespace/review-upgrades') {
+                if (context.checkError) return {error: context.checkError};
+                if (context.onCheck) await context.onCheck();
+                return {data: context.report || {upgrades: [], reviewFingerprint: 'fresh-catalog'}};
+            }
             calls.push({url, options});
             const payload = JSON.parse(options.body);
             if (context.onFetch) await context.onFetch(payload);
@@ -70,6 +75,7 @@ function harness() {
     assert.deepStrictEqual(JSON.parse(h.calls[0].options.body), {
         namespaceFingerprint: stateBefore.namespaceFingerprint,
         ns_state: {abstractions: originalRows},
+        upgradeReview: {draft: originalRows, reviewFingerprint: 'fresh-catalog', slots: []},
     });
     assert.strictEqual(h.win.bootImage, imageBefore);
     assert.strictEqual(h.sim.memory, memoryBefore);
@@ -180,6 +186,35 @@ function harness() {
         assert.strictEqual(h.calls.length, 1, 'no implicit retry or refreshed CAS');
         assert.deepStrictEqual(JSON.parse(h.calls[0].options.body).ns_state.abstractions.at(-1), draft);
     }
+    for (const choices of [[14], [], null]) {
+        h = harness();
+        h.context.report = {reviewFingerprint: 'reviewed', upgrades: [{
+            slot: 14, blocked: null,
+            replacement: {...originalRows[1], lump_version: 3, token: 'abcdef01'},
+        }]};
+        h.context._nsChooseUpgrades = async () => choices;
+        assert.strictEqual(await h.win._nsTableSave(), choices !== null);
+        if (choices === null) {
+            assert.strictEqual(h.calls.length, 0);
+            assert.deepStrictEqual(h.win._nsState.savedAbstractions, originalRows);
+        } else {
+            const payload = JSON.parse(h.calls[0].options.body);
+            assert.strictEqual(payload.ns_state.abstractions[1].lump_version,
+                choices.length ? 3 : 2);
+            assert.strictEqual(h.win._nsTableDirty, false);
+        }
+        assert.deepStrictEqual(Array.from(h.sim.memory), [4, 5, 6]);
+    }
+    h = harness();
+    h.context.checkError = new Error('Catalog unavailable');
+    assert.strictEqual(await h.win._nsTableSave(), false);
+    assert.strictEqual(h.calls.length, 0);
+    assert.match(h.note.textContent, /Catalog unavailable/);
+    h = harness();
+    h.context.onCheck = async () => { h.win._nsTableRowEdits = {'14': {name: 'Changed'}}; };
+    assert.strictEqual(await h.win._nsTableSave(), false);
+    assert.strictEqual(h.calls.length, 0);
+    assert.match(h.note.textContent, /draft changed during review/);
     const addCode = source.slice(source.indexOf('function _nsTableAddConfirm()'),
         source.indexOf('// Explicit recovery for an unsaved executable Add'));
     for (const forbidden of ['sim.writePersistentWord(', 'sim.writeNSEntry(',

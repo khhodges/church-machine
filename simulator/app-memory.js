@@ -6041,6 +6041,98 @@ function _nsTableRowsForSave(state) {
     return rows;
 }
 
+// Upgrade chooser: presentation only. Resolves with the individually checked
+// numeric slots (possibly empty) or null on Cancel/Escape. No fetching, no
+// state edits; the caller owns API calls and orchestration.
+function _nsChooseUpgrades(report) {
+    return new Promise(resolve => {
+        const items = (report && Array.isArray(report.upgrades)) ? report.upgrades : [];
+        const opener = document.activeElement;
+        const el = (tag, css, text) => {
+            const n = document.createElement(tag);
+            if (css) n.style.cssText = css;
+            if (text != null) n.textContent = String(text);
+            return n;
+        };
+        const overlay = el('div', 'position:fixed;inset:0;z-index:10000;background:rgba(10,14,20,0.6);display:flex;align-items:center;justify-content:center;');
+        const dlg = el('div', 'background:#1e2430;color:#d8dee9;border:1px solid #3b4252;border-radius:6px;max-width:720px;width:92vw;max-height:86vh;display:flex;flex-direction:column;font:13px system-ui,sans-serif;box-shadow:0 8px 28px rgba(0,0,0,0.45);');
+        dlg.setAttribute('role', 'dialog');
+        dlg.setAttribute('aria-modal', 'true');
+        const titleId = 'nsUpgTitle' + Date.now(), descId = titleId + 'D';
+        dlg.setAttribute('aria-labelledby', titleId);
+        dlg.setAttribute('aria-describedby', descId);
+        const title = el('h2', 'margin:0;padding:12px 16px;font-size:15px;border-bottom:1px solid #3b4252;', 'Choose LUMP upgrades');
+        title.id = titleId;
+        const desc = el('p', 'margin:0;padding:10px 16px;color:#a9b1c1;line-height:1.45;',
+            'Review available upgrades and selections that could not be checked. Nothing is upgraded automatically: only slots you check will be changed in the saved table. The built image, bitstream and active simulation are unchanged by this save.');
+        desc.id = descId;
+        const list = el('div', 'overflow:auto;padding:4px 16px 8px;flex:1;');
+        const boxes = [];
+        const fmt = v => v ? `v${v.lump_version != null ? v.lump_version : '?'}` : 'none';
+        if (!items.length) list.appendChild(el('p', 'color:#a9b1c1;', 'No upgrades proposed.'));
+        items.forEach(u => {
+            const row = el('div', 'border:1px solid #3b4252;border-radius:4px;padding:8px 10px;margin:6px 0;' + (u.blocked ? 'opacity:0.75;' : ''));
+            const lab = el('label', 'display:flex;gap:10px;align-items:center;cursor:' + (u.blocked ? 'not-allowed' : 'pointer') + ';');
+            const cb = el('input');
+            cb.type = 'checkbox';
+            cb.checked = false;
+            cb.disabled = !!u.blocked;
+            cb.dataset.slot = String(Number(u.slot));
+            lab.appendChild(cb);
+            lab.appendChild(el('span', 'font-weight:600;', `Upgrade NS[${u.slot}] ${u.abstraction || ''}`));
+            lab.appendChild(el('span', 'margin-left:auto;font-family:monospace;color:#a9b1c1;', `${fmt(u.selected)} \u2192 ${fmt(u.proposed)}`));
+            row.appendChild(lab);
+            if (u.blocked) {
+                const why = el('div', 'color:#ebcb8b;margin:4px 0 0 26px;', 'Blocked: ' + u.blocked);
+                why.id = `${titleId}b${u.slot}`;
+                cb.setAttribute('aria-describedby', why.id);
+                row.appendChild(why);
+            } else boxes.push(cb);
+            const det = el('details', 'margin:6px 0 0 26px;');
+            det.appendChild(el('summary', 'cursor:pointer;color:#88c0d0;', 'Exact artifacts'));
+            const tbl = el('table', 'border-collapse:collapse;font-family:monospace;font-size:12px;margin-top:4px;');
+            const tr = (a, b, c) => { const r = el('tr'); [a, b, c].forEach((t, i) => r.appendChild(el(i ? 'td' : 'th', 'text-align:left;padding:2px 8px;vertical-align:top;word-break:break-all;', t))); tbl.appendChild(r); };
+            tr('', 'Current', 'Proposed');
+            ['filename', 'token', 'lump_version', 'binary_hash'].forEach(k =>
+                tr(k, (u.selected || {})[k] ?? '\u2014', (u.proposed || {})[k] ?? '\u2014'));
+            det.appendChild(tbl);
+            row.appendChild(det);
+            list.appendChild(row);
+        });
+        const foot = el('div', 'display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid #3b4252;');
+        const btnCss = 'padding:6px 14px;border-radius:4px;border:1px solid #4c566a;cursor:pointer;font:inherit;';
+        const cancel = el('button', btnCss + 'background:#2e3440;color:#d8dee9;', 'Cancel');
+        const ok = el('button', btnCss + 'background:#5e81ac;color:#eceff4;border-color:#5e81ac;', 'Confirm and Save');
+        cancel.type = ok.type = 'button';
+        foot.append(cancel, ok);
+        dlg.append(title, desc, list, foot);
+        overlay.appendChild(dlg);
+        document.body.appendChild(overlay);
+        const finish = value => {
+            document.removeEventListener('keydown', onKey, true);
+            overlay.remove();
+            if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus();
+            resolve(value);
+        };
+        const focusables = () => Array.from(dlg.querySelectorAll('input:not([disabled]),button:not([disabled]),summary'));
+        function onKey(e) {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(null); return; }
+            if (e.key !== 'Tab') return;
+            const f = focusables();
+            if (!f.length) return;
+            const first = f[0], last = f[f.length - 1];
+            if (!dlg.contains(document.activeElement)) { e.preventDefault(); first.focus(); }
+            else if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+        document.addEventListener('keydown', onKey, true);
+        overlay.addEventListener('mousedown', e => { if (e.target === overlay) e.preventDefault(); });
+        cancel.addEventListener('click', () => finish(null));
+        ok.addEventListener('click', () => finish(boxes.filter(b => b.checked).map(b => Number(b.dataset.slot))));
+        (boxes[0] || ok).focus();
+    });
+}
+
 // Ordinary Save is deliberately independent of image generation and execution.
 window._nsTableSave = async function(btn) {
     if (window._nsTableSaveError !== null || window._nsTableSaveInFlight) return false;
@@ -6048,13 +6140,50 @@ window._nsTableSave = async function(btn) {
     if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
     try {
         const state = window._nsState;
-        const abstractions = _nsTableRowsForSave(state);
+        const draft = _nsTableRowsForSave(state);
+        const frozenDraft = JSON.stringify(draft);
+        const fingerprint = state.namespaceFingerprint;
+        const assertDraftCurrent = () => {
+            if (window._nsState.namespaceFingerprint !== fingerprint ||
+                    JSON.stringify(_nsTableRowsForSave(window._nsState)) !== frozenDraft) {
+                throw new Error('Namespace draft changed during review. Nothing saved; review upgrades again.');
+            }
+        };
+        if (btn) btn.textContent = 'Checking saved revisions…';
+        const checked = await fetch('/api/namespace/review-upgrades', {
+            method: 'POST', cache: 'no-store',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({namespaceFingerprint: fingerprint,
+                ns_state: {abstractions: draft}}),
+        });
+        const report = await _actionableJsonResponse(checked, 'Check Namespace upgrades', {
+            dataChanged: false, nextAction: 'Keep your draft and retry the upgrade check.',
+        });
+        if (!report || !Array.isArray(report.upgrades) ||
+                typeof report.reviewFingerprint !== 'string') {
+            throw new Error('Upgrade check returned incomplete information. Nothing saved; retry the check.');
+        }
+        assertDraftCurrent();
+        const slots = report.upgrades.length ? await _nsChooseUpgrades(report) : [];
+        if (slots === null) throw Object.assign(new Error('Save cancelled.'), {code: 'change_rejected'});
+        assertDraftCurrent();
+        const abstractions = draft.map(row => {
+            if (!slots.includes(row.slot)) return row;
+            const choice = report.upgrades.find(item => item.slot === row.slot);
+            if (!choice || choice.blocked || !choice.replacement) {
+                throw new Error('Upgrade choice is blocked or incomplete; review again.');
+            }
+            return choice.replacement;
+        });
+        if (btn) btn.textContent = 'Saving…';
         const response = await fetch('/api/namespace/save-table', {
             method: 'POST',
+            beforeConfirmedMutation: assertDraftCurrent,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                namespaceFingerprint: state.namespaceFingerprint,
+                namespaceFingerprint: fingerprint,
                 ns_state: { abstractions },
+                upgradeReview: {draft, reviewFingerprint: report.reviewFingerprint, slots},
             }),
         });
         const data = await _actionableJsonResponse(response, 'Save Namespace Table', {
@@ -6069,7 +6198,7 @@ window._nsTableSave = async function(btn) {
         // Review is asynchronous. Preserve edits made while its dialog was
         // open instead of clearing them with the earlier request's receipt.
         const currentRows = _nsTableRowsForSave(window._nsState);
-        const newerDraft = JSON.stringify(currentRows) !== JSON.stringify(abstractions);
+        const newerDraft = JSON.stringify(currentRows) !== frozenDraft;
         window._nsState = Object.assign({}, data,
             newerDraft ? { abstractions: currentRows } : {});
         window._nsTableDraftRows = newerDraft ? currentRows : null;
@@ -6083,7 +6212,8 @@ window._nsTableSave = async function(btn) {
         }
         _setNsDirty(newerDraft);
         const note = document.getElementById('nsSaveLayoutNote');
-        if (note) note.textContent = 'Namespace table saved. Changed physical allocations were checked at commit. Built image, bitstream, and active simulation unchanged; unchanged legacy layout problems may still need review.';
+        if (note) note.textContent = 'Namespace table saved. ' + slots.length +
+            ' individually approved upgrade(s) saved. Built image, bitstream, and active simulation unchanged. Use Prepare Simulation, then review/approve and activate explicitly. Unchanged legacy layout problems may still need review.';
         if (btn) {
             btn.textContent = newerDraft
                 ? 'Earlier table saved — newer edits unsaved'

@@ -259,6 +259,10 @@ async function main() {
             symbolicEntryAt: () => null,
         },
         fetch: async (url, options) => {
+            if (url === '/api/namespace/review-upgrades') return {
+                ok: true, status: 200,
+                json: async () => ({upgrades: [], reviewFingerprint: 'fresh-catalog'}),
+            };
             saveCalls.push({ url, options });
             if (url === '/api/namespace/save-table') {
                 return {

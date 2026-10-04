@@ -4899,7 +4899,7 @@ def _read_namespace_design_document():
 def _namespace_table_candidate(payload):
     """Shared read-only preflight for protected review and Namespace-only commit."""
     from server.namespace_authority import validate_namespace_design_rows, namespace_removal_generations
-    if not isinstance(payload, dict) or set(payload) - {"namespaceFingerprint", "ns_state"}:
+    if not isinstance(payload, dict) or set(payload) - {"namespaceFingerprint", "ns_state", "upgradeReview"}:
         raise ValueError("Namespace-only save accepts namespaceFingerprint and ns_state only")
     expected = payload.get("namespaceFingerprint")
     if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
@@ -4912,9 +4912,39 @@ def _namespace_table_candidate(payload):
     state = _read_namespace_design_document()
     if _namespace_state_fingerprint(state["abstractions"]) != expected:
         raise ValueError("Namespace changed since review; reload before saving")
+    if "upgradeReview" in payload:
+        from server.namespace_upgrades import review, apply
+        receipt = payload["upgradeReview"]
+        if not isinstance(receipt, dict) or set(receipt) != {"draft", "reviewFingerprint", "slots"}:
+            raise ValueError("Invalid upgrade review; check saved revisions again")
+        validate_namespace_design_rows(receipt["draft"], MAX_NS_ENTRIES)
+        report = review(receipt["draft"], LUMPS_DIR, _prepare_run_candidate,
+                        _check_namespace_allocation)
+        if report["reviewFingerprint"] != receipt["reviewFingerprint"]:
+            raise ValueError("Saved LUMP catalog or reviewed bytes changed; review upgrades again")
+        if rows != apply(report, receipt["draft"], receipt["slots"]):
+            raise ValueError("Namespace draft differs from individually reviewed upgrades; review again")
     namespace_removal_generations(state, rows)
     _check_namespace_allocation(rows)
     return state, rows
+
+
+@app.route("/api/namespace/review-upgrades", methods=["POST"])
+def namespace_review_upgrades():
+    """Inspect fresh saved revisions without changing any draft or saved data."""
+    try:
+        from server.namespace_upgrades import review
+        payload = request.get_json(silent=True)
+        if not isinstance(payload, dict) or set(payload) != {"namespaceFingerprint", "ns_state"}:
+            raise ValueError("Expected the exact Namespace draft and fingerprint")
+        with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR):
+            _, rows = _namespace_table_candidate(payload)
+            report = review(rows, LUMPS_DIR, _prepare_run_candidate,
+                            _check_namespace_allocation)
+        return jsonify(ok=True, **report)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=f"Upgrade check failed: {exc}. Nothing saved; keep your draft and retry.",
+                       dataChanged=False), 409
 
 
 def _check_namespace_allocation(rows, pending=None, config=None, before_config=None):
@@ -27379,6 +27409,8 @@ def _recover_lump_transition_before_request():
             "/api/namespace-lump.json",
             "/api/boot-image/ns-state",
             "/api/boot-image/save-ns",
+            "/api/namespace/save-table",
+            "/api/namespace/review-upgrades",
         }
     ):
         return None

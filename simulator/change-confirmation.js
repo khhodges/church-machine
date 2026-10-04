@@ -97,7 +97,7 @@
     function needsReview(url) {
         if (url.origin !== window.location.origin) return false;
         var path = url.pathname;
-        if (['/api/namespace/image-refresh/prepare',
+        if (['/api/namespace/image-refresh/prepare', '/api/namespace/review-upgrades',
             '/api/lumps/save-plan', '/api/lumps/finalize',
             '/api/lumps/save-diagnostics', '/api/lumps/approval-intent',
             '/api/lumps/deploy-authorize'].includes(path) ||
@@ -118,11 +118,13 @@
         // Queue the entire review/commit, not merely the visible dialogs.
         // Otherwise later intents bind pre-commit state (and first-use session
         // cookies) before an earlier approved mutation has completed.
-        var result = mutationQueue.then(function () { return reviewedFetch(request); });
+        var beforeCommit = options && options.beforeConfirmedMutation;
+        var result = mutationQueue.then(function () { return reviewedFetch(request, beforeCommit); });
         mutationQueue = result.catch(function () {});
         return result;
     };
-    async function reviewedFetch(request) {
+    async function reviewedFetch(request, beforeCommit) {
+        if (beforeCommit) beforeCommit();
         var response = await nativeFetch(request.clone());
         if (response.status !== 428 || new URL(request.url).origin !== window.location.origin) return response;
         var payload;
@@ -137,6 +139,7 @@
             }), {status: 409, headers: {'Content-Type': 'application/json'}});
         }
         var headers = new Headers(request.headers);
+        if (beforeCommit) beforeCommit();
         headers.set('X-Change-Confirmation', payload.change_confirmation.id);
         // One retry only. Expiry, stale state and replay require a new action.
         return nativeFetch(new Request(request, {headers: headers}));
