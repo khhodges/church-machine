@@ -110,6 +110,11 @@
       "type": "Inform"
     },
     {
+      "artifact_pin": {
+        "filename": "CapabilityTest.1.ff2e3f35.lump",
+        "revision": 39,
+        "token": "a207ecd1"
+      },
       "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
       "boot": true,
       "boot_resident": true,
@@ -128,12 +133,7 @@
       "seq": 0,
       "slot": 10,
       "token": "a207ecd1",
-      "type": "Inform",
-      "artifact_pin": {
-        "filename": "CapabilityTest.1.ff2e3f35.lump",
-        "token": "a207ecd1",
-        "revision": 39
-      }
+      "type": "Inform"
     },
     {
       "f": 0,
