@@ -1634,6 +1634,15 @@
     "filename": "CapabilityTest.1.ff2e3f35.lump",
     "lump_version": 40,
     "compiled_at": 1791072510.9183779,
-    "operation_id": "c86a3eb6-42c5-491a-b92b-adfcda45f645"
+    "operation_id": "c86a3eb6-42c5-491a-b92b-adfcda45f645",
+    "archived": true
+  },
+  {
+    "token": "a207ecd1",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.a28f6ee7.lump",
+    "lump_version": 41,
+    "compiled_at": 1791074291.563188,
+    "operation_id": "9ce751c1-2c60-4812-94c1-785aea1376f8"
   }
 ]

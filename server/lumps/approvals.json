@@ -925,6 +925,28 @@
         "signature": "f4cc29340f3940003f9150864ba145e661fdb51b53fd2dfac242027f1623f6f5"
       },
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "797938d068cbe8149c8baed681878d49133dd1a28742eae02c2d64c86e1572b3": {
+      "binary_hash": "797938d068cbe8149c8baed681878d49133dd1a28742eae02c2d64c86e1572b3",
+      "dot_name": "CapabilityTest",
+      "issue_n": 1,
+      "abstraction": "CapabilityTest",
+      "filename": "CapabilityTest.1.a28f6ee7.lump",
+      "compiled_at": 1791074291.563188,
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "797938d068cbe8149c8baed681878d49133dd1a28742eae02c2d64c86e1572b3",
+        "source_hash": "e1a2b056e20d525951122c3c098ba32397d1dc6b80b342872a4724b4176d9683",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "c1be1db7580abeab82e69dc50c954269303292a67ede7204675fccd1a2eed9f2"
+      },
+      "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     }
   }
 }
