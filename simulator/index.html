@@ -3248,10 +3248,19 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
                             The Wukong XC7A100T uses Yosys + Vivado for P&amp;R.
                         </div>
                     </div>
+                    <div class="settings-section" id="settingsIdeHierarchySection" aria-labelledby="settingsIdeHierarchyTitle">
+                        <div class="settings-section-title" id="settingsIdeHierarchyTitle">IDE hierarchy — server setup</div>
+                        <div class="settings-label">Server-provisioned IDE node (read-only)</div>
+                        <code id="settingsIdeHierarchyNode" style="display:block;overflow-wrap:anywhere;">Not available</code>
+                        <p id="settingsIdeHierarchyStatus" role="status" aria-live="polite">Checking server configuration…</p>
+                        <p>This node comes only from the server. The browser’s <code>church_petname</code> below is a naming preference, not ownership authority. Saving Settings cannot provision or change the IDE node.</p>
+                        <a href="/docs/CM_LUMP_SPECIFICATION.md#:~:text=Simple%20IDE-node%20provisioning" target="_blank" rel="noopener">Simple IDE-node provisioning instructions</a>
+                        <button type="button" class="btn btn-sm" onclick="refreshSettingsIdeHierarchy()">Refresh status</button>
+                    </div>
                     <div class="settings-section" id="settingsIdentitySection">
                         <div class="settings-section-title">Identity</div>
-                        <div style="color:#888;font-size:0.78rem;margin-bottom:0.6rem;">Your dot pet name is stamped into every compiled LUMP as the identity seal — <code>petname.Abstraction#n</code> is globally unique.</div>
-                        <label class="settings-label">Dot Pet Name
+                        <div style="color:#888;font-size:0.78rem;margin-bottom:0.6rem;">Your browser dot pet name is used when naming compiled LUMPs — <code>petname.Abstraction#n</code>. Choosing a name does not assign an IDE hierarchy node or grant leaf ownership.</div>
+                        <label class="settings-label">Browser Dot Pet Name (church_petname)
                             <input type="text" id="settingPetname" class="modal-input" placeholder="e.g. ken or org.dep.proj" maxlength="128" autocomplete="off" spellcheck="false">
                         </label>
                         <label class="settings-label">Default Issue Number
