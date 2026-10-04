@@ -22,7 +22,10 @@ const MANIFEST = path.join(LUMPS_DIR, 'manifest.json');
 const NS_STATE = path.join(LUMPS_DIR, 'ns-state.json');
 const APPROVALS = path.join(LUMPS_DIR, 'approvals.json');
 const CHECK_ONLY = process.argv.includes('--check');
-if (!CHECK_ONLY) require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
+const CANDIDATE_DIR = arg('--candidate-dir');
+if (CHECK_ONLY && CANDIDATE_DIR) throw new Error('--check and --candidate-dir are mutually exclusive');
+if (CANDIDATE_DIR) require('./live-lump-guard').assertOfflineOutput(path.resolve(CANDIDATE_DIR));
+else if (!CHECK_ONLY) require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
 const DOT_NAME = 'SelfTest';
 
 function json(value) {
@@ -153,7 +156,7 @@ const entry = {
     variant_group: 'selftest-history',
 };
 console.log(`SelfTest artifact: ${filename}`);
-console.log(`Content token (CRC-32): ${token}`);
+console.log(`Bootstrap runtime SELF token: ${token}`);
 console.log(`slot=${nsSlot} seq=${seq} cw=${cw} cc=${cc} lump_size=${lumpSize} binary_sha256=${binaryHash}`);
 
 const active = manifest.filter(e => e.token === token && e.abstraction === DOT_NAME && !e.archived);
@@ -171,10 +174,32 @@ const approvalRecord = {
     capability_type: 'inform',
     compiled_at: existingApproval?.compiled_at || Date.now() / 1000,
 };
+if (CANDIDATE_DIR) {
+    // Review evidence only: never manufacture admission or install a candidate.
+    const destination = path.resolve(CANDIDATE_DIR);
+    fs.mkdirSync(destination, { recursive: true });
+    fs.writeFileSync(path.join(destination, filename), bytes, { flag: 'wx' });
+    fs.writeFileSync(path.join(destination, 'review.json'), json({
+        status: 'unapproved-candidate', installed: false,
+        filename, binary_hash: binaryHash, source_sha256: crypto.createHash('sha256').update(source).digest('hex'),
+        selected_filename: stateRow.filename, selected_binary_hash: stateRow.binary_hash,
+        proposed_issue: issueN, slot: nsSlot, sequence: seq, words: lumpSize,
+        code_words: cw, capability_rows: cc,
+        method_entry: '0xbf000001', continuation: 'Next at c-list row 1; destination binding requires review',
+        warning: 'No approval created. Trusted admission, layout review and explicit adoption are required. No Namespace or boot image changed.',
+    }), { flag: 'wx' });
+    console.log('Unapproved review candidate written; no live state or approval changed.');
+    process.exit(0);
+}
 if (CHECK_ONLY) {
     const failures = [];
     const activeRows = manifest.filter(e => e.abstraction === DOT_NAME && !e.archived);
     const activeRow = activeRows.length === 1 ? activeRows[0] : null;
+    const activeIssue = activeRow?.issue_n || activeRow?.lump_version;
+    const activeIdentityString = Number.isInteger(activeIssue) && activeIssue > 0
+        ? `${DOT_NAME}#${activeIssue}` : null;
+    const activeIdentityHash = activeIdentityString
+        ? crypto.createHash('sha256').update(activeIdentityString).digest('hex') : null;
     const activePath = activeRow && path.join(LUMPS_DIR, activeRow.filename);
     let activeBytes = null;
     let activeHash = null;
@@ -202,9 +227,14 @@ if (CHECK_ONLY) {
             : storedSource.toString('utf8');
     } catch (_) {}
     if (!activeBytes || activeSource !== source ||
-            activeCc < 1 ||
+            activeCc !== cc ||
             JSON.stringify(activeWords) !== JSON.stringify(compiledWords)) {
         failures.push('active SelfTest binary does not contain the canonical compiled source');
+        if (activeSource !== source) failures.push('embedded source differs from canonical source');
+        if (activeCc !== cc) failures.push(`capability rows: saved ${activeCc}, required ${cc} (SELF and Next)`);
+        if (activeWords?.[0] !== method1Dispatch) failures.push('method entry must be BRANCH +1 (0xbf000001)');
+        if (activeWords && JSON.stringify(activeWords.slice(1)) !== JSON.stringify(compiledWords.slice(1)))
+            failures.push('source-body instruction words differ from current compiler output');
     }
     if (!activeRow || activeRow.token !== token ||
             activeRow.filename !== stateRow.filename ||
@@ -214,7 +244,7 @@ if (CHECK_ONLY) {
     if (stateRow.token !== token ||
         stateRow.slot !== nsSlot || stateRow.seq !== seq ||
         stateRow.filename !== activeRow?.filename ||
-        stateRow.identity_hash !== identityHash ||
+        !activeIdentityHash || stateRow.identity_hash !== activeIdentityHash ||
         stateRow.binary_hash !== activeHash ||
         stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
         stateRow.resident !== true || stateRow.boot_resident !== true ||
@@ -228,10 +258,12 @@ if (CHECK_ONLY) {
     if (!approved || approved.binary_hash !== activeHash ||
             approved.filename !== stateRow.filename ||
             approved.token !== token || approved.abstraction !== DOT_NAME ||
-            approved.identity_string !== identityString ||
-            approved.identity_hash !== identityHash ||
+            approved.identity_string !== activeIdentityString ||
+            approved.identity_hash !== activeIdentityHash ||
             approved.identity_seal_location !== 'approval') {
         failures.push('SelfTest hash-bound approval is missing or stale');
+        failures.push(!approved ? 'no approval for selected binary hash'
+            : 'existing approval does not match selected revision metadata; no approval was modified');
     }
     if (failures.length) die(failures.join('\nFAIL: '));
     console.log('OK: canonical SelfTest source, manifest, ns-state, and named artifact are fresh.');

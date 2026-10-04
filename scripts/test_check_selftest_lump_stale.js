@@ -23,6 +23,23 @@ try {
     fs.writeFileSync(path.join(dir, '00000600.lump'), 'intentionally unrelated legacy artifact');
     r = run(GUARD, ['--lump-words', '8192']);
     check(r.status === 0, 'guard ignores a legacy 00000600.lump');
+    r = run(GUARD, ['--lump-words', '16384']);
+    check(r.status === 0, 'prospective allocation/revision never changes active identity validation');
+    const protectedFiles = ['manifest.json', 'ns-state.json', 'approvals.json'];
+    const before = protectedFiles.map(name => fs.readFileSync(path.join(dir, name)));
+    const candidateDir = path.join(dir, 'review');
+    r = run(BUILD, ['--candidate-dir', candidateDir]);
+    check(r.status === 0, 'isolated unapproved candidate preparation succeeds');
+    const review = JSON.parse(fs.readFileSync(path.join(candidateDir, 'review.json')));
+    const candidate = fs.readFileSync(path.join(candidateDir, review.filename));
+    check(review.status === 'unapproved-candidate' && review.installed === false,
+        'review distinguishes preparation from approval and installation');
+    check(candidate.readUInt32BE(4) === 0xBF000001 && (candidate.readUInt32BE(0) & 255) === 2,
+        'candidate has method dispatch and both capability rows');
+    check(protectedFiles.every((name, i) => fs.readFileSync(path.join(dir, name)).equals(before[i])),
+        'candidate preparation preserves manifest, Namespace and approvals');
+    r = run(BUILD, ['--candidate-dir', candidateDir]);
+    check(r.status !== 0, 'existing review candidate cannot be overwritten');
     const statePath = path.join(dir, 'ns-state.json');
     const state = JSON.parse(fs.readFileSync(statePath));
     state.abstractions[0].filename = 'missing.lump';

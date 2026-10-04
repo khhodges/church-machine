@@ -14,3 +14,9 @@ SelfTest execution verdicts must be bound to the exact selected binary's control
 **Why:** Stale addresses have classified a correctly executed BRANCHCC as a failure and waited for a RETURN on a correctly skipped failure path. Both reported arithmetic failures despite a clean hardware-model trace reaching the next tests.
 
 **How to apply:** Validate branch and failure-path words against the selected artifact before interpreting a trace. Derive targets from that artifact and verify their meanings independently; never update expected addresses merely to match observed execution.
+
+Validate an active revision against its own declared identity, not a prospective rebuild's identity. Offline review candidates carry no admission authority.
+
+**Why:** Repacking canonical source can allocate a different size and advance a proposed issue even while the selected artifact remains internally consistent. Comparing its approval to that future issue creates misleading stale-identity failures. Preparing corrected bytes does not authorize live replacement.
+
+**How to apply:** Separate source freshness, internal selected-artifact consistency, and candidate adoption. Candidate preparation must leave Namespace, approvals, selected binaries and boot images unchanged; review allocation and destination-local capability binding before explicit adoption.
