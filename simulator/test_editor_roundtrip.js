@@ -1,14 +1,14 @@
 'use strict';
 // test_editor_roundtrip.js — Round-trip test for Task #2108
 //
-// Confirms that the structured source emitted by openLumpInEditor's
-// reconstruction path (`method Name { ... }` blocks) compiles back through
-// CLOOMCCompiler to code words that match the original LUMP binary.
+// Confirms that reconstructed method bodies inside an explicitly declared
+// test abstraction compile back to the original LUMP code words. This helper
+// is a compiler fixture, not the editor's source-recovery implementation:
+// the editor keeps inspection/disassembly separate from owned editable source.
 //
 // Steps exercised per test case:
 //   1. Assemble a known N-method LUMP with assembleLump().
-//   2. Run the reconstruction logic (mirrors openLumpInEditor lines 4463-4513)
-//      to produce `method Name { assembly mnemonics }` source text.
+//   2. Build explicitly named structured fixtures from reconstructed bodies.
 //   3. Re-compile that source through CLOOMCCompiler.compile().
 //   4. Assert each method's re-compiled code array matches the original body.
 //   5. Re-assemble with assembleLump() and verify the code region is identical.
@@ -42,11 +42,10 @@ const { assembleLump, decodeBranchEntry, BRANCH_OPCODE } = require('./lump_assem
 // (3<<27)|(14<<23) = 0x1F000000
 const RETURN_WORD = ((3 << 27) | (14 << 23)) >>> 0;
 
-// ── reconstructSource: mirrors the structured-block emitter in openLumpInEditor
-// (app-lumps.js lines 4463-4513).
+// ── reconstructSource: test-only structured source fixture builder.
 //
 // Inputs:
-//   lumpName    — string label for the comment header
+//   lumpName    — abstraction identity explicitly supplied by the test author
 //   trimmed     — uint32 array: lump code words with header stripped + zero-trimmed
 //   methodNames — array of method name strings (length = N)
 //
@@ -68,7 +67,8 @@ function reconstructSource(lumpName, trimmed, methodNames) {
     });
 
     var lines = [
-        '; ' + lumpName + '  (' + trimmed.length + ' words, cc=0)'
+        '; ' + lumpName + '  (' + trimmed.length + ' words, cc=0)',
+        'abstraction ' + lumpName + ' {'
     ];
 
     for (var mi = 0; mi < N; mi++) {
@@ -91,6 +91,7 @@ function reconstructSource(lumpName, trimmed, methodNames) {
         lines.push('');
     }
 
+    lines.push('}');
     return lines.join('\n');
 }
 
@@ -131,6 +132,11 @@ function check(label, cond, detail) {
 }
 
 // Editor keeps RETURN's literal low-12-bit convention, including bits 5/6.
+{
+    const undeclared = new CLOOMCCompiler().compile('method Alpha {\n RETURN\n}', []);
+    check('Undeclared method fragments remain rejected',
+        undeclared.errors.some(error => /No abstraction declaration found/.test(error.message)));
+}
 for (const mask of [0, 1, 32, 64, 0x895, 0xFFF]) {
     const asm = new ChurchAssembler();
     const word = (RETURN_WORD | mask) >>> 0;
@@ -263,7 +269,8 @@ console.log('\n--- T-ER03: BRANCH table not leaked into body text ---');
     // Body text lines (non-comment, non-header, non-brace) must all be 'RETURN'
     var bodyLines3 = (src3 || '').split('\n').filter(function(l) {
         var t = l.trim();
-        return t && !t.startsWith(';') && !t.startsWith('method') && t !== '}';
+        return t && !t.startsWith(';') && !t.startsWith('method') &&
+            !t.startsWith('abstraction ') && t !== '}';
     });
     var nonReturn3 = bodyLines3.filter(function(l) { return l.trim() !== 'RETURN'; });
     check('T-ER03b: all body lines are RETURN (no BRANCH table leaked)',

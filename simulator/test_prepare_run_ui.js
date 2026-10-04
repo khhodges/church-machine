@@ -15,15 +15,16 @@ function fn(source, name) {
     return source.slice(match.index, source.indexOf('\n}', match.index) + 2);
 }
 assert.doesNotMatch(abstractions, /\/api\/boot-image\/generate|Retry boot-image cache|Prepare boot image<\/button>/);
-assert.match(abstractions, /simulationPreparationAbstractionsPanel[\s\S]*SimulationPreparation\.markup\(\)/);
+assert.doesNotMatch(abstractions, /simulationPreparationAbstractionsPanel/);
+assert.match(memory, /Advanced — Simulation configuration[\s\S]*simulationPreparationPanel[\s\S]*SimulationPreparation\.markup\(\)/,
+    'optional private preparation belongs in the advanced Namespace panel');
 assert.doesNotMatch(fn(run, '_showBootPreparationBlocked'), /click Prepare boot image|committed image is prepared/);
 assert.doesNotMatch(fn(run, '_ensureCommittedImageForBoot'), /fetch|generateBootImage|savePreparedBootEntry/);
 assert.match(fn(memory, 'generateBootImage'), /\/api\/boot-image\/generate/,
     'independent explicit hardware publication remains available');
 assert.doesNotMatch(fn(memory, 'generateBootImage'), /sim\.loadBootImage|sim\.reset|SimulationPreparation\.activate/);
 const calls = [];
-const panels = { simulationPreparationPanel: { innerHTML: '' },
-    simulationPreparationAbstractionsPanel: { innerHTML: '' } };
+const panels = { simulationPreparationPanel: { innerHTML: '' } };
 const saved = { namespaceFingerprint: 'saved-design', abstractions: [{ slot: 6, boot: true }] };
 const pins = { 6: { revision: 1, token: 'exact', filename: 'exact.lump' } };
 const context = {
@@ -57,11 +58,9 @@ for (const name of ['savePreparedBootEntry', 'refreshPreparedBootImageCache', 'p
     }
     assert.strictEqual(calls.length, 3);
     assert(calls.every(call => JSON.stringify(call.payload) === '{"namespaceFingerprint":"saved-design"}'));
-    assert.strictEqual(panels.simulationPreparationPanel.innerHTML,
-        panels.simulationPreparationAbstractionsPanel.innerHTML);
-    assert.match(panels.simulationPreparationAbstractionsPanel.innerHTML, /Prepare for Simulation/);
-    assert.match(panels.simulationPreparationAbstractionsPanel.innerHTML, /Approve Configuration/);
-    assert.match(panels.simulationPreparationAbstractionsPanel.innerHTML, /Activate Simulation/);
+    assert.match(panels.simulationPreparationPanel.innerHTML, /Prepare for Simulation/);
+    assert.match(panels.simulationPreparationPanel.innerHTML, /Approve Configuration/);
+    assert.match(panels.simulationPreparationPanel.innerHTML, /Activate Simulation/);
     delete context.window.SimulationPreparation;
     await assert.rejects(context.savePreparedBootEntry(), /unavailable/);
     assert.strictEqual(calls.length, 3, 'missing private API cannot fall back to generation');

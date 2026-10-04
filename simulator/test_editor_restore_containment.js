@@ -174,6 +174,7 @@ function storageObject(initial) {
     let preservedDraft = null;
     let saves = 0;
     let inputListener = null;
+    let allowReplacement = false;
     const editor = {
         value: 'draft',
         parentNode: { parentNode: { insertBefore(node) { banner = node; } } },
@@ -186,6 +187,7 @@ function storageObject(initial) {
     };
     const sandbox = {
         window: {
+            async confirmSourceReplacement() { return allowReplacement; },
             _editorSourceFilePath: 'owned.cloomc',
             _editorNavigationEpoch: 0,
             _advanceEditorNavigationEpoch() {
@@ -282,7 +284,12 @@ function storageObject(initial) {
         { type: 'source', id: 'owned.cloomc' }, 'draft', editor);
     resolveFetch({ ok: true, text: () => Promise.resolve('server source') });
     await new Promise(resolve => setImmediate(resolve));
-    buttons['#_authoritativeAccept'].onclick();
+    await buttons['#_authoritativeAccept'].onclick();
+    assert.strictEqual(editor.value, 'draft', 'declining confirmation preserves the draft');
+    assert.strictEqual(preservedDraft, null);
+    assert.strictEqual(saves, 0);
+    allowReplacement = true;
+    await buttons['#_authoritativeAccept'].onclick();
     assert.strictEqual(editor.value, 'server source');
     assert.deepStrictEqual(preservedDraft, {
         owner: { type: 'source', id: 'owned.cloomc' },
@@ -298,7 +305,7 @@ function storageObject(initial) {
     assert.ok(banner && banner._ownerDraftRecovery);
     assert.strictEqual(buttons['#_authoritativeBefore'].textContent, 'server source');
     assert.strictEqual(buttons['#_authoritativeAfter'].textContent, 'draft');
-    buttons['#_authoritativeRestore'].onclick();
+    await buttons['#_authoritativeRestore'].onclick();
     assert.strictEqual(editor.value, 'draft');
     assert.strictEqual(preservedDraft, null);
     assert.strictEqual(saves, 2);
