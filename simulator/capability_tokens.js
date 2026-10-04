@@ -82,20 +82,37 @@
         }
     }
 
+    const hierarchyPath = value => typeof value === 'string' &&
+        /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(value);
+
+    // Validate the whole server-provisioned configuration, including unused
+    // foreign definitions. This checks structure, not global node ownership.
+    function validateHierarchyConfiguration(config) {
+        const invalid = reason => ({ ok: false,
+            error: `IDE hierarchy is missing or malformed (${reason}). Configure server/ide-hierarchy.json: ask the operator to provision it using server/ide-hierarchy.example.json with the assigned IDE node, exact aliases and trusted foreign definitions; no ownership was inferred.` });
+        const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+        if (!object(config) || !hierarchyPath(config.node)) return invalid('invalid node');
+        for (const field of ['aliases', 'definitions']) {
+            if (config[field] != null && !object(config[field])) return invalid(`${field} must be an object`);
+        }
+        // Alias keys are PetNames: numeric and hash-separated Thread instances
+        // are allowed here, but never in canonical hierarchy paths.
+        const petName = value => /^[A-Za-z_][A-Za-z0-9_-]*(?:[.#][A-Za-z0-9_-]+)*$/.test(value);
+        for (const [key, value] of Object.entries(config.aliases || {})) {
+            if (!petName(key) || !hierarchyPath(value)) return invalid(`invalid alias "${key}"`);
+        }
+        for (const [key, rights] of Object.entries(config.definitions || {})) {
+            if (!hierarchyPath(key)) return invalid(`invalid definition path "${key}"`);
+            if (!Array.isArray(rights)) return invalid(`definition "${key}" permissions must be an array`);
+            try { normalizeRights({ rights }); }
+            catch (e) { return invalid(`definition "${key}": ${e.message}`); }
+        }
+        return { ok: true, error: null };
+    }
+
+    // Compatibility entry point for the Format LUMP setup guard.
     function hierarchyConfigurationError(config) {
-        const path = value => typeof value === 'string' &&
-            /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(value);
-        const petName = value => typeof value === 'string' &&
-            /^[A-Za-z_][A-Za-z0-9_-]*(?:[.#][A-Za-z0-9_-]+)*$/.test(value);
-        const malformed = !config || typeof config !== 'object' || Array.isArray(config) ||
-            !path(config.node) ||
-            ['aliases', 'definitions'].some(key => config[key] != null &&
-                (typeof config[key] !== 'object' || Array.isArray(config[key]))) ||
-            Object.entries(config.aliases || {}).some(([key, value]) => !petName(key) || !path(value)) ||
-            Object.keys(config.definitions || {}).some(key => !path(key));
-        return malformed
-            ? 'IDE hierarchy is missing or malformed. Configure server/ide-hierarchy.json: ask the operator to provision it using server/ide-hierarchy.example.json with the assigned IDE node, exact aliases and trusted foreign definitions; no ownership was inferred.'
-            : null;
+        return validateHierarchyConfiguration(config).error;
     }
 
     // Exact path components, not textual prefixes or imported short names.
@@ -111,17 +128,15 @@
                 (rights.length !== 1 || rights[0] !== 'E')
                 ? 'SELF permissions are compiler-owned E. Use bare SELF or SELF E.' : null };
         }
-        const path = value => typeof value === 'string' &&
-            /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(value);
-        const configurationError = hierarchyConfigurationError(config);
-        if (configurationError) return { ownership: 'unconfigured', error: configurationError };
+        const configuration = validateHierarchyConfiguration(config);
+        if (!configuration.ok) return { ownership: 'unconfigured', error: configuration.error };
         const aliases = config.aliases || {};
         const definitions = config.definitions || {};
         const explicit = cap && typeof cap === 'object' && (cap.N || cap.identity_string || cap.canonical_leaf);
         const canonical = explicit ? String(explicit).replace(/#[1-9][0-9]*$/, '') :
             Object.prototype.hasOwnProperty.call(aliases, name) ? aliases[name] :
             name.includes('.') ? name : `${config.node}.${name}`;
-        if (!path(canonical)) return { ownership: 'invalid', error:
+        if (!hierarchyPath(canonical)) return { ownership: 'invalid', error:
             `Malformed canonical leaf "${canonical}". Configure an exact alias for PetName "${name}" in server/ide-hierarchy.json; no ownership was inferred.` };
         if (cap && cap.canonical_leaf && cap.canonical_leaf !== canonical) {
             return { ownership: 'invalid', error: `Capability "${name}" has conflicting canonical identities.` };
@@ -627,6 +642,7 @@
     return {
         hierarchyConfigurationError,
         normalizeRights,
+        validateHierarchyConfiguration,
         checkLeafOwnership,
         authoredRightsForName,
         rightsToPerms,

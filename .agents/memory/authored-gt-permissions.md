@@ -17,6 +17,12 @@ Formatter setup validation is independent of individual leaf decisions: even a S
 
 **Why:** The user approved explicit IDE-node setup and asked to keep it simple. A locally chosen string is not proof of global hierarchy ownership; assignment remains the operator's responsibility.
 
+Hierarchy setup validation must not make empty, SELF-only, or NULL-only programs depend on an IDE node assignment.
+
+**Why:** These declarations make no IDE-owned leaf claim. Requiring configuration before checking for ordinary leaves breaks standalone compiler attestation and bootstrap artifact publication.
+
+**How to apply:** Validate the entire configuration, including unused foreign definitions, whenever authoring checks an ordinary leaf. Keep compiler-owned SELF and NULL exceptions configuration-independent; Settings still reports the configuration's actual status.
+
 Permission changes to a register-held Golden Token are a runtime M-bit concern, distinct from changing a leaf definition on its owning IDE. Permissionless Thread GTs remain valid for SWITCH/CHANGE. In `SWITCH CR12, Thread.1 ; CR6, #0`, the semicolon makes the remainder a comment: `Thread.1` is a pet name and must resolve through the active C-list to its current CR6 row.
 
 Alias-key syntax and canonical hierarchy syntax are different contracts. Legacy Thread PetNames, including numeric and hash-separated instances, need exact configured aliases rather than fabricated canonical identities.

@@ -22,6 +22,26 @@ async function show(config, code = 200) {
     await context.refreshSettingsIdeHierarchy();
 }
 (async () => {
+    for (const { name, config, valid } of require('./ide_hierarchy_cases.json')) {
+        const before = JSON.stringify(config);
+        const check = CapabilityTokens.validateHierarchyConfiguration(config);
+        assert.equal(check.ok, valid, name);
+        const leaf = CapabilityTokens.checkLeafOwnership({ name: 'UART_TX', rights: ['W'] }, config);
+        assert.equal(leaf.error, check.error, name);
+        for (const cap of [{ name: 'SELF', rights: ['E'] }, { name: 'NULL' }]) {
+            assert.equal(CapabilityTokens.checkLeafOwnership(cap, config).error, null, name);
+        }
+        await show(config);
+        if (valid) {
+            assert.equal(node(), config.node, name);
+            assert.match(status(), /Configured by the server/, name);
+        } else {
+            assert.equal(node(), 'Not available', name);
+            if (config !== null) assert.ok(status().includes(check.error), name);
+            else assert.match(status(), /Not configured/, name);
+        }
+        assert.equal(JSON.stringify(config), before, 'validation must not mutate ' + name);
+    }
     document.getElementById('settingPetname').value = 'browser.claim';
     await show({ node: 'Org.Assigned_IDE', aliases: { 'Thread.1': 'Org.Assigned_IDE.Thread1' } });
     assert.equal(node(), 'Org.Assigned_IDE');

@@ -2,6 +2,7 @@
 import copy
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 from bootstrap_test_support import isolate_application, reviewed_post
@@ -10,6 +11,10 @@ isolate_application()
 from test_lump_save_endpoint import isolated_lumps
 import server.app as app_module
 from server import ide_leaf_policy
+
+
+HIERARCHY_CASES = json.loads(
+    (Path(__file__).resolve().parents[2] / "simulator" / "ide_hierarchy_cases.json").read_text())
 
 
 @pytest.fixture
@@ -192,3 +197,49 @@ def test_permissionless_thread_alias_compile_save_and_foreign_guard(setup, name)
         # A valid legacy alias must not poison unrelated local declarations.
         _, unrelated = compile_candidate(client, "UART_TX RW")
         assert unrelated["ok"], unrelated
+
+@pytest.mark.parametrize("case", HIERARCHY_CASES, ids=lambda case: case["name"])
+def test_hierarchy_settings_authoring_parity(setup, case):
+    client, _, config_path = setup
+    config_path.write_text(json.dumps(case["config"]))
+    # The GET contract remains the raw parsed file (even semantically invalid),
+    # not a validation envelope or a browser-derived authority object.
+    response = client.get("/api/ide-hierarchy")
+    assert response.status_code == 200
+    assert response.get_json() == case["config"]
+    check = json.loads(subprocess.run(
+        ["node", "-e",
+         "const p=require('./simulator/capability_tokens.js');"
+         "process.stdout.write(JSON.stringify(p.validateHierarchyConfiguration(JSON.parse(process.argv[1]))));",
+         json.dumps(case["config"])],
+        capture_output=True, text=True, check=True).stdout)
+    assert check["ok"] == case["valid"]
+    caps = [{"name": "UART_TX", "rights": ["W"]}]
+    if case["valid"]:
+        assert ide_leaf_policy.validate(caps)[0]["ownership"] == "local"
+        assert ide_leaf_policy.validate([]) == []
+    else:
+        with pytest.raises(ValueError) as error:
+            ide_leaf_policy.validate(caps)
+        assert str(error.value) == check["error"]
+    # Compiler-owned SELF and null rows make no IDE ownership claim.
+    assert ide_leaf_policy.validate([]) == []
+    assert ide_leaf_policy.validate([{"name": "SELF", "rights": ["E"]}])[0]["error"] is None
+    assert ide_leaf_policy.validate([{"name": "NULL"}])[0]["error"] is None
+    _, compiled = compile_candidate(client, "UART_TX W", {
+        "_ide_hierarchy": {"node": "global.local"},
+        "ideHierarchy": {"node": "global.local"},
+    })
+    assert compiled["ok"] == case["valid"], compiled
+    if not case["valid"]:
+        assert check["error"] in compiled["error"]
+
+def test_hierarchy_get_missing_and_unreadable_contract(setup):
+    client, _, config_path = setup
+    config_path.unlink()
+    response = client.get("/api/ide-hierarchy")
+    assert response.status_code == 200 and response.get_json() is None
+    config_path.write_text("{broken")
+    response = client.get("/api/ide-hierarchy")
+    assert response.status_code == 422
+    assert "unreadable" in response.get_json()["error"]

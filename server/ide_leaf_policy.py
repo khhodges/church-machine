@@ -8,6 +8,7 @@ _TOKENS = os.path.join(os.path.dirname(__file__), "..", "simulator", "capability
 
 
 def configuration():
+    """Read the raw endpoint payload; semantic checks belong to the shared JS policy."""
     try:
         with open(CONFIG_PATH, encoding="utf-8") as handle:
             return json.load(handle)
@@ -21,7 +22,12 @@ def configuration():
 
 
 def validate(capabilities, config=None):
-    """Use the same policy as the browser, with server-controlled input only."""
+    """Use shared whole-configuration validation for leaf authoring.
+
+    SELF/NULL and empty declarations do not claim IDE-owned leaves and retain
+    their configuration-independent behavior. Input comes from the server file,
+    never from a browser ownership claim.
+    """
     if not isinstance(capabilities, list):
         raise ValueError("Capability declarations must be an array.")
     if config is None:

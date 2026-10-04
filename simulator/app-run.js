@@ -15533,20 +15533,9 @@ async function refreshSettingsIdeHierarchy() {
             status.textContent = 'Not configured. ' + action;
             return;
         }
-        // Use the authoring policy's grammar rather than treating a browser
-        // pet name (or a syntactically valid node alone) as setup evidence.
-        const check = CapabilityTokens.checkLeafOwnership({
-            name: '', canonical_leaf: `${config.node}.HierarchyStatus`, rights: []
-        }, config);
-        let valid = check.ownership === 'local' && !check.error;
-        for (const rights of Object.values(config.definitions || {})) {
-            try {
-                if (!Array.isArray(rights)) valid = false;
-                CapabilityTokens.normalizeRights({ rights });
-            } catch (_) { valid = false; }
-        }
-        if (!valid) {
-            status.textContent = 'Malformed configuration. ' + action;
+        const check = CapabilityTokens.validateHierarchyConfiguration(config);
+        if (!check.ok) {
+            status.textContent = 'Malformed configuration. ' + check.error + ' ' + action;
             return;
         }
         node.textContent = config.node;
