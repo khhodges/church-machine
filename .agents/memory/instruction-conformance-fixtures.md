@@ -22,3 +22,15 @@ minimum debug metadata omitted aliased output ports from runtime lookup.
 
 **How to apply:** Keep independent generated execution fail-closed on missing
 ports, and bound compilation separately from instruction completion.
+
+Do not port fused-instruction recovery tests by changing only the opcode.
+Separate declared-capability resolution, scheduler suspension, and retirement
+rejection into distinct cases.
+
+**Why:** Explicit name-and-rights declarations can resolve before LOAD consumes
+the row. That successful operation is not the old fused instruction's lazy IRQ
+path. Expecting the same IRQ after an opcode substitution creates false failures.
+
+**How to apply:** Keep exact destination identity and grant assertions for
+supported loads, no-write assertions for invalid declarations, separate named-slot
+scheduler coverage, and explicit rejection coverage for retired instructions.
