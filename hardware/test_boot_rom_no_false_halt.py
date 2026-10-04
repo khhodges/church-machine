@@ -1003,8 +1003,27 @@ def test_turing_arithmetic_register_and_immediate_forms():
         "IADD/ISUB register/immediate operand mismatch: "
         f"DR1..DR5={results['dr']}"
     )
+def _selftest_verdict(number, condition, comparison):
+    """Locate a unique fail-fast sequence in the exact selected artifact."""
+    words = WUKONG_SELFTEST_WORDS
+    cw = (words[0] >> 10) & 0x1FFF
+    # Independently specified ISA words: conditional BRANCH +3,
+    # IADD DR1, DR0, #test_number, RETURN.
+    sequence = [*comparison, (23 << 27) | (condition << 23) | 3,
+                0xAF084000 | number, 0x1F000000]
+    matches = [i for i in range(1, cw - len(sequence) + 2)
+               if list(words[i:i + len(sequence)]) == sequence]
+    assert len(matches) == 1, f"SelfTest verdict {number} missing or ambiguous"
+    branch = matches[0] + len(comparison)
+    target = branch + 3
+    assert target <= cw, "SelfTest pass branch escapes executable body"
+    nia = lambda index: (WUKONG_SELFTEST_BASE_WORD + index) * 4
+    return nia(branch), (nia(branch + 1), nia(branch + 2)), nia(target)
+
+
 def test_selftest_first_arithmetic_check_passes():
-    """Factory SelfTest must branch past its first failure RETURN at NIA 0x690."""
+    """Factory SelfTest must skip the selected artifact's first failure path."""
+    branch, failures, passed = _selftest_verdict(1, 0, [0xB708C00B])
     dut = BootRomHarness(_DMEM_INIT)
     results = {}
 
@@ -1024,11 +1043,11 @@ def test_selftest_first_arithmetic_check_passes():
                     "fault_stage": ctx.get(dut.core.fault_stage),
                 }
                 details.append(row)
-                if row["nia"] in (0x690, 0x694):
+                if row["nia"] in (*failures, passed):
                     break
             await ctx.tick()
         results["details"] = details
-        results["timeout"] = not details or details[-1]["nia"] not in (0x690, 0x694)
+        results["timeout"] = not details or details[-1]["nia"] not in (*failures, passed)
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -1045,10 +1064,11 @@ def test_selftest_first_arithmetic_check_passes():
     assert all(not row["fault_valid"] for row in details), (
         f"SelfTest faulted before its first arithmetic verdict: {details[-6:]}"
     )
-    assert all(row["nia"] != 0x690 for row in details), (
-        "SelfTest took the first arithmetic failure RETURN at NIA 0x690"
+    assert any(row["nia"] == branch for row in details)
+    assert all(row["nia"] not in failures for row in details), (
+        "SelfTest took the first arithmetic failure path"
     )
-    assert details[-1]["nia"] == 0x694, (
+    assert details[-1]["nia"] == passed, (
         "SelfTest did not take the EQ pass branch to the second arithmetic check; "
         f"last retire={details[-1]}"
     )
@@ -1056,6 +1076,8 @@ def test_selftest_first_arithmetic_check_passes():
 
 def test_selftest_borrow_sets_c_clear_and_passes_test_27():
     """0-1 must clear C so SelfTest's BRANCHCC skips failure RETURN 27."""
+    branch, failures, passed = _selftest_verdict(
+        27, 3, [0xB7088001, 0xB718C001])
     dut = BootRomHarness(_DMEM_INIT)
     results = {}
 
@@ -1064,13 +1086,17 @@ def test_selftest_borrow_sets_c_clear_and_passes_test_27():
         if not results["boot_ok"]:
             return
         retired = []
+        faults = []
         for _ in range(5000):
             if ctx.get(dut.core.retire_valid):
                 retired.append(ctx.get(dut.core.retire_nia))
-                if retired[-1] in (0x8DC, 0x8E0, 0x8E4):
+                if ctx.get(dut.core.retire_fault_valid):
+                    faults.append((retired[-1], ctx.get(dut.core.retire_fault_code)))
+                if retired[-1] in (*failures, passed):
                     break
             await ctx.tick()
         results["retired"] = retired
+        results["faults"] = faults
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)
@@ -1080,10 +1106,12 @@ def test_selftest_borrow_sets_c_clear_and_passes_test_27():
 
     assert results.get("boot_ok"), "boot_complete never rose"
     retired = results.get("retired", [])
-    assert 0x8DC not in retired and 0x8E0 not in retired, (
+    assert not results["faults"], results["faults"]
+    assert branch in retired
+    assert all(nia not in failures for nia in retired), (
         "SelfTest failed test 27 because BRANCHCC did not recognize the borrow"
     )
-    assert retired and retired[-1] == 0x8E4, (
+    assert retired and retired[-1] == passed, (
         f"SelfTest did not branch to test 28; last retires={retired[-8:]}"
     )
 
