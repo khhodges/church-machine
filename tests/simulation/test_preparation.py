@@ -13,6 +13,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from server import boot_image
+from server.artifact_revisions import RevisionStore
+from server.lump_approvals import (
+    is_trusted_compiler_record, sign_compiler_record, write_approvals,
+)
 from server.simulation_preparation import (
     PreparationStore, digest, stage_image, validate_simulator_resident_inventory,
 )
@@ -53,6 +57,124 @@ def snapshot(root):
 
 def ids(prepared):
     return {key: prepared[key] for key in ("preparationId", "configurationHash")}
+
+
+@pytest.fixture
+def compiler_self_saved(saved, monkeypatch):
+    """Authenticate a nonportable SELF marker without reading any real key."""
+    root, rows, cfg = saved
+    path = root / rows[-1]["filename"]
+    raw = path.read_bytes()[:-4] + struct.pack(">I", 0xFEED5E1F)
+    path.write_bytes(raw)
+    binary_hash = hashlib.sha256(raw).hexdigest()
+    rows[-1]["binary_hash"] = binary_hash
+    key = b"isolated-simulation-evidence-test-key" * 2
+    monkeypatch.setattr(boot_image, "compiler_record_verification_key", lambda _: key)
+    approval = {
+        "binary_hash": binary_hash, "filename": path.name,
+        "dot_name": "SelfTest", "issue_n": 1,
+        "trust_origin": "trusted-home-ide", "compiler_identity": "CLOOMC",
+        "compiler_version": "test",
+        "compiler_record": sign_compiler_record(
+            {"binary_hash": binary_hash, "compilation": "reviewed"}, signing_key=key),
+    }
+    write_approvals(str(root / "approvals.json"), {binary_hash: approval})
+    (root / "ns-state.json").write_text(json.dumps({"abstractions": rows}))
+    assert "portable_binding" not in approval
+    assert is_trusted_compiler_record(approval, binary=raw, signing_key=key)
+    return root, rows, cfg, approval, key
+
+
+@pytest.mark.parametrize("phase", ["approve", "pending-activate", "ephemeral-activate"])
+@pytest.mark.parametrize("mutation", ["removed", "forged", "replaced"])
+def test_compiler_evidence_changed_after_review_rejects_transition(
+        compiler_self_saved, monkeypatch, phase, mutation):
+    root, rows, cfg, approval, key = compiler_self_saved
+    before = snapshot(root)
+    source_rows, source_cfg = copy.deepcopy(rows), copy.deepcopy(cfg)
+    history = RevisionStore(str(root / "history"))
+    publications = []
+    publish = history.publish
+
+    def track_publish(*args, **kwargs):
+        publications.append((args, kwargs))
+        return publish(*args, **kwargs)
+
+    monkeypatch.setattr(history, "publish", track_publish)
+    # Non-retained approvals must also revalidate at activation. Durable
+    # approvals intentionally use retained inputs, not the mutable library.
+    store = PreparationStore(
+        revision_store=None if phase == "ephemeral-activate" else history)
+    reviewed = store.prepare(rows, cfg, root, 6)
+    assert reviewed["artifactBindings"][0]["approvalHash"] == digest(approval)
+    if phase == "ephemeral-activate":
+        store.transition(ids(reviewed), rows, root)
+    record_before = copy.deepcopy(store.records[reviewed["preparationId"]])
+    assert snapshot(root) == before
+
+    changed = copy.deepcopy(approval)
+    if mutation == "removed":
+        (root / "approvals.json").unlink()
+    else:
+        if mutation == "forged":
+            changed["compiler_record"]["signature"] = "0" * 64
+            assert not is_trusted_compiler_record(
+                changed, binary=(root / changed["filename"]).read_bytes(), signing_key=key)
+        else:
+            # Same immutable artifact, genuinely valid new compiler evidence.
+            # Authentication alone cannot authorize an older pending review.
+            changed["compiler_record"] = sign_compiler_record(
+                {"binary_hash": changed["binary_hash"], "compilation": "replacement"},
+                signing_key=key)
+            assert is_trusted_compiler_record(
+                changed, binary=(root / changed["filename"]).read_bytes(), signing_key=key)
+            assert digest(changed) != digest(approval)
+        write_approvals(str(root / "approvals.json"), {changed["binary_hash"]: changed})
+    after_mutation = snapshot(root)
+    expected_error = ("Saved artifacts changed; prepare again" if mutation == "replaced"
+                      else "cannot materialize compiler SELF")
+    with pytest.raises(ValueError, match=expected_error):
+        store.transition(ids(reviewed), rows, root, activate=phase != "approve")
+
+    assert store.records[reviewed["preparationId"]] == record_before
+    assert not store.records[reviewed["preparationId"]]["activated"]
+    assert publications == []
+    assert history.history("namespace") == []
+    assert not (root / "history").exists()
+    assert snapshot(root) == after_mutation
+    assert {name: data for name, data in after_mutation.items() if name != "approvals.json"} == {
+        name: data for name, data in before.items() if name != "approvals.json"}
+    assert rows == source_rows and cfg == source_cfg
+
+
+def test_unchanged_compiler_evidence_review_publishes_and_activates(compiler_self_saved):
+    root, rows, cfg, approval, _ = compiler_self_saved
+    before = snapshot(root)
+    history = RevisionStore(str(root / "history"))
+    store = PreparationStore(revision_store=history)
+    reviewed = store.prepare(rows, cfg, root, 6)
+    assert reviewed["artifactBindings"][0]["approvalHash"] == digest(approval)
+    approved = store.transition(ids(reviewed), rows, root)
+    assert approved["approved"] is True
+    assert store.records[reviewed["preparationId"]]["activated"] is False
+    revision = approved["approvedRevisionId"]
+    assert [item["revision_id"] for item in history.history("namespace")] == [revision]
+    assert Path(history.file_path("namespace", revision, approval["filename"])).read_bytes() == (
+        before[approval["filename"]])
+
+    active = store.transition(ids(reviewed), rows, root, activate=True)
+    assert active["approved"] is True and active["activated"] is True
+    assert active["approvedRevisionId"] == revision
+    image = struct.pack(f"<{len(active['words'])}I", *active["words"])
+    assert hashlib.sha256(image).hexdigest() == reviewed["imageHash"]
+    assert image == Path(history.file_path("namespace", revision, "simulation.bin")).read_bytes()
+    validate_simulator_resident_inventory(image)
+    location = active["words"][-7 * 4]
+    assert active["words"][location + 63] == 0x4A000006
+    assert struct.unpack(">64I", before[approval["filename"]])[-1] == 0xFEED5E1F
+    assert snapshot(root) == before
+    with pytest.raises(ValueError, match="already activated"):
+        store.transition(ids(reviewed), rows, root, activate=True)
 
 
 def test_uncertified_preparation_is_private_and_hardware_still_rejects(saved):
