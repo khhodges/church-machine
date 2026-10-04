@@ -1652,5 +1652,13 @@
     "lump_version": 42,
     "compiled_at": 1791101695.8026366,
     "operation_id": "f82520a0-12ab-4a92-8435-6628c1c89d2e"
+  },
+  {
+    "token": "313e637c",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.b29b38e3.lump",
+    "lump_version": 17,
+    "compiled_at": 1791116317.3631735,
+    "operation_id": "47c104f2-8f75-409a-86e6-090dfde18cdc"
   }
 ]

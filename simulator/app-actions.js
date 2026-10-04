@@ -122,7 +122,7 @@
         // confusing immediately after opening a saved source asynchronously).
         // Keep it clickable so save() can give the precise prerequisite.
         const interactive = state.ok || action === 'save';
-        button.disabled = !interactive;
+        button.disabled = !interactive || (action === 'save' && activeOperation === 'save');
         const base = button.dataset.actionBaseTooltip ||
             button.getAttribute('data-tooltip') || button.getAttribute('title') || button.textContent.trim();
         button.dataset.actionBaseTooltip = base;
@@ -238,7 +238,22 @@
     async function save(options) {
         if (activeOperation) return reportSaveFailure(operationBusy('save'));
         activeOperation = 'save';
+        const saveButtons = ['btnHamSaveLump', 'btnToolbarSaveLump', 'btnSaveNS']
+            .map(id => document.getElementById(id)).filter(Boolean);
+        const setProgress = label => {
+            saveButtons.forEach(button => {
+                if (!button.dataset.saveIdleLabel) button.dataset.saveIdleLabel = button.textContent;
+                button.textContent = label;
+                button.disabled = true;
+                button.setAttribute('aria-busy', 'true');
+            });
+        };
+        setProgress('Building for save…');
         try {
+        // Let the browser paint feedback before synchronous assembly starts.
+        if (typeof requestAnimationFrame === 'function') {
+            await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+        }
         const sourceSurface = options && options.sourceSurface || 'asmEditor';
         const state = eligibility('save', undefined, sourceSurface);
         if (!state.ok) return reportSaveFailure(reportUnavailable('save', sourceSurface));
@@ -255,6 +270,7 @@
         if (typeof showFormatLump !== 'function') {
             return reportSaveFailure({ ok: false, error: 'The Format LUMP dialog is unavailable.' });
         }
+        setProgress('Preparing review…');
         const review = await showFormatLump();
         if (review && review.ok === false) return reportSaveFailure(review);
         const dialog = document.getElementById('saveNSDialog');
@@ -270,6 +286,12 @@
                 (error && error.message ? error.message : 'An internal error interrupted review preparation.') });
         } finally {
             activeOperation = null;
+            saveButtons.forEach(button => {
+                button.textContent = button.dataset.saveIdleLabel;
+                delete button.dataset.saveIdleLabel;
+                button.setAttribute('aria-busy', 'false');
+            });
+            refresh();
         }
     }
     async function exportCandidate(options) {

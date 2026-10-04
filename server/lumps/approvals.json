@@ -969,6 +969,28 @@
         "signature": "093289ade35c4a96f166bc3e8c4677615d8ea425a38735aab2375217f327fd76"
       },
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af": {
+      "binary_hash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "abstraction": "WukongCallHome",
+      "filename": "WukongCallHome.1.b29b38e3.lump",
+      "compiled_at": 1791116317.3631735,
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
+        "source_hash": "8c92a82112d7ee758e95d7602ce61ae41546e5dedb14eafbbdb36f3ffcbd1d08",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "cba460ebdc15be76b2cbe8ac995e72feddcb638ebf86935abe9c628e8b03655e"
+      },
+      "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90"
     }
   }
 }
