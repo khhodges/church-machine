@@ -81,7 +81,8 @@ def _localize_portable(raw, binding, rows, bindings, directory):
     """Materialize only a private derivative; retain source N/T/hash separately."""
     from server.portable_binding import mint_gt, verify_candidate
     contract = binding["portableBinding"]
-    words = _validate_body(raw, executable=True)
+    words = _validate_body(
+        raw, executable=True, label=f"NS[{binding['slot']}] {binding['filename']}")
     owner = next(row for row in rows if row["slot"] == binding["slot"])
     start = len(words) - (words[0] & 255)
     for dep in contract["dependencies"]:
@@ -111,7 +112,30 @@ def _localize_portable(raw, binding, rows, bindings, directory):
     return struct.pack(f">{len(words)}I", *words), words[start]
 
 
-def _validate_body(raw, executable=False):
+def _static_clist_index(word):
+    """Decode only statically known CR6 accesses; never guess a DR value.
+
+    Master ISA: LOAD/SAVE operand15 = sign:1, magnitude:10, DR:4.
+    Legacy fused instructions have distinct formats, not that indexed format.
+    Dynamic accesses still undergo the simulator/hardware runtime checks.
+    """
+    if ((word >> 15) & 15) != 6:
+        return None
+    opcode = (word >> 27) & 31
+    operand = word & 0x7FFF
+    if opcode in (0, 1):
+        if operand & 15:  # Only hardwired DR0 has a statically known value.
+            return None
+        magnitude = (operand >> 4) & 1023
+        return -magnitude if operand & 0x4000 else magnitude
+    if opcode == 8:
+        return operand & 31  # ELOADCALL row; other bits select the method.
+    if opcode == 9:
+        return operand  # XLOADLAMBDA uses the full immediate.
+    return None
+
+
+def _validate_body(raw, executable=False, *, label="Simulation artifact"):
     if not raw or len(raw) % 4:
         raise ValueError("Simulation artifact must contain whole big-endian words")
     words = list(struct.unpack(f">{len(raw) // 4}I", raw))
@@ -123,10 +147,13 @@ def _validate_body(raw, executable=False):
     if executable and (typ != 0 or not cw):
         raise ValueError("Simulation target is not structurally executable")
     if executable:
-        for word in words[1:1 + cw]:
-            if (((word >> 27) & 31) in (0, 1, 8, 9)
-                    and ((word >> 15) & 15) == 6 and (word & 31) >= cc):
-                raise ValueError("Simulation executable has an unresolved c-list reference")
+        for offset, word in enumerate(words[1:1 + cw], 1):
+            index = _static_clist_index(word)
+            if index is not None and not 0 <= index < cc:
+                raise ValueError(
+                    f"{label}: word +{offset} (0x{word:08X}) has an out-of-range "
+                    f"C-list index {index}; C-list contains {cc} words. "
+                    "No image was published by this validation.")
     return words
 
 
@@ -137,7 +164,7 @@ def validate_simulation_executable(path, lumps_dir, label, bootstrap_binding=Non
     if not matches:
         raise ValueError(f"{label}: executable is not in the frozen Namespace")
     artifact_bindings(matches, lumps_dir)
-    words = _validate_body(Path(path).read_bytes(), executable=True)
+    words = _validate_body(Path(path).read_bytes(), executable=True, label=label)
     cc = words[0] & 255
     if cc < 1:
         raise ValueError(f"{label}: simulator resident requires a complete SELF row 0")

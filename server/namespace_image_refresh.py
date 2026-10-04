@@ -140,7 +140,7 @@ def reconstruct(config, rows, directory, *, compact=False):
             if (body[0] >> 8) & 3 == 2:
                 thread_slots.add(slot)
             if slot == entry or slot not in thread_slots:
-                _validate_body(raw, executable=True)
+                _validate_body(raw, executable=True, label=label)
             cc = body[0] & 255
             if slot in thread_slots:
                 if (body[0] >> 8) & 3 != 2:
