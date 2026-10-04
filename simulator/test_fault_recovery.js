@@ -6,7 +6,7 @@
 //   T004 — pause timer fire: Scheduler.pause arms timer; step to deadline fires IRQ
 //   T005 — Wait flag-set wake: pendingWakeFlags signals sleeping thread via IRQ sweep
 //   T006 — Structured fault record: halt-always path populates all fields correctly
-//   T008 — Scheduler.pause method-table index 4: assembled ELOADCALL encodes index 4,
+//   T008 — Scheduler.pause method-table index 4: explicit LOAD/CALL encodes index 4,
 //           dispatch chain resolves to pause handler, thread transitions to sleeping
 //   T010 — Continuous step() loop: timer fires naturally via natural stepCount
 //           increments (UI "Run" simulation) without manual stepCount assignment
@@ -160,16 +160,16 @@ console.log('\n--- T006: Structured fault record (unhandled) ---');
 // ── T008: Scheduler.pause — assembled ELOADCALL + runtime dispatch integration ─
 //
 // Verifies the full chain:
-//   1. ChurchAssembler encodes Scheduler.pause() as ELOADCALL with method index 5
+//   1. ChurchAssembler encodes LOAD + CALL with method index 5
 //      (1-based) → 0-based index 4, matching the methods array in abstractions.js.
-//   2. The simulator's ELOADCALL dispatch path (methods[ecMethodIdx-1] → dispatchMethod)
+//   2. The simulator's CALL dispatch path (methods[selector-1] → dispatchMethod)
 //      resolves to the 'pause' handler and returns ok=true (no fault/halt).
 //   3. The calling thread transitions to 'sleeping' with wakeStep set — the concrete
 //      scheduler state change that signals a correct pause rather than a fault.
 //
 // Assembler conventions used here mirror SCHED_CONVENTIONS_BC from assembler_test.js
-// (BC84–BC88 / BC90–BC94).  Encoding: pause index=4 → 1-based=5; slot=8; imm=0x0508.
-console.log('\n--- T008: Scheduler.pause assembled ELOADCALL + runtime dispatch ---');
+// Encoding: LOAD selects c-list row 8; CALL selector 5 denotes pause index 4.
+console.log('\n--- T008: Scheduler.pause assembled LOAD/CALL + runtime dispatch ---');
 {
     const { sim, registry, sysAbs } = makeTestSim();
 
@@ -179,7 +179,7 @@ console.log('\n--- T008: Scheduler.pause assembled ELOADCALL + runtime dispatch 
     check('T008b: Scheduler.methods[4] === "pause" (0-based index 4)',
         sched && sched.methods[4] === 'pause');
 
-    // ── T008c-e: assemble Scheduler.pause() and verify ELOADCALL encoding ──
+    // ── T008c-e: assemble explicit LOAD/CALL and verify encoding ──
     // Use the same convention table the application assembler uses for Scheduler
     // bare-calls (mirrors SCHED_CONVENTIONS_BC from assembler_test.js BC84-BC88).
     const SCHED_CONV = {
@@ -195,31 +195,30 @@ console.log('\n--- T008: Scheduler.pause assembled ELOADCALL + runtime dispatch 
 
     const asm = new ChurchAssembler(SCHED_CONV);
     asm.setNamespace(SCHED_NS);
-    const asmResult = asm.assemble('Scheduler.pause()\nHALT');
+    const asmResult = asm.assemble('LOAD CR0, Scheduler\nCALL CR0, pause\nHALT');
 
-    check('T008c: Scheduler.pause() assembles without errors',
+    check('T008c: explicit Scheduler LOAD/CALL assembles without errors',
         asmResult.errors.length === 0,
         (asmResult.errors[0] || {}).message);
 
-    // Decode the ELOADCALL word — same bit-field extraction the simulator uses
-    // (see simulator.js _execEloadcall / assembler.js R-type field-width comment):
-    //   imm = word & 0x7FFF
-    //   ecRow       = imm & 0x1F         → c-list row / Scheduler NS slot (8), 5-bit field
-    //   ecMethodIdx = (imm >>> 5) & 0x7F → 1-based method index (5 for pause), 7-bit field
-    const eloadWord = (asmResult.words[0] || 0) >>> 0;
-    const encodedImm     = eloadWord & 0x7FFF;
-    const encodedRow     = encodedImm & 0x1F;
-    const encodedMethod1 = (encodedImm >>> 5) & 0x7F;   // 1-based
+    // LOAD uses the compact immediate index; CALL carries a direct selector.
+    const loadWord = asmResult.words[0] >>> 0;
+    const callWord = asmResult.words[1] >>> 0;
+    check('T008c-opcodes: program is LOAD CR0, CR6[8]; CALL CR0, 4; HALT',
+        asmResult.words.length === 3 && loadWord === 0x07030080 &&
+        callWord === 0x17000005 && asmResult.words[2] === 0);
+    const encodedRow     = (loadWord & 0x7FFF) >>> 4;
+    const encodedMethod1 = callWord & 0x7FFF;   // 1-based
     const encodedMethod0 = encodedMethod1 - 1;           // 0-based index into methods[]
 
-    check('T008d: assembled ELOADCALL encodes Scheduler NS slot (row=8)',
+    check('T008d: assembled LOAD encodes Scheduler c-list row=8',
         encodedRow === 8);
-    check('T008e: assembled ELOADCALL encodes method 5 (1-based) for pause (0-based index 4)',
+    check('T008e: assembled CALL encodes method 5 (1-based) for pause (0-based index 4)',
         encodedMethod1 === 5 && encodedMethod0 === 4);
 
-    // ── T008f-g: simulator ELOADCALL dispatch chain resolves to 'pause' ────
+    // ── T008f-g: simulator CALL dispatch chain resolves to 'pause' ────
     // The simulator does exactly:
-    //   methodName = abstraction.methods[ecMethodIdx]   (0-based, extracted above)
+    //   methodName = abstraction.methods[selector-1]
     //   result     = dispatchMethod(nsSlot, methodName, sim, args)
     // Replicate this chain to confirm the link is not broken.
     const resolvedName = sched ? sched.methods[encodedMethod0] : undefined;
@@ -227,7 +226,10 @@ console.log('\n--- T008: Scheduler.pause assembled ELOADCALL + runtime dispatch 
 
     const DURATION = 10;
     const stepAtCall = sim.stepCount;
-    const result = registry.dispatchMethod(8, resolvedName, sim, { duration: DURATION });
+    // An encoding regression should fail assertions, not crash the remaining suite.
+    const result = resolvedName === 'pause'
+        ? registry.dispatchMethod(8, resolvedName, sim, { duration: DURATION })
+        : null;
 
     check('T008g: dispatch via assembled index returns ok=true (no fault)',
         result && result.ok === true);
@@ -322,11 +324,8 @@ console.log('\n--- T008-step: sim.step() executes Scheduler.pause (method index 
 // Verifies the complete mid-execution pause flow as an end-to-end integration:
 //
 //   Phase A — Assembler encoding (prerequisite):
-//     The ChurchAssembler is used to encode Scheduler.pause() as an ELOADCALL
-//     instruction.  The encoded method index (0-based = 4, 1-based = 5) is
-//     extracted from the instruction word and used as the DR3 value for the
-//     subsequent CALL step, establishing a provable link between the assembler
-//     output and the runtime behaviour.
+//     ChurchAssembler emits explicit LOAD/CALL for Scheduler.pause.
+//     Extract its selector for the legacy host-abstraction dispatch below.
 //
 //   Phase B — loadProgram + step() → thread sleeps:
 //     A two-word program [CALL CR0 (legacy mode), HALT] is written into a fresh
@@ -350,7 +349,7 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
 {
     const { sim: t9sim, registry: t9reg, sysAbs: t9sys } = makeTestSim();
 
-    // ── Phase A: assembler produces ELOADCALL for Scheduler.pause() ──────────
+    // ── Phase A: assembler produces LOAD/CALL for Scheduler.pause ──────────
     // The same convention table used in T008 (mirrors SCHED_CONVENTIONS_BC).
     const T9_CONV = {
         'Scheduler': {
@@ -364,25 +363,20 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
     const T9_NS = { 'Scheduler': 8 };
     const t9asm = new ChurchAssembler(T9_CONV);
     t9asm.setNamespace(T9_NS);
-    const t9asmResult = t9asm.assemble('Scheduler.pause()\nHALT');
+    const t9asmResult = t9asm.assemble('LOAD CR0, Scheduler\nCALL CR0, pause\nHALT');
 
-    check('T009-A1: assembler produces no errors for Scheduler.pause()',
+    check('T009-A1: assembler produces no errors for explicit Scheduler LOAD/CALL',
         t9asmResult.errors.length === 0);
 
-    // Extract the 0-based method index from the ELOADCALL encoding (same
-    // bit-field widths as T008 — see simulator.js _execEloadcall /
-    // assembler.js R-type field-width comment):
-    //   imm15[4:0]  = c-list row = NS slot (8 for Scheduler), 5-bit field
-    //   imm15[11:5] = method index 1-based (5 for pause → 0-based = 4), 7-bit field
-    const t9eloadWord = (t9asmResult.words[0] || 0) >>> 0;
-    const t9Imm       = t9eloadWord & 0x7FFF;
-    const t9Method1   = (t9Imm >>> 5) & 0x7F;   // 1-based
+    const t9LoadWord  = t9asmResult.words[0] >>> 0;
+    const t9CallWord  = t9asmResult.words[1] >>> 0;
+    const t9Method1   = t9CallWord & 0x7FFF;   // 1-based
     const t9Method0   = t9Method1 - 1;            // 0-based index into methods[]
 
-    check('T009-A2: ELOADCALL encodes Scheduler NS slot 8 in imm[4:0]',
-        (t9Imm & 0x1F) === 8);
-    check('T009-A3: ELOADCALL encodes method index 5 (1-based) for pause',
-        t9Method1 === 5 && t9Method0 === 4);
+    check('T009-A2: LOAD encodes Scheduler c-list row 8',
+        t9LoadWord === 0x07030080);
+    check('T009-A3: CALL encodes method index 5 (1-based) for pause',
+        t9CallWord === 0x17000005 && t9Method1 === 5 && t9Method0 === 4);
 
     // ── Phase B: loadProgram writes runnable code + step() pauses thread ─────
     // Use pre-boot fetch mode (bootComplete=false) so step() reads instructions
@@ -401,17 +395,14 @@ console.log('\n--- T009: loadProgram + step() pause + step() timer wake ---');
     const t9schedGT = t9sim.createGT(1, 8, { E: 1 }, 1);
     t9sim.cr[0] = { word0: t9schedGT, word1: 0, word2: 0, word3: 0, m: 0 };
 
-    // Pre-load DR3 with the 0-based method index derived from the ELOADCALL word.
-    // Legacy CALL mode (imm=0) reads DR3 as the method selector: DR3=4 → pause.
+    // The non-resident host-abstraction path uses legacy DR3 method selection.
+    // Preserve that integration while deriving DR3 from the current CALL encoding.
     const T9_DURATION = 15;
-    t9sim.dr[3] = t9Method0;      // method index proven by assembler encoding
+    t9sim.dr[3] = t9Method0;     // method index proven by assembler encoding
     t9sim.dr[1] = T9_DURATION;    // pause duration in simulation steps
 
-    // Encode: CALL CR0 (opcode=2, cond=AL=14, crDst=0, crSrc=0, imm=0 = legacy).
-    const T9_CALL_CR0 = ((2 << 27) | (14 << 23) | (0 << 19) | (0 << 15) | 0) >>> 0;
-
-    // Load a two-word program [CALL CR0, HALT] via loadProgram (pre-boot path).
-    // loadProgram with bootComplete=false writes words to memory[startAddr + i].
+    // CALL CR0 with imm=0 exercises the existing host-abstraction fast path.
+    const T9_CALL_CR0 = ((2 << 27) | (14 << 23)) >>> 0;
     t9sim.loadProgram([T9_CALL_CR0, 0x00000000 /*HALT*/], 0);
 
     // Execute the CALL instruction via step().
