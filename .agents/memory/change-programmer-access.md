@@ -5,14 +5,16 @@ description: One-GT CHANGE is programmer-accessible but uses microcode authority
 
 CHANGE is not a protected instruction. Do not block CR13–CR15 at compilation while exempting CR12, or rewrite programmer-authored CHANGE into SWITCH.
 
-Do not assume self-target CHANGE is forbidden. The user explicitly challenged
-that restriction and regards self-targeting as a useful save/restore test.
+Self-target CHANGE is valid. The user explicitly confirmed that CHANGE CR12
+should work as well as CHANGE CR13, and regards self-targeting as a useful
+save/restore test. Neither requires an M-bit merely to supply the operand.
 
 **Why:** An implementation's dormant-only guard is not architectural authority.
 
 **How to apply:** When correcting self-target handling, preserve normal validation
 and verify save/restore ordering against the newly saved continuation, without
-restoring stale context or accumulating frames.
+restoring stale context or accumulating frames. When CR12 identifies the active
+Thread, CHANGE CR12 must resume after CHANGE following that save/restore.
 
 The valid input Thread GT has no permissions, deliberately preventing ordinary
 programmer access to protected Thread state. CHANGE performs the transition
