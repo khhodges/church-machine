@@ -11,6 +11,19 @@ Successful builds and saves should prioritize source beside exact binary disasse
 
 **Why:** The user wants to inspect generated instructions, not have successful audit messages replace that view. Source preservation and binary inspection are independent requirements.
 
+Main-view navigation must retain document ownership as well as visible text,
+including a personal draft's separate saved-binary inspection. Only an explicit
+document change should replace that ownership.
+
+**Why:** History can open a personal draft rather than a saved-LUMP owner.
+Clearing its owner on entry to Editor invalidates an in-flight exact-binary
+response even when the source remains visibly correct. Preserving only a
+saved-LUMP display mode is therefore insufficient.
+
+**How to apply:** Navigation regressions must check personal and saved-LUMP
+owners, pending binary completion, and away/back and same-view navigation—not
+just the presence of a tab or unchanged source text.
+
 Disassembly and Console Output belong in one shared tabbed output area beside
 the source, not separate vertically stacked panels.
 

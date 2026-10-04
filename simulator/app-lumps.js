@@ -4681,7 +4681,8 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                     ? `<button type="button" class="btn lump-history-open-editor" title="Open this preview text as a new editable draft. The immutable LUMP and boot selection are unchanged.">Open in Editor</button>`
                     : '') +
                 `</div>` +
-                `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre" aria-readonly="${selectedCode.readOnly ? 'true' : 'false'}">${
+                `<p class="lump-history-source-scroll-hint">Full source — ${displayedCode.split(/\r\n|\r|\n/).length} lines. Scroll inside the code below to read every line. Binary words follow underneath.</p>` +
+                `<pre class="lump-stored-src-pre lump-stored-src-pre-full lump-history-source-pre" tabindex="0" aria-label="Full source for version ${version}; scroll to read all lines" aria-readonly="${selectedCode.readOnly ? 'true' : 'false'}">${
                     selectedCode.kind === 'reconstructed-source'
                         ? e(displayedCode)
                         : _highlightCLOOMCSource(displayedCode, sourceLanguage)

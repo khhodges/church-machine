@@ -409,8 +409,22 @@
 }
 
 .lump-history-preview-body .lump-history-source-pre {
-    max-height: none;
-    overflow: visible;
+    max-height: 55vh;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    border: 1px solid var(--border-color, #39445a);
+    padding: 0.75rem;
+}
+
+.lump-history-source-scroll-hint {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0.5rem 0;
+}
+
+.lump-history-source-pre:focus-visible {
+    outline: 2px solid var(--accent-color, #e9bb4b);
+    outline-offset: 2px;
 }
 
 .lump-save-conflict-dialog {

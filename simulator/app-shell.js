@@ -2698,7 +2698,7 @@ function switchView(viewId) {
     // detach here, returning to Editor leaves the source/name visible but
     // replaces the immutable disassembly with the normal Console.
     if (viewId !== 'editor' && currentView === 'editor' &&
-            !window._savedLumpEditorMode) {
+            !window._savedLumpEditorMode && !window._personalSavedBinaryPresentation) {
         if (window._editorLumpDirtyListener && window._editorLumpDirtyListenerEl) {
             window._editorLumpDirtyListenerEl.removeEventListener('input', window._editorLumpDirtyListener);
         }
@@ -2710,7 +2710,10 @@ function switchView(viewId) {
     }
     // Do not discard a saved-LUMP workspace merely because another main view
     // is visited. Returning to Editor must restore the exact same two panes.
+    // History opens a personal draft with a separate, exact saved-binary
+    // inspection. That presentation belongs to its document too.
     if (!window._savedLumpEditorMode &&
+            !window._personalSavedBinaryPresentation &&
             (viewId !== 'editor' || !window._committingSavedLumpOpen) &&
             !(viewId === 'editor' && window._restoredEditorOwnerPending) &&
             typeof window.exitSavedLumpEditorMode === 'function') {
@@ -2781,8 +2784,9 @@ function switchView(viewId) {
     if (viewId === 'editor') {
         const preserveRestoredOwner = !!window._restoredEditorOwnerPending;
         window._restoredEditorOwnerPending = false;
-        if (!_editorCREditActive && !preserveRestoredOwner) {
-            if (activeUserTabId && userTabDirty) saveActiveUserTab();
+        // View navigation is not a document change. Clearing a personal owner
+        // here also invalidates its in-flight exact-binary inspection.
+        if (!_editorCREditActive && !preserveRestoredOwner && !activeUserTabId) {
             activeUserTabId = null;
             userTabDirty = false;
             document.querySelectorAll('.example-tab').forEach(t => t.classList.remove('active'));
