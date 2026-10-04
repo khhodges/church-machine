@@ -42,6 +42,109 @@ def store(root):
     return refresh.RefreshStore(root, root / "ns-state.json", root / "config.json")
 
 
+def compiler_marker_fixture(root, monkeypatch):
+    from server.lump_approvals import sign_compiler_record, write_approvals
+    cfg, rows = fixture(root)
+    raw = (root / "selected.lump").read_bytes()[:-4] + struct.pack(">I", 0xFEED5E1F)
+    digest = refresh.sha(raw)
+    name = f"Exact.1.{digest[:8]}.lump"
+    (root / name).write_bytes(raw)
+    rows[2].update(filename=name, binary_hash=digest)
+    key = b"compiler-self-test-only-key" * 2
+    monkeypatch.setattr(refresh.boot, "compiler_record_verification_key", lambda _: key)
+    approval = dict(binary_hash=digest, filename=name, dot_name="Exact", issue_n=1,
+                    trust_origin="trusted-home-ide", compiler_identity="CLOOMC",
+                    compiler_version="test",
+                    compiler_record=sign_compiler_record({"binary_hash": digest}, signing_key=key))
+    write_approvals(str(root / "approvals.json"), {digest: approval})
+    (root / "ns-state.json").write_text(json.dumps({"abstractions": rows}))
+    return cfg, rows, raw, approval
+
+
+@pytest.mark.parametrize("sequence", [3, 7])
+def test_verified_marker_private_refresh(tmp_path, monkeypatch, sequence):
+    cfg, rows, raw, _ = compiler_marker_fixture(tmp_path, monkeypatch)
+    rows[2]["seq"] = sequence
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    image, evidence = refresh.reconstruct(cfg, rows, tmp_path)
+    words = struct.unpack("<8192I", image)
+    expected = refresh.boot.create_gt(sequence, 20, {"E": 1}, 1)
+    source = struct.unpack(">64I", raw)
+    assert words[1024:1087] == source[:-1]  # actual header/code unchanged
+    assert words[1087] == words[8192 - 21 * 4 + 3] == expected
+    assert evidence["artifactBindings"][0]["derivativeHash"] != refresh.sha(raw)
+    assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
+@pytest.mark.parametrize("defect", ["missing", "forged", "missing-key", "bytes", "wrong-self", "old-destination"])
+def test_marker_evidence_fail_closed(tmp_path, monkeypatch, defect):
+    from server.lump_approvals import write_approvals
+    cfg, rows, raw, approval = compiler_marker_fixture(tmp_path, monkeypatch)
+    if defect == "missing":
+        write_approvals(str(tmp_path / "approvals.json"), {})
+    elif defect == "forged":
+        approval["compiler_record"]["signature"] = "0" * 64
+        write_approvals(str(tmp_path / "approvals.json"), {refresh.sha(raw): approval})
+    elif defect == "missing-key":
+        def unavailable(_):
+            raise RuntimeError("compiler key unavailable")
+        monkeypatch.setattr(refresh.boot, "compiler_record_verification_key", unavailable)
+    else:
+        words = list(struct.unpack(">64I", raw))
+        if defect == "bytes":
+            words[1] ^= 1
+        else:
+            words[-1] = 0x12345678 if defect == "wrong-self" else 0x4A020014
+        raw = struct.pack(">64I", *words)
+        (tmp_path / rows[2]["filename"]).write_bytes(raw)
+        rows[2]["binary_hash"] = refresh.sha(raw)
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    with pytest.raises(ValueError, match="SELF"):
+        refresh.reconstruct(cfg, rows, tmp_path)
+    assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
+def test_shared_simulation_validator_accepts_only_verified_marker(tmp_path, monkeypatch):
+    from server.simulation_preparation import validate_simulation_executable
+    cfg, rows, raw, _ = compiler_marker_fixture(tmp_path, monkeypatch)
+    path = tmp_path / rows[2]["filename"]
+    assert validate_simulation_executable(path, tmp_path, "test") == list(struct.unpack(">64I", raw))
+    (tmp_path / "approvals.json").write_text('{"version":1,"algorithm":"sha256","approvals":{}}')
+    with pytest.raises(ValueError, match="compiler SELF"):
+        validate_simulation_executable(path, tmp_path, "test")
+
+
+def test_compiler_marker_shared_staging(tmp_path, monkeypatch):
+    from server.simulation_preparation import stage_image
+    cfg, rows, raw, _ = compiler_marker_fixture(tmp_path, monkeypatch)
+    cfg["step1"]["namespaceLumpWords"] = 64
+    rows[2].update(slot=6, name="SelfTest")
+    rows = [rows[0], rows[2]]
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": rows}))
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    image, prepared, bindings = stage_image(cfg, rows, str(tmp_path), 6)
+    words = struct.unpack("<8192I", image)
+    assert words[1024:1087] == struct.unpack(">64I", raw)[:-1]
+    assert words[1087] == words[8192 - 7 * 4 + 3] == 0x4A030006
+    derivative = next(r for r in prepared if r["slot"] == 6)["simulationBinding"]
+    assert derivative["sourceArtifact"]["binaryHash"] == refresh.sha(raw)
+    assert derivative["derivativeHash"] != refresh.sha(raw)
+    assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
+def test_compiler_marker_boot_generator(tmp_path, monkeypatch):
+    cfg, rows, raw, _ = compiler_marker_fixture(tmp_path, monkeypatch)
+    cfg["step1"]["namespaceLumpWords"] = 64
+    rows[2].update(slot=6, name="SelfTest", resident=True, boot_resident=True)
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": [rows[0], rows[2]]}))
+    image = refresh.boot.generate_boot_image(cfg, str(tmp_path), 6)
+    words = struct.unpack("<8192I", image)
+    loc = words[8192 - 7 * 4]
+    assert words[loc:loc + 63] == struct.unpack(">64I", raw)[:-1]
+    assert words[loc + 63] == words[8192 - 7 * 4 + 3] == 0x4A030006
+    assert (tmp_path / rows[2]["filename"]).read_bytes() == raw
+
+
 def test_saved_thread_design_generates_only_assigned_instances(tmp_path):
     cfg, rows = fixture(tmp_path)
     cfg["step1"]["threadCount"] = 3

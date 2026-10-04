@@ -146,9 +146,8 @@ def reconstruct(config, rows, directory, *, compact=False):
                 if (body[0] >> 8) & 3 != 2:
                     raise ValueError(f"{label}: saved Thread body has a different header type")
             else:
-                token = boot.create_gt(integer(row["seq"]), slot, {"E": 1}, 1)
-                if not cc or body[-cc] != token:
-                    raise ValueError(f"{label}: immutable SELF differs from destination GT")
+                raw, token = boot.materialize_compiler_self(raw, row, directory, label)
+                body = _validate_body(raw, executable=True, label=label)
             location = integer(row["location"])
             kind = binding["filename"]
             derivatives.append(dict(binding, derivativeHash=sha(raw), localSelfGT=f"{token:08x}"))

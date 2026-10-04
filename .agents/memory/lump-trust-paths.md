@@ -63,3 +63,17 @@ artifact solely because its destination retained residency policy.
 **How to apply:** Revalidate exact bytes before materializing intrinsic SELF
 in a destination copy; preserve immutable source bytes and provenance. External
 portable relocations still require their verified binding contract.
+
+Generic simulation preparation and Refresh Image may materialize the compiler's
+intrinsic SELF only after authenticating the exact selected artifact. This does
+not certify the resulting image for hardware. Retain the source artifact hash
+separately from the destination derivative hash and bind review to compiler
+evidence as well as bytes.
+
+**Why:** A valid saved compiler artifact can intentionally have no destination
+SELF yet; rejecting it as a mismatched static capability prevents refresh, while
+unconditional replacement turns an untrusted placeholder into executable authority.
+
+**How to apply:** Share the compiler-verified materialization boundary with boot
+generation. Derive SELF from the selected slot and sequence in private memory;
+never rewrite saved artifacts or treat an arbitrary wrong SELF as a marker.

@@ -1834,6 +1834,57 @@ def _require_approved_executable_lump(path, lumps_dir, label, bootstrap_binding=
         raise ValueError(
             f"generate_boot_image: {label} exact hash-bound approval required: {exc}") from exc
 
+def materialize_compiler_self(raw, binding, lumps_dir, label):
+    """Bind intrinsic SELF only from exact authenticated compiler bytes.
+
+    Return a private derivative. Already-bound SELF must match the destination;
+    neither an arbitrary placeholder nor an old destination is repairable.
+    """
+    from pathlib import Path
+    slot, sequence = binding.get("slot"), binding.get("seq")
+    if (type(slot) is not int or not 0 <= slot <= 65535
+            or type(sequence) is not int or not 0 <= sequence <= 511):
+        raise ValueError(f"{label}: invalid destination slot/sequence")
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    cc = words[0] & 255
+    expected = create_gt(sequence, slot, {"E": 1}, 1)
+    if not cc or cc >= len(words):
+        raise ValueError(f"{label}: requires a complete SELF row zero")
+    if words[-cc] == expected:
+        return raw, expected
+    if words[-cc] != 0xFEED5E1F:
+        raise ValueError(
+            f"{label}: immutable SELF differs from destination GT. "
+            "Select an artifact bound to this slot/sequence or recompile it; "
+            "stored artifacts and image are unchanged.")
+    try:
+        digest = hashlib.sha256(raw).hexdigest()
+        if digest != (binding.get("binary_hash") or binding.get("binaryHash")):
+            raise ValueError("selected artifact hash differs from exact bytes")
+        filename = binding.get("filename")
+        if not isinstance(filename, str) or os.path.basename(filename) != filename:
+            raise ValueError("requires an exact selected filename")
+        path = Path(lumps_dir) / filename
+        if path.is_symlink():
+            raise ValueError("mutable artifact alias is not an exact saved file")
+        exact = _require_approved_executable_lump(str(path), lumps_dir, label, binding)
+        if exact != words:
+            raise ValueError("selected bytes changed during SELF verification")
+        approval = read_approvals(os.path.join(lumps_dir, "approvals.json")).get(digest)
+        if not is_trusted_compiler_record(
+                approval, binary=raw,
+                signing_key=compiler_record_verification_key(approval.get("compiler_record"))):
+            raise ValueError("intrinsic SELF requires authenticated compiler evidence")
+    except (ValueError, RuntimeError, OSError) as exc:
+        raise ValueError(
+            f"{label}: cannot materialize compiler SELF: {exc}. "
+            "Restore the exact saved artifact and its authenticated compiler evidence, "
+            "or recompile and explicitly select the new revision, then prepare again. "
+            "Stored artifacts and image are unchanged.") from exc
+    words[-cc] = expected
+    return struct.pack(f">{len(words)}I", *words), expected
+
+
 def parse_ns_table(image_bytes):
     """Parse the NS table from a boot image binary.
 
@@ -3617,10 +3668,14 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         _exact = executable_validator(
             os.path.join(lumps_dir, _binding["filename"]), lumps_dir,
             f"compiler SELF NS[{_slot}]", _binding)
-        if _exact[len(_exact) - (_exact[0] & 255)] != 0xFEED5E1F:
-            raise ValueError(f"NS[{_slot}] SELF marker differs from approved bytes")
         _base = total - (_slot + 1) * NS_ENTRY_WORDS
-        _self = create_gt(_ns_word1_get(mem[_base + 1], "gt_seq"), _slot, {"E": 1}, 1)
+        if mem[_loc:_loc + _size] != _exact:
+            raise ValueError(f"NS[{_slot}] destination body differs from approved bytes")
+        _destination = dict(_binding, slot=_slot,
+                            seq=_ns_word1_get(mem[_base + 1], "gt_seq"))
+        _, _self = materialize_compiler_self(
+            struct.pack(f">{len(_exact)}I", *_exact), _destination,
+            lumps_dir, f"compiler SELF NS[{_slot}]")
         mem[_loc + _size - _cc] = _self
         mem[_base + 3] = _self
 

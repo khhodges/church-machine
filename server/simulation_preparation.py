@@ -73,6 +73,12 @@ def artifact_bindings(rows, directory):
             validate_unresolved_clist(contract, words)
             binding["portableBinding"] = contract
             binding["approvalHash"] = digest(approval)
+        elif words[0] & 255 and words[-(words[0] & 255)] == 0xFEED5E1F:
+            from server.boot_image import materialize_compiler_self
+            materialize_compiler_self(raw, row, directory, f"NS[{row['slot']}] {filename}")
+            # Approval and activation must recheck the exact evidence reviewed,
+            # not just the immutable artifact's hash.
+            binding["approvalHash"] = digest(approval)
         bindings.append(binding)
     return bindings
 
@@ -169,12 +175,9 @@ def validate_simulation_executable(path, lumps_dir, label, bootstrap_binding=Non
     if cc < 1:
         raise ValueError(f"{label}: simulator resident requires a complete SELF row 0")
     for row in matches:
-        sequence = row.get("seq")
-        if type(sequence) is not int or not 0 <= sequence <= 511:
-            raise ValueError(f"{label}: simulator resident has an invalid sequence")
-        expected = 0x4A000000 | (sequence << 16) | row["slot"]
-        if words[len(words) - cc] != expected:
-            raise ValueError(f"{label}: immutable SELF row 0 differs from owning Namespace GT")
+        from server.boot_image import materialize_compiler_self
+        materialize_compiler_self(
+            struct.pack(f">{len(words)}I", *words), row, lumps_dir, label)
     return words
 
 
@@ -239,15 +242,10 @@ def stage_image(cfg, rows, directory, entry_slot):
                 # Catalog lookup identity is not the destination runtime GT.
                 # Validate immutable SELF against the Namespace, then derive
                 # only the private descriptor. Never rewrite the saved binding.
-                words = _validate_body(raw, executable=True)
+                _validate_body(raw, executable=True)
                 owner = next(row for row in rows if row["slot"] == binding["slot"])
-                sequence = owner.get("seq")
-                if type(sequence) is not int or not 0 <= sequence <= 511:
-                    raise ValueError(f"NS[{owner['slot']}] simulator resident has an invalid sequence")
-                cc = words[0] & 255
-                local_gt = 0x4A000000 | (sequence << 16) | owner["slot"]
-                if not cc or words[len(words) - cc] != local_gt:
-                    raise ValueError(f"NS[{owner['slot']}] immutable SELF row 0 differs from owning Namespace GT")
+                raw, local_gt = boot_image.materialize_compiler_self(
+                    raw, owner, directory, f"NS[{owner['slot']}] {binding['filename']}")
             local_hash = hashlib.sha256(raw).hexdigest()
             local_tokens[binding["slot"]] = local_gt
             staged = next(row for row in image_rows if row["slot"] == binding["slot"])
