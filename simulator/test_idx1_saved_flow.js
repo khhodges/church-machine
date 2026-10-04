@@ -57,7 +57,8 @@ async function progressRace() {
         assert.equal(options.signal, 'bounded-plan');
         const error = new Error('timed out'); error.name = 'TimeoutError'; throw error;
     };
-    vm.runInContext(extract(lumps, '_requestLumpSavePlan'), context);
+    vm.runInContext(extract(lumps, '_artifactOnlyLumpSaveMetadata') +
+        extract(lumps, '_requestLumpSavePlan'), context);
     await assert.rejects(context._requestLumpSavePlan([], {}), /30 seconds.*No LUMP commit/);
 }
 async function main() {
@@ -76,7 +77,7 @@ async function main() {
         return;
     }
     await progressRace();
-    const source = 'capabilities { SELF E }\nIADD DR11, DR0, #2\nIADD DR3, DR0, #28\nBFEXT DR2, DR3, DR11, 3\nHALT';
+    const source = '; @abstraction Assembly\ncapabilities { SELF E }\nIADD DR11, DR0, #2\nIADD DR3, DR0, #28\nBFEXT DR2, DR3, DR11, 3\nHALT';
     const compiled = IDE.compile(new Assembler(), source);
     assert.deepEqual(compiled.errors, []);
     const candidate = Object.freeze({ token: 'disposable', abstraction: 'Assembly',

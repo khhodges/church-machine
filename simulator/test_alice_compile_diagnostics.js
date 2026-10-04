@@ -283,13 +283,13 @@ async function main() {
         assert.equal(literalLoad.errors.length, 0);
         assert.equal(bareLoad.errors.length, 0);
         assert.equal(literalLoad.words[0], bareLoad.words[0]);
-        assert.equal(literalLoad.words[0] & 0x7FFF, 11);
+        // Current indexed encoding: DR0 + magnitude 11, not raw immediate 11.
+        assert.equal(literalLoad.words[0] & 0x7FFF, 11 << 4);
         const registerLoad = new ChurchAssembler().assemble('LOAD CR1, CR6, DR11');
-        assert.equal(registerLoad.errors.length, 1);
-        assert.match(registerLoad.errors[0].message, /data register, not a c-list row/);
-        assert.match(registerLoad.errors[0].message, /does not read the value in DR11 at runtime/);
-        assert.match(registerLoad.errors[0].message, /no register-indexed LOAD/);
-        assert.equal(registerLoad.errors[0].colStart, 15);
+        assert.equal(registerLoad.errors.length, 0);
+        assert.equal(registerLoad.words[0] & 0x7FFF, 11,
+            'runtime DR11 index has zero immediate magnitude');
+        assert.notEqual(registerLoad.words[0], literalLoad.words[0]);
         assert.equal(new ChurchAssembler().assemble('IADD DR1, DR2, DR11').errors.length, 0,
             'register operands remain valid where the ISA supports them');
         assert.equal(malloryWords.length, 256);
@@ -299,15 +299,22 @@ async function main() {
         const savedMalloryAudit = audit.lumpAudit(malloryWords, {
             cw: 5, cc: 2, lump_size: 256
         });
-        assert.equal(savedMalloryAudit.find(item => item.ruleId === 'RCI').severity, 'error');
+        // Historical bytes predate indexed LOAD: 0x0002 now means DR2 + 0,
+        // not literal row 2. Keep the release untouched; audit the newly
+        // compiled source below to test its intentional missing-row access.
+        assert.equal(savedMalloryAudit.find(item => item.ruleId === 'RCI').severity, 'pass');
         run.LumpContentFrame = frame;
         run._editorOpenLumpToken = '0ca567b5';
         editor.value = mallory.source;
         const compiledMallory = await run.IDEActions.compile();
         assert.equal(compiledMallory.ok, true, 'compilation is separate from static audit');
         assert.equal(registryEntry.sources.memory.capabilities.length, 2);
+        const currentMallory = new ChurchAssembler().assemble(mallory.source);
+        assert.equal(currentMallory.errors.length, 0);
         assert.deepEqual(Array.from(registryEntry.sources.memory.words),
-            malloryWords.slice(1, 6), 'compiler emitted the exact original instruction words');
+            currentMallory.words, 'candidate retains the current compiler instruction words');
+        assert.equal(currentMallory.words[1] & 0x7FFF, 2 << 4,
+            'the deliberate missing-row access still targets literal c-list row 2');
         elements.get('saveNSDialog').style.display = 'none';
         vm.runInContext(click[1], run);
         const malloryReview = await savePromise;

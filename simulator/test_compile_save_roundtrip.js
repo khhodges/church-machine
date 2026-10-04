@@ -9,6 +9,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const LumpContentFrame = require('./lump-content-frame');
 
 function extractBlock(source, marker) {
     const start = source.indexOf(marker);
@@ -53,6 +54,23 @@ const registrySource = fs.readFileSync(
 
 const sourceText = 'abstraction Task3430RoundTrip { method Ping() { return(3430) } }';
 const codeWords = [0x11111111, 0x22222222];
+// Disposable server-response fixture, not a real attestation or saved artifact.
+const serverWords = new Array(64).fill(0);
+serverWords[0] = ((0x1F << 27) | (codeWords.length << 10) | 1) >>> 0;
+serverWords.splice(1, codeWords.length, ...codeWords);
+const apiBytes = Buffer.from(JSON.stringify({
+    name: 'Task3430RoundTrip',
+    capabilities: [{ name: 'SELF', rights: ['E'], compiler_owned_self: true }],
+}));
+serverWords[3] = (0xAB000000 | apiBytes.length) >>> 0;
+LumpContentFrame.lumpFramePackBE([...apiBytes]).forEach((word, i) => {
+    serverWords[4 + i] = word;
+});
+const compilerRecord = {
+    schema: 'church-compiler-output/v1', attestation: 'isolated-test-evidence',
+    capability_rows: [{ name: 'SELF', rights: ['E'], relocation_row: 0,
+        compiler_owned_self: true, symbolic_self: true, pending_symbolic: false }],
+};
 const elements = new Map();
 const asmEditor = makeElement('asmEditor');
 asmEditor.value = sourceText;
@@ -125,6 +143,7 @@ const context = {
     },
     ChurchSimulator: { SELF_CAPABILITY_PLACEHOLDER: 0xFEED5E1F },
     LumpContentFrame: {
+        ...LumpContentFrame,
         async lumpBuildContentFrame() {
             return { frameWords: [0xAB000001] };
         },
@@ -139,6 +158,22 @@ const context = {
     _autoFillCapRights() {},
     _activeCompileClistSlots() { return {}; },
     _compileWithActiveClist(source) { return context.cloomcCompiler.compile(source); },
+    _compileCallApiBindings() { return []; },
+    _sourceCallApiBindings() { return []; },
+    async fetch(url, options) {
+        assert(['/api/compile', '/api/compile/attest'].includes(url),
+            `unexpected network request: ${url}`);
+        const request = JSON.parse(options.body);
+        if (url === '/api/compile') assert.strictEqual(request.source, sourceText);
+        else {
+            assert.deepStrictEqual(request.words, serverWords);
+            assert.deepStrictEqual(request.compiler_record, compilerRecord);
+        }
+        return { ok: true, status: 200,
+            headers: { get() { return 'application/json'; } },
+            async json() { return { ok: true, words: serverWords.slice(),
+                compiler_record: compilerRecord, trust_origin: 'trusted-home-ide' }; } };
+    },
     requirePermission() { return true; },
     onLangChange() {},
     _clearAsmErrors() {},
@@ -189,7 +224,11 @@ context.window.LumpSaveDiagnostics = {
 };
 
 vm.runInContext(
+    extractBlock(compileSource, 'function _formatCandidateReferenceReport(') + '\n' +
     extractBlock(compileSource, 'function _isCompilerSelfCapability(') + '\n' +
+    extractBlock(compileSource, 'function _readCompiledCandidateCapabilities(') + '\n' +
+    extractBlock(compileSource, 'function _deriveCompiledLumpLayout(') + '\n' +
+    extractBlock(compileSource, 'async function _readCompileJsonResponse(') + '\n' +
     extractBlock(compileSource, 'function _validateCompiledCandidateClist(') + '\n' +
     extractBlock(compileSource, 'function _materializeLumpCapabilities(') + '\n' +
     extractBlock(compileSource, 'async function compileAndBuild(') + '\n' +
@@ -201,7 +240,7 @@ vm.runInContext(
     const build = await context.compileAndBuild();
 
     assert.strictEqual(build.ok, true,
-        'compile did not produce a candidate');
+        build.error || 'compile did not produce a candidate');
     assert.strictEqual(context.confirmationCount || 0, 0,
         'candidate-only compile unexpectedly requested a save-plan approval');
     const token = context.window.LumpRegistry.getCurrent();
@@ -218,8 +257,10 @@ vm.runInContext(
         'compiler candidate should retain its allocated binary separately');
     assert.strictEqual(
         context.window._lastCLOOMCLump.words[1 + codeWords.length] >>> 0,
-        0xAB000001,
+        serverWords[3],
         'compiler candidate must place the embedded content frame after code');
+    assert.deepStrictEqual(Array.from(context.window._lastCLOOMCLump.words), serverWords,
+        'candidate must retain the exact server artifact');
 
     // Exercise the actual hamburger Save Lump handler and its real formatter.
     context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ node: 'test.ide' }) });
