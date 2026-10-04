@@ -1001,9 +1001,13 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
         // Write a pending sentinel into the c-list at PENDING_SLOT
         const pendingGT = ChurchSimulator.makePendingGT(PET_NAME);
         sim.memory[CLIST_BASE + PENDING_SLOT] = pendingGT;
-        sim.programCapabilities = {
-            [PENDING_SLOT]: { name: PET_NAME, rights: ['E'] },
-        };
+        sim.memory[CLIST_BASE] = sim.createGT(0, NS_SLOT, { E: 1 }, 1);
+        sim.programCapabilities = [
+            { name: 'SELF', rights: ['E'], compiler_owned_self: true },
+            { name: PET_NAME, rights: ['E'] },
+        ];
+        // Installation provenance, not header typ alone, protects ordinary SELF.
+        sim._compilerOwnedSelfSlots[NS_SLOT] = true;
 
         return { sim, pendingGT };
     }
@@ -1030,6 +1034,9 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
               ((written >>> 27) & 0x1F) === 0b01001);
         check('T_RESOLVE_A7: result.gt matches the word written to memory',
               (result.gt >>> 0) === written);
+        check('T_RESOLVE_A8: SELF and neighbouring rows are unchanged',
+            sim.memory[CLIST_BASE] === sim.createGT(0, NS_SLOT, { E: 1 }, 1) &&
+            sim.memory[CLIST_BASE + 2] === 0 && sim.memory[CLIST_BASE + 3] === 0);
     }
 
     // ── T_RESOLVE_B: double-resolve rejected — slot is no longer pending ─────
@@ -1130,7 +1137,7 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
                result.error.toLowerCase().includes('c-list')));
     }
 
-    // ── T_RESOLVE_I: CR6 present, clistCount=0 in word2 → slotIdx 0 rejected ─
+    // ── T_RESOLVE_I: resident header cc=0 → slotIdx 0 rejected ─
     {
         const { sim } = makeResolveSim();
         // A c-list bound is derived from the resident header, never from W1.
@@ -1147,6 +1154,37 @@ console.log('\n--- T_RESOLVE: resolvePendingSlot ---');
         check('T_RESOLVE_I3: error reports clistCount as 0',
               typeof result.error === 'string' &&
               result.error.includes('0'));
+    }
+
+    // Rights are required, never silently replaced by E; rejected writes leave
+    // both the capability and its neighbours intact.
+    for (const rights of [undefined, [], ['BOGUS'], ['R', 'E'], ['L', 'S']]) {
+        const { sim } = makeResolveSim();
+        sim.programCapabilities[PENDING_SLOT].rights = rights;
+        const before = Array.from(sim.memory);
+        const result = sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);
+        check(`T_RESOLVE_J: reject invalid rights ${JSON.stringify(rights)}`, !result.ok);
+        check(`T_RESOLVE_J: rejection does not write ${JSON.stringify(rights)}`,
+            before.every((word, index) => word === sim.memory[index]));
+    }
+    {
+        const { sim } = makeResolveSim();
+        sim.memory[CLIST_BASE] = ChurchSimulator.makePendingGT('SELF');
+        const before = sim.memory[CLIST_BASE];
+        const result = sim.resolvePendingSlot(0, NS_SLOT);
+        check('T_RESOLVE_K: ordinary SELF cannot be interactively replaced',
+            !result.ok && /immutable.*self/i.test(result.error));
+        check('T_RESOLVE_K: rejected SELF remains unchanged',
+            sim.memory[CLIST_BASE] === before);
+    }
+    {
+        const { sim } = makeResolveSim();
+        sim.programCapabilities[PENDING_SLOT].rights = ['R', 'W'];
+        writeTestNsEntry(sim, NS_SLOT, CLIST_BASE - (64 - CLIST_COUNT),
+            63, 0, 0, 1, 7, CLIST_COUNT);
+        const result = sim.resolvePendingSlot(PENDING_SLOT, NS_SLOT);
+        check('T_RESOLVE_L: requested RW rights and live sequence are preserved',
+            result.ok && result.gt === sim.createGT(7, NS_SLOT, { R: 1, W: 1 }, 1));
     }
 }
 
@@ -1490,42 +1528,39 @@ console.log('\n--- T015: LAZY_LOAD wired from _execCall (cw=0 lump) ---');
     }
 }
 
-// ── T016: declared capability resolution through supported LOAD ───────────
-//
-// Explicit name + rights declarations resolve before LOAD consumes the row.
-// A new symbolic name can allocate an in-memory descriptor; an existing name
-// reuses its descriptor. Neither needs the old fused-instruction IRQ path.
-// T018 separately covers scheduler suspension through petNameMemory.
-console.log('\n--- T016: declared capability resolution through LOAD ---');
+// ── T016: declared NULL/pending resolution through supported LOAD + CALL ──
+// ELOADCALL is retired. Declared rows resolve using explicit rights, including
+// symbolic registration for missing targets. PetNameMemory suspension/recovery
+// is exercised separately by T018, rather than bypassing declaration validation.
+console.log('\n--- T016: declared resolution through LOAD + CALL ---');
 {
     // ── Shared helpers ──────────────────────────────────────────────────────
     const C_SLOT    = 2;    // c-list slot holding the NULL / pending GT
     const NS_SLOT5  = 5;    // NS slot backing CR6's GT
     const CLIST_BASE = 0x400;
 
-    // Resolve the capability with current LOAD before a separate CALL.
-    // Indexed CALL is not a replacement for the retired fused lazy-load path.
-    const LOAD_ROW2 = ((0 << 27) | (14 << 23) | (0 << 19) | (6 << 15) | (C_SLOT << 4)) >>> 0;
-
     function makeDeclaredLoadSim() {
         const { sim, registry, sysAbs } = makeTestSim();
         sim.bootComplete = false;
 
-        // NS slot 5 backs CR6 (the c-list GT); clistCount=10 so ecRow=2 is in range.
-        writeTestNsEntry(sim, NS_SLOT5, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
+        // Install a real owner header; CR6 points to its tail, not its header.
+        const ownerBase = CLIST_BASE - (64 - 10);
+        sim.memory[ownerBase] = sim.packLumpHeader(0, 1, 10, 0);
+        writeTestNsEntry(sim, NS_SLOT5, ownerBase, 63, 0, 0, 1, 1, 10, 0);
 
-        // CR6 = E-perm Inform GT for slot 5; word1 = c-list base; word2 encodes clistCount.
+        // W2 mirrors Namespace authority; the resident header supplies cc.
         const cr6GT = sim.createGT(1, NS_SLOT5, {E:1}, 1);
         sim.cr[6] = {
             word0: cr6GT,
             word1: CLIST_BASE,
-            word2: sim.packNSWord1(63, 0, 0, 1, 10),
+            word2: sim.readNSEntry(NS_SLOT5).word1_limit,
             word3: 0, m: 0
         };
 
-        // Compact LOAD index is DR0 + C_SLOT, encoded in imm[13:4].
-        sim.memory[0] = LOAD_ROW2;
-        sim.programCapabilities = { [C_SLOT]: { name: 'UnknownAbstraction', rights: ['E'] } };
+        sim.memory[CLIST_BASE] = cr6GT;
+        const assembled = new ChurchAssembler().assemble('LOAD CR0, CR6[2]\nCALL CR0, 0\nHALT');
+        if (assembled.errors.length) throw new Error(JSON.stringify(assembled.errors));
+        sim.memory.set(assembled.words, 0);
 
         // Track _fireSchedulerIRQ.
         let irqReason = null, irqSlot = null;
@@ -1539,116 +1574,30 @@ console.log('\n--- T016: declared capability resolution through LOAD ---');
         return { sim, registry, sysAbs, getIRQ: () => ({ reason: irqReason, slot: irqSlot }) };
     }
 
-    // ── T016-A: NULL row with explicit declaration resolves before LOAD ───
-    {
+    // Preserve incoming coverage of new symbolic descriptors as well as the
+    // resident LOAD/CALL cases below.
+    for (const pending of [false, true]) {
         const { sim, getIRQ } = makeDeclaredLoadSim();
-
-        // c-list slot C_SLOT = NULL GT (memory word = 0).
-        sim.memory[CLIST_BASE + C_SLOT] = 0;
-
-        // Declare a pet name for slot C_SLOT that has no matching NS label.
-        sim.programCapabilities = { [C_SLOT]: { name: 'UnknownAbstraction', rights: ['E'] } };
-        // Ensure no NS label matches 'UnknownAbstraction'.
-        delete sim.nsLabels['UnknownAbstraction'];
-
+        const name = pending ? 'PendingAbstraction' : 'UnknownAbstraction';
+        sim.programCapabilities = { [C_SLOT]: { name, rights: ['E'] } };
+        sim.memory[CLIST_BASE + C_SLOT] = pending ? ChurchSimulator.makePendingGT(name) : 0;
         const result = sim.step();
-        const irq = getIRQ();
-
-        check('T016-A1: step() returned a non-null result',
-            result !== null);
         const loaded = sim.cr[0].word0 >>> 0;
         const parsed = sim.parseGT(loaded);
-        check('T016-A2: declared LOAD completes without suspension',
+        check(`T016 symbolic ${pending}: LOAD completes without suspension`,
             result && !result.lazySuspended && !sim._lazySuspended);
-        check('T016-A3: NULL row is replaced with loaded Inform GT',
-            !ChurchSimulator.isNullGT(loaded) && parsed.type === 1 &&
+        check(`T016 symbolic ${pending}: exact row contains loaded Inform GT`,
+            parsed.type === 1 && !ChurchSimulator.isPendingGT(loaded) &&
             sim.memory[CLIST_BASE + C_SLOT] === loaded);
-        check('T016-A4: resolved descriptor has the declared name',
-            sim.nsLabels[parsed.index] === 'UnknownAbstraction');
-        check('T016-A5: immediate resolution does not dispatch an IRQ',
-            irq.reason === null);
-        check('T016-A6: grant is exactly the declared E permission',
+        check(`T016 symbolic ${pending}: descriptor retains declared name`,
+            sim.nsLabels[parsed.index] === name);
+        check(`T016 symbolic ${pending}: grant is exactly E with live sequence`,
             loaded === sim.createGT(sim._nsSequenceForWrite(parsed.index), parsed.index, { E: 1 }, 1));
-        check('T016-A7: machine NOT halted after LAZY_RESOLVE',
-            !sim.halted);
-        check('T016-A8: no fault logged (LAZY_RESOLVE is not a halt-level fault)',
-            sim.faultLog.length === 0);
-        check('T016-A9: LOAD reports the resolved name',
-            sim.output.includes('LOAD CR0') && sim.output.includes('UnknownAbstraction'));
+        check(`T016 symbolic ${pending}: no fault, halt or IRQ`,
+            !sim.halted && !sim.faultLog.length && getIRQ().reason === null);
+        check(`T016 symbolic ${pending}: LOAD reports resolved name`,
+            sim.output.includes('LOAD CR0') && sim.output.includes(name));
     }
-
-    // ── T016-B: pending sentinel resolves with explicit name and rights ───
-    {
-        const { sim, getIRQ } = makeDeclaredLoadSim();
-
-        const PET_NAME = 'PendingAbstraction';
-        sim.programCapabilities[C_SLOT] = { name: PET_NAME, rights: ['E'] };
-        // Place a pending GT sentinel at c-list slot C_SLOT.
-        sim.memory[CLIST_BASE + C_SLOT] = ChurchSimulator.makePendingGT(PET_NAME);
-        // Ensure no NS label resolves 'PendingAbstraction'.
-        for (const k of Object.keys(sim.nsLabels)) {
-            if (String(sim.nsLabels[k]).toUpperCase() === PET_NAME.toUpperCase()) {
-                delete sim.nsLabels[k];
-            }
-        }
-
-        const result = sim.step();
-        const irq = getIRQ();
-
-        check('T016-B1: step() returned a non-null result (pending GT path)',
-            result !== null);
-        const loaded = sim.cr[0].word0 >>> 0;
-        const parsed = sim.parseGT(loaded);
-        check('T016-B2: declared LOAD completes without suspension',
-            result && !result.lazySuspended && !sim._lazySuspended);
-        check('T016-B3: loaded capability is Inform, not a pending sentinel',
-            parsed.type === 1 && !ChurchSimulator.isPendingGT(loaded));
-        check('T016-B4: exact c-list row holds the loaded GT',
-            sim.memory[CLIST_BASE + C_SLOT] === loaded);
-        check('T016-B5: resolved descriptor has the declared name',
-            sim.nsLabels[parsed.index] === PET_NAME);
-        check('T016-B6: immediate resolution does not dispatch an IRQ',
-            irq.reason === null);
-        check('T016-B7: grant is exactly the declared E permission',
-            loaded === sim.createGT(sim._nsSequenceForWrite(parsed.index), parsed.index, { E: 1 }, 1));
-        check('T016-B8: machine NOT halted after LAZY_RESOLVE (PENDING_GT)',
-            !sim.halted);
-        check('T016-B9: no fault logged during pending resolution',
-            sim.faultLog.length === 0);
-        check('T016-B10: output mentions PENDING_GT pet name',
-            sim.output.includes(PET_NAME));
-    }
-
-    // ── T016-C: pending GT with resolvable name → instant resolution, no IRQ ─
-    {
-        const { sim, getIRQ } = makeDeclaredLoadSim();
-
-        const PET_NAME   = 'KnownAbstraction';
-        const TARGET_SLOT = 15;
-        sim.programCapabilities[C_SLOT] = { name: PET_NAME, rights: ['E'] };
-
-        // Write a valid NS entry at slot 15 so isNSEntryValid returns true.
-        writeTestNsEntry(sim, TARGET_SLOT, 0x300, 63, 0, 0, 1, 1, 0, 0);
-        sim.nsLabels[TARGET_SLOT] = PET_NAME;
-
-        // Place a pending GT in the c-list.
-        sim.memory[CLIST_BASE + C_SLOT] = ChurchSimulator.makePendingGT(PET_NAME);
-
-        // LOAD resolves the capability; executing its target is a separate CALL.
-        sim.step();
-        const irq = getIRQ();
-
-        check('T016-C1: _fireSchedulerIRQ NOT called with LAZY_RESOLVE (name resolved instantly)',
-            irq.reason !== 'LAZY_RESOLVE');
-        check('T016-C2: LOAD uses the existing descriptor without a fault',
-            sim.parseGT(sim.cr[0].word0).index === TARGET_SLOT &&
-            sim.faultLog.length === 0);
-        check('T016-C3: pending slot was rewritten to an Inform GT',
-            !ChurchSimulator.isPendingGT(sim.memory[CLIST_BASE + C_SLOT]) &&
-            sim.memory[CLIST_BASE + C_SLOT] !== 0);
-    }
-
-    // A pending name is not authority: missing/invalid grants fail closed.
     for (const [label, declaration] of [
         ['absent', undefined],
         ['missing-rights', { name: 'PendingAbstraction' }],
@@ -1657,7 +1606,7 @@ console.log('\n--- T016: declared capability resolution through LOAD ---');
         const { sim, getIRQ } = makeDeclaredLoadSim();
         const pending = ChurchSimulator.makePendingGT('PendingAbstraction');
         sim.memory[CLIST_BASE + C_SLOT] = pending;
-        sim.programCapabilities[C_SLOT] = declaration;
+        sim.programCapabilities = { [C_SLOT]: declaration };
         sim.step();
         check(`T016-D ${label}: fails with pending-resolution fault`,
             sim.halted && sim.faultLog.some(f => f.type === 'LAZY_RESOLVE_PENDING'));
@@ -1668,11 +1617,10 @@ console.log('\n--- T016: declared capability resolution through LOAD ---');
         check(`T016-D ${label}: no scheduler IRQ substitutes for missing authority`,
             getIRQ().reason === null);
     }
-
-    // Keep retirement coverage distinct from supported resolution behavior.
     for (const opcode of [8, 9]) {
         for (const pending of [0, ChurchSimulator.makePendingGT('PendingAbstraction')]) {
             const { sim, getIRQ } = makeDeclaredLoadSim();
+            sim.programCapabilities = { [C_SLOT]: { name: 'PendingAbstraction', rights: ['E'] } };
             sim.memory[CLIST_BASE + C_SLOT] = pending;
             sim.memory[0] = ((opcode << 27) | (14 << 23) | (6 << 15) | C_SLOT) >>> 0;
             sim.step();
@@ -1681,11 +1629,46 @@ console.log('\n--- T016: declared capability resolution through LOAD ---');
                 sim.halted && sim.faultLog.some(f => f.type === 'INVALID_OP'));
             check(`${label}: c-list row remains unchanged`,
                 sim.memory[CLIST_BASE + C_SLOT] === pending);
-            check(`${label}: no capability loaded`,
-                sim.cr[0].word0 === 0);
-            check(`${label}: no lazy-resolution IRQ`,
-                getIRQ().reason === null);
+            check(`${label}: no capability loaded`, sim.cr[0].word0 === 0);
+            check(`${label}: no lazy-resolution IRQ`, getIRQ().reason === null);
         }
+    }
+    for (const pending of [false, true]) {
+        const { sim, getIRQ } = makeDeclaredLoadSim();
+        const name = 'KnownAbstraction';
+        const target = 20;
+        writeTestNsEntry(sim, target, 0x300, 63, 0, 0, 1, 7, 1, 0);
+        sim.nsLabels[target] = name;
+        sim.memory[0x300] = sim.packLumpHeader(0, 2, 1, 0);
+        // Method-zero table entry is a canonical branch to the HALT body.
+        const method = new ChurchAssembler().assemble('BRANCH body\nbody:\nHALT');
+        if (method.errors.length) throw new Error(JSON.stringify(method.errors));
+        sim.memory[0x301] = method.words[0];
+        sim.memory[0x302] = 0;
+        sim.memory[0x33f] = sim.createGT(7, target, { E: 1 }, 1);
+        sim.programCapabilities = { [C_SLOT]: { name, rights: ['E'] } };
+        sim.memory[CLIST_BASE + C_SLOT] = pending ? ChurchSimulator.makePendingGT(name) : 0;
+        const result = sim.step();
+        const expected = sim.createGT(7, target, { E: 1 }, 1);
+        check(`T016 ${pending}: LOAD succeeds without suspension or fault`,
+            result && !result.lazySuspended && !sim.halted && !sim.faultLog.length);
+        check(`T016 ${pending}: exact GT replaces unresolved word and populates CR0`,
+            sim.memory[CLIST_BASE + C_SLOT] === expected && sim.cr[0].word0 === expected);
+        check(`T016 ${pending}: no LAZY_RESOLVE IRQ for a declared live target`,
+            getIRQ().reason !== 'LAZY_RESOLVE');
+        const call = sim.step();
+        check(`T016 ${pending}: explicit CALL succeeds after resolution`,
+            call && !sim.halted && !sim.faultLog.length);
+    }
+    {
+        const { sim } = makeDeclaredLoadSim();
+        const pending = ChurchSimulator.makePendingGT('MissingRights');
+        sim.memory[CLIST_BASE + C_SLOT] = pending;
+        sim.step();
+        check('T016: pending sentinel without a declaration fails closed',
+            sim.faultLog.some(f => f.type === 'LAZY_RESOLVE_PENDING'));
+        check('T016: rejected pending sentinel is not rewritten',
+            sim.memory[CLIST_BASE + C_SLOT] === pending);
     }
 }
 
@@ -1825,25 +1808,24 @@ console.log('\n--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---')
     const NS_SLOT7   = 7;    // NS slot backing CR6's c-list
     const CLIST_BASE = 0x500;
 
-    // LOAD AL, CR1, CR6, LOAD_SLOT
-    // opcode=0(5b), cond=AL=14(4b), crDst=1(4b), crSrc=6(4b), imm=LOAD_SLOT(15b)
-    const LOAD_INSTR = ((0 << 27) | (14 << 23) | (1 << 19) | (6 << 15) | (LOAD_SLOT << 4)) >>> 0;
+    // Compact LOAD index: magnitude in bits 14:4, DR selector in bits 3:0.
+    const LOAD_INSTR = ((14 << 23) | (1 << 19) | (6 << 15) | (LOAD_SLOT << 4)) >>> 0;
 
     function makeLoadSim() {
         const { sim, registry, sysAbs } = makeTestSim();
         // bootComplete=false → _fetchInstruction uses direct memory[pc] path,
-        // no CR14 setup required (same pattern as T016 makeEloadSim).
+        // no CR14 setup required.
         sim.bootComplete = false;
 
         // NS slot 7 backs CR6 (the c-list GT); clistCount=10 so LOAD_SLOT=3 is in range.
         writeTestNsEntry(sim, NS_SLOT7, CLIST_BASE, 63, 0, 0, 1, 1, 10, 0);
 
-        // CR6 = E-perm Inform GT for slot 7; word1 = c-list base; word2 encodes clistCount.
+        // Synthetic non-LUMP descriptor uses the declared side-table count.
         const cr6GT = sim.createGT(1, NS_SLOT7, { E: 1 }, 1);
         sim.cr[6] = {
             word0: cr6GT,
             word1: CLIST_BASE,
-            word2: sim.packNSWord1(63, 0, 0, 1, 10),
+            word2: sim.readNSEntry(NS_SLOT7).word1_limit,
             word3: 0, m: 0
         };
 
@@ -1909,6 +1891,37 @@ console.log('\n--- T018: LAZY_RESOLVE wired from _execLoad (petNameMemory) ---')
             result && result.slot === LOAD_SLOT);
         check('T018-B7: output contains [LAZY-RESOLVE] tag',
             sim.output.includes('[LAZY-RESOLVE]'));
+
+        // Interactive introduction must restore the suspended occurrence and
+        // let the exact LOAD retry, not skip it or retain the handler's state.
+        const suspended = sim._pendingResolves.get(LOAD_SLOT);
+        const savedDRs = [...suspended.savedDRs];
+        const target = 20;
+        writeTestNsEntry(sim, target, 0x900, 63, 0, 0, 1, 4, 0, 0);
+        sim.bootComplete = true; // Resolve Now is a post-boot UI operation.
+        const rejected = sim.resolvePendingSlot(LOAD_SLOT, target);
+        check('T018-B8a: missing rights cannot clear or resume a pending suspension',
+            !rejected.ok && /rights/.test(rejected.error) && sim._lazySuspended &&
+            sim._pendingResolves.get(LOAD_SLOT) === suspended &&
+            sim.memory[CLIST_BASE + LOAD_SLOT] === 0);
+        sim.programCapabilities = { [LOAD_SLOT]: { name: 'Introduced', rights: ['R'] } };
+        sim.dr[3] = 999;
+        const resolved = sim.resolvePendingSlot(LOAD_SLOT, target);
+        check('T018-B8: interactive introduction resumes and clears pending state',
+            resolved.ok && !sim._lazySuspended && !sim._pendingResolves.has(LOAD_SLOT));
+        check('T018-B9: original PC, registers, flags and STO restored',
+            sim.pc === suspended.pc && sim.sto === suspended.savedSto &&
+            savedDRs.every((value, index) => sim.dr[index] === value) &&
+            suspended.savedCRs.every((cr, index) =>
+                Object.keys(cr).every(key => cr[key] === sim.cr[index][key])) &&
+            Object.keys(suspended.savedFlags).every(key =>
+                sim.flags[key] === suspended.savedFlags[key]));
+        sim.bootComplete = false; // Return to this fixture's direct-fetch mode.
+        const retried = sim.step();
+        check('T018-B10: original LOAD retries successfully with exact granted rights',
+            retried && !retried.lazySuspended && !sim.halted &&
+            sim.cr[1].word0 === sim.createGT(4, target, { R: 1 }, 1) &&
+            sim.pc === suspended.pc + 1 && sim.faultLog.length === 0);
     }
 }
 
@@ -2032,9 +2045,10 @@ console.log('\n--- T012: faultSnapshot event emitted before _returnToBoot() ---'
     check('T012d: snap.source === "simulator"', t12snap && t12snap.source === 'simulator');
     check('T012e: snap.fault_code matches BOUNDS',
         t12snap && t12snap.fault_code === ChurchSimulator.FAULT_CODES.BOUNDS);
-    check('T012f: snap.fault_message matches fault() message',
+    check('T012f: snap.fault_message preserves the exact routed fault record',
         t12snap && t12snap.fault_message === t12sim.faultLog[0].message &&
-        t12snap.fault_message.endsWith('Test bounds fault for snapshot (T012)'));
+        t12sim.faultLog[0].rawDiagnosticReason === 'Test bounds fault for snapshot (T012)' &&
+        t12snap.fault_message.endsWith(' — Test bounds fault for snapshot (T012)'));
     check('T012g: snap.nia matches PC at fault time',
         t12snap && snap_nia_ok(t12snap));
     check('T012h: snap.cr is a 16-element array',
