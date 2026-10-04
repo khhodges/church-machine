@@ -1,0 +1,46 @@
+{
+  "boot_config_sha256": "39a8ae8177fcfca37447482b75584fb794fb2a4d44c19da92af6cf33cbe38687",
+  "image_sha256": "52f0d42f0291dddae74e049fdec2a6b09bb30c0b55d14ded26a5ea395125c648",
+  "namespace_fingerprint": "e548be1912a6065f8a4097b965cdd1a1ea186b400fca6a11c25bb7be424edd40",
+  "origin": "generated",
+  "resident_bindings": [
+    {
+      "artifact_sha256": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "boot_resident": true,
+      "filename": "SelfTest.1.8b19abd7.lump",
+      "load_policy": "Resident",
+      "localized_clist_sha256": "37fa6d81a99764b966f9e8499eb68d6e7c761f303e5f60f397564c88a7ae990a",
+      "ns_slot_policy": "static",
+      "resident": true,
+      "slot": 6,
+      "token": "4a000006"
+    },
+    {
+      "artifact_sha256": "49bda45936d9bc4a668814a35f49174969a02f881ee7c8a4aadd9692a15c4283",
+      "boot_resident": true,
+      "filename": "WukongCallHome.1.7fe59019.lump",
+      "load_policy": "Resident",
+      "localized_clist_sha256": "9490f2f2d477701107d2bb38df964a4b286eb808d9a5bfa243086954bdda006c",
+      "ns_slot_policy": "static",
+      "resident": true,
+      "slot": 7,
+      "token": "4a000007"
+    },
+    {
+      "artifact_sha256": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "boot_resident": true,
+      "filename": "CapabilityTest.1.ff2e3f35.lump",
+      "load_policy": "Resident",
+      "localized_clist_sha256": "b54f3079868f3c737b0ffebb9bee3c2b39159d133e6757a2146971e56374677b",
+      "ns_slot_policy": "static",
+      "resident": true,
+      "slot": 10,
+      "token": "a207ecd1"
+    }
+  ],
+  "source_sha256": {
+    "manifest": "eedbf4e0b55a6ad046691cc9ac426ec34138350f42de495839147b40d871f9b5",
+    "ns_state": "7e023e2ed22fb7ccc092853093dce1ffa1918eab9825c0be69cc959e1b8dabc3"
+  },
+  "version": 1
+}
