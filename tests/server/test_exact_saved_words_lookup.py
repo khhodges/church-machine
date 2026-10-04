@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import tempfile
 import unittest
+from server.idx1_profile import validate_execution, execution_fields
 
 
 class ExactSavedWordsTests(unittest.TestCase):
@@ -46,6 +47,9 @@ class ExactSavedWordsTests(unittest.TestCase):
             "_lump_preview_issues": lambda *a, **kw: [],
             "_lump_archive_provenance": lambda *a, **kw: {"kind": "archived-manifest-row"},
             "_validate_lump_snapshot": lambda *a: {"errors": []},
+            "_attach_unverified_exact_source": lambda *a: None,
+            "validate_execution": validate_execution,
+            "execution_fields": execution_fields,
         }
         exec(compile(ast.Module(body=[route], type_ignores=[]), str(source), "exec"), self.env)
 

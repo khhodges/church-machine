@@ -214,6 +214,20 @@ def is_trusted_compiler_record(record, *, binary=None, signing_key=None):
     return True
 
 
+def is_compiler_owned_record(record, *, binary=None):
+    """Authenticated compiler provenance, excluding frozen bootstrap records."""
+    if (not isinstance(record, dict)
+            or record.get("bootstrap_t") is not None
+            or record.get("bootstrap_runtime_gt") is not None):
+        return False
+    try:
+        return is_trusted_compiler_record(
+            record, binary=binary,
+            signing_key=compiler_record_verification_key(record.get("compiler_record")))
+    except (ValueError, TypeError, RuntimeError):
+        return False
+
+
 def read_approvals(path, missing_ok=True):
     try:
         with open(path, encoding="utf-8") as source:

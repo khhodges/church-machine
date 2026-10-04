@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 import re
-from server.lump_approvals import read_approvals
+from server.lump_approvals import read_approvals, is_compiler_owned_record
 from server.bootstrap_identity import verify_bootstrap_self_gt, resident_inform_egt
 
 _HEX8_RE = re.compile(r"^[0-9a-f]{8}$")
@@ -142,6 +142,8 @@ def check_lump_canonical_integrity(lumps_dir, key8, lump_raw):
     dot_name, issue, number = parsed
     if dot_name != approval.get("dot_name") or issue != approval.get("issue_n"):
         return f"Integrity invariant violated: canonical filename identity disagrees for token {key8}."
+    if is_compiler_owned_record(approval, binary=lump_raw):
+        return True
     binding = _frozen_bootstrap_binding(lumps_dir, key8, filename)
     if binding is None and compute_number(dot_name, lump_raw) != number:
         return f"Filename integrity failure for {entry['filename']} (token {key8})."

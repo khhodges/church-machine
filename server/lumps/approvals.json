@@ -910,19 +910,19 @@
       "issue_n": 1,
       "abstraction": "CapabilityTest",
       "filename": "CapabilityTest.1.ff2e3f35.lump",
-      "compiled_at": 1791047127.5230067,
+      "compiled_at": 1791072510.9183779,
       "trust_origin": "trusted-home-ide",
       "compiler_identity": "Trusted Home IDE compiler",
       "compiler_version": "server-compile-v1",
       "compiler_record": {
         "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+        "source_hash": "d6548b10dcbdb08cedf93ad22cd22a1e2a9f6183378eeaadbfa34578e800c2a1",
+        "language": "javascript",
         "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
-        "language": "javascript",
-        "signature": "f4cc29340f3940003f9150864ba145e661fdb51b53fd2dfac242027f1623f6f5",
-        "signing_key_id": "compiler-signing-secret/v1",
         "signing_scheme": "church-compiler-hmac-sha256/v2",
-        "source_hash": "d6548b10dcbdb08cedf93ad22cd22a1e2a9f6183378eeaadbfa34578e800c2a1"
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "f4cc29340f3940003f9150864ba145e661fdb51b53fd2dfac242027f1623f6f5"
       },
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
     }

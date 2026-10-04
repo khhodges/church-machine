@@ -105,3 +105,53 @@ def test_existing_idx1_browser_replay_still_authenticates(monkeypatch):
     execution = validate_execution(payload["metadata"], raw)
     result = app_module._attest_idx1_browser_candidate(payload["metadata"], words, execution)
     assert app_module._trusted_compile_metadata(result, hashlib.sha256(raw).hexdigest(), words)
+
+
+@pytest.mark.parametrize("evidence", ["valid", "tampered", "missing", "bootstrap"])
+def test_identity_audit_uses_exact_provenance_not_resident_name(
+        candidate, isolated_lumps, monkeypatch, evidence):
+    import json
+    metadata, words = candidate
+    metadata.update(content_type="code", grants=["E"], methods=[], artifact_only=True)
+    client = app_module.app.test_client()
+    saved = publish(client, {"binary": words, "metadata": metadata})
+    # Model an abstraction also present in the frozen bootstrap ancestry list.
+    monkeypatch.setattr(app_module, "_BOOTSTRAP_IDENTITY_NAMES", {"replayprobe"})
+    entry = {"abstraction": "ReplayProbe", "filename": saved["filename"],
+             "token": saved["token"], "archived": True}
+    (isolated_lumps / "ns-state.json").write_text(json.dumps({
+        "abstractions": [{
+            "name": "ReplayProbe", "filename": saved["filename"],
+            "token": saved["token"], "slot": 10, "seq": 0, "f": 0, "g": 0,
+            "type": "Inform", "resident": True, "boot_resident": True,
+            "ns_slot_policy": "static", "load_policy": "Resident",
+        }]}))
+    inspected = app_module._inspect_lump_binary(
+        (isolated_lumps / saved["filename"]).read_bytes())
+    approvals_path = isolated_lumps / "approvals.json"
+    approvals = json.loads(approvals_path.read_text())
+    approval = approvals["approvals"][inspected["binary_hash"]]
+    if evidence == "tampered":
+        approval["compiler_record"]["attestation"] = "0" * 64
+    elif evidence == "missing":
+        approval.pop("compiler_record")
+    elif evidence == "bootstrap":
+        approval["bootstrap_t"] = 1
+    approvals_path.write_text(json.dumps(approvals))
+    identity = app_module._bootstrap_snapshot_identity(isolated_lumps, entry, inspected)
+    if evidence == "valid":
+        assert identity is None
+        response = client.get(
+            f"/api/lump/{saved['token']}/words",
+            query_string={"exact_filename": saved["filename"],
+                          "binary_hash": inspected["binary_hash"]})
+        assert response.status_code == 200, response.json
+        assert response.json.get("bootstrap_identity") is None
+        assert response.json["words"] == inspected["words"]
+        assert not response.json.get("validation_errors")
+        assert not any(
+            c["code"].startswith("bootstrap_identity")
+            for c in response.json["activation_eligibility"]["checks"])
+    else:
+        assert identity["applies"] is True
+        assert identity["valid"] is False

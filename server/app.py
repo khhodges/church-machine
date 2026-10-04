@@ -15217,6 +15217,21 @@ def _bootstrap_snapshot_identity(
     if abstraction.casefold() not in _BOOTSTRAP_IDENTITY_NAMES:
         return None
 
+    # A resident assignment is not proof of bootstrap ancestry for these
+    # exact bytes. Compiler-owned revisions retain their own authenticated
+    # identity, including unresolved SELF, until destination materialization.
+    try:
+        approval = _matching_lump_approval(lumps_dir, inspected["binary_hash"])
+        if (isinstance(approval, dict)
+                and approval.get("bootstrap_t") is None
+                and approval.get("bootstrap_runtime_gt") is None
+                and _trusted_compile_metadata(
+                    approval, inspected["binary_hash"], inspected["words"])):
+            return None
+    except (ValueError, KeyError, TypeError, RuntimeError):
+        # Missing/invalid evidence must never exempt a historical bootstrap.
+        pass
+
     record_token = str(manifest_entry.get("token") or "").strip().lower()
 
     def _unavailable(reason):
@@ -15381,6 +15396,18 @@ def _activation_eligibility(
         isinstance(abstraction, str)
         and abstraction.casefold() in _BOOTSTRAP_IDENTITY_NAMES
     )
+    if known_bootstrap and binary_hash:
+        # This is a read-only explanation, not an activation grant. The caller
+        # computed the exact byte hash; require a matching signed record before
+        # suppressing ancestry-based bootstrap expectations.
+        from server.lump_approvals import is_compiler_owned_record, read_approvals
+        try:
+            exact_approval = read_approvals(
+                os.path.join(LUMPS_DIR, "approvals.json")).get(binary_hash)
+            if is_compiler_owned_record(exact_approval):
+                known_bootstrap = False
+        except (OSError, ValueError, TypeError):
+            pass
     errors = [
         str(message) for message in (validation_errors or []) if message
     ]

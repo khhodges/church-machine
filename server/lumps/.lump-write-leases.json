@@ -1,26 +1,7 @@
 {
   "leases": {},
   "waiters": {
-    "CapabilityTest": [
-      {
-        "owner_key": "KeEUhKp_N_9bOwJ2DcsBfZuwdzPdLKdM",
-        "operation_id": "aa3187cbff474ce59e7a150a00c08ce6",
-        "requested_at": 1791046939.3927672,
-        "expires_at": 1791047239.3927672
-      },
-      {
-        "owner_key": "rXDZrAiIg3BdyyabONaO1fKZZ131PZLe",
-        "operation_id": "9923148d8f87409d85102648cda84e30",
-        "requested_at": 1791046967.4588466,
-        "expires_at": 1791047267.4588466
-      },
-      {
-        "owner_key": "7K_mS1ahp8EW8ICt_gwnjFf4sgXWkZGI",
-        "operation_id": "0dec8fc40ddf4ca993a7659f6e3c09cd",
-        "requested_at": 1791047042.3022935,
-        "expires_at": 1791047342.3022935
-      }
-    ]
+    "CapabilityTest": []
   },
   "messages": {}
 }
