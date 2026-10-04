@@ -154,7 +154,7 @@ const entry = {
     token, abstraction: DOT_NAME, filename, issue_n: issueN, lump_version: issueN,
     variant_group: 'selftest-history',
 };
-console.log(`SelfTest artifact: ${filename}`);
+console.log(`${CHECK_ONLY ? 'Proposed builder output (not selected or written)' : 'SelfTest artifact'}: ${filename}`);
 console.log(`Bootstrap runtime SELF token: ${token}`);
 console.log(`slot=${nsSlot} seq=${seq} cw=${cw} cc=${cc} lump_size=${lumpSize} binary_sha256=${binaryHash}`);
 
@@ -225,6 +225,17 @@ if (CHECK_ONLY) {
             ? zlib.inflateRawSync(storedSource).toString('utf8')
             : storedSource.toString('utf8');
     } catch (_) {}
+    console.log(`Selected SelfTest artifact: ${activeRow?.filename || '(missing or ambiguous)'}`);
+    console.log(`Selected binary SHA-256: ${activeHash || '(unreadable)'}`);
+    // Bootstrap identity is the exact row-zero E-GT, not a name-hash seal.
+    // Keep the hash-bound approval and Namespace binding checks independent
+    // from comparison with the prospective builder output above.
+    const selectedSelf = activeBytes && activeCc > 0 &&
+        activeCc * 4 <= activeBytes.length
+        ? activeBytes.readUInt32BE(activeBytes.length - activeCc * 4) : null;
+    if (selectedSelf !== selfGT) {
+        failures.push('selected SelfTest row-zero SELF GT differs from the Namespace binding');
+    }
     if (!activeBytes || activeSource !== source ||
             activeCc !== cc ||
             JSON.stringify(activeWords) !== JSON.stringify(compiledWords)) {
@@ -243,7 +254,6 @@ if (CHECK_ONLY) {
     if (stateRow.token !== token ||
         stateRow.slot !== nsSlot || stateRow.seq !== seq ||
         stateRow.filename !== activeRow?.filename ||
-        !activeIdentityHash || stateRow.identity_hash !== activeIdentityHash ||
         stateRow.binary_hash !== activeHash ||
         stateRow.ns_slot_policy !== 'static' || stateRow.load_policy !== 'Resident' ||
         stateRow.resident !== true || stateRow.boot_resident !== true ||
@@ -256,14 +266,21 @@ if (CHECK_ONLY) {
     const approved = approvals && approvals[activeHash];
     if (!approved || approved.binary_hash !== activeHash ||
             approved.filename !== stateRow.filename ||
-            approved.token !== token || approved.abstraction !== DOT_NAME ||
-            approved.identity_string !== activeIdentityString ||
-            approved.identity_hash !== activeIdentityHash ||
-            approved.identity_seal_location !== 'approval') {
+            approved.abstraction !== DOT_NAME || approved.dot_name !== DOT_NAME ||
+            approved.issue_n !== activeIssue ||
+            approved.bootstrap_t !== token || approved.bootstrap_runtime_gt !== selectedSelf ||
+            selectedSelf !== selfGT ||
+            approved.capability_type !== 'inform' ||
+            !Array.isArray(approved.grants) || approved.grants.length !== 1 || approved.grants[0] !== 'E' ||
+            (approved.token != null && approved.token !== token) ||
+            (approved.identity_string != null && approved.identity_string !== activeIdentityString) ||
+            (approved.identity_hash != null && approved.identity_hash !== activeIdentityHash) ||
+            (approved.identity_seal_location != null && approved.identity_seal_location !== 'approval')) {
         failures.push('SelfTest hash-bound approval is missing or stale');
         failures.push(!approved ? 'no approval for selected binary hash'
             : 'existing approval does not match selected revision metadata; no approval was modified');
     }
+    else console.log('Selected hash-bound bootstrap approval matches; source freshness is checked separately.');
     if (failures.length) die(failures.join('\nFAIL: '));
     console.log('OK: canonical SelfTest source, manifest, ns-state, and named artifact are fresh.');
     process.exit(0);

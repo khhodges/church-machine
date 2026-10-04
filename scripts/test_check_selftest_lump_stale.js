@@ -25,6 +25,54 @@ try {
     check(r.status === 0, 'guard ignores a legacy 00000600.lump');
     r = run(GUARD, ['--lump-words', '16384']);
     check(r.status === 0, 'prospective allocation/revision never changes active identity validation');
+    const approvalsPath = path.join(dir, 'approvals.json');
+    const approvals = JSON.parse(fs.readFileSync(approvalsPath));
+    const hash = Object.keys(approvals.approvals)[0];
+    const approval = approvals.approvals[hash];
+    for (const key of ['token', 'identity_string', 'identity_hash', 'identity_seal_location']) {
+        delete approval[key];
+    }
+    fs.writeFileSync(approvalsPath, JSON.stringify(approvals));
+    const bootstrapState = JSON.parse(fs.readFileSync(path.join(dir, 'ns-state.json')));
+    bootstrapState.abstractions[0].identity_hash = 'obsolete-non-authoritative-name-hash';
+    fs.writeFileSync(path.join(dir, 'ns-state.json'), JSON.stringify(bootstrapState));
+    const validApprovals = fs.readFileSync(approvalsPath);
+    r = run(GUARD);
+    check(r.status === 0, 'current bootstrap approval needs no deferred identity-seal fields');
+    check(r.stdout.includes('Selected SelfTest artifact: ' + approval.filename) &&
+        r.stdout.includes('Proposed builder output (not selected or written):'),
+        'diagnostics distinguish the selected file from proposed output');
+    for (const [field, value] of [
+        ['binary_hash', 'wrong'], ['filename', 'wrong.lump'],
+        ['issue_n', approval.issue_n + 1], ['bootstrap_t', '00000000'],
+        ['bootstrap_runtime_gt', approval.bootstrap_runtime_gt ^ 1],
+        ['grants', ['R']], ['capability_type', 'abstract'],
+        ['abstraction', 'Other'], ['dot_name', 'Other'],
+    ]) {
+        const invalid = JSON.parse(validApprovals);
+        invalid.approvals[hash][field] = value;
+        fs.writeFileSync(approvalsPath, JSON.stringify(invalid));
+        const beforeCheck = fs.readFileSync(approvalsPath);
+        r = run(GUARD);
+        check(r.status !== 0 && r.stderr.includes('SelfTest hash-bound approval is missing or stale'),
+            `rejects mismatched ${field}`);
+        check(fs.readFileSync(approvalsPath).equals(beforeCheck), `does not repair ${field}`);
+    }
+    fs.writeFileSync(approvalsPath, JSON.stringify({ approvals: {} }));
+    r = run(GUARD);
+    check(r.status !== 0 && r.stderr.includes('no approval for selected binary hash'),
+        'missing hash-bound approval remains a failure');
+    fs.writeFileSync(approvalsPath, validApprovals);
+    const binaryPath = path.join(dir, approval.filename);
+    const validBinary = fs.readFileSync(binaryPath);
+    const badSelf = Buffer.from(validBinary);
+    const cc = badSelf.readUInt32BE(0) & 255;
+    badSelf.writeUInt32BE(0, badSelf.length - cc * 4);
+    fs.writeFileSync(binaryPath, badSelf);
+    r = run(GUARD);
+    check(r.status !== 0 && r.stderr.includes('row-zero SELF GT differs'),
+        'rejects wrong SELF bytes even with otherwise valid approval metadata');
+    fs.writeFileSync(binaryPath, validBinary);
     const protectedFiles = ['manifest.json', 'ns-state.json', 'approvals.json'];
     const before = protectedFiles.map(name => fs.readFileSync(path.join(dir, name)));
     const candidateDir = path.join(dir, 'review');
