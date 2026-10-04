@@ -268,12 +268,35 @@ def test_unresolved_clist_cannot_trigger_later_catalog_injection(saved):
     root, rows, cfg = saved
     path = root / rows[-1]["filename"]
     words = list(struct.unpack(">64I", path.read_bytes()))
-    words[1] = (6 << 15) | 1  # LOAD using CR6 row 1, but cc=1.
+    # LOAD CR6[DR0 + 1]: magnitude starts at bit 4; DR0 is hardwired zero.
+    words[1] = (6 << 15) | (1 << 4)  # Static row 1 is outside cc=1.
     raw = struct.pack(">64I", *words)
     path.write_bytes(raw)
     rows[-1]["binary_hash"] = hashlib.sha256(raw).hexdigest()
-    with pytest.raises(ValueError, match="unresolved c-list"):
-        PreparationStore().prepare(rows, cfg, root, 6)
+    before = snapshot(root)
+    store = PreparationStore()
+    with pytest.raises(
+            ValueError,
+            match=r"word \+1 .*out-of-range C-list index 1; C-list contains 1 words"):
+        store.prepare(rows, cfg, root, 6)
+    assert not store.records
+    assert snapshot(root) == before
+
+
+def test_dynamic_clist_index_is_left_to_runtime_checks(saved):
+    root, rows, cfg = saved
+    path = root / rows[-1]["filename"]
+    words = list(struct.unpack(">64I", path.read_bytes()))
+    # LOAD CR6[DR1 + 0]: DR1 is unknown during preparation, not static row 1.
+    words[1] = (6 << 15) | 1
+    raw = struct.pack(">64I", *words)
+    path.write_bytes(raw)
+    rows[-1]["binary_hash"] = hashlib.sha256(raw).hexdigest()
+    before = snapshot(root)
+    store = PreparationStore()
+    prepared = store.prepare(rows, cfg, root, 6)
+    assert prepared["preparationId"] in store.records
+    assert snapshot(root) == before
 
 
 @pytest.mark.parametrize("defect", ["missing_self", "wrong_self"])
