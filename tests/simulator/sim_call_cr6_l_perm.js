@@ -128,6 +128,33 @@ console.log('\n--- PHASE PM: perm-mask sanity ---');
 }
 
 // ── PHASE 1: lump-header path (cc > 0), via _execCall() ──────────────────────
+// Match the isolated hardware CALL matrix: canonical signed displacements,
+// bounded legacy offsets, private entries and both table/target bounds.
+for (const [method, entry, target, fault] of [
+    [1, 0xBF000001, 2, null], [3, 0xBF007FFF, 2, null],
+    [1, 0xBF000003, 4, null], [1, 2, 2, null], [1, 4, 4, null],
+    [1, 0, null, 'PRIVATE_METHOD'],
+    [1, 0xBF007FFF, null, 'BOUNDS'], [1, 0xBF004000, null, 'BOUNDS'],
+    [1, 0xBF003FFF, null, 'BOUNDS'], [1, 0xBF000004, null, 'BOUNDS'],
+    [1, 5, null, 'INVALID_OP'], [1, 0xAF084001, null, 'INVALID_OP'],
+    [5, 2, null, 'BOUNDS'],
+]) {
+    const sim = makeCallSim();
+    const faults = installFaultCapture(sim);
+    const base = 0x200;
+    writeLumpHdr(sim, base, 1, 4);
+    writeTestNsEntry(sim, 10, base, 63, 0, 0, 1, 0, 1, 0);
+    sim.memory[base + method] = entry >>> 0;
+    sim.cr[0] = {word0: sim.createGT(0, 10, {E:1}, 1), word1:0, word2:0, word3:0, m:0};
+    sim.cr[12] = {word0:0, word1:0, word2:0, word3:0, m:0};
+    sim.cr[15] = {word0:0, word1:0, word2:0, word3:0, m:0};
+    const result = sim._execCall({crDst:0, imm:method});
+    assert(`dispatch ${method}:0x${entry.toString(16)}`,
+        fault ? result === null && faults[0]?.type === fault
+            : result !== null && faults.length === 0 && sim.pc === target - 1,
+        JSON.stringify({faults, pc:sim.pc, target, fault}));
+}
+
 console.log('\n--- PHASE 1: lump-header path (cc=2) ---');
 {
     const CALLEE_BASE = 0x0200;

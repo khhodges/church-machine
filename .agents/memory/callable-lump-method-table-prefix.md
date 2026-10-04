@@ -19,4 +19,4 @@ Never classify a saved bare entry of 2 as inherently corrupt, or promote a BRANC
 
 **Why:** An isolated SelfTest candidate probe found hardware interpreting the BRANCH instruction as a raw word offset, producing an out-of-range NIA before body entry. The exact same bytes completed the body and returned successfully through method zero. This is a consumer-format mismatch, not evidence that the old bare entry was bad.
 
-**How to apply:** Require a numbered CALL hardware-model trace before adopting a candidate. Keep direct-entry success distinct from method-table compatibility, and keep simulation evidence distinct from physical-board release evidence.
+**How to apply:** Require a numbered CALL hardware-model trace before adopting a candidate. Both canonical signed relative entries and bounded legacy offsets must remain supported, with table-index and target bounds checked before instruction fetch. Keep direct-entry success distinct from method-table compatibility, and keep simulation evidence distinct from physical-board release evidence. Fixing the model decoder does not update previously generated RTL or an installed bitstream.

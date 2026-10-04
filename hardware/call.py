@@ -642,21 +642,42 @@ class ChurchCall(Elaboratable):
                 # Read method table entry at memory[lump_base + call_imm * 4].
                 # ns_base_from_cr14 = lump_base (byte address of lump word 0 = header).
                 # call_imm_latched is the 15-bit method index (≥1 when this state is reached).
-                # The fetched word is a lump-base-relative WORD offset of the method body.
+                # Canonical BRANCH entries are relative to their table word;
+                # legacy bare entries are LUMP-base-relative WORD offsets.
                 m.d.comb += [
                     self.mem_rd_addr.eq(ns_base_from_cr14 + (call_imm_latched.as_unsigned() << 2)),
-                    self.mem_rd_en.eq(1),
+                    self.mem_rd_en.eq(call_imm_latched <= cw_reg),
                 ]
                 m.d.sync += rd_armed.eq(1)
-                with m.If(self.mem_rd_valid & rd_armed):
+                target = Signal(signed(17))
+                m.d.comb += target.eq(
+                    Cat(call_imm_latched, Const(0, 2)).as_signed()
+                    + self.mem_rd_data[:15].as_signed())
+                with m.If(call_imm_latched > cw_reg):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
+                    m.next = "FAULT"
+                with m.Elif(self.mem_rd_valid & rd_armed):
                     m.d.sync += rd_armed.eq(0)
-                    m.d.sync += method_entry_reg.eq(self.mem_rd_data)
                     with m.If(self.mem_rd_data == 0):
                         # Table entry = 0 → private method or out-of-range index → FAULT.
                         m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                         m.next = "FAULT"
-                    with m.Else():
+                    with m.Elif(self.mem_rd_data[27:32] == 23):
+                        # Canonical BRANCH: signed PC-relative displacement;
+                        # validate before converting to a physical word offset.
+                        with m.If((target < 1) | (target > cw_reg)):
+                            m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
+                            m.next = "FAULT"
+                        with m.Else():
+                            m.d.sync += method_entry_reg.eq(target)
+                            m.next = "SET_CR14_LIMIT_WRITE"
+                    with m.Elif(self.mem_rd_data <= cw_reg):
+                        # Legacy bare offsets include the header word.
+                        m.d.sync += method_entry_reg.eq(self.mem_rd_data)
                         m.next = "SET_CR14_LIMIT_WRITE"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
+                        m.next = "FAULT"
 
             with m.State("SET_CR14_LIMIT_WRITE"):
                 # Write CR14 with PERM_X (M=1) and corrected limit_offset = cw-1 (authoritative code-word count from lump header)

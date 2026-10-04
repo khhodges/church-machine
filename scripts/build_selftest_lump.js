@@ -90,8 +90,8 @@ if (!/^\s*IADD\s+DR1\s*,\s*DR0\s*,\s*#0\s*;\s*DR1 = 0 \(all 81 tests passed/m.te
 const result = new ChurchAssembler().assemble(source);
 if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.message}`).join('\n'));
 
-// Simulator-format method table. Hardware compatibility must be verified:
-// the current hardware CALL consumer reads bare word offsets, not BRANCH words.
+// Canonical BRANCH method table. The model decoder also accepts bounded legacy
+// offsets; deployed hardware must be rebuilt and verified before format adoption.
 // This builder's format comparison is not proof of runtime invalidity.
 const method1Dispatch = ((23 << 27) | (14 << 23) | 1) >>> 0;
 const compiledWords = [method1Dispatch, ...result.words.map(word => word >>> 0)];

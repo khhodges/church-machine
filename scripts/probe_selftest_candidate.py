@@ -75,6 +75,7 @@ def probe(directory, method=1):
     sim.add_testbench(bench)
     sim.run()
     print(json.dumps(report, indent=2))
+    return report
 
 
 if __name__ == "__main__":

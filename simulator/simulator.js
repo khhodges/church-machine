@@ -7725,6 +7725,10 @@ class ChurchSimulator {
             this.pc = 1;
         } else {
             const lumpBaseWord = nsEntry.word0_location;  // word index of lump_base in memory[]
+            if (methodIndex > hdr.cw) {
+                this.fault('BOUNDS', `CALL method index ${methodIndex} exceeds code words ${hdr.cw}`);
+                return null;
+            }
             const tableEntry = this.memory[lumpBaseWord + methodIndex] >>> 0;
             if (tableEntry === 0) {
                 this.fault('PRIVATE_METHOD', `CALL CR${d.crDst}: method index ${methodIndex} is private (table entry = 0)`);
@@ -7736,7 +7740,12 @@ class ChurchSimulator {
                 const soff = (tableEntry & 0x4000)
                     ? ((tableEntry & 0x7FFF) | 0xFFFF8000)
                     : (tableEntry & 0x7FFF);
-                this.pc = (methodIndex - 1) + soff;  // = bodyOffset
+                const targetWord = methodIndex + soff;
+                if (targetWord < 1 || targetWord > hdr.cw) {
+                    this.fault('BOUNDS', `CALL method ${methodIndex} targets word ${targetWord} outside executable code`);
+                    return null;
+                }
+                this.pc = targetWord - 1;
             } else if (tableEntry > 0 && tableEntry <= hdr.cw) {
                 // Legacy entries are physical lump-word offsets: 1 names the
                 // first word after the header.  The live PC is code-view
