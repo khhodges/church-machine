@@ -26,13 +26,13 @@ const reduced = CapabilityTokens.resolveCapability(
     { name: 'LED_DEV', rights: ['R'] },
     { sim, lumps: [] }
 );
-assert.strictEqual(reduced.error, null, 'compiler does not enforce runtime M-bit policy');
+assert.match(reduced.error, /cannot redefine/, 'a reference cannot narrow the definition');
 
 const expanded = CapabilityTokens.resolveCapability(
     { name: 'LED_DEV', rights: ['R', 'W', 'X'] },
     { sim, lumps: [] }
 );
-assert.strictEqual(expanded.error, null, 'registry grants do not become a compiler block');
+assert.match(expanded.error, /cannot redefine/, 'a reference cannot expand the definition');
 
 const thread = CapabilityTokens.resolveCapability(
     { name: 'Thread.2', rights: [] },
@@ -44,7 +44,7 @@ const changedThread = CapabilityTokens.resolveCapability(
     { name: 'Thread.2', rights: ['E'] },
     { sim, lumps: [] }
 );
-assert.strictEqual(changedThread.error, null, 'Thread declarations are not blocked by the compiler');
+assert.match(changedThread.error, /cannot redefine/, 'Thread definition permissions remain fixed');
 
 const changedNamespace = CapabilityTokens.resolveCapability(
     { name: 'ExistingService', rights: ['X'] },
@@ -52,4 +52,13 @@ const changedNamespace = CapabilityTokens.resolveCapability(
 );
 assert.strictEqual(changedNamespace.error, null);
 
-console.log('PASS: authored permission policy is deferred to the runtime M-bit mechanism');
+const definitions = [{name: 'Defined', authored_rights: ['R', 'W']}];
+assert.strictEqual(CapabilityTokens.resolveCapability(
+    {name: 'Defined', rights: ['W', 'R']}, {lumps: definitions}).error, null);
+assert.match(CapabilityTokens.resolveCapability(
+    {name: 'Defined', rights: ['X']}, {lumps: definitions}).error, /cannot redefine/);
+assert.deepStrictEqual(definitions[0].authored_rights, ['R', 'W']);
+assert.strictEqual(CapabilityTokens.resolveCapability(
+    {name: 'NewIdea', rights: ['X']}, {lumps: []}).error, null,
+    'a first symbolic definition does not require a live Namespace');
+console.log('PASS: definitions are fixed; runtime M-bit operations are separate');

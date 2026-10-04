@@ -54,6 +54,28 @@ binary-and-metadata requirement, not a console-formatting convention.
 
 ### Compilation, saving, and destination resolution
 
+#### Permission definition and SELF ownership
+
+- The defining programmer establishes a PetName's permissions at its first
+  definition. A reference by another programmer cannot redefine those rights.
+  Preserve the definition's rights and identity together; changing a local
+  reference is not authorization to modify its owner.
+- SELF is the exception to programmer-specified permissions: it is the
+  compiler-owned row-zero owner capability and always has exactly **E**.
+  `SELF` alone is sufficient source. `SELF E` remains compatible.
+  Explicit overrides such as `SELF RW` are compile errors, not successful
+  candidates that fail only when saved. The historical spelling `__SELF__`
+  follows the same rule.
+- New symbolic references may still name an object that has not yet been
+  created. Do not invent permission definitions from current Namespace state.
+  When an imported definition supplies authored rights, compilation must reject
+  a conflicting declaration. Save materialization checks known authored rights
+  from the catalog and fixed device definitions.
+- These are declaration rules, not changes to runtime M-bit operations. Runtime
+  manipulation of a register-held GT does not redefine the original PetName.
+- Existing saved and historical binaries remain immutable. Validation must not
+  silently rewrite their SELF words or permissions to repair old artifacts.
+
 Compilation and Save LUMP must not require referenced objects to be installed,
 assigned, or resident in any local Namespace. Necessary referenced API/type and
 identity evidence must be supplied independently of destination placement.

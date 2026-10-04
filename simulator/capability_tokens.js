@@ -192,6 +192,17 @@
             };
         }
 
+        // Check definition evidence, not mutable registry/live grants.
+        // Ordinary references must not redefine another programmer's PetName.
+        const authored = authoredRightsForName(name, lumps);
+        if (authored !== null) {
+            if (rights.slice().sort().join('') !== authored.slice().sort().join('')) {
+                return { name, rights, grants: authored, nsIndex: null,
+                    source: 'authored-definition',
+                    error: `Capability "${name}" cannot redefine its owner's permissions (${authored.join('') || 'none'}).` };
+            }
+        }
+
         const allAbs = (sim && sim.abstractionRegistry && sim.abstractionRegistry.abstractions) || {};
 
         // SelfTest's Next capability is a reserved alias for the active

@@ -391,11 +391,16 @@ class CLOOMCCompiler {
                 return normalized === 'SELF' || normalized === '__SELF__' ||
                     !!(cap && typeof cap === 'object' && cap.symbolic_self);
             };
-            // SELF is the compiler's initial suggestion for a newly opened
-            // C-list, not an ownership constraint. Keep one symbolic row zero
-            // and leave later programmer changes untouched for advisory
-            // validation at save time.
+            // The compiler owns SELF's E-only permissions in every frontend.
+            // Reject overrides now, rather than deferring failure until Save.
             const userDeclared = declared.filter(cap => !isContextualSelf(cap));
+            for (const cap of declared.filter(isContextualSelf)) {
+                if (Array.isArray(cap.rights) && cap.rights.length &&
+                        (cap.rights.length !== 1 || cap.rights[0] !== 'E')) {
+                    result.errors = [...(result.errors || []), { line: 1,
+                        message: 'SELF permissions are compiler-owned E. Remove the explicit permission override; use SELF.' }];
+                }
+            }
             result.capabilities = [{
                 name: '__SELF__',
                 rights: ['E'],
@@ -1355,6 +1360,13 @@ class CLOOMCCompiler {
         // Assembly operands continue to use the author's original row indices.
         const selfRows = (result.capabilities || []).flatMap((cap, row) =>
             cap && /^(?:SELF|__SELF__)$/i.test(String(cap.name || '')) ? [row] : []);
+        for (const row of selfRows) {
+            const rights = result.capabilities[row].rights;
+            if (!Array.isArray(rights) || rights.length !== 1 || rights[0] !== 'E') {
+                result.errors.push({ line: asm._capBlockLine || 1,
+                    message: 'SELF permissions are compiler-owned E. Remove the explicit permission override; use SELF.' });
+            }
+        }
         if (selfRows.length > 1 || selfRows.some(row => row !== 0)) {
             result.errors.push({
                 line: asm._capBlockLine || 1,
@@ -1418,6 +1430,25 @@ class CLOOMCCompiler {
                 ? { ...cap, name: cap.target } : cap;
         const source = Array.from(declaredCaps || [], normalize);
         const uploaded = Array.from(uploadCaps || [], normalize);
+        // An exact imported definition owns its declared permissions. A local
+        // reference cannot redefine them. Unbound symbolic declarations remain
+        // valid; mutable live Namespace grants are not definition evidence.
+        if (outErrors) {
+            for (const cap of source) {
+                const definition = uploaded.find(item => nameOf(item) === nameOf(cap) &&
+                    item && (Array.isArray(item.authored_rights) ||
+                        ((item.identity_hash || item.binary_hash || concrete(item)) &&
+                            Array.isArray(item.rights))));
+                if (!definition || nameOf(cap) === '__SELF__') continue;
+                const canonical = rights => [...new Set((rights || [])
+                    .flatMap(value => String(value).toUpperCase().split('')))].sort().join('');
+                const definedRights = definition.authored_rights || definition.rights;
+                if (canonical(cap.rights) !== canonical(definedRights)) {
+                    outErrors.push({ line: 1, col: 0, endCol: 0,
+                        message: `Capability "${cap.name}" cannot redefine its owner's permissions (${canonical(definedRights) || 'none'}).` });
+                }
+            }
+        }
         // Concrete input is an existing layout, not a bag of name metadata.
         // Otherwise source order wins, with upload-only rows appended. Decide
         // ownership before enrichment, never from merged token fields.
@@ -1451,19 +1482,22 @@ class CLOOMCCompiler {
         // zero word, must neither move nor gain a new implicit owner row.
         const hasCompilerSelf = this._reserveCompilerSelfRow === true && !fixedLayout;
         if (hasCompilerSelf) {
-            // Keep explicitly declared permissions intact. SELF ownership
-            // establishes identity, not permission policy: the runtime
-            // enforces authority when a GT is used.
+            // SELF is compiler-owned, not a programmer permission declaration.
             const authoredSelf = caps.find(cap => nameOf(cap) === '__SELF__');
+            if (authoredSelf && Array.isArray(authoredSelf.rights) &&
+                    authoredSelf.rights.length &&
+                    (authoredSelf.rights.length !== 1 || authoredSelf.rights[0] !== 'E') &&
+                    outErrors) {
+                outErrors.push({ line: 1, col: 0, endCol: 0,
+                    message: 'SELF permissions are compiler-owned E. Remove the explicit permission override; use SELF.' });
+            }
             for (let i = caps.length - 1; i >= 0; i--) {
                 if (nameOf(caps[i]) === '__SELF__' && !concrete(caps[i])) caps.splice(i, 1);
             }
             caps.unshift({
                 name: 'SELF',
-                rights: authoredSelf && Array.isArray(authoredSelf.rights)
-                    ? authoredSelf.rights.slice() : ['E'],
-                grants: authoredSelf && Array.isArray(authoredSelf.grants)
-                    ? authoredSelf.grants.slice() : ['E'],
+                rights: ['E'],
+                grants: ['E'],
                 symbolic_self: true,
                 compiler_owned_self: true, compiler_assisted_self: true, placeholder: true,
             });
@@ -1487,6 +1521,18 @@ class CLOOMCCompiler {
         }
         for (let i = 0; i < caps.length; i++) {
             const key = nameOf(caps[i]);
+            if (key === '__SELF__' && !caps[i].rights &&
+                    ['token', 'gt', 'word0'].some(field => caps[i][field] === 0)) {
+                // A symbolic zero placeholder has no stored permissions to
+                // rewrite. Assign the compiler-owned metadata, not live bytes.
+                caps[i] = { ...caps[i], rights: ['E'] };
+            }
+            if (key === '__SELF__' && outErrors &&
+                    (!Array.isArray(caps[i].rights) || caps[i].rights.length !== 1 ||
+                        caps[i].rights[0] !== 'E')) {
+                outErrors.push({ line: 1, col: 0, endCol: 0,
+                    message: 'SELF permissions are compiler-owned E. Remove the explicit permission override; use SELF.' });
+            }
             if (fixedLayout && key === '__SELF__' && i !== 0 && outErrors) {
                 outErrors.push({
                     line: 1, col: 0, endCol: 0,

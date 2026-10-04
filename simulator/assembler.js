@@ -3162,7 +3162,7 @@ class ChurchAssembler {
             }
         }
         return name.toUpperCase() === 'SELF' || name === '__SELF__'
-            ? { name, rights, symbolic_self: true, compiler_owned_self: true,
+            ? { name, rights: rights.length ? rights : ['E'], symbolic_self: true, compiler_owned_self: true,
                 placeholder: true, identity_contract: 'dynamic-local' }
             : { name, rights };
     }

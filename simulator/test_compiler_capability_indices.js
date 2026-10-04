@@ -686,27 +686,29 @@ check('assembly rejects duplicate or misplaced SELF without shifting rows or nar
     assert.strictEqual(external.capabilities[1].compiler_owned_self, undefined);
     const authored = compile('capabilities { SELF RW, SECRET_DATA RW }\nRETURN');
     const internal = compile('capabilities { __SELF__ RW, SECRET_DATA RW }\nRETURN');
-    assert.deepStrictEqual(authored.errors, []);
-    assert.deepStrictEqual(internal.errors, []);
+    assert.ok(authored.errors.some(e => /compiler-owned E/.test(e.message)));
+    assert.ok(internal.errors.some(e => /compiler-owned E/.test(e.message)));
     assert.deepStrictEqual(authored.capabilities.map(c => c.rights),
         internal.capabilities.map(c => c.rights));
-    assert.deepStrictEqual(authored.capabilities[0].rights, ['R', 'W']);
-    assert.deepStrictEqual(authored.capabilities[1].rights, ['R', 'W']);
+    const bare = compile('capabilities { SELF, SECRET_DATA RW }\nRETURN');
+    assert.deepStrictEqual(bare.errors, []);
+    assert.deepStrictEqual(bare.capabilities[0].rights, ['E']);
+    assert.deepStrictEqual(bare.capabilities[1].rights, ['R', 'W']);
 });
 
-check('generated compiler preserves authored SELF permissions for both spellings', () => {
+check('generated compiler rejects SELF permission overrides for both spellings', () => {
     const build = spelling => `abstraction Owner {
         capabilities { ${spelling} RW, Foo E }
         method Run() {
             CALL CR6[Foo], Run
         }
     }`;
-    const publicSelf = compileOrThrow(new CLOOMCCompiler(), build('SELF'), []);
-    const internalSelf = compileOrThrow(new CLOOMCCompiler(), build('__SELF__'), []);
-    assert.deepStrictEqual(publicSelf.capabilities[0].rights, ['R', 'W']);
-    assert.deepStrictEqual(internalSelf.capabilities[0].rights, ['R', 'W']);
-    assert.deepStrictEqual(publicSelf.capabilities.map(c => c.rights),
-        internalSelf.capabilities.map(c => c.rights));
+    for (const spelling of ['SELF', '__SELF__']) {
+        const result = new CLOOMCCompiler().compile(build(spelling), []);
+        assert.ok(result.errors.some(e => /compiler-owned E/.test(e.message)));
+        const bare = compileOrThrow(new CLOOMCCompiler(), build(spelling).replace(`${spelling} RW`, spelling), []);
+        assert.deepStrictEqual(bare.capabilities[0].rights, ['E']);
+    }
 });
 
 console.log(`Results: ${passed} passed, ${failed} failed`);
