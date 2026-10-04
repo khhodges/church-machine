@@ -3,6 +3,18 @@ name: Uniform indexed operand intent
 description: User requires register-plus-immediate indexing across all indexed instructions, not just LOAD.
 ---
 
+Static artifact-admission checks must follow each opcode's current operand
+encoding, including register-plus-immediate indexing. A shared old C-list mask
+must not be applied across instructions with different formats.
+
+**Why:** Refresh reconstruction rejected a compiler-produced indexed LOAD by
+interpreting the encoded immediate for row 1 as row 16, leaving an older image
+unchanged despite a successful LUMP save.
+
+**How to apply:** Include server-side admission in ISA conformance checks, not
+only assembler, disassembler and execution. Runtime-dependent indices require
+runtime bounds enforcement, not a guessed static row.
+
 The user explicitly confirmed on 2026-10-02 that **Church Machine Instruction
 Set** is the master ISA text; other references and implementation descriptions
 must defer to it.
