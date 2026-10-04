@@ -1,3 +1,4 @@
+- [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.
 - [Declared abstraction identity](declared-abstraction-identity.md) — missing names require programmer correction, never generated fallback identities.
 - [Save and review safety](save-review-index.md) — consent, frozen snapshots, retry ownership, diagnostic evidence, review cookies, and approval replay.
 - [Structured merge corruption](structured-merge-corruption.md) — compare conflict output to clean index stages; corruption can occur outside the marked regions
@@ -24,7 +25,7 @@
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
 - [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
-- [Wukong build-host policy](wukong-build-host-policy.md) — serialize resource-constrained Vivado builds and accept releases only with fresh, timing-clean provenance
+- [Hardware release evidence](hardware-release-index.md) — serialized builds, source fingerprints, fresh staging, complete bundles, and historical authority.
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
 - [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
@@ -47,15 +48,10 @@
 - [SelfTest Next follows LightningBolt](selftest-next-lightningbolt.md) — Next.GT is coupled to the selected boot-entry GT; independent continuation targets are prohibited
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
-- [Hardware readiness fingerprints](hardware-readiness-fingerprint.md) — generated Verilog/RTLIL must carry a content fingerprint of active Python inputs before synthesis
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
 - [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
 - [Fault recovery boot precedence](fault-boot-selftest-order.md) — boot wins after faults; three Boot steps enter the prepared lightning-bolt target, not an implicit SelfTest
-- [Bitstream release candidate baseline](bitstream-release-candidate-baseline.md) — Versions must surface pending hardware commits; never claim an artifact released without a trusted source commit
-- [Wukong release-host staging](wukong-release-host-staging.md) — Build each candidate in a fresh commit-pinned vendor checkout; never reuse stale or dirty historical build directories
-- [Verified binary merge survival](verified-binary-merge-survival.md) — provenance is not a release unless its ignored binary is explicitly tracked and CI verifies the complete bundle
-- [Historical hardware authority chain](historical-hardware-authority-chain.md) — grant saved test context only through an exact build, source, and artifact-digest binding
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
 - [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
 - [Actionable transport incidents](actionable-transport-incidents.md) — latch terminal failures until proven recovery; diagnostics may escalate guidance but never replace incident identity

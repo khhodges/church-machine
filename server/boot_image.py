@@ -2323,14 +2323,28 @@ def validate_resident_artifact_bindings(
         with open(provenance_path, encoding="utf-8") as provenance_file:
             provenance = json.load(provenance_file)
         image_digest = hashlib.sha256(image_bytes).hexdigest()
+        generic_refresh = (
+            isinstance(provenance, dict)
+            and provenance.get("origin") == "generic-refresh"
+            and provenance.get("profile") == "clean-saved-namespace-v1"
+            and provenance.get("purpose") == "generic-simulator-image"
+            and provenance.get("status") == "committed"
+            and provenance.get("committed") is True
+        )
         if (not isinstance(provenance, dict)
-                or provenance.get("version") != 1
+                or (provenance.get("version") != 1 and not generic_refresh)
                 or (require_provenance_image_digest
                     and provenance.get("image_sha256") != image_digest)):
             raise ValueError("generation provenance does not authenticate this boot image")
+        binding_rows = provenance.get(
+            "artifactBindings" if generic_refresh else "resident_bindings", [])
+        if (not isinstance(binding_rows, list)
+                or any(not isinstance(row, dict)
+                       or type(row.get("slot")) is not int for row in binding_rows)
+                or len({row["slot"] for row in binding_rows}) != len(binding_rows)):
+            raise ValueError("generation provenance has invalid or duplicate resident bindings")
         provenance_by_slot = {
-            row["slot"]: row for row in provenance.get("resident_bindings", [])
-            if isinstance(row, dict) and isinstance(row.get("slot"), int)
+            row["slot"]: row for row in binding_rows
         }
     except (OSError, ValueError, TypeError) as exc:
         raise ValueError(f"boot image generation provenance is unavailable: {exc}") from exc
@@ -2383,7 +2397,8 @@ def validate_resident_artifact_bindings(
                 "matches the committed selection")
         generation_binding = provenance_by_slot.get(slot)
         if (generation_binding is None
-                or generation_binding.get("artifact_sha256") != artifact_digest
+                or generation_binding.get(
+                    "binaryHash" if generic_refresh else "artifact_sha256") != artifact_digest
                 or generation_binding.get("filename") != filename):
             raise ValueError(
                 f"resident NS slot {slot} selected artifact changed since this "
@@ -2421,7 +2436,16 @@ def validate_resident_artifact_bindings(
         localized_rows = actual[len(expected) - image_cc:] if image_cc else ()
         localized_digest = hashlib.sha256(struct.pack(
             f"<{len(localized_rows)}I", *localized_rows)).hexdigest()
-        if generation_binding.get("localized_clist_sha256") != localized_digest:
+        if generic_refresh:
+            # Refresh evidence binds the entire destination-localized LUMP,
+            # serialized in canonical big-endian artifact order.
+            derivative_digest = hashlib.sha256(struct.pack(
+                f">{len(actual)}I", *actual)).hexdigest()
+            if generation_binding.get("derivativeHash") != derivative_digest:
+                raise ValueError(
+                    f"resident NS slot {slot} localized artifact does not match "
+                    "the authenticated refresh provenance")
+        elif generation_binding.get("localized_clist_sha256") != localized_digest:
             raise ValueError(
                 f"resident NS slot {slot} localized capability rows do not match "
                 "the authenticated generation provenance")

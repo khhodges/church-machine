@@ -42,6 +42,55 @@ def store(root):
     return refresh.RefreshStore(root, root / "ns-state.json", root / "config.json")
 
 
+@pytest.mark.parametrize("damage", [
+    None, "image", "artifact", "derivative", "duplicate", "uncommitted",
+    "namespace", "localized",
+])
+def test_resident_validator_refresh_provenance(tmp_path, monkeypatch, damage):
+    """Refresh evidence is accepted without rewriting runtime files."""
+    # This generic simulator fixture intentionally has no fixed hardware Thread
+    # slot. Keep structural checks, but isolate resident evidence from that
+    # independent hardware profile requirement.
+    validate_structure = refresh.boot.validate_boot_image
+    monkeypatch.setattr(
+        refresh.boot, "validate_boot_image",
+        lambda image, **kwargs: validate_structure(
+            image, **{**kwargs, "saved_namespace_only": True}))
+    cfg, rows = fixture(tmp_path)
+    image, evidence = refresh.reconstruct(cfg, rows, tmp_path, compact=True)
+    rows = evidence.pop("compactedRows")
+    (tmp_path / "ns-state.json").write_text(json.dumps({"abstractions": rows}))
+    evidence.update(origin="generic-refresh", committed=True, status="committed")
+    if damage == "image":
+        evidence["image_sha256"] = "0" * 64
+    elif damage == "artifact":
+        evidence["artifactBindings"][0]["binaryHash"] = "0" * 64
+    elif damage == "derivative":
+        evidence["artifactBindings"][0]["derivativeHash"] = "0" * 64
+    elif damage == "duplicate":
+        evidence["artifactBindings"].append(copy.deepcopy(evidence["artifactBindings"][0]))
+    elif damage == "uncommitted":
+        evidence["committed"] = False
+    elif damage == "namespace":
+        evidence["namespace_fingerprint"] = "0" * 64
+    elif damage == "localized":
+        words = list(struct.unpack("<8192I", image))
+        location = refresh.integer(next(row for row in rows if row["slot"] == 20)["location"])
+        words[location + 63] ^= 1
+        image = struct.pack("<8192I", *words)
+        # Even with a matching image digest, localized bytes must match evidence.
+        evidence["image_sha256"] = refresh.sha(image)
+    (tmp_path / "boot-image.bin").write_bytes(image)
+    (tmp_path / "boot-image.provenance.json").write_text(json.dumps(evidence))
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+    if damage is None:
+        assert refresh.boot.validate_resident_artifact_bindings(image, str(tmp_path))
+    else:
+        with pytest.raises(ValueError):
+            refresh.boot.validate_resident_artifact_bindings(image, str(tmp_path))
+    assert before == {p.name: p.read_bytes() for p in tmp_path.iterdir()}
+
+
 def compiler_marker_fixture(root, monkeypatch):
     from server.lump_approvals import sign_compiler_record, write_approvals
     cfg, rows = fixture(root)
