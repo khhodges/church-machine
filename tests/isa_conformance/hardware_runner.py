@@ -54,6 +54,11 @@ class Harness:
         raw.update({f"dr{i}": s for i, s in enumerate(c.debug_dr_words)})
         raw.update({f"cr{i}w{j}": s for i, row in enumerate(c.debug_cr_words)
                     for j, s in enumerate(row)})
+        core_signals = {
+            s.name: s for statements in self.fragment.statements.values()
+            for s in statements._lhs_signals()
+        }
+        raw["index_arithmetic_fault"] = core_signals["compact_index_fault"]
         # Observe the actual shared mLoad / SAVE consumer, not a copied decoder.
         for sub, name, *_ in self.fragment.subfragments:
             if name in ("u_load", "u_save"):
@@ -64,12 +69,27 @@ class Harness:
                 if len(candidates) != 1:
                     raise RuntimeError(f"Cannot uniquely locate {name} index input")
                 raw["load_index" if name == "u_load" else "save_index"] = candidates[0]
+                start_name = "load_start" if name == "u_load" else "save_start"
+                starts = [s for s in all_signals.values() if s.name == start_name]
+                if len(starts) != 1:
+                    raise RuntimeError(f"Cannot uniquely locate {name} start input")
+                raw[start_name] = starts[0]
         self.outputs = {}
         for name, value in raw.items():
             out = Signal(len(value), name=f"observe_{name}")
             self.fragment.add_statements("comb", out.eq(value))
             self.outputs[name] = out
         self.ports = list(self.inputs.values()) + list(self.outputs.values())
+
+
+def index_observation(samples, opcode):
+    """Keep rejected combinational bits separate from an admitted index."""
+    prefix = "save" if opcode == 1 else "load"
+    rejected = any(row["index_arithmetic_fault"] for row in samples)
+    accepted = any(row[f"{prefix}_start"] for row in samples)
+    wire = samples[0][f"{prefix}_index"]
+    return dict(index=None if rejected else wire, index_wire=wire,
+                index_arithmetic_fault=rejected, index_accepted=accepted)
 
 
 def snapshot(row):
@@ -88,12 +108,12 @@ def observations(vectors, trace, samples):
         run = [samples[i] for i in positions if trace[i]["phase"] == "execute"]
         fault = next((r["fault"] for r in run if r["fault_valid"] or r["retire_fault"]), None)
         terminal = "fault" if fault is not None else "retire" if any(r["retire"] for r in run) else "timeout"
-        index = None
+        index = dict(index=None)
         if v["kind"] == "index":
-            index = run[0]["save_index" if v["word"] >> 27 == 1 else "load_index"]
+            index = index_observation(run, v["word"] >> 27)
         results.append(dict(id=v["id"], initial=snapshot(samples[before]),
                             final=snapshot(samples[after]), terminal=terminal,
-                            fault=fault, index=index,
+                            fault=fault, **index,
                             data_reads=[dict(byte=r["addr"], word=r["addr"]/4)
                                         for r in run if r["rd"]],
                             writes=[dict(byte=r["addr"], word=r["addr"]/4, value=r["data"])

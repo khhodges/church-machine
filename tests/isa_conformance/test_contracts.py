@@ -67,3 +67,32 @@ def test_false_predicate_must_preserve_flags_and_destination():
     r["final"]["dr"][2] = 0
     r["final"]["flags"] = 2
     assert set(judge(v, r)) == {"DR result/preservation", "false predicate flag preservation"}
+
+
+def test_rejected_arithmetic_wire_is_not_an_executed_index():
+    from hardware_runner import index_observation
+    v = next(v for v in vectors() if v["id"] == "load-index-7")
+    samples = [dict(load_index=0xFFFFFFFF, load_start=0,
+                    index_arithmetic_fault=1)]
+    measured = index_observation(samples, 0)
+    assert measured["index"] is None
+    assert measured["index_wire"] == 0xFFFFFFFF
+    r = observation(v)
+    r.update(measured)
+    assert judge(v, r) == []
+    # Never hide an actual launch or effect just because arithmetic rejected.
+    samples[0]["load_start"] = 1
+    r.update(index_observation(samples, 0))
+    assert "rejected index started consumer" in judge(v, r)
+    r["data_reads"] = [{"word": 0}]
+    assert "forbidden data read" in judge(v, r)
+
+
+def test_unrejected_wrapped_wire_still_fails():
+    from hardware_runner import index_observation
+    v = next(v for v in vectors() if v["id"] == "save-index-8")
+    r = observation(v)
+    r.update(index_observation([dict(save_index=0, save_start=1,
+                                     index_arithmetic_fault=0)], 1))
+    assert "compact effective index" in judge(v, r)
+    assert "missing arithmetic rejection" in judge(v, r)

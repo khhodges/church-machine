@@ -675,6 +675,8 @@
         <div id="flagsPopover" class="toolbar-flags-popover" style="display:none;" aria-live="polite"></div>
         <div id="bootExecutionFreshnessWarning" class="boot-execution-freshness-warning"
              role="alert" aria-live="assertive" style="display:none;"></div>
+        <div id="simulationImageFreshnessWarning" class="boot-execution-freshness-warning"
+             role="alert" aria-live="assertive" style="display:none;white-space:pre-line;"></div>
     </div>
 
     <div id="home" class="view">
@@ -3553,7 +3555,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="idx1-execution-envelope.js?v=sha256-d1b769677eb3"></script>
     <script src="idx1-memory.js?v=sha256-fc8ce715b2ad"></script>
     <script src="idx1-runtime.js?v=sha256-bf5ac02c55f9"></script>
-    <script src="simulator.js?v=sha256-0ef9bc3d0b34"></script>
+    <script src="simulator.js?v=sha256-7d8ab875def4"></script>
     <script src="capability_tokens.js?v=sha256-c76bea81de62"></script>
     <script src="portable_lump_binding.js?v=sha256-a6c0ffbfcc29"></script>
     <script src="assembler.js?v=sha256-3b1821abac64"></script>
@@ -3601,7 +3603,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump-audit.js?v=sha256-80e1d626a627"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
     <script src="build-handoff.js?v=sha256-4a64ee3f2f0f"></script>
-    <script src="app-lumps.js?v=sha256-3a134d7c7654"></script>
+    <script src="app-lumps.js?v=sha256-ef5463f9133f"></script>
     <script src="app-absdetail.js?v=sha256-e4335577f58a"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
@@ -3611,8 +3613,8 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump_save_handler.js?v=sha256-ec3eda592cae"></script>
     <script src="lump_lease_ui.js?v=sha256-622b3d8a575c"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-fe6147e41935"></script>
-    <script src="app-simulation-preparation.js"></script>
+    <script src="app-run.js?v=sha256-e3dbfa490c0e"></script>
+    <script src="app-simulation-preparation.js?v=sha256-0be8212a4898"></script>
     <script src="app-actions.js?v=sha256-60786290737e"></script>
     <script src="app-build-approval.js?v=sha256-2ee3b8c94a19"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>

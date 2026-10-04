@@ -58,3 +58,27 @@ assert.deepStrictEqual(
     'fetch-bounds metadata preserves the code register and pet name');
 
 console.log('PASS fault snapshot pet names and note');
+
+// Capture a real fault's evidence, then overwrite/reset the live state. The
+// report must retain its original code and identity without aliasing RAM.
+const recordedSim = new ChurchSimulator();
+const base = 0x900;
+const codeWords = [0xf8000c00, 0x17030007, 0x071b0001, 0x07230002];
+codeWords.forEach((w, i) => { recordedSim.memory[base + i] = w >>> 0; });
+recordedSim.cr[14] = { word0: recordedSim.createGT(0, 7, { R: 1, X: 1 }, 1),
+    word1: base, word2: 0, word3: 0 };
+recordedSim._slotIdentity.set(7, { secure: true, binaryHash: 'a'.repeat(64) });
+recordedSim._executionAttempt = {
+    pre: recordedSim._executionEvidenceState(), occurrenceId: 'original:388'
+};
+recordedSim.fault('BOUNDS', 'recorded fixture');
+const captured = recordedSim.faultLog.at(-1);
+const frozen = JSON.stringify(captured);
+recordedSim.memory[base + 3] = 0x07230020;
+recordedSim._slotIdentity.set(7, { secure: true, binaryHash: 'b'.repeat(64) });
+recordedSim.reset();
+assert.equal(JSON.stringify(captured), frozen, 'reset cannot change captured fault evidence');
+assert.deepEqual(captured.faultCodeWords, codeWords.map(w => w >>> 0));
+assert.equal(captured.executionArtifact.identity.binaryHash, 'a'.repeat(64));
+assert.equal(captured.executionOccurrence, 'original:388');
+console.log('PASS immutable fault artifact evidence across reset');

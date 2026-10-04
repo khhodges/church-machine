@@ -154,3 +154,6 @@
 - [CHANGE programmer access](change-programmer-access.md) — CHANGE is not protected; never exempt CR12 while blocking CR13–CR15 at compile time.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
+- [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.
+- [Bitfield width decision](bitfield-width-decision.md) — BFEXT/BFINS width zero is invalid; user selected widths 1–31, not a zero-means-32 convention.
+- [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.

@@ -41,14 +41,18 @@ Immediate-only and register-only forms are special cases, not different
 semantic models. This is a target ISA requirement, not a claim of implemented
 support.
 
-On 2026-10-02, when presented with the multiword IDX1 packet-fetching
-proposal, the user corrected it: "one instruction only for idx instructions."
-Do not treat the existing multiword IDX1 software/specification as approval
-of the intended hardware encoding. Reconcile the single-instruction encoding
-constraint before implementing packet fetching or extending that design.
+Single-word indexing is the chosen design. The user reaffirmed on
+2026-10-04: "Forget the multiword IDX1, the single word is the one to use."
+Treat multiword IDX1 as superseded, not as an alternative to propose,
+implement, or include in a matching bitstream.
 
 **Why:** The user explicitly rejected the packet proposal as not what was intended;
 existing implementation is not authority over that requirement.
+
+**How to apply:** Use single-word indexing in implementation and conformance
+reviews. Do not revive packet fetching or a multiword compatibility profile.
+This decision does not itself authorize deleting existing files, rewriting
+saved artifacts, or starting a paused hardware build.
 
 In the subsequent clarification, the user declined the proposed constraint
 "exactly one 32-bit word, no extensions" and specified: "The instruction uses

@@ -1352,7 +1352,13 @@ function _highlightCLOOMCSource(rawText, language) {
     let html = rawText.split('\n').map(line => _hlCloomcLine(line, isAsm)).join('\n');
     // NS[N] hover annotations — applied after tokenising (NS refs are still plain
     // text at this point, so the regex inside _annotateNsRefInCode will find them).
-    if (typeof _annotateNsRefInCode === 'function') html = _annotateNsRefInCode(html);
+    if (typeof _annotateNsRefInCode === 'function') {
+        // Authored comments may describe an old layout. Do not promote them
+        // into current Namespace mappings through live hover labels.
+        html = html.split(/(<span class="lump-hl-comment">.*?<\/span>)/g)
+            .map(part => part.startsWith('<span class="lump-hl-comment">')
+                ? part : _annotateNsRefInCode(part)).join('');
+    }
     return html;
 }
 
@@ -1950,7 +1956,8 @@ function _renderSavedLumpWordUsage(panel, savedWords) {
 
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection, savedWords) {
     window._faultNavigationBinary = savedWords
-        ? { token: lookupToken, words: Array.from(savedWords) } : null;
+        ? { token: lookupToken, words: Array.from(savedWords),
+            binaryHash: lump && lump.binary_hash, filename: lump && lump.filename } : null;
     window._savedLumpEditorMode = true;
     window._compiledCandidateEditorMode = false;
     window._editorSavedBinaryReceipt = lump && lump.filename && lump.binary_hash
@@ -1964,7 +1971,7 @@ function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, 
     if (tabs) tabs.style.display = '';
     if (layout) layout.classList.add('saved-lump-editor-layout');
     if (layout) layout.classList.remove('disassembly-diagnostics-layout', 'compiled-candidate-editor-layout');
-    _setDisassemblyPresentationStatus('Exact saved binary — source edits and restored drafts do not change these bytes.');
+    _setDisassemblyPresentationStatus('Exact saved binary — source edits and restored drafts do not change these bytes. C-list rows are local, not Namespace slots. Source comments are authored text, not verified mappings.');
     if (typeof _clearAsmErrors === 'function') _clearAsmErrors();
     ['codeHistoryPanel', 'codeSyntaxPanel', 'codeJsPanel',
         'asmWarningPanel'].forEach(function(id) {
@@ -1992,21 +1999,72 @@ function _setDisassemblyPresentationStatus(message) {
 
 // Fault offsets include the header. Do not count lines in reconstructed
 // disassembly: method dispatch words and comments make that mapping lossy.
-function _revealFaultInstruction(token, offset, rawWord) {
+function _revealFaultInstruction(token, offset, rawWord, evidence) {
     const binary = window._faultNavigationBinary;
     const output = document.getElementById('savedLumpDisassembly');
+    if (output && typeof output.querySelectorAll === 'function') {
+        output.querySelectorAll('.fault-code-line-highlight').forEach(row => {
+            row.classList.remove('fault-code-line-highlight');
+            row.removeAttribute('aria-current');
+        });
+    }
+    const hex = w => w == null ? 'unavailable' : '0x' + (w >>> 0).toString(16).padStart(8, '0');
+    const decode = w => w == null ? 'decode unavailable' : assembler.disassemble(w >>> 0);
+    const savedListing = binary && typeof _formatCanonicalSavedLumpWords === 'function'
+        ? _formatCanonicalSavedLumpWords(binary.words, {}).split('\n') : [];
+    const savedLine = i => savedListing.find(line =>
+        line.startsWith('[' + String(i).padStart(4, '0') + ']'));
+    const savedWord = binary && String(binary.token) === String(token) &&
+        Number.isInteger(offset) && offset >= 1 && offset < binary.words.length
+        ? binary.words[offset] >>> 0 : null;
+    const identity = evidence && evidence.artifact && evidence.artifact.identity;
+    const recordedHash = identity && identity.binaryHash;
+    const hashKnown = /^[a-f0-9]{64}$/i.test(recordedHash || '') &&
+        /^[a-f0-9]{64}$/i.test(binary && binary.binaryHash || '');
+    const hashMatches = hashKnown && recordedHash.toLowerCase() === binary.binaryHash.toLowerCase();
+    const codeWords = evidence && evidence.codeWords;
+    const codeMatches = binary && Array.isArray(codeWords) && codeWords.length > 1 &&
+        codeWords.length === (((binary.words[0] >>> 10) & 0x1fff) + 1) &&
+        codeWords.every((w, i) => (w >>> 0) === (binary.words[i] >>> 0));
+    const artifactMatches = hashMatches && identity.secure === true && codeMatches;
+    const identityStatus = artifactMatches ? 'matching captured identity and complete code' :
+        hashKnown && !hashMatches ? 'different saved revision' :
+        'execution identity unverified — a matching word is not artifact identity';
+    const comparison = 'Recorded ' + (evidence && evidence.location || 'location unknown') +
+        ' / PC ' + (evidence && evidence.pc || 'unknown') + ': ' + hex(rawWord) + ' ' + decode(rawWord) +
+        '. Inspected saved ' + (binary && binary.filename || token) + ' +' + offset +
+        ': ' + (savedLine(offset) || hex(savedWord) + ' ' + decode(savedWord)) +
+        '. Identity: ' + identityStatus +
+        '; recorded seal ' + (recordedHash || 'unknown') +
+        '; saved seal ' + (binary && binary.binaryHash || 'unknown') +
+        '; occurrence ' + (evidence && evidence.occurrence || 'unknown') + '. ';
+    let addressing = '';
+    if (rawWord != null && ((rawWord >>> 27) & 31) === 0) {
+        const dr = rawWord & 15;
+        addressing = dr ? 'Runtime index DR' + dr +
+            (evidence && Array.isArray(evidence.dr) && evidence.dr[dr] != null
+                ? ' captured value ' + hex(evidence.dr[dr]) : ' (captured value unavailable)') +
+            '; not a fixed C-list row. ' :
+            'Fixed immediate index ' + ((rawWord >>> 4) & 1023) +
+            ' (local C-list row when based on CR6, not a Namespace slot). ';
+    }
     if (!output || !binary || String(binary.token) !== String(token) ||
             !Number.isInteger(offset) || offset < 1 || rawWord == null ||
             offset >= binary.words.length ||
             (binary.words[offset] >>> 0) !== (rawWord >>> 0)) {
         _setDisassemblyPresentationStatus(
-            'Exact fault location unavailable: the opened binary does not match the recorded instruction. No source line was selected.');
+            comparison + addressing + 'Saved instruction does not match the recorded instruction, or its location is unavailable. Cause unknown. No source line was selected; source is unchanged.');
+        return false;
+    }
+    if (!artifactMatches) {
+        _setDisassemblyPresentationStatus(comparison + addressing +
+            'Instruction word matches, but no fault highlight or source selection is justified. Source is unchanged.');
         return false;
     }
     const words = binary.words;
     const cw = Math.min((words[0] >>> 10) & 0x1FFF, words.length - 1);
     if (offset > cw) {
-        _setDisassemblyPresentationStatus('The recorded offset is outside this LUMP’s code section. No source line was selected.');
+        _setDisassemblyPresentationStatus(comparison + 'The recorded offset is outside this LUMP’s code section. No source line was selected.');
         return false;
     }
     output.textContent = '';
@@ -2016,6 +2074,7 @@ function _revealFaultInstruction(token, offset, rawWord) {
         row.style.display = 'block';
         row.textContent = '+' + i + '  0x' + (words[i] >>> 0).toString(16).padStart(8, '0') +
             '  ' + assembler.disassemble(words[i] >>> 0);
+        if (savedLine(i)) row.textContent = '+' + i + '  ' + savedLine(i);
         if (i === offset) {
             row.className = 'fault-code-line-highlight';
             row.setAttribute('aria-current', 'location');
@@ -2025,8 +2084,8 @@ function _revealFaultInstruction(token, offset, rawWord) {
     }
     switchCodeTab('disassembly');
     target.scrollIntoView({ block: 'center' });
-    _setDisassemblyPresentationStatus('Fault instruction at LUMP +' + offset +
-        ' highlighted — raw word matches the recorded fault. Source is unchanged.');
+    _setDisassemblyPresentationStatus(comparison + addressing + 'Fault instruction at LUMP +' + offset +
+        ' highlighted. Source is unchanged; comments are authored text, not verified C-list or Namespace mappings.');
 
     // Only a complete byte-for-byte source mapping can select editable text.
     // A stale draft or an unsupported high-level language remains untouched.
@@ -2341,6 +2400,18 @@ function _formatCanonicalSavedLumpWords(words, details) {
         if (!annotation && i <= cw && typeof assembler !== 'undefined' && assembler &&
                 typeof assembler.disassemble === 'function') {
             try { annotation = assembler.disassemble(word); } catch (_error) {}
+            if (((word >>> 27) & 31) <= 1 && ((word >>> 15) & 15) === 6 &&
+                    !(word & 0x400f)) {
+                var localRow = (word >>> 4) & 1023;
+                var localCap = localRow < cc ? caps[localRow] : null;
+                var localName = typeof localCap === 'string' ? localCap :
+                    localCap && (localCap.dot_name || localCap.dotName || localCap.name);
+                annotation += ' ; local C-list row ' + localRow +
+                    (typeof localName === 'string' && localName.trim()
+                        ? ' (' + JSON.stringify(localName) + ', declared in saved bytes)'
+                        : ' (PetName unavailable in saved bytes)') +
+                    ' — not a Namespace slot';
+            }
         } else if (i >= clistStart && cc > 0) {
             var row = i - clistStart;
             var cap = caps[row];
@@ -5956,7 +6027,16 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
 
     const dis = w => {
         if (typeof assembler !== 'undefined' && assembler) {
-            try { return assembler.disassemble(w >>> 0, clistSlotName); } catch (_) {}
+            try {
+                const text = assembler.disassemble(w >>> 0);
+                const row = (w >>> 4) & 1023;
+                const fixedCList = ((w >>> 27) & 31) <= 1 &&
+                    ((w >>> 15) & 15) === 6 && !(w & 0x400f);
+                return text + (fixedCList
+                    ? ' ; local C-list row ' + row + ' — ' +
+                        (clistSlotName[row] || 'unavailable') + ' (not a Namespace slot)'
+                    : '');
+            } catch (_) {}
         }
         return `0x${(w >>> 0).toString(16).padStart(8, '0').toUpperCase()}`;
     };
@@ -8704,7 +8784,9 @@ async function openLumpInEditor(token, options) {
             }, _inMemoryLump ? null : serverWords);
         // Unsaved compiled LUMPs also have exact code words for navigation.
         window._faultNavigationBinary = serverWords
-            ? { token: token, words: Array.from(serverWords) } : null;
+            ? { token: token, words: Array.from(serverWords),
+                binaryHash: !_inMemoryLump && _exactResponseLump && _exactResponseLump.binary_hash,
+                filename: _exactResponseLump && _exactResponseLump.filename } : null;
         window._editorOpenedBootInspectionToken =
             options && options.bootInspection ? token : null;
         window._editorOpenedBootInspectionKind =

@@ -21,7 +21,8 @@ class ChurchDRead(Elaboratable):
         DR0 is hardwired zero, so DRx=0 collapses to pure-base mode.
 
     Security gate: checks R permission on CR_src.word0_gt.perms[PERM_R].
-    Bounds gate:   checks effective_offset < CR_src.word2_w2.limit_offset[15:0].
+    Bounds gate:   checks effective_offset <= the full descriptor limit and
+                   rejects overflow of the 32-bit byte address.
     Address:       CR_src.word1_location + (effective_offset << 2).
 
     MMIO: when address[30]=1, address[31]=0 the top-level routes the
@@ -81,25 +82,27 @@ class ChurchDRead(Elaboratable):
 
         gt_null      = Signal()
         has_r        = Signal()
-        limit        = Signal(16)
+        limit        = Signal(len(cr_w2.limit_offset))
         # 33-bit effective offset: captures the carry from (10-bit base + 32-bit DRx).
         # Amaranth computes imm_reg[4:14] (10b) + drx_val_reg (32b) = 33-bit result.
         # Assigning to Signal(33) preserves the carry so that base=1, DRx=0xFFFFFFFF
-        # gives eff_off=0x100000000, which correctly fails eff_off <= limit (16-bit).
+        # gives eff_off=0x100000000, which correctly fails the descriptor bound.
         eff_off      = Signal(33)
         in_bounds    = Signal()
         exact_m_cap = Signal()
-        effective_addr = Signal(32)
+        # Keep the carry until admission; a wide offset must never alias low
+        # memory or an MMIO device by truncation.
+        effective_addr = Signal(36)
         accesses_m_port = Signal()
 
         m.d.comb += [
             gt_null.eq(cr_view.word0_gt.as_value() == 0),
             has_r.eq(~cr_gt.dom & cr_gt.perm[PERM_R]),
-            limit.eq(cr_w2.limit_offset[:16]),
+            limit.eq(cr_w2.limit_offset),
             eff_off.eq(Mux(imm_reg[14],
                            imm_reg[:14],                        # immediate: bits[13:0]
                            (imm_reg[4:14] + drx_val_reg))),     # indexed: base + full DR[DRx]
-            in_bounds.eq(eff_off <= limit),
+            in_bounds.eq((eff_off <= limit) & (effective_addr[32:] == 0)),
             exact_m_cap.eq(
                 (cr_gt.gt_type == GT_TYPE_INFORM) &
                 ~cr_gt.dom & cr_gt.perm[PERM_R] &
@@ -108,7 +111,7 @@ class ChurchDRead(Elaboratable):
                 (cr_view.word1_location == M_BIT_PORT)
             ),
             effective_addr.eq(
-                cr_view.word1_location + Cat(C(0, 2), eff_off[:16])),
+                cr_view.word1_location + (eff_off << 2)),
             accesses_m_port.eq(effective_addr == M_BIT_PORT),
         ]
 
@@ -166,8 +169,8 @@ class ChurchDRead(Elaboratable):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.BOUNDS)]
                     m.next = "IDLE"
                 with m.Else():
-                    # eff_off passed bounds (eff_off <= limit where limit ≤ 16 bits);
-                    # safe to truncate to 16 bits for byte-address formation.
+                    # Both the complete word offset and byte address passed
+                    # bounds. Only now is narrowing to the 32-bit bus safe.
                     m.d.sync += addr_reg.eq(effective_addr)
                     m.next = "MEM_ACCESS"
 

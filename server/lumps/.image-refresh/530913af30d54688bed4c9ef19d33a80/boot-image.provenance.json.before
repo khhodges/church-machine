@@ -20,13 +20,12 @@
       "token": "4a000006"
     },
     {
-      "approvalHash": "316f1b07c605d8c79d16128c01ce7da3392d618f23751ff16e203c1f01b3f7cc",
-      "binaryHash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
-      "derivativeHash": "0bd2338fafec792f3b2eb32809df829ea4b40fba4c36756aeeb3a88d330f31ad",
-      "filename": "WukongCallHome.1.b29b38e3.lump",
+      "binaryHash": "49bda45936d9bc4a668814a35f49174969a02f881ee7c8a4aadd9692a15c4283",
+      "derivativeHash": "49bda45936d9bc4a668814a35f49174969a02f881ee7c8a4aadd9692a15c4283",
+      "filename": "WukongCallHome.1.7fe59019.lump",
       "localSelfGT": "4a000007",
       "slot": 7,
-      "token": "313e637c"
+      "token": "4a000007"
     },
     {
       "approvalHash": "bb1d48145e677d7202e562518302b400169e4f19366402429ca6a6b6980ce20e",
@@ -41,14 +40,20 @@
   "bootEntrySlot": 10,
   "committed": true,
   "hardwareCertified": false,
-  "image_sha256": "04d250d130b34c2e18fb23a4ffe9687ea21b35995c99e11c1e5ad9b03ce34a2c",
-  "namespace_fingerprint": "e5a1d2525db7d19930a8e0f543c7379f6273526b814849c273b15d9d38d43f24",
-  "namespace_sha256": "06883b1f0738cd0472cb4ea8de5da8a43f965d619b168a07a8301172f39efde5",
-  "operationId": "530913af30d54688bed4c9ef19d33a80",
+  "image_sha256": "11f0bcf0b223a0a8ada55d453b00853d3f37294284520484c01430aa7cc989a2",
+  "namespace_fingerprint": "e84a0e3134d8839584a3445468b9ffab5dcc36f1477b59420d150a7f2fc79b92",
+  "namespace_sha256": "c7fbc188bd47761a8c876a5bc2c65d73f99d51567aebd8a8e80e3b351751bfed",
+  "operationId": "d53c49cd0f4a419182cd04d1fc728675",
   "origin": "generic-refresh",
   "profile": "clean-saved-namespace-v1",
   "purpose": "generic-simulator-image",
-  "relocations": [],
+  "relocations": [
+    "NS[6] SelfTest: 0x990 \u2192 0x110 (2048 words)",
+    "NS[7] WukongCallHome: 0x110 \u2192 0x910 (1024 words)",
+    "NS[10] CapabilityTest: 0x590 \u2192 0xD10 (1024 words)",
+    "NS[11] Thread.2: 0x1190 \u2192 0x1110 (256 words)",
+    "NS[12] Thread.3: 0x1290 \u2192 0x1210 (256 words)"
+  ],
   "slotResults": [
     "NS[0] Boot.NS: Namespace header; word 0x0",
     "NS[1] Boot.Thread: Generated Thread; word 0x10\u20130x10F; 256 words",
@@ -57,7 +62,7 @@
     "NS[4] BTN_DEV: MMIO; no ordinary RAM body; word 0x40000028",
     "NS[5] TIMER_DEV: MMIO; no ordinary RAM body; word 0x4000002C",
     "NS[6] SelfTest: SelfTest.1.8b19abd7.lump; word 0x110\u20130x90F; 2048 words",
-    "NS[7] WukongCallHome: WukongCallHome.1.b29b38e3.lump; word 0x910\u20130xD0F; 1024 words",
+    "NS[7] WukongCallHome: WukongCallHome.1.7fe59019.lump; word 0x910\u20130xD0F; 1024 words",
     "NS[10] CapabilityTest: CapabilityTest.1.68be391a.lump; word 0xD10\u20130x110F; 1024 words",
     "NS[11] Thread.2: Generated Thread; word 0x1110\u20130x120F; 256 words",
     "NS[12] Thread.3: Generated Thread; word 0x1210\u20130x130F; 256 words",
@@ -452,7 +457,6 @@
     "/home/runner/workspace/server/lumps/WukongCallHome.1.9089ba84.lump": "5309e1f1ce8ec976abf28e706e088d242b1059a256597cdb899ab770880808b4",
     "/home/runner/workspace/server/lumps/WukongCallHome.1.9bf03976.lump": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
     "/home/runner/workspace/server/lumps/WukongCallHome.1.abde52f5.lump": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
-    "/home/runner/workspace/server/lumps/WukongCallHome.1.b29b38e3.lump": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
     "/home/runner/workspace/server/lumps/WukongCallHome.1.ba8b8e76.lump": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
     "/home/runner/workspace/server/lumps/WukongCallHome.1.d54e2115.lump": "6ef1ecd997d151c0a3fdff9c613b72c673c247414007056f32e5443d1913fb77",
     "/home/runner/workspace/server/lumps/WukongCallHome.1.e3f43d74.lump": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
@@ -477,7 +481,7 @@
     "/home/runner/workspace/server/lumps/WukongCallHome_v7.lump": "5a2ec522560b8a1de17ad0f5f752091b0f3469aefc41c5bf0d12ce05124a097b",
     "/home/runner/workspace/server/lumps/WukongCallHome_v8.lump": "9fd1738667d0ad6d41d56377c99baf6e5e88ef9b00fc7294a26b48ef48ae5916",
     "/home/runner/workspace/server/lumps/WukongCallHome_v9.lump": "f631e6d24d722ff7f9512beeef75ea9b26361252c485b37c076cda0d9bb515df",
-    "/home/runner/workspace/server/lumps/approvals.json": "dcabe2381b2682b718f6731a2facdd5bc39c663667cab1b339d36e0c4fb066c8",
+    "/home/runner/workspace/server/lumps/approvals.json": "6108fa137d3b28013245ada8210716bf4cbf6076f3c403beafe3fc8d8614171d",
     "/home/runner/workspace/server/lumps/c7425d6c.json": "ba0073455a1873dc8d3e18924634e2ff9c346670d76a7686c5b1d7822a5df096",
     "/home/runner/workspace/server/lumps/ide.Alice.1.1e49ecb5.lump": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
     "/home/runner/workspace/server/lumps/ide.Alice.1.1eec355e.json": "dcf64345833a9a415034105c0310957d8293543930f6e4e4e7a481e6cc4e4001",
@@ -490,8 +494,8 @@
     "/home/runner/workspace/server/lumps/ide.Mallory.1.fdaed91d.lump": "8a9e5540721dbb9ff2bc1a5f8c8189cfd082d3e86745cb3452d2ea14ec922b32",
     "/home/runner/workspace/server/lumps/ide.testMbit.1.d5046b90.json": "834adc263db9e2265464efa040fde3783428cda5b7296b3f3b15f996b3ae702b",
     "/home/runner/workspace/server/lumps/ide.testMbit.1.d5046b90.lump": "7f7049a605ce9ebdeb1ed2bf61ec33dec1cb1fe4a3aaf51be0e72791e57e051e",
-    "/home/runner/workspace/server/lumps/manifest.json": "fc0cadde7816d53e365c11273386c8ac265a31f2e153608c707477522cbe7c3f",
-    "/home/runner/workspace/server/lumps/ns-state.json": "06883b1f0738cd0472cb4ea8de5da8a43f965d619b168a07a8301172f39efde5",
+    "/home/runner/workspace/server/lumps/manifest.json": "a42ab0eca520952b80c67d8d042348ef755359a85acd3834f921c6fc05639d30",
+    "/home/runner/workspace/server/lumps/ns-state.json": "c7fbc188bd47761a8c876a5bc2c65d73f99d51567aebd8a8e80e3b351751bfed",
     "/home/runner/workspace/server/lumps/server_managed_tokens.json": "b93d3f7ade317116229547f041014788913f8237cf73e3af2ef143f001362c0b"
   },
   "stages": [

@@ -421,6 +421,7 @@ class ChurchCore(Elaboratable):
 
         cond_exec_enable = Signal()
         compact_index_fault = Signal()
+        bf_fault = Signal()
         compact_index = Signal(33)
         compact_index_selected = Signal()
         fetch_bounds_fault = Signal()   # combinatorial; gates cond_exec_enable and drives fault
@@ -1040,7 +1041,7 @@ class ChurchCore(Elaboratable):
             & ~(lambda_start_sig if not self.iot_profile else 0)
             & ~(eloadcall_start_sig if not self.iot_profile else 0)
             & ~(xloadlambda_start_sig if not self.iot_profile else 0)
-            & ~fetch_bounds_fault & ~compact_index_fault & ~u_outform_fsm.intercept_start
+            & ~fetch_bounds_fault & ~compact_index_fault & ~bf_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
             # CALL and RETURN must NOT advance the PC on their issue cycles.
@@ -1666,19 +1667,23 @@ class ChurchCore(Elaboratable):
         # ── BFEXT ────────────────────────────────────────────────────────────
         # Bit-field extract.
         # DR[dst] = (DR[src] >> offset) & ((1 << width) - 1)
-        # imm[4:0]  = offset (0-31)
-        # imm[9:5]  = width  (1-32, encoded as 0-31 where 0 means 32)
+        # imm[4:0] = width (1-31); imm[9:5] = offset (0-31).
+        # Reject zero width and fields extending beyond bit 31.
         # Flags: N = result[31], Z = (result==0), C = 0, V = 0.
 
-        m.d.comb += bfext_start_sig.eq(cond_exec_enable & is_bfext_op & ~any_unit_busy)
+        bf_invalid = Signal()
+        m.d.comb += bfext_start_sig.eq(cond_exec_enable & is_bfext_op & ~any_unit_busy & ~bf_invalid)
         m.d.sync += bfext_busy_reg.eq(bfext_start_sig & ~bfext_busy_reg)
 
         bf_offset = Signal(5)
         bf_width  = Signal(5)
         bf_mask   = Signal(32)
         m.d.comb += [
-            bf_offset.eq(u_decoder.immediate[0:5]),
-            bf_width.eq(u_decoder.immediate[5:10]),
+            bf_offset.eq(u_decoder.immediate[5:10]),
+            bf_width.eq(u_decoder.immediate[0:5]),
+            bf_invalid.eq((bf_width == 0) | ((bf_offset + bf_width) > 32)),
+            bf_fault.eq(cond_exec_enable & ~any_unit_busy &
+                        (is_bfext_op | is_bfins_op) & bf_invalid),
             bf_mask.eq((1 << bf_width) - 1),
             bfext_result.eq((u_regs.dr_rd_data1 >> bf_offset) & bf_mask),
         ]
@@ -1694,13 +1699,12 @@ class ChurchCore(Elaboratable):
         # ── BFINS ────────────────────────────────────────────────────────────
         # Bit-field insert.
         # DR[dst] = (DR[dst] & ~mask_shifted) | ((DR[src] & mask) << offset)
-        # imm[4:0]  = offset (0-31)
-        # imm[9:5]  = width  (encoded same as BFEXT)
+        # imm[4:0] = width; imm[9:5] = offset (same as BFEXT).
         # dr_rd_data1 = DR[cr_src] (value to insert, read on port 1)
         # dr_rd_data2 = DR[cr_dst] (existing destination, read on port 2)
         # Flags: N = result[31], Z = (result==0), C = 0, V = 0.
 
-        m.d.comb += bfins_start_sig.eq(cond_exec_enable & is_bfins_op & ~any_unit_busy)
+        m.d.comb += bfins_start_sig.eq(cond_exec_enable & is_bfins_op & ~any_unit_busy & ~bf_invalid)
         m.d.sync += bfins_busy_reg.eq(bfins_start_sig & ~bfins_busy_reg)
 
         bfins_mask_shifted = Signal(32)
@@ -2701,7 +2705,7 @@ class ChurchCore(Elaboratable):
         )
         with m.If(fetch_bounds_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
-        with m.Elif(compact_index_fault):
+        with m.Elif(compact_index_fault | bf_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
         # Decoder/perm faults are combinational functions of the currently
         # fetched word.  While a multi-cycle unit owns the shared DMEM bus the

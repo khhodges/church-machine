@@ -2637,12 +2637,12 @@ class ChurchAssembler {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseDR(parts[2], lineNum);
                 const rawWid12 = this._parseImm(parts[4], lineNum);
-                const pos12 = this._parseImm(parts[3], lineNum) & 0x1F;
-                const wid12 = rawWid12 & 0x1F;
-                if (wid12 === 0) {
+                const pos12 = this._parseImm(parts[3], lineNum);
+                const wid12 = rawWid12;
+                if (wid12 < 1 || wid12 > 31) {
                     const _widTok12 = (parts[4] || '').replace(/,/g, '').trim();
-                    this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _widTok12), message: `BFEXT: width must be ≥ 1 (got ${rawWid12})` });
-                } else if (pos12 + wid12 > 32) {
+                    this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _widTok12), message: `BFEXT: width must be 1–31 (got ${rawWid12})` });
+                } else if (pos12 < 0 || pos12 > 31 || pos12 + wid12 > 32) {
                     const _posTok12 = (parts[3] || '').replace(/,/g, '').trim();
                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _posTok12), message: `BFEXT: pos+width must be ≤ 32 (pos=${pos12}, width=${wid12}, sum=${pos12 + wid12})` });
                 }
@@ -2653,12 +2653,12 @@ class ChurchAssembler {
                 crDst = this._parseDR(parts[1], lineNum);
                 crSrc = this._parseDR(parts[2], lineNum);
                 const rawWid13 = this._parseImm(parts[4], lineNum);
-                const pos13 = this._parseImm(parts[3], lineNum) & 0x1F;
-                const wid13 = rawWid13 & 0x1F;
-                if (wid13 === 0) {
+                const pos13 = this._parseImm(parts[3], lineNum);
+                const wid13 = rawWid13;
+                if (wid13 < 1 || wid13 > 31) {
                     const _widTok13 = (parts[4] || '').replace(/,/g, '').trim();
-                    this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _widTok13), message: `BFINS: width must be ≥ 1 (got ${rawWid13})` });
-                } else if (pos13 + wid13 > 32) {
+                    this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _widTok13), message: `BFINS: width must be 1–31 (got ${rawWid13})` });
+                } else if (pos13 < 0 || pos13 > 31 || pos13 + wid13 > 32) {
                     const _posTok13 = (parts[3] || '').replace(/,/g, '').trim();
                     this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, _posTok13), message: `BFINS: pos+width must be ≤ 32 (pos=${pos13}, width=${wid13}, sum=${pos13 + wid13})` });
                 }

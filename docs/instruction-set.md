@@ -17,6 +17,21 @@ Existing encoding tables and repeated instruction descriptions elsewhere in
 this document remain baseline records pending reconciliation; they do not
 override these corrections or establish a new encoding layout.
 
+## BFEXT/BFINS: bitfield contract
+
+**Normative correction — 2026-10-04.** This supersedes the repeated baseline
+bitfield descriptions below. Assembly syntax is `BFEXT DRd, DRs, #lsb, #width`
+and `BFINS DRd, DRs, #lsb, #width`, preserving the existing assembler syntax.
+Immediate bits 4:0 encode width directly (1–31); bits 9:5 encode lsb (0–31).
+Zero width and lsb + width > 32 fault with BOUNDS, without changing registers
+or condition flags. Assemblers reject out-of-range operands before masking.
+No new interpretation of immediate bits 14:10 is introduced here.
+
+BFEXT zero-extends the selected source field. BFINS replaces only the selected
+destination field with the low width bits of the pre-write source. Both set
+N/Z from the computed result and clear C/V; DR0 writes remain discarded.
+The usual condition predicate applies; a false predicate has no effects.
+
 ## CHANGE: one-GT Thread activation
 
 **Normative correction — 2026-10-03.** This section supersedes the indexed

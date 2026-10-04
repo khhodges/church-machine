@@ -59,6 +59,26 @@ def vectors():
                               kind="index", section="Compact indexed LOAD/SAVE operand",
                               word=word(op, 2, 1, imm), dr=dr, flags=0,
                               index=index if 0 <= index <= 0xffffffff else None))
+    for op in (18, 19):
+        for pos, width in [(0, 1), (31, 1), (1, 31), (0, 31),
+                           (7, 9), (0, 0), (31, 2), (2, 31)]:
+            for dst, src in [(2, 1), (2, 2), (0, 1), (2, 0)]:
+                dr = [0] * 16
+                dr[1], dr[2] = 0x89abcdef, 0x76543210
+                cases.append(dict(
+                    id=f"bitfield-{op}-{pos}-{width}-{dst}-{src}",
+                    kind="bitfield", section="BFEXT/BFINS: bitfield contract",
+                    word=word(op, dst, src, (pos << 5) | width),
+                    dr=dr, flags=15, op=op, pos=pos, width=width,
+                    dst=dst, src=src))
+    # False predicates suppress even malformed bitfields.
+    for op in (18, 19):
+        dr = [0] * 16
+        dr[1], dr[2] = 0x89abcdef, 0x76543210
+        cases.append(dict(id=f"bitfield-false-{op}", kind="bitfield",
+                          section="BFEXT/BFINS: bitfield contract",
+                          word=word(op, 2, 1, 0, cond=15), dr=dr, flags=15,
+                          op=op, pos=0, width=0, dst=2, src=1, skipped=True))
     return cases
 
 
@@ -88,6 +108,20 @@ def judge(vector, observation):
           "fixture M bits")
     check(observation["terminal"] != "timeout", "bounded completion")
     expected_dr = vector["dr"].copy()
+    bf_invalid = False
+    bf_result = 0
+    if vector["kind"] == "bitfield":
+        p, w = vector["pos"], vector["width"]
+        bf_invalid = not vector.get("skipped") and (w == 0 or p + w > 32)
+        if not bf_invalid and not vector.get("skipped"):
+            mask = (1 << w) - 1
+            source = initial["dr"][vector["src"]]
+            old = initial["dr"][vector["dst"]]
+            bf_result = ((source >> p) & mask) if vector["op"] == 18 else (
+                (old & ~(mask << p)) | ((source & mask) << p))
+            bf_result &= 0xffffffff
+            if vector["dst"]:
+                expected_dr[vector["dst"]] = bf_result
     if vector["kind"] == "condition" and vector["taken"]:
         expected_dr[2] = 0
     check(final["dr"] == expected_dr, "DR result/preservation")
@@ -95,9 +129,16 @@ def judge(vector, observation):
     check(final["m"] == initial["m"], "forbidden M change")
     check(not observation["data_reads"], "forbidden data read")
     check(not observation["writes"], "forbidden memory write")
-    if vector["kind"] == "index":
+    if vector["kind"] == "bitfield" and bf_invalid:
+        check(observation["terminal"] == "fault", "invalid bitfield must fault")
+        check(observation["fault"] in ("BOUNDS", 8), "bitfield BOUNDS fault")
+        check(final["flags"] == initial["flags"], "fault flag preservation")
+    elif vector["kind"] == "index":
         check(observation["terminal"] == "fault", "NULL authority/arithmetic must reject")
         check(observation["index"] == vector["index"], "compact effective index")
+        if vector["index"] is None and "index_accepted" in observation:
+            check(observation["index_arithmetic_fault"], "missing arithmetic rejection")
+            check(not observation["index_accepted"], "rejected index started consumer")
         check(final["flags"] == initial["flags"], "fault flag preservation")
         # Fault priority and diagnostic PC/recovery changes deliberately not inferred.
     else:
@@ -105,6 +146,10 @@ def judge(vector, observation):
         if "retire_count" in observation:
             check(observation["retire_count"] == 1, "exactly one retirement")
         check(final["pc_word"] == 1, "exactly one instruction advance")
+        if vector["kind"] == "bitfield":
+            check(final["flags"] == (initial["flags"] if vector.get("skipped") else
+                                    ((bf_result >> 31) | (2 if bf_result == 0 else 0))),
+                  "bitfield NZCV")
         if vector["kind"] == "condition" and not vector["taken"]:
             check(final["flags"] == initial["flags"], "false predicate flag preservation")
         if vector["kind"] == "mcmp":

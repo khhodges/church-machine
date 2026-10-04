@@ -45,7 +45,8 @@ def select_bootstrap_residents(lumps):
 
     The checked-in Namespace may contain IDE drafts (including an IDX1
     selection at slot 15) that cannot be prepared as bootstrap residents,
-    and its CapabilityTest binding may point to an archived publication.
+    and resident bindings may point to compiler revisions rather than the
+    fixed-GT publications exercised by these historical bootstrap tests.
     Neither is part of this bootstrap-only fixture.
     """
     assert lumps.resolve() != (Path(__file__).resolve().parents[2] / "server/lumps").resolve(), \
@@ -76,14 +77,17 @@ def select_bootstrap_residents(lumps):
         if row.get("name") in {"Tunnel", "Ethernet"}:
             for field in ("token", "filename", "binary_hash"):
                 row.pop(field, None)
-        if row.get("name") == "CapabilityTest" and row.get("slot") == 10:
-            from server.bootstrap_identity import resident_inform_egt
+        if (row.get("name"), row.get("slot")) in {
+                ("SelfTest", 6), ("WukongCallHome", 7), ("CapabilityTest", 10)}:
+            from server.bootstrap_identity import (
+                resident_inform_egt, validate_bootstrap_candidate,
+            )
             # The live selection can legitimately be a compiler revision.
             # This bootstrap-only fixture selects the exact approved bootstrap
             # authority, not whichever token happens to be live in the IDE.
             bootstrap_token = f"{resident_inform_egt(row):08x}"
             active = [entry for entry in manifest
-                      if entry.get("abstraction") == "CapabilityTest"
+                      if entry.get("abstraction") == row["name"]
                       and entry.get("token") == bootstrap_token
                       and entry.get("archived") is not True]
             assert len(active) == 1
@@ -93,6 +97,11 @@ def select_bootstrap_residents(lumps):
             assert approvals[digest]["filename"] == selected["filename"]
             assert approvals[digest]["bootstrap_t"] == bootstrap_token
             assert approvals[digest]["bootstrap_runtime_gt"] == int(bootstrap_token, 16)
+            # Do not bless a manifest/approval label without checking the exact
+            # binary's SELF row against the destination's bootstrap authority.
+            validate_bootstrap_candidate(
+                {**row, "token": bootstrap_token}, body, bootstrap_token,
+                digest, approvals[digest])
             row["token"] = bootstrap_token
             row.pop("artifact_pin", None)
             row["filename"] = selected["filename"]

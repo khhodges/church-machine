@@ -6576,12 +6576,42 @@ def boot_image_upload():
     })
 
 
-def _boot_execution_freshness(state, lumps_dir):
+@app.route("/api/simulation/image-freshness", methods=["GET"])
+def simulation_image_freshness():
+    """Compare exact committed image bytes, not the mutable Namespace selection."""
+    from server.simulation_image_freshness import image_freshness
+    try:
+        with open(BOOT_IMAGE_PATH, "rb") as source:
+            image = source.read()
+        with open(BOOT_IMAGE_PROVENANCE_PATH, encoding="utf-8") as source:
+            provenance = json.load(source)
+        with open(NS_STATE_PATH, encoding="utf-8") as source:
+            state = json.load(source)
+        def read_artifact(filename):
+            if not isinstance(filename, str) or os.path.basename(filename) != filename:
+                raise ValueError("Invalid artifact filename")
+            with open(os.path.join(LUMPS_DIR, filename), "rb") as artifact:
+                return artifact.read()
+        report = image_freshness(
+            image, provenance, request.args.get("imageHash"), state,
+            _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json")),
+            lambda rows: _boot_execution_freshness(
+                rows, LUMPS_DIR, require_evidence=True), read_artifact)
+    except (OSError, ValueError, TypeError):
+        report = {"status": "unknown", "warnings": [],
+                  "reason": "Loaded-image freshness evidence is unavailable. No data was changed."}
+    response = jsonify(report)
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+def _boot_execution_freshness(state, lumps_dir, *, require_evidence=False):
     """Report when committed Namespace bindings are not the newest compilations."""
     from server.lump_approvals import read_approvals
 
     warnings = []
     failed_saves = []
+    comparison_incomplete = False
     try:
         approvals = read_approvals(os.path.join(lumps_dir, "approvals.json"))
     except (OSError, ValueError):
@@ -6679,6 +6709,8 @@ def _boot_execution_freshness(state, lumps_dir):
                     })
                     continue
                 compatible.append(entry)
+            if require_evidence and not inspected_any:
+                candidates = []
             if inspected_any:
                 candidates = compatible
                 # A rejected immutable archive is an actionable incident only
@@ -6708,8 +6740,10 @@ def _boot_execution_freshness(state, lumps_dir):
                         continue
                     failed_saves.append(incident)
         except (OSError, ValueError, KeyError, TypeError):
-            pass
+            if require_evidence:
+                candidates = []
         if not candidates:
+            comparison_incomplete = True
             continue
         latest = max(candidates, key=lambda entry: (
             entry.get("lump_version")
@@ -6745,7 +6779,8 @@ def _boot_execution_freshness(state, lumps_dir):
             "reason": "committed-boot-image-does-not-use-latest-compilation",
         })
     result = {
-        "status": "stale" if warnings else "current",
+        "status": "stale" if warnings else (
+            "unknown" if require_evidence and comparison_incomplete else "current"),
         "warnings": warnings,
     }
     if failed_saves:

@@ -904,6 +904,9 @@ async function stepSim() {
     if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Step')) return;
+    if (!window.SimulationPreparation ||
+            !await window.SimulationPreparation.checkExecutionFreshness()) return;
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     // A configured boot prefetch is part of startup, not an ordinary lazy-load
     // pause. Never execute user code while its ordered downloads are pending.
     if (sim.bootComplete && sim._bootPrefetchPromise) {
@@ -2219,6 +2222,10 @@ async function runSimGo(preserveView, options) {
     // two boot-complete callbacks — from spawning a second concurrent
     // runBatch() loop and corrupting simulation state.
     if (sim.running || _simRunActive) return;
+    if (!window.SimulationPreparation ||
+            !await window.SimulationPreparation.checkExecutionFreshness()) return;
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    if (sim.running || _simRunActive) return;
     if (sim._bootPrefetchPromise) {
         const pending = sim._bootPrefetchPromise;
         pending.then(() => {
@@ -2750,12 +2757,16 @@ function finishWalk() {
     updateThreadControl();
     updateDashboard();
 }
-function walkToggle() {
+async function walkToggle() {
     if (walkRunning) {
         finishWalk();
         return;
     }
     if (!_requireCommittedImageForExecution('Walk')) return;
+    if (!window.SimulationPreparation ||
+            !await window.SimulationPreparation.checkExecutionFreshness()) return;
+    if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
+    if (walkRunning || sim.running || _simRunActive) return;
     walkRunning = true;
     sim.walkActive = true;
     if (typeof _syncPullToRefreshGuard === 'function') _syncPullToRefreshGuard();
@@ -4201,6 +4212,7 @@ let _faultModalEditLineNum   = null;   // source line for the faulting instructi
 let _faultModalNsIdxForLump  = null;   // NS slot fallback when no line num
 let _faultModalInstrIdx      = null;   // instruction index within the faulting LUMP
 let _faultModalRawWord       = null;
+let _faultModalEvidence      = null;
 let _lastRetryLump = null;
 
 function faultAlertOn() {
@@ -4375,7 +4387,8 @@ const _FAULT_LOG_FIELDS = ['type','message','pc','physicalPC','step','faultStep'
                             'bootAttemptId','bootProgress','bootRomAddress','destinationRegister',
                            'pcRegister','pcPetName','logicalPC','attemptedPhysicalAddress',
                             'gateReason','bootEvidence','observed_instr_word',
-                           'observedInstructionWord','gt_snapshot','pet_names'];
+                           'observedInstructionWord','gt_snapshot','pet_names',
+                           'executionArtifact','executionOccurrence','faultCodeWords'];
 
 // Return only the instruction word captured with a fault record.  Fault
 // details are historical evidence: never reinterpret them using live memory,
@@ -4775,7 +4788,6 @@ function showFaultModal(f) {
     const _petDR = {};
     for (const [reg, name] of Object.entries(f.pet_names || {})) {
         if (/^CR(?:[0-9]|1[0-5])$/.test(reg)) _petCR[Number(reg.slice(2))] = name;
-        if (/^DR(?:[0-9]|1[0-5])$/.test(reg)) _petDR[Number(reg.slice(2))] = name;
     }
     // Apply pet names and (optionally) highlight a specific offset bracket in a disasm string.
     // offsetToHighlight: string like "[0x0008]" to wrap in .itrace-offset-fault, or null.
@@ -4783,7 +4795,7 @@ function showFaultModal(f) {
         let s = str
             .replace(/\bCR(\d+)\b/g, (m, n) => {
                 const a = _petCR[+n];
-                return a ? `<span class="itrace-pet" title="CR${n}">${a}</span>` : m;
+                return a ? `CR${n} (<span class="itrace-pet">${String(a).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>)` : m;
             })
             .replace(/\bDR(\d+)\b/g, (m, n) => {
                 const a = _petDR[+n];
@@ -4846,6 +4858,13 @@ function showFaultModal(f) {
     // Expose to faultModalInvestigate() which runs after the modal is dismissed.
     _faultModalEditLineNum  = _editLineNum;
     _faultModalRawWord = word;
+    _faultModalEvidence = JSON.parse(JSON.stringify({
+        artifact: f.executionArtifact || null,
+        occurrence: f.executionOccurrence || null,
+        codeWords: f.faultCodeWords || null,
+        location: nsStr, pc: pcHex,
+        dr: f.drSnapshot || null
+    }));
     _faultModalNsIdxForLump = nsIdxForViewLump;
     _faultModalInstrIdx = (locationNs && Number.isInteger(locationNs.offset) &&
             locationNs.offset >= 1)
@@ -5055,17 +5074,6 @@ function showFaultModal(f) {
                     <td class="freg-petname">${petName ? `<span class="fault-clist-petname">${petName.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>` : ''}</td>
                 </tr>`;
             }
-            // Also list any DR pet names that aren't in the CR snapshot
-            const drPetEntries = Object.entries(pnames).filter(([k]) => k.startsWith('DR'));
-            if (drPetEntries.length > 0) {
-                for (const [regKey, petName] of drPetEntries) {
-                    snapRows += `<tr>
-                        <td class="freg-name">${regKey}</td>
-                        <td class="freg-base"></td>
-                        <td class="freg-petname"><span class="fault-clist-petname">${petName.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span></td>
-                    </tr>`;
-                }
-            }
             gtSnapshotSection = `
         <div class="fault-regs-section">
             <div class="fault-regs-label">GT Snapshot <span class="fault-regs-legend" style="font-size:0.7em;color:#555577">(non-null CRs at fault)</span></div>
@@ -5205,6 +5213,17 @@ function showFaultModal(f) {
             <button class="btn btn-muted" onclick="faultModalClearAndDismiss()" title="Clear fault state — stops the flashing alert">&#x2715; Clear</button>
         </div>
         <div class="${_msgClass}" ${_editOnclick}>${_transformFaultMsg(f.message)}${_editBadge}</div>
+        <div class="fault-detail-row">
+            <span class="fault-detail-label">Recorded execution</span>
+            <span class="fault-detail-value">${_escHtml(
+                'PC ' + pcHex + ' / ' + nsStr + '; raw ' +
+                (word === null ? 'unavailable' : '0x' + word.toString(16).padStart(8, '0')) +
+                '; ' + disasm + '; captured binary seal: ' +
+                (f.executionArtifact && f.executionArtifact.identity &&
+                    f.executionArtifact.identity.binaryHash || 'unknown') +
+                '. Open code to compare with the currently saved artifact. The slot may now contain another revision; names and a single matching word do not prove identity.'
+            )}</span>
+        </div>
         <div class="fault-summary-grid">
             ${descSection}
             ${gtSnapshotSection}
@@ -5265,6 +5284,7 @@ async function _faultModalOpenExecutedSource(lineNum) {
     const nsIdx = _faultModalNsIdxForLump;
     const instrIdx = _faultModalInstrIdx;
     const rawWord = _faultModalRawWord;
+    const evidence = _faultModalEvidence;
     faultModalDismiss();
     if (nsIdx != null && typeof sim !== 'undefined' && sim &&
             typeof sim.lumpTokenAtSlot === 'function' &&
@@ -5282,7 +5302,7 @@ async function _faultModalOpenExecutedSource(lineNum) {
             if (String(window._editorOpenLumpToken) === String(token) &&
                     typeof _revealFaultInstruction === 'function') {
                 _revealFaultInstruction(token,
-                    Number.isInteger(instrIdx) ? instrIdx + 1 : null, rawWord);
+                    Number.isInteger(instrIdx) ? instrIdx + 1 : null, rawWord, evidence);
             }
             return;
         }

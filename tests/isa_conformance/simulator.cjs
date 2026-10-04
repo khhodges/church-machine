@@ -107,7 +107,7 @@ for (const v of vectors) {
     });
     const initial = snapshot();
     let fault = null, faultState = null, index = null, observing = false;
-    for (const method of ['_execLoad','_execSave','_execMcmp','_execShl']) {
+    for (const method of ['_execLoad','_execSave','_execMcmp','_execShl','_execBfext','_execBfins']) {
         const original = s[method];
         s[method] = function(...args) {
             observing = true;

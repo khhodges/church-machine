@@ -6410,6 +6410,21 @@ class ChurchSimulator {
             `From ${fromName}.${fromMethod} -> To ${toName}.${toMethod} — ${rawDiagnosticReason}`;
         const entry = {
             type, message: routedMessage, rawDiagnosticReason,
+            // Capture identity from this attempt, never from a later reset or
+            // editor selection. Registered identity alone is not byte evidence.
+            executionArtifact: this._executionAttempt
+                ? this._executionAttempt.pre.artifact : null,
+            executionOccurrence: this._executionAttempt
+                ? this._executionAttempt.occurrenceId : null,
+            faultCodeWords: (() => {
+                const cap = this._executionAttempt && this._executionAttempt.pre.artifact.codeCapability;
+                if (!cap || !cap.word0 || !Number.isInteger(cap.word1)) return null;
+                const base = cap.word1 >>> 0;
+                const header = this.memory[base] >>> 0;
+                const cw = (header >>> 10) & 0x1fff;
+                if ((header >>> 27) !== 31 || !cw || base + cw >= this.memory.length) return null;
+                return Array.from(this.memory.slice(base, base + cw + 1), w => w >>> 0);
+            })(),
             callRoute: route,
             pc: this.pc, physicalPC: this.physicalPC, step: this.stepCount,
             threadSlot: this._liveThreadOwned && Number.isInteger(this._currentThreadSlot)
