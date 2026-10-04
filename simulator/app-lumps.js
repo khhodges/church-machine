@@ -9048,7 +9048,7 @@ function _formatLumpApiDefinition(absName, caps) {
             return {
                 name: (cap && cap.name) || '',
                 rights: (cap && Array.isArray(cap.rights)) ? cap.rights.slice() : [],
-                ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token', 'canonical_leaf']
                     .filter(key => cap && typeof cap[key] === 'string').map(key => [key, cap[key]])),
                 grants: (cap && Array.isArray(cap.grants)) ? cap.grants.slice() : []
             };
@@ -9243,7 +9243,8 @@ window.showFormatLump = async function() {
         ? window.LumpRegistry.getCurrent()
         : null;
     var _svWords = _regMem.memory.words.slice();
-    var _caps    = (_regMem.memory.capabilities || []).slice();
+    var _caps    = (_regMem.memory.capabilities || []).map(cap =>
+        cap && typeof cap === 'object' ? { ...cap } : cap);
     var _absName = (_regEntry && _regEntry.abstraction) || '';
 
     // ── Build every user-selectable, spec-compliant binary from one snapshot ──
@@ -9253,6 +9254,25 @@ window.showFormatLump = async function() {
         var _missingValidator = 'Cannot format this LUMP: capability token validator is unavailable.';
         alert(_missingValidator);
         return { ok: false, error: _missingValidator, reported: true };
+    }
+    let ideHierarchy;
+    try {
+        const response = await fetch('/api/ide-hierarchy', { cache: 'no-store' });
+        ideHierarchy = await response.json();
+        if (!response.ok) throw new Error(ideHierarchy.error || 'Unable to read IDE hierarchy.');
+        for (let i = 0; i < _caps.length; i++) {
+            const cap = _caps[i];
+            const decision = CapabilityTokens.checkLeafOwnership(cap, ideHierarchy);
+            if (decision.error) throw new Error(decision.error);
+            if (decision.canonical) _caps[i] = {
+                ...(typeof cap === 'string' ? { name: cap } : cap),
+                canonical_leaf: decision.canonical,
+            };
+        }
+    } catch (error) {
+        const message = 'Cannot format this LUMP: ' + error.message;
+        alert(message);
+        return { ok: false, error: message, reported: true };
     }
     var _lcf = (typeof LumpContentFrame !== 'undefined') ? LumpContentFrame : null;
     if (!_lcf) {
@@ -9316,6 +9336,7 @@ window.showFormatLump = async function() {
             _svBinary[_fsStart + _frameIndex] = _frameWds[_frameIndex] >>> 0;
         }
         var _capMaterialized = CapabilityTokens.materialize(_caps, _svBinary, _svLumpSize - _svCC, {
+            ideHierarchy,
             sim: (typeof sim !== 'undefined' ? sim : null),
             lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
         });
@@ -9352,7 +9373,7 @@ window.showFormatLump = async function() {
         }
         var _normalizedCaps = _capMaterialized.resolvedCaps.map(function(cap) {
             return {
-                ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token', 'canonical_leaf']
                     .filter(key => typeof cap[key] === 'string').map(key => [key, cap[key]])),
                 name: cap.name,
                 rights: cap.rights.slice(),

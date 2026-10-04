@@ -103,6 +103,7 @@ def _make_cache_key(payload: dict) -> str:
         'isa_profile': payload.get('isa_profile'),
         'portable_binding': payload.get('portable_binding') or payload.get('portableBinding'),
         'call_api_authorities': payload.get('_resolved_call_api_authorities'),
+        'ide_hierarchy': payload.get('_ide_hierarchy'),
     }
     canonical = json.dumps(key_obj, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(canonical.encode('utf-8')).hexdigest()

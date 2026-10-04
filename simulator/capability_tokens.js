@@ -69,30 +69,7 @@
             /^Thread[.#]\d+$/i.test(String(name || ''));
     }
 
-    const FIXED_AUTHORED_RIGHTS = Object.freeze({
-        LED_DEV: ['R', 'W'],
-        LED0: ['R', 'W'],
-        LED1: ['R', 'W'],
-        LED2: ['R', 'W'],
-        LED3: ['R', 'W'],
-        LED4: ['R', 'W'],
-        LED5: ['R', 'W'],
-        UART_DEV: ['R', 'W'],
-        UART0: ['R', 'W'],
-        UART_TX: ['W'],
-        UART_RX: ['R'],
-        BTN_DEV: ['R'],
-        BUTTON0: ['R'],
-        TIMER_DEV: ['R', 'W'],
-        TIMER0: ['R', 'W'],
-        DISPLAY0: ['W'],
-        M_BIT_DEV: ['R', 'W'],
-    });
-
     function authoredRightsForName(name, lumps) {
-        const key = String(name || '').toUpperCase();
-        if (_isThreadName(name)) return [];
-        if (FIXED_AUTHORED_RIGHTS[key]) return FIXED_AUTHORED_RIGHTS[key].slice();
         const lump = (Array.isArray(lumps) ? lumps : []).find(item =>
             _sameName(item && (item.abstraction || item.name), name));
         if (!lump) return null;
@@ -103,6 +80,62 @@
         } catch (_) {
             return null;
         }
+    }
+
+    // Exact path components, not textual prefixes or imported short names.
+    // Only the server-provisioned alias/definition table is ownership evidence.
+    function checkLeafOwnership(cap, config) {
+        const name = _nameOf(cap);
+        if (name === 'NULL' || (cap && cap.null_row)) return { ownership: 'null', error: null };
+        let rights;
+        try { rights = normalizeRights(cap); }
+        catch (e) { return { ownership: 'invalid', error: e.message }; }
+        if (/^(SELF|__SELF__)$/i.test(name)) {
+            return { ownership: 'compiler', error: rights.length &&
+                (rights.length !== 1 || rights[0] !== 'E')
+                ? 'SELF permissions are compiler-owned E. Use bare SELF or SELF E.' : null };
+        }
+        const path = value => typeof value === 'string' &&
+            /^[A-Za-z_][A-Za-z0-9_-]*(?:\.[A-Za-z_][A-Za-z0-9_-]*)*$/.test(value);
+        // Alias keys are source PetNames, not canonical hierarchy paths.
+        // In particular Thread.1 and Thread#1 are supported legacy spellings.
+        const petName = value => typeof value === 'string' &&
+            /^[A-Za-z_][A-Za-z0-9_-]*(?:[.#][A-Za-z0-9_-]+)*$/.test(value);
+        const missing = () => ({ ownership: 'unconfigured',
+            error: 'IDE hierarchy is missing or malformed. Configure node, aliases and foreign definitions in server/ide-hierarchy.json; no ownership was inferred.' });
+        if (!config || !path(config.node) ||
+                (config.aliases != null && (typeof config.aliases !== 'object' || Array.isArray(config.aliases))) ||
+                (config.definitions != null && (typeof config.definitions !== 'object' || Array.isArray(config.definitions)))) return missing();
+        const aliases = config.aliases || {};
+        const definitions = config.definitions || {};
+        if (Object.entries(aliases).some(([key, value]) => !petName(key) || !path(value)) ||
+                Object.keys(definitions).some(key => !path(key))) return missing();
+        const explicit = cap && typeof cap === 'object' && (cap.N || cap.identity_string || cap.canonical_leaf);
+        const canonical = explicit ? String(explicit).replace(/#[1-9][0-9]*$/, '') :
+            Object.prototype.hasOwnProperty.call(aliases, name) ? aliases[name] :
+            name.includes('.') ? name : `${config.node}.${name}`;
+        if (!path(canonical)) return { ownership: 'invalid', error:
+            `Malformed canonical leaf "${canonical}". Configure an exact alias for PetName "${name}" in server/ide-hierarchy.json; no ownership was inferred.` };
+        if (cap && cap.canonical_leaf && cap.canonical_leaf !== canonical) {
+            return { ownership: 'invalid', error: `Capability "${name}" has conflicting canonical identities.` };
+        }
+        if (explicit && Object.prototype.hasOwnProperty.call(aliases, name) && aliases[name] !== canonical) {
+            return { ownership: 'invalid', error: `Capability "${name}" conflicts with its configured canonical leaf ${aliases[name]}.` };
+        }
+        const parts = canonical.split('.');
+        const parent = parts.slice(0, -1).join('.');
+        if (parent === config.node) return { ownership: 'local', canonical, error: null };
+        let defined;
+        try {
+            if (!Object.prototype.hasOwnProperty.call(definitions, canonical)) throw new Error('missing');
+            defined = normalizeRights({ rights: definitions[canonical] });
+        } catch (_) {
+            return { ownership: 'foreign', canonical,
+                error: `Foreign leaf "${canonical}" has no trusted permission definition. Configure its exact definition in server/ide-hierarchy.json; importing a PetName does not grant ownership.` };
+        }
+        return { ownership: 'foreign', canonical,
+            error: rights.slice().sort().join('') === defined.slice().sort().join('') ? null :
+                `Foreign leaf "${canonical}" cannot redefine permissions (${defined.join('') || 'none'}). Change its definition on the owning IDE, not this IDE.` };
     }
 
     function isContextualSelf(cap) {
@@ -177,7 +210,7 @@
         }
 
         if (isContextualSelf(cap)) {
-            if (rights.length !== 1 || rights[0] !== 'E') {
+            if (rights.length && (rights.length !== 1 || rights[0] !== 'E')) {
                 return {
                     name: 'SELF', rights, grants: ['E'], nsIndex: null,
                     source: 'contextual-self', symbolic_self: true,
@@ -192,15 +225,13 @@
             };
         }
 
-        // Check definition evidence, not mutable registry/live grants.
-        // Ordinary references must not redefine another programmer's PetName.
-        const authored = authoredRightsForName(name, lumps);
-        if (authored !== null) {
-            if (rights.slice().sort().join('') !== authored.slice().sort().join('')) {
-                return { name, rights, grants: authored, nsIndex: null,
-                    source: 'authored-definition',
-                    error: `Capability "${name}" cannot redefine its owner's permissions (${authored.join('') || 'none'}).` };
-            }
+        // Token inspection of historical artifacts is not a definition change.
+        // Authoring callers supply the server's hierarchy explicitly.
+        const ownership = Object.prototype.hasOwnProperty.call(context, 'ideHierarchy')
+            ? checkLeafOwnership(cap, context.ideHierarchy) : { error: null };
+        if (ownership.error) {
+            return { name, rights, grants, nsIndex: null,
+                source: ownership.ownership, error: ownership.error };
         }
 
         const allAbs = (sim && sim.abstractionRegistry && sim.abstractionRegistry.abstractions) || {};
@@ -353,6 +384,7 @@
         return (Array.isArray(caps) ? caps : []).map((cap, index) => {
             const resolved = resolveCapability(cap, context);
             const identityKeys = ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token'];
+            if (cap && typeof cap.canonical_leaf === 'string') resolved.canonical_leaf = cap.canonical_leaf;
             const hasFullIdentity = identityKeys.some(key => cap && typeof cap[key] === 'string' &&
                 (key !== 'token' || !Number.isInteger(cap.nsIndex) ||
                  cap[key].replace(/^0x/i, '').length > 8));
@@ -510,12 +542,13 @@
                 declaredRights.join('') === capRights.join('');
             const allowEmbeddedSymbol =
                 i > 0 && !resolvedCaps[i].error && embedded && typeof embedded.name === 'string' &&
-                /^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})$/.test(embedded.name) &&
+                (_isThreadName(embedded.name) ||
+                    /^(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})$/.test(embedded.name)) &&
                 embedded.name === capName &&
-                ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                ['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token', 'canonical_leaf']
                     .every(key => embedded[key] === resolvedCaps[i][key]) &&
                 normalizeRights(embedded).join('') === capRights.join('') &&
-                capRights.length > 0 &&
+                (capRights.length > 0 || _isThreadName(capName)) &&
                 (word === 0 || ((word >>> 16) === 0xFEED &&
                     word !== 0xFEED5E1F && word !== 0xFEEDDA7A));
             const check = (allowSelfPlaceholder || allowAuthenticatedPending || allowEmbeddedSymbol)
@@ -586,6 +619,7 @@
 
     return {
         normalizeRights,
+        checkLeafOwnership,
         authoredRightsForName,
         rightsToPerms,
         isContextualSelf,

@@ -137,7 +137,7 @@
 - [Resident publication bootstrap approval](resident-publication-bootstrap-approval.md) — derive bootstrap metadata from validated fixed bindings and exact SELF bytes, never a browser flag
 - [Callable LUMP method-table prefix](callable-lump-method-table-prefix.md) — any LUMP entered through CALL method N needs canonical dispatch words before its source body
 - [Static path-write guard precision](static-path-write-guard-precision.md) — distinguish write destinations, lexical scope, temp roots, and env-backed fallbacks to avoid unsafe gaps or read-only false positives
-- [GT permission enforcement boundary](authored-gt-permissions.md) — permission changes are a runtime M-bit concern; compiler and save admission must not block them
+- [IDE leaf permission ownership](authored-gt-permissions.md) — trusted IDE hierarchy owns leaf definitions; local revisions may change rights, foreign imports confer no ownership.
 - [SelfTest status evidence](selftest-status-evidence.md) — discarded DR0 failure writes can mask test failures; inspect branch evidence independently of DR1 return status
 - [Namespace save layout versus identity](namespace-save-layout-identity.md) — regeneration may normalize descriptors without substituting artifacts; ordinary unchanged saves preserve layout
 - [Resident installation isolation](resident-install-execution-isolation.md) — background deployments must not splice a new c-list into running code; direct-run activation is explicit

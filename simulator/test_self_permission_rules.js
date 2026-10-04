@@ -20,5 +20,10 @@ assert.strictEqual(compile('SELF RW').ok, false);
 const errors = [];
 new Compiler()._buildROM([{name: 'Other', rights: ['X']}],
     [{name: 'Other', authored_rights: ['R']}], errors);
-assert.ok(errors.some(e => /cannot redefine/.test(e.message)));
-console.log('PASS server compilation and save resolver agree on SELF; imported permissions are fixed');
+assert.ok(!errors.some(e => /cannot redefine/.test(e.message)),
+    'short-name upload metadata cannot establish foreign ownership');
+assert.match(Tokens.checkLeafOwnership(
+    {name: 'Other', canonical_leaf: 'global.remote.Other', rights: ['X']},
+    {node: 'global.local', definitions: {'global.remote.Other': ['R']}}).error,
+    /Foreign leaf/);
+console.log('PASS SELF remains E; foreign permissions require IDE-instance evidence');

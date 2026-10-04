@@ -1,17 +1,27 @@
 ---
 name: GT permission enforcement boundary
-description: Records that authored-permission policy belongs to runtime M-bit enforcement, not compilation.
+description: IDE-instance leaf ownership controls authored definitions; runtime M-bit operations are separate.
 ---
 
-At first definition of a Pet name, the defining programmer must establish its permissions; others cannot change that definition.
+Each IDE instance owns its leaves in the global dot.name hierarchy and may establish or change their permissions. Human users need not be identified. This supersedes the earlier human-ownership and universally frozen-owner-permissions assumptions.
 
-**Why:** The user explicitly stated that when a Pet name is first defined its permissions are fixed against changes by others. This is distinct from compiler-owned SELF, whose E permission is automatic.
+**Why:** The user explicitly confirmed IDE-instance ownership, including allowing the owning IDE's UART_TX RW declaration despite the historical W default. SELF remains compiler-owned E.
 
-**How to apply:** Preserve the original permission definition when other programmers reference the Pet name. Do not interpret the runtime-enforcement guidance below as permission to redefine another owner's declaration. Keep definition ownership separate from runtime operations on a GT.
+**How to apply:** Resolve ownership from the canonical global dot.name and trusted IDE hierarchy configuration, never short names, broad textual prefixes, human accounts, device defaults, mutable live grants, or client ownership claims. Foreign references preserve their definitions. Missing hierarchy configuration requires an actionable configuration error, not inferred ownership. Changes create ordinary new saved revisions; never rewrite history or implicitly install or change Namespace state.
 
-Permission changes to a register-held Golden Token are a runtime M-bit concern, but redefining a PetName's original permissions is not. The user's clarified definition-ownership rule supersedes the earlier blanket allowance for mismatched authored permissions at compile/save time. Reject conflicts with known definition evidence; do not infer definitions from mutable live Namespace grants. Permissionless Thread GTs remain valid for SWITCH/CHANGE. In `SWITCH CR12, Thread.1 ; CR6, #0`, the semicolon makes the remainder a comment: `Thread.1` is a pet name and must resolve through the active C-list to its current CR6 row.
+Keep provisioning simple: a server-managed IDE node assignment, not human sign-in or a new global registration service. An independent IDE needs a new assignment; tabs and restarts remain the same IDE.
 
-**Why:** Definition ownership and runtime authority are different boundaries. A register operation cannot authorize rewriting another programmer's definition, and a definition check must not ban legitimate runtime M-bit operations.
+**Why:** The user approved explicit IDE-node setup and asked to keep it simple. A locally chosen string is not proof of global hierarchy ownership; assignment remains the operator's responsibility.
+
+Permission changes to a register-held Golden Token are a runtime M-bit concern, distinct from changing a leaf definition on its owning IDE. Permissionless Thread GTs remain valid for SWITCH/CHANGE. In `SWITCH CR12, Thread.1 ; CR6, #0`, the semicolon makes the remainder a comment: `Thread.1` is a pet name and must resolve through the active C-list to its current CR6 row.
+
+Alias-key syntax and canonical hierarchy syntax are different contracts. Legacy Thread PetNames, including numeric and hash-separated instances, need exact configured aliases rather than fabricated canonical identities.
+
+**Why:** Applying canonical-path grammar to alias keys blocked legitimate permissionless Thread declarations and made their intended configuration workaround invalidate unrelated authoring.
+
+**How to apply:** Accept supported PetNames as alias keys while retaining strict canonical targets and exact-parent ownership. Test permissionless Thread references through actual compilation and saved-artifact publication, not just the policy helper.
+
+**Why:** Definition ownership and runtime authority are different boundaries. A register operation cannot authorize rewriting a foreign IDE's definition, and a definition check must not ban legitimate runtime M-bit operations.
 
 Pet-name resolution tests must establish the target's actual C-list binding from the saved artifact, not inject an assumed row. A configured Thread display name alone does not establish a C-list row. Do not infer that `Thread.1` universally means row 45.
 

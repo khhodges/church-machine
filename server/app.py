@@ -4475,6 +4475,15 @@ def _validate_step1(target_board, step1):
                 f"reserved for the namespace table)")
     return None
 
+@app.route("/api/ide-hierarchy", methods=["GET"])
+def get_ide_hierarchy():
+    from server.ide_leaf_policy import configuration
+    try:
+        return jsonify(configuration())
+    except ValueError as exc:
+        return jsonify(error=str(exc)), 422
+
+
 @app.route("/api/boot-config", methods=["GET"])
 def boot_config_get():
     # Returns the persisted project boot config, or `null` when none exists.
@@ -10924,14 +10933,16 @@ def _symbolic_declared_clist_rows(words, capabilities):
         self_row = row == 0 and declared.get("compiler_owned_self") is True
         if self_row and name in ("SELF", "__SELF__") and inner_name in ("SELF", "__SELF__"):
             name = inner_name = "SELF"
+        thread_name = isinstance(name, str) and re.fullmatch(
+            r"(?:Boot\.Thread|Thread[.#]\d+)", name, re.IGNORECASE)
         if (not isinstance(name, str) or name != inner_name
-                or not re.fullmatch(r"(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})", name)):
+                or not (thread_name or re.fullmatch(r"(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})", name))):
             continue
         if any(declared.get(key) != intrinsic.get(key) for key in (
-                "N", "T", "binary_hash", "identity_hash", "identity_string", "token")):
+                "N", "T", "binary_hash", "identity_hash", "identity_string", "token", "canonical_leaf")):
             continue
         rights, inner_rights = declared.get("rights"), intrinsic.get("rights")
-        if (not isinstance(rights, list) or not rights
+        if (not isinstance(rights, list) or (not rights and not thread_name)
                 or not isinstance(inner_rights, list)
                 or any(not isinstance(right, str) or right not in "RWXLSE" or len(right) != 1
                        for right in rights + inner_rights)
@@ -11107,6 +11118,8 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
         raise ValueError("IDX1 browser candidate must be assembly")
     compile_input = {"source": source,
                      "language": "assembly" if execution is not None else "auto", "tier": 2}
+    from server.ide_leaf_policy import configuration as _ide_configuration
+    compile_input["_ide_hierarchy"] = _ide_configuration()
     if execution is not None:
         compile_input["isa_profile"] = "IDX1"
     compiled = run_compile(compile_input)
@@ -11169,7 +11182,7 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
                 raise ValueError("IDX1 capability rights must be strings")
             result.append((name, sorted(set(rights)), {
                 key: cap[key] for key in ("N", "T", "token", "binary_hash",
-                                         "identity_hash", "identity_string") if key in cap
+                                         "identity_hash", "identity_string", "canonical_leaf") if key in cap
             }))
         return result
 
@@ -13212,6 +13225,15 @@ def save_lump():
                 "committed": False,
                 "safe_retry": True,
             }), 422
+    # Inspect exact binary declarations; client metadata cannot bypass ownership.
+    try:
+        from server.ide_leaf_policy import validate as _validate_leaf_ownership
+        _leaf_api = (_parse_intrinsic_lump_content(_sl_words) or {}).get("api_definition") or {}
+        _leaf_caps = _leaf_api.get("capabilities") or metadata.get("capabilities") or []
+        _validate_leaf_ownership(_leaf_caps)
+    except (ValueError, OSError, subprocess.SubprocessError) as exc:
+        return jsonify(error=f"Leaf permission validation failed: {exc}",
+                       capability_validation_failed=True, committed=False), 422
     _declared_caps_raw = metadata.get("capabilities", [])
     if _declared_caps_raw is None:
         _declared_caps_raw = []
@@ -21635,6 +21657,11 @@ def api_compile():
     _call_api_authorities = _compile_call_api_authorities(
         body.get("call_api_bindings"))
     body["_resolved_call_api_authorities"] = _call_api_authorities
+    from server.ide_leaf_policy import configuration as _ide_configuration
+    try:
+        body["_ide_hierarchy"] = _ide_configuration()
+    except ValueError as exc:
+        return jsonify(ok=False, error=str(exc), unchanged_data=True), 200
     result = run_compile(body)
     if isinstance(result, dict):
         result = dict(result)
@@ -21650,9 +21677,12 @@ def api_compile():
         try:
             from server.compile_reference_verification import verify_pinned_references, UnsupportedReferenceError
             _reference_api = (_parse_intrinsic_lump_content(_compile_words) or {}).get("api_definition") or {}
+            from server.ide_leaf_policy import validate as _validate_leaf_ownership
+            result["leaf_ownership"] = _validate_leaf_ownership(
+                _reference_api.get("capabilities") or [])
             result["verified_references"] = verify_pinned_references(
                 _reference_api.get("capabilities") or [], LUMPS_DIR)
-        except (OSError, ValueError, TypeError) as exc:
+        except (OSError, ValueError, TypeError, subprocess.SubprocessError) as exc:
             return jsonify({
                 "ok": False, "error": f"Reference verification failed: {exc}",
                 "unchanged_data": True,

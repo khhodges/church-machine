@@ -1430,25 +1430,9 @@ class CLOOMCCompiler {
                 ? { ...cap, name: cap.target } : cap;
         const source = Array.from(declaredCaps || [], normalize);
         const uploaded = Array.from(uploadCaps || [], normalize);
-        // An exact imported definition owns its declared permissions. A local
-        // reference cannot redefine them. Unbound symbolic declarations remain
-        // valid; mutable live Namespace grants are not definition evidence.
-        if (outErrors) {
-            for (const cap of source) {
-                const definition = uploaded.find(item => nameOf(item) === nameOf(cap) &&
-                    item && (Array.isArray(item.authored_rights) ||
-                        ((item.identity_hash || item.binary_hash || concrete(item)) &&
-                            Array.isArray(item.rights))));
-                if (!definition || nameOf(cap) === '__SELF__') continue;
-                const canonical = rights => [...new Set((rights || [])
-                    .flatMap(value => String(value).toUpperCase().split('')))].sort().join('');
-                const definedRights = definition.authored_rights || definition.rights;
-                if (canonical(cap.rights) !== canonical(definedRights)) {
-                    outErrors.push({ line: 1, col: 0, endCol: 0,
-                        message: `Capability "${cap.name}" cannot redefine its owner's permissions (${canonical(definedRights) || 'none'}).` });
-                }
-            }
-        }
+        // Imported metadata is not IDE ownership evidence. The shared leaf
+        // policy runs at the server compile/save boundary with trusted hierarchy
+        // configuration, never against a short-name upload or live grants.
         // Concrete input is an existing layout, not a bag of name metadata.
         // Otherwise source order wins, with upload-only rows appended. Decide
         // ownership before enrichment, never from merged token fields.

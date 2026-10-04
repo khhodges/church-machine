@@ -1,0 +1,10 @@
+{
+  "node": "org.lab.ide1",
+  "aliases": {
+    "UART_TX": "org.lab.ide1.UART_TX",
+    "RemoteUART": "org.lab.ide2.UART_TX"
+  },
+  "definitions": {
+    "org.lab.ide2.UART_TX": ["W"]
+  }
+}

@@ -17034,7 +17034,7 @@ async function confirmSaveToNamespace() {
             }
             _caps = _fallbackMaterialized.resolvedCaps.map(function(cap) {
                 return {
-                    ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+                    ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token', 'canonical_leaf']
                         .filter(key => typeof cap[key] === 'string').map(key => [key, cap[key]])),
                     name: cap.name,
                     rights: cap.rights.slice(),

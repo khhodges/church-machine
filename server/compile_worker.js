@@ -213,6 +213,19 @@ if (isMainThread) {
         }
     }
 
+    // Private server configuration is injected by /api/compile, not accepted
+    // from browser ownership claims. Persist resolved names in the binary.
+    if (Object.prototype.hasOwnProperty.call(payload, '_ide_hierarchy')) {
+        const policy = require(path.join(SIM_DIR, 'capability_tokens.js'));
+        for (const cap of compileResult.capabilities || []) {
+            const decision = policy.checkLeafOwnership(cap, payload._ide_hierarchy);
+            if (decision.error) {
+                compileResult.errors = [...(compileResult.errors || []),
+                    { line: 0, message: decision.error }];
+            } else if (decision.canonical) cap.canonical_leaf = decision.canonical;
+        }
+    }
+
     // ── Compile errors ────────────────────────────────────────────────────────
     const errors   = compileResult.errors   || [];
     const warnings = compileResult.warnings || [];
@@ -325,7 +338,7 @@ if (isMainThread) {
     const capabilities = (compileResult.capabilities || []).map((cap, row) => ({
         name: String(cap && cap.name || ''),
         rights: Array.isArray(cap && cap.rights) ? cap.rights.slice() : [],
-        ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+        ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token', 'canonical_leaf']
             .filter(key => cap && typeof cap[key] === 'string').map(key => [key, cap[key]])),
         relocation_row: row,
         compiler_owned_self: !!(cap && cap.compiler_owned_self),

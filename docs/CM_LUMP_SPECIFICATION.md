@@ -56,25 +56,57 @@ binary-and-metadata requirement, not a console-formatting convention.
 
 #### Permission definition and SELF ownership
 
-- The defining programmer establishes a PetName's permissions at its first
-  definition. A reference by another programmer cannot redefine those rights.
-  Preserve the definition's rights and identity together; changing a local
-  reference is not authorization to modify its owner.
+- Each IDE instance owns its leaf nodes in the global dot.name hierarchy.
+  The owning IDE may establish and change their permissions. No human-user
+  identity is required. This replaces the earlier human-ownership and frozen
+  owner-permissions assumptions.
 - SELF is the exception to programmer-specified permissions: it is the
   compiler-owned row-zero owner capability and always has exactly **E**.
   `SELF` alone is sufficient source. `SELF E` remains compatible.
   Explicit overrides such as `SELF RW` are compile errors, not successful
   candidates that fail only when saved. The historical spelling `__SELF__`
   follows the same rule.
-- New symbolic references may still name an object that has not yet been
-  created. Do not invent permission definitions from current Namespace state.
-  When an imported definition supplies authored rights, compilation must reject
-  a conflicting declaration. Save materialization checks known authored rights
-  from the catalog and fixed device definitions.
+- New local symbolic references may name objects not yet created. Ownership
+  comes from the exact canonical leaf's parent and trusted IDE-node configuration,
+  not short PetNames, imported metadata, textual prefixes, Namespace grants,
+  or hardcoded device defaults. In particular UART_TX W is not ownership evidence:
+  its owning IDE can declare UART_TX RW. Foreign references must preserve the
+  trusted foreign definition.
 - These are declaration rules, not changes to runtime M-bit operations. Runtime
   manipulation of a register-held GT does not redefine the original PetName.
 - Existing saved and historical binaries remain immutable. Validation must not
   silently rewrite their SELF words or permissions to repair old artifacts.
+
+#### Simple IDE-node provisioning
+
+Before authoring, the operator provisions `server/ide-hierarchy.json` on the
+server using `server/ide-hierarchy.example.json` as a schema example. Replace
+the example names with the node assigned by the parent hierarchy; this file
+does not register a global name or prove a self-claimed assignment.
+
+- `node`: exact IDE hierarchy path.
+- `aliases`: optional exact PetName-to-canonical-leaf mappings, especially for imports.
+- `definitions`: trusted foreign canonical leaf-to-permission-array mappings.
+
+An unaliased single-component PetName resolves to `node.PetName`; dotted names
+are absolute. Local ownership requires the leaf's **exact parent** to equal
+`node`, not merely start with it. Relative dotted legacy names need explicit
+aliases. Alias keys use PetName syntax, including `Thread.1`, `Thread#1`, and
+`Boot.Thread`; alias targets remain canonical hierarchy paths. For example,
+`"Thread.1": "global.local.Thread1"` preserves a permissionless Thread reference
+without treating the short spelling as ownership evidence. A foreign Thread
+requires its exact trusted definition (an empty array for no permissions), and
+cannot acquire permissions through its alias. Names are case-sensitive. New compilations embed `canonical_leaf`
+alongside the local PetName, so another IDE cannot acquire ownership by importing
+the artifact. Explicit immutable N identities take precedence and must agree.
+
+The file is server-managed, ignored by Git, and not writable through the browser.
+An independent cloned IDE needs its own assignment; tabs and restarts do not
+create new IDEs. Missing or malformed configuration fails authoring with an
+actionable configuration error. The compile endpoint overwrites client-supplied
+configuration, and Save independently checks the binary's embedded declarations.
+Permission changes use normal saved revisions: no history rewrite, Namespace
+installation, hardware upload, or runtime M-bit change is implied.
 
 Compilation and Save LUMP must not require referenced objects to be installed,
 assigned, or resident in any local Namespace. Necessary referenced API/type and

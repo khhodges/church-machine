@@ -235,7 +235,7 @@ function buildApiDefinition(result, words) {
         capabilities: (result.capabilities || []).map(cap => ({
             name: cap.name || '',
             rights: Array.isArray(cap.rights) ? cap.rights.slice() : [],
-            ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token']
+            ...Object.fromEntries(['N', 'T', 'binary_hash', 'identity_hash', 'identity_string', 'token', 'canonical_leaf']
                 .filter(key => typeof cap[key] === 'string').map(key => [key, cap[key]])),
         })),
     };
