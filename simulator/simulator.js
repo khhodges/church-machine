@@ -5208,9 +5208,11 @@ class ChurchSimulator {
         return true;
     }
 
-    _readThreadResumeFrame(threadBase, layout, threadSlot) {
-        const protectedState = this._unpackProtectedIndicator(
-            this.memory[threadBase + THREAD_STO_OFFSET] >>> 0);
+    _readThreadResumeFrame(threadBase, layout, threadSlot, staged = null) {
+        const protectedState = staged
+            ? {sto: staged.savedSTO - 2, sz: 1}
+            : this._unpackProtectedIndicator(
+                this.memory[threadBase + THREAD_STO_OFFSET] >>> 0);
         const frameBase = protectedState.sto;
         if (protectedState.sz !== 1 ||
                 frameBase < layout.stackStart - 1 ||
@@ -5219,8 +5221,8 @@ class ChurchSimulator {
                 `CHANGE Thread slot ${threadSlot}: invalid CHURCH frame STO ${frameBase}`);
             return null;
         }
-        const enterGT = this.memory[threadBase + frameBase + 1] >>> 0;
-        const packedWord = this.memory[threadBase + frameBase + 2] >>> 0;
+        const enterGT = staged ? staged.enterGT : this.memory[threadBase + frameBase + 1] >>> 0;
+        const packedWord = staged ? staged.frameWord : this.memory[threadBase + frameBase + 2] >>> 0;
         let parsed;
         try {
             parsed = this.parseGT(enterGT);
@@ -8688,12 +8690,9 @@ class ChurchSimulator {
         }
         const targetIdx = threadCheck.index;
         const entry = threadCheck.entry;
-        if (this._liveThreadOwned && targetIdx === this._currentThreadSlot) {
-            this.fault('TYPE', 'CHANGE target is the active Thread, not a dormant incoming context');
-            return null;
-        }
+        const selfTarget = this._liveThreadOwned && targetIdx === this._currentThreadSlot;
         const threadSwitch = true;
-        // ── Thread CHANGE: dormant Thread entry ───────────────────────────────────
+        // ── Thread CHANGE: incoming context (including the running Thread) ────────
         // DR0–DR15 and CR0–CR11 live in fixed homes. Resume identity, NIA,
         // flags, and STO come only from the canonical CHURCH frame.
         if (!threadSwitch) this._flushLambdaCache();
@@ -8714,9 +8713,20 @@ class ChurchSimulator {
         }
         const tBase = entry.word0_location;
         const threadSeq = this.parseNSWord1(entry.word1_limit).gtSeq;
+        // Validate the would-be suspension without writing it: self CHANGE
+        // restores the current continuation, never the older dormant snapshot.
+        let selfSuspend = null;
+        if (selfTarget) {
+            selfSuspend = this._prepareThreadSuspendFrame(
+                tBase, targetLayout, targetIdx, continuationPC);
+            if (!selfSuspend) return null;
+            selfSuspend.frameWord = this._packFrameWord(
+                continuationPC, 1, selfSuspend.savedSTO);
+        }
         const restoredRegs = [];
         for (let i = 0; i < 12; i++) {
-            const gtWord = this.memory[tBase + targetLayout.capsStart + i] >>> 0;
+            const gtWord = selfTarget ? this.cr[i].word0 >>> 0
+                : this.memory[tBase + targetLayout.capsStart + i] >>> 0;
             if (gtWord === 0 || ChurchSimulator.isNullGT(gtWord)) {
                 restoredRegs[i] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
                 continue;
@@ -8747,7 +8757,7 @@ class ChurchSimulator {
                 `CHANGE restore CR5 heap GT for Thread slot ${targetIdx}: ${heapCheck.message}`);
             return null;
         }
-        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx);
+        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend);
         if (!resume) return null;
         // Validate the actual C-List backing the saved executable context before
         // suspending the outgoing Thread or publishing any incoming registers.
@@ -8816,7 +8826,7 @@ class ChurchSimulator {
                 this.fault('BOUNDS', `CHANGE: outgoing Thread slot ${outSlot} has invalid Thread geometry`);
                 return null;
             }
-            const suspend = this._prepareThreadSuspendFrame(
+            const suspend = selfSuspend || this._prepareThreadSuspendFrame(
                 outBase, outLayout, outSlot, continuationPC);
             if (!suspend) return null;
             outgoingPrepared = {

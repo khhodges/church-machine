@@ -3373,8 +3373,8 @@ function _instrSymbolicMeaning(decoded) {
         case 'RETURN':
             return 'Return using the saved frame; keep mask 0x' + (imm & 0xFFF).toString(16).toUpperCase() + ': CR0–CR4/CR7–CR11 set bits prevent clearing, zero bits clear; CR5 descriptor unchanged; CR6 always reconstructed. M boundary rules still apply.';
         case 'CHANGE':
-            return 'CHANGE CR' + dst + ' through CR' + src + '[' + imm + '] if authorized; ' +
-                (dst < 12 ? 'PRIV_REG fault if executed.' : dst >= 14 ? 'Thread-context switch.' : 'system capability load.');
+            return 'CHANGE using the permissionless Thread GT held in CR' + dst +
+                '; save the running Thread and restore the target Thread. Self-target resumes after CHANGE; no operand M-bit required.';
         case 'SWITCH':
             return 'Isolated-register LOAD into CR' + dst + ' from CR' + src + ', C-list row #' + imm + '; destination M authorizes access and is consumed on success.';
         case 'TPERM':

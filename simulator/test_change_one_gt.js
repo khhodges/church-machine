@@ -114,9 +114,34 @@ rejects('wrong C-List SELF identity', f => {
 rejects('C-List geometry mismatch', f => {
     f.sim.memory[f.incoming.base] = f.sim.packLumpHeader(0, 3, 0, 0);
 }, /C-List.*geometry/);
-rejects('self activation cannot restore a stale dormant frame', f => {
+for (const register of [12, 13]) {
+    test(`self CHANGE CR${register} restores the new continuation without M authority`, () => {
+        const {sim, slots, gt} = fixture();
+        sim.memory[4097] = assemble(`CHANGE CR${register}`)[0];
+        sim.cr[register].word0 = gt(slots[0]);
+        sim.cr[register].m = 0;
+        const sto = sim.sto, flags = {...sim.flags};
+        const caps = sim.cr.slice(0, 5).map(r => r.word0);
+        for (let repeat = 0; repeat < 5; repeat++) {
+            sim.pc = 0;
+            sim.dr[1] = 101 + repeat;
+            assert(sim.step(), JSON.stringify(sim.faultLog));
+            assert.equal(sim.pc, 1);
+            assert.equal(sim.sto, sto);
+            assert.deepEqual(sim.flags, flags);
+            assert.equal(sim.dr[1], 101 + repeat);
+            assert.deepEqual(sim.cr.slice(0, 5).map(r => r.word0), caps);
+            assert.equal(sim._currentThreadSlot, slots[0]);
+        }
+        assert(sim.step());
+        assert.equal(sim.dr[2], 303);
+        assert.deepEqual(sim.faultLog, []);
+    });
+}
+rejects('self CHANGE still rejects invalid current C-List atomically', f => {
     f.sim.cr[13].word0 = f.gt(f.slots[0]);
-}, /active Thread/);
+    f.sim.memory[4096 + 63] = 0;
+}, /C-List SELF/);
 rejects('unexpected validation error becomes a hard fault', f => {
     f.sim._readThreadResumeFrame = () => { throw new Error('injected frame validation error'); };
 }, /injected frame validation error/);

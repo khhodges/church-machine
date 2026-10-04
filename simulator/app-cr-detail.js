@@ -2455,7 +2455,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
         return out(`${crDst === 6 ? `recall${cc} self` : `call${cc} CR${crDst}`}, method #${imm}`);
     }
     if (opcode === 3) return out(`return${cc} with mask 0x${(imm & 0xFFF).toString(16).toUpperCase()} (CR0–CR11: set bits keep callee values; clear bits restore caller values)`);
-    if (opcode === 4) return out(`change${cc} CR${crDst}, CR${crSrc}[${imm}] if authorized${crDst < 12 ? ' [PRIV_REG fault if executed]' : crDst >= 14 ? '; Thread-context switch' : '; system capability load'}`);
+    if (opcode === 4) return out(`change${cc} using the permissionless Thread GT held in CR${crDst}; save the running Thread and restore the target Thread; self-target resumes after CHANGE; no operand M-bit required`);
     if (opcode === 7) return out(`lambda${cc} enter reduction using CR${crDst} if authorized; CR${crDst} is not overwritten`);
     if (opcode === 6) {
         if (imm === 0x7FFF) return out(`tperm${cc} attenuate CR${crDst} to permissions in CR${crSrc} if subset; no expansion [Z=success, N=!Z; C,V=0]`);

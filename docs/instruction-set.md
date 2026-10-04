@@ -38,6 +38,11 @@ Namespace-slot operand, or implicit `[0]` lookup. CHANGE is not a protected
 instruction; CR13 must not be rejected while CR12 is specially exempted.
 Capability and Thread-context validation remain execution concerns.
 
+Self-target CHANGE is valid, including `CHANGE CR12` when CR12 identifies the
+running Thread. Save and restore the newly captured continuation and resume
+after CHANGE; do not restore an older dormant snapshot or accumulate frames.
+Neither CR12.M nor CR13.M is required merely to supply the operand GT.
+
 **Thread GT permissions and microcode authority:** The GT supplied for a valid
 CHANGE has **no permissions**. This deliberately prevents programmer access to
 the protected Thread state through that GT. CHANGE performs its save/restore

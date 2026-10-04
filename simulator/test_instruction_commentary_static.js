@@ -14,6 +14,12 @@ const word = (op, dst = 1, src = 1, imm = 0, cond = 14) =>
 const decode = (op, dst, src, imm, cond) =>
     context._decompileWord(word(op, dst, src, imm, cond), 99, 7, 100, {1:'staleLED'}, null);
 const text = (...args) => decode(...args).desc;
+for (const register of [12, 13]) {
+    const explanation = text(4, register, register, 0);
+    assert(explanation.includes(`Thread GT held in CR${register}`));
+    assert(explanation.includes('self-target resumes after CHANGE'));
+    assert(!/\[0\]|system capability load|PRIV_REG/.test(explanation));
+}
 for (let op = 0; op < 31; op++) {
     assert.equal(decode(op).kind, 'static', `opcode ${op}`);
     for (let cond = 0; cond < 16; cond++) {
@@ -52,14 +58,19 @@ assert(text(2,1,6,(3 << 5) | 7).includes('CR6[0x0007], method #3'));
 assert(text(3,0,0,0x7FFF).includes('mask 0xFFF'));
 assert(text(3).includes('set bits keep callee'));
 assert(text(6,1,2,0).includes('not permission removal'));
-assert(text(6,1,2,14).includes('BIND'));
+const exact = text(6,1,2,14);
+assert(exact.includes('EXACT'));
+assert(exact.includes('CR1.GT with CR2.GT'));
+assert(exact.includes('match Z=1, mismatch Z=0, no fault'));
+assert(!exact.includes('BIND'));
 assert(text(6,1,2,13).includes('FRAME'));
 assert(text(6,1,2,0x7FFF).includes('no expansion'));
 assert(text(6,1,2,15).includes('reserved'));
 assert(text(8,1,6,(7 << 5) | 3).includes('CR6[3]'));
 assert(text(8,1,6,(7 << 5) | 3).includes('method #7'));
 assert(text(5,15,15,0).includes('M required')); // not an assumed no-op
-assert(text(4,1,6,0).includes('PRIV_REG'));
+assert(text(4,1,1,0).includes('Thread GT held in CR1'));
+assert(!text(4,1,1,0).includes('PRIV_REG'));
 assert.equal(context._decompileWord(0), null);
 assert.equal(context._decompileWord(0xF8000000), null);
 const lumps = fs.readFileSync(__dirname + '/app-lumps.js', 'utf8');
