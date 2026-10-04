@@ -54,3 +54,14 @@ appear to request unrelated source changes even after its first review.
 **How to apply:** Stage dependent effects before one complete review, retain
 request/session/state-bound validation at commit, and stop on unexpected changes.
 Never replace the repeated dialogs with a blanket security exemption.
+
+After merged confirmation-policy changes, verify the running server has loaded
+them before changing the policy again.
+
+**Why:** A merged read-only upgrade-check exemption was present on disk while
+the existing Python process still returned HTTP 428. Restarting the IDE server
+made the same check return the expected upgrade choices without policy edits.
+
+**How to apply:** Compare the live response with the current route classification;
+restart the managed workflow when they disagree, then verify a non-mutating
+request. Do not weaken the actual save confirmation to fix stale runtime code.
