@@ -4189,7 +4189,7 @@ function updateNamespace() {
     const _cntFree = _nsSnapshot.counts.free;
     const _statChip = (label, val, color, title) =>
         `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 7px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);font-size:0.72rem;white-space:nowrap;" title="${title}"><span style="color:${color};font-weight:600;">${label}</span><span style="color:#ccc;">${val}</span></span>`;
-    let html = '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 4 words per entry (128 bits; word3 reserved) \u2014 click a row to inspect memory</div>';
+    let html = '';
     html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
     html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Total NS slots available in this boot image');
     html += _statChip('Assigned', _nsSnapshot.counts.assigned, '#a0c0e0', 'Approved assignments and explicit local drafts; not proof of image installation');
@@ -4199,8 +4199,6 @@ function updateNamespace() {
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace rows only; built images and simulation remain unchanged">\u{1F4BE} Save Namespace Table</button>`;
-    if (window.SimulationPreparation) html += '<details id="simulationAdvanced" style="flex-basis:100%;padding:8px 0"><summary style="cursor:pointer">Advanced — Simulation configuration</summary><p>Optional private configuration review. To run the saved image, use Run; these steps are not required.</p><section id="simulationPreparationPanel">' + window.SimulationPreparation.markup() + '</section></details>';
-    html += '<div id="nsSaveLayoutNote" style="flex-basis:100%;font-size:0.72rem;color:#aaa;padding:2px 0;">Save checks changed physical allocations against the current Namespace before committing. Unchanged legacy problems remain inspectable. It does not relocate entries, rebuild an image, or activate simulation.</div>';
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
     html += '</div>';
     // Bank custody status deliberately projects no raw NS slot, address,
@@ -4663,6 +4661,9 @@ function updateNamespace() {
     }
 
     html += '</tbody></table>';
+    html += '<div class="ns-layout-header">NS_ENTRY_LAYOUT: 4 words per entry (128 bits; word3 reserved) \u2014 click a row to inspect memory</div>';
+    html += '<div id="nsSaveLayoutNote" style="font-size:0.72rem;color:#aaa;padding:8px 0;" role="status">Save checks changed physical allocations against the current Namespace before committing. Unchanged legacy problems remain inspectable. It does not relocate entries, rebuild an image, or activate simulation.</div>';
+    if (window.SimulationPreparation) html += '<details id="simulationAdvanced" style="padding:8px 0"><summary style="cursor:pointer">Advanced — Simulation configuration</summary><p>Optional private configuration review. To run the saved image, use Run; these steps are not required.</p><section id="simulationPreparationPanel">' + window.SimulationPreparation.markup() + '</section></details>';
     container.innerHTML = html;
     _initNSBolt();
     // Restore dirty indicator after re-render (innerHTML wipes the previous button state)

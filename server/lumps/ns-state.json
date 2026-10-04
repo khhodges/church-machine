@@ -111,28 +111,28 @@
     },
     {
       "artifact_pin": {
-        "filename": "CapabilityTest.1.ff2e3f35.lump",
-        "revision": 39,
-        "token": "a207ecd1"
+        "filename": "CapabilityTest.1.68be391a.lump",
+        "revision": 42,
+        "token": "39700a92"
       },
-      "binary_hash": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "binary_hash": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
       "boot": true,
       "boot_resident": true,
       "f": 0,
-      "filename": "CapabilityTest.1.ff2e3f35.lump",
+      "filename": "CapabilityTest.1.68be391a.lump",
       "g": 0,
       "issue_n": 1,
       "limit": "0x003F4",
       "load_policy": "Resident",
       "location": "0x00000590",
-      "lump_version": 39,
+      "lump_version": 42,
       "name": "CapabilityTest",
       "ns_slot_policy": "static",
       "resident": true,
       "seal": "0xDED1F6EF",
       "seq": 0,
       "slot": 10,
-      "token": "a207ecd1",
+      "token": "39700a92",
       "type": "Inform"
     },
     {

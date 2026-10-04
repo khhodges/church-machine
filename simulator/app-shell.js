@@ -2744,8 +2744,8 @@ function switchView(viewId) {
         updateNamespace();
         if (typeof refreshBootCapacity === 'function') refreshBootCapacity();
         setTimeout(function() {
-            const top = document.getElementById('bootCapacityPanel') ||
-                document.getElementById('namespaceTable');
+            const top = document.getElementById('namespaceTable') ||
+                document.getElementById('bootCapacityPanel');
             if (top) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 80);
     }
