@@ -90,23 +90,28 @@
       "type": "Inform"
     },
     {
-      "binary_hash": "49bda45936d9bc4a668814a35f49174969a02f881ee7c8a4aadd9692a15c4283",
+      "artifact_pin": {
+        "filename": "WukongCallHome.1.b29b38e3.lump",
+        "revision": 17,
+        "token": "313e637c"
+      },
+      "binary_hash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
       "boot_resident": true,
       "f": 0,
-      "filename": "WukongCallHome.1.7fe59019.lump",
+      "filename": "WukongCallHome.1.b29b38e3.lump",
       "g": 0,
       "issue_n": 1,
       "limit": "0x003FC",
       "load_policy": "Resident",
       "location": "0x00000910",
-      "lump_version": 16,
+      "lump_version": 17,
       "name": "WukongCallHome",
       "ns_slot_policy": "static",
       "resident": true,
       "seal": "0xDED6B6EF",
       "seq": 0,
       "slot": 7,
-      "token": "4a000007",
+      "token": "313e637c",
       "type": "Inform"
     },
     {
