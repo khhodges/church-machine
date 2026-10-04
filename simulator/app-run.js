@@ -1540,6 +1540,7 @@ function openThreadContextModal(slot, origin) {
         </dl>
         <p id="threadContextDisabledReason" class="thread-context-reasons" aria-live="polite"></p>
         <footer>
+          <button type="button" id="threadContextInspect" class="btn btn-secondary" title="View Thread memory without changing execution">Inspect Only</button>
           <button type="button" id="threadContextRun" class="btn btn-success">Run</button>
           <button type="button" id="threadContextStop" class="btn btn-danger">Stop</button>
           <button type="button" id="threadContextReset" class="btn btn-warning">Reset Thread</button>
@@ -1567,6 +1568,7 @@ function openThreadContextModal(slot, origin) {
             }
         }
     });
+    document.getElementById('threadContextInspect').addEventListener('click', inspectThreadFromModal);
     document.getElementById('threadContextRun').addEventListener('click', runThreadFromModal);
     document.getElementById('threadContextStop').addEventListener('click', stopThreadFromModal);
     document.getElementById('threadContextReset').addEventListener('click', resetThreadFromModal);
@@ -1577,6 +1579,14 @@ function openThreadContextModal(slot, origin) {
 function openActiveThreadContextModal(origin) {
     if (!sim || typeof sim.activeThreadStatus !== 'function') return;
     openThreadContextModal(sim.activeThreadStatus().slot, origin);
+}
+
+function inspectThreadFromModal() {
+    const row = _threadModalRow();
+    if (!row) return;
+    const slot = row.slot;
+    closeThreadContextModal();
+    _showNSThreadModal(slot);
 }
 
 function closeThreadContextModal(restoreFocus = true) {

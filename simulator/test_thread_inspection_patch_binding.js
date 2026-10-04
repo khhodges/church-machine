@@ -181,4 +181,20 @@ assert(runSource.includes('LIVE — machine register context') &&
 assert(runSource.includes('threadContextObservation'),
     'Thread inspection modal renders an explicit observation source');
 
+assert(runSource.includes('id="threadContextInspect"') &&
+    runSource.includes("'click', inspectThreadFromModal"),
+    'Inspect Only button is wired');
+const inspectActions = [];
+const inspectSandbox = vm.createContext({
+    _threadModalRow: () => ({slot: 11}),
+    closeThreadContextModal: () => inspectActions.push('close'),
+    _showNSThreadModal: slot => inspectActions.push(['inspect', slot]),
+    sim: new Proxy({}, {get() { throw new Error('inspection accessed execution controls'); }}),
+});
+vm.runInContext(extractFunction(runSource, 'inspectThreadFromModal'), inspectSandbox);
+vm.runInContext('inspectThreadFromModal()', inspectSandbox);
+assert.deepEqual(inspectActions, ['close', ['inspect', 11]]);
+inspectSandbox._threadModalRow = () => null;
+vm.runInContext('inspectThreadFromModal()', inspectSandbox);
+assert.equal(inspectActions.length, 2, 'missing Thread does not redirect inspection');
 console.log('PASS Thread inspection and patch-target binding');
