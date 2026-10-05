@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
 import subprocess
@@ -280,12 +281,25 @@ def _write_generated_provenance(directory, image, config):
 
 def _validate_stage(directory):
     """Validate the exact catalog and boot graph before publication."""
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from server.approval_retention_audit import documented_approval_deletion
+
     for path in directory.iterdir():
         if path.is_symlink() and not path.exists():
             raise ValueError(f"broken symlink in bootstrap catalog: {path.name}")
     manifest = json.loads((directory / "manifest.json").read_text())
     state = json.loads((directory / "ns-state.json").read_text())
-    approvals = json.loads((directory / "approvals.json").read_text()).get("approvals", {})
+    envelope = json.loads((directory / "approvals.json").read_text())
+    if not isinstance(envelope, dict) or not isinstance(envelope.get("approvals"), dict):
+        raise ValueError("approvals.json has no approvals map")
+    approvals = envelope["approvals"]
+    for digest, record in approvals.items():
+        if not re.fullmatch(r"[0-9a-f]{64}", digest) or not isinstance(record, dict):
+            raise ValueError("approval must have an exact SHA-256 key and object record")
+        if any(value != digest for field, value in record.items()
+               if field == "binary_hash" or field.endswith("_binary_hash")):
+            raise ValueError(f"approval binary hash does not match its key: {digest}")
     selected = {}
     for name, (slot, expected_gt) in RESIDENTS.items():
         rows = [row for row in state.get("abstractions", []) if row.get("name") == name
@@ -324,8 +338,11 @@ def _validate_stage(directory):
         selected[name] = (row, raw, alloc, cc)
     body_digests = {hashlib.sha256(path.read_bytes()).hexdigest()
                     for path in directory.glob("*.lump") if path.is_file()}
-    if set(approvals) - body_digests:
-        raise ValueError("approval without current or archived binary")
+    for digest in set(approvals) - body_digests:
+        if not documented_approval_deletion(directory, digest, approvals[digest], manifest):
+            raise ValueError(
+                f"approval without current or archived binary or exact completed "
+                f"historical-deletion evidence: {digest}")
 
     # generate_boot_image has already validated structural descriptors; inspect
     # its serialized W3 and boot continuation graph independently here.
