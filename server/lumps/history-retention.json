@@ -53,6 +53,15 @@
       "dereferenced_binary_hash": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
       "preserved_alias_routes": [],
       "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    },
+    {
+      "version": 31,
+      "filename": "CapabilityTest_v31.lump",
+      "binary_hash": "5ade31ec3dff80e622242d889566d24ce301a43ce69c6597669fa9bff9e0e4d3",
+      "deleted_at": 1791212837.607906,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": true,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
     }
   ],
   "4a000006": [
@@ -73,6 +82,62 @@
         }
       ],
       "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    },
+    {
+      "version": 97,
+      "filename": "SelfTest_v97.lump",
+      "binary_hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "deleted_at": 1791212837.77667,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": true,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 80,
+      "filename": "SelfTest.80.f37bafd6.lump",
+      "binary_hash": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "deleted_at": 1791212838.0874584,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": false,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 84,
+      "filename": "SelfTest.84.f37bafd6.lump",
+      "binary_hash": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "deleted_at": 1791212838.3801272,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": false,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 86,
+      "filename": "SelfTest.86.f37bafd6.lump",
+      "binary_hash": "efa0e4323679355a530f0ce9bcf8cf19f962204bba7a45b543ca308f1ece17d7",
+      "deleted_at": 1791212838.6879458,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": false,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    }
+  ],
+  "4a000007": [
+    {
+      "version": 13,
+      "filename": "WukongCallHome_v13.lump",
+      "binary_hash": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+      "deleted_at": 1791212837.8863118,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": true,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 14,
+      "filename": "WukongCallHome_v14.lump",
+      "binary_hash": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+      "deleted_at": 1791212837.9809573,
+      "trigger": "explicit-user-approved-history-deletion",
+      "previously_listed": true,
+      "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
     }
   ]
 }
