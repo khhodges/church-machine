@@ -39,6 +39,17 @@ permanently exempt otherwise-expired archives from the approved policy.
 reference roots. Frozen selections and retained artifact inventories still
 protect the exact binaries they name.
 
+Approval-to-binary consistency must recognize exact completed historical
+deletions without treating the ledger as a general missing-file exemption.
+
+**Why:** Retaining approvals after authorized archive deletion is intentional;
+requiring every audit digest to retain physical bytes contradicts that policy.
+
+**How to apply:** Require the approval's exact filename and SHA-256 in completed
+deletion evidence. Pending intent is not completion, and neither historical
+evidence nor a shared digest excuses loss of a live or selected artifact.
+Keep approval structure and hash-field validation independent of this exception.
+
 Explicit single-revision deletion is exempt from age and newest-version policy,
 but never from reference, link, approval-evidence, or recovery protections.
 
