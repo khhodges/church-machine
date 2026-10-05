@@ -1,0 +1,78 @@
+{
+  "00aa1234": [
+    {
+      "version": 405,
+      "filename": "Adder.1.e437ee2c.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1791212222.3545372,
+      "trigger": "explicit-user-approved-symlink-removal",
+      "removed_symlink_target": "Adder.1.0f63efe0.lump",
+      "dereferenced_binary_hash": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21",
+      "preserved_alias_routes": [
+        {
+          "filename": "Adder.1.3c5784bc.lump",
+          "old_target": "Adder.1.2009489d.lump",
+          "new_target": "Adder.1.0f63efe0.lump",
+          "resolved_hash": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21"
+        },
+        {
+          "filename": "Adder.1.2009489d.lump",
+          "old_target": "Adder.1.e437ee2c.lump",
+          "new_target": "Adder.1.0f63efe0.lump",
+          "resolved_hash": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21"
+        },
+        {
+          "filename": "Adder.1.13ec2f50.lump",
+          "old_target": "Adder.1.e437ee2c.lump",
+          "new_target": "Adder.1.0f63efe0.lump",
+          "resolved_hash": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21"
+        }
+      ],
+      "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    }
+  ],
+  "4a00000a": [
+    {
+      "version": 30,
+      "filename": "CapabilityTest.1.3dad236a.lump",
+      "binary_hash": "2fc18b2411234ab1b41f9749bbc5b25bea8e8d39798f4312853ab99eb7fb6c68",
+      "deleted_at": 1791212222.5853872,
+      "trigger": "explicit-user-approved-symlink-removal",
+      "removed_symlink_target": "CapabilityTest.1.8efa26a3.lump",
+      "dereferenced_binary_hash": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
+      "preserved_alias_routes": [],
+      "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    },
+    {
+      "version": 32,
+      "filename": "CapabilityTest.1.8efa26a3.lump",
+      "binary_hash": "5ade31ec3dff80e622242d889566d24ce301a43ce69c6597669fa9bff9e0e4d3",
+      "deleted_at": 1791212222.6011674,
+      "trigger": "explicit-user-approved-symlink-removal",
+      "removed_symlink_target": "CapabilityTest.1.3f7e1c54.lump",
+      "dereferenced_binary_hash": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
+      "preserved_alias_routes": [],
+      "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    }
+  ],
+  "4a000006": [
+    {
+      "version": 96,
+      "filename": "SelfTest.1.9beaf6e7.lump",
+      "binary_hash": "d2a9819251d0493b440681bedb8dab2646e84ff70289c90126c7ed51055441b2",
+      "deleted_at": 1791212222.695881,
+      "trigger": "explicit-user-approved-symlink-removal",
+      "removed_symlink_target": "SelfTest.1.8b19abd7.lump",
+      "dereferenced_binary_hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "preserved_alias_routes": [
+        {
+          "filename": "SelfTest.95.37f37c75.lump",
+          "old_target": "SelfTest.1.9beaf6e7.lump",
+          "new_target": "SelfTest.1.8b19abd7.lump",
+          "resolved_hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de"
+        }
+      ],
+      "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    }
+  ]
+}

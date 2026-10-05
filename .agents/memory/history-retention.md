@@ -49,3 +49,15 @@ breaking a saved Namespace or frozen downstream artifact that still uses it.
 for manual and policy cleanup. Recovery may finish an already missing archive's
 bookkeeping; it must not replay an unlink of a surviving archive without fresh
 reference validation.
+
+Explicit removal of obsolete symlink aliases must account for incoming alias
+chains, not just live Namespace selections.
+
+**Why:** Deleting an intermediate historical name can break other retained
+names even though the ultimate executable file remains untouched.
+
+**How to apply:** Keep ordinary retention's linked-file rejection. For separately
+authorized alias cleanup, preserve existing incoming aliases' exact resolved
+bytes, record any route shortening in the deletion ledger, and verify all
+remaining files' hashes. This does not authorize inventing new historical
+aliases or changing their ultimate targets. Keep approvals and audit evidence.
