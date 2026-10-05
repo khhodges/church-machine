@@ -1,197 +1,147 @@
-"""Canonical named SelfTest lump load-and-run test (Task #1285).
+"""Selected immutable SelfTest execution, independent of repository freshness.
 
-Verifies that the canonical SelfTest artifact (filename from manifest/ns-state) can be
-loaded into a fresh simulator boot image via ChurchSimulator.loadLumpBinary()
-and that the 81-test selftest suite runs to completion with DR1 === 0 (all
-tests passed) while hardwired DR0 remains zero.
-
-The selftest (simulator/examples/post_flash_selftest.cloomc) covers:
-  SECTION A  Tests  1-15  Data register independence
-  SECTION B  Tests 16-23  IADD arithmetic
-  SECTION C  Tests 24-30  ISUB arithmetic
-  SECTION D  Tests 31-36  SHL shift-left
-  SECTION E  Tests 37-41  SHR logical right
-  SECTION F  Tests 42-45  SHR arithmetic right
-  SECTION G  Tests 46-57  Branch conditions
-  SECTION H  Tests 58-62  BFEXT / BFINS bit-field operations
-  SECTION I  Tests 63-73  TPERM presets + domain purity (E-GT on CR0 and CR1)
-  SECTION J  Tests 74-77  TPERM EXACT credential-pinning (CR0/CR1/CR2 identity)
-  SECTION K  Tests 78-79  Combined-permission (RW, LS) domain purity checks
-  SECTION L  Tests 80-81  Final GT immutability and CLEAR verification
-
-Result convention:
-  DR1 = 0  — all 81 tests passed
-  DR1 = N  — test N was the first to fail (fail-fast)
-  DR0 = 0  — always; hardwired zero is not a status register
+Identity/structure setup failures are not execution faults. Numbered CALL and
+RETURN are exercised on the simulator; this is not evidence for deployed RTL.
+The separately registered strict freshness guard remains active.
 """
-
 import json
-import os
+import hashlib
+import struct
+import zlib
+from pathlib import Path
+import shutil
 import subprocess
-import sys
 
 import pytest
 
-ROOT         = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-HARNESS      = os.path.join(ROOT, 'tests', 'simulator', 'sim_selftest_lump_runs.js')
-STALE_CHECK  = os.path.join(ROOT, 'scripts', 'check_selftest_lump_stale.js')
+ROOT = Path(__file__).resolve().parents[2]
+HARNESS = ROOT / "tests/simulator/sim_selftest_lump_runs.js"
 
 
-@pytest.fixture(scope='module', autouse=True)
-def _selftest_lump_stale_check():
-    """Fail the module early if the selftest lump binary is stale.
-
-    Runs ``node scripts/check_selftest_lump_stale.js`` once before any test in
-    this module executes.  A non-zero exit code means the binary is missing or
-    out-of-date; the whole module is failed immediately with a clear message so
-    the developer knows to run ``node scripts/build_selftest_lump.js``.
-    """
-    try:
-        proc = subprocess.run(
-            ['node', STALE_CHECK],
-            capture_output=True,
-            timeout=60,
-            cwd=ROOT,
-        )
-    except FileNotFoundError:
-        pytest.skip('Node.js not available — skipping selftest-lump stale check')
-        return
-    except subprocess.TimeoutExpired:
-        pytest.fail(
-            'selftest-lump stale check timed out after 60 s — '
-            'check scripts/check_selftest_lump_stale.js for issues'
-        )
-        return
-
-    if proc.returncode != 0:
-        stdout = proc.stdout.decode('utf-8', errors='replace').strip()
-        stderr = proc.stderr.decode('utf-8', errors='replace').strip()
-        output = '\n'.join(filter(None, [stdout, stderr]))
-        pytest.fail(
-            'selftest lump is stale or missing — run: '
-            'node scripts/build_selftest_lump.js\n\n'
-            + output
-        )
+def run_selected(directory=None):
+    args = ["node", str(HARNESS)]
+    if directory is not None:
+        args += ["--lumps-dir", str(directory)]
+    proc = subprocess.run(args, cwd=ROOT, capture_output=True, text=True, timeout=60)
+    return json.loads(proc.stdout), proc.returncode, proc.stderr
 
 
-def _node_available():
-    try:
-        subprocess.run(['node', '--version'], capture_output=True, check=True)
-        return True
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return False
+@pytest.fixture(scope="module")
+def selected_run():
+    if not shutil.which("node"):
+        pytest.skip("Node.js not available")
+    report, code, stderr = run_selected()
+    if not report["executionReached"]:
+        pytest.fail(f"SelfTest setup failed; no execution observed: {report}; {stderr}")
+    return report, code
 
 
-def _run():
-    proc = subprocess.run(
-        ['node', HARNESS],
-        capture_output=True,
-        timeout=60,
-        cwd=ROOT,
-    )
-    raw = proc.stdout.decode('utf-8', errors='replace').strip()
-    stderr = proc.stderr.decode('utf-8', errors='replace').strip()
-    try:
-        report = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise RuntimeError(
-            f'sim_selftest_lump_runs.js produced non-JSON output: {e}\n'
-            f'stdout:\n{raw}\n'
-            f'stderr:\n{stderr}'
-        )
-    return report, proc.returncode, stderr
+def test_selftest_lump_loads_and_boots(selected_run):
+    report, _ = selected_run
+    assert report["bootComplete"] and report["loaded"], report
 
 
-def test_selftest_lump_loads_and_boots():
-    """Boot image initialises correctly before loading the selftest lump."""
-    if not _node_available():
-        import pytest
-        pytest.skip('Node.js not available')
-
-    report, returncode, stderr = _run()
-
-    assert report.get('bootComplete') is True, (
-        'Simulator boot did not complete before loading the selftest lump. '
-        f'Report: {report}'
-    )
-    assert report.get('loaded') is True, (
-        'loadLumpBinary() returned false — lump could not be installed in the selected SelfTest NS slot. '
-        f'failMessage: {report.get("failMessage")}'
-    )
+def test_selftest_lump_runs_to_completion(selected_run):
+    report, code = selected_run
+    assert report["terminatedBy"] == "RETURN", report
+    assert report["faultType"] is None and not report["faultLog"], report
+    assert report["pass"] and code == 0, report
 
 
-def test_selftest_lump_runs_to_completion():
-    """Selftest terminates normally via RETURN or ELOADCALL, not a mid-test fault or loop.
-
-    Two valid completion paths:
-      RETURN    — legacy completion: selftest ended with RETURN on an empty stack
-                  (STACK_UNDERFLOW), indicating all tests ran to their end labels.
-      ELOADCALL — current completion: selftest ended with ELOADCALL CR1, Next;
-                  the harness patches c-list[1] with a null sentinel so the
-                  ELOADCALL faults cleanly instead of self-looping indefinitely.
-    """
-    if not _node_available():
-        import pytest
-        pytest.skip('Node.js not available')
-
-    report, returncode, stderr = _run()
-
-    terminated_by = report.get('terminatedBy')
-    assert terminated_by in ('RETURN', 'ELOADCALL'), (
-        f'Selftest did not terminate normally — got terminatedBy={terminated_by!r}. '
-        f'Expected "RETURN" (legacy) or "ELOADCALL" (current completion path). '
-        f'failMessage: {report.get("failMessage")}. '
-        f'steps={report.get("steps")}. '
-        f'First unexpected fault: '
-        + (str(report.get("faultLog", [{}])[0]) if report.get("faultLog") else "none")
-    )
+def test_selftest_lump_dr1_is_zero_and_dr0_is_hardwired_zero(selected_run):
+    report, _ = selected_run
+    assert report["dr1"] == 0 and report["dr0"] == 0, report
 
 
-def test_selftest_lump_dr1_is_zero_and_dr0_is_hardwired_zero():
-    """DR1 === 0 reports success; DR0 remains hardwired zero.
-
-    If this assertion fails, DR1 contains the number of the first failing test
-    (the selftest uses a fail-fast strategy: IADD DR1, DR0, #N then RETURN).
-    """
-    if not _node_available():
-        import pytest
-        pytest.skip('Node.js not available')
-
-    report, returncode, stderr = _run()
-
-    dr0 = report.get('dr0')
-    dr1 = report.get('dr1')
-    fail_msg = report.get('failMessage')
-    fail_section = report.get('failSection')
-
-    section_hint = f' ({fail_section})' if fail_section else ''
-
-    assert dr1 == 0 and dr0 == 0, (
-        f'Selftest lump FAILED: {fail_msg}. '
-        f'DR1={dr1} means test {dr1}{section_hint} was the first to fail; '
-        f'DR0={dr0} must remain hardwired zero. '
-        f'terminatedBy={report.get("terminatedBy")!r}. '
-        f'steps={report.get("steps")}.'
-    )
+@pytest.fixture(scope="module")
+def built_fixture(tmp_path_factory):
+    """Synthetic offline approval, never admission of modified live bytes."""
+    directory = tmp_path_factory.mktemp("selftest-built")
+    (directory / "manifest.json").write_text("[]")
+    (directory / "ns-state.json").write_text(json.dumps({
+        "abstractions": [{"name": "SelfTest", "slot": 41, "seq": 3}]
+    }))
+    subprocess.run(["node", str(ROOT / "scripts/build_selftest_lump.js"),
+                    "--lumps-dir", str(directory)], cwd=ROOT, check=True,
+                   capture_output=True, timeout=60)
+    return directory
 
 
-if __name__ == '__main__':
-    if not _node_available():
-        print('SKIP: Node.js not available')
-        sys.exit(0)
-    try:
-        report, returncode, stderr = _run()
-        if report.get('pass'):
-            print(f'PASS: selftest lump ran {report["steps"]} steps, DR1=0 and DR0 remained hardwired zero.')
-            sys.exit(0)
-        else:
-            print(f'FAIL: {report.get("failMessage")}')
-            print(f'  terminatedBy={report.get("terminatedBy")}')
-            print(f'  steps={report.get("steps")}')
-            print(f'  dr1={report.get("dr1")}, dr0={report.get("dr0")}')
-            if stderr:
-                print(f'stderr:\n{stderr}')
-            sys.exit(1)
-    except Exception as e:
-        print(f'ERROR: {e}')
-        sys.exit(1)
+def mutate_fixture(directory, kind):
+    state_path = directory / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    row = state["abstractions"][0]
+    binary = directory / row["filename"]
+    data = bytearray(binary.read_bytes())
+    old_hash = row["binary_hash"]
+    if kind == "text":
+        cw = (struct.unpack_from(">I", data)[0] >> 10) & 8191
+        start = (cw + 1) * 4
+        frame = struct.unpack_from(">I", data, start)[0]
+        cursor = start + 4 + ((frame & 65535) + 3) // 4 * 4
+        size = struct.unpack_from(">I", data, cursor)[0]
+        source = zlib.decompress(data[cursor + 4:cursor + 4 + size], -15)
+        compressor = zlib.compressobj(wbits=-15)
+        compressed = compressor.compress(source + b"\n; isolated older text fixture\n") + compressor.flush()
+        data[cursor:-4] = bytes(len(data) - cursor - 4)
+        struct.pack_into(">I", data, cursor, len(compressed))
+        data[cursor + 4:cursor + 4 + len(compressed)] = compressed
+    elif kind == "legacy":
+        struct.pack_into(">I", data, 4, 2)
+    elif kind == "dispatch":
+        struct.pack_into(">I", data, 4, 0)  # private method, DR1 still zero
+    elif kind == "execution":
+        struct.pack_into(">I", data, 8, 0x17000001)  # CALL CR0 method 1
+        # Recursive calls overflow the real protected stack; no sentinel success.
+    elif kind == "identity":
+        data[-1] ^= 1
+    binary.write_bytes(data)
+    # Only the synthetic regression fixtures receive new hash-bound records.
+    # Identity tampering intentionally retains old evidence and must fail setup.
+    if kind != "identity":
+        new_hash = hashlib.sha256(data).hexdigest()
+        row["binary_hash"] = new_hash
+        state_path.write_text(json.dumps(state))
+        approvals_path = directory / "approvals.json"
+        approvals = json.loads(approvals_path.read_text())
+        approval = approvals["approvals"].pop(old_hash)
+        approval["binary_hash"] = new_hash
+        approvals["approvals"][new_hash] = approval
+        approvals_path.write_text(json.dumps(approvals))
+
+
+@pytest.mark.parametrize("kind", ["fresh", "text", "legacy", "dispatch", "execution", "identity"])
+def test_freshness_is_not_execution(built_fixture, tmp_path, kind):
+    directory = tmp_path / "selected"
+    shutil.copytree(built_fixture, directory)
+    if kind != "fresh":
+        mutate_fixture(directory, kind)
+    before = {p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()}
+    guard = subprocess.run(["node", str(ROOT / "scripts/check_selftest_lump_stale.js"),
+                            "--lumps-dir", str(directory)], cwd=ROOT,
+                           capture_output=True, text=True, timeout=60)
+    report, code, _ = run_selected(directory)
+    assert before == {p.name: p.read_bytes() for p in directory.iterdir() if p.is_file()}
+    assert (guard.returncode == 0) == (kind == "fresh"), guard.stdout + guard.stderr
+    if kind in ("fresh", "text", "legacy"):
+        assert report["pass"] and code == 0 and report["terminatedBy"] == "RETURN", report
+        assert not report["faultLog"], report
+    elif kind == "identity":
+        assert not report["executionReached"] and report["steps"] == 0, report
+        assert report["terminatedBy"] == "SETUP_FAILED" and report["faultType"] is None, report
+    else:
+        assert code == 1 and report["executionReached"] and not report["pass"], report
+        assert report["terminatedBy"] == "UNEXPECTED_FAULT", report
+        assert report["phase"] == kind and report["dr1"] == 0, report
+    if kind == "text":
+        assert "Embedded-text freshness: DIFFERENT" in guard.stdout
+        assert "Instruction-body freshness: MATCH" in guard.stdout
+        assert "Method-entry format: MATCH" in guard.stdout
+    if kind == "legacy":
+        assert "Embedded-text freshness: MATCH" in guard.stdout
+        assert "Instruction-body freshness: MATCH" in guard.stdout
+        assert "Method-entry format: DIFFERENT" in guard.stdout
+    if kind == "execution":
+        assert "Embedded-text freshness: MATCH" in guard.stdout
+        assert "Instruction-body freshness: DIFFERENT" in guard.stdout
+        assert "Method-entry format: MATCH" in guard.stdout

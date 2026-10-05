@@ -1,302 +1,123 @@
-// tests/simulator/sim_selftest_lump_runs.js
-//
-// Headless harness used by tests/simulator/test_selftest_lump_runs.py.
-//
-// Loads the canonical named SelfTest artifact (resolved from manifest + ns-state) into a fresh boot image via
-// ChurchSimulator.loadLumpBinary(), runs the simulator to completion, and
-// verifies that DR1 === 0 (all 81 self-tests passed) and DR0 remains zero.
-//
-// The Post-Flash Self-Test uses DR1 as its result register:
-//   DR1 = 0   — all 81 tests passed
-//   DR1 = N   — test N was the first to fail (fail-fast)
-// DR0 is hardwired zero and cannot carry status.
-//
-// The selftest ends with RETURN.  Because loadLumpBinary() resets the call
-// stack, RETURN on an empty stack triggers a STACK_UNDERFLOW fault which
-// causes the simulator to halt.  We intercept fault() to read DR1 before
-// the fault handler zeroes registers.
-//
-// Output (JSON to stdout):
-//   {
-//     "bootComplete":  true,
-//     "loaded":        true,
-//     "steps":         <number of step() calls>,
-//     "dr0":           <hardwired-zero value captured on first fault>,
-//     "dr1":           <DR1 status captured on first fault>,
-//     "faultType":     "STACK_UNDERFLOW" | other,
-//     "faultMessage":  <fault message string>,
-//     "terminatedBy":  "RETURN" | "HALT" | "MAX_STEPS" | "UNEXPECTED_FAULT",
-//     "pass":          true | false,
-//     "failSection":   null | "SECTION X <description> test N",
-//     "failMessage":   null | "SECTION X <description> test N was the first to fail (DR1=N)"
-//   }
-
+// Read-only simulator evidence for the selected immutable SelfTest. Repository
+// source equality is deliberately not a prerequisite. This is not FPGA evidence.
 'use strict';
-
-const fs   = require('fs');
 const path = require('path');
-
-global.window = {
-    bootConfig: {
-        step1: {
-            totalNamespaceWords: 16384,
-            namespaceLumpWords:     64,
-            threadLumpWords:       256,
-        }
-    }
+const fs = require('fs');
+const os = require('os');
+const { inspectSelectedSelfTest } = require('../../scripts/selftest_selected_artifact');
+const ROOT = path.resolve(__dirname, '../..');
+const index = process.argv.indexOf('--lumps-dir');
+const input = index < 0 ? path.join(ROOT, 'server/lumps') : path.resolve(process.argv[index + 1]);
+const isolated = fs.mkdtempSync(path.join(os.tmpdir(), 'selftest-runtime-'));
+const report = {
+    target: 'ChurchSimulator (not physical-board or generated-RTL evidence)',
+    phase: 'setup', executionReached: false, bootComplete: false, loaded: false,
+    steps: 0, dr0: null, dr1: null, faultType: null, faultMessage: null,
+    faultLog: [], terminatedBy: null, pass: false, failMessage: null,
 };
-
-const ROOT = path.resolve(__dirname, '..', '..');
-
-const ChurchSimulator     = require(path.join(ROOT, 'simulator', 'simulator.js'));
-const AbstractionRegistry = require(path.join(ROOT, 'simulator', 'abstractions.js'));
-const SystemAbstractions  = require(path.join(ROOT, 'simulator', 'system_abstractions.js'));
-
-// ── Set up simulator with system abstractions ─────────────────────────────────
-const sim      = new ChurchSimulator();
-const registry = new AbstractionRegistry();
-const sys      = new SystemAbstractions(registry);
-sim.initAbstractions(registry, sys, null);
-
-// ── Boot the simulator ────────────────────────────────────────────────────────
-const MAX_BOOT = 32;
-let bootIters  = 0;
-while (bootIters < MAX_BOOT && !sim.bootComplete && !sim.halted) {
-    const advanced = sim._bootStep();
-    bootIters++;
-    if (!advanced) break;
-}
-
-if (!sim.bootComplete) {
-    const out = {
-        bootComplete: false,
-        loaded: false,
-        steps: 0,
-        dr0: null,
-        faultType: null,
-        faultMessage: null,
-        terminatedBy: 'BOOT_FAILED',
-        pass: false,
-        failMessage: `Boot did not complete after ${bootIters} iterations; halted=${sim.halted}`,
-    };
-    process.stdout.write(JSON.stringify(out) + '\n');
-    process.exit(1);
-}
-
-// ── Load canonical SelfTest — filename is owned by manifest + ns-state ───────
-const MANIFEST_PATH = path.join(ROOT, 'server', 'lumps', 'manifest.json');
-const NS_STATE_PATH = path.join(ROOT, 'server', 'lumps', 'ns-state.json');
-const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
-const selftestEntries = manifest.filter(e =>
-    e.abstraction === 'SelfTest' && !e.archived);
-const nsState = JSON.parse(fs.readFileSync(NS_STATE_PATH, 'utf8'));
-const selftestRows = (nsState.abstractions || []).filter(e => e.name === 'SelfTest');
-if (selftestEntries.length !== 1 || selftestRows.length !== 1 ||
-    selftestEntries[0].filename !== selftestRows[0].filename) {
-    process.stdout.write(JSON.stringify({
-        bootComplete: true, loaded: false, steps: 0, dr0: null,
-        faultType: null, faultMessage: null,
-        terminatedBy: 'LUMP_NOT_FOUND', pass: false,
-        failMessage: 'Canonical SelfTest manifest/ns-state binding is missing or inconsistent',
-    }) + '\n');
-    process.exit(1);
-}
-const selftestEntry = selftestEntries[0];
-const LUMP_TOKEN = selftestEntry.token;
-const LUMP_PATH  = path.join(ROOT, 'server', 'lumps', selftestEntry.filename);
-let lumpBytes;
 try {
-    lumpBytes = fs.readFileSync(LUMP_PATH);
-} catch (e) {
-    const out = {
-        bootComplete: true,
-        loaded: false,
-        steps: 0,
-        dr0: null,
-        faultType: null,
-        faultMessage: null,
-        terminatedBy: 'LUMP_NOT_FOUND',
-        pass: false,
-        failMessage: `Cannot read lump file: ${e.message}`,
-    };
-    process.stdout.write(JSON.stringify(out) + '\n');
-    process.exit(1);
-}
+    // Copy only the selected inputs, not the live directory. Hash/approval checks
+    // detect a torn snapshot; neither copying nor execution repairs any input.
+    for (const name of ['manifest.json', 'ns-state.json', 'approvals.json'])
+        fs.copyFileSync(path.join(input, name), path.join(isolated, name));
+    const manifest = JSON.parse(fs.readFileSync(path.join(isolated, 'manifest.json')));
+    const rows = manifest.filter(e => e.abstraction === 'SelfTest' && !e.archived);
+    if (rows.length !== 1 || path.basename(rows[0].filename) !== rows[0].filename)
+        throw new Error('missing or ambiguous selected SelfTest');
+    fs.copyFileSync(path.join(input, rows[0].filename), path.join(isolated, rows[0].filename));
+    const selected = inspectSelectedSelfTest(isolated);
+    report.selectedFilename = selected.entry.filename;
+    report.selectedHash = selected.hash;
+    report.methodEntry = `0x${selected.words[1].toString(16).padStart(8, '0')}`;
+    global.window = { bootConfig: { step1: {
+        totalNamespaceWords: 16384, namespaceLumpWords: 64, threadLumpWords: 256,
+    } } };
+    const ChurchSimulator = require('../../simulator/simulator');
+    const Registry = require('../../simulator/abstractions');
+    const System = require('../../simulator/system_abstractions');
+    const sim = new ChurchSimulator();
+    const registry = new Registry();
+    sim.initAbstractions(registry, new System(registry), null);
+    for (let i = 0; i < 32 && !sim.bootComplete && !sim.halted; i++)
+        if (!sim._bootStep()) break;
+    report.bootComplete = sim.bootComplete;
+    if (!sim.bootComplete) throw new Error('simulator boot did not complete');
+    // Reproduce the selected destination generation in this private Namespace.
+    // Loading into the default generation would otherwise mint a different GT.
+    sim.bootComplete = false;
+    sim.writeNSEntry(selected.binding.slot, 0x0400, selected.cw,
+        0, 0, 1, selected.binding.seq, selected.cc);
+    sim.bootComplete = true;
+    report.loaded = sim.loadLumpBinary(selected.words, selected.binding.slot, { activateExecution: true });
+    if (!report.loaded) throw new Error(`selected SelfTest load failed: ${sim.output}`);
 
-// Parse big-endian 32-bit words
-const wordCount = lumpBytes.length / 4;
-const lumpWords = [];
-for (let i = 0; i < wordCount; i++) {
-    lumpWords.push(lumpBytes.readUInt32BE(i * 4));
-}
-
-// loadLumpBinary places the lump at 0x0400 (extended-code area), updates the
-// selected canonical SelfTest namespace slot (resolved from ns-state — see
-// "Boot.Abstr token and filename migration" — slot 3 is stale), CR14 (code
-// register), and CR6 (c-list register). Targeting sim.bootEntrySlot (rather
-// than a hardcoded slot number) ensures loadLumpBinary's
-// `abstrSlot === this.bootEntrySlot` check rebuilds CR14 to point at the
-// newly-loaded code; a stale slot number leaves CR14 pointing at old memory
-// and the very first fetch reads garbage.
-const selectedSelfTestSlot = selftestRows[0].slot;
-const loaded = sim.loadLumpBinary(lumpWords, selectedSelfTestSlot);
-
-if (!loaded) {
-    const out = {
-        bootComplete: true,
-        loaded: false,
-        steps: 0,
-        dr0: null,
-        faultType: null,
-        faultMessage: null,
-        terminatedBy: 'LOAD_FAILED',
-        pass: false,
-        failMessage: 'loadLumpBinary returned false — see sim.output for details',
-    };
-    process.stdout.write(JSON.stringify(out) + '\n');
-    process.exit(1);
-}
-
-// ── Intercept fault() to capture status at the moment of the first fault ─────
-// Two completion paths:
-//   RETURN path   — selftest ends with RETURN; empty stack → STACK_UNDERFLOW.
-//   ELOADCALL path — selftest ends with ELOADCALL CR1, Next; c-list[1] patched
-//                    to null above → fault (not STACK_UNDERFLOW) with DR0=0.
-//
-// We also watch for any unexpected earlier fault (e.g. LOAD validation failure)
-// which would indicate a real error rather than normal completion.
-// DR0 is captured before any recovery handler can clear it.
-let capturedDR0      = null;
-let capturedDR1      = null;
-let capturedFaultType = null;
-let capturedFaultMsg  = null;
-
-const origFault = sim.fault.bind(sim);
-sim.fault = function(type, msg, meta) {
-    if (capturedDR0 === null) {
-        // First fault — capture state before any recovery handler fires
-        capturedDR0       = sim.dr[0] >>> 0;
-        capturedDR1       = sim.dr[1] >>> 0;
-        capturedFaultType = type;
-        capturedFaultMsg  = msg;
-    }
-    origFault(type, msg, meta);
-};
-
-// ── Run to completion ─────────────────────────────────────────────────────────
-const MAX_STEPS = 100000;
-let steps = 0;
-let reachedFinalEloadcall = false;
-
-while (steps < MAX_STEPS && !sim.halted && sim.bootComplete) {
-    const r = sim.step();
-    steps++;
-    if (!r) break;  // null result means a fault or skip
-    // The modern SelfTest completion instruction is its only ELOADCALL.  Stop
-    // immediately after observing it instead of mutating Next.GT: a NULL GT can
-    // legitimately enter lazy resolution and be restored, masking completion
-    // as a self-loop in this headless harness.
-    if (r.instr && r.instr.mnemonic === 'ELOADCALL') {
-        reachedFinalEloadcall = true;
-        capturedDR0 = sim.dr[0] >>> 0;
-        capturedDR1 = sim.dr[1] >>> 0;
-        break;
-    }
-}
-
-// ── DR1 → section name mapping ────────────────────────────────────────────────
-// Matches the section table in simulator/examples/post_flash_selftest.cloomc
-const SELFTEST_SECTIONS = [
-    { first: 1,  last: 15, name: 'SECTION A', desc: 'Data register independence' },
-    { first: 16, last: 23, name: 'SECTION B', desc: 'IADD arithmetic' },
-    { first: 24, last: 30, name: 'SECTION C', desc: 'ISUB arithmetic' },
-    { first: 31, last: 36, name: 'SECTION D', desc: 'SHL shift-left' },
-    { first: 37, last: 41, name: 'SECTION E', desc: 'SHR logical right' },
-    { first: 42, last: 45, name: 'SECTION F', desc: 'SHR arithmetic right' },
-    { first: 46, last: 57, name: 'SECTION G', desc: 'Branch conditions' },
-    { first: 58, last: 62, name: 'SECTION H', desc: 'BFEXT / BFINS bit-field operations' },
-    { first: 63, last: 73, name: 'SECTION I', desc: 'TPERM presets + domain purity' },
-    { first: 74, last: 77, name: 'SECTION J', desc: 'TPERM EXACT credential-pinning' },
-    { first: 78, last: 79, name: 'SECTION K', desc: 'TPERM same-domain multi-permission immutability' },
-    { first: 80, last: 81, name: 'SECTION L', desc: 'LOAD from multiple c-list slots' },
-];
-
-function drToSection(n) {
-    for (const s of SELFTEST_SECTIONS) {
-        if (n >= s.first && n <= s.last) {
-            return `${s.name} ${s.desc} test ${n}`;
+    // A small isolated caller uses numbered CALL method 1, then we stop at its
+    // return address. Never patch the selected bytes or synthesize a Next row.
+    const callerSlot = 60;
+    const callerBase = sim.NS_TABLE_BASE - 64;
+    const callee = sim.readNSEntry(selected.binding.slot);
+    if (selected.words.some((word, i) => (sim.memory[callee.word0_location + i] >>> 0) !== word))
+        throw new Error('installation changed selected SelfTest bytes');
+    if (selected.binding.slot === callerSlot || callee.word0_location + selected.words.length > callerBase)
+        throw new Error('fixture caller overlaps selected SelfTest');
+    const callerGT = sim.createGT(0, callerSlot, { E: 1 }, 1);
+    sim.memory[callerBase] = ((31 << 27) | (2 << 10) | 1) >>> 0;
+    sim.memory[callerBase + 1] = sim.encodeInstruction(2, 14, 0, 0, 1);
+    sim.memory[callerBase + 2] = sim.encodeInstruction(3, 14, 0, 0, 0);
+    sim.memory[callerBase + 63] = callerGT;
+    sim.bootComplete = false; // privileged fixture construction, never runtime registration
+    sim.writeNSEntry(callerSlot, callerBase, 2, 0, 0, 1, 0, 1);
+    sim.bootComplete = true;
+    sim._installLumpHeaderContext(sim.parseGT(callerGT), callerSlot,
+        sim.readNSEntry(callerSlot), sim.parseLumpHeader(sim.memory[callerBase]));
+    sim.cr[0] = { word0: selected.selfGT, word1: callee.word0_location,
+        word2: callee.word1_limit, word3: callee.word2_seals, m: 0 };
+    sim.pc = 0;
+    sim.halted = false;
+    const originalFault = sim.fault.bind(sim);
+    sim.fault = (type, message, meta) => {
+        if (report.faultType === null) {
+            report.faultType = type;
+            report.faultMessage = message;
+            report.dr0 = sim.dr[0] >>> 0;
+            report.dr1 = sim.dr[1] >>> 0;
         }
+        report.faultLog.push({ type, message });
+        originalFault(type, message, meta);
+    };
+    report.phase = 'dispatch';
+    report.executionReached = true;
+    let returned = false;
+    while (report.steps < 100000 && !sim.halted && sim.bootComplete) {
+        const step = sim.step();
+        report.steps++;
+        if (report.faultType !== null) break;
+        if (report.steps === 1) {
+            if (step?.instr?.opcode !== 2 ||
+                sim.parseGT(sim.cr[14].word0).index !== selected.binding.slot)
+                throw new Error('numbered CALL did not enter selected SelfTest');
+            report.phase = 'execution';
+        } else if (sim.cr[14].word1 === callerBase && sim.pc === 1) {
+            returned = step?.instr?.opcode === 3;
+            break;
+        }
+        if (!step) break;
     }
-    return null;
-}
-
-// ── Determine termination reason and pass/fail ────────────────────────────────
-let terminatedBy;
-if (reachedFinalEloadcall) {
-    terminatedBy = 'ELOADCALL';
-} else if (capturedDR0 !== null) {
-    // A fault was intercepted — classify by type and DR1 status:
-    //   STACK_UNDERFLOW  → old RETURN-path completion
-    //   any other fault, DR1=0 → ELOADCALL-path completion (null-sentinel fired)
-    //   any other fault, DR1≠0 → a real failure mid-test
-    if (capturedFaultType === 'STACK_UNDERFLOW') {
-        terminatedBy = 'RETURN';
-    } else if (capturedDR1 === 0) {
-        terminatedBy = 'ELOADCALL';
-    } else {
-        terminatedBy = 'UNEXPECTED_FAULT';
+    if (report.dr0 === null) {
+        report.dr0 = sim.dr[0] >>> 0;
+        report.dr1 = sim.dr[1] >>> 0;
     }
-} else if (steps >= MAX_STEPS) {
-    // Loop hit step limit without any fault — probably an infinite loop
-    capturedDR0  = sim.dr[0] >>> 0;
-    capturedDR1  = sim.dr[1] >>> 0;
-    terminatedBy = 'MAX_STEPS';
-} else {
-    // Loop exited because !sim.bootComplete (e.g. _returnToBoot) without a fault
-    capturedDR0  = sim.dr[0] >>> 0;
-    capturedDR1  = sim.dr[1] >>> 0;
-    terminatedBy = 'HALT';
+    report.terminatedBy = report.faultType !== null ? 'UNEXPECTED_FAULT' :
+        returned ? 'RETURN' : report.steps >= 100000 ? 'MAX_STEPS' : 'HALT';
+    report.pass = returned && !report.faultType && report.dr0 === 0 && report.dr1 === 0;
+    if (!report.pass)
+        report.failMessage = `${report.phase}: ${report.terminatedBy}; ${report.faultMessage || ''} DR1=${report.dr1}, DR0=${report.dr0}`;
+} catch (error) {
+    report.terminatedBy = report.executionReached ? 'HARNESS_ERROR' : 'SETUP_FAILED';
+    report.failMessage = `${report.phase}: ${error.message}` +
+        (report.executionReached ? '' : '; execution not attempted');
+} finally {
+    fs.rmSync(isolated, { recursive: true, force: true });
 }
-
-// Both RETURN (old binary) and ELOADCALL (current binary) are valid completions.
-const pass = (capturedDR0 === 0) && (capturedDR1 === 0) &&
-    (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL');
-
-let failSection = null;
-let failMessage = null;
-if (!pass) {
-    if (terminatedBy === 'RETURN' || terminatedBy === 'ELOADCALL') {
-        // Normal termination but DR1 != 0: a specific test failed
-        failSection = drToSection(capturedDR1);
-        const sectionLabel = failSection || `test ${capturedDR1}`;
-        failMessage = `${sectionLabel} was the first to fail (DR1=${capturedDR1})`;
-    } else if (terminatedBy === 'UNEXPECTED_FAULT') {
-        failMessage = (
-            `Unexpected fault [${capturedFaultType}] after ${steps} steps: ${capturedFaultMsg}. ` +
-            `DR1=${capturedDR1}, DR0=${capturedDR0} at fault time.`
-        );
-    } else {
-        failMessage = `Selftest terminated unexpectedly (${terminatedBy}) after ${steps} steps; DR1=${capturedDR1}, DR0=${capturedDR0}`;
-    }
-}
-
-// ── Emit JSON report ──────────────────────────────────────────────────────────
-const faultLog = (sim.faultLog || []).map(f => ({ type: f.type, message: f.message }));
-
-const out = {
-    bootComplete: true,
-    loaded: true,
-    steps,
-    dr0: capturedDR0,
-    dr1: capturedDR1,
-    faultType: capturedFaultType,
-    faultMessage: capturedFaultMsg,
-    faultLog,
-    terminatedBy,
-    pass,
-    failSection,
-    failMessage,
-};
-
-process.stdout.write(JSON.stringify(out) + '\n');
-process.exit(pass ? 0 : 1);
+process.stdout.write(JSON.stringify(report) + '\n');
+process.exit(report.pass ? 0 : 1);

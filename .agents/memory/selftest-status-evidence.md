@@ -20,3 +20,9 @@ Validate an active revision against its own declared identity, not a prospective
 **Why:** Repacking canonical source can allocate a different size and advance a proposed issue even while the selected artifact remains internally consistent. Comparing its approval to that future issue creates misleading stale-identity failures. Preparing corrected bytes does not authorize live replacement.
 
 **How to apply:** Separate source freshness, internal selected-artifact consistency, and candidate adoption. Candidate preparation must leave Namespace, approvals, selected binaries and boot images unchanged; review allocation and destination-local capability binding before explicit adoption.
+
+SelfTest runtime fixtures must exercise numbered CALL and an actual return to the caller, independently of repository example freshness. A zero DR1 at a fault is never successful completion.
+
+**Why:** The prior runtime harness accepted arbitrary faults with DR1 zero as a continuation and blocked all execution behind source freshness. Neither result established what the selected executable actually did.
+
+**How to apply:** Preserve and validate selected bytes and their destination generation in an isolated fixture; report setup, dispatch, and body execution separately. Keep the strict freshness guard active, and do not promote simulator format support into a claim about deployed RTL.

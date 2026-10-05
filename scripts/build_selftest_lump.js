@@ -22,11 +22,25 @@ const MANIFEST = path.join(LUMPS_DIR, 'manifest.json');
 const NS_STATE = path.join(LUMPS_DIR, 'ns-state.json');
 const APPROVALS = path.join(LUMPS_DIR, 'approvals.json');
 const CHECK_ONLY = process.argv.includes('--check');
+const IDENTITY_ONLY = process.argv.includes('--identity-only');
+if (IDENTITY_ONLY && !CHECK_ONLY) throw new Error('--identity-only requires --check');
 const CANDIDATE_DIR = arg('--candidate-dir');
 if (CHECK_ONLY && CANDIDATE_DIR) throw new Error('--check and --candidate-dir are mutually exclusive');
 if (CANDIDATE_DIR) require('./live-lump-guard').assertOfflineOutput(path.resolve(CANDIDATE_DIR));
 else if (!CHECK_ONLY) require('./live-lump-guard').assertOfflineOutput(LUMPS_DIR);
 const DOT_NAME = 'SelfTest';
+
+if (IDENTITY_ONLY) {
+    try {
+        const selected = require('./selftest_selected_artifact').inspectSelectedSelfTest(LUMPS_DIR);
+        console.log(`OK: selected SelfTest identity/structure: ${selected.entry.filename} sha256=${selected.hash}`);
+        console.log('Repository freshness not evaluated; target execution not attempted.');
+        process.exit(0);
+    } catch (error) {
+        console.error(`SETUP_IDENTITY_OR_STRUCTURE: ${error.message}; execution not attempted.`);
+        process.exit(1);
+    }
+}
 
 function json(value) {
     return JSON.stringify(value, null, 2).replace(/[^\x00-\x7F]/g,
@@ -192,6 +206,11 @@ if (CANDIDATE_DIR) {
 }
 if (CHECK_ONLY) {
     const failures = [];
+    try {
+        require('./selftest_selected_artifact').inspectSelectedSelfTest(LUMPS_DIR);
+    } catch (error) {
+        failures.push(`selected identity/structure: ${error.message}`);
+    }
     const activeRows = manifest.filter(e => e.abstraction === DOT_NAME && !e.archived);
     const activeRow = activeRows.length === 1 ? activeRows[0] : null;
     const activeIssue = activeRow?.issue_n || activeRow?.lump_version;
@@ -236,10 +255,14 @@ if (CHECK_ONLY) {
     if (selectedSelf !== selfGT) {
         failures.push('selected SelfTest row-zero SELF GT differs from the Namespace binding');
     }
+    console.log(`Embedded-text freshness: ${activeSource === source ? 'MATCH' : 'DIFFERENT'}`);
+    console.log(`Instruction-body freshness: ${activeWords && JSON.stringify(activeWords.slice(1)) === JSON.stringify(compiledWords.slice(1)) ? 'MATCH' : 'DIFFERENT'}`);
+    console.log(`Method-entry format: ${activeWords?.[0] === method1Dispatch ? 'MATCH' : 'DIFFERENT'} (builder comparison only; actual-target CALL evidence required)`);
+    console.log('Execution not attempted by this freshness check.');
     if (!activeBytes || activeSource !== source ||
             activeCc !== cc ||
             JSON.stringify(activeWords) !== JSON.stringify(compiledWords)) {
-        failures.push('active SelfTest binary does not contain the canonical compiled source');
+        failures.push('repository freshness/format comparison failed; not an observed execution fault; selected artifact unchanged');
         if (activeSource !== source) failures.push('embedded source differs from canonical source');
         if (activeCc !== cc) failures.push(`capability rows: saved ${activeCc}, builder expects ${cc} (SELF only); no Next continuation`);
         if (activeWords?.[0] !== method1Dispatch) failures.push('method entry differs from builder BRANCH +1 format; verify target decoder compatibility before replacement');
