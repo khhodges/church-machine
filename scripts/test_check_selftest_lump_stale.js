@@ -4,6 +4,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
 const { spawnSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 const BUILD = path.join(__dirname, 'build_selftest_lump.js');
@@ -82,8 +83,25 @@ try {
     const candidate = fs.readFileSync(path.join(candidateDir, review.filename));
     check(review.status === 'unapproved-candidate' && review.installed === false,
         'review distinguishes preparation from approval and installation');
-    check(candidate.readUInt32BE(4) === 0xBF000001 && (candidate.readUInt32BE(0) & 255) === 2,
-        'candidate has method dispatch and both capability rows');
+    check(candidate.readUInt32BE(4) === 0xBF000001 && (candidate.readUInt32BE(0) & 255) === 1,
+        'candidate has method dispatch and SELF only');
+    check(candidate.length === 8192 && review.words === 2048,
+        'compressed candidate retains the 8 KiB allocation');
+    const cw = (candidate.readUInt32BE(0) >>> 10) & 8191;
+    let cursor = (cw + 1) * 4;
+    const frame = candidate.readUInt32BE(cursor);
+    check((frame >>> 24) === 0xAB && ((frame >>> 16) & 255) === 7,
+        'source frame declares raw-deflate compression');
+    cursor += 4 + Math.ceil((frame & 65535) / 4) * 4;
+    const storedLength = candidate.readUInt32BE(cursor);
+    const restored = zlib.inflateRawSync(candidate.subarray(cursor + 4, cursor + 4 + storedLength)).toString();
+    check(restored === fs.readFileSync(path.join(ROOT, 'simulator/examples/post_flash_selftest.cloomc'), 'utf8'),
+        'compressed source round-trips exactly');
+    check(!/\bNext\b/.test(restored) && /capabilities\s*\{\s*SELF\s+E\s*;[^\n]*\n\s*\}/.test(restored),
+        'embedded source declares only SELF, with no Next');
+    check(candidate.readUInt32BE(cw * 4) === 0x1F000000 &&
+        review.continuation === 'RETURN to caller; SELF-only C-list',
+        'final instruction and review describe RETURN to caller');
     check(protectedFiles.every((name, i) => fs.readFileSync(path.join(dir, name)).equals(before[i])),
         'candidate preparation preserves manifest, Namespace and approvals');
     r = run(BUILD, ['--candidate-dir', candidateDir]);

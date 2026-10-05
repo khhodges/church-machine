@@ -33,17 +33,14 @@
 ;   X-permission is NOT a stored Golden Token — it is constructed dynamically by CALL
 ;   from the lump header into CR14 (a privileged register, off-limits for TPERM).
 ;   Slot 0: E-GT at c-list[0] enables LOAD + TPERM tests and EXACT cross-comparison.
-;   Slot 1: Next.GT at c-list[1] — the continuation called at done: when all 81 tests
-;           pass.  boot_image.py overrides this word at image-generation time; the
-;           stored default (0x4A000006) is the SelfTest self-loop, used when the
-;           binary is loaded directly without going through the boot image generator.
+;   SELF is the only capability. Completion returns to the caller.
+;   CapabilityTest owns the loop and calls WukongCallHome after SelfTest returns.
 ;   At SelfTest entry the hardware guarantees:
 ;     CR0  = E-GT for SelfTest  (Church domain, E-perm; from thread[+244])
-;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SelfTest from c-list[0])
+;     CR1  = E-GT for SelfTest  (loaded via: LOAD CR1, SELF from c-list[0])
 ;   CR0 and CR1 hold the same GT word (0x4A000006) — TPERM EXACT cross-check passes.
 capabilities {
-    SelfTest     E,         ; slot 0 — E-GT for TPERM/EXACT tests
-    Next         E          ; slot 1 — Next.GT (localized to the LightningBolt target)
+    SELF         E          ; slot 0 — E-GT for TPERM/EXACT tests
     }
 ;
 ; Fail-fast pattern (every instruction on its own line, ; is comment):
@@ -60,7 +57,7 @@ capabilities {
 ; ── Initialise ───────────────────────────────────────────────────────────────
 start:
     IADD DR1, DR0, #0       ; explicit success status; DR1 remains scratch until done
-    LOAD CR1, SelfTest      ; CR1 = E-GT (Church domain; from c-list slot 0)
+    LOAD CR1, SELF          ; CR1 = E-GT (Church domain; from c-list slot 0)
 
 ; ═══════════════════════════════════════════════════════════════════════════════
 ; SECTION A — Data register independence  (Tests 1-15)
@@ -717,7 +714,7 @@ tI73:
 ; CR0 (from thread[+244]) and CR1 (from c-list[0]) both encode 0x4A000006,
 ; so cross-comparison passes as well as self-comparison.
 tJstart:
-    LOAD CR2, SelfTest      ; CR2 = E-GT (same GT word as CR1 — second LOAD from slot 0)
+    LOAD CR2, SELF          ; CR2 = E-GT (same GT word as CR1 — second LOAD from slot 0)
     ; Test 74: CR0 EXACT CR0 — self-comparison always passes  → Z=1
     TPERM CR0, EXACT, CR0
     BRANCHEQ tJ75
@@ -782,7 +779,7 @@ tL81:
     RETURN
 
 ; ═══════════════════════════════════════════════════════════════════════════════
-; All 81 tests passed — return to the runtime-selected boot continuation.
+; All 81 tests passed — return to the caller.
 ; ═══════════════════════════════════════════════════════════════════════════════
 done:
     IADD DR1, DR0, #0       ; DR1 = 0 (all 81 tests passed; DR0 stays hardwired zero)

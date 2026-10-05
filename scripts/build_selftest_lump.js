@@ -47,9 +47,9 @@ function crc32(buf) {
 }
 function frame(text) {
     const api = Buffer.from(JSON.stringify({ name: DOT_NAME, methods: [] }));
-    const src = Buffer.from(text);
+    const src = zlib.deflateRawSync(Buffer.from(text));
     const data = Buffer.concat([
-        Buffer.from([0xAB, 0x03, api.length >>> 8, api.length & 0xFF]), api,
+        Buffer.from([0xAB, 0x07, api.length >>> 8, api.length & 0xFF]), api,
         Buffer.alloc((4 - api.length % 4) % 4),
         Buffer.from([src.length >>> 24, src.length >>> 16 & 0xFF, src.length >>> 8 & 0xFF, src.length & 0xFF]), src,
         Buffer.alloc((4 - src.length % 4) % 4),
@@ -96,12 +96,13 @@ if (result.errors.length) die(result.errors.map(e => `line ${e.line}: ${e.messag
 const method1Dispatch = ((23 << 27) | (14 << 23) | 1) >>> 0;
 const compiledWords = [method1Dispatch, ...result.words.map(word => word >>> 0)];
 const cw = compiledWords.length;
-// SelfTest owns two capability rows:
-//   row 0 — canonical SELF E-GT
-//   row 1 — Next.GT, localized by boot_image.py to the LightningBolt target
-// This is the builder's declared-row policy, not proof that the body uses Next.
-// The canonical source currently completes through RETURN.
-const cc = 2;
+// CapabilityTest owns the loop. SelfTest returns to its caller and owns only
+// its SELF E-GT; there is no separately bound continuation capability.
+const declarations = source.match(/capabilities\s*\{([^}]*)\}/)?.[1]
+    .replace(/;[^\n]*/g, '').replace(/\s+/g, ' ').trim();
+if (!/^SELF E,?$/.test(declarations || ''))
+    die('SelfTest capability contract requires SELF E only; no Next continuation');
+const cc = 1;
 const content = frame(source);
 const needed = 1 + cw + content.length + cc;
 let lumpSize = 64;
@@ -122,7 +123,6 @@ compiledWords.forEach((word, i) => { words[1 + i] = word; });
 content.forEach((word, i) => { words[1 + cw + i] = word >>> 0; });
 const selfGT = ((4 << 28) | (1 << 27) | (1 << 25) | (seq << 16) | nsSlot) >>> 0;
 words[lumpSize - cc] = selfGT;
-words[lumpSize - 1] = selfGT;
 const bytes = Buffer.alloc(lumpSize * 4);
 words.forEach((word, i) => bytes.writeUInt32BE(word, i * 4));
 const binaryHash = crypto.createHash('sha256').update(bytes).digest('hex');
@@ -184,7 +184,7 @@ if (CANDIDATE_DIR) {
         selected_filename: stateRow.filename, selected_binary_hash: stateRow.binary_hash,
         proposed_issue: issueN, slot: nsSlot, sequence: seq, words: lumpSize,
         code_words: cw, capability_rows: cc,
-        method_entry: '0xbf000001', continuation: 'Next at c-list row 1; destination binding requires review',
+        method_entry: '0xbf000001', continuation: 'RETURN to caller; SELF-only C-list',
         warning: 'No approval created. Trusted admission, layout review and explicit adoption are required. No Namespace or boot image changed.',
     }), { flag: 'wx' });
     console.log('Unapproved review candidate written; no live state or approval changed.');
@@ -241,7 +241,7 @@ if (CHECK_ONLY) {
             JSON.stringify(activeWords) !== JSON.stringify(compiledWords)) {
         failures.push('active SelfTest binary does not contain the canonical compiled source');
         if (activeSource !== source) failures.push('embedded source differs from canonical source');
-        if (activeCc !== cc) failures.push(`capability rows: saved ${activeCc}, builder expects ${cc} (SELF and Next); this alone does not prove a runtime fault`);
+        if (activeCc !== cc) failures.push(`capability rows: saved ${activeCc}, builder expects ${cc} (SELF only); no Next continuation`);
         if (activeWords?.[0] !== method1Dispatch) failures.push('method entry differs from builder BRANCH +1 format; verify target decoder compatibility before replacement');
         if (activeWords && JSON.stringify(activeWords.slice(1)) !== JSON.stringify(compiledWords.slice(1)))
             failures.push('source-body instruction words differ from current compiler output');
