@@ -61,3 +61,14 @@ authorized alias cleanup, preserve existing incoming aliases' exact resolved
 bytes, record any route shortening in the deletion ledger, and verify all
 remaining files' hashes. This does not authorize inventing new historical
 aliases or changing their ultimate targets. Keep approvals and audit evidence.
+
+Approval consistency audits must recognize exact completed historical deletions,
+without requiring deleted bytes to be restored.
+
+**Why:** Permanent deletion and permanent approval retention are both intentional;
+requiring every retained approval to have a surviving binary contradicts them.
+
+**How to apply:** Require matching filename and digest in completed deletion
+evidence, no pending deletion or surviving path, and no live selection. Preserve
+approval hash/structure checks and distinguish historical input inventories from
+executable bindings. Never make a blanket exception for missing binaries.

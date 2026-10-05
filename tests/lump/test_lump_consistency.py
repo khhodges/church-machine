@@ -7,7 +7,8 @@ Rules enforced
 R1   Every current .lump has valid header magic (bits[31:27] = 0x1F).
 R2   Binary file size in words == header-declared lump_size.
 R3   Every current .lump filename has a manifest.json entry.
-R4   approvals.json uses exact SHA-256 keys and refers to repository binaries.
+R4   approvals.json uses exact SHA-256 keys and refers to repository binaries
+     or exact, completed historical-deletion evidence; live selections stay strict.
 R5   manifest.cw / cc / lump_size == binary header values.
 R8   No duplicate ns_slot values unless all claimants share the same non-null variant_group.
 R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
@@ -420,6 +421,7 @@ class TestR4_ApprovalStore:
     """R4: canonical approval records are addressed by exact binary SHA-256."""
 
     def test_approval_keys_and_binary_hash_fields(self):
+        from server.approval_retention_audit import documented_approval_deletion
         binary_digests = {}
         for filename in _all_lump_filenames():
             path = os.path.join(LUMPS_DIR, filename)
@@ -438,9 +440,11 @@ class TestR4_ApprovalStore:
                     assert value == digest, (
                         f"approvals.json {digest}.{field}={value!r} must equal its key"
                     )
-            assert digest in binary_digests, (
+            assert digest in binary_digests or documented_approval_deletion(
+                LUMPS_DIR, digest, record, MANIFEST
+            ), (
                 f"approvals.json record {digest} does not match any current or "
-                "archive .lump binary"
+                "archive .lump binary or exact completed historical-deletion evidence"
             )
 
 
