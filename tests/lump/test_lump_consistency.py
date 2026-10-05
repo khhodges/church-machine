@@ -8,7 +8,7 @@ R1   Every current .lump has valid header magic (bits[31:27] = 0x1F).
 R2   Binary file size in words == header-declared lump_size.
 R3   Every current .lump filename has a manifest.json entry.
 R4   approvals.json uses exact SHA-256 keys and refers to repository binaries
-     or exact, completed historical-deletion evidence; live selections stay strict.
+     or exact, completed historical deletion evidence.
 R5   manifest.cw / cc / lump_size == binary header values.
 R8   No duplicate ns_slot values unless all claimants share the same non-null variant_group.
 R9   RETIRED — ns_slot=null is implicitly dynamic; ns_slot_policy is optional/informational only.
@@ -53,6 +53,7 @@ by the full SHA-256 of immutable binary bytes.
 
 import hashlib
 import json
+import math
 import os
 import re as _re
 import struct
@@ -417,35 +418,220 @@ class TestR3_HashAuthorityAliases:
         assert not _is_represented_binary(str(candidate), represented)
 
 
+def _retention_deletions(root):
+    """Read completed evidence only; never recover or modify retention state."""
+    path = os.path.join(root, "history-retention.json")
+    if not os.path.exists(path):
+        return set(), set()
+    with open(path, encoding="utf-8") as source:
+        ledger = json.load(source)
+    assert isinstance(ledger, dict), "history-retention.json must be an object"
+    completed = set()
+    pending = set()
+    for token, entries in ledger.items():
+        assert _re.fullmatch(r"[0-9a-f]{8}", token), "Invalid retention token"
+        assert isinstance(entries, list), "Retention entries must be a list"
+        for entry in entries:
+            assert isinstance(entry, dict), "Retention entry must be an object"
+            filename = entry.get("filename")
+            digest = entry.get("binary_hash")
+            assert (isinstance(filename, str)
+                    and _re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\.lump", filename)
+                    and ".." not in filename), "Invalid retention filename"
+            assert isinstance(digest, str) and _re.fullmatch(
+                r"[0-9a-f]{64}", digest), "Invalid retention binary_hash"
+            assert type(entry.get("version")) is int and entry["version"] > 0, (
+                "Invalid retention version"
+            )
+            status = entry.get("status", "deleted")
+            assert status in ("pending", "deleted"), "Invalid retention status"
+            if status == "pending":
+                pending.update((filename, digest))
+                continue
+            deleted_at = entry.get("deleted_at")
+            assert (type(deleted_at) in (int, float)
+                    and math.isfinite(deleted_at) and deleted_at > 0), (
+                "Completed retention evidence needs a valid deleted_at"
+            )
+            # Modern journal completion has no status; older recovery sets deleted.
+            assert isinstance(entry.get("trigger"), str) and entry["trigger"].strip(), (
+                "Completed retention evidence needs a trigger"
+            )
+            completed.add((filename, digest))
+    return completed, pending
+
+
+def _reference_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _reference_strings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _reference_strings(child)
+
+
+def _check_approval_binaries(root, approvals, manifest, namespace):
+    binary_digests = set()
+    for filename in os.listdir(root):
+        path = os.path.join(root, filename)
+        if filename.endswith(".lump") and os.path.isfile(path):
+            with open(path, "rb") as binary:
+                binary_digests.add(hashlib.sha256(binary.read()).hexdigest())
+    deleted, pending = _retention_deletions(root)
+    live = set(_reference_strings([
+        [row for row in manifest if row.get("archived") is not True], namespace
+    ]))
+    journal = os.path.join(root, ".history-retention-pending.json")
+    if os.path.exists(journal):
+        with open(journal, encoding="utf-8") as source:
+            pending.update(_reference_strings(json.load(source)))
+    for digest, record in approvals.items():
+        assert _re.fullmatch(r"[0-9a-f]{64}", digest), (
+            f"approvals.json key is not exact lowercase SHA-256: {digest!r}"
+        )
+        assert isinstance(record, dict), (
+            f"approvals.json record {digest} must be an object"
+        )
+        for field, value in record.items():
+            if field == "binary_hash" or field.endswith("_binary_hash"):
+                assert value == digest, (
+                    f"approvals.json {digest}.{field}={value!r} must equal its key"
+                )
+        if digest in binary_digests:
+            continue
+        filename = record.get("filename")
+        assert (isinstance(filename, str)
+                and (filename, digest) in deleted
+                and not os.path.lexists(os.path.join(root, filename))
+                and filename not in live and digest not in live
+                and filename not in pending and digest not in pending), (
+            f"approvals.json record {digest} ({filename!r}) does not match any "
+            "current or archive .lump binary or exact completed historical deletion; "
+            "check for unexplained loss or live/pending references"
+        )
+
+
 class TestR4_ApprovalStore:
     """R4: canonical approval records are addressed by exact binary SHA-256."""
 
     def test_approval_keys_and_binary_hash_fields(self):
-        from server.approval_retention_audit import documented_approval_deletion
-        binary_digests = {}
-        for filename in _all_lump_filenames():
-            path = os.path.join(LUMPS_DIR, filename)
-            if os.path.isfile(path):
-                with open(path, "rb") as binary:
-                    binary_digests[hashlib.sha256(binary.read()).hexdigest()] = filename
-        for digest, record in APPROVALS.items():
-            assert _re.fullmatch(r"[0-9a-f]{64}", digest), (
-                f"approvals.json key is not exact lowercase SHA-256: {digest!r}"
-            )
-            assert isinstance(record, dict), (
-                f"approvals.json record {digest} must be an object"
-            )
-            for field, value in record.items():
-                if field == "binary_hash" or field.endswith("_binary_hash"):
-                    assert value == digest, (
-                        f"approvals.json {digest}.{field}={value!r} must equal its key"
-                    )
-            assert digest in binary_digests or documented_approval_deletion(
-                LUMPS_DIR, digest, record, MANIFEST
-            ), (
-                f"approvals.json record {digest} does not match any current or "
-                "archive .lump binary or exact completed historical-deletion evidence"
-            )
+        with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as source:
+            namespace = json.load(source)
+        _check_approval_binaries(LUMPS_DIR, APPROVALS, MANIFEST, namespace)
+
+
+class TestR4_DeletionEvidence:
+    """Private fixtures: never edit the repository's artifacts or approvals."""
+
+    @pytest.fixture
+    def evidence(self, tmp_path):
+        digest = hashlib.sha256(b"historical bytes").hexdigest()
+        filename = "SelfTest.86.f37bafd6.lump"
+        record = dict(filename=filename, binary_hash=digest)
+        entry = dict(record, version=86, deleted_at=1791212838.0,
+                     trigger="explicit-user-approved-history-deletion")
+        return tmp_path, digest, record, {"4a000006": [entry]}
+
+    def check(self, evidence, *, manifest=None, namespace=None):
+        root, digest, record, ledger = evidence
+        (root / "history-retention.json").write_text(json.dumps(ledger))
+        _check_approval_binaries(root, {digest: record}, manifest or [], namespace or {})
+
+    @pytest.mark.parametrize("status", [None, "deleted"])
+    def test_completed_exact_deletion(self, evidence, status):
+        if status:
+            evidence[3]["4a000006"][0]["status"] = status
+        self.check(evidence)
+
+    def test_shared_digest_with_exact_filename(self, evidence):
+        entries = evidence[3]["4a000006"]
+        entries.extend(dict(entries[0], filename=f"SelfTest.{n}.f37bafd6.lump",
+                            version=n) for n in (80, 84))
+        self.check(evidence)
+
+    def test_existing_binary_needs_no_deletion(self, evidence):
+        evidence[0].joinpath("retained.lump").write_bytes(b"historical bytes")
+        evidence[3].clear()
+        self.check(evidence)
+
+    @pytest.mark.parametrize("field,value", [
+        ("filename", "Other.86.f37bafd6.lump"),
+        ("filename", "../SelfTest.86.f37bafd6.lump"),
+        ("filename", "/SelfTest.86.f37bafd6.lump"),
+        ("filename", "SelfTest.json"), ("filename", None),
+        ("binary_hash", "a" * 64), ("binary_hash", "bad"),
+        ("binary_hash", "A" * 64),
+        ("status", "pending"), ("status", "unknown"), ("status", None),
+        ("deleted_at", None), ("deleted_at", True), ("deleted_at", -1),
+        ("deleted_at", float("nan")), ("deleted_at", float("inf")),
+        ("version", True), ("version", 0), ("trigger", ""),
+    ])
+    def test_invalid_or_nonmatching_entry(self, evidence, field, value):
+        evidence[3]["4a000006"][0][field] = value
+        with pytest.raises(AssertionError):
+            self.check(evidence)
+
+    @pytest.mark.parametrize("ledger", [[], {"bad": []}, {"4a000006": {}},
+                                        {"4a000006": [None]}, {}])
+    def test_malformed_or_empty_ledger(self, evidence, ledger):
+        with pytest.raises(AssertionError):
+            self.check((*evidence[:3], ledger))
+
+    def test_invalid_json_and_absent_ledger(self, evidence):
+        root, digest, record, _ = evidence
+        with pytest.raises(AssertionError):
+            _check_approval_binaries(root, {digest: record}, [], {})
+        (root / "history-retention.json").write_text("{")
+        with pytest.raises(json.JSONDecodeError):
+            _check_approval_binaries(root, {digest: record}, [], {})
+
+    @pytest.mark.parametrize("selector", ["filename", "binary_hash"])
+    @pytest.mark.parametrize("location", ["manifest", "namespace"])
+    def test_live_or_selected_artifact(self, evidence, selector, location):
+        row = {selector: evidence[2][selector]}
+        kwargs = ({"manifest": [row]} if location == "manifest"
+                  else {"namespace": {"abstractions": [{"artifact_pin": row}]}})
+        with pytest.raises(AssertionError):
+            self.check(evidence, **kwargs)
+
+    def test_archived_manifest_is_not_live(self, evidence):
+        self.check(evidence, manifest=[dict(evidence[2], archived=True)])
+
+    @pytest.mark.parametrize("kind", ["journal", "ledger"])
+    def test_pending_conflicts_with_completed_evidence(self, evidence, kind):
+        entry = dict(evidence[3]["4a000006"][0], status="pending")
+        if kind == "journal":
+            (evidence[0] / ".history-retention-pending.json").write_text(
+                json.dumps({"token": "4a000006", "entry": entry}))
+        else:
+            evidence[3]["4a000006"].append(entry)
+        with pytest.raises(AssertionError):
+            self.check(evidence)
+
+    @pytest.mark.parametrize("kind", ["changed", "dangling"])
+    def test_deleted_name_must_remain_absent(self, evidence, kind):
+        path = evidence[0] / evidence[2]["filename"]
+        if kind == "changed":
+            path.write_bytes(b"different bytes")
+        else:
+            path.symlink_to("missing.lump")
+        with pytest.raises(AssertionError):
+            self.check(evidence)
+
+    @pytest.mark.parametrize("field", ["binary_hash", "compiler_binary_hash"])
+    def test_deletion_never_bypasses_hash_fields(self, evidence, field):
+        evidence[2][field] = "b" * 64
+        with pytest.raises(AssertionError, match="must equal its key"):
+            self.check(evidence)
+
+    def test_deletion_never_bypasses_record_or_key_structure(self, evidence):
+        root, digest, _, ledger = evidence
+        (root / "history-retention.json").write_text(json.dumps(ledger))
+        for approvals in ({digest: []}, {"BAD": {}}, {digest: {}}):
+            with pytest.raises(AssertionError):
+                _check_approval_binaries(root, approvals, [], {})
 
 
 class TestR5_ManifestMatchesBinary:
