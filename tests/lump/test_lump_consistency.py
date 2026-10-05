@@ -472,7 +472,35 @@ def _reference_strings(value):
             yield from _reference_strings(child)
 
 
-def _check_approval_binaries(root, approvals, manifest, namespace):
+def _frozen_selection_strings(frozen_root):
+    """Protect selections/inventories, not copied approvals or stale provenance."""
+    from server.history_retention import reference_documents
+
+    for path, text in reference_documents(frozen_root, excluded=("approvals.json",)).items():
+        name = os.path.basename(path)
+        if name not in ("revision.json", "namespace.json") and not name.startswith("build-approval-"):
+            continue
+        document = json.loads(text)
+        assert isinstance(document, dict), f"Invalid frozen selection document: {path}"
+        if name == "namespace.json":
+            yield from _reference_strings(document.get("abstractions", []))
+        elif name == "revision.json":
+            metadata = document.get("metadata", {})
+            yield from _reference_strings(metadata.get("selected_lumps", []))
+            # Revision files inventories attest retained artifacts, not the
+            # unselected approvals copied alongside them.
+            for filename, digest in document.get("files", {}).items():
+                if filename.endswith(".lump"):
+                    yield filename
+                    yield digest
+                    if _re.fullmatch(r"[0-9a-f]{64}\.lump", filename):
+                        yield filename[:-5]
+        else:
+            yield from _reference_strings(document.get("ns_map", {}))
+            yield from _reference_strings(document.get("namespace_snapshot", {}))
+
+
+def _check_approval_binaries(root, approvals, manifest, namespace, *, frozen_root=None):
     binary_digests = set()
     for filename in os.listdir(root):
         path = os.path.join(root, filename)
@@ -483,6 +511,8 @@ def _check_approval_binaries(root, approvals, manifest, namespace):
     live = set(_reference_strings([
         [row for row in manifest if row.get("archived") is not True], namespace
     ]))
+    if frozen_root is not None:
+        live.update(_frozen_selection_strings(frozen_root))
     journal = os.path.join(root, ".history-retention-pending.json")
     if os.path.exists(journal):
         with open(journal, encoding="utf-8") as source:
@@ -519,7 +549,9 @@ class TestR4_ApprovalStore:
     def test_approval_keys_and_binary_hash_fields(self):
         with open(os.path.join(LUMPS_DIR, "ns-state.json"), encoding="utf-8") as source:
             namespace = json.load(source)
-        _check_approval_binaries(LUMPS_DIR, APPROVALS, MANIFEST, namespace)
+        _check_approval_binaries(
+            LUMPS_DIR, APPROVALS, MANIFEST, namespace,
+            frozen_root=os.path.join(LUMPS_DIR, "..", "build-snapshots"))
 
 
 class TestR4_DeletionEvidence:
@@ -534,10 +566,11 @@ class TestR4_DeletionEvidence:
                      trigger="explicit-user-approved-history-deletion")
         return tmp_path, digest, record, {"4a000006": [entry]}
 
-    def check(self, evidence, *, manifest=None, namespace=None):
+    def check(self, evidence, *, manifest=None, namespace=None, frozen_root=None):
         root, digest, record, ledger = evidence
         (root / "history-retention.json").write_text(json.dumps(ledger))
-        _check_approval_binaries(root, {digest: record}, manifest or [], namespace or {})
+        _check_approval_binaries(root, {digest: record}, manifest or [], namespace or {},
+                                frozen_root=frozen_root)
 
     @pytest.mark.parametrize("status", [None, "deleted"])
     def test_completed_exact_deletion(self, evidence, status):
@@ -598,6 +631,34 @@ class TestR4_DeletionEvidence:
 
     def test_archived_manifest_is_not_live(self, evidence):
         self.check(evidence, manifest=[dict(evidence[2], archived=True)])
+
+    @pytest.mark.parametrize("selector", ["filename", "binary_hash"])
+    @pytest.mark.parametrize("kind", ["revision", "namespace", "legacy", "inventory"])
+    def test_frozen_selection_blocks_deletion_exception(self, evidence, selector, kind):
+        root, digest, record, _ = evidence
+        frozen = root / "frozen"
+        frozen.mkdir()
+        selected = {selector: record[selector]}
+        name, document = {
+            "revision": ("revision.json", {"metadata": {"selected_lumps": [selected]}}),
+            "namespace": ("namespace.json", {"abstractions": [selected]}),
+            "legacy": ("build-approval-example.json", {"ns_map": {"slot_rules": [selected]}}),
+            "inventory": ("revision.json", {"files": {record["filename"]: digest}}),
+        }[kind]
+        (frozen / name).write_text(json.dumps(document))
+        with pytest.raises(AssertionError, match="live/pending references"):
+            self.check(evidence, frozen_root=frozen)
+
+    def test_frozen_unselected_approvals_and_stale_provenance_are_not_roots(self, evidence):
+        frozen = evidence[0] / "frozen"
+        frozen.mkdir()
+        (frozen / "approvals.json").write_text(json.dumps({evidence[1]: evidence[2]}))
+        (frozen / "boot-image.provenance.json").write_text(
+            json.dumps({"inputs": [evidence[2]]}))
+        (frozen / "revision.json").write_text(json.dumps({
+            "metadata": {"selected_lumps": []},
+            "files": {"approvals.json": "a" * 64}}))
+        self.check(evidence, frozen_root=frozen)
 
     @pytest.mark.parametrize("kind", ["journal", "ledger"])
     def test_pending_conflicts_with_completed_evidence(self, evidence, kind):
