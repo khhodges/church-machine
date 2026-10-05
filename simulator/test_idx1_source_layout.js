@@ -82,10 +82,33 @@ const malformed = new Assembler().assemble('RETURN', {
 });
 assert(malformed.errors.length); // Malformed metadata is diagnostic, not a crash.
 
-// IDX1 is never selected by seeing a register operand in legacy source.
-const legacy = new Assembler().assemble('LOAD CR1, CR6, DR11');
-assert(legacy.errors.length);
+// A register index is supported by the default compact LOAD encoding; it
+// does not implicitly select the explicit, non-executable IDX1 product.
+const compact = new Assembler().assemble('LOAD CR1, CR6, DR11');
+assert.deepEqual(compact.errors, []);
+assert.equal(compact.words.length, 1);
+assert.equal(compact.words[0] >>> 27, 0); // LOAD, not opcode-10 IDX1 prefix.
+assert.equal(compact.words[0] & 0x7FFF, 11); // DR11, zero magnitude.
+assert.equal(compact.profile, undefined);
+assert.equal(compact.layout, undefined);
+
+// Literal LOADs are one word in both profiles, but their index fields differ:
+// compact uses magnitude << 4 plus DR0, while IDX1 uses the literal directly.
 const literal = 'LOAD CR1, CR6, #2\nRETURN';
-assert.deepEqual(compile(literal, { fastEntry: 1, dispatch: [] }).words,
-    new Assembler().assemble(literal).words);
+const idxLiteral = compile(literal, { fastEntry: 1, dispatch: [] });
+const compactLiteral = new Assembler().assemble(literal);
+assert.deepEqual(idxLiteral.errors, []);
+assert.deepEqual(compactLiteral.errors, []);
+assert.equal(idxLiteral.executable, false);
+assert.equal(idxLiteral.profile, 'IDX1');
+assert.equal(idxLiteral.words.length, 2);
+assert.equal(compactLiteral.words.length, 2);
+assert.equal(idxLiteral.words[0] & 0x7FFF, 2);
+assert.equal(compactLiteral.words[0] & 0x7FFF, 2 << 4);
+assert.equal(idxLiteral.words[0] >>> 15, compactLiteral.words[0] >>> 15);
+assert.equal(idxLiteral.words[1], compactLiteral.words[1]);
+assert.deepEqual(idxLiteral.layout.instructionStarts, [1, 2]);
+assert.deepEqual(idxLiteral.layout.extents, [
+    { startWord: 1, endWord: 3, kind: 'code' },
+]);
 console.log('IDX1 source-layout compiler tests passed (no executable admission)');
