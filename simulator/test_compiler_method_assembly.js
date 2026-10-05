@@ -316,7 +316,8 @@ assert.equal(
     fixtureHash,
     'full compile must not mutate the saved fixture',
 );
-assert.deepEqual(fullResult.capabilities.map(cap => cap.name), ['SELF', 'Next']);
+assert.deepEqual(fullResult.capabilities.map(cap => cap.name), ['SELF'],
+    'SelfTest returns to its caller; it must not acquire a Next continuation');
 assert.equal(fullResult.capabilities[0].compiler_owned_self, true);
 assert.ok(fullResult.methods[0].code.length > 300, 'full SelfTest method must be assembled');
 
@@ -334,7 +335,6 @@ assert.deepEqual(workerResult.capabilities.map(cap => ({
     name: cap.name, row: cap.relocation_row, pending: cap.pending_symbolic,
 })), [
     { name: 'SELF', row: 0, pending: false },
-    { name: 'Next', row: 1, pending: true },
 ]);
 assert.equal(workerResult.compiler_record.source_hash,
     crypto.createHash('sha256').update(Buffer.from(wrapped, 'utf8')).digest('hex'));

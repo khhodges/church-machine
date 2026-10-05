@@ -4,6 +4,7 @@
 // Validate source/API content embedded in self-defining LUMP binaries.
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 const ROOT = path.resolve(__dirname, '..');
 
 function arg(name, fallback) {
@@ -39,7 +40,13 @@ function inspect(file) {
     if (flags & 1) {
         const n = raw.readUInt32BE(sourceLengthAt);
         if (sourceLengthAt + 4 + n > end) throw new Error('embedded source exceeds freespace');
-        source = raw.subarray(sourceLengthAt + 4, sourceLengthAt + 4 + n).toString('utf8');
+        const storedSource = raw.subarray(sourceLengthAt + 4, sourceLengthAt + 4 + n);
+        try {
+            source = ((flags & 0x04) ? zlib.inflateRawSync(storedSource) : storedSource)
+                .toString('utf8');
+        } catch (error) {
+            throw new Error(`invalid compressed embedded source: ${error.message}`);
+        }
     }
     return { api, source };
 }
@@ -60,6 +67,9 @@ function historicalClassification(entry, error) {
 }
 
 function main() {
+    console.log('Scope: repository-example freshness and embedded-content integrity; ' +
+        'a source mismatch alone does not establish selected-artifact runtime invalidity. ' +
+        'See docs/test-release-classification.md.');
     const manifestValue = JSON.parse(fs.readFileSync(path.join(LUMPS, 'manifest.json'), 'utf8'));
     const manifest = Array.isArray(manifestValue) ? manifestValue : Object.values(manifestValue);
     let checked = 0;

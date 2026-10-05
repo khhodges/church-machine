@@ -3,6 +3,7 @@
 # Expensive firmware release validation is opt-in: --group release.
 # Prints every suite's output followed by a full pass/fail summary.
 # Exits non-zero if any suite fails.
+# Failure purpose/release impact: docs/test-release-classification.md.
 #
 # Usage:
 #   ./scripts/run-all-tests.sh                                    # run all suites
@@ -571,6 +572,7 @@ echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "  PRE-FLIGHT: checking run-all-tests.sh is in sync"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Test purpose and release impact: docs/test-release-classification.md"
 node scripts/check-run-all-tests-sync.js || {
     echo ""
     echo "STOPPING: run-all-tests.sh is out of sync with .replit workflows."

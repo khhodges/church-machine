@@ -25,3 +25,15 @@ release-only replay run during ordinary testing.
 **How to apply:** Use the validation API for validation workflows (the ordinary
 workflow API rejects them), inspect the resulting parent dependencies, and
 keep release-only checks explicitly opt-in in both execution paths.
+
+Classify a failing assertion by the requirement and authoritative release input
+it protects, not by the suite's name or its red status alone.
+
+**Why:** The user approved separating genuine FPGA safety requirements from
+obsolete design expectations. Repository examples and newer builder formats
+can disagree with the intended selected program without proving it defective.
+
+**How to apply:** Preserve strict exit codes and unresolved safety checks.
+Retire superseded expectations, not whole suites; distinguish source freshness,
+test setup failures, observed execution faults, and actual-target compatibility.
+Never change selected artifacts just to satisfy an obsolete example.

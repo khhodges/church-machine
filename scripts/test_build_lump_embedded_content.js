@@ -4,6 +4,8 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const zlib = require('zlib');
+const assert = require('assert');
 
 const { execFileSync, spawnSync } = require('child_process');
 const { historicalClassification, inspect } = require('./check-lump-embedded-content.js');
@@ -44,15 +46,16 @@ function seedCanonicalState(dir, script) {
         JSON.stringify({ version: 1, algorithm: 'sha256', approvals: {} }, null, 2) + '\n');
 }
 
-function writeFixtureLump(file, source) {
+function writeFixtureLump(file, source, compressed = false) {
     const size = 64;
     const raw = Buffer.alloc(size * 4);
     const api = Buffer.from(JSON.stringify({ methods: [] }), 'utf8');
-    const sourceBytes = Buffer.from(source, 'utf8');
+    const sourceBytes = compressed
+        ? zlib.deflateRawSync(Buffer.from(source, 'utf8')) : Buffer.from(source, 'utf8');
     raw.writeUInt32BE(0, 0);
     let offset = 4;
     raw[offset] = 0xab;
-    raw[offset + 1] = 1;
+    raw[offset + 1] = compressed ? 7 : 1;
     raw.writeUInt16BE(api.length, offset + 2);
     api.copy(raw, offset + 4);
     offset = (offset + 4 + api.length + 3) & ~3;
@@ -117,11 +120,55 @@ for (const [script, sourceName] of builds) {
 }
 try {
     testHistoricalClassificationBoundary();
+    testCompressedSourceBoundary();
 } catch (error) {
     console.error(`FAIL historical classification boundary: ${error.message}`);
     failures++;
 }
 if (failures) process.exit(1);
+
+function testCompressedSourceBoundary() {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lump-compressed-content-'));
+    try {
+        const source = '; UTF-8 source: λ → caller\nRETURN\n'.repeat(30);
+        const file = path.join(dir, 'compressed.lump');
+        writeFixtureLump(file, source, true);
+        assert.equal(inspect(file).source, source, 'raw DEFLATE must decode exact source');
+        const valid = fs.readFileSync(file);
+        const sourceLengthAt = (8 + valid.readUInt16BE(6) + 3) & ~3;
+        const broken = Buffer.from(valid);
+        broken.fill(0xff, sourceLengthAt + 4);
+        fs.writeFileSync(file, broken);
+        assert.throws(() => inspect(file), /invalid compressed embedded source/);
+        assert.equal(historicalClassification({ archived: true },
+            new Error('invalid compressed embedded source')), null,
+        'archival must never excuse damaged compressed content');
+        const oversized = Buffer.from(valid);
+        oversized.writeUInt32BE(valid.length, sourceLengthAt);
+        fs.writeFileSync(file, oversized);
+        assert.throws(() => inspect(file), /embedded source exceeds freespace/);
+        const examples = path.join(dir, 'examples');
+        fs.mkdirSync(examples);
+        fs.writeFileSync(path.join(examples, 'fixture.cloomc'), source);
+        fs.writeFileSync(file, valid);
+        fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify([
+            { abstraction: 'Fixture', filename: 'compressed.lump' },
+        ]));
+        const run = () => spawnSync(process.execPath, [
+            path.join(__dirname, 'check-lump-embedded-content.js'),
+            '--lumps-dir', dir, '--examples-dir', examples,
+        ], { encoding: 'utf8' });
+        const matching = run();
+        assert.equal(matching.status, 0, matching.stdout + matching.stderr);
+        fs.writeFileSync(path.join(examples, 'fixture.cloomc'), source + '; changed\n');
+        const stale = run();
+        assert.equal(stale.status, 1, 'genuine source drift must remain a failing check');
+        assert.match(stale.stderr, /does not match canonical source/);
+        console.log('PASS compressed source, corruption, bounds, and genuine drift');
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
 
 function writeMissingContentLump(file) {
     fs.writeFileSync(file, Buffer.alloc(64 * 4));
