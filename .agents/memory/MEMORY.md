@@ -46,7 +46,7 @@
 - [Namespace reissue generation](boot-entry-generation-minting.md) — every GT minted for a reused slot must inherit the live/retained Word-1 sequence
 - [Boot test private runtime state](boot-test-private-runtime-state.md) — LUMP isolation must include every boot-regeneration persistence input, including saved config
 - [Latched multi-cycle hardware inputs](latched-multicycle-hardware-inputs.md) — capture operands, control-flow state, and security decisions at acceptance; never consume live inputs later
-- [SelfTest Next follows LightningBolt](selftest-next-lightningbolt.md) — Next.GT is coupled to the selected boot-entry GT; independent continuation targets are prohibited
+- [SelfTest caller-return flow](selftest-next-lightningbolt.md) — no Next capability; CapabilityTest calls SelfTest and WukongCallHome, with CHANGE to Thread.2 each iteration.
 - [Capability picker version selection](capability-picker-version-selection.md) — show one latest eligible LUMP per abstraction by default; place older versions behind an explicit disclosure
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata

@@ -1,24 +1,21 @@
 ---
-name: SelfTest Next follows LightningBolt
-description: The SelfTest continuation capability is defined by the selected LightningBolt boot entry.
+name: SelfTest caller-return flow
+description: User-confirmed CapabilityTest loop uses CALL/RETURN, not a SelfTest Next capability.
 ---
 
-SelfTest C-List row 1 (`Next.GT`) must always target the same Namespace slot as
-the selected ⚡ LightningBolt boot entry. It is not an independently configurable
-continuation and must never silently fall back to a separate persisted target.
+SelfTest must not have a Next capability. The user explicitly confirmed that
+CapabilityTest calls SelfTest and WukongCallHome, each returning to CapabilityTest,
+and loops. CapabilityTest performs CHANGE to Thread.2 on each iteration:
+Boot.Thread to Thread.2 initially, then Thread.2 to itself.
 
-**Why:** Thread.CR0 and SelfTest's post-success continuation must dispatch to the
-same selected abstraction. Separate settings can diverge and make the visible
-continuation label disagree with the generated boot image.
+**Why:** The old Next/LightningBolt continuation rule describes an obsolete flow.
+It must not justify reintroducing Next into a replacement SelfTest or treating
+the selected SELF-only C-list as defective.
 
-**How to apply:** Explicit image preparation couples the destination-local
-SelfTest Next capability to the selected target, including its current generation.
-The canonical SelfTest artifact must declare at least two C-list rows: row 0 for
-SELF and row 1 for Next. A builder that emits only SELF makes the final
-`LOAD CR0, CR6[1]` access out of range before the image builder can localize Next.
-Never rewrite immutable source LUMPs. Never reapply a browser preference during
-reset or boot: imported/prepared image bytes own boot authority. Expose a
-selection discrepancy and require deliberate preparation instead.
+**How to apply:** Cross-check exact selected artifacts rather than older example
+sources, comments, or builders. Preserve the caller-return loop and immutable
+saved artifacts. Passing an isolated candidate replay does not validate the
+candidate's capability declarations against this intended application flow.
 
 Build Approval may show LightningBolt in the same per-slot selector, but it is
 a synthetic boot-role choice, separate from load policy. The
