@@ -8,3 +8,15 @@ Every fresh or generated Thread image must contain its two-word root CALL frame 
 **Why:** UI-specific sentinel creation allowed Compile+Run and booted execution to disagree, and a null CR12 caused direct runs to fail before the program could start.
 
 **How to apply:** Treat the protected Thread image as frame authority. Direct execution may validate and activate Boot.Thread transactionally, but must not manufacture a second sentinel or fall back to overwriting the prepared boot-entry LUMP. CHANGE into any fresh Thread must interpret NIA `0x7FFF` as “start at code word 0 and retain the root frame,” never install it as executable PC; only an ordinary suspended frame supplies a resume PC. Do not add catalog `resident`/`boot_resident` flags to Thread rows: those flags require artifact locators, while Thread residency is proven by their in-image typ=2 bodies and descriptors.
+
+A regenerated image is not an interchangeable fixture for a saved prepared
+image when testing secondary Thread entry.
+
+**Why:** Fresh secondary-thread initialization can choose SelfTest while the
+saved prepared Thread enters CapabilityTest. The former runs a returning
+SelfTest without a caller and faults; it does not disprove the saved loop.
+
+**How to apply:** Verify prepared CR0 homes and root-frame Enter GTs before
+diagnosing CHANGE or RETURN. Test the saved image first, identify regenerated
+image differences explicitly, and preserve independently prepared Thread
+entries as reviewed release inputs rather than silently inheriting Boot.Thread.
