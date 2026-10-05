@@ -49,6 +49,9 @@ requiring every audit digest to retain physical bytes contradicts that policy.
 deletion evidence. Pending intent is not completion, and neither historical
 evidence nor a shared digest excuses loss of a live or selected artifact.
 Keep approval structure and hash-field validation independent of this exception.
+Frozen selections must be checked before accepting a surviving same-digest
+copy under another filename; audit inventories alone cannot prove that an exact
+selected locator still exists.
 
 Explicit single-revision deletion is exempt from age and newest-version policy,
 but never from reference, link, approval-evidence, or recovery protections.

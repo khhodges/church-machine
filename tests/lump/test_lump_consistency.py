@@ -529,9 +529,16 @@ def _check_approval_binaries(root, approvals, manifest, namespace, *, frozen_roo
                 assert value == digest, (
                     f"approvals.json {digest}.{field}={value!r} must equal its key"
                 )
+        filename = record.get("filename")
+        if isinstance(filename, str) and filename in live:
+            selected_path = os.path.join(root, filename)
+            assert (os.path.isfile(selected_path)
+                    and _binary_sha256(selected_path) == digest), (
+                f"Selected approval artifact {filename!r} is missing or changed; "
+                "another filename with identical bytes does not satisfy selection"
+            )
         if digest in binary_digests:
             continue
-        filename = record.get("filename")
         assert (isinstance(filename, str)
                 and (filename, digest) in deleted
                 and not os.path.lexists(os.path.join(root, filename))
@@ -646,7 +653,20 @@ class TestR4_DeletionEvidence:
             "inventory": ("revision.json", {"files": {record["filename"]: digest}}),
         }[kind]
         (frozen / name).write_text(json.dumps(document))
-        with pytest.raises(AssertionError, match="live/pending references"):
+        with pytest.raises(AssertionError):
+            self.check(evidence, frozen_root=frozen)
+
+    @pytest.mark.parametrize("state", ["missing", "changed"])
+    def test_frozen_exact_selection_not_satisfied_by_shared_digest(self, evidence, state):
+        root, _, record, _ = evidence
+        root.joinpath("retained.lump").write_bytes(b"historical bytes")
+        if state == "changed":
+            root.joinpath(record["filename"]).write_bytes(b"wrong bytes")
+        frozen = root / "frozen"
+        frozen.mkdir()
+        (frozen / "revision.json").write_text(json.dumps({
+            "metadata": {"selected_lumps": [record]}}))
+        with pytest.raises(AssertionError, match="Selected approval artifact"):
             self.check(evidence, frozen_root=frozen)
 
     def test_frozen_unselected_approvals_and_stale_provenance_are_not_roots(self, evidence):
