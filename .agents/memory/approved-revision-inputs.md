@@ -61,3 +61,14 @@ build must not consume its later explicit upload permission.
 **How to apply:** Test the real staged source layout locally, permit safe tracked
 symlinks without traversing symlink overlay parents, and test build retention
 followed by first upload and replay rejection as a single lifecycle.
+
+Approved bitstream synthesis must work without a connected physical board.
+
+**Why:** The user explicitly approved offline droplet builds. A live device and
+bridge session are needed for programming, not for producing an artifact from
+an exact approved Namespace revision.
+
+**How to apply:** Keep authentication, exact revision selection, frozen input
+validation, and hardware certification checks for builds. Keep live target and
+session checks on upload and programming operations; never relax those when
+changing build-only behavior.

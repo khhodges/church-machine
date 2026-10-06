@@ -546,8 +546,8 @@ def test_start_auth_precedes_identity_and_live_target_validation():
     assert response.status_code == 401
 
 
-def test_start_requires_one_exact_identity_and_explicit_live_session(monkeypatch, tmp_path):
-    """Task #3330 rejects identity splits and omitted board-session correlation."""
+def test_start_requires_one_exact_identity_without_live_session(monkeypatch, tmp_path):
+    """Offline synthesis still rejects split identities and missing approval."""
     if not REPORT_TOKEN:
         pytest.skip('REPORT_TOKEN not set')
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
@@ -568,12 +568,12 @@ def test_start_requires_one_exact_identity_and_explicit_live_session(monkeypatch
     response = client.post(
         '/api/wukong-build/start', json=no_session, headers=AUTH_HEADERS,
     )
-    assert response.status_code == 409
-    assert 'session' in response.get_json()['error'].lower()
+    assert response.status_code == 422
+    assert 'approval snapshot' in response.get_json()['error'].lower()
 
 
-def test_start_rejects_stale_live_target_before_approval_gate(monkeypatch, tmp_path):
-    """A prior bridge report cannot satisfy Task #3330's fresh-board requirement."""
+def test_start_stale_target_still_requires_approval(monkeypatch, tmp_path):
+    """A stale bridge does not block synthesis or bypass approval."""
     if not REPORT_TOKEN:
         pytest.skip('REPORT_TOKEN not set')
     monkeypatch.setattr(_app, '_BUILD_SNAPSHOTS_DIR', str(tmp_path))
@@ -588,8 +588,8 @@ def test_start_rejects_stale_live_target_before_approval_gate(monkeypatch, tmp_p
         json=_build_start_payload(identity, device_uid, session_id),
         headers=AUTH_HEADERS,
     )
-    assert response.status_code == 409
-    assert response.get_json()['decision'] == 'stale_target'
+    assert response.status_code == 422
+    assert response.get_json()['error'].startswith('No approval snapshot')
 
 
 def test_start_rejected_without_snapshot(monkeypatch, tmp_path):
@@ -1303,6 +1303,13 @@ def test_approved_start_freezes_committed_namespace_before_worker_runs(monkeypat
         },
     }
     revision = _approved_revision(monkeypatch, tmp_path, namespace_a)
+    # The small-byte fixture tests launch ownership, not RTL certification.
+    # Keep the certification call required while its own tests validate evidence.
+    checked_revisions = []
+    monkeypatch.setattr(_app, '_require_hardware_namespace_revision',
+                        lambda record: checked_revisions.append(record))
+    monkeypatch.setattr(_app, '_wukong_target_error',
+                        lambda *_a, **_k: pytest.fail('Synthesis must not contact a board'))
     monkeypatch.setattr(_app, '_capture_committed_namespace_snapshot',
                         lambda **_: pytest.fail('Build must not re-read the mutable Namespace'))
     monkeypatch.setattr(_app, '_ba_write_ssh_key', lambda: str(tmp_path / 'key'))
@@ -1327,13 +1334,13 @@ def test_approved_start_freezes_committed_namespace_before_worker_runs(monkeypat
         'all_checks_pass': True, 'provenance_identity': 'newer-unselected',
         'namespace_revision_id': '0' * 64,
     }))
-    device_uid, session_id = _report_live_build_target()
     response = client.post(
         '/api/wukong-build/start',
-        json=_build_start_payload(nonce, device_uid, session_id),
+        json={'provenance_identity': nonce, 'build_nonce': nonce},
         headers=AUTH_HEADERS,
     )
     assert response.status_code == 200, response.get_json()
+    assert len(checked_revisions) == 1
     with _app.app.app_context():
         saved = _app.BuildRecord.query.order_by(_app.BuildRecord.id.desc()).first()
         saved_snapshot = json.loads(saved.ns_snapshot)

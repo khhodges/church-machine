@@ -1104,7 +1104,7 @@ const BuildApprovalView = {
             return;
         }
         const targetAuthorization = window.TargetState.authorize(
-            'bitstream', { id: targetBuild });
+            'build', { id: targetBuild });
         if (!targetAuthorization.ok) return;
         const btn = document.getElementById('baApproveBtn');
         if (btn) btn.disabled = true;

@@ -120,7 +120,7 @@ const historical = {
     context.window.TargetState = {
         resolve: () => ({ buildId: first.provenance_identity }),
         authorize: (kind, artifact) => {
-            assert.strictEqual(kind, 'bitstream');
+            assert.strictEqual(kind, 'build');
             assert.strictEqual(artifact.id, first.provenance_identity);
             return { ok: true, request: { artifact_identity: artifact.id } };
         },

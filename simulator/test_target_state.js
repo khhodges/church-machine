@@ -64,6 +64,10 @@ target.select({ mode: target.MODES.BITSTREAM, deviceUid: 'selected-board', build
 target.observeDevice({ uid: 'selected-board', sessionId: 'session-bitstream', connected: true, runningBuildId: 'build-41' });
 check(!target.authorize('bitstream', { id: 'build-41' }).ok, 'bitstream build mismatch fails closed');
 check(target.authorize('bitstream', { id: 'build-42' }).ok, 'selected exact bitstream build authorizes');
+target.observeDevice({ uid: 'selected-board', connected: false });
+check(target.authorize('build', { id: 'build-42' }).ok, 'offline exact build authorizes');
+check(!target.authorize('build', { id: 'other' }).ok, 'offline wrong build fails');
+check(!target.authorize('bitstream', { id: 'build-42' }).ok, 'offline programming remains blocked');
 target.select({ mode: target.MODES.SIMULATOR });
 check(target.authorize('simulator', { id: 'simulator-state' }).ok, 'Simulator mode authorizes simulator mutation');
 

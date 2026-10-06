@@ -106,6 +106,12 @@
     }
     function authorize(kind, artifact) {
         var s = resolve();
+        if (kind === 'build') {
+            if (s.mode !== MODES.BITSTREAM) return deny('select Wukong FPGA — Bitstream.');
+            if (!artifact || !artifact.id || artifact.id !== s.buildId)
+                return deny('select the exact approved build identity.');
+            return { ok: true, target: s, request: { build_id: artifact.id } };
+        }
         if (kind === 'simulator') return s.mode === MODES.SIMULATOR ? { ok: true, target: s } : deny('select Simulator RAM before changing simulator memory.');
         var wanted = kind === 'bitstream' ? MODES.BITSTREAM : MODES.RUNTIME;
         if (s.mode !== wanted) return deny('select ' + (wanted === MODES.BITSTREAM ? 'Wukong FPGA — Bitstream' : 'Wukong RAM — Runtime Upload') + '.');

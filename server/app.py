@@ -25790,6 +25790,8 @@ def _ba_build_worker(key_path):
 
     ssh_base = [
         'ssh', '-i', key_path,
+        '-o', 'BatchMode=yes',
+        '-o', 'IdentitiesOnly=yes',
         '-o', 'StrictHostKeyChecking=accept-new',
         '-o', 'ConnectTimeout=15',
         f'{_DROPLET_USER}@{_DROPLET_IP}',
@@ -26012,9 +26014,8 @@ def wukong_build_start():
     if not ok:
         return err
     request_data = request.get_json(silent=True) or {}
-    target, target_error = _wukong_target_error(request_data)
-    if target_error:
-        return _wukong_target_rejection(target_error)
+    # Synthesis consumes an approved immutable revision, not a live board.
+    # Upload/programming endpoints retain their independent device/session gates.
     supplied_identities = [
         str(request_data.get(key, '') or '').strip()
         for key in ('build_intent_id', 'provenance_identity',
@@ -26118,8 +26119,6 @@ def wukong_build_start():
             "record_id": record_id,
             "namespace_fingerprint": namespace_snapshot["fingerprint"],
             "namespace_revision_id": namespace_revision_id,
-            "target_device_uid": target["device_uid"],
-            "target_session_id": target["bridge_session"],
             "selected_build_id": approved_identity,
             "provenance_identity": approved_identity,
         }
