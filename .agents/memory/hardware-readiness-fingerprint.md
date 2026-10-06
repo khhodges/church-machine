@@ -30,3 +30,14 @@ fault-aware handshake, not a fixed clock count.
 instruction semantics. Injecting a test instruction too early produces misleading
 ISA failures. Fixing that prerequisite does not justify relaxing later result
 or permission assertions.
+
+Check intended empty-slot membership in both simulator and standalone hardware
+Namespace projections before approving generated inputs.
+
+**Why:** Correcting simulator generation did not remove stale sealed descriptors
+from the separate hardware catalog projection. Fresh RTL alone reproduced them,
+and the old readiness check incorrectly required seals even for empty slots.
+
+**How to apply:** Require all-zero descriptors for absent slots, while retaining
+integrity validation for every nonempty descriptor. An image digest in provenance
+does not by itself prove that every hardware initialization descriptor matches.

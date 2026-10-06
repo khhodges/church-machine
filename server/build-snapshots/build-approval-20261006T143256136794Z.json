@@ -1,0 +1,1649 @@
+{
+  "frozen_at": "20261006T143256136794Z",
+  "all_checks_pass": true,
+  "ns_map": {
+    "tiers": {
+      "bootstrap": [
+        {
+          "slot": 0,
+          "name": "Boot.NS",
+          "token": null,
+          "header_word": "0xF8810100",
+          "cw": 64,
+          "cc": 0,
+          "location": "0x1FC00",
+          "words": null,
+          "limit": null,
+          "load_policy": "Bootstrap",
+          "slot_rule": "Bootstrap",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "Boot.NS namespace LUMP (boot ROM)",
+          "programmable": false,
+          "size_budget": {
+            "available": false,
+            "reason": "N/A \u2014 boot namespace table",
+            "metadata": "not applicable"
+          },
+          "checks": [
+            {
+              "label": "BRAM",
+              "ok": true,
+              "detail": "Baked into BRAM at NS_TABLE_BASE"
+            }
+          ]
+        },
+        {
+          "slot": 1,
+          "name": "Boot.Thread",
+          "token": null,
+          "header_word": "0xF900820C",
+          "cw": 32,
+          "cc": 12,
+          "location": "0xe00",
+          "words": null,
+          "limit": null,
+          "load_policy": "Resident",
+          "slot_rule": "Resident",
+          "perms": [
+            "NONE"
+          ],
+          "source": "generated Thread.1 body (boot ROM)",
+          "programmable": false,
+          "size_budget": {
+            "available": true,
+            "metadata": "generated Thread body",
+            "sections": [
+              {
+                "label": "Header",
+                "words": 1,
+                "bytes": 4
+              },
+              {
+                "label": "Data registers",
+                "words": 16,
+                "bytes": 64
+              },
+              {
+                "label": "Protected STO",
+                "words": 1,
+                "bytes": 4
+              },
+              {
+                "label": "Heap",
+                "words": 194,
+                "bytes": 776
+              },
+              {
+                "label": "LIFO stack",
+                "words": 32,
+                "bytes": 128
+              },
+              {
+                "label": "Capability homes",
+                "words": 12,
+                "bytes": 48
+              }
+            ],
+            "code": {
+              "words": 32,
+              "bytes": 128
+            },
+            "api": {
+              "words": 0,
+              "bytes": 0,
+              "measured": true
+            },
+            "gt_capabilities": {
+              "words": 12,
+              "bytes": 48
+            },
+            "freespace": {
+              "words": 0,
+              "bytes": 0,
+              "reserved": false
+            },
+            "total": {
+              "words": 256,
+              "bytes": 1024
+            },
+            "allocation": {
+              "words": 256,
+              "bytes": 1024
+            },
+            "reconciles": true
+          },
+          "checks": [
+            {
+              "label": "BRAM",
+              "ok": true,
+              "detail": "Thread lump baked into BRAM"
+            }
+          ]
+        }
+      ],
+      "resident": [
+        {
+          "slot": 2,
+          "name": "UART_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000014",
+          "words": 3,
+          "limit": 2,
+          "load_policy": "Hardware",
+          "slot_rule": "Hardware",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM hardware register",
+          "programmable": false,
+          "size_budget": {
+            "available": false,
+            "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (3 words)",
+            "metadata": "not applicable"
+          },
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000014"
+            }
+          ]
+        },
+        {
+          "slot": 3,
+          "name": "LED_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000000",
+          "words": 5,
+          "limit": 4,
+          "load_policy": "Hardware",
+          "slot_rule": "Hardware",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM hardware register",
+          "programmable": false,
+          "size_budget": {
+            "available": false,
+            "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (5 words)",
+            "metadata": "not applicable"
+          },
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000000"
+            }
+          ]
+        },
+        {
+          "slot": 4,
+          "name": "BTN_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x40000028",
+          "words": 1,
+          "limit": 0,
+          "load_policy": "Hardware",
+          "slot_rule": "Hardware",
+          "perms": [
+            "R"
+          ],
+          "source": "boot ROM hardware register",
+          "programmable": false,
+          "size_budget": {
+            "available": false,
+            "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (1 word)",
+            "metadata": "not applicable"
+          },
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x40000028"
+            }
+          ]
+        },
+        {
+          "slot": 5,
+          "name": "TIMER_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0x4000002C",
+          "words": 5,
+          "limit": 4,
+          "load_policy": "Hardware",
+          "slot_rule": "Hardware",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM hardware register",
+          "programmable": false,
+          "size_budget": {
+            "available": false,
+            "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (5 words)",
+            "metadata": "not applicable"
+          },
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0x4000002C"
+            }
+          ]
+        },
+        {
+          "slot": 13,
+          "name": "M_BIT_DEV",
+          "token": null,
+          "header_word": "MMIO",
+          "cw": null,
+          "cc": null,
+          "location": "0xFFFFFF1C",
+          "words": 1,
+          "limit": 0,
+          "load_policy": "Hardware",
+          "slot_rule": "Hardware",
+          "perms": [
+            "R",
+            "W"
+          ],
+          "source": "boot ROM hardware register",
+          "programmable": false,
+          "size_budget": {
+            "available": false,
+            "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (1 word)",
+            "metadata": "not applicable"
+          },
+          "checks": [
+            {
+              "label": "MMIO",
+              "ok": true,
+              "detail": "MMIO at 0xFFFFFF1C"
+            }
+          ]
+        },
+        {
+          "slot": 6,
+          "name": "SelfTest",
+          "token": "4a000006",
+          "header_word": "0xFA87D001",
+          "cw": 500,
+          "cc": 1,
+          "location": "0x0600",
+          "words": null,
+          "limit": null,
+          "load_policy": "Resident",
+          "slot_rule": "Resident",
+          "perms": [
+            "E"
+          ],
+          "source": "SelfTest.1.8b19abd7.lump",
+          "programmable": false,
+          "size_budget": {
+            "available": true,
+            "metadata": "measured",
+            "code": {
+              "words": 500,
+              "bytes": 2000
+            },
+            "api": {
+              "words": 49,
+              "bytes": 196,
+              "measured": true
+            },
+            "gt_capabilities": {
+              "words": 1,
+              "bytes": 4
+            },
+            "freespace": {
+              "words": 1546,
+              "bytes": 6184,
+              "reserved": true
+            },
+            "total": {
+              "words": 2048,
+              "bytes": 8192
+            },
+            "allocation": {
+              "words": 2048,
+              "bytes": 8192
+            },
+            "reconciles": true
+          },
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xFA87D001  cw=500 cc=1"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=500 cc=1"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=0945ce7b36001779f569004e960526c5"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='4a000006' file='4a000006'"
+            },
+            {
+              "label": "overlap",
+              "ok": true,
+              "detail": "No byte-range overlap with other resident slots"
+            }
+          ]
+        },
+        {
+          "slot": 7,
+          "name": "WukongCallHome",
+          "token": "313e637c",
+          "header_word": "0xFA012C03",
+          "cw": 75,
+          "cc": 3,
+          "location": "0x1200",
+          "words": null,
+          "limit": null,
+          "load_policy": "Resident",
+          "slot_rule": "Resident",
+          "perms": [
+            "E"
+          ],
+          "source": "WukongCallHome.1.b29b38e3.lump",
+          "programmable": false,
+          "size_budget": {
+            "available": true,
+            "metadata": "measured",
+            "code": {
+              "words": 75,
+              "bytes": 300
+            },
+            "api": {
+              "words": 92,
+              "bytes": 368,
+              "measured": true
+            },
+            "gt_capabilities": {
+              "words": 3,
+              "bytes": 12
+            },
+            "freespace": {
+              "words": 945,
+              "bytes": 3780,
+              "reserved": true
+            },
+            "total": {
+              "words": 1024,
+              "bytes": 4096
+            },
+            "allocation": {
+              "words": 1024,
+              "bytes": 4096
+            },
+            "reconciles": true
+          },
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xFA012C03  cw=75 cc=3"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=75 cc=3"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=a6306f1a1aaf0c1aceef153d98153d27"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='313e637c' file='313e637c'"
+            },
+            {
+              "label": "overlap",
+              "ok": true,
+              "detail": "No byte-range overlap with other resident slots"
+            }
+          ]
+        },
+        {
+          "slot": 11,
+          "name": "Thread.2",
+          "token": null,
+          "header_word": "0xF900820C",
+          "cw": 32,
+          "cc": 12,
+          "location": "0x00001110",
+          "words": null,
+          "limit": null,
+          "load_policy": "Resident",
+          "slot_rule": "Resident",
+          "perms": [
+            "NONE"
+          ],
+          "source": "generated Thread body (boot image)",
+          "programmable": false,
+          "size_budget": {
+            "available": true,
+            "metadata": "generated Thread body",
+            "sections": [
+              {
+                "label": "Header",
+                "words": 1,
+                "bytes": 4
+              },
+              {
+                "label": "Data registers",
+                "words": 16,
+                "bytes": 64
+              },
+              {
+                "label": "Protected STO",
+                "words": 1,
+                "bytes": 4
+              },
+              {
+                "label": "Heap",
+                "words": 194,
+                "bytes": 776
+              },
+              {
+                "label": "LIFO stack",
+                "words": 32,
+                "bytes": 128
+              },
+              {
+                "label": "Capability homes",
+                "words": 12,
+                "bytes": 48
+              }
+            ],
+            "code": {
+              "words": 32,
+              "bytes": 128
+            },
+            "api": {
+              "words": 0,
+              "bytes": 0,
+              "measured": true
+            },
+            "gt_capabilities": {
+              "words": 12,
+              "bytes": 48
+            },
+            "freespace": {
+              "words": 0,
+              "bytes": 0,
+              "reserved": false
+            },
+            "total": {
+              "words": 256,
+              "bytes": 1024
+            },
+            "allocation": {
+              "words": 256,
+              "bytes": 1024
+            },
+            "reconciles": true
+          },
+          "checks": [
+            {
+              "label": "Thread layout",
+              "ok": true,
+              "detail": "generated 256-word Thread body: heap=194w stack=32w caps=12w"
+            }
+          ]
+        },
+        {
+          "slot": 12,
+          "name": "Thread.3",
+          "token": null,
+          "header_word": "0xF900820C",
+          "cw": 32,
+          "cc": 12,
+          "location": "0x00001210",
+          "words": null,
+          "limit": null,
+          "load_policy": "Resident",
+          "slot_rule": "Resident",
+          "perms": [
+            "NONE"
+          ],
+          "source": "generated Thread body (boot image)",
+          "programmable": false,
+          "size_budget": {
+            "available": true,
+            "metadata": "generated Thread body",
+            "sections": [
+              {
+                "label": "Header",
+                "words": 1,
+                "bytes": 4
+              },
+              {
+                "label": "Data registers",
+                "words": 16,
+                "bytes": 64
+              },
+              {
+                "label": "Protected STO",
+                "words": 1,
+                "bytes": 4
+              },
+              {
+                "label": "Heap",
+                "words": 194,
+                "bytes": 776
+              },
+              {
+                "label": "LIFO stack",
+                "words": 32,
+                "bytes": 128
+              },
+              {
+                "label": "Capability homes",
+                "words": 12,
+                "bytes": 48
+              }
+            ],
+            "code": {
+              "words": 32,
+              "bytes": 128
+            },
+            "api": {
+              "words": 0,
+              "bytes": 0,
+              "measured": true
+            },
+            "gt_capabilities": {
+              "words": 12,
+              "bytes": 48
+            },
+            "freespace": {
+              "words": 0,
+              "bytes": 0,
+              "reserved": false
+            },
+            "total": {
+              "words": 256,
+              "bytes": 1024
+            },
+            "allocation": {
+              "words": 256,
+              "bytes": 1024
+            },
+            "reconciles": true
+          },
+          "checks": [
+            {
+              "label": "Thread layout",
+              "ok": true,
+              "detail": "generated 256-word Thread body: heap=194w stack=32w caps=12w"
+            }
+          ]
+        },
+        {
+          "slot": 10,
+          "name": "CapabilityTest",
+          "token": "39700a92",
+          "header_word": "0xFA00940B",
+          "cw": 37,
+          "cc": 11,
+          "location": "0x00000510",
+          "words": null,
+          "limit": null,
+          "load_policy": "Resident",
+          "slot_rule": "LightningBolt",
+          "perms": [
+            "E"
+          ],
+          "source": "CapabilityTest.1.68be391a.lump",
+          "programmable": true,
+          "size_budget": {
+            "available": true,
+            "metadata": "measured",
+            "code": {
+              "words": 37,
+              "bytes": 148
+            },
+            "api": {
+              "words": 180,
+              "bytes": 720,
+              "measured": true
+            },
+            "gt_capabilities": {
+              "words": 11,
+              "bytes": 44
+            },
+            "freespace": {
+              "words": 975,
+              "bytes": 3900,
+              "reserved": true
+            },
+            "total": {
+              "words": 1024,
+              "bytes": 4096
+            },
+            "allocation": {
+              "words": 1024,
+              "bytes": 4096
+            },
+            "reconciles": true
+          },
+          "checks": [
+            {
+              "label": "header",
+              "ok": true,
+              "detail": "Header valid: 0xFA00940B  cw=37 cc=11"
+            },
+            {
+              "label": "cw/cc",
+              "ok": true,
+              "detail": "binary cw=37 cc=11"
+            },
+            {
+              "label": "binary",
+              "ok": true,
+              "detail": "md5=f633d0a0de15a39d4e67ef1803ee1836"
+            },
+            {
+              "label": "token",
+              "ok": true,
+              "detail": "manifest token='39700a92' file='39700a92'"
+            }
+          ]
+        }
+      ],
+      "lazy": [],
+      "unused": []
+    },
+    "slot_rules": [
+      {
+        "slot": 0,
+        "name": "Boot.NS",
+        "token": null,
+        "header_word": "0xF8810100",
+        "cw": 64,
+        "cc": 0,
+        "location": "0x1FC00",
+        "words": null,
+        "limit": null,
+        "load_policy": "Bootstrap",
+        "slot_rule": "Bootstrap",
+        "perms": [
+          "R",
+          "W"
+        ],
+        "source": "Boot.NS namespace LUMP (boot ROM)",
+        "programmable": false,
+        "size_budget": {
+          "available": false,
+          "reason": "N/A \u2014 boot namespace table",
+          "metadata": "not applicable"
+        },
+        "checks": [
+          {
+            "label": "BRAM",
+            "ok": true,
+            "detail": "Baked into BRAM at NS_TABLE_BASE"
+          }
+        ]
+      },
+      {
+        "slot": 1,
+        "name": "Boot.Thread",
+        "token": null,
+        "header_word": "0xF900820C",
+        "cw": 32,
+        "cc": 12,
+        "location": "0xe00",
+        "words": null,
+        "limit": null,
+        "load_policy": "Resident",
+        "slot_rule": "Resident",
+        "perms": [
+          "NONE"
+        ],
+        "source": "generated Thread.1 body (boot ROM)",
+        "programmable": false,
+        "size_budget": {
+          "available": true,
+          "metadata": "generated Thread body",
+          "sections": [
+            {
+              "label": "Header",
+              "words": 1,
+              "bytes": 4
+            },
+            {
+              "label": "Data registers",
+              "words": 16,
+              "bytes": 64
+            },
+            {
+              "label": "Protected STO",
+              "words": 1,
+              "bytes": 4
+            },
+            {
+              "label": "Heap",
+              "words": 194,
+              "bytes": 776
+            },
+            {
+              "label": "LIFO stack",
+              "words": 32,
+              "bytes": 128
+            },
+            {
+              "label": "Capability homes",
+              "words": 12,
+              "bytes": 48
+            }
+          ],
+          "code": {
+            "words": 32,
+            "bytes": 128
+          },
+          "api": {
+            "words": 0,
+            "bytes": 0,
+            "measured": true
+          },
+          "gt_capabilities": {
+            "words": 12,
+            "bytes": 48
+          },
+          "freespace": {
+            "words": 0,
+            "bytes": 0,
+            "reserved": false
+          },
+          "total": {
+            "words": 256,
+            "bytes": 1024
+          },
+          "allocation": {
+            "words": 256,
+            "bytes": 1024
+          },
+          "reconciles": true
+        },
+        "checks": [
+          {
+            "label": "BRAM",
+            "ok": true,
+            "detail": "Thread lump baked into BRAM"
+          }
+        ]
+      },
+      {
+        "slot": 2,
+        "name": "UART_DEV",
+        "token": null,
+        "header_word": "MMIO",
+        "cw": null,
+        "cc": null,
+        "location": "0x40000014",
+        "words": 3,
+        "limit": 2,
+        "load_policy": "Hardware",
+        "slot_rule": "Hardware",
+        "perms": [
+          "R",
+          "W"
+        ],
+        "source": "boot ROM hardware register",
+        "programmable": false,
+        "size_budget": {
+          "available": false,
+          "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (3 words)",
+          "metadata": "not applicable"
+        },
+        "checks": [
+          {
+            "label": "MMIO",
+            "ok": true,
+            "detail": "MMIO at 0x40000014"
+          }
+        ]
+      },
+      {
+        "slot": 3,
+        "name": "LED_DEV",
+        "token": null,
+        "header_word": "MMIO",
+        "cw": null,
+        "cc": null,
+        "location": "0x40000000",
+        "words": 5,
+        "limit": 4,
+        "load_policy": "Hardware",
+        "slot_rule": "Hardware",
+        "perms": [
+          "R",
+          "W"
+        ],
+        "source": "boot ROM hardware register",
+        "programmable": false,
+        "size_budget": {
+          "available": false,
+          "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (5 words)",
+          "metadata": "not applicable"
+        },
+        "checks": [
+          {
+            "label": "MMIO",
+            "ok": true,
+            "detail": "MMIO at 0x40000000"
+          }
+        ]
+      },
+      {
+        "slot": 4,
+        "name": "BTN_DEV",
+        "token": null,
+        "header_word": "MMIO",
+        "cw": null,
+        "cc": null,
+        "location": "0x40000028",
+        "words": 1,
+        "limit": 0,
+        "load_policy": "Hardware",
+        "slot_rule": "Hardware",
+        "perms": [
+          "R"
+        ],
+        "source": "boot ROM hardware register",
+        "programmable": false,
+        "size_budget": {
+          "available": false,
+          "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (1 word)",
+          "metadata": "not applicable"
+        },
+        "checks": [
+          {
+            "label": "MMIO",
+            "ok": true,
+            "detail": "MMIO at 0x40000028"
+          }
+        ]
+      },
+      {
+        "slot": 5,
+        "name": "TIMER_DEV",
+        "token": null,
+        "header_word": "MMIO",
+        "cw": null,
+        "cc": null,
+        "location": "0x4000002C",
+        "words": 5,
+        "limit": 4,
+        "load_policy": "Hardware",
+        "slot_rule": "Hardware",
+        "perms": [
+          "R",
+          "W"
+        ],
+        "source": "boot ROM hardware register",
+        "programmable": false,
+        "size_budget": {
+          "available": false,
+          "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (5 words)",
+          "metadata": "not applicable"
+        },
+        "checks": [
+          {
+            "label": "MMIO",
+            "ok": true,
+            "detail": "MMIO at 0x4000002C"
+          }
+        ]
+      },
+      {
+        "slot": 6,
+        "name": "SelfTest",
+        "token": "4a000006",
+        "header_word": "0xFA87D001",
+        "cw": 500,
+        "cc": 1,
+        "location": "0x0600",
+        "words": null,
+        "limit": null,
+        "load_policy": "Resident",
+        "slot_rule": "Resident",
+        "perms": [
+          "E"
+        ],
+        "source": "SelfTest.1.8b19abd7.lump",
+        "programmable": false,
+        "size_budget": {
+          "available": true,
+          "metadata": "measured",
+          "code": {
+            "words": 500,
+            "bytes": 2000
+          },
+          "api": {
+            "words": 49,
+            "bytes": 196,
+            "measured": true
+          },
+          "gt_capabilities": {
+            "words": 1,
+            "bytes": 4
+          },
+          "freespace": {
+            "words": 1546,
+            "bytes": 6184,
+            "reserved": true
+          },
+          "total": {
+            "words": 2048,
+            "bytes": 8192
+          },
+          "allocation": {
+            "words": 2048,
+            "bytes": 8192
+          },
+          "reconciles": true
+        },
+        "checks": [
+          {
+            "label": "header",
+            "ok": true,
+            "detail": "Header valid: 0xFA87D001  cw=500 cc=1"
+          },
+          {
+            "label": "cw/cc",
+            "ok": true,
+            "detail": "binary cw=500 cc=1"
+          },
+          {
+            "label": "binary",
+            "ok": true,
+            "detail": "md5=0945ce7b36001779f569004e960526c5"
+          },
+          {
+            "label": "token",
+            "ok": true,
+            "detail": "manifest token='4a000006' file='4a000006'"
+          },
+          {
+            "label": "overlap",
+            "ok": true,
+            "detail": "No byte-range overlap with other resident slots"
+          }
+        ]
+      },
+      {
+        "slot": 7,
+        "name": "WukongCallHome",
+        "token": "313e637c",
+        "header_word": "0xFA012C03",
+        "cw": 75,
+        "cc": 3,
+        "location": "0x1200",
+        "words": null,
+        "limit": null,
+        "load_policy": "Resident",
+        "slot_rule": "Resident",
+        "perms": [
+          "E"
+        ],
+        "source": "WukongCallHome.1.b29b38e3.lump",
+        "programmable": false,
+        "size_budget": {
+          "available": true,
+          "metadata": "measured",
+          "code": {
+            "words": 75,
+            "bytes": 300
+          },
+          "api": {
+            "words": 92,
+            "bytes": 368,
+            "measured": true
+          },
+          "gt_capabilities": {
+            "words": 3,
+            "bytes": 12
+          },
+          "freespace": {
+            "words": 945,
+            "bytes": 3780,
+            "reserved": true
+          },
+          "total": {
+            "words": 1024,
+            "bytes": 4096
+          },
+          "allocation": {
+            "words": 1024,
+            "bytes": 4096
+          },
+          "reconciles": true
+        },
+        "checks": [
+          {
+            "label": "header",
+            "ok": true,
+            "detail": "Header valid: 0xFA012C03  cw=75 cc=3"
+          },
+          {
+            "label": "cw/cc",
+            "ok": true,
+            "detail": "binary cw=75 cc=3"
+          },
+          {
+            "label": "binary",
+            "ok": true,
+            "detail": "md5=a6306f1a1aaf0c1aceef153d98153d27"
+          },
+          {
+            "label": "token",
+            "ok": true,
+            "detail": "manifest token='313e637c' file='313e637c'"
+          },
+          {
+            "label": "overlap",
+            "ok": true,
+            "detail": "No byte-range overlap with other resident slots"
+          }
+        ]
+      },
+      {
+        "slot": 10,
+        "name": "CapabilityTest",
+        "token": "39700a92",
+        "header_word": "0xFA00940B",
+        "cw": 37,
+        "cc": 11,
+        "location": "0x00000510",
+        "words": null,
+        "limit": null,
+        "load_policy": "Resident",
+        "slot_rule": "LightningBolt",
+        "perms": [
+          "E"
+        ],
+        "source": "CapabilityTest.1.68be391a.lump",
+        "programmable": true,
+        "size_budget": {
+          "available": true,
+          "metadata": "measured",
+          "code": {
+            "words": 37,
+            "bytes": 148
+          },
+          "api": {
+            "words": 180,
+            "bytes": 720,
+            "measured": true
+          },
+          "gt_capabilities": {
+            "words": 11,
+            "bytes": 44
+          },
+          "freespace": {
+            "words": 975,
+            "bytes": 3900,
+            "reserved": true
+          },
+          "total": {
+            "words": 1024,
+            "bytes": 4096
+          },
+          "allocation": {
+            "words": 1024,
+            "bytes": 4096
+          },
+          "reconciles": true
+        },
+        "checks": [
+          {
+            "label": "header",
+            "ok": true,
+            "detail": "Header valid: 0xFA00940B  cw=37 cc=11"
+          },
+          {
+            "label": "cw/cc",
+            "ok": true,
+            "detail": "binary cw=37 cc=11"
+          },
+          {
+            "label": "binary",
+            "ok": true,
+            "detail": "md5=f633d0a0de15a39d4e67ef1803ee1836"
+          },
+          {
+            "label": "token",
+            "ok": true,
+            "detail": "manifest token='39700a92' file='39700a92'"
+          }
+        ]
+      },
+      {
+        "slot": 11,
+        "name": "Thread.2",
+        "token": null,
+        "header_word": "0xF900820C",
+        "cw": 32,
+        "cc": 12,
+        "location": "0x00001110",
+        "words": null,
+        "limit": null,
+        "load_policy": "Resident",
+        "slot_rule": "Resident",
+        "perms": [
+          "NONE"
+        ],
+        "source": "generated Thread body (boot image)",
+        "programmable": false,
+        "size_budget": {
+          "available": true,
+          "metadata": "generated Thread body",
+          "sections": [
+            {
+              "label": "Header",
+              "words": 1,
+              "bytes": 4
+            },
+            {
+              "label": "Data registers",
+              "words": 16,
+              "bytes": 64
+            },
+            {
+              "label": "Protected STO",
+              "words": 1,
+              "bytes": 4
+            },
+            {
+              "label": "Heap",
+              "words": 194,
+              "bytes": 776
+            },
+            {
+              "label": "LIFO stack",
+              "words": 32,
+              "bytes": 128
+            },
+            {
+              "label": "Capability homes",
+              "words": 12,
+              "bytes": 48
+            }
+          ],
+          "code": {
+            "words": 32,
+            "bytes": 128
+          },
+          "api": {
+            "words": 0,
+            "bytes": 0,
+            "measured": true
+          },
+          "gt_capabilities": {
+            "words": 12,
+            "bytes": 48
+          },
+          "freespace": {
+            "words": 0,
+            "bytes": 0,
+            "reserved": false
+          },
+          "total": {
+            "words": 256,
+            "bytes": 1024
+          },
+          "allocation": {
+            "words": 256,
+            "bytes": 1024
+          },
+          "reconciles": true
+        },
+        "checks": [
+          {
+            "label": "Thread layout",
+            "ok": true,
+            "detail": "generated 256-word Thread body: heap=194w stack=32w caps=12w"
+          }
+        ]
+      },
+      {
+        "slot": 12,
+        "name": "Thread.3",
+        "token": null,
+        "header_word": "0xF900820C",
+        "cw": 32,
+        "cc": 12,
+        "location": "0x00001210",
+        "words": null,
+        "limit": null,
+        "load_policy": "Resident",
+        "slot_rule": "Resident",
+        "perms": [
+          "NONE"
+        ],
+        "source": "generated Thread body (boot image)",
+        "programmable": false,
+        "size_budget": {
+          "available": true,
+          "metadata": "generated Thread body",
+          "sections": [
+            {
+              "label": "Header",
+              "words": 1,
+              "bytes": 4
+            },
+            {
+              "label": "Data registers",
+              "words": 16,
+              "bytes": 64
+            },
+            {
+              "label": "Protected STO",
+              "words": 1,
+              "bytes": 4
+            },
+            {
+              "label": "Heap",
+              "words": 194,
+              "bytes": 776
+            },
+            {
+              "label": "LIFO stack",
+              "words": 32,
+              "bytes": 128
+            },
+            {
+              "label": "Capability homes",
+              "words": 12,
+              "bytes": 48
+            }
+          ],
+          "code": {
+            "words": 32,
+            "bytes": 128
+          },
+          "api": {
+            "words": 0,
+            "bytes": 0,
+            "measured": true
+          },
+          "gt_capabilities": {
+            "words": 12,
+            "bytes": 48
+          },
+          "freespace": {
+            "words": 0,
+            "bytes": 0,
+            "reserved": false
+          },
+          "total": {
+            "words": 256,
+            "bytes": 1024
+          },
+          "allocation": {
+            "words": 256,
+            "bytes": 1024
+          },
+          "reconciles": true
+        },
+        "checks": [
+          {
+            "label": "Thread layout",
+            "ok": true,
+            "detail": "generated 256-word Thread body: heap=194w stack=32w caps=12w"
+          }
+        ]
+      },
+      {
+        "slot": 13,
+        "name": "M_BIT_DEV",
+        "token": null,
+        "header_word": "MMIO",
+        "cw": null,
+        "cc": null,
+        "location": "0xFFFFFF1C",
+        "words": 1,
+        "limit": 0,
+        "load_policy": "Hardware",
+        "slot_rule": "Hardware",
+        "perms": [
+          "R",
+          "W"
+        ],
+        "source": "boot ROM hardware register",
+        "programmable": false,
+        "size_budget": {
+          "available": false,
+          "reason": "N/A \u2014 ARTIX-7 MMIO hardware register (1 word)",
+          "metadata": "not applicable"
+        },
+        "checks": [
+          {
+            "label": "MMIO",
+            "ok": true,
+            "detail": "MMIO at 0xFFFFFF1C"
+          }
+        ]
+      }
+    ],
+    "boot_entry_slot": 10,
+    "ns_table_base": "0x1FC00",
+    "ns_slot_count": 8,
+    "namespace_header": {
+      "format_tag": 1314080818,
+      "version": 2,
+      "base_byte": 0,
+      "total_words": 16384,
+      "slot_count": 64,
+      "table_offset_words": 16128,
+      "table_offset_byte": 64512,
+      "boot_entry_word": 1296,
+      "boot_entry_byte": 5184,
+      "boot_entry_slot": 10,
+      "seal_boundary_word": 6,
+      "available": true
+    },
+    "hardware_budget": {
+      "lumps": 5,
+      "code": {
+        "words": 676,
+        "bytes": 2704
+      },
+      "api": {
+        "words": 321,
+        "bytes": 1284
+      },
+      "gt_capabilities": {
+        "words": 39,
+        "bytes": 156
+      },
+      "freespace": {
+        "words": 3466,
+        "bytes": 13864
+      },
+      "total": {
+        "words": 4608,
+        "bytes": 18432
+      },
+      "allocation": {
+        "words": 4608,
+        "bytes": 18432
+      }
+    }
+  },
+  "provenance_identity": "wukong-build-intent:v2:80c713390ccb625594c26f2d92c1b27854c347f85fc006a52595a56b222cbb0a",
+  "namespace_revision_id": "3a53c8ebe99bcccb3eb1c4371c8c897851853d60cd7d64d66c0343f69b502166",
+  "namespace_snapshot": {
+    "schema_version": 1,
+    "fingerprint": "83b6eb8a6e2cf4323538f21db08d8f2dde32c2b2c2693a742265d0f51e55e2f7",
+    "captured_at": "2026-10-06T14:32:56Z",
+    "authority": "server-committed-namespace",
+    "provenance": {
+      "hardware_version": 20,
+      "source_commit": "5a6078529288d4d25c8124e01e1c6e4685164d9b",
+      "approval_frozen_at": "20261006T143256136794Z",
+      "committed_raw_fingerprint": "9544f696da646c61d5c9840c9d4aba7f68dbd866563075069f6e38b7494fa117"
+    },
+    "namespace": {
+      "decoded_slots": [
+        {
+          "name": "Boot.NS",
+          "slot": 0,
+          "location": "0x00000000",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x000FF",
+          "seq": 0,
+          "seal": "0xDEB25EEF"
+        },
+        {
+          "name": "Boot.Thread",
+          "slot": 1,
+          "location": "0x00000010",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x000FF",
+          "seq": 0,
+          "seal": "0xDEB256EF"
+        },
+        {
+          "name": "UART_DEV",
+          "slot": 2,
+          "location": "0x40000014",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x00002",
+          "seq": 0,
+          "seal": "0xDEADF4CF"
+        },
+        {
+          "name": "LED_DEV",
+          "slot": 3,
+          "location": "0x40000000",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x00004",
+          "seq": 0,
+          "seal": "0xDEAD3ECF"
+        },
+        {
+          "name": "BTN_DEV",
+          "slot": 4,
+          "location": "0x40000028",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x00000",
+          "seq": 0,
+          "seal": "0xDEADAACF"
+        },
+        {
+          "name": "TIMER_DEV",
+          "slot": 5,
+          "location": "0x4000002C",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x00004",
+          "seq": 0,
+          "seal": "0xDEAD28CF"
+        },
+        {
+          "name": "SelfTest",
+          "slot": 6,
+          "location": "0x00000910",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x007FE",
+          "seq": 0,
+          "seal": "0xDE56F6EF",
+          "token": "4a000006"
+        },
+        {
+          "name": "WukongCallHome",
+          "slot": 7,
+          "location": "0x00000110",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x003FC",
+          "seq": 0,
+          "seal": "0xDED2B6EF",
+          "token": "313e637c"
+        },
+        {
+          "name": "CapabilityTest",
+          "slot": 10,
+          "location": "0x00000510",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x003F4",
+          "seq": 0,
+          "seal": "0xDED1B6EF",
+          "token": "39700a92",
+          "boot": true
+        },
+        {
+          "name": "Thread.2",
+          "slot": 11,
+          "location": "0x00001110",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x000FF",
+          "seq": 0,
+          "seal": "0xDEBAD6EF"
+        },
+        {
+          "name": "Thread.3",
+          "slot": 12,
+          "location": "0x00001210",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x000FF",
+          "seq": 0,
+          "seal": "0xDEBB56EF"
+        },
+        {
+          "name": "M_BIT_DEV",
+          "slot": 13,
+          "location": "0xFFFFFF1C",
+          "type": "Inform",
+          "f": 0,
+          "g": 0,
+          "limit": "0x00000",
+          "seq": 0,
+          "seal": "0x21523090"
+        }
+      ],
+      "raw": {
+        "total_words": 16384,
+        "max_entries": 64,
+        "ns_table_base": 16128,
+        "entries": [
+          {
+            "slot": 0,
+            "w0": 0,
+            "w1": 255,
+            "w2": 3736231663,
+            "w3": 0
+          },
+          {
+            "slot": 1,
+            "w0": 16,
+            "w1": 255,
+            "w2": 3736229615,
+            "w3": 0
+          },
+          {
+            "slot": 2,
+            "w0": 1073741844,
+            "w1": 2,
+            "w2": 3735942351,
+            "w3": 0
+          },
+          {
+            "slot": 3,
+            "w0": 1073741824,
+            "w1": 4,
+            "w2": 3735895759,
+            "w3": 0
+          },
+          {
+            "slot": 4,
+            "w0": 1073741864,
+            "w1": 0,
+            "w2": 3735923407,
+            "w3": 0
+          },
+          {
+            "slot": 5,
+            "w0": 1073741868,
+            "w1": 4,
+            "w2": 3735890127,
+            "w3": 0
+          },
+          {
+            "slot": 6,
+            "w0": 2320,
+            "w1": 2046,
+            "w2": 3730241263,
+            "w3": 1241513990
+          },
+          {
+            "slot": 7,
+            "w0": 272,
+            "w1": 1020,
+            "w2": 3738351343,
+            "w3": 1241513991
+          },
+          {
+            "slot": 10,
+            "w0": 1296,
+            "w1": 1012,
+            "w2": 3738285807,
+            "w3": 1241513994
+          },
+          {
+            "slot": 11,
+            "w0": 4368,
+            "w1": 255,
+            "w2": 3736786671,
+            "w3": 0
+          },
+          {
+            "slot": 12,
+            "w0": 4624,
+            "w1": 255,
+            "w2": 3736819439,
+            "w3": 0
+          },
+          {
+            "slot": 13,
+            "w0": 4294967068,
+            "w1": 0,
+            "w2": 559034512,
+            "w3": 0
+          }
+        ]
+      }
+    }
+  }
+}
