@@ -57,6 +57,8 @@ identity, permission, structural, and actual-target compatibility checks.
 | Old download controls/endpoints must remain forever | **Conditional retirement only:** inspect `bitstream-version-labeling-tests`, confirm the supported replacement delivery contract, then update exact-route/UI assertions. | Retired controls are not requirements, but correct artifact identity and delivery remain mandatory. |
 
 Never rewrite immutable historical binaries to remove old syntax or capabilities.
+For the isolated prepared-Thread comparison and explicit generation input, see
+[prepared Thread release evidence](prepared-thread-release-evidence.md).
 An explicit historical compatibility fixture may still describe an old format;
 it must not assert that today's selected program needs that old behavior.
 

@@ -1083,10 +1083,17 @@ def validate_boot_image(image_bytes, total_namespace_words=None, *, check_layout
         resume_nia = (packed_resume >> 13) & 0x7FFF
         if (code_loc >= n_words or ((words[code_loc] >> 27) & 0x1F) != 0x1F
                 or code_cw == 0
-                or (resume_nia != 0x7FFF and
+                or (resume_nia not in (0, 0x7FFF) and
                     (not saved_namespace_only or resume_nia >= code_cw))):
             raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has non-executable CHURCH Enter identity")
         saved_sto = packed_resume & 0xFFF
+        if not saved_namespace_only and resume_nia == 0:
+            root_sto = layout["stack_end"] - 2
+            if (resume_sto != root_sto - 2 or saved_sto != root_sto
+                    or words[thread_loc + root_sto + 1] != identity
+                    or words[thread_loc + root_sto + 2] !=
+                    ((0x7FFF << 13) | (1 << 12) | layout["stack_end"])):
+                raise ValueError(f"validate_boot_image: Thread slot {thread_slot} has malformed initial continuation/root")
         if ((packed_resume >> 12) & 1) != 1 or (
                 saved_sto < layout["stack_start"] + 1
                 or saved_sto > layout["stack_end"]
@@ -2521,12 +2528,20 @@ def build_boot_image_provenance(image_bytes, lumps_dir, ns_state_path=None):
     }
 
 
+_NO_PREPARED_THREAD_IMAGE = object()
+
+
 def generate_boot_image(cfg, lumps_dir, boot_entry_slot=None,
-                        require_entry_resident=False):
+                        require_entry_resident=False, *,
+                        prepared_thread_image=_NO_PREPARED_THREAD_IMAGE):
     """Hardware/publication generator: compiler admission is mandatory."""
-    return _generate_boot_image(
+    image = _generate_boot_image(
         cfg, lumps_dir, boot_entry_slot, require_entry_resident,
         _require_approved_executable_lump)
+    if prepared_thread_image is not _NO_PREPARED_THREAD_IMAGE:
+        from server.prepared_thread_entries import preserve_prepared_entries
+        image = preserve_prepared_entries(image, prepared_thread_image, cfg, lumps_dir)
+    return image
 
 
 def generate_simulation_image(cfg, lumps_dir, boot_entry_slot=None):
@@ -3323,12 +3338,12 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     # ----- Generated Thread bodies (Thread.2 .. Thread.N) ----------------
     # A Lightning Bolt selection prepares *Boot.Thread* only.  Do not use a
     # new next-boot target as authority to rewrite another Thread's saved
-    # context.  Freshly allocated secondary contexts retain their independent
-    # conventional SelfTest continuation; persisted contexts are never edited
-    # by this image builder.
-    _secondary_thread_gt = create_gt(
-        _selftest_sequence, _selftest_slot, {"E": 1}, 1)
-    for _thread_loc in extra_thread_locs:
+    # context. Thread.2/3 explicitly start CapabilityTest through an initial
+    # continuation frame, not an implicit CALL. This formats new images only.
+    for _ordinal, _thread_loc in enumerate(extra_thread_locs, start=2):
+        _secondary_thread_gt = create_gt(
+            retained_sequences.get(CAPABILITY_TEST_NS_SLOT, 0) if _ordinal <= 3 else _selftest_sequence,
+            CAPABILITY_TEST_NS_SLOT if _ordinal <= 3 else _selftest_slot, {"E": 1}, 1)
         mem[_thread_loc] = pack_lump_header(
             _ns_n_minus_6(thread_size), thread_stack_words, THREAD_CAP_WORDS, 2)
         mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | _resume_sto
@@ -3337,6 +3352,13 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         mem[_thread_loc + _resume_sto + 2] = (
             (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
         )
+        # CHANGE restores this real PC-0 continuation, leaving the poison
+        # root beneath it. Unlike boot, ordinary CHANGE has no following CALL.
+        if thread_stack_words < 4:
+            raise ValueError("secondary Thread startup requires two two-word frames")
+        mem[_thread_loc + THREAD_STO_OFFSET] = (1 << 12) | (_resume_sto - 2)
+        mem[_thread_loc + _resume_sto - 1] = _secondary_thread_gt
+        mem[_thread_loc + _resume_sto] = (1 << 12) | _resume_sto
 
     # Memory-manager GT at c-list[0]: R|W capability over NS slot 0 (full namespace).
     mem_mgr_gt = create_gt(0, 0, {"R":1, "W":1}, 1)

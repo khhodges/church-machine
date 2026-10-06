@@ -45,6 +45,10 @@ function fixture() {
     sim.memory[base + layout.capsStart] = incoming.gt;
     sim.memory[base + layout.capsStart + 2] = gt(slots[0]);
     assert(sim._formatThreadRootSentinel(base, layout, incoming.gt, {image: true}));
+    const rootSTO = layout.stackEnd - 2;
+    sim.memory[base + rootSTO - 1] = incoming.gt;
+    sim.memory[base + rootSTO] = sim._packFrameWord(0, 1, rootSTO);
+    sim.memory[base + 17] = (1 << 12) | (rootSTO - 2);
     sim._writeCR(0, manager.gt, manager.entry);
     sim._installLumpHeaderContext(sim.parseGT(manager.gt), 32, manager.entry, manager.header);
     sim.cr[13] = {word0: gt(target), word1: entry.word0_location,

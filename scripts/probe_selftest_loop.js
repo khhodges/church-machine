@@ -8,10 +8,11 @@ const crypto = require('crypto');
 const {spawnSync} = require('child_process');
 const root = path.resolve(__dirname, '..');
 const directory = path.resolve(process.argv[2] || '');
-const review = JSON.parse(fs.readFileSync(path.join(directory, 'review.json')));
-const raw = fs.readFileSync(path.join(directory, review.filename));
+const exactSelected = process.argv.includes('--selected');
+const review = exactSelected ? null : JSON.parse(fs.readFileSync(path.join(directory, 'review.json')));
+const raw = exactSelected ? null : fs.readFileSync(path.join(directory, review.filename));
 const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
-assert.strictEqual(digest(raw), review.binary_hash);
+if (raw) assert.strictEqual(digest(raw), review.binary_hash);
 const config = JSON.parse(fs.readFileSync(path.join(root, 'server/boot-config.json')));
 assert.strictEqual(config.bootEntrySlot, 10, 'review requires the prepared CapabilityTest entry');
 const state = JSON.parse(fs.readFileSync(path.join(root, 'server/lumps/ns-state.json')));
@@ -24,10 +25,12 @@ const selected = ['SelfTest', 'CapabilityTest', 'WukongCallHome'].map(name => {
     return {name, filename, hash};
 });
 const protectedFiles = [...selected.map(row => row.filename),
-    ...['boot-config.json', 'lumps/boot-image.bin', 'lumps/approvals.json', 'lumps/manifest.json',
+    ...['boot-config.json', 'lumps/boot-image.bin', 'lumps/boot-image.provenance.json',
+        'lumps/approvals.json', 'lumps/manifest.json',
         'lumps/ns-state.json'].map(name => path.join(root, 'server', name))];
 const before = protectedFiles.map(filename => digest(fs.readFileSync(filename)));
 const regenerate = process.argv.includes('--regenerate');
+const preserve = process.argv.includes('--preserve-prepared');
 const generated = regenerate ? spawnSync('python3', ['-c', `
 import contextlib, json, pathlib, shutil, sys, tempfile
 from server.boot_image import generate_boot_image
@@ -36,7 +39,7 @@ with tempfile.TemporaryDirectory(prefix="selftest-loop-") as directory:
     shutil.copytree("server/lumps", catalog)
     cfg = json.load(open("server/boot-config.json"))
     with contextlib.redirect_stdout(sys.stderr):
-        image = generate_boot_image(cfg, str(catalog))
+        image = generate_boot_image(cfg, str(catalog)${preserve ? ', prepared_thread_image=(catalog / "boot-image.bin").read_bytes()' : ''})
     sys.stdout.buffer.write(image)
 `], {cwd: root, encoding: null, timeout: 60000, maxBuffer: 8 * 1024 * 1024})
     : {status: 0, stdout: fs.readFileSync(path.join(root, 'server/lumps/boot-image.bin'))};
@@ -47,6 +50,15 @@ const sim = new ChurchSimulator();
 const image = generated.stdout.buffer.slice(generated.stdout.byteOffset,
     generated.stdout.byteOffset + generated.stdout.byteLength);
 assert(sim.loadBootImage(image), sim.lastBootImageError);
+const preparedEntries = [1, 11, 12].map(slot => {
+    const base = sim.readNSEntry(slot).word0_location;
+    const size = 2 ** (((sim.memory[base] >>> 23) & 15) + 6);
+    const indicator = sim.memory[base + 17] >>> 0;
+    const sto = indicator & 4095;
+    return {slot, base, cr0: sim.memory[base + size - 12] >>> 0,
+        indicator, enter: sim.memory[base + sto + 1] >>> 0,
+        frame: sim.memory[base + sto + 2] >>> 0};
+});
 for (let i = 0; !sim.bootComplete && !sim.halted && i < 32; i++) sim._bootStep();
 assert(sim.bootComplete && !sim.halted, 'canonical boot completes');
 assert.strictEqual(sim._currentThreadSlot, 1);
@@ -62,6 +74,7 @@ for (const [slot, name] of [[6, 'SelfTest'], [7, 'WukongCallHome'], [10, 'Capabi
         assert.strictEqual(sim.memory[at + i] >>> 0, saved.readUInt32BE(i * 4),
             `${name} image differs from selected instruction word ${i}`);
 }
+if (raw) {
 const entry = sim.readNSEntry(6);
 const base = entry.word0_location;
 const header = sim.memory[base] >>> 0;
@@ -73,11 +86,15 @@ assert.strictEqual(header & 255, 1);
 assert.strictEqual(raw.readUInt32BE(raw.length - 4),
     sim.memory[base + raw.length / 4 - 1] >>> 0);
 for (let i = 0; i < raw.length / 4; i++) sim.memory[base + i] = raw.readUInt32BE(i * 4);
-const report = {candidate: review.filename, binary_hash: review.binary_hash,
+}
+const report = {candidate: review?.filename || 'exact-selected-artifacts', binary_hash: review?.binary_hash,
     image_mode: regenerate ? 'regenerated' : 'saved-prepared',
     image_sha256: digest(generated.stdout),
+    preserved_preparation: preserve, preparedEntries,
+    input_hashes: Object.fromEntries(protectedFiles.map((filename, i) =>
+        [path.relative(root, filename), before[i]])),
     admission_tested: false, selected, changes: [], calls: [], returns: [],
-    faults: [], trace_tail: []};
+    faults: [], trace_start: [], trace_tail: []};
 const fault = sim.fault.bind(sim);
 sim.fault = (type, message, meta) => {
     report.faults.push({type, message});
@@ -95,6 +112,7 @@ try {
             pc: sim.pc, sto: sim.sto};
         const row = {step, ...pre,
             instruction: result?.instr ? sim.opName(result.instr.opcode) : null, post};
+        if (step < 32) report.trace_start.push(row);
         report.trace_tail.push(row);
         if (report.trace_tail.length > 15) report.trace_tail.shift();
         assert.strictEqual(report.faults.length, 0, JSON.stringify(report.faults));

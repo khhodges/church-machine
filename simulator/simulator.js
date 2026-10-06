@@ -800,6 +800,12 @@ class ChurchSimulator {
                 const parsedEnter = this.parseGT(enterGT);
                 const savedSTO = packed & 0xFFF;
                 const nia = (packed >>> 13) & 0x7FFF;
+                const rootSTO = layout.stackEnd - 2;
+                const initialContinuation = nia === 0 &&
+                    resumeSTO === rootSTO - 2 && savedSTO === rootSTO &&
+                    src[threadBase + rootSTO + 1] === enterGT &&
+                    src[threadBase + rootSTO + 2] ===
+                        (((0x7FFF << 13) | (1 << 12) | layout.stackEnd) >>> 0);
                 const codeNsBase = src.length -
                     (parsedEnter.index + 1) * this.NS_ENTRY_WORDS;
                 const codeBase = codeNsBase >= 0 ? (src[codeNsBase] >>> 0) : src.length;
@@ -813,7 +819,8 @@ class ChurchSimulator {
                         ((packed >>> 12) & 1) !== 1 ||
                         savedSTO < layout.stackStart + 1 ||
                         savedSTO > layout.stackEnd ||
-                        resumeSTO !== savedSTO - 2 || nia !== 0x7FFF) {
+                        resumeSTO !== savedSTO - 2 ||
+                        (nia !== 0x7FFF && !initialContinuation)) {
                     this.lastBootImageError =
                         `Thread slot ${threadSlot} lacks a canonical two-word CHURCH resume frame.`;
                     this.output += `[BOOTIMG] ERROR: ${this.lastBootImageError} Rejected.\n`;
@@ -5208,7 +5215,7 @@ class ChurchSimulator {
         return true;
     }
 
-    _readThreadResumeFrame(threadBase, layout, threadSlot, staged = null) {
+    _readThreadResumeFrame(threadBase, layout, threadSlot, staged = null, allowRoot = true) {
         const protectedState = staged
             ? {sto: staged.savedSTO - 2, sz: 1}
             : this._unpackProtectedIndicator(
@@ -5253,6 +5260,11 @@ class ChurchSimulator {
                 frameBase !== frame.savedSTO - 2) {
             this.fault('TYPE',
                 `CHANGE Thread slot ${threadSlot}: malformed CHURCH frame`);
+            return null;
+        }
+        if (!allowRoot && frame.returnPC === 0x7FFF) {
+            this.fault('STACK_UNDERFLOW',
+                `CHANGE Thread slot ${threadSlot}: poison root frame has no suspended continuation`);
             return null;
         }
         const codeHeader = this.parseLumpHeader(
@@ -5339,7 +5351,7 @@ class ChurchSimulator {
         this.mElevation = true;
         try {
             const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
-            const resume = this._readThreadResumeFrame(threadBase, layout, threadSlot);
+            const resume = this._readThreadResumeFrame(threadBase, layout, threadSlot, null, true);
             if (!resume) return false;
             const threadGT = this.createGT(
                 seq, threadSlot, {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
@@ -8616,7 +8628,7 @@ class ChurchSimulator {
                     // a gap, stale companion, or looping previous-STO must
                     // reject the whole CHANGE transaction.
                     const restoreResume = this._readThreadResumeFrame(
-                        tBase, restoreLayout, targetIdx);
+                        tBase, restoreLayout, targetIdx, null, true);
                     if (!restoreResume) return null;
                     const restoredRegs = [];
                     for (let i = 0; i < 12; i++) {
@@ -8781,7 +8793,7 @@ class ChurchSimulator {
                 `CHANGE restore CR5 heap GT for Thread slot ${targetIdx}: ${heapCheck.message}`);
             return null;
         }
-        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend);
+        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend, false);
         if (!resume) return null;
         // Validate the actual C-List backing the saved executable context before
         // suspending the outgoing Thread or publishing any incoming registers.
@@ -8886,16 +8898,11 @@ class ChurchSimulator {
         for (let i = 0; i < 16; i++) {
             this.dr[i] = this.memory[tBase + 1 + i] >>> 0;
         }
-        // A suspended Thread resumes by popping its saved CHURCH frame. A
-        // freshly formatted Thread instead carries the canonical 0x7FFF root
-        // poison marker: that marker is never an executable NIA. Activate
-        // fresh code at word zero and retain the root frame as the bottom of
-        // the live stack, matching Boot.Thread and direct Compile+Run.
-        const isRootSentinel = resume.frame.returnPC === 0x7FFF;
+        // Ordinary CHANGE pops a real suspended continuation. Poison roots
+        // are rejected before any context is committed; only explicit boot
+        // activation may initialize execution from a preformatted root.
         const resumePC = resume.resumePC;
-        const resumeSTO = isRootSentinel
-            ? (resume.frame.savedSTO - 2) >>> 0
-            : resume.frame.savedSTO;
+        const resumeSTO = resume.frame.savedSTO;
         this.sto = resumeSTO;
         this.flags = resume.frame.flags;
         this.pc = resumePC;
@@ -8918,9 +8925,7 @@ class ChurchSimulator {
             codeParsed, codeParsed.index, codeEntry, codeHeader);
         this._currentThreadSlot = targetIdx;
         this._liveThreadOwned = true;
-        const frameDesc = isRootSentinel
-            ? 'CHURCH root sentinel retained; entry NIA 0x0'
-            : `CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()}`;
+        const frameDesc = `CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()}`;
         const desc = `CHANGE CR${d.crDst} (Thread object restored for slot ${targetIdx}; ${headerContext.desc}; ${frameDesc})`;
         this.output += desc + '\n';
         this.pc = resumePC;

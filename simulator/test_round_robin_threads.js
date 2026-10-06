@@ -187,7 +187,7 @@ assert.strictEqual(selectedStep.physicalPC, firstEntry.word0_location + 1,
 for (let i = 0; i < 16; i++) {
     committed.dr[i] = (0xD4004000 + i) >>> 0;
 }
-committed.pc = 0x2A;
+committed.pc = 2; // valid inside the selected CapabilityTest, not a historical longer LUMP
 committed.flags = {N: true, Z: false, C: true, V: false};
 committed.sto = entryLayouts[1].stackEnd - 4;
 const suspendedThread2 = {
@@ -203,7 +203,7 @@ assert.strictEqual(committed.cr[12].word1, committedBases[2],
 assert.deepStrictEqual(committed.dr, thread3InitialDRs,
     'the next CHANGE restores all sixteen Thread#3 data registers');
 const dormantThread2Row = committed.threadStatusRows().find(row => row.slot === 11);
-assert.strictEqual(dormantThread2Row.nia, 0x2A,
+assert.strictEqual(dormantThread2Row.nia, 2,
     'the dormant Thread card reads NIA from the CHANGE-saved Thread object');
 assert.deepStrictEqual(dormantThread2Row.indicatorFlags, suspendedThread2.flags,
     'the dormant Thread card reads FLAGS from its own CHANGE-saved Thread object');
@@ -211,7 +211,7 @@ const thread2Indicator = committed._unpackProtectedIndicator(
     committed.memory[committedBases[1] + 17] >>> 0);
 const thread2ResumeFrame = committed._unpackFrameWord(
     committed.memory[committedBases[1] + thread2Indicator.sto + 2] >>> 0);
-assert.strictEqual(thread2ResumeFrame.returnPC, 0x2A,
+assert.strictEqual(thread2ResumeFrame.returnPC, 2,
     'CHANGE writes the outgoing NIA into the canonical CHURCH frame');
 assert.strictEqual(committed.advanceConfiguredThread().slot, 1);
 assert.strictEqual(committed.cr[0].word0, entryWords[0],
@@ -323,6 +323,12 @@ const preBootThread1Base = preBoot.readNSEntry(1).word0_location;
 const preBootThread1Layout = preBoot._threadLayoutAtBase(preBootThread1Base);
 const preBootThread1EntryGT = preBoot.memory[
     preBootThread1Base + preBootThread1Layout.capsStart] >>> 0;
+// This browsing fixture explicitly prepares a continuation for Thread.1.
+// A factory Boot.Thread root alone is not resumable by ordinary CHANGE.
+const preBootRootSTO = preBootThread1Layout.stackEnd - 2;
+preBoot.memory[preBootThread1Base + preBootRootSTO - 1] = preBootThread1EntryGT;
+preBoot.memory[preBootThread1Base + preBootRootSTO] = (1 << 12) | preBootRootSTO;
+preBoot.memory[preBootThread1Base + 17] = (1 << 12) | (preBootRootSTO - 2);
 assert.strictEqual(preBoot.cr[0].word0, 0,
     'pre-boot live CR0 starts reset and does not represent Thread.1');
 assert.strictEqual(preBoot.advanceConfiguredThread().slot, 11,
@@ -382,13 +388,16 @@ assert.strictEqual(preBoot.loadBootImage(image), true,
     'a valid replacement image can replace an owned pre-boot context');
 assert.strictEqual(preBoot._liveThreadOwned, false,
     'successful image replacement clears live Thread ownership');
+const sameSlotFaults = [];
+preBoot.fault = type => sameSlotFaults.push(type);
 const unownedSameSlot = preBoot.selectConfiguredThread(1);
-assert.strictEqual(unownedSameSlot.ok, true,
-    'selecting the displayed slot while unowned restores its Thread');
+assert.strictEqual(unownedSameSlot.ok, false,
+    'unowned factory Boot.Thread needs boot CALL, not ordinary CHANGE');
+assert.deepStrictEqual(sameSlotFaults, ['STACK_UNDERFLOW']);
 assert.strictEqual(unownedSameSlot.unchanged, undefined,
     'same-slot selection is only a no-op when that Thread owns the live banks');
-assert.strictEqual(preBoot._liveThreadOwned, true,
-    'same-slot restoration establishes ownership after image replacement');
+assert.strictEqual(preBoot._liveThreadOwned, false,
+    'rejected root-only activation never establishes ownership');
 
 // Thread Reset restores only the selected immutable loaded-image body.
 const resetFixture = new ChurchSimulator();
@@ -461,7 +470,7 @@ const beforeRejectedFaultCount = resetFixture.faultLog.length;
 let rejectedResetFaultEvents = 0;
 resetFixture.on('fault', () => { rejectedResetFaultEvents++; });
 const activeBaseline = resetFixture._threadBaselines.get(11);
-activeBaseline.words[activeResetIndicator.sto + 1] = 0xFFFFFFFF;
+activeBaseline.words[(activeBaseline.words[17] & 4095) + 1] = 0xFFFFFFFF;
 const rejectedActiveReset = resetFixture.resetThreadToBaseline(11);
 assert.strictEqual(rejectedActiveReset.ok, false,
     'active Thread Reset rejects a baseline whose saved entry identity no longer validates');
@@ -667,10 +676,10 @@ assert.strictEqual(capabilityTestRows[0].gtPetName, 'CapabilityTest',
     'active Thread card distinguishes the executing CapabilityTest identity');
 assert.strictEqual(capabilityTestRows[0].physicalAddress, 0x0D0D,
     'CapabilityTest base 0x0D00 + header + relative NIA 0x000C is 0x0D0D');
-assert.strictEqual(capabilityTestRows[1].physicalAddress, null,
-    'a dormant root sentinel is not presented as an executable physical address');
-assert.strictEqual(initialThreadRows[1].nia, 0x7FFF,
-    'never-selected dormant Threads expose their canonical root-sentinel NIA');
+assert.strictEqual(capabilityTestRows[1].physicalAddress, 0x0D01,
+    'a dormant initial continuation identifies the first executable word');
+assert.strictEqual(initialThreadRows[1].nia, 0,
+    'never-selected secondary Threads expose their initial continuation NIA');
 assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
     'each configured Thread status resolves a GT pet name');
 assert.strictEqual(uiSim.threadStatusRows(99).length, 3,
