@@ -59,3 +59,15 @@ of their launcher and continue consuming resources after failure.
 
 **How to apply:** Include the effective catalog in before/after hashes; keep
 descendant-kill regression tests for both nonzero exits and tool deadlines.
+
+Do not diagnose a compiler hang solely from the release compilation deadline.
+
+**Why:** On an Ubuntu droplet, Icarus 12 compiled the preserved 8.6 MB negative
+consumer Verilog successfully in 470 seconds after the 180-second gate timed
+out. This establishes compilation success only, not behavioral or release
+success.
+
+**How to apply:** Diagnose saved inputs separately with a bounded command and
+durably recorded exit status. Remote diagnostics should survive terminal
+disconnects. Do not silently increase release limits or count partial replay
+as full release evidence.
