@@ -65,6 +65,14 @@ def _namespace_fingerprint(app_module, rows):
     return app_module._namespace_state_fingerprint(rows)
 
 
+def _confirmed_post(client, path, **kwargs):
+    response = client.post(path, **kwargs)
+    assert response.status_code == 428, response.get_json()
+    confirmation = response.get_json()["change_confirmation"]["id"]
+    return client.post(path, headers={"X-Change-Confirmation": confirmation},
+                       **kwargs)
+
+
 def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
         tmp_path, isolated_boot_lumps, monkeypatch):
     """A real Save NS commit stores the snapshot; it does not rebuild it.
@@ -110,20 +118,9 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
         boot_entry_slot=selected_before["slot"])
     projected_rows = _descriptor_rows(image, initial_rows)
 
-    # Physical placement is a builder-owned projection.  This fixture includes
-    # historical descriptor geometry, so normalization is observable without
-    # implying that a selected artifact was replaced.
-    descriptor_keys = ("location", "limit", "seal")
-    changed_descriptors = {
-        row["slot"] for row in projected_rows
-        if any(
-            row.get(key) != next(
-                old.get(key) for old in initial_rows
-                if old["slot"] == row["slot"])
-            for key in descriptor_keys
-        )
-    }
-    assert changed_descriptors
+    # A normalized live fixture may already match the generated descriptors.
+    # The contract below is exact identity and byte preservation across saves,
+    # not a requirement that every input first undergo relocation.
     assert _artifact_and_selection_identity(projected_rows) == identity_before
 
     raw = parse_ns_table_raw(image)
@@ -133,7 +130,7 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
 
     app_module.app.config["TESTING"] = True
     with app_module.app.test_client() as client:
-        first = client.post("/api/boot-image/save-ns", json={
+        first = _confirmed_post(client, "/api/boot-image/save-ns", json={
             "data_b64": base64.b64encode(image).decode("ascii"),
             "ns_state": {"abstractions": projected_rows},
             "namespaceFingerprint": _namespace_fingerprint(
@@ -147,7 +144,7 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
         first_image_digest = hashlib.sha256(
             (private_lumps / "boot-image.bin").read_bytes()).hexdigest()
 
-        second = client.post("/api/boot-image/save-ns", json={
+        second = _confirmed_post(client, "/api/boot-image/save-ns", json={
             "data_b64": base64.b64encode(image).decode("ascii"),
             "ns_state": {"abstractions": first_rows},
             "namespaceFingerprint": _namespace_fingerprint(
@@ -155,6 +152,9 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
             "boot_config": None,
         })
         assert second.status_code == 200, second.get_json()
+        saved_state = json.loads(state_path.read_text(encoding="utf-8"))
+        assert saved_state["committed_raw_fingerprint"] == (
+            app_module._raw_namespace_fingerprint(parse_ns_table_raw(image)))
 
     second_rows = json.loads(
         state_path.read_text(encoding="utf-8"))["abstractions"]

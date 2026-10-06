@@ -64,3 +64,12 @@ Removing the review hook also conceals a separate required authorization step.
 state, replay its actual confirmation, and require the intended failure message
 and byte-for-byte restoration. For lock-sensitive rollback, observe restoration
 while the transaction lock is held, not only the generator's lock state.
+
+Copied live Namespace fixtures may already have normalized descriptors.
+
+**Why:** A legitimate saved-image preparation removed the layout differences
+that an idempotent-save test had assumed were always present.
+
+**How to apply:** Construct historical geometry explicitly when testing
+normalization; ordinary unchanged-save tests should assert identity, exact
+bytes, and raw-table binding without requiring an initial relocation.
