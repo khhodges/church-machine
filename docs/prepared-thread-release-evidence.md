@@ -92,7 +92,10 @@ generated destination generation, descriptor authority, and entire localized
 target allocation. Placement seals may change when bodies relocate. Only CR0
 and matching entry identity transfer; fresh root and initial frames are generated
 canonically. Data registers, stack contents, flags, and other capability homes
-are never copied. Thread.3 may intentionally differ from Boot.Thread/Thread.2.
+are never copied. The generic preservation mechanism supports independent Thread
+targets, but the current release requirement is explicit: **Thread.2 and Thread.3
+must both enter CapabilityTest**. A synthetic test of differing targets is not
+authority to select SelfTest for Thread.3 in this release.
 
 The explicit preservation path accepts validated root-only or initial-frame
 preparation as entry identity input, then constructs clean initial frames for

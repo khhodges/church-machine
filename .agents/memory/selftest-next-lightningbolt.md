@@ -8,6 +8,15 @@ CapabilityTest calls SelfTest and WukongCallHome, each returning to CapabilityTe
 and loops. CapabilityTest performs CHANGE to Thread.2 on each iteration:
 Boot.Thread to Thread.2 initially, then Thread.2 to itself.
 
+Both Thread.2 and Thread.3 must use CapabilityTest as their prepared entry.
+
+**Why:** The user explicitly confirmed this applies to both secondary Threads,
+not only the Thread.2 path exercised by the current loop.
+
+**How to apply:** Preserve this release requirement in preparation and validation.
+Generic support for independent Thread targets does not authorize selecting
+SelfTest for Thread.3. Do not silently rewrite already saved immutable images.
+
 **Why:** The old Next/LightningBolt continuation rule describes an obsolete flow.
 It must not justify reintroducing Next into a replacement SelfTest or treating
 the selected SELF-only C-list as defective.
