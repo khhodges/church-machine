@@ -9,6 +9,17 @@ from scripts import check_method_dispatch_release as gate
 import shutil
 from scripts.check_corrected_generated_rtl import Recorder
 ROOT = gate.ROOT
+NEGATIVE_CONSUMER_TIMEOUT = 900
+
+
+def test_nested_replay_time_budgets():
+    # Each case needs conversion (120s), compilation, simulation (60s),
+    # plus 120s for imports, model recording and process cleanup.
+    assert Recorder.compile_timeout == 600
+    assert NEGATIVE_CONSUMER_TIMEOUT >= 120 + Recorder.compile_timeout + 60 + 120
+    # The full gate must also accommodate the supported sequential execution.
+    assert gate.TIMEOUT >= 14 * NEGATIVE_CONSUMER_TIMEOUT
+    assert gate.TIMEOUT <= 4 * 60 * 60
 
 
 def ready_process(monkeypatch, pidfile):
@@ -263,7 +274,8 @@ def test_incompatible_method_consumer_is_rejected(tmp_path):
     command = [sys.executable, "-c",
                "from scripts.replay_method_dispatch_rtl import replay_one; "
                "print(replay_one(('case', (1, 0xBF000001, 2, None))))"]
-    result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=600)
+    result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True,
+                            timeout=NEGATIVE_CONSUMER_TIMEOUT)
     (tmp_path / "negative-consumer.log").write_text(result.stdout + result.stderr)
     assert result.returncode != 0
     assert 'assert result["returned"] and not result["faults"]' in result.stderr

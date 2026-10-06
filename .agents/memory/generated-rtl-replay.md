@@ -71,3 +71,14 @@ success.
 durably recorded exit status. Remote diagnostics should survive terminal
 disconnects. Do not silently increase release limits or count partial replay
 as full release evidence.
+
+The user authorized increasing release time budgets while preserving every
+behavioral assertion and failure check.
+
+**Why:** The saved timed-out compilation completed successfully with a longer
+diagnostic deadline and its four-state RTL replay passed; that did not execute
+the enclosing Python negative-consumer assertion.
+
+**How to apply:** Keep compiler, enclosing case and full sequential matrix
+budgets consistent and bounded. Report saved replay success separately from
+the negative-consumer test and complete fresh release evidence.

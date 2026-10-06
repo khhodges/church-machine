@@ -13,8 +13,14 @@ alternate emitter, or accept a partial report. The standalone diagnostic
 runner's `--first-case` option is not release evidence.
 
 Workers default to two, with a maximum of four. Yosys conversion is limited to
-120 seconds, each Icarus compilation to 180 seconds, simulation to 60 seconds,
-and the entire matrix to 3600 seconds. The gate kills the matrix process group
+120 seconds, each Icarus compilation to 600 seconds, simulation to 60 seconds,
+and the entire matrix to 14400 seconds (four hours). The isolated negative-consumer
+test has a 900-second outer deadline. These enclosing budgets allow conversion,
+model recording and cleanup as well as compilation; the matrix budget covers
+all 14 cases even with `--jobs 1`. They are maximum durations, not expected
+run times. A saved release fixture compiled successfully in 470 seconds on the
+validation droplet, exceeding the former 180-second limit.
+The gate kills the matrix process group
 on deadline. Missing tools, timeouts, compiler errors, simulation errors,
 unknown-value mismatches, and changed inputs all fail the gate.
 

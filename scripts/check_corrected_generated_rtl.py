@@ -48,7 +48,9 @@ class Recorder:
     write_verilog_opts = ("-sv",)
     release_converter = False
     release_rtl_cache = {}
-    compile_timeout = 180
+    # Saved release RTL took 470 seconds to compile on the validation droplet.
+    # Keep a bounded deadline with headroom; timeout still fails the replay.
+    compile_timeout = 600
 
     @staticmethod
     @contextmanager
