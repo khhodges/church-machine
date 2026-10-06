@@ -71,6 +71,8 @@ def check_contract() -> list[str]:
     _fail_if(NS_TABLE_BASE > 0, "canonical namespace base must be non-zero")
     # Wukong deliberately projects the root table to byte address zero.
     for slot in range(NS_SLOT_COUNT):
+        if not any(WUKONG_DEMO_NAMESPACE[slot * 4:slot * 4 + 4]):
+            continue  # Empty entries have no authority or integrity seal.
         word0 = WUKONG_DEMO_NAMESPACE[slot * 4]
         word1 = WUKONG_DEMO_NAMESPACE[slot * 4 + 1]
         word2 = WUKONG_DEMO_NAMESPACE[slot * 4 + 2]

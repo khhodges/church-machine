@@ -693,6 +693,15 @@ def _load_admitted_artifact(filename, expected_hash, abstraction):
 _selftest_ns_state_path = _lumps_dir / "ns-state.json"
 try:
     _selftest_ns_state = json.loads(_selftest_ns_state_path.read_text(encoding="utf-8"))
+    _selected_namespace_slots = {
+        row["slot"] for row in _selftest_ns_state.get("abstractions", [])
+        if isinstance(row, dict) and isinstance(row.get("slot"), int)
+    }
+    # Catalog defaults are not Namespace membership. In particular, absent
+    # Tunnel/Ethernet assignments must not leave sealed descriptors at 8/9.
+    for _slot in range(2, len(WUKONG_DEMO_NAMESPACE) // 4):
+        if _slot not in _selected_namespace_slots:
+            WUKONG_DEMO_NAMESPACE[_slot * 4:_slot * 4 + 4] = [0, 0, 0, 0]
     _selftest_selected = [entry for entry in _selftest_ns_state.get("abstractions", [])
                           if entry.get("name") == "SelfTest"]
     if len(_selftest_selected) != 1:
