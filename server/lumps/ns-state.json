@@ -78,22 +78,27 @@
       "issue_n": 1,
       "limit": "0x007FE",
       "load_policy": "Resident",
-      "location": "0x00000110",
+      "location": "0x00000990",
       "lump_version": 98,
       "name": "SelfTest",
       "ns_slot_policy": "static",
       "resident": true,
-      "seal": "0xDE52F6EF",
+      "seal": "0xDE56B6EF",
       "seq": 0,
       "slot": 6,
       "token": "4a000006",
-      "type": "Inform"
+      "type": "Inform",
+      "artifact_pin": {
+        "filename": "SelfTest.1.8b19abd7.lump",
+        "token": "4a000006",
+        "revision": 98
+      }
     },
     {
       "artifact_pin": {
         "filename": "WukongCallHome.1.b29b38e3.lump",
-        "revision": 17,
-        "token": "313e637c"
+        "token": "313e637c",
+        "revision": 17
       },
       "binary_hash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
       "boot_resident": true,
@@ -103,12 +108,12 @@
       "issue_n": 1,
       "limit": "0x003FC",
       "load_policy": "Resident",
-      "location": "0x00000910",
+      "location": "0x00000110",
       "lump_version": 17,
       "name": "WukongCallHome",
       "ns_slot_policy": "static",
       "resident": true,
-      "seal": "0xDED6B6EF",
+      "seal": "0xDED2B6EF",
       "seq": 0,
       "slot": 7,
       "token": "313e637c",
@@ -117,8 +122,8 @@
     {
       "artifact_pin": {
         "filename": "CapabilityTest.1.68be391a.lump",
-        "revision": 42,
-        "token": "39700a92"
+        "token": "39700a92",
+        "revision": 42
       },
       "binary_hash": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
       "boot": true,
@@ -129,12 +134,12 @@
       "issue_n": 1,
       "limit": "0x003F4",
       "load_policy": "Resident",
-      "location": "0x00000D10",
+      "location": "0x00000590",
       "lump_version": 42,
       "name": "CapabilityTest",
       "ns_slot_policy": "static",
       "resident": true,
-      "seal": "0xDED5B6EF",
+      "seal": "0xDED1F6EF",
       "seq": 0,
       "slot": 10,
       "token": "39700a92",
@@ -145,10 +150,10 @@
       "g": 0,
       "limit": "0x000FF",
       "load_policy": "Resident",
-      "location": "0x00001110",
+      "location": "0x00001190",
       "name": "Thread.2",
       "resident": true,
-      "seal": "0xDEBAD6EF",
+      "seal": "0xDEBA96EF",
       "seq": 0,
       "slot": 11,
       "type": "Inform"
@@ -158,10 +163,10 @@
       "g": 0,
       "limit": "0x000FF",
       "load_policy": "Resident",
-      "location": "0x00001210",
+      "location": "0x00001290",
       "name": "Thread.3",
       "resident": true,
-      "seal": "0xDEBB56EF",
+      "seal": "0xDEBB16EF",
       "seq": 0,
       "slot": 12,
       "type": "Inform"
@@ -178,10 +183,10 @@
       "type": "Inform"
     }
   ],
+  "generated_at": 1791292874.7458994,
   "freeSlotSequences": {
     "8": 1,
     "9": 1
   },
-  "generated_at": 1791048384.576973,
   "save_mode": "table-only"
 }
