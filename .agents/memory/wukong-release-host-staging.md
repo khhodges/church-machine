@@ -14,3 +14,15 @@ Release snapshots must contain hydrated LFS-backed boot/LUMP binaries, not point
 **Why:** A Git archive can silently package LFS pointers, and a clean host may not expose Vivado or Amaranth on its default PATH. Both conditions should stop before synthesis, but neither means the source itself is invalid.
 
 **How to apply:** Verify the staged readiness gate before launching Vivado, explicitly select the vendor executable and Python environment, and treat all pre-synthesis failures as non-candidates with no release artifact.
+
+The droplet's default Python may lack Amaranth even though a vendor-build
+environment is installed. The user verified that
+`/root/wukong-vivado-python/bin/python` imports Amaranth 0.5.8 and passes the
+staged readiness check.
+
+**Why:** Using the default Python incorrectly made a prepared build host appear
+to need dependency installation.
+
+**How to apply:** Check that interpreter still exists and imports Amaranth, then
+set `CM_PYTHON` explicitly in the background build script. Do not depend on an
+interactive shell's activated environment being inherited by tmux.
