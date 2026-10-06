@@ -16,7 +16,9 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from scripts.rtl_process_supervision import kill_session
-TIMEOUT = 3600
+# Cover all 14 cases even with --jobs 1 and the 600-second compiler deadline,
+# including conversion, simulation, model recording and process cleanup.
+TIMEOUT = 4 * 60 * 60
 
 
 def digest(path):

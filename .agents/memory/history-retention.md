@@ -39,6 +39,17 @@ permanently exempt otherwise-expired archives from the approved policy.
 reference roots. Frozen selections and retained artifact inventories still
 protect the exact binaries they name.
 
+The user explicitly requested: “remove all tests related to any approved deletion.”
+
+**Why:** The user rejected maintaining deletion-related regression checks after
+the approved archive cleanup. This supersedes the earlier plan to add
+completed-deletion exceptions and their test coverage.
+
+**How to apply:** Do not reintroduce approved-deletion/retention tests without
+new authorization. Keep ordinary approval structure/hash-field checks.
+Removing tests does not authorize changing runtime deletion protections,
+migration validation, approval evidence, or live artifacts.
+
 Explicit single-revision deletion is exempt from age and newest-version policy,
 but never from reference, link, approval-evidence, or recovery protections.
 

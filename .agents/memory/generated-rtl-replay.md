@@ -59,3 +59,26 @@ of their launcher and continue consuming resources after failure.
 
 **How to apply:** Include the effective catalog in before/after hashes; keep
 descendant-kill regression tests for both nonzero exits and tool deadlines.
+
+Do not diagnose a compiler hang solely from the release compilation deadline.
+
+**Why:** On an Ubuntu droplet, Icarus 12 compiled the preserved 8.6 MB negative
+consumer Verilog successfully in 470 seconds after the 180-second gate timed
+out. This establishes compilation success only, not behavioral or release
+success.
+
+**How to apply:** Diagnose saved inputs separately with a bounded command and
+durably recorded exit status. Remote diagnostics should survive terminal
+disconnects. Do not silently increase release limits or count partial replay
+as full release evidence.
+
+The user authorized increasing release time budgets while preserving every
+behavioral assertion and failure check.
+
+**Why:** The saved timed-out compilation completed successfully with a longer
+diagnostic deadline and its four-state RTL replay passed; that did not execute
+the enclosing Python negative-consumer assertion.
+
+**How to apply:** Keep compiler, enclosing case and full sequential matrix
+budgets consistent and bounded. Report saved replay success separately from
+the negative-consumer test and complete fresh release evidence.
