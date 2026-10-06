@@ -3094,6 +3094,11 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     for i, entry in enumerate(catalog):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
         assigned = _state_by_slot.get(i)
+        if i not in {0, 1} and assigned is None:
+            # Catalog positions describe available objects, not Namespace
+            # membership. An omitted saved slot must remain empty.
+            clist_gts.append(0)
+            continue
         if (i not in {0, 1, _selftest_slot, *_MMIO_SLOT_SPECS}
                 and i not in _generated_thread_slots
                 and assigned is not None and not image_artifact_selected(assigned, cfg)):
