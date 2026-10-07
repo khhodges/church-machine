@@ -256,7 +256,7 @@ SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
 # FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
 # downloadable host-bridge version, intentionally tracked separately from
 # the FPGA build version.
-BRIDGE_VERSION    = 18
+BRIDGE_VERSION    = 19
 
 # Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
 TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
@@ -1734,12 +1734,10 @@ def main():
     # has no UID field. Never derive identity from a serial path or truncate it.
     device_uid = str(args.device_uid or '').strip()
 
-    # For https:// IDE URLs the common case is a self-signed / lab certificate
-    # (e.g. lab.cloomc.org), which floods the terminal with one urllib3
-    # InsecureRequestWarning per HTTP request and drowns out the HW trace.
-    # Default to skipping verification for https and suppress the per-request
-    # warnings, printing a single one-line notice at startup instead.
-    verify_tls = not (args.insecure or ide_base.startswith('https://'))
+    # HTTPS carries the bridge credential: verify the server certificate by
+    # default. Only an explicit --insecure may disable verification.
+    # Requests also supports REQUESTS_CA_BUNDLE for private certificate roots.
+    verify_tls = not args.insecure
     if not verify_tls:
         try:
             import urllib3
@@ -1762,9 +1760,12 @@ def main():
                 print(f'[bridge] {port} not found — trying {alt} instead')
                 port = alt
         print(f'Wukong bridge: {port} @ {args.baud} baud → {ide_base}')
-    print(f'[bridge] version v{BRIDGE_VERSION} (for Wukong build v{BRIDGE_VERSION})')
+    print(f'[bridge] version v{BRIDGE_VERSION} (host software; FPGA version reported separately)')
     if not verify_tls:
-        print('SSL verification disabled — add a cert to enable')
+        print('WARNING: TLS certificate verification disabled by --insecure; '
+              'the IDE server identity is not verified')
+    elif ide_base.startswith('https://'):
+        print('TLS certificate verification enabled')
     if church_only:
         print('[trace] church-only filter enabled — bare Turing RESULTs suppressed')
 
