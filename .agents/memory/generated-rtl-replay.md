@@ -6,6 +6,19 @@ description: Constant combinational emission and preserving the elaboration used
 Model simulation success is not evidence that emitted plain Verilog simulates
 identically. Check constant-only combinational blocks with a four-state simulator.
 
+When synthesis folds a registered ROM address into a synchronous BRAM read,
+check the initial output and first enabled read, not only the ROM contents.
+
+**Why:** The inspected Wukong netlist feeds next-counter bits into the BRAM
+address, enables its read with the initialization write, and initializes the
+output to zero. Retained behavioral ROM entry zero instead contains a nonzero
+Namespace limit. Correct INIT contents alone do not establish startup equivalence;
+a skipped first entry must be confirmed with initialization-write evidence.
+
+**How to apply:** Capture the first initialization writes before proposing a
+fix. Compare addresses, data, enables, and initial outputs against the retained
+elaboration; do not infer equivalence from later valid entries or clean timing.
+
 **Why:** With Amaranth 0.5.9 and Yosys 0.51, partial constant GT assignments were
 emitted as `always @*` blocks with empty sensitivity lists. Icarus never ran
 them, leaving bits unknown and blocking Namespace initialization; the equivalent
