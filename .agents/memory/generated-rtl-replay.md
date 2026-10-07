@@ -12,12 +12,16 @@ check the initial output and first enabled read, not only the ROM contents.
 **Why:** The inspected Wukong netlist feeds next-counter bits into the BRAM
 address, enables its read with the initialization write, and initializes the
 output to zero. Retained behavioral ROM entry zero instead contains a nonzero
-Namespace limit. Correct INIT contents alone do not establish startup equivalence;
-a skipped first entry must be confirmed with initialization-write evidence.
+Namespace limit. The initialization-write waveform confirmed that the first
+expected address/data pair was replaced by a zero write to address zero;
+every subsequent pair matched the retained ROM. Correct INIT contents alone
+therefore do not establish startup equivalence.
 
 **How to apply:** Capture the first initialization writes before proposing a
 fix. Compare addresses, data, enables, and initial outputs against the retained
 elaboration; do not infer equivalence from later valid entries or clean timing.
+Require a valid ROM output before the first write and verify both the first
+and final entries through the synthesized mapping, not behavioral RTL alone.
 
 **Why:** With Amaranth 0.5.9 and Yosys 0.51, partial constant GT assignments were
 emitted as `always @*` blocks with empty sensitivity lists. Icarus never ran
