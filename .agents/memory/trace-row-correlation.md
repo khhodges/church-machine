@@ -3,8 +3,21 @@ name: Trace row correlation
 description: Rule for combining hardware retirement addresses, instruction words, disassembly, and effects in one displayed row.
 ---
 
-Hardware trace rows may combine NIA-backed symbols with a hardware-observed
-instruction word only when the mapped word and observed word match. A word
+Hardware trace rows require independently verified running-image identity
+before attaching approved-image or reference-address symbols. Matching build
+numbers, upload delivery, or a single instruction word do not establish that
+identity. Inspection of approved immutable bytes is a separate operation.
+
+**Why:** An independently programmed image can reuse the same addresses and
+instructions as a reference image without containing the same program.
+
+**How to apply:** Keep live symbols, cursors, and inspection-row breakpoints
+unavailable without exact board-to-image evidence; a server restart must not
+recover authority merely by restoring a reference or uploaded address map.
+
+After image identity is established, hardware trace rows may combine
+NIA-backed symbols with a hardware-observed instruction word only when the
+mapped word and observed word match. A word
 derived from the same NIA map is not independent evidence and must never
 self-validate. An unknown address may
 still show word-derived disassembly, but it must remain visibly unlabelled; a

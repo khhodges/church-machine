@@ -4,7 +4,7 @@ from hardware.wukong_trace_symbols import (
     _BOOT_WORDS,
     _WUKONG_CALLHOME_FALLBACK_WORDS,
     boot_disassembly,
-    trace_metadata,
+    reference_metadata as trace_metadata,
 )
 
 

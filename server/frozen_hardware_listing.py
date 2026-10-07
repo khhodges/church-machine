@@ -68,5 +68,7 @@ def listing(store, revision_id, disassemble):
     return dict(ok=True, name=target, boot_target=target, boot_gt=boot_gt,
                 revision_id=revision_id, source_map="approved-image",
                 trace_authoritative=False, trace_pet_name=None, rows=rows,
+                identity_status="unavailable",
+                identity_reason="The legacy UART protocol does not report an exact image identity.",
                 notice="Selected approved image — NOT confirmed running on board. "
                        "Hardware-initialized LUMP words; boot ROM omitted.")

@@ -542,38 +542,17 @@ def _wukong_disassemble_word(word, pet_name=None):
 # ── Dynamic NIA map ──────────────────────────────────────────────────────────
 # Populated by _wukong_update_active_lump_nia() whenever a boot image is sent
 # to hardware.  Stores {base_byte, end_byte, name, lump_words} for the active
-# entry lump so every trace event gets a "LumpName.N" label instead of a raw
-# hex NIA.  Resident Wukong programs are covered by
-# _wukong_trace_metadata_static;
-# for user-compiled lumps this map is the only source of labels.
+# entry lump for inspection. Sending these bytes does not prove the complete
+# running image; never use this table as live trace authority.
 _wukong_active_lump_info = {}
 
 def _wukong_resolve_nia(nia):
-    """Resolve a trace NIA: check the dynamic active-lump table first, then
-    fall back to the static resident-program + Boot-ROM table from
-    wukong_trace_symbols."""
-    info = _wukong_active_lump_info
-    if (info and
-            info.get('base_byte', -1) <= nia < info.get('end_byte', 0) and
-            nia % 4 == 0):
-        offset = (nia - info['base_byte']) // 4
-        name   = info.get('name', 'Lump')
-        word   = info.get('lump_words', {}).get(offset)
-        if offset == 0:
-            disasm = 'LUMP_HEADER'
-        elif word is not None:
-            disasm = _wukong_disassemble_word(word, name)
-        else:
-            disasm = f'WORD 0x{offset:08X}'
-        return {
-            'pet_name':   name,
-            'offset':     offset,
-            'nia_label':  f'{name}.{offset}',
-            'map_instr_word': int(word) & 0xFFFFFFFF if word is not None else None,
-            'disasm':     disasm,
-            'source_map': 'uploaded',
-        }
-    return _wukong_trace_metadata_static(nia)
+    """Fail closed: neither an upload nor a reference NIA proves board identity.
+
+    The current UART protocol has no exact image-identity response. Keep
+    uploaded maps available for inspection, never for live annotation.
+    """
+    return None
 
 _wukong_trace_metadata = _wukong_resolve_nia
 
@@ -581,10 +560,9 @@ _wukong_trace_metadata = _wukong_resolve_nia
 def _wukong_correlate_trace_metadata(nia, supplied_word=None):
     """Return only instruction metadata that belongs to this retirement.
 
-    NIA-backed symbols are authoritative when the packet has no instruction
-    word.  When a newer bridge supplies a word, it must match the word mapped
-    at that NIA.  An unknown NIA can still be decoded from its supplied word,
-    but is explicitly marked as word-only rather than assigned a false label.
+    Address metadata first requires independently verified image identity.
+    A supplied word can be decoded without it, but cannot prove that an
+    address belongs to an approved LUMP.
     """
     location = _wukong_trace_metadata(nia) or {}
     word = None if supplied_word is None else int(supplied_word) & 0xFFFFFFFF
@@ -22785,7 +22763,9 @@ def wukong_trace_post():
         'nia':         int(data.get('nia', 0)),
         'ev_type':     ev_type,
         'payload_gt':  payload_gt,
-        'gt_label':    str(data.get('gt_label', '') or ''),
+        # Legacy bridges attach factory slot names without image evidence.
+        # Preserve the raw GT but do not promote those names to authority.
+        'gt_label':    '',
         # Reserved for a future packet field that is observed at retirement.
         # Never promote bridge map metadata into raw hardware evidence.
         'instr':       (int(data['observed_instr_word'])
@@ -23408,6 +23388,10 @@ def wukong_command_post():
     cmd = str(data.get('cmd', '')).strip()
     if cmd not in ('s', 'r', 'h', 'q', 'b', 'u', 'f', 'k'):
         return jsonify({'ok': False, 'error': 'unknown cmd'}), 400
+    if cmd == 'b' and data.get('namespace_revision'):
+        return jsonify(ok=False, blocked_stage='image_identity_unavailable',
+                       error='Inspection-row breakpoint rejected: the running FPGA '
+                             'image is not verified. No command was queued.'), 409
 
     entry = {'cmd': cmd}
     target, target_error = _wukong_target_error(data)

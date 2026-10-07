@@ -497,6 +497,7 @@
   var codeListingEl = document.getElementById('codeListing');
   var codeListingSource = null;
   var codeListingTracePet = null;
+  var codeListingAuthoritative = false;
   var lastTraceNia = null;
   var workspaceEl = document.getElementById('workspace');
   var bridgeAlertIncidentId = null;
@@ -1055,11 +1056,11 @@
     // hardware just executed that line.
   }
   function updateExecutionRows() {
-    if (selectedNamespaceRevision) {
+    if (!codeListingAuthoritative) {
       Object.keys(codeByNia).forEach(function (key) {
         codeByNia[key].classList.remove('last', 'present', 'next');
       });
-      document.getElementById('workspaceSelection').textContent = 'Approved image inspection — no live execution correlation';
+      document.getElementById('workspaceSelection').textContent = 'Image inspection — no verified live execution correlation';
       return;
     }
     Object.keys(codeByNia).forEach(function (key) {
@@ -1070,7 +1071,7 @@
     });
   }
   function setCurrentNia(nia) {
-    if (selectedNamespaceRevision) return;
+    if (!codeListingAuthoritative) return;
     if (nia === undefined || nia === null || isNaN(Number(nia))) return;
     lastNia = currentNia;
     currentNia = Number(nia) >>> 0;
@@ -1091,6 +1092,7 @@
       ' · Next: ' + (nextLabel ? nextLabel.nia_label : '—');
   }
   function renderCodeListing(data) {
+    codeListingAuthoritative = data.trace_authoritative === true;
     codeRows = data.rows || [];
     codeByNia = {};
     codeListingEl.innerHTML = '';
@@ -1118,10 +1120,14 @@
       var bp = document.createElement('button');
       bp.className = 'bp';
       bp.textContent = 'BP';
-      bp.title = 'Arm breakpoint at ' + hex(item.nia);
+      bp.disabled = !codeListingAuthoritative;
+      bp.title = codeListingAuthoritative ? 'Arm breakpoint at ' + hex(item.nia) :
+        'Inspection only: running board image is not verified';
       bp.onclick = function (ev) {
         ev.stopPropagation();
-        sendCmd({ cmd: 'b', nia: item.nia }, 'SET BP @ ' + hex(item.nia));
+        if (!codeListingAuthoritative) return;
+        sendCmd({ cmd: 'b', nia: item.nia, namespace_revision: selectedNamespaceRevision },
+          'SET BP @ ' + hex(item.nia));
         selectNia(item.nia);
       };
       row.appendChild(marker); row.appendChild(addr); row.appendChild(offset);
@@ -1165,6 +1171,10 @@
         }
       })
       .catch(function () {
+        codeListingAuthoritative = false;
+        codeRows = [];
+        codeByNia = {};
+        updateExecutionRows();
         document.getElementById('codeSource').textContent = 'code map unavailable';
         codeListingEl.innerHTML = '<div class="empty-pane">Could not load the hardware code map.</div>';
       });

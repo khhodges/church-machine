@@ -169,7 +169,17 @@ def _resident_lump_metadata(nia, base, pet_name, words):
 
 
 def trace_metadata(nia):
-    """Return source metadata for *nia*, or ``None`` when it is not known.
+    """No live address authority exists in the legacy UART protocol.
+
+    Build/version bytes, upload acknowledgements and a matching instruction
+    are not evidence of the complete running image. Reference inspection must
+    explicitly use reference_metadata instead.
+    """
+    return None
+
+
+def reference_metadata(nia):
+    """Return inspection-only reference metadata for *nia*.
 
     ``nia_label`` is the requested pet-name/offset form.  The offset is a
     word offset, matching the LUMP instruction layout, while ``nia`` remains

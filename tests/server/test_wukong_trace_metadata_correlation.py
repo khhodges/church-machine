@@ -50,12 +50,11 @@ def test_bridge_map_word_cannot_self_validate_as_hardware_evidence():
     ])
     decoded = wukong_bridge.decode_trace_packet(packet)
     assert "observed_instr_word" not in decoded
-    decoded.update(wukong_bridge._trace_location(decoded["nia"]))
-    assert decoded["map_instr_word"] == 0x8F098000
+    assert wukong_bridge._trace_location(decoded["nia"]) is None
+    assert "map_instr_word" not in decoded
     assert "observed_instr_word" not in decoded
 
     item = app_module._wukong_correlate_trace_metadata(
         decoded["nia"], decoded.get("observed_instr_word"))
-    assert item["disasm"] == "DWRITE DR1, CR3, #0, DR0"
-    assert item["metadata_status"] == "NIA map (unverified)"
+    assert item == {}
     assert "observed_instr_word" not in item

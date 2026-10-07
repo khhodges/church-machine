@@ -156,7 +156,7 @@ except ImportError:
     requests = None  # IDE notifications silently skipped; bridge main() will exit if None
 
 try:
-    from wukong_trace_symbols import trace_metadata as _trace_metadata
+    from wukong_trace_symbols import reference_metadata as _trace_metadata
 except ImportError:
     # The bridge is also distributed as a standalone single-file download.
     _trace_metadata = None
@@ -508,7 +508,12 @@ def _standalone_boot_disassemble(offset, entry_pet_name='SelfTest'):
 
 
 def _trace_location(nia):
-    """Resolve the reference-bitstream pet-name/offset and disassembly."""
+    """Legacy UART has no image identity; never label live NIAs by reference."""
+    return None
+
+
+def _reference_trace_location(nia):
+    """Inspection-only legacy reference map, never called by UART decoding."""
     if _trace_metadata is not None:
         return _trace_metadata(nia)
     nia = int(nia) & 0xFFFFFFFF
@@ -620,9 +625,9 @@ def _decode_gt_label(gt_word):
     to call this at all).
 
     Examples:
-        0x42000007 -> 'WukongCallHome, Turing X-perm'
-        0x1A000007 -> 'WukongCallHome, Church L-perm'
-        0x02000001 -> 'Boot.NS, Turing no-perm'
+        0x42000007 -> 'slot 7, Turing X-perm'
+        0x1A000007 -> 'slot 7, Church L-perm'
+        0x02000001 -> 'slot 1, Turing no-perm'
         0x00000000 -> 'NULL GT'
     """
     if gt_word is None:
@@ -634,7 +639,7 @@ def _decode_gt_label(gt_word):
     if gt_type == 0:
         return 'NULL GT'
     type_pfx = _GT_TYPE_SUFFIX.get(gt_type, '')
-    slot_str = _GT_SLOT_NAMES.get(slot, f'slot {slot}')
+    slot_str = f'slot {slot}'
     dom_str  = 'Church' if dom else 'Turing'
     if dom:   # Church: L S E
         parts = (['L'] if perm & 1 else []) + \
