@@ -23,6 +23,11 @@ elaboration; do not infer equivalence from later valid entries or clean timing.
 Require a valid ROM output before the first write and verify both the first
 and final entries through the synthesized mapping, not behavioral RTL alone.
 
+Prefer a separate fetch cycle and write cycle for this startup-only transfer.
+**Why:** An extra cycle per sparse word is a small boot-time cost compared with
+the risk of relying on inferred ROM power-up data or retiming behavior. Keep
+performance optimizations subordinate to first-entry and final-entry evidence.
+
 **Why:** With Amaranth 0.5.9 and Yosys 0.51, partial constant GT assignments were
 emitted as `always @*` blocks with empty sensitivity lists. Icarus never ran
 them, leaving bits unknown and blocking Namespace initialization; the equivalent

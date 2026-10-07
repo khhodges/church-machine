@@ -207,6 +207,10 @@ args = "hex-tab-fill-path-tests"
 task = "workflow.run"
 args = "wukong-fault-sentinel"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "wukong-boot-rom-guard"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -720,12 +724,12 @@ outputType = "console"
 name = "wukong-boot-rom-guard"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python -m pytest tests/hardware/test_wukong_boot_rom_guard.py -v"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m pytest tests/hardware/test_wukong_boot_rom_guard.py tests/hardware/test_sparse_memory_init.py -v"
 
 [[workflows.workflow]]
 name = "e2e-tests"

@@ -61,6 +61,7 @@ from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
                        wukong_wch_header)
 from .uart_tx import UartTx
 from .uart_rx import UartRx
+from .sparse_memory_init import SparseMemoryInitializer
 from shared.architecture_contracts import PROFILES as ARCH_PROFILES, TRACE_UNITS as ARCH_TRACE_UNITS
 
 _WUKONG_ARCH_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
@@ -607,7 +608,7 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # N_INIT is computed here (before the UART mux) so C(N_INIT & 0xFF, 8)
         # is available when the boot sentinel mux is elaborated.  The boot FSM
-        # below also uses N_INIT for Signal(range(N_INIT+1)) and the done-latch.
+        # below initializes the same ordered pairs through a clocked ROM.
         N_INIT = len(hw_init_pairs)
 
         # The hardware init sequencer below writes every non-zero word before
@@ -1792,35 +1793,27 @@ class ChurchWukongXC7A100T(Elaboratable):
         # Phase 1 (16 cycles): boot_delay counts to 0xF — waits for GSR to
         #   complete and all FFs to settle at their init values.
         #
-        # Phase 2 (~N cycles, one per hw_init_pair): hw_init_ctr counts through
-        #   hw_init_pairs, writing each non-zero DMEM word via the write port.
+        # Phase 2 (2*N cycles): fetch then commit each hw_init_pair, writing
+        #   each non-zero DMEM word via the write port.
         #   This bypasses the Vivado BRAM `initial`-block inference problem.
         #
-        #   The (addr, data) pair for each cycle comes from a small combinatorial
-        #   LUTRAM (init_rom) seeded with hw_init_pairs — one case in hardware,
-        #   no large MUX chain.  A registered hw_init_done flag (latches when
-        #   hw_init_ctr reaches N_INIT-1) replaces the synthesisable < N_INIT
-        #   comparison, eliminating any Vivado comparison-folding or off-by-one.
+        #   Explicit synchronous-ROM latency is essential: folding the old
+        #   counter + combinatorial ROM into BRAM skipped its first entry.
+        #   Completion is asserted only after the final accepted memory write.
         #
         # Phase 3 (1 cycle): boot_start pulsed; boot_triggered latched.
         #   The LED mux switches to CM-controlled outputs.
         #   The UART TX arbitrator sends sentinel bytes 0xBC N_INIT TU_VERSION (first free TX slots).
         boot_delay  = Signal(4, init=0)
-        hw_init_ctr = Signal(range(N_INIT + 1), init=0)
         # hw_init_done declared earlier (near boot_triggered) for UART arbitrator use
 
-        # ── Init LUTRAM (combinatorial read port → no MUX chain) ───────────────
-        # Each entry packs dmem_addr[13:0] in bits[45:32] and dmem_data[31:0]
-        # in bits[31:0].  Vivado infers LUTRAM for the small depth (~50 entries).
-        _init_rom_contents = [
-            ((addr & 0x3FFF) << 32) | (val & 0xFFFFFFFF)
-            for addr, val in hw_init_pairs
-        ] or [0]   # guard: at least one entry so depth >= 1
-        init_rom    = m.submodules.init_rom = LibMemory(
-            shape=unsigned(46), depth=len(_init_rom_contents),
-            init=_init_rom_contents)
-        init_rom_rd = init_rom.read_port(domain="comb")
-        m.d.comb   += init_rom_rd.addr.eq(hw_init_ctr)
+        initializer = m.submodules.initializer = SparseMemoryInitializer(hw_init_pairs)
+        m.d.comb += [
+            hw_init_done.eq(initializer.done),
+            hw_init_wr_en.eq(initializer.write_en),
+            hw_init_wr_addr.eq(initializer.write_addr),
+            hw_init_wr_data.eq(initializer.write_data),
+        ]
 
         # boot_triggered declared early (before UART arbitrator) so the sentinel
         # logic can reference it; driven here in the boot FSM.
@@ -1829,18 +1822,9 @@ class ChurchWukongXC7A100T(Elaboratable):
             with m.If(boot_delay < 0xF):
                 m.d.sync += boot_delay.eq(boot_delay + 1)
 
-            # Phase 2: write non-zero DMEM words one per cycle (ROM lookup)
+            # Phase 2: a clocked fetch must precede every memory write.
             with m.Elif(~hw_init_done):
-                m.d.sync += hw_init_ctr.eq(hw_init_ctr + 1)
-                m.d.comb += [
-                    hw_init_wr_en.eq(1),
-                    hw_init_wr_addr.eq(init_rom_rd.data[32:46]),
-                    hw_init_wr_data.eq(init_rom_rd.data[0:32]),
-                ]
-                # Latch done flag on the last write cycle so Phase 2.5 begins
-                # the very next cycle — no fencepost, no comparison folding.
-                with m.If(hw_init_ctr == N_INIT - 1):
-                    m.d.sync += hw_init_done.eq(1)
+                m.d.comb += initializer.enable.eq(1)
 
             # Phase 2.5: send "WUKONG\r\n" hardware banner before CM starts.
             # banner_req / banner_byte / banner_done are driven by the UART

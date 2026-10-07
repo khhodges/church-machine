@@ -17,7 +17,7 @@ Coverage:
     Test 2  — ChurchCore simulation: boot_complete rises; CR12 = Inform GT with slot_id=1
     Test 3  — ChurchCore simulation: CR8 stays NULL after boot (wrong-target regression)
     Test 4  — ChurchWukongXC7A100T simulation: hw_init FSM completes; boot_triggered
-              latches within 17 + N_INIT cycles (observable via led[1] transition)
+              latches within 17 + 2*N_INIT cycles (observable via led[1] transition)
 
 Reference: hardware/core.py INIT_THRD case
 
@@ -223,9 +223,9 @@ def test_wukong_boot_triggered():
 
     The Wukong boot FSM has three phases:
       Phase 1: 16 cycles  (boot_delay counts to 0xF)
-      Phase 2: N_INIT cycles  (one DMEM write per cycle via init LUTRAM)
+      Phase 2: 2*N_INIT cycles (clocked fetch, then DMEM write)
       Phase 3: 1 cycle    (boot_start pulse + boot_triggered latch)
-    Total: 17 + N_INIT cycles from GSR.
+    Total excluding UART banner: 17 + 2*N_INIT cycles from GSR.
 
     Observable without an internal debug port: led[1].
       Before boot_triggered: led[1] = hb_blink (starts at 0, toggling every
@@ -280,8 +280,8 @@ def test_wukong_boot_triggered():
     hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
     N_INIT = len(hw_init_pairs)
 
-    # Phase1=16 + Phase2=N_INIT + Phase3=1 = 17+N_INIT; allow +4 margin.
-    expected_cycle = 17 + N_INIT
+    # Phase1=16 + Phase2=2*N_INIT + Phase3=1; allow +4 margin.
+    expected_cycle = 17 + 2 * N_INIT
     max_cycles     = expected_cycle + 4
 
     async def testbench(ctx):
@@ -302,7 +302,7 @@ def test_wukong_boot_triggered():
 
     print("\n=== Test 4: ChurchWukongXC7A100T — boot_triggered latches ===")
     print(f"  N_INIT         = {N_INIT} non-zero DMEM words")
-    print(f"  Expected cycle = {expected_cycle}  (16 + {N_INIT} + 1)")
+    print(f"  Expected cycle = {expected_cycle}  (16 + 2*{N_INIT} + 1)")
     print(f"  Max allowed    = {max_cycles}")
 
     boot_cycle = results["boot_cycle"]

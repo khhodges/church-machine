@@ -61,6 +61,7 @@ CORE_SOURCES: tuple[str, ...] = (
 )
 
 WUKONG_SOURCES: tuple[str, ...] = CORE_SOURCES + (
+    "hardware/sparse_memory_init.py",
     "hardware/gen_rtlil.py",
     "hardware/uart_rx.py",
     "hardware/uart_tx.py",
