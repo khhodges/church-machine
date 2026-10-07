@@ -40,6 +40,19 @@ avoid a second independent elaboration of the DUT under the old debug taps.
 Keep the full method-dispatch release replay outside the default IDE test loop.
 Partial/resumed diagnostic runs are not release evidence.
 
+When a fully bit-lowered frozen Verilog replay is impractically slow, a
+hash-verified retained RTLIL elaboration can be converted with
+`proc; flatten; opt; write_verilog` for a separate diagnostic replay.
+
+**Why:** Preserving word-level operations can make the retained elaboration
+tractable without importing or re-elaborating today's source. This is not
+equivalent evidence to replaying the final bit-lowered release file.
+
+**How to apply:** Label the conversion and evidence boundary explicitly, retain
+cycle limits and logs, and never treat a shell exit of zero at a testbench
+timeout as a passing boot. Include the bridge's UART inputs before claiming to
+reproduce a physical run that used automatic halt and snapshot commands.
+
 **Why:** Each Icarus compilation is expensive, and a partial run cannot establish
 that the complete matrix and the exact SelfTest candidate passed together against
 unchanged source. Boot harness imports also depend on the selected artifact
