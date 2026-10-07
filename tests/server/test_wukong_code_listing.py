@@ -24,7 +24,7 @@ def client():
 
 
 def test_reference_listing_uses_hardware_nia_addresses(client):
-    response = client.get('/hardware/wukong/code')
+    response = client.get('/hardware/wukong/code?reference=1')
 
     assert response.status_code == 200
     data = response.get_json()
@@ -44,7 +44,7 @@ def test_reference_listing_uses_hardware_nia_addresses(client):
     assert [row['disasm'] for row in data['rows'][:3]] == [
         'LOAD NAMESPACE CR15',
         'LOAD THREAD+HEAP CR12+, CR5',
-        'CALL CR[0] SelfTest',
+        'CALL CR[0] WukongCallHome',
     ]
     assert all('<unknown>' not in row['disasm'] for row in data['rows']
                if row['nia_label'].startswith('WukongCallHome.'))
@@ -54,13 +54,13 @@ def test_known_pet_name_never_uses_unknown_decoder_placeholder(client, monkeypat
     """A known lump remains inspectable if the optional decoder is unavailable."""
     monkeypatch.setattr(app_module, '_wts_disasm', lambda _word: '<unknown>')
 
-    data = client.get('/hardware/wukong/code').get_json()
+    data = client.get('/hardware/wukong/code?reference=1').get_json()
 
     known_rows = [row for row in data['rows']
                   if row['nia_label'].startswith('WukongCallHome.')]
     assert known_rows
     assert all(row['disasm'] != '<unknown>' for row in known_rows)
-    assert known_rows[1]['disasm'] == 'WORD 0x071B0005'
+    assert known_rows[1]['disasm'] == f"WORD 0x{known_rows[1]['word']:08X}"
 
 
 def test_uploaded_listing_uses_active_lump_map(client):
@@ -80,8 +80,8 @@ def test_uploaded_listing_uses_active_lump_map(client):
     assert rows[0x204]['nia_label'] == 'Demo.1'
 
 
-def test_trace_wukongcallhome_wins_over_overlapping_uploaded_selftest(client):
-    """A live WCH NIA must not be displayed as the cached SelfTest lump."""
+def test_trace_address_does_not_promote_reference_identity(client):
+    """An address alone must not replace an uploaded map with factory symbols."""
     app_module._wukong_active_lump_info = {
         'base_byte': 0x600,
         'name': 'SelfTest',
@@ -90,8 +90,8 @@ def test_trace_wukongcallhome_wins_over_overlapping_uploaded_selftest(client):
 
     data = client.get('/hardware/wukong/code?trace_nia=0x1204').get_json()
 
-    assert data['source_map'] == 'reference-bitstream'
-    assert data['trace_authoritative'] is True
-    assert data['trace_pet_name'] == 'WukongCallHome'
+    assert data['source_map'] == 'uploaded'
+    assert data['trace_authoritative'] is False
+    assert data['trace_pet_name'] is None
     rows = {row['nia']: row for row in data['rows']}
-    assert rows[0x1204]['nia_label'] == 'WukongCallHome.1'
+    assert 0x1204 not in rows

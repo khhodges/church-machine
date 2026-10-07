@@ -23249,7 +23249,21 @@ def wukong_code_get():
     overlapping uploaded lump such as SelfTest.  Every row contains the
     byte-addressed NIA used by trace packets.
     """
+    revision_id = request.args.get('namespace_revision', '')
+    if revision_id:
+        try:
+            from server.frozen_hardware_listing import listing
+            return jsonify(listing(_artifact_revision_store(), revision_id,
+                                   _wukong_disassemble_word))
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            return jsonify(ok=False, rows=[], source_map='unavailable',
+                           trace_authoritative=False,
+                           notice="Approved image map unavailable: " + str(exc)), 400
     info = dict(_wukong_active_lump_info)
+    if not info and request.args.get('reference') != '1':
+        return jsonify(ok=True, rows=[], source_map='unavailable',
+                       trace_authoritative=False, trace_pet_name=None,
+                       notice="No verified board code map. Select an approved image to inspect.")
     trace_nia = request.args.get('trace_nia')
     trace_location = None
     if trace_nia is not None:
@@ -23258,7 +23272,9 @@ def wukong_code_get():
         except (TypeError, ValueError):
             trace_location = None
     trace_pet_name = (trace_location or {}).get('pet_name')
-    force_reference = trace_pet_name == 'WukongCallHome'
+    # An address alone cannot identify the resident image. Reference mappings
+    # are available only by explicit request, never promoted by trace NIA.
+    force_reference = request.args.get('reference') == '1'
     rows = []
     source_map = 'uploaded'
 
@@ -23310,7 +23326,7 @@ def wukong_code_get():
                 _canonical_wch_header as _wch_header,
             )
             source_map = 'reference-bitstream'
-            for offset, word in enumerate(_selftest_words):
+            for offset, word in enumerate(_selftest_words[:512]):
                 word = int(word) & 0xFFFFFFFF
                 add_row(offset, int(_selftest_base) + offset * 4, word,
                         f'SelfTest.{offset}',
@@ -23330,8 +23346,11 @@ def wukong_code_get():
         'name': ('WukongCallHome' if force_reference
                  else str(info.get('name') if info else 'WukongCallHome')),
         'source_map': source_map,
-        'trace_authoritative': bool(trace_location),
-        'trace_pet_name': trace_pet_name,
+        'trace_authoritative': False,
+        'trace_pet_name': None,
+        'notice': ('Reference image only — NOT confirmed running on board'
+                   if force_reference else
+                   'Uploaded LUMP map — running board identity not verified'),
         'rows': rows,
     })
 

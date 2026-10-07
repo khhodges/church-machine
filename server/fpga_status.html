@@ -268,6 +268,7 @@
              <span class="next">Next</span>
            </div>
           <span id="codeSource">Loading code listing…</span>
+          <button id="inspectB1" type="button">Inspect approved B.1 image</button>
         </div>
       </header>
       <div class="workspace-body">
@@ -1039,6 +1040,7 @@
     return name + asm + ' · ' + ev + suffix;
   }
   function selectNia(nia, source) {
+    if (selectedNamespaceRevision && source === 'event') return;
     if (nia === undefined || nia === null || isNaN(Number(nia))) return;
     selectedNia = Number(nia) >>> 0;
     Object.keys(codeByNia).forEach(function (key) {
@@ -1053,6 +1055,13 @@
     // hardware just executed that line.
   }
   function updateExecutionRows() {
+    if (selectedNamespaceRevision) {
+      Object.keys(codeByNia).forEach(function (key) {
+        codeByNia[key].classList.remove('last', 'present', 'next');
+      });
+      document.getElementById('workspaceSelection').textContent = 'Approved image inspection — no live execution correlation';
+      return;
+    }
     Object.keys(codeByNia).forEach(function (key) {
       var rowNia = Number(key);
       codeByNia[key].classList.toggle('last', lastNia !== null && rowNia === lastNia);
@@ -1061,6 +1070,7 @@
     });
   }
   function setCurrentNia(nia) {
+    if (selectedNamespaceRevision) return;
     if (nia === undefined || nia === null || isNaN(Number(nia))) return;
     lastNia = currentNia;
     currentNia = Number(nia) >>> 0;
@@ -1085,7 +1095,7 @@
     codeByNia = {};
     codeListingEl.innerHTML = '';
     if (!codeRows.length) {
-      codeListingEl.innerHTML = '<div class="empty-pane">No matching code map is available yet. Upload a boot image to associate executable words with hardware NIAs.</div>';
+      codeListingEl.innerHTML = '<div class="empty-pane">No verified board code map. Use Inspect approved B.1 image to examine its frozen instructions without claiming they are running.</div>';
       return;
     }
     codeRows.forEach(function (item) {
@@ -1127,9 +1137,15 @@
       if (currentRow) currentRow.scrollIntoView({ block: 'center' });
     }
   }
+  var selectedNamespaceRevision = new URLSearchParams(window.location.search).get('namespace_revision') || '';
+  document.getElementById('inspectB1').onclick = function () {
+    selectedNamespaceRevision = '3a53c8ebe99bcccb3eb1c4371c8c897851853d60cd7d64d66c0343f69b502166';
+    loadCodeListing();
+  };
   function loadCodeListing() {
     var url = '/hardware/wukong/code';
-    if (lastTraceNia !== null) url += '?trace_nia=' + encodeURIComponent(hex(lastTraceNia));
+    if (selectedNamespaceRevision) url += '?namespace_revision=' + encodeURIComponent(selectedNamespaceRevision);
+    else if (lastTraceNia !== null) url += '?trace_nia=' + encodeURIComponent(hex(lastTraceNia));
     fetch(url)
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -1139,7 +1155,14 @@
         var source = d.source_map === 'uploaded' ? 'uploaded active lump' :
           (d.source_map === 'reference-bitstream' ? 'reference WukongCallHome' : 'no code map');
         document.getElementById('codeSource').textContent =
-          d.trace_authoritative ? source + ' · trace authoritative' : source;
+          d.notice ? d.notice + (d.boot_target ? ' Boot target: ' + d.boot_target : '') :
+          (d.trace_authoritative ? source + ' · trace authoritative' : source);
+        if (d.source_map === 'approved-image') {
+          codeListingEl.querySelectorAll('button.bp').forEach(function (button) {
+            button.disabled = true;
+            button.title = 'Inspection only: running board image is not verified';
+          });
+        }
       })
       .catch(function () {
         document.getElementById('codeSource').textContent = 'code map unavailable';
