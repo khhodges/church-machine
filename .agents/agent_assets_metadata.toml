@@ -416,3 +416,17 @@ mtime_ms = 1790978322465
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9d69301b-43b4-4380-ac37-0a3dac0e4e47/57fef984-25a0-4c0c-9afb-048391b154c7"
 storage_version_token = "1790978404074582"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "2h2--Jn7I1tjoiQ6j227a"
+uri = "file://attached_assets/church_wukong_B1_corrected.mcs"
+type = "unspecified"
+title = "Corrected B.1 MCS"
+description = "Verified SPIx4 flash image — church_wukong_B1_corrected.mcs"
+logical_id = "6ab7ea37-a336-41d4-8c09-b514181fb5c2"
+content_hash = "sha256:89f88ffde0b7c9a95687bec92cc7ca97d8f6da7b05f82b323bdeab8be6d1655f"
+size = 10521876
+mtime_ms = 1791502393205
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6ab7ea37-a336-41d4-8c09-b514181fb5c2/d7aa2467-f6a3-427c-9c44-7b4495a0f36c"
+storage_version_token = "1791502398919274"
+content_type = "application/octet-stream"
