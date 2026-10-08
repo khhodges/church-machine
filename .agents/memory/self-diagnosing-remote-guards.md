@@ -40,3 +40,13 @@ caused repeated transfer failures before any source fix reached the droplet.
 SHA-256 before sharing the command. On the remote host, verify that checksum and
 run an apply preflight before modifying an isolated checkout; fail closed on
 download, integrity, or context mismatch.
+
+Capture expected negative diagnostic statuses inside a child process and persist
+its output before returning control to an interactive remote console.
+**Why:** Input-equivalence audits intentionally return a nonzero status for a
+mismatch. A user reported losing the terminal during such an audit; its cause
+was not established, so do not equate terminal closure with a hardware or
+compiler crash.
+**How to apply:** Keep the audit's fail-closed status, record it separately from
+the recovery wrapper's status, and allow result recovery without rerunning a
+build or changing either retained input.
