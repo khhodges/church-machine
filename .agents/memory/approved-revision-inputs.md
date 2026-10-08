@@ -13,6 +13,14 @@ against the retained elaboration before calling a source repair input-equivalent
 generated hardware still has a different initialization payload from the frozen
 image. Those checks prove non-mutation, not historical correspondence.
 
+An optional-artifact fallback must not silently change a frozen repair image.
+**Why:** Regeneration omitted the original boot-selected CapabilityTest LUMP
+and reverted its Namespace descriptor while the rest of the image remained
+unchanged. A valid initializer microtest did not detect that input substitution.
+**How to apply:** Require byte-for-byte frozen initialization payload comparison
+before full synthesis; report admission/selection failures instead of accepting
+an optional omission or weakening the artifact's admission checks.
+
 **Why:** LUMP publication can reuse a filename while archiving its previous bytes.
 Merely storing that filename in a downstream snapshot would silently change its
 input or make an otherwise valid historical approval unusable.
