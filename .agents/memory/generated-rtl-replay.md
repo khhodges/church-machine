@@ -6,6 +6,15 @@ description: Constant combinational emission and preserving the elaboration used
 Model simulation success is not evidence that emitted plain Verilog simulates
 identically. Check constant-only combinational blocks with a four-state simulator.
 
+Derive post-instruction capability expectations from the instruction's memory
+inputs and semantics, not the reset/bootstrap seed.
+**Why:** A replay incorrectly expected the bootstrap Namespace GT to survive
+the first LOAD. That assertion obscured successful initialization and a correct
+loaded limit; the LOAD legitimately replaced the GT field.
+**How to apply:** Keep exact full-capability checks, but distinguish reset and
+post-LOAD states. Inspect mismatching fields before changing RTL or masking
+fields out of an assertion.
+
 When synthesis folds a registered ROM address into a synchronous BRAM read,
 check the initial output and first enabled read, not only the ROM contents.
 

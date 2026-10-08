@@ -5,7 +5,10 @@ import shutil
 import sys
 from pathlib import Path
 
-build, out = map(Path, sys.argv[1:])
+build, out = map(Path, sys.argv[1:3])
+trace = sys.argv[3:] == ["--trace"]
+if sys.argv[3:] and not trace:
+    raise SystemExit("Only optional argument is --trace")
 checks = {
     "church_wukong_xc7a100t.v": "d7fb9b95ca8304a05148cd30ab5c1053f2c246e2b5509b461cc008ed594b677a",
     "synth_funcsim.v": "e120f6713aeaa307835ae78bddac4ed03dd0858b53290ef5ffa6fdc0c61ed226",
@@ -86,7 +89,9 @@ module tb;
     if (fault_valid === 1'b1)
       $fatal(1,"BOOT_FAULT nia=%h fault=%h CR15=%h",nia,fault,cr15);
     if (init_checked && nia === 32'h4) begin
-      if (cr15 !== 96'h0000003f000000001a000000)
+      // LOAD obtains GT zero from NS slot 0's location word. The nonzero
+      // reset/bootstrap GT is not the post-LOAD value.
+      if (cr15 !== 96'h0000003f0000000000000000)
         $fatal(1,"BOOT_LOAD_MISMATCH CR15=%h",cr15);
       $display("INIT_AND_BOOT_LOAD_PASS CR15=%h nia=%h",cr15,nia);
       $finish;
@@ -94,13 +99,47 @@ module tb;
   end
 endmodule
 """
+if trace:
+    tb = tb.replace("reg init_checked=0;", """reg init_checked=0;
+  reg boot_load_checked=0;
+  reg [31:0] last_nia=32'hffffffff;
+  integer trace_count=0;""")
+    tb = tb.replace("if (init_checked && nia === 32'h4)", "if (init_checked && !boot_load_checked && nia === 32'h4)")
+    tb = tb.replace("""      $finish;
+    end
+  end""", """      boot_load_checked=1;
+    end
+    if (init_checked && nia !== last_nia) begin
+      if (trace_count < 256)
+        $display("NIA_OBSERVATION t=%t nia=%h CR15=%h boot=%b",
+          $time,nia,cr15,boot);
+      if (nia === 32'h2e08)
+        $display("TARGET_NIA_OBSERVED_NOT_RETIREMENT_PROOF t=%t",$time);
+      last_nia=nia;
+      trace_count=trace_count+1;
+    end
+  end""")
+    # A diagnostic timeout remains a failure, never evidence of execution.
 (out / "tb.sv").write_text(tb.replace("@CR15@", cr15).replace("@DATA@", data).replace("@LANES@", lanes))
 (out / "inputs.sha256").write_text("".join(f"{digest}  {name}\n" for name, digest in checks.items()))
 (out / "run.sh").write_text(r"""#!/usr/bin/env bash
 set -eo pipefail
 cd "$(dirname "$0")"
 ROOT=$PWD
-trap 'rc=$?; echo "$rc" > "$ROOT/exit-status"; echo "BOOT_REPLAY_EXIT=$rc"' EXIT
+finish() {
+  local rc=$?
+  trap - EXIT
+  if test -f simulation.log; then
+    echo "=== Saved replay evidence ==="
+    grep -E 'INIT_PAIR_PASS|ALL_INIT_PAIRS_PASS|INIT_AND_BOOT_LOAD_PASS|TARGET_NIA|BOOT_FAULT|REPLAY_TIMEOUT|BOOT_LOAD_MISMATCH|Fatal:|ERROR:' simulation.log || true
+    echo "=== Last observed NIA transitions (not retirement proof) ==="
+    grep '^NIA_OBSERVATION' simulation.log | tail -20 || true
+  fi
+  echo "$rc" > "$ROOT/exit-status"
+  echo "BOOT_REPLAY_EXIT=$rc"
+  exit "$rc"
+}
+trap finish EXIT
 exec 9>/tmp/church-vivado-build.lock
 flock -n 9 || { echo "Another Vivado job owns the build lock"; exit 1; }
 sha256sum -c inputs.sha256
@@ -118,4 +157,12 @@ if grep -Eiq 'Fatal:|ERROR:' simulation.log; then exit 1; fi
 echo "INITIALIZATION_AND_FIRST_LOAD_ONLY_NOT_BOUNDS_OR_RELEASE_APPROVAL"
 """)
 print(f"Prepared replay: {out}")
-print("Scope: all 2693 physical initialization writes and first boot LOAD only.")
+if trace:
+    runner = out / "run.sh"
+    runner.write_text(runner.read_text().replace(
+        'source /opt/Xilinx',
+        'echo "TRACE_DIAGNOSTIC_NOT_RETIREMENT_OR_RELEASE_PROOF"\nsource /opt/Xilinx'))
+    print("Scope: verify initialization/first LOAD, then observe NIA until first fault or 10 ms timeout.")
+    print("Trace mode has no success exit: a fault or timeout remains nonzero; inspect the saved observations.")
+else:
+    print("Scope: all 2693 physical initialization writes and first boot LOAD only.")
