@@ -40,6 +40,15 @@ introducing new object bytes.
 scope, preserve all ROM entries, and require fresh synthesis, integrated replay,
 and release approval. A retained baseline is not approval of arbitrary imports.
 
+The user approved removing the frozen build's 66 physical debug outputs while
+retaining UART diagnostics and the six intended board connections.
+**Why:** Routed reports proved that unassigned debug ports were driving real
+package pins with automatically chosen I/O standards.
+**How to apply:** This permits a narrowly verified port-interface edit, not a
+program or core-logic rewrite. Preserve the frozen initializer/program and
+50 MHz clock, restore strict I/O DRC checks, and revalidate the new synthesized
+and routed artifacts rather than transferring the old replay's approval.
+
 **Why:** LUMP publication can reuse a filename while archiving its previous bytes.
 Merely storing that filename in a downstream snapshot would silently change its
 input or make an otherwise valid historical approval unusable.
