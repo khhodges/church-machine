@@ -27,3 +27,16 @@ diagnostic info that the script could have printed itself on first failure.
 don't have direct access to should default to verbose, self-diagnosing output
 on the failure path — treat "not enough info to diagnose from the pasted
 error alone" as a bug in the guard itself.
+
+For remote source fixes, verify that a commit is reachable from the remote
+before instructing the user to fetch its hash. A local checkpoint is not proof
+that the upstream repository has that commit. Prefer a checksum-verified file
+download over long encoded chat payloads when Git cannot supply the fix.
+
+**Why:** An unavailable upstream commit followed by an incomplete encoded paste
+caused repeated transfer failures before any source fix reached the droplet.
+
+**How to apply:** Fetch the actual served patch yourself and compare its full
+SHA-256 before sharing the command. On the remote host, verify that checksum and
+run an apply preflight before modifying an isolated checkout; fail closed on
+download, integrity, or context mismatch.
