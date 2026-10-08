@@ -6,6 +6,13 @@ An approved Namespace retains its selected LUMP bytes and generated build inputs
 an approved bitstream retains the exact Namespace revision and source commit.
 Compatibility filenames and current catalog rows are not historical authority.
 
+A catalog copied from an old build directory is not automatically the catalog
+that produced its retained RTL. Check the resulting initialization payload
+against the retained elaboration before calling a source repair input-equivalent.
+**Why:** A copied catalog can pass its own unchanged-file checks while newly
+generated hardware still has a different initialization payload from the frozen
+image. Those checks prove non-mutation, not historical correspondence.
+
 **Why:** LUMP publication can reuse a filename while archiving its previous bytes.
 Merely storing that filename in a downstream snapshot would silently change its
 input or make an otherwise valid historical approval unusable.
