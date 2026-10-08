@@ -41,6 +41,15 @@ the reduced test is meant to reproduce.
 require the baseline failure to reproduce before calling a candidate a
 controlled fix.
 
+Distributed ROM is a supported candidate remedy for the startup retiming defect,
+not a full-system release approval.
+**Why:** A paired synthesized initializer experiment reproduced the baseline's
+zero first write, while the distributed-ROM candidate passed the complete
+retained sequence with pauses and sticky completion.
+**How to apply:** Preserve the ROM mapping constraint through the release
+emission pipeline, verify absence of block RAM for this ROM, and repeat the
+exact-payload comparison plus boot validation in the integrated netlist.
+
 For synthesized-waveform checks, reconstruct memory data from the physical
 RAM primitive pins rather than assuming a surviving named bus is full-width.
 **Why:** Synthesis can split or narrow the original write-data bus while routing
