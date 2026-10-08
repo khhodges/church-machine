@@ -21,6 +21,25 @@ unchanged. A valid initializer microtest did not detect that input substitution.
 before full synthesis; report admission/selection failures instead of accepting
 an optional omission or weakening the artifact's admission checks.
 
+Identical catalog bytes and identical loader code do not guarantee that a
+historical image can be regenerated in the current verification context.
+**Why:** Both retained and copied catalogs selected the same intact binary, and
+both loader versions had identical source hashes, yet the current verification
+context rejected its admission evidence and omitted it.
+**How to apply:** Diagnose trust availability separately from byte integrity.
+Do not call this a missing or corrupted binary, expose signing credentials, or
+disable admission checks merely to make regeneration match a retained image.
+
+For a frozen hardware repair, a hash-verified retained generated RTL baseline
+can be used with a narrowly scoped, reversible mapping edit rather than
+regenerating its program from the current catalog.
+**Why:** This preserves the original initialization payload when the current
+verification context cannot reproduce it, without altering admission rules or
+introducing new object bytes.
+**How to apply:** Record original and candidate hashes, enforce the exact edit
+scope, preserve all ROM entries, and require fresh synthesis, integrated replay,
+and release approval. A retained baseline is not approval of arbitrary imports.
+
 **Why:** LUMP publication can reuse a filename while archiving its previous bytes.
 Merely storing that filename in a downstream snapshot would silently change its
 input or make an otherwise valid historical approval unusable.
