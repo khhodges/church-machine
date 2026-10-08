@@ -33,6 +33,14 @@ alone cannot recover an entry that the mapped address path never requests.
 in a small synthesized initializer test before another full-system synthesis.
 Keep first-entry and final-entry evidence mandatory; model tests are insufficient.
 
+Preserve the real reset-less clock domain in reduced startup reproductions.
+**Why:** Adding a synchronous reset can change register-to-ROM folding and
+provide extra array reads before enable, masking the initialization defect that
+the reduced test is meant to reproduce.
+**How to apply:** Use the original reset model and export its clock explicitly;
+require the baseline failure to reproduce before calling a candidate a
+controlled fix.
+
 For synthesized-waveform checks, reconstruct memory data from the physical
 RAM primitive pins rather than assuming a surviving named bus is full-width.
 **Why:** Synthesis can split or narrow the original write-data bus while routing
