@@ -46,6 +46,10 @@ not a full-system release approval.
 **Why:** A paired synthesized initializer experiment reproduced the baseline's
 zero first write, while the distributed-ROM candidate passed the complete
 retained sequence with pauses and sticky completion.
+An additional paired test using the extracted original startup controller and
+the complete frozen ROM also reproduced the baseline's zero first write and
+passed every candidate write with distributed mapping. This rules out the
+replacement two-phase controller being necessary for that isolated remedy.
 **How to apply:** Preserve the ROM mapping constraint through the release
 emission pipeline, verify absence of block RAM for this ROM, and repeat the
 exact-payload comparison plus boot validation in the integrated netlist.
