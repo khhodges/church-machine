@@ -24,6 +24,16 @@ count, observe trace-drain/halt state, and retain a bounded wall-time budget.
 Do not call a short timeout a core stall or force away trace backpressure to
 claim equivalence with the retained hardware.
 
+Treat unassigned top-level debug ports as a board-safety review requirement,
+even when retained constraints downgrade NSTD-1 and UCIO-1 to warnings.
+**Why:** The frozen board XDC describes debug outputs as internal-only, but
+routed DRC still reported 66 logical debug ports without assigned I/O standards
+or locations. A comment or severity downgrade does not establish that those
+outputs are disconnected from package pins.
+**How to apply:** Inspect the routed I/O report and actual buffers before
+approving a bitstream. Preserve the original reports; do not infer safe pin
+usage from a successful routing exit or waive negative setup slack.
+
 When synthesis folds a registered ROM address into a synchronous BRAM read,
 check the initial output and first enabled read, not only the ROM contents.
 
