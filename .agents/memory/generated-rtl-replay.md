@@ -27,9 +27,9 @@ claim equivalence with the retained hardware.
 Treat unassigned top-level debug ports as a board-safety review requirement,
 even when retained constraints downgrade NSTD-1 and UCIO-1 to warnings.
 **Why:** The frozen board XDC describes debug outputs as internal-only, but
-routed DRC still reported 66 logical debug ports without assigned I/O standards
-or locations. A comment or severity downgrade does not establish that those
-outputs are disconnected from package pins.
+the routed I/O report assigned them real package pins with default LVCMOS18
+standards; utilization reported 72 bonded IOBs, only six fixed. The 66 debug
+outputs are not disconnected merely because NSTD-1/UCIO-1 were downgraded.
 **How to apply:** Inspect the routed I/O report and actual buffers before
 approving a bitstream. Preserve the original reports; do not infer safe pin
 usage from a successful routing exit or waive negative setup slack.
