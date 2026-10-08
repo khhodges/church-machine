@@ -23,10 +23,15 @@ elaboration; do not infer equivalence from later valid entries or clean timing.
 Require a valid ROM output before the first write and verify both the first
 and final entries through the synthesized mapping, not behavioral RTL alone.
 
-Prefer a separate fetch cycle and write cycle for this startup-only transfer.
-**Why:** An extra cycle per sparse word is a small boot-time cost compared with
-the risk of relying on inferred ROM power-up data or retiming behavior. Keep
-performance optimizations subordinate to first-entry and final-entry evidence.
+Separate fetch/write phases alone do not establish startup correctness.
+**Why:** Synthesized replay of the two-phase initializer still started the ROM
+at entry one: the fetch phase enabled only the BRAM output register, while
+the array read occurred in the write phase. Stable half-cycle observations and
+the actual RAM clock edge confirmed a zero write to word zero. Extra waiting
+alone cannot recover an entry that the mapped address path never requests.
+**How to apply:** Verify entry-zero addressing and array/output-register enables
+in a small synthesized initializer test before another full-system synthesis.
+Keep first-entry and final-entry evidence mandatory; model tests are insufficient.
 
 For synthesized-waveform checks, reconstruct memory data from the physical
 RAM primitive pins rather than assuming a surviving named bus is full-width.
