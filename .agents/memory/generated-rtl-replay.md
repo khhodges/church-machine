@@ -15,6 +15,15 @@ loaded limit; the LOAD legitimately replaced the GT field.
 post-LOAD states. Inspect mismatching fields before changing RTL or masking
 fields out of an assertion.
 
+Budget integrated replay time for UART trace backpressure, not just core cycles.
+**Why:** At 57,600 baud, two 12-byte events consume about 4.17 ms and three
+consume about 6.25 ms. A 10 ms replay passed initialization and the first LOAD
+but stopped at the boot CALL before the trace traffic could drain.
+**How to apply:** Allow for the startup banner and each instruction's event
+count, observe trace-drain/halt state, and retain a bounded wall-time budget.
+Do not call a short timeout a core stall or force away trace backpressure to
+claim equivalence with the retained hardware.
+
 When synthesis folds a registered ROM address into a synchronous BRAM read,
 check the initial output and first enabled read, not only the ROM contents.
 

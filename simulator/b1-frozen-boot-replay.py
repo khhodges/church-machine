@@ -27,6 +27,10 @@ for i in range(16):
 for name in ("hw_init_done", "hw_init_wr_en"):
     if f"wire {name};" not in net:
         raise SystemExit(f"Missing initializer signal: {name}")
+if trace:
+    for name in ("trace_unit_state", "step_halted"):
+        if f"wire {name};" not in net:
+            raise SystemExit(f"Missing pacing observation: {name}")
 out.mkdir(parents=True, exist_ok=False)
 for name in checks:
     shutil.copyfile(build / name, out / name)
@@ -100,6 +104,7 @@ module tb;
 endmodule
 """
 if trace:
+    tb = tb.replace("#10000000;", "#30000000;")
     tb = tb.replace("reg init_checked=0;", """reg init_checked=0;
   reg boot_load_checked=0;
   reg [31:0] last_nia=32'hffffffff;
@@ -119,6 +124,33 @@ if trace:
       trace_count=trace_count+1;
     end
   end""")
+    tb = tb.replace("endmodule", r"""
+  // Read-only observations. Never force a net, accelerate UART, or send RX.
+  always begin
+    #1000000;
+    $display("PACE t=%t nia=%h trace_drain=%b step_halted=%b tx=%b",
+      $time,nia,dut.trace_unit_state,dut.step_halted,tx);
+  end
+  integer uart_bit;
+  reg [7:0] uart_byte;
+  initial begin
+    #200;
+    forever begin
+      @(negedge tx);
+      #8680; // Half of the retained 868-clock UART bit at a 20 ns clock.
+      if (tx !== 1'b0) $fatal(1,"UART_START_SAMPLE_INVALID");
+      for (uart_bit=0;uart_bit<8;uart_bit=uart_bit+1) begin
+        #17360;
+        uart_byte[uart_bit]=tx;
+      end
+      #17360;
+      if (tx !== 1'b1 || (^uart_byte === 1'bx))
+        $fatal(1,"UART_FRAME_INVALID byte=%h",uart_byte);
+      $display("UART_BYTE t=%t byte=%02h",$time,uart_byte);
+    end
+  end
+endmodule
+""")
     # A diagnostic timeout remains a failure, never evidence of execution.
 (out / "tb.sv").write_text(tb.replace("@CR15@", cr15).replace("@DATA@", data).replace("@LANES@", lanes))
 (out / "inputs.sha256").write_text("".join(f"{digest}  {name}\n" for name, digest in checks.items()))
@@ -134,6 +166,8 @@ finish() {
     grep -E 'INIT_PAIR_PASS|ALL_INIT_PAIRS_PASS|INIT_AND_BOOT_LOAD_PASS|TARGET_NIA|BOOT_FAULT|REPLAY_TIMEOUT|BOOT_LOAD_MISMATCH|Fatal:|ERROR:' simulation.log || true
     echo "=== Last observed NIA transitions (not retirement proof) ==="
     grep '^NIA_OBSERVATION' simulation.log | tail -20 || true
+    echo "=== Last pacing observations ==="
+    grep '^PACE ' simulation.log | tail -5 || true
   fi
   echo "$rc" > "$ROOT/exit-status"
   echo "BOOT_REPLAY_EXIT=$rc"
@@ -149,7 +183,7 @@ if ! grep -q '^module glbl' synth_funcsim.v; then
   timeout 60s xvlog "$XILINX_VIVADO/data/verilog/src/glbl.v"
 fi
 timeout --kill-after=30s 1800s xelab work.tb work.glbl -L unisims_ver -L unimacro_ver -debug typical -s boot_replay
-timeout --kill-after=30s 1800s xsim boot_replay -runall -log simulation.log
+timeout --kill-after=30s 5400s xsim boot_replay -runall -log simulation.log
 sha256sum -c inputs.sha256
 grep -q '^ALL_INIT_PAIRS_PASS count=2693' simulation.log
 grep -q '^INIT_AND_BOOT_LOAD_PASS ' simulation.log
@@ -162,7 +196,7 @@ if trace:
     runner.write_text(runner.read_text().replace(
         'source /opt/Xilinx',
         'echo "TRACE_DIAGNOSTIC_NOT_RETIREMENT_OR_RELEASE_PROOF"\nsource /opt/Xilinx'))
-    print("Scope: verify initialization/first LOAD, then observe NIA until first fault or 10 ms timeout.")
+    print("Scope: verify initialization/first LOAD, then observe NIA, pacing and UART until first fault or 30 ms timeout.")
     print("Trace mode has no success exit: a fault or timeout remains nonzero; inspect the saved observations.")
 else:
     print("Scope: all 2693 physical initialization writes and first boot LOAD only.")
