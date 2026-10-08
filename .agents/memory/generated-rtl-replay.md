@@ -28,6 +28,12 @@ Prefer a separate fetch cycle and write cycle for this startup-only transfer.
 the risk of relying on inferred ROM power-up data or retiming behavior. Keep
 performance optimizations subordinate to first-entry and final-entry evidence.
 
+For synthesized-waveform checks, reconstruct memory data from the physical
+RAM primitive pins rather than assuming a surviving named bus is full-width.
+**Why:** Synthesis can split or narrow the original write-data bus while routing
+its remaining bits through separate logic. Checking the truncated bus can
+incorrectly diagnose missing high bits.
+
 **Why:** With Amaranth 0.5.9 and Yosys 0.51, partial constant GT assignments were
 emitted as `always @*` blocks with empty sensitivity lists. Icarus never ran
 them, leaving bits unknown and blocking Namespace initialization; the equivalent
