@@ -170,11 +170,8 @@ const TIER_FLAGS = { 0: 0x00, 1: 0x01, 2: 0x03 };
 const N_MAX = 15;
 
 /** Strip comment-only lines and trailing comments for Tier 1 embedding. */
-function stripComments(src) {
-    return src.split('\n')
-        .map(l => l.replace(/;.*$/, '').replace(/\/\/.*$/, ''))
-        .filter(l => l.trim().length > 0)
-        .join('\n');
+function stripComments(src, language = 'assembly') {
+    return require('./lump-content-frame').lumpFrameStripComments(src, language);
 }
 
 /**
@@ -307,7 +304,7 @@ function packBEWords(str) {
  * @param {string}   source full source text
  * @param {number}   tier   0 | 1 | 2 (default 2 — full source + comments)
  */
-function embedSelfDefinition(words, api, source, tier) {
+function embedSelfDefinition(words, api, source, tier, sourceLanguage) {
     if (tier === undefined || tier === null) tier = 2;
     if (!(tier in TIER_FLAGS)) throw new Error(`unknown tier ${tier} — one of 0, 1, 2`);
     if (tier >= 1 && (!source || !source.length)) {
@@ -329,7 +326,7 @@ function embedSelfDefinition(words, api, source, tier) {
     }
     let srcPacked = { words: [], byteLength: 0 };
     if (tier >= 1) {
-        srcPacked = packBEWords(tier === 1 ? stripComments(source) : source);
+        srcPacked = packBEWords(tier === 1 ? stripComments(source, sourceLanguage || (api && api.language)) : source);
     }
     const need = 1 + apiPacked.words.length +
                  (tier >= 1 ? 1 + srcPacked.words.length : 0);

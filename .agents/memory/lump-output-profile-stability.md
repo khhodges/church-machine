@@ -28,3 +28,9 @@ consistent variants does not prove compiler metadata semantics are correct.
 
 **How to apply:** Require compact rebuild equivalence evidence before advertising
 it as reproducible source; do not describe packaging equality as that proof.
+
+Full/compact equivalence must use the same exact dependency identities, not
+whatever artifacts their names select later.
+
+**Why:** Catalog movement can otherwise make a compact derivation appear to
+change semantics even when only the selected dependency changed.

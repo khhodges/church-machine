@@ -6,15 +6,18 @@ from pathlib import Path
 import pytest
 
 from server.lump_variants import build_bundle, read_variant, summary
+from server.compact_rebuild import freeze_context
 from tests.server.test_lump_save_endpoint import app_module, _words_with_source, isolated_lumps
 
 
 def test_bundle_roundtrip_and_exact_source(tmp_path):
-    source = "; retained comment\nRETURN\n"
+    source = "; @abstraction VariantExample\n; retained comment\nRETURN\n"
     words = _words_with_source(source)
+    words[2] |= 0x030000  # this fixture retains full source, not compact source
     raw = struct.pack(f">{len(words)}I", *words)
     bundle = build_bundle(raw, source, hashlib.sha256(source.encode()).hexdigest(),
-                          app_module._parse_intrinsic_lump_content)
+                          app_module._parse_intrinsic_lump_content,
+                          freeze_context({"language": "assembly"}))
     primary = bundle["bundle_id"]
     (tmp_path / (primary + ".variants.json")).write_text(json.dumps(bundle))
     assert set(summary(bundle)) == {"api", "compact", "full"}
@@ -37,11 +40,13 @@ def test_bundle_roundtrip_and_exact_source(tmp_path):
 
 
 def test_variant_routes_and_exact_editor_source(tmp_path, monkeypatch):
-    source = "RETURN\n"
+    source = "; @abstraction VariantExample\nRETURN\n"
     words = _words_with_source(source)
+    words[2] |= 0x030000
     raw = struct.pack(f">{len(words)}I", *words)
     bundle = build_bundle(raw, source, hashlib.sha256(source.encode()).hexdigest(),
-                          app_module._parse_intrinsic_lump_content)
+                          app_module._parse_intrinsic_lump_content,
+                          freeze_context({"language": "assembly"}))
     primary = bundle["bundle_id"]
     path = tmp_path / "primary.lump"
     path.write_bytes(raw)
@@ -64,23 +69,32 @@ def test_variant_routes_and_exact_editor_source(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("fail_bundle_write", [False, True])
-def test_compile_plan_and_atomic_bundle_save(isolated_lumps, monkeypatch, fail_bundle_write):
+@pytest.mark.parametrize("browser_candidate", [False, True])
+@pytest.mark.parametrize("primary_tier", [None, 0])
+def test_compile_plan_and_atomic_bundle_save(isolated_lumps, monkeypatch, fail_bundle_write, browser_candidate, primary_tier):
     monkeypatch.setenv("COMPILER_SIGNING_SECRET", "isolated-variant-test-key-" + "x" * 40)
-    source = "abstraction VariantExample { method Read() { return(7) } }"
+    source = "// full source comment\nabstraction VariantExample {\nmethod Read() {\nreturn(7);\n}\n}"
     with app_module.app.test_client() as client:
-        compiled = client.post("/api/compile", json={
-            "source": source, "language": "javascript", "tier": 0}).get_json()
+        compile_request = {"source": source, "language": "javascript"}
+        if primary_tier is not None:
+            compile_request["tier"] = primary_tier
+        compiled = client.post("/api/compile", json=compile_request).get_json()
         assert compiled["ok"], compiled
         record = compiled["compiler_record"]
         payload = {"binary": compiled["words"], "metadata": {
             "abstraction": "VariantExample", "language": "javascript",
             "artifact_only": True, "content_type": "code", "grants": ["E"],
-            "capabilities": compiled["capabilities"], "submitted_source": None,
+            "capabilities": compiled["capabilities"], "submitted_source":
+                app_module._parse_intrinsic_lump_content(compiled["words"])["source"],
             "source_required": True, "original_source": source, "save_variants": True,
             "compiler_record": record, "trust_origin": compiled["trust_origin"],
             "compiler_identity": record["compiler_identity"],
             "compiler_version": record["compiler_version"],
         }}
+        if browser_candidate:
+            for key in ("compiler_record", "trust_origin", "compiler_identity", "compiler_version"):
+                payload["metadata"].pop(key)
+            payload["metadata"]["compiler_candidate"] = True
         planned = client.post("/api/lumps/save-plan", json=payload)
         assert planned.status_code == 201, planned.get_json()
         plan = planned.get_json()

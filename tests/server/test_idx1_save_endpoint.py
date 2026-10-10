@@ -119,7 +119,7 @@ def test_unsigned_browser_compact_frame_is_attested(client, isolated_lumps):
     raw = (isolated_lumps / saved["filename"]).read_bytes()
     inspected = app_module._inspect_lump_binary(raw)
     assert inspected["content_profile"] == "compact"
-    assert inspected["source"] == "LOAD CR1, CR6, DR2\nRETURN"
+    assert inspected["source"] == "; @abstraction PrivateIDX1\nLOAD CR1, CR6, DR2\nRETURN\n"
 
 
 @pytest.mark.parametrize("attack", ["source", "code", "layout", "api"])
@@ -138,8 +138,8 @@ def test_unsigned_browser_candidate_cannot_forge_compiler_facts(client, attack):
         else:
             # Change an API byte, keeping JSON/frame lengths and envelope valid.
             raw = bytearray(original.payload)
-            at = raw.index(b'"DR0"')
-            raw[at + 3] = ord("1")
+            at = raw.index(b'"DR1"')
+            raw[at + 3] = ord("9")
             payload["binary"] = [int.from_bytes(raw[i:i+4], "big") for i in range(0,len(raw),4)]
         raw = bytes.fromhex("".join(f"{word:08x}" for word in payload["binary"]))
         meta["payloadSha256"] = hashlib.sha256(raw).hexdigest()

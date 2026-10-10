@@ -2290,7 +2290,7 @@ async function compileAndBuild(options) {
             mtbf_status:     mtbfStatus,
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
-             submitted_source: null,
+             submitted_source: await _frameBuilder.lumpDecodeContentFrame(lumpWordsArray),
              save_variants: _frameSource.trim().length > 0,
              // Keep compiler provenance independently of the output frame.
              // A Format/API-only choice may omit embedded source, but never

@@ -23,10 +23,24 @@ Companion publication participates in the primary's rollback transaction.
   derivation alone would have reproduced that bug consistently in all variants.
 - Compact source cannot reproduce removed comments and therefore cannot have
   the same exact-source hash as the canonical full source.
-- Compact-source rebuild equivalence remains unverified. Before treating it as
-  a reproducible build input, compile it under the same compiler and dependency
-  identities and compare executable words, C-List and normalized API. Fail
-  explicitly on mismatch; do not claim the full-source seal was reproduced.
+- New variant saves require two uncached rebuilds (full and canonical compact)
+  with the compiler fingerprint and frozen resolved dependency inputs carried
+  in the signed compile record. A compiler change, missing context, compile
+  failure, or executable/C-List/API difference rejects the save. Older records
+  must be recompiled; historical bundles are not rewritten.
+- API comparison ignores JSON object-key ordering only. Method order, selectors,
+  visibility, parameters, return conventions and dependency identities remain
+  significant. Assembly abstraction declarations are retained even though
+  their syntax resembles a comment. Language-specific comments are removed
+  without stripping quoted comment markers or CLOOMC statement semicolons.
+- Bundle schema 2 binds rebuild evidence into the exact bundle identity:
+  distinct full/compact source hashes, both rebuild binary hashes, compiler
+  and frozen-input hashes, and a semantic digest. Rebuild binaries use the same
+  API-only packaging for comparison; they are not the approved primary or its
+  source-bearing companions. No compact text reproduces the full-source seal.
+- Unsupported source/session combinations fail explicitly (for example,
+  standalone symbolic input without its required compile session). Equality
+  between rebuilds is not independent proof of compiler correctness.
 - IDX1 still requires source-bearing executable admission. Its API-only
   admission restriction must not be bypassed merely to match a storage default.
 

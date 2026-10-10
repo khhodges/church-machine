@@ -16,7 +16,7 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def build_bundle(binary, source, source_hash, parse):
+def build_bundle(binary, source, source_hash, parse, compile_context=None):
     if not isinstance(source, str) or digest(source.encode()) != source_hash:
         raise ValueError("Full source does not match the compiler-attested source")
     words = list(struct.unpack(f">{len(binary) // 4}I", binary))
@@ -30,15 +30,22 @@ const {embedSelfDefinition} = require('./simulator/lump_builder');
 const input = JSON.parse(fs.readFileSync(0, 'utf8'));
 const out = {};
 for (const [profile, tier] of [['api',0],['compact',1],['full',2]]) {
-  out[profile] = embedSelfDefinition(input.words, input.api, input.source, tier);
+  out[profile] = embedSelfDefinition(input.words, input.api, input.source, tier, input.language);
 }
 process.stdout.write(JSON.stringify(out));
 """
     proc = subprocess.run(
         ["node", "-e", script], cwd=Path(__file__).resolve().parents[1],
-        input=json.dumps({"words": words, "api": frame["api_definition"], "source": source}),
+        input=json.dumps({"words": words, "api": frame["api_definition"], "source": source,
+                          "language": (compile_context or {}).get("source_language") or
+                          (compile_context or {}).get("inputs", {}).get("language")}),
         capture_output=True, text=True, timeout=15, check=True)
     generated = json.loads(proc.stdout)
+    from server.compact_rebuild import verify_rebuild
+    compact = parse(generated["compact"])["source"]
+    if frame["tier"] == 1 and frame["source"] != compact:
+        raise ValueError("Primary compact source is not the canonical derivation; recompile full source")
+    verification = verify_rebuild(source, compact, compile_context, parse)
     profiles = {}
     for profile, array in generated.items():
         data = struct.pack(f">{len(array)}I", *array)
@@ -54,8 +61,9 @@ process.stdout.write(JSON.stringify(out));
     primary_profile = ("api", "compact", "full")[frame["tier"]]
     profiles[primary_profile] = {"sha256": digest(binary), "bytes": len(binary),
                                  "data": base64.b64encode(binary).decode()}
-    bundle = {"schema": 1, "primary_sha256": digest(binary),
+    bundle = {"schema": 2, "primary_sha256": digest(binary),
             "source_sha256": source_hash, "primary_profile": primary_profile,
+            "compact_rebuild": verification,
             "profiles": profiles}
     bundle["bundle_id"] = digest(json.dumps(bundle, sort_keys=True).encode())
     return bundle

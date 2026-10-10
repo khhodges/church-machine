@@ -11171,11 +11171,17 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
     compile_input["_ide_hierarchy"] = _ide_configuration()
     if execution is not None:
         compile_input["isa_profile"] = "IDX1"
+    from server.compact_rebuild import freeze_context, compiler_fingerprint
+    compact_context = freeze_context(compile_input)
+    compile_input["_compiler_sha256"] = compact_context["compiler_sha256"]
     compiled = run_compile(compile_input)
+    if compact_context["compiler_sha256"] != compiler_fingerprint():
+        raise ValueError("Compiler changed while attesting browser candidate; recompile")
     if not compiled.get("ok"):
         raise ValueError("Compiler rejected candidate source: " +
                          str(compiled.get("error", "unknown compile error")))
     language = compiled.get("language")
+    compact_context["source_language"] = language
     metadata = dict(metadata, language=language)
     compiled_raw = struct.pack(f'>{len(compiled["words"])}I', *compiled["words"])
     if execution is not None:
@@ -11196,9 +11202,8 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
     if inspected["content_frame_error"]:
         raise ValueError("IDX1 candidate content frame: " + inspected["content_frame_error"])
     profile = inspected["content_profile"]
-    compact = "\n".join(line for line in (
-        re.sub(r"//.*$", "", re.sub(r";.*$", "", line))
-        for line in source.split("\n")) if line.strip())
+    from server.compact_rebuild import compact_source
+    compact = compact_source(source, language) if profile == "compact" else None
     expected_source = {"full": source, "compact": compact, "api": None}.get(profile)
     if profile not in ("full", "compact", "api") or inspected["source"] != expected_source:
         raise ValueError("IDX1 candidate embedded source differs from compiler source/profile")
@@ -11211,7 +11216,9 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
             or api.get("methods") not in allowed_methods
             or (execution is not None and api.get("isa_profile", "IDX1") != "IDX1")
             or (execution is None and api.get("isa_profile") is not None)
-            or api.get("returnConvention") != {"register": "DR0", "description": "return value"}
+            or api.get("returnConvention") not in [
+                {"register": "DR0", "description": "return value"},
+                (compiler_api or {}).get("returnConvention")]
             or set(api) - {"name", "language", "methods", "capabilities",
                            "returnConvention", "isa_profile"}):
         raise ValueError("IDX1 candidate embedded API differs from compiler assembly interface")
@@ -11245,6 +11252,7 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
         "source_hash": hashlib.sha256(source.encode("utf-8")).hexdigest(),
         "language": language, "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
+        "compact_compile_context": compact_context,
         **({"isa_profile": "IDX1", "execution_digest": execution.execution_digest}
            if execution is not None else {}),
         "capability_rows": compiled["capabilities"],
@@ -13916,6 +13924,7 @@ def save_lump():
             "language": _incoming_record.get("language"),
             "compiler_identity": _incoming_record.get("compiler_identity"),
             "compiler_version": _incoming_record.get("compiler_version"),
+            "compact_compile_context": _incoming_record.get("compact_compile_context"),
             **{key: metadata[key] for key in ("isa_profile", "execution_digest")
                if key in metadata},
         }
@@ -14018,7 +14027,8 @@ def save_lump():
             _variant_bundle = build_bundle(
                 lump_bytes, metadata.get("original_source"),
                 _trusted_compiler_record.get("source_hash"),
-                _parse_intrinsic_lump_content)
+                _parse_intrinsic_lump_content,
+                _trusted_compiler_record.get("compact_compile_context"))
         except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
             return jsonify({"error": f"Variant save rejected: {exc}",
                             "committed": False, "safe_retry": True}), 422
@@ -14646,6 +14656,7 @@ def save_lump():
                     "language": _incoming.get("language"),
                     "compiler_identity": _incoming.get("compiler_identity"),
                     "compiler_version": _incoming.get("compiler_version"),
+                    "compact_compile_context": _incoming.get("compact_compile_context"),
                     **{key: metadata[key] for key in ("isa_profile", "execution_digest")
                        if key in metadata},
                 }, signing_key=_compiler_attestation_key())
@@ -15031,10 +15042,15 @@ def save_lump():
     if _variant_bundle is not None:
         from server.lump_variants import build_bundle, summary
         if _variant_bundle["primary_sha256"] != _binary_hash:
-            _variant_bundle = build_bundle(
-                lump_bytes, metadata.get("original_source"),
-                _trusted_compiler_record.get("source_hash"),
-                _parse_intrinsic_lump_content)
+            try:
+                _variant_bundle = build_bundle(
+                    lump_bytes, metadata.get("original_source"),
+                    _trusted_compiler_record.get("source_hash"),
+                    _parse_intrinsic_lump_content,
+                    _trusted_compiler_record.get("compact_compile_context"))
+            except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
+                return jsonify(error=f"Variant save rejected: {exc}",
+                               committed=False, safe_retry=True), 422
         new_entry["output_variants"] = summary(_variant_bundle)
         new_entry["variant_primary_hash"] = _binary_hash
         new_entry["variant_bundle_id"] = _variant_bundle["bundle_id"]
@@ -21806,7 +21822,12 @@ def api_compile():
         body["_ide_hierarchy"] = _ide_configuration()
     except ValueError as exc:
         return jsonify(ok=False, error=str(exc), unchanged_data=True), 200
+    from server.compact_rebuild import freeze_context, compiler_fingerprint
+    _compact_compile_context = freeze_context(body)
+    body["_compiler_sha256"] = _compact_compile_context["compiler_sha256"]
     result = run_compile(body)
+    if _compact_compile_context["compiler_sha256"] != compiler_fingerprint():
+        return jsonify(ok=False, error="Compiler changed during compilation; retry"), 200
     if isinstance(result, dict):
         result = dict(result)
         result["call_api_authorities"] = _call_api_authorities
@@ -21867,6 +21888,7 @@ def api_compile():
             ],
             "compiler_identity": "Trusted Home IDE compiler",
             "compiler_version": "server-compile-v1",
+            "compact_compile_context": _compact_compile_context,
             **{key: result[key] for key in ("isa_profile", "execution_digest")
                if key in result},
         }

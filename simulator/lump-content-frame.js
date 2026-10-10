@@ -84,12 +84,54 @@ function lumpFramePackBE(bytes) {
     return ws;
 }
 
-/** Remove comment-only lines and trailing assembly / C-style line comments. */
-function lumpFrameStripComments(source) {
-    return String(source || '').split('\n')
-        .map(function(line) { return line.replace(/;.*$/, '').replace(/\/\/.*$/, ''); })
-        .filter(function(line) { return line.trim().length > 0; })
-        .join('\n');
+/** Canonical compact-source derivation shared with the server compiler. */
+function lumpFrameStripComments(src, language = 'assembly') {
+    // Preserve tokens, string contents, and semantic assembly declarations.
+    let out = '', quote = null;
+    const functional = ['haskell', 'lambda'].includes(language);
+    for (let i = 0; i < src.length; i++) {
+        const c = src[i], next = src[i + 1];
+        if (quote) {
+            out += c;
+            if (c === '\\' && i + 1 < src.length) out += src[++i];
+            else if (c === quote) quote = null;
+            continue;
+        }
+        if (c === '"' || c === '`' ||
+                (c === "'" && !(functional && /[\w']/.test(src[i - 1] || '')))) {
+            quote = c; out += c; continue;
+        }
+        const lineComment = (c === '/' && next === '/') ||
+            (c === ';' && (language === 'assembly' || !out.split('\n').pop().trim())) ||
+            (functional && c === '-' && next === '-');
+        if (lineComment) {
+            const rest = src.slice(i).split('\n', 1)[0];
+            if (c === ';' && /^\s*;\s*(?:@abstraction|Abstraction:)\s+/i.test(rest)) {
+                out += rest; i += rest.length - 1; continue;
+            }
+            while (i < src.length && src[i] !== '\n') i++;
+            if (i < src.length) out += '\n';
+            continue;
+        }
+        const block = (language === 'javascript' && c === '/' && next === '*')
+            ? ['/*', '*/'] : (functional && c === '{' && next === '-') ? ['{-', '-}'] : null;
+        if (block) {
+            let depth = 1;
+            out += ' ';
+            i += 2;
+            for (; i < src.length && depth; i++) {
+                if (src.slice(i, i + 2) === block[1]) { depth--; i++; }
+                else if (functional && src.slice(i, i + 2) === block[0]) { depth++; i++; }
+                else if (src[i] === '\n') out += '\n';
+            }
+            if (depth) throw new Error('Unterminated source comment');
+            i--;
+            continue;
+        }
+        out += c;
+    }
+    // Whitespace can be part of a multiline literal.
+    return out;
 }
 
 function lumpFrameOutputProfile(options) {
@@ -142,7 +184,7 @@ async function lumpBuildContentFrame(apiObj, srcText, options) {
     var _profile = lumpFrameOutputProfile(options);
     var _requestedProfile = options !== undefined && options !== null;
     var _srcText = (srcText && typeof srcText === 'string') ? srcText : '';
-    if (_profile === 'compact') _srcText = lumpFrameStripComments(_srcText);
+    if (_profile === 'compact') _srcText = lumpFrameStripComments(_srcText, apiObj && apiObj.language);
     if (_profile === 'api') _srcText = '';
     if (_profile !== 'api' && _srcText.trim().length === 0) {
         if (_requestedProfile) {
