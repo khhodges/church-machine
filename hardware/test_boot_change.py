@@ -143,6 +143,24 @@ def test_boot_installs_complete_thread_without_scratch_or_context_save():
     assert r["thread_base_en"] and r["thread_base"] == 0x2600
 
 
+@pytest.mark.parametrize("limit,accepted", [
+    (1021, True), (1023, True), (1020, False), (1022, False),
+    (1024, False), (0, False),
+])
+def test_boot_entry_limit_preserves_public_body_authority(limit, accepted):
+    mem = fixture()  # allocation 1024, C-List count 2
+    mem[10 * 16 + 4] = limit
+    mem[10 * 16 + 8] = integrity32(0x2E00, limit)
+    result = replay(mem)
+    if accepted:
+        assert result["complete"] and not result["fault"]
+        assert result["after"][0] == cap(0x4A00000A, 0x2E00, limit)
+    else:
+        assert result["fault"] and not result["complete"]
+        assert result["writes"] == []
+        assert result["after"] == result["before"]
+
+
 def test_factory_capability_test_full_core_boot():
     from hardware import boot_rom as b
     from hardware.test_boot_rom_no_false_halt import BootRomHarness, _build_dmem_init

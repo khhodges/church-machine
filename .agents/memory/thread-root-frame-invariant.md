@@ -57,3 +57,15 @@ Calling this a missing generic-image root would repair the wrong input.
 **How to apply:** Inspect the exact generic bytes, hardware projection, and
 retained initializer separately. A fresh generation or image hash alone does
 not prove that elaboration installed the same Thread context.
+
+Preserve executable descriptor authority when reconciling boot admission with
+prepared images; do not widen a saved limit merely to satisfy a factory fixture.
+
+**Why:** Factory full-allocation descriptors and prepared public-body limits
+coexist. The candidate's protected C-List is separately derived from its header,
+so requiring the factory limit rejected an otherwise valid prepared image.
+
+**How to apply:** Keep both exact supported layouts constrained, reject arbitrary
+truncation, and compare the full restored CR0 triple to its original descriptor.
+This is a compatibility decision; the instruction-set text does not explicitly
+mandate both Namespace limit encodings.

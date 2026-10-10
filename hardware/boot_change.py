@@ -211,7 +211,14 @@ class BootChange(Elaboratable):
                     (entry_header[23:27] > 7) | (entry_header[:8] == 0) |
                     (entry_header[10:23] == 0) |
                     (entry_header[10:23] >= entry_caps) |
-                    (ew.limit_offset != entry_size - 1) |
+                    # Namespace executables may bound the public body before
+                    # the protected C-List. CALL derives that private region
+                    # from the authenticated header, not the public limit.
+                    # Factory descriptors also use the full allocation.
+                    # Accept only these two exact layouts, never arbitrary
+                    # truncation, and preserve the supplied authority.
+                    ((ew.limit_offset != entry_size - 1) &
+                     (ew.limit_offset != entry_caps - 1)) |
                     ((ev.word1_location + ((entry_size - 1) << 2)) > 0xFFFFFFFF)
                 ):
                     fail(FaultType.BOUNDS)

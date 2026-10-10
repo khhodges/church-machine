@@ -1,5 +1,26 @@
 # Root-frame candidate review — 2026-10-10
 
+## Follow-up: executable-limit mismatch resolved
+
+Boot CHANGE now accepts the two exact descriptor layouts in use: full allocation
+and public body ending immediately before the C-List. It preserves the supplied
+limit in CR0 rather than widening authority. Other limits still fail closed.
+This follows the existing generator/regression contract and CALL's separate
+header-derived C-List region; it is not a new instruction encoding.
+The LUMP specification's separate CR14/CR6 regions support that separation;
+the instruction-set text does not itself specify these two Namespace limit
+encodings, so this is implementation-compatibility evidence, not a claim that
+both encodings are explicitly mandated there.
+
+87 boot-CHANGE and scheduler tests passed, including truncated/oversized
+descriptor rejection. The exact candidate projection also passed the behavioral
+replay with all 16 complete capability triples checked, no CR8 writes, and no
+memory writes. Evidence: `generated-artifacts/root-frame-limit-corrected/`.
+The 1,229 protected input files remained unchanged. No approval was frozen;
+fresh elaboration provenance and release review remain outstanding.
+
+The following records the initial failure before this correction.
+
 ## Result: candidate prepared, approval blocked
 
 The merged boot CHANGE was replayed against a newly generated candidate's
