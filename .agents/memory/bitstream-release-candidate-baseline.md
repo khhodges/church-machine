@@ -19,4 +19,10 @@ Do not infer the latest completed build from the mutable legacy bundle alone. Ch
 
 **Why:** The user reports newer builds outside the legacy version sequence; inspecting only the old bundle led to an unsupported “not ready” answer.
 
-**How to apply:** If the requested build cannot be located locally, report that evidence gap and ask where its build record lives rather than claiming it was never built.
+**How to apply:** Search uploaded terminal transcripts in `attached_assets` as well as local artifacts and build history before asking the user. Manual remote builds can be evidenced only by those transcripts, without updating the IDE's legacy bundle or revision database. If the requested build still cannot be located, report the evidence gap rather than claiming it was never built.
+
+Uploaded completion logs establish historical build results, not current possession of the files or a successful physical-board run.
+
+**Why:** Remote build outputs and corrected packages have appeared in user-supplied terminal logs while the workspace retained an older downloadable bitstream.
+
+**How to apply:** Distinguish recorded completion/timing/hash evidence from fresh remote-file verification and board acceptance. Do not equate simulation replay or successful file generation with board validation.
