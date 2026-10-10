@@ -14,3 +14,9 @@ When a local bitstream has no trustworthy version sidecar, a received boot senti
 **Why:** The physical board can provide useful live evidence even while the stored artifact's provenance is incomplete. Conflating them would falsely certify that the downloadable bytes match the board.
 
 **How to apply:** Label sentinel-derived values as running-board status and retain an unverified-metadata notice for the local `.bit` until a verified upload regenerates its sidecar.
+
+Do not infer the latest completed build from the mutable legacy bundle alone. Check named build/revision history and distinguish approved inputs, completed synthesis, and board validation.
+
+**Why:** The user reports newer builds outside the legacy version sequence; inspecting only the old bundle led to an unsupported “not ready” answer.
+
+**How to apply:** If the requested build cannot be located locally, report that evidence gap and ask where its build record lives rather than claiming it was never built.
