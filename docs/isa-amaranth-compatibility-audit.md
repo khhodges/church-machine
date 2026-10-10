@@ -1,5 +1,59 @@
 # Amaranth ISA compatibility audit
 
+## Direct/indirect and retirement recheck — 2026-10-10
+
+**Verdict: targeted execution checks pass, but documentation, IDE metadata and
+some regression fixtures remain stale. This is not whole-ISA certification.**
+
+This recheck covered direct CALL, C-List lookup, immediate and DR-indexed
+LOAD/SAVE, compiler lowering, instruction pickers, admission and C-List
+reference analysis. No executable code, saved programs, Namespace, boot image
+or hardware was changed. No generated RTL replay or physical-board test was
+performed; older release evidence below is not a fresh verification.
+
+### Findings
+
+- The master ISA retires ELOADCALL (8) and XLOADLAMBDA (9). Compiler/simulator
+  rejection tests pass. Supported explicit CALL lowering produces opcode 2;
+  some legacy high-level capability-call syntax is rejected, not translated.
+- Direct `CALL CRs` uses the E-GT in that register. `CALL CR6[PetName]` selects
+  a GT from the caller's C-List. These are distinct forms, not aliases for a
+  fused opcode.
+- Current LOAD/SAVE uses one instruction with a selected DR, a 10-bit unsigned
+  magnitude and a separate sign bit. Immediate-only uses DR0. Arithmetic must not wrap into a
+  permitted access. Encoding, runtime arithmetic and containment checks pass.
+- Amaranth source excludes opcodes 8 and 9 from `valid_opcode` in
+  `hardware/decoder.py`; both retired FSM start signals are zero in
+  `hardware/core.py`. Retained historical signal names do not imply execution.
+- Repeated sections in `docs/instruction-set.md`, `docs/isa_reference.md` and
+  `docs/isa_encoding.md` still describe retired operations, old shorthand or
+  backward compatibility. Opening disclaimers do not reconcile those sections.
+- User-facing `simulator/app-absdetail.js` metadata still advertises
+  `ELOADCALL Navana.Find`, `ELOADCALL Mint.Encode` and hidden scheduler
+  ELOADCALL. This is not merely a historical comment.
+
+### Results
+
+| Command | Result |
+|---|---|
+| `node simulator/test_retired_opcodes.js` | Pass |
+| `node simulator/test_compact_load_save.js` | Pass |
+| `node simulator/test_named_capability_load.js` | 5 passed |
+| `node tests/simulator/sim_call_cr6_l_perm.js` | 30 passed |
+| `node simulator/test_compact_clist_mutation.js` | Pass |
+| `node simulator/test_instruction_picker_catalog.js` | Pass, 22 mnemonics |
+| `node simulator/test_indexed_call_annotation.js` | Fail: expects SAVE row 7 where the operand now means DR7 + 0 |
+| `node simulator/assembler_idx1_test.js` | Fail: encoding expectations not reconciled; also retains superseded multiword LOAD expectations |
+| `python3 -m pytest tests/hardware/test_indexed_call_cr6.py -q` | 3 passed |
+| `python3 -m pytest tests/hardware/test_compact_index_core.py -q` | 23 passed |
+| `python3 -m pytest tests/server/test_indexed_admission_conformance.py -q` | 28 passed |
+
+The hardware tests execute Amaranth models, not generated RTL or a board.
+The failed IDX1 assembler test exits early: later assertions were not checked.
+Every direct/indirect LAMBDA, DREAD, DWRITE form, method selector and high-level
+lowering path has **not** been exhaustively verified in this targeted pass.
+Do not infer those verdicts from passing LOAD/SAVE or CALL checks.
+
 **Scope correction (2026-10-02):** the user clarified that indexed instructions
 must themselves add the data-register value to the immediate. See
 [the master ISA indexing rule](instruction-set.md#uniform-indexed-operands).
