@@ -230,7 +230,7 @@ function buildApiDefinition(result, words) {
     const api = {
         name: result.abstractionName || '',
         language: result.language || 'assembly',
-        returnConvention: { register: 'DR0', description: 'return value' },
+        returnConvention: { register: 'DR1', description: 'return value' },
         methods: [],
         capabilities: (result.capabilities || []).map(cap => ({
             name: cap.name || '',
@@ -279,7 +279,7 @@ function buildApiDefinition(result, words) {
             index: i,
             branchOffset,
             inputs,
-            returns: { name: 'result', register: 'DR0' },
+            returns: { name: 'result', register: 'DR1' },
         });
     });
     return api;

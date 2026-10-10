@@ -9180,7 +9180,7 @@ function _formatLumpApiDefinition(absName, caps) {
     return {
         name: absName || '',
         language: (typeof sim !== 'undefined' && sim && sim._lastCompiledLanguage) || 'assembly',
-        returnConvention: { register: 'DR0', description: 'return value' },
+        returnConvention: { register: 'DR1', description: 'return value' },
         methods: _methods.filter(function(method) { return !method._internal; }).map(function(method, index) {
             var _drPets = (method.pet_names && method.pet_names.DR) || {};
             return {
@@ -9188,7 +9188,7 @@ function _formatLumpApiDefinition(absName, caps) {
                 index: index,
                 inputs: Object.keys(_drPets).sort(function(a, b) { return Number(a) - Number(b); })
                     .map(function(reg) { return { name: _drPets[reg], register: 'DR' + reg }; }),
-                returns: { name: 'result', register: 'DR0' }
+                returns: { name: 'result', register: 'DR1' }
             };
         }),
         capabilities: (caps || []).map(function(cap) {

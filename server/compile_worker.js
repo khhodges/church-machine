@@ -1,4 +1,6 @@
 'use strict';
+// Embedded API return ABI: DR1 (DR0 is constant zero). Keep the worker stamp
+// changed with this correction so cached pre-correction candidates are evicted.
 /**
  * server/compile_worker.js — CLOOMC / Assembly compile subprocess worker
  *
