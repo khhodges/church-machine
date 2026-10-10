@@ -14009,7 +14009,20 @@ def save_lump():
     # A source-bearing editor save must carry the source inside the immutable
     # binary.  Without this guard an API-only profile could still return a
     # successful save while silently discarding the user's editor contents.
-    if metadata.get("source_required") is True and (
+    _variant_bundle = None
+    if metadata.get("save_variants") is True:
+        try:
+            from server.lump_variants import build_bundle
+            if not _trusted_compiler_record:
+                raise ValueError("Three-variant saves require compiler-attested input")
+            _variant_bundle = build_bundle(
+                lump_bytes, metadata.get("original_source"),
+                _trusted_compiler_record.get("source_hash"),
+                _parse_intrinsic_lump_content)
+        except (ValueError, TypeError, KeyError, OSError, subprocess.SubprocessError) as exc:
+            return jsonify({"error": f"Variant save rejected: {exc}",
+                            "committed": False, "safe_retry": True}), 422
+    if _variant_bundle is None and metadata.get("source_required") is True and (
             not isinstance(_embedded_source, str) or not _embedded_source):
         return jsonify({
             "error": (
@@ -14940,6 +14953,8 @@ def save_lump():
 
     def _save_additional_json(final_manifest_entry):
         documents = _resident_additional_json(final_manifest_entry)
+        if _variant_bundle is not None:
+            documents[os.path.join(lumps_dir, _variant_bundle["bundle_id"] + ".variants.json")] = _variant_bundle
         if _label_document is not None:
             documents[BOOT_CONFIG_PATH] = _label_document
         if getattr(g, "_lump_save_operation_active", False):
@@ -15012,6 +15027,17 @@ def save_lump():
                 "committed": False,
                 "safe_retry": True,
             }), 422
+
+    if _variant_bundle is not None:
+        from server.lump_variants import build_bundle, summary
+        if _variant_bundle["primary_sha256"] != _binary_hash:
+            _variant_bundle = build_bundle(
+                lump_bytes, metadata.get("original_source"),
+                _trusted_compiler_record.get("source_hash"),
+                _parse_intrinsic_lump_content)
+        new_entry["output_variants"] = summary(_variant_bundle)
+        new_entry["variant_primary_hash"] = _binary_hash
+        new_entry["variant_bundle_id"] = _variant_bundle["bundle_id"]
 
     # Consume authorization only after every byte/Namespace/approval check has
     # passed. A rejected bootstrap candidate leaves both authorization records
@@ -16265,6 +16291,25 @@ def _attach_unverified_exact_source(response, lump_path, catalog_record=None):
     by abstraction name, so a current catalog entry cannot be relabelled as
     source for historical bytes.
     """
+    from server.lump_variants import read_variant, summary
+    # Siblings are resolved by the exact primary binary hash, never "latest".
+    try:
+        primary_hash = _file_sha256(lump_path)
+        bundle_id = (catalog_record or {}).get("variant_bundle_id")
+        if bundle_id:
+            raw, bundle = read_variant(os.path.dirname(lump_path), bundle_id, "full")
+            if bundle["primary_sha256"] != primary_hash:
+                raise ValueError("Source sibling belongs to a different primary binary")
+            frame = _parse_intrinsic_lump_content(
+                list(_struct.unpack(f">{len(raw) // 4}I", raw)))
+            if not frame or hashlib.sha256(frame["source"].encode()).hexdigest() != bundle["source_sha256"]:
+                raise ValueError("Full-source sibling failed source verification")
+            response["editing_source"] = frame["source"]
+            response["editing_source_provenance"] = "exact-revision full-source sibling"
+            response["output_variants"] = summary(bundle)
+            response["variant_bundle_id"] = bundle_id
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        response["variant_error"] = str(exc)
     if response.get("source"):
         return response
     fallback_source = None
@@ -18141,6 +18186,45 @@ def get_lump_version_words(token, version):
     return jsonify(response)
 
 
+@app.route("/api/lump-variants/<primary_hash>")
+def lump_variant_info(primary_hash):
+    from server.lump_variants import read_variant, summary
+    try:
+        bundle_id = primary_hash
+        if not os.path.isfile(os.path.join(LUMPS_DIR, primary_hash + ".variants.json")):
+            rows = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
+            matches = {row["variant_bundle_id"] for row in rows
+                       if row.get("variant_primary_hash") == primary_hash
+                       and row.get("variant_bundle_id")}
+            if not matches:
+                raise FileNotFoundError()
+            if len(matches) != 1:
+                return jsonify({"error": "Multiple source revisions share these bytes; select an exact revision"}), 409
+            bundle_id = next(iter(matches))
+        _, bundle = read_variant(LUMPS_DIR, bundle_id, "full")
+        return jsonify({"primary_sha256": primary_hash, "variants": summary(bundle)})
+    except FileNotFoundError:
+        return jsonify({"error": "No bundle retained for this revision"}), 404
+    except (ValueError, KeyError, OSError) as exc:
+        return jsonify({"error": str(exc)}), 409
+
+
+@app.route("/api/lump-variants/<primary_hash>/<profile>")
+def download_lump_variant(primary_hash, profile):
+    from server.lump_variants import read_variant
+    try:
+        raw, bundle = read_variant(LUMPS_DIR, primary_hash, profile)
+    except FileNotFoundError:
+        return jsonify({"error": "This exact revision has no saved variant bundle"}), 404
+    except (ValueError, KeyError, OSError) as exc:
+        return jsonify({"error": str(exc)}), 409
+    response = make_response(raw)
+    response.headers["Content-Type"] = "application/octet-stream"
+    response.headers["Content-Disposition"] = f'attachment; filename="{primary_hash}.{profile}.lump"'
+    response.headers["X-Lump-SHA256"] = bundle["profiles"][profile]["sha256"]
+    return response
+
+
 @app.route("/api/lump-source/<name>")
 def get_lump_source(name):
     """Return source embedded in the exact manifest-located LUMP bytes."""
@@ -18170,6 +18254,17 @@ def get_lump_source(name):
         if isinstance(canonical, str):
             return jsonify({"error": canonical, "binary_only": True}), 409
         trust = approval is not None and canonical is True
+        linked = {}
+        _attach_unverified_exact_source(linked, os.path.join(
+            LUMPS_DIR, entry.get("filename") or f"{entry.get('token', '')}.lump"), entry)
+        if linked.get("variant_error"):
+            return jsonify({"error": linked["variant_error"]}), 409
+        if isinstance(linked.get("editing_source"), str):
+            return jsonify({"name": name, "source": linked["editing_source"],
+                            "source_path": linked["editing_source_provenance"],
+                            "binary_only": False, "binary_hash": inspected["binary_hash"],
+                            "approved": trust, "trusted": trust,
+                            "output_variants": linked["output_variants"]})
         if inspected["source"]:
             return jsonify({"name": name, "source": inspected["source"],
                             "source_path": f"embedded (Tier {inspected['sourceStorageTier']})",

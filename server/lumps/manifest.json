@@ -1181,5 +1181,13 @@
     "lump_version": 17,
     "compiled_at": 1791116317.3631735,
     "operation_id": "47c104f2-8f75-409a-86e6-090dfde18cdc"
+  },
+  {
+    "token": "3b057bbb",
+    "abstraction": "ide.Flag",
+    "filename": "ide.Flag.1.5614560b.lump",
+    "lump_version": 1,
+    "compiled_at": 1791662524.0224752,
+    "operation_id": "e604beda-42ca-451d-8f7b-b835ce498c20"
   }
 ]

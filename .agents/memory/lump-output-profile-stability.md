@@ -3,8 +3,28 @@ name: LUMP output profile stability
 description: Why repeated LUMP saves must retain the selected embedded-content profile.
 ---
 
-Remember the selected API-only, Compact-source, or Full-source output profile per abstraction, and infer it from an opened V1.3 content frame when no preference exists. Reopening Save must not silently choose a different profile.
+Save all three linked variants for source-bearing compiler revisions: full source
+for IDE editing, API-only for build/test, compact source for sharing. This
+supersedes the earlier single-output preference policy. Preserve explicit
+source-dependent ISA admission restrictions rather than bypassing them.
 
-**Why:** LUMP allocation is a power-of-two total artifact size. Changing only the embedded-content profile can move an otherwise unchanged LUMP between 64, 128, and 512 words, making History appear unstable even when CW and CC barely change.
+**Why:** The user explicitly requested retaining all three uses together instead
+of disabling API-only to avoid source loss. Allocation changes across variants
+are legitimate; the primary build artifact remains exact-byte authority.
 
-**How to apply:** Keep History based on actual binary length, label entries with their encoded profile, and treat a larger allocation as legitimate only when content/profile crosses an allocation boundary. Do not substitute CW for artifact size.
+**How to apply:** Commit the variants atomically; resolve editing source through
+the exact revision's content-addressed bundle, never latest-by-name or primary
+binary hash alone. Comment-only source revisions can have identical API-only
+binaries but require distinct full-source siblings. Test the build bytes, not a
+different source-bearing sibling. Never rewrite immutable historical artifacts.
+
+Full source is the canonical editing input; API-only and compact are read-only
+derivations, not co-equal editable records. Keep a shared revision identity and
+separate binary/source hashes.
+
+**Why:** The user's architectural review emphasized prevention by derivation.
+Comment removal cannot reproduce the exact full-source seal, and generating
+consistent variants does not prove compiler metadata semantics are correct.
+
+**How to apply:** Require compact rebuild equivalence evidence before advertising
+it as reproducible source; do not describe packaging equality as that proof.

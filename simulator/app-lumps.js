@@ -3629,6 +3629,25 @@ function _ddRenderSource(modal, detail, navSlot, navName) {
         label = '\u25cb Embedded source unavailable (legacy LUMP)';
     }
     el.appendChild(_ddMakeSourceBtn(tierClass, label, navSlot, navName));
+    if (/^[0-9a-f]{64}$/.test(detail.binary_hash || '')) {
+        const links = document.createElement('div');
+        el.appendChild(links);
+        fetch('/api/lump-variants/' + (detail.variant_bundle_id || detail.binary_hash)).then(async response => {
+            if (response.status === 404) return;
+            const bundle = await response.json();
+            if (!response.ok) throw new Error(bundle.error || 'Variant lookup failed');
+            if (!links.isConnected) return;
+            for (const [profile, title] of [
+                ['api', 'API only'], ['compact', 'Share compact source'], ['full', 'Full source']]) {
+                const a = document.createElement('a');
+                a.href = bundle.variants[profile].url;
+                a.textContent = title + ' (' + bundle.variants[profile].bytes + ' B)';
+                a.download = '';
+                a.style.marginRight = '12px';
+                links.appendChild(a);
+            }
+        }).catch(error => { links.textContent = 'Saved variants unavailable: ' + error.message; });
+    }
 }
 
 function _ddRenderSourceFailed(modal, navSlot, navName) {
@@ -9244,23 +9263,23 @@ function _renderFormatLumpCandidate(pending) {
     var _profilesEl = document.getElementById('fmtOutputProfiles');
     if (_profilesEl) {
         var _profileInfo = {
-            api:     { title: 'API only', detail: 'JSON API; no source' },
-            compact: { title: 'Compact source', detail: 'JSON API + comments removed' },
-            full:    { title: 'Full source', detail: 'JSON API + complete source' }
+            api:     { title: 'API only — build/test', detail: 'JSON API; no embedded source' },
+            compact: { title: 'Compact — sharing', detail: 'JSON API + comments removed' },
+            full:    { title: 'Full — IDE editing', detail: 'JSON API + complete source' }
         };
         _profilesEl.innerHTML = ['api', 'compact', 'full'].map(function(profile) {
             var item = pending.candidates[profile];
             var info = _profileInfo[profile];
             var sourceRequired = typeof pending.sourceText === 'string' &&
                 pending.sourceText.trim().length > 0;
-            var disabled = !item || (profile === 'api' && sourceRequired);
+            var disabled = !item;
             var detail = pending.isaProfile === 'IDX1' && profile === 'api'
                 ? 'IDX1 protected reload requires compiler source; choose Full or Compact'
                 : disabled
                 ? (item && profile === 'api' && sourceRequired
                     ? 'Source retention requires an embedded source frame'
                     : 'Requires saved source')
-                : info.detail;
+                : info.detail + (sourceRequired ? ' · Saved together' : '');
             var size = disabled ? 'Unavailable' :
                 item.frame.frameWords.length + ' frame words · ' +
                 item.lumpSize + ' words / ' + _fmtLumpByteSize(item.lumpSize * 4);
@@ -9348,8 +9367,8 @@ function _renderFormatLumpCandidate(pending) {
 function _selectFormatLumpProfile(profile) {
     var pending = window._pendingLumpData;
     if (!pending || !pending.candidates || !pending.candidates[profile]) return;
-    if (profile === 'api' && typeof pending.sourceText === 'string' &&
-            pending.sourceText.trim().length > 0) {
+    if (typeof pending.sourceText === 'string' && pending.sourceText.trim().length > 0) {
+        // These are retained siblings, not competing publication choices.
         return;
     }
     pending.selectedProfile = profile;
@@ -9612,8 +9631,8 @@ window.showFormatLump = async function() {
         : (_candidates.full ? 'full' : 'api');
     // A non-empty editor source is part of the save contract.  Never allow a
     // remembered API-only preference to silently discard it.
-    if (_srcText.trim().length > 0 && _selectedProfile === 'api') {
-        _selectedProfile = _candidates.full ? 'full' : 'compact';
+    if (_srcText.trim().length > 0) {
+        _selectedProfile = indexedView ? 'full' : 'api';
     }
     // Persist inferred/default selections too. A programmer should not have to
     // re-click an already-selected profile merely to keep it for the next save.
@@ -10580,6 +10599,9 @@ function _lumpApprovalMatchesBinary(payload) {
 }
 
 async function _loadSavedLumpCapabilities(token, wordsPayload) {
+    if (wordsPayload.variant_error) {
+        throw new Error('Exact-revision source bundle failed verification: ' + wordsPayload.variant_error);
+    }
     const inspection = _lumpBinaryInspection(wordsPayload);
     if (!inspection || typeof inspection !== 'object') {
         throw new Error('binary inspection fields are unavailable');
@@ -10644,7 +10666,8 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
         profile: content.contentFrameValid ? content.profile : null,
         language: content.contentFrameValid && typeof api.language === 'string'
             ? api.language : null,
-        source: content.contentFrameValid && content.source != null ? content.source :
+        source: typeof wordsPayload.editing_source === 'string' ? wordsPayload.editing_source :
+            content.contentFrameValid && content.source != null ? content.source :
             (typeof approved.original_source === 'string' ? approved.original_source : null),
         identityHash: approved.identity_hash || null,
         binaryHash,

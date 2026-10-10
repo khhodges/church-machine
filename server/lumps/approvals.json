@@ -991,6 +991,28 @@
         "signature": "cba460ebdc15be76b2cbe8ac995e72feddcb638ebf86935abe9c628e8b03655e"
       },
       "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90"
+    },
+    "370666640deb3b9516bce08120ab9fe0bdca98728428a5cdc8e2c371c93b047f": {
+      "binary_hash": "370666640deb3b9516bce08120ab9fe0bdca98728428a5cdc8e2c371c93b047f",
+      "dot_name": "ide.Flag",
+      "issue_n": 1,
+      "abstraction": "ide.Flag",
+      "filename": "ide.Flag.1.5614560b.lump",
+      "compiled_at": 1791662524.0224752,
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "370666640deb3b9516bce08120ab9fe0bdca98728428a5cdc8e2c371c93b047f",
+        "source_hash": "2e3d1d527727760bae2b267e2d26bfd610fbc28d290ac9089bb3587d9995362a",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "b81a1b0ce25a7038fbd726baf0fa7fc233c3045fc0ea2fcc05bbe33e30c789d2"
+      },
+      "identity_hash": "d9cd0ae2b0562b21bda7f5097781e9f0164ab60aaa656c61e1ac6824dc26a53a"
     }
   }
 }

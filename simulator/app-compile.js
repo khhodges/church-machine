@@ -1998,7 +1998,7 @@ async function compileAndBuild(options) {
             })),
         };
     const _frameSource = typeof source === 'string' ? source : '';
-    const _frameProfile = _frameSource.trim().length > 0 ? 'full' : 'api';
+    const _frameProfile = 'api';
     let _contentFrame;
     try {
         _contentFrame = await _frameBuilder.lumpBuildContentFrame(
@@ -2290,7 +2290,8 @@ async function compileAndBuild(options) {
             mtbf_status:     mtbfStatus,
             source_hash:     _simRunHash || _currentEditorHash(),
             source:          source,
-             submitted_source: _frameSource.trim().length > 0 ? _frameSource : null,
+             submitted_source: null,
+             save_variants: _frameSource.trim().length > 0,
              // Keep compiler provenance independently of the output frame.
              // A Format/API-only choice may omit embedded source, but never
              // discards the compiler source/words needed for diagnostics.

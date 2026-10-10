@@ -17034,11 +17034,8 @@ async function confirmSaveToNamespace() {
                         'lumpOutputProfile:' + encodeURIComponent(_svAbsName));
                 } catch (_e) {}
             }
-            if (!_fallbackSourceText.trim()) {
-                _fallbackProfile = 'api';
-            } else if (!['api', 'compact', 'full'].includes(_fallbackProfile)) {
-                _fallbackProfile = 'full';
-            }
+            _fallbackProfile = _saveSnapshot && _saveSnapshot.isaProfile === 'IDX1'
+                ? 'full' : 'api';
             if (typeof LumpContentFrame === 'undefined' ||
                     typeof LumpContentFrame.lumpBuildContentFrame !== 'function' ||
                     typeof _formatLumpApiDefinition !== 'function') {
@@ -17202,6 +17199,9 @@ async function confirmSaveToNamespace() {
                     typeof _saveSnapshot.sourceText === 'string'
                     ? _saveSnapshot.sourceText : null,
                 original_compiled_words: _svWords.slice(),
+                save_variants: !!(_saveSnapshot &&
+                    typeof _saveSnapshot.sourceText === 'string' &&
+                    _saveSnapshot.sourceText.trim().length > 0),
                 original_binary: (_svOriginalBinary || _svBinary).slice(),
                 output_profile: (_snapshotPending &&
                     ['api', 'compact', 'full'].includes(_snapshotPending.selectedProfile))
