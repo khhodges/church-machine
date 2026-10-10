@@ -52,11 +52,11 @@ from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
                        WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD,
                        CAPABILITY_TEST_NS_SLOT,
                        WUKONG_CAPABILITY_TEST_BASE_WORD,
-                       WUKONG_CAPABILITY_TEST_WORDS,
+                       WUKONG_CAPABILITY_TEST_WORDS, WUKONG_CAPABILITY_TEST_IMAGE_WORDS,
                        WUKONG_CALLHOME_BASE_WORD,
                        WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD,
                        WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
-                       WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+                       WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT, initialize_factory_thread_root,
                        WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
                        wukong_wch_header)
 from .uart_tx import UartTx
@@ -211,7 +211,7 @@ while len(_dmem_tmp) < _WUKONG_DMEM_WORDS:
     _dmem_tmp.append(0)
 for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
     _dmem_tmp[WUKONG_SELFTEST_BASE_WORD + _i] = _v
-for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_IMAGE_WORDS):
     _dmem_tmp[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
 for _i, _v in enumerate([wukong_wch_header(_wch_cw_mod)] + list(WUKONG_NUC_PROGRAM)):
     _dmem_tmp[WUKONG_CALLHOME_BASE_WORD + _i] = _v
@@ -221,7 +221,8 @@ _dmem_tmp[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
 _dmem_tmp[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
 _dmem_tmp[WUKONG_THREAD_CAPS0_WORD] = make_gt(
     GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
-_dmem_tmp[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
+initialize_factory_thread_root(_dmem_tmp, make_gt(
+    GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0))
 WUKONG_N_INIT = sum(1 for v in _dmem_tmp if v != 0)
 del _dmem_tmp, _wch_cw_mod
 
@@ -574,7 +575,7 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         # Factory first abstraction. Its final ELOADCALL enters the resident
         # SelfTest at slot 6, so both LUMPs remain present in the image.
-        for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+        for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_IMAGE_WORDS):
             dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
 
         # WukongCallHome LUMP body at DMEM byte 0x1200 = word 1152.
@@ -591,16 +592,16 @@ class ChurchWukongXC7A100T(Elaboratable):
         # relocation rationale (a base-0 Thread lump collides with the NS
         # table: protected Thread STO is NS slot 4 word1).
         #   header  : valid lump header (size=256, sw=32, cc=12)
-        #   STO     : 243 (sp_max) so the boot CALL's stack push succeeds
+        #   STO     : SZ=1, STO=241, with the validated poison root at +242/+243
         #   caps[0] : SelfTest E-GT (NS slot 6) — the ⚡ boot entry.
         #             BOOT_PROGRAM[2] = CALL CR0,CR0[0] resolves THIS word.
-        #   caps[12]: S-perm Boot.Thread GT so RESTORE_CALL[12] gives CR12 a
-        #             non-null cap (FETCH_THREAD_HDR faults otherwise).
+        # CR12 is installed from its permissionless GT by boot CHANGE.
         dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
         dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
         dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
             GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
-        dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(GT_TYPE_INFORM, PERM_MASK_S, 1, 0)
+        initialize_factory_thread_root(dmem_init, make_gt(
+            GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0))
         # Words 0x47A..0x47F remain zero (padding to 128-word init boundary).
 
         hw_init_pairs = [(addr, val)

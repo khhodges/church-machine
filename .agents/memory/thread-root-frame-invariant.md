@@ -32,6 +32,13 @@ Preserve independently prepared entry identity only as exact, validated input,
 never as proof that execution is valid. Do not copy arbitrary mutable private
 Thread state during release regeneration.
 
+The user authorized updating the factory initializer and verifying full-core
+boot when strict CHANGE admission exposed its empty stack.
+**Why:** A fail-closed correction must also have a compatible newly prepared
+factory input; an old approval is not permission to bypass context validation.
+**How to apply:** Keep this separate from historical artifact repair, new
+Namespace approval, mapped-image approval, and any physical board operation.
+
 **Why:** Keeping saved bytes and making those bytes safe to execute are separate
 requirements. The user rejected making an invalid Thread startup pass merely
 by selecting a different abstraction.

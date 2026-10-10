@@ -767,6 +767,7 @@ _capability_test_ns_state_path = _lumps_dir / "ns-state.json"
 WUKONG_CAPABILITY_TEST_FILENAME = None
 WUKONG_CAPABILITY_TEST_ALLOC = 0
 WUKONG_CAPABILITY_TEST_WORDS = ()
+WUKONG_CAPABILITY_TEST_IMAGE_WORDS = ()
 WUKONG_CAPABILITY_TEST_BOUND = False
 WUKONG_CAPABILITY_TEST_STATUS = {
     "bound": False,
@@ -810,6 +811,15 @@ try:
     WUKONG_CAPABILITY_TEST_FILENAME = _capability_test_filename
     WUKONG_CAPABILITY_TEST_ALLOC = _capability_test_alloc
     WUKONG_CAPABILITY_TEST_WORDS = _capability_test_words
+    # Keep the admitted portable bytes above immutable. Only the new factory
+    # destination copy receives compiler-owned SELF, using the shared exact
+    # hash/authenticated-compiler binding gate (never a blind sentinel patch).
+    from server.boot_image import materialize_compiler_self
+    _capability_test_image, _capability_test_self_gt = materialize_compiler_self(
+        _capability_test_raw, _capability_test_ns_matches[0], _lumps_dir,
+        "Factory CapabilityTest")
+    WUKONG_CAPABILITY_TEST_IMAGE_WORDS = tuple(struct.unpack(
+        f">{_capability_test_alloc}I", _capability_test_image))
     WUKONG_CAPABILITY_TEST_BOUND = True
     WUKONG_CAPABILITY_TEST_STATUS = {
         "bound": True, "code": "structurally-valid",
@@ -870,18 +880,28 @@ WUKONG_DEMO_NAMESPACE[WUKONG_CALLHOME_NS_SLOT * 4 + 2] = integrity32(_wch_loc_by
 # Relocate the Thread lump to byte 0xE00 (word 896) — after the full SelfTest
 # image (words 384-895) and before WukongCallHome (words 1152-1279).
 #   header  word 896      : magic, size=256 words, sw(cw)=32, typ=2, cc=12
-#   STO     word 896+17   : 243 (= sp_max = 256 − 12 − 1)
+#   STO     word base+17  : SZ=1, STO=241; canonical poison root at +242/+243
 #   caps[0] word 896+244  : boot-entry E-GT (⚡ CapabilityTest)
-#   caps[12]word 896+256  : S-perm Boot.Thread GT (slot 1) for CR12
+# CR12 is resolved privately by boot CHANGE; no out-of-body caps[12] is needed.
 # Slot 1 word1 limit widened to 0xFF (256-word alloc); seal recomputed.
 # ---------------------------------------------------------------------------
 WUKONG_THREAD_HEADER = (
     (0x1F << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12
 )  # n_minus_6=2 (256 words), sw=32, typ=2, cc=12 — mirrors boot_image.py
 WUKONG_THREAD_STO_WORD  = WUKONG_THREAD_BASE_WORD + 17    # protected STO
-WUKONG_THREAD_STO_INIT  = 243                             # sp_max
+WUKONG_THREAD_STO_INIT  = (1 << 12) | 241  # canonical two-word poison root
 WUKONG_THREAD_CAPS0_WORD  = WUKONG_THREAD_BASE_WORD + 244  # Thread.caps[0]
 WUKONG_THREAD_CAPS12_WORD = WUKONG_THREAD_BASE_WORD + 256  # Thread.caps[12]
+
+
+def initialize_factory_thread_root(words, entry_gt):
+    """Prepare a new factory initializer; never edit saved/approved artifacts."""
+    words[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
+    words[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
+    words[WUKONG_THREAD_BASE_WORD + 242] = entry_gt
+    words[WUKONG_THREAD_BASE_WORD + 243] = (0x7FFF << 13) | (1 << 12) | 243
+    words[WUKONG_THREAD_CAPS0_WORD] = entry_gt
+
 _wukong_thr_loc  = WUKONG_THREAD_BASE_WORD * 4   # 0xE00
 _wukong_thr_w1   = 0x000000FF                    # lim17 = 255 → 256-word alloc
 WUKONG_DEMO_NAMESPACE[1 * 4 + 0] = _wukong_thr_loc

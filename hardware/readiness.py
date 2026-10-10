@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 
 CORE_SOURCES: tuple[str, ...] = (
+    "hardware/boot_change.py",
     "hardware/boot_rom.py",
     "hardware/call.py",
     "hardware/change.py",

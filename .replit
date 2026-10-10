@@ -211,6 +211,10 @@ args = "wukong-fault-sentinel"
 task = "workflow.run"
 args = "wukong-boot-rom-guard"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "boot-change-validation"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -1187,3 +1191,14 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python3 -m pytest scripts/test_method_dispatch_release.py -q && python3 scripts/check_method_dispatch_release.py"
+
+[[workflows.workflow]]
+name = "boot-change-validation"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest hardware/test_boot_change.py hardware/test_wukong_thread_scheduler_contract.py -q"
+
+[workflows.workflow.metadata]
+isValidation = true

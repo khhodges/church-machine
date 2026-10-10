@@ -38,12 +38,15 @@ def probe(directory, method=1):
     descriptor(7, caller, 128)
     caller_gt = t.make_gt(t.GT_TYPE_INFORM, t.PERM_MASK_E, 7)
     memory[thread + b.WUKONG_THREAD_CAPS0_WORD - b.WUKONG_THREAD_BASE_WORD] = caller_gt
-    memory[caller] = t._lump_header(n_minus_6=1, cw=3, cc=1)
-    memory[caller + 1] = t.encode_church(t.ChurchOpcode.LOAD, t.CondCode.AL, cr_dst=0, cr_src=6)
+    memory[thread + 242] = caller_gt
+    memory[caller] = t._lump_header(n_minus_6=1, cw=3, cc=2)
+    # Compact LOAD index: DR0 + 1 (immediate occupies bits 13:4).
+    memory[caller + 1] = t.encode_church(t.ChurchOpcode.LOAD, t.CondCode.AL, cr_dst=0, cr_src=6, imm=1 << 4)
     memory[caller + 2] = t.encode_church(t.ChurchOpcode.CALL, t.CondCode.AL, cr_src=0, imm=method)
     memory[caller + 3] = t.encode_turing(t.TuringOpcode.BRANCH, t.CondCode.AL, imm=0)
     cc = words[0] & 255
     assert cc > 0, "candidate lacks SELF"
+    memory[caller + 126] = caller_gt
     memory[caller + 127] = words[-cc]
     dut = t.BootRomHarness(memory)
     rows = []

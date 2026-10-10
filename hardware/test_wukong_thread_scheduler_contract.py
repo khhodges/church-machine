@@ -7,6 +7,7 @@ from amaranth.back import rtlil
 from amaranth.sim import Simulator
 
 from hardware.change import ChurchChange
+from hardware.test_boot_change import prepare_synthetic_boot
 from hardware.boot_rom import encode_church, encode_turing
 from hardware.decoder import ChurchDecoder
 from hardware.test_boot_rom_no_false_halt import BootRomHarness, _build_dmem_init
@@ -392,6 +393,7 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         dmem[thread_word + layout["stack_end"] - 1] = 0
     elif corruption is not None:
         raise ValueError(f"unknown Thread-switch corruption: {corruption}")
+    prepare_synthetic_boot(dmem)
     return (
         dmem,
         source_code_base + 4,
@@ -817,6 +819,7 @@ def test_full_core_signed_overflow_branches_follow_live_arithmetic(
     dmem[program_word] = pack_lump_header(
         3, program_word + len(program), 2, 0)
     dmem[program_word + 1:program_word + 1 + len(program)] = program
+    prepare_synthetic_boot(dmem)
     dut = BootRomHarness(dmem)
     branch_flags = {}
 

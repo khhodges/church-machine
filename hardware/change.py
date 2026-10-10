@@ -5,6 +5,7 @@ from .hw_types import *
 from .layouts import (GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT,
                       LUMP_HEADER_LAYOUT, WORD2_LAYOUT)
 from .mload import ChurchMLoad
+from .boot_change import BootChange
 from .stack_frame import stack_slot_addr
 from .thread_design import (
     THREAD_CAP_WORDS,
@@ -94,6 +95,13 @@ class ChurchChange(Elaboratable):
 
         u_mload = ChurchMLoad()
         m.submodules.u_mload = u_mload
+        m.submodules.u_boot_change = boot_change = BootChange()
+        m.d.comb += [
+            boot_change.thread.eq(self.cr12_thread),
+            boot_change.namespace.eq(self.cr15_namespace),
+            boot_change.mem_data.eq(self.mem_rd_data),
+            boot_change.mem_valid.eq(self.mem_rd_valid),
+        ]
 
         cr_index = Signal(4)
         crn_reg_latched = Signal(CAP_REG_LAYOUT)
@@ -464,15 +472,14 @@ class ChurchChange(Elaboratable):
 
             with m.State("CHECK_CR12_AUTH"):
                 # crn_reg_latched is valid here (latched at end of LATCH_CRN).
-                # M-elevated boot path bypasses authority and jumps directly to
-                # LOAD_THREAD (skipping SAVE_DR context save, as BOOT_PROGRAM
-                # runs before any thread context exists to save).  RESTORE_CALL
-                # then loads CR0–CR11 from the thread caps zone.
+                # Boot uses the validated, scratch-free back half. Its incoming
+                # identity is CR12's permissionless GT, not synthesized S authority.
                 # Post-boot (m_elevated=False) requires:
                 #   • source cap carries S-perm
                 #   • source cap location matches the target CR's port address
-                with m.If(self.m_elevated):
-                    m.next = "LOAD_THREAD"
+                with m.If(boot_window_lat & (cr_dst_latched == 12)):
+                    m.d.comb += boot_change.start.eq(1)
+                    m.next = "BOOT_ACTIVATE"
                 with m.Elif(~crn_has_s_perm):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_S)]
                     m.next = "FAULT"
@@ -481,6 +488,28 @@ class ChurchChange(Elaboratable):
                     m.next = "FAULT"
                 with m.Else():
                     m.next = "CR12_CR13_LOAD"
+
+            with m.State("BOOT_ACTIVATE"):
+                m.d.comb += [
+                    self.mem_rd_addr.eq(boot_change.mem_addr),
+                    self.mem_rd_en.eq(boot_change.mem_en),
+                    self.cr_wr_en.eq(boot_change.cr_en),
+                    self.cr_wr_addr.eq(boot_change.cr_addr),
+                    self.cr_wr_data.eq(boot_change.cr_data),
+                ]
+                with m.If(boot_change.fault):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(boot_change.fault_type),
+                    ]
+                    m.next = "FAULT"
+                with m.Elif(boot_change.done):
+                    m.d.sync += [
+                        thread_hdr_reg.eq(boot_change.header),
+                        incoming_thread_base.eq(boot_change.thread_base),
+                        thread_loaded.eq(1),
+                    ]
+                    m.next = "COMPLETE"
 
             with m.State("CR12_CR13_LOAD"):
                 # Load the GT from NS[index] (via source cap authority) directly
