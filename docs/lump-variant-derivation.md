@@ -41,8 +41,11 @@ Companion publication participates in the primary's rollback transaction.
 - Unsupported source/session combinations fail explicitly (for example,
   standalone symbolic input without its required compile session). Equality
   between rebuilds is not independent proof of compiler correctness.
-- IDX1 still requires source-bearing executable admission. Its API-only
-  admission restriction must not be bypassed merely to match a storage default.
+- IDX1 API-only reload requires the exact revision's retained full-source bundle
+  and signed compiler source hash. The server recompiles that source and checks
+  saved code and typed layout; the browser also validates the exact execution
+  envelope and source hash before protected admission. Missing or mismatched
+  companions cannot fall back to a sidecar or latest editor source.
 
 ## Verification so far
 

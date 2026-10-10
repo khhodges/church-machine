@@ -586,7 +586,7 @@ function assembleAndLoad(options) {
         ? result.namedSlots.slice() : null;
     const entryLabel = Object.keys(result.labels || {}).find(k => (result.labels[k] === 0)) || null;
     const _srcAbstrName = (source.match(/;\s*Abstraction:\s*(.+)/i) || [])[1]?.trim() || null;
-    const _rawName = _srcAbstrName || entryLabel || 'Assembly';
+    const _rawName = result.abstractionName || _srcAbstrName || entryLabel || 'Assembly';
     const _asmTok = typeof window._computeLumpToken === 'function'
         ? window._computeLumpToken(_rawWords, _rawCaps) : null;
     // IDX1 candidates stay in the immutable compiler snapshot, not the legacy
@@ -16701,6 +16701,10 @@ async function _reloadCommittedLumpArtifact(response, fallbackName, savedMetadat
         await window.ChurchIDX1IDE.validateSaved(committedWords, {
             ...savedMetadata, ...response,
             source: savedMetadata && savedMetadata.original_source,
+            // This is the just-committed frozen input, checked against the
+            // returned signed source hash. Later reloads require the server's
+            // retained exact-bundle verification instead.
+            compiler_verified_source: savedMetadata && savedMetadata.original_source,
         });
         // Save is retention, not consent to replace an executing context.
         // The saved-LUMP Load into Sim action verifies and admits the complete

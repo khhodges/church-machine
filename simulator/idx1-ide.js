@@ -32,8 +32,8 @@
         const frame = node ? require('./lump-content-frame.js') : root.LumpContentFrame;
         const inspected = await frame.lumpInspectContentFrame(words);
         if (!inspected.contentFrameValid || !inspected.apiDefinition ||
-                !['full', 'compact'].includes(inspected.profile))
-            throw new Error('IDX1 Save requires an intact source-bearing content frame');
+                !['api', 'full', 'compact'].includes(inspected.profile))
+            throw new Error('IDX1 Save requires an intact content frame');
         if (inspected.apiDefinition.name === name) return words.slice();
         const built = await frame.lumpBuildContentFrame(
             { ...inspected.apiDefinition, name }, source, { profile: inspected.profile });
@@ -77,6 +77,17 @@
             throw new Error('IDX1 saved envelope does not bind exact saved bytes');
         const source = metadata.source;
         if (typeof source !== 'string') throw new Error('IDX1 saved compiler source is missing');
+        const frame = node ? require('./lump-content-frame.js') : root.LumpContentFrame;
+        const content = await frame.lumpInspectContentFrame(words);
+        if (content.profile === 'api') {
+            if (metadata.compiler_verified_source !== source)
+                throw new Error('IDX1 API-only reload requires its exact compiler-verified source bundle');
+            const digest = node ? require('crypto').createHash('sha256').update(source).digest('hex') :
+                Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',
+                    new TextEncoder().encode(source))), b => b.toString(16).padStart(2, '0')).join('');
+            if (digest !== metadata.compiler_record.source_hash)
+                throw new Error('IDX1 source differs from compiler-attested revision');
+        }
         const compiled = compile(new Assembler(), source);
         if (compiled.errors.length || compiled.words.length !== cw ||
                 compiled.words.some((word, i) => word !== (words[i + 1] >>> 0)) ||
@@ -92,6 +103,7 @@
             isa_profile: plan.isa_profile, execution_envelope: plan.execution_envelope,
             execution_digest: plan.execution_digest, compiler_record: plan.compiler_record,
             source: metadata.original_source ?? metadata.source,
+            compiler_verified_source: metadata.original_source ?? metadata.source,
         };
         await validateSaved(plan.final_binary, finalized);
         for (const key of ['isa_profile', 'execution_envelope', 'execution_digest'])
@@ -139,6 +151,12 @@
             profile: 'IDX1', sourceLayout: { fastEntry: 1, dispatch: [] },
         });
         result.abstractionName = declaration[1];
+        // Browser and server compilation must expose the same intrinsic owner
+        // row, including sources without an explicit capabilities block.
+        result.capabilities = [
+            { name: '__SELF__', rights: ['E'], compiler_owned_self: true, symbolic_self: true },
+            ...(result.capabilities || []).filter(cap => !['SELF', '__SELF__'].includes(cap.name)),
+        ];
         if (!result.errors.length) {
             try { Runtime.requireSupported(result.words, result.layout.instructionStarts.map(w => w - 1)); }
             catch (error) { result.errors.push({ line: 0, message: error.message }); }

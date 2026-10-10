@@ -11216,9 +11216,11 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
             or api.get("methods") not in allowed_methods
             or (execution is not None and api.get("isa_profile", "IDX1") != "IDX1")
             or (execution is None and api.get("isa_profile") is not None)
-            or api.get("returnConvention") not in [
+            or (execution is not None and
+                api.get("returnConvention") != (compiler_api or {}).get("returnConvention"))
+            or (execution is None and api.get("returnConvention") not in [
                 {"register": "DR0", "description": "return value"},
-                (compiler_api or {}).get("returnConvention")]
+                (compiler_api or {}).get("returnConvention")])
             or set(api) - {"name", "language", "methods", "capabilities",
                            "returnConvention", "isa_profile"}):
         raise ValueError("IDX1 candidate embedded API differs from compiler assembly interface")
@@ -13023,13 +13025,19 @@ def save_lump():
     if _input_execution is not None:
         try:
             _idx1_frame = _inspect_lump_binary(_input_execution.payload)
-            if (_idx1_frame["content_profile"] not in ("full", "compact")
+            _idx1_bundle_source = (
+                _idx1_frame["content_profile"] == "api"
+                and metadata.get("save_variants") is True
+                and isinstance(metadata.get("original_source"), str)
+                and metadata["original_source"].strip())
+            if (not _idx1_bundle_source and (
+                    _idx1_frame["content_profile"] not in ("full", "compact")
                     or not isinstance(_idx1_frame["source"], str)
-                    or not _idx1_frame["source"].strip()
+                    or not _idx1_frame["source"].strip())
                     or _idx1_frame["content_frame_error"]):
                 raise ValueError(
                     "IDX1 Save requires Full or Compact embedded source; "
-                    "API-only/source-free IDX1 reload is unsupported")
+                    "API-only requires an exact compiler-attested source bundle")
         except ValueError as exc:
             return jsonify({"error": str(exc), "committed": False}), 400
     if (_is_preflight
@@ -15054,6 +15062,10 @@ def save_lump():
         new_entry["output_variants"] = summary(_variant_bundle)
         new_entry["variant_primary_hash"] = _binary_hash
         new_entry["variant_bundle_id"] = _variant_bundle["bundle_id"]
+        # API-only binaries may be identical across comment-only revisions.
+        # Retain this revision's signed source evidence, not only the mutable
+        # approval indexed by the shared primary hash.
+        new_entry["variant_compiler_record"] = _trusted_compiler_record
 
     # Consume authorization only after every byte/Namespace/approval check has
     # passed. A rejected bootstrap candidate leaves both authorization records
@@ -16018,7 +16030,7 @@ def get_lump_detail(token):
 
 
 def _latest_primary_compilation(abstraction):
-    """Resolve one immutable, source-bearing primary revision on the server."""
+    """Resolve exact primary bytes with intrinsic or verified revision source."""
     name = str(abstraction or "").strip()
     if not name:
         raise ValueError("abstraction is required")
@@ -16032,20 +16044,37 @@ def _latest_primary_compilation(abstraction):
         if not isinstance(filename, str) or os.path.basename(filename) != filename:
             continue
         try:
-            inspected = _inspect_lump_binary(os.path.join(LUMPS_DIR, filename))
-            if not isinstance(inspected.get("source"), str) or not inspected["source"]:
-                continue
+            lump_path = os.path.join(LUMPS_DIR, filename)
+            inspected = _inspect_lump_binary(lump_path)
             if _check_lump_canonical_integrity(
                     LUMPS_DIR, str(row.get("token") or "").lower().zfill(8),
                     inspected["raw_bytes"]) is not True:
                 continue
-            if _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"]) is None:
+            approval = _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"])
+            if approval is None:
+                continue
+            if row.get("variant_bundle_id"):
+                linked = {}
+                _attach_unverified_exact_source(linked, lump_path, row)
+                source = linked.get("editing_source")
+                if linked.get("variant_error") or not isinstance(source, str) or not source:
+                    continue
+                record = row.get("variant_compiler_record") or approval.get("compiler_record") or {}
+                evidence = dict(approval, compiler_record=record,
+                                compiler_identity=record.get("compiler_identity"),
+                                compiler_version=record.get("compiler_version"))
+                if (not _trusted_compile_metadata(evidence, inspected["binary_hash"], inspected["words"])
+                        or record.get("source_hash") != hashlib.sha256(source.encode()).hexdigest()):
+                    continue
+                inspected["editing_source"] = source
+                inspected["source_approval"] = evidence
+            elif not isinstance(inspected.get("source"), str) or not inspected["source"]:
                 continue
             candidates.append((row, inspected))
         except (OSError, ValueError):
             continue
     if not candidates:
-        raise LookupError("no unambiguous saved primary compilation with intrinsic source")
+        raise LookupError("no unambiguous saved primary compilation with verified source")
     # Version is the authoritative saved-revision order.  Ties are ambiguous.
     candidates.sort(key=lambda pair: int(pair[0].get("lump_version") or 0),
                    reverse=True)
@@ -16131,7 +16160,7 @@ def _validate_promotion_binding(metadata, binary_hash):
 @app.route("/api/lumps/latest-primary/<path:abstraction>")
 @app.route("/api/lumps/promotion-candidate/<path:abstraction>")
 def get_latest_primary_compilation(abstraction):
-    """Return exact intrinsic source and bytes for a promotion candidate."""
+    """Return exact verified source and primary bytes for a promotion candidate."""
     try:
         before_token = request.args.get("from_token")
         before_revision = request.args.get("from_revision")
@@ -16181,13 +16210,14 @@ def get_latest_primary_compilation(abstraction):
         "filename": row.get("filename"),
         "binary_hash": inspected["binary_hash"],
         "seal": row.get("seal") or row.get("identity_seal") or inspected["binary_hash"],
-        "source": inspected["source"],
+        "source": inspected.get("editing_source", inspected["source"]),
         "words": inspected["words"],
-        "intrinsic_source": True,
+        "intrinsic_source": bool(inspected["source"]),
+        "verified_bundle_source": "editing_source" in inspected,
         "immutable": True,
         "archived": bool(row.get("archived")),
         "promotion_available": True,
-        "approval": _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"]),
+        "approval": inspected.get("source_approval") or _matching_lump_approval(LUMPS_DIR, inspected["binary_hash"]),
         "promotion_binding": promotion_binding,
     })
 
@@ -16320,6 +16350,34 @@ def _attach_unverified_exact_source(response, lump_path, catalog_record=None):
                 list(_struct.unpack(f">{len(raw) // 4}I", raw)))
             if not frame or hashlib.sha256(frame["source"].encode()).hexdigest() != bundle["source_sha256"]:
                 raise ValueError("Full-source sibling failed source verification")
+            approval = _matching_lump_approval(os.path.dirname(lump_path), primary_hash) or {}
+            with open(lump_path, "rb") as primary_file:
+                primary_raw = primary_file.read()
+            execution = validate_execution(approval, primary_raw)
+            if execution is not None:
+                retained_record = (catalog_record or {}).get("variant_compiler_record")
+                if not isinstance(retained_record, dict):
+                    raise ValueError("IDX1 source bundle is missing revision compiler evidence")
+                approval = dict(approval, compiler_record=retained_record,
+                                compiler_identity=retained_record.get("compiler_identity"),
+                                compiler_version=retained_record.get("compiler_version"))
+                primary_words = list(struct.unpack(f">{len(primary_raw)//4}I", primary_raw))
+                if (not _trusted_compile_metadata(approval, primary_hash, primary_words)
+                        or approval["compiler_record"].get("source_hash") != bundle["source_sha256"]):
+                    raise ValueError("IDX1 source bundle does not match compiler attestation")
+                from server.compile_api import run_compile
+                compiled = run_compile({"source": frame["source"], "language": "assembly",
+                                        "isa_profile": "IDX1", "tier": 2})
+                if not compiled.get("ok"):
+                    raise ValueError("IDX1 source bundle failed compiler verification")
+                compiled_raw = struct.pack(f'>{len(compiled["words"])}I', *compiled["words"])
+                rebuilt = validate_execution(compiled, compiled_raw)
+                if (rebuilt is None
+                        or json.loads(rebuilt.metadata_bytes)["layout"] != json.loads(execution.metadata_bytes)["layout"]
+                        or compiled["words"][1:1 + execution.code_words] != primary_words[1:1 + execution.code_words]):
+                    raise ValueError("IDX1 source bundle differs from saved execution")
+                response["compiler_verified_source"] = frame["source"]
+                response["source_compiler_record"] = retained_record
             response["editing_source"] = frame["source"]
             response["editing_source_provenance"] = "exact-revision full-source sibling"
             response["output_variants"] = summary(bundle)
@@ -16679,7 +16737,7 @@ def get_lump_words(token_hex):
         manifest = _read_manifest_safe(os.path.join(LUMPS_DIR, "manifest.json"))
     except ValueError:
         manifest = []
-    manifest_entry = exact_manifest_entry or next(
+    manifest_entry = exact_manifest_entry or archive_manifest_entry or next(
         (row for row in manifest
          if isinstance(row, dict)
          and row.get("archived") is not True

@@ -501,7 +501,8 @@ async function _showLatestCompilationPromotion(archivedToken, exactTarget) {
         });
         if (window._latestPromotionRequestId !== requestId) return;
         if (!candidate || !Array.isArray(candidate.words) ||
-            candidate.intrinsic_source !== true || candidate.immutable !== true ||
+            (candidate.intrinsic_source !== true && candidate.verified_bundle_source !== true) ||
+            candidate.immutable !== true ||
             typeof candidate.source !== 'string' || !candidate.source ||
             !candidate.promotion_binding ||
             typeof candidate.promotion_binding.binding_id !== 'string' ||
@@ -540,6 +541,9 @@ async function _showLatestCompilationPromotion(archivedToken, exactTarget) {
                     promoted_from_revision: candidate.revision,
                     binary_hash: candidate.binary_hash,
                     promotion_binding: candidate.promotion_binding,
+                    ...(candidate.verified_bundle_source ? {
+                        original_source: source, save_variants: true,
+                    } : {}),
                 });
                 const approval = await _confirmLumpSavePlan(
                     candidate.words, metadata,
@@ -8016,6 +8020,20 @@ async function openLumpInEditor(token, options) {
     }
     if (window._savedLumpOpenRequestId !== _openRequestId ||
             !_openWriteGuard.accepts()) return;
+    if (_wordsResponse && (_wordsResponse.variant_error ||
+            (_wordsResponse.isa_profile === 'IDX1' &&
+             _wordsResponse.content_profile === 'api' &&
+             typeof _wordsResponse.compiler_verified_source !== 'string'))) {
+        var _variantOpenError = 'The exact revision source bundle could not be verified: ' +
+            (_wordsResponse.variant_error || 'Compiler-verified full source is missing') +
+            '. Your editor text was kept. Restore this revision’s source bundle and reopen it.';
+        if (typeof _showFpgaToast === 'function') {
+            _showFpgaToast('Saved source unavailable', _variantOpenError, 'error', 8000);
+        } else if (typeof window.alert === 'function') {
+            window.alert(_variantOpenError);
+        }
+        return false;
+    }
     try {
         _preserveEditorNavigationBuffer();
     } catch (error) {
@@ -8100,6 +8118,13 @@ async function openLumpInEditor(token, options) {
         });
     var _sourceResolution = _diagnosticSource !== null
         ? _resolveSavedLumpEditorSource(_diagnosticSource, null)
+        : _wordsResponse && typeof _wordsResponse.editing_source === 'string'
+        ? {
+            source: _wordsResponse.editing_source,
+            restored: true,
+            origin: 'exact-revision-source-bundle',
+            inspectionSources: []
+        }
         : _resolveSavedLumpEditorSource(
             _serverFrameSource, _browserFrameSource, _browserFrameDecodeConfirmed,
             _wordsResponse && _wordsResponse.unverified_source,
@@ -9100,9 +9125,9 @@ window.editorSaveLump = function() {
         }
     };
 
-    var _regEntry = window.LumpRegistry
+    var _regEntry = indexedView || (window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
-        : null;
+        : null);
     var _regMem = _regEntry ? _regEntry.sources : null;
     var _hasCompiledWords = !!(_regMem && _regMem.memory && _regMem.memory.words
                                && _regMem.memory.words.length > 0);
@@ -9284,9 +9309,7 @@ function _renderFormatLumpCandidate(pending) {
             var sourceRequired = typeof pending.sourceText === 'string' &&
                 pending.sourceText.trim().length > 0;
             var disabled = !item;
-            var detail = pending.isaProfile === 'IDX1' && profile === 'api'
-                ? 'IDX1 protected reload requires compiler source; choose Full or Compact'
-                : disabled
+            var detail = disabled
                 ? (item && profile === 'api' && sourceRequired
                     ? 'Source retention requires an embedded source frame'
                     : 'Requires saved source')
@@ -9307,7 +9330,7 @@ function _renderFormatLumpCandidate(pending) {
     var _warning = document.getElementById('fmtOutputWarning');
     if (_warning) {
         _warning.textContent = pending.selectedProfile === 'api' && pending.sourceText.trim().length > 0
-            ? 'API only does not store source. Reopening this LUMP cannot restore the editor text.'
+            ? 'API-only is the approved build/test binary. Exact full source is retained in the linked revision bundle for editing.'
             : '';
     }
 
@@ -9376,9 +9399,11 @@ function _renderFormatLumpCandidate(pending) {
 }
 
 function _selectFormatLumpProfile(profile) {
+    if (typeof _saveNSRequestInFlight !== 'undefined' && _saveNSRequestInFlight) return;
     var pending = window._pendingLumpData;
     if (!pending || !pending.candidates || !pending.candidates[profile]) return;
-    if (typeof pending.sourceText === 'string' && pending.sourceText.trim().length > 0) {
+    if (pending.isaProfile !== 'IDX1' &&
+            typeof pending.sourceText === 'string' && pending.sourceText.trim().length > 0) {
         // These are retained siblings, not competing publication choices.
         return;
     }
@@ -9392,6 +9417,9 @@ function _selectFormatLumpProfile(profile) {
         } catch (_e) {}
     }
     _renderFormatLumpCandidate(pending);
+    if (typeof _captureLumpSaveSnapshot === 'function') {
+        window._saveNSPreparedSnapshot = _captureLumpSaveSnapshot();
+    }
 }
 window._selectFormatLumpProfile = _selectFormatLumpProfile;
 
@@ -9468,7 +9496,10 @@ window.showFormatLump = async function() {
     } catch (error) {
         window._pendingLumpData = null;
         window._saveNSPreparedSnapshot = null;
-        const message = 'Cannot format this LUMP: ' + error.message + ' No LUMP was saved.';
+        const message = _formatActionableNetworkError('Format LUMP preparation', error, {
+            dataChanged: false,
+            nextAction: 'Compile the current draft and retry Format LUMP. If it fails again, report this reason to the IDE operator.',
+        }) + ' No LUMP was saved.';
         alert(message);
         return { ok: false, error: message, reported: true };
     }
@@ -9507,25 +9538,21 @@ window.showFormatLump = async function() {
         _apiObj.methods = [];
     }
     var _candidates = {};
-    // Source-less IDX1 reload is not an admitted route. Do not produce an
-    // API-only candidate or silently upgrade its chosen storage profile.
-    var _profiles = indexedView ? [] : ['api'];
+    // API-only execution retains exact compiler-attested source in its bundle.
+    var _profiles = ['api'];
     if (_srcText.trim().length > 0) _profiles.push('compact', 'full');
 
     for (var _profileIndex = 0; _profileIndex < _profiles.length; _profileIndex++) {
         var _profile = _profiles[_profileIndex];
         var _built = await _lcf.lumpBuildContentFrame(_apiObj, _srcText, { profile: _profile });
         var _frameWds = _built.frameWords;
-        var _svLumpSize = 64;
+    var _svLumpSize = _selectedCandidate.lumpSize;
         var _fsStart = 1 + _svCW;
         while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) _svLumpSize = _svLumpSize << 1;
         var _svNm6 = 0;
         while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-        var _svHdr = (((0x1F & 0x1F) << 27) |
-                      ((_svNm6 & 0x0F) << 23) |
-                      ((_svCW & 0x1FFF) << 10) |
-                      (_svCC & 0xFF)) >>> 0;
-        var _svBinary = new Array(_svLumpSize).fill(0);
+    var _svHdr = _selectedCandidate.binary[0] >>> 0;
+    var _svBinary = _selectedCandidate.binary;
         _svBinary[0] = _svHdr;
         for (var _wordIndex = 0; _wordIndex < _svCW; _wordIndex++) {
             _svBinary[1 + _wordIndex] = _svWords[_wordIndex] >>> 0;
@@ -9640,10 +9667,10 @@ window.showFormatLump = async function() {
     var _selectedProfile = _preferredProfile && _candidates[_preferredProfile]
         ? _preferredProfile
         : (_candidates.full ? 'full' : 'api');
-    // A non-empty editor source is part of the save contract.  Never allow a
-    // remembered API-only preference to silently discard it.
+    // Full editor source is retained independently in the exact revision
+    // bundle; the approved build/test primary can therefore be API-only.
     if (_srcText.trim().length > 0) {
-        _selectedProfile = indexedView ? 'full' : 'api';
+        _selectedProfile = 'api';
     }
     // Persist inferred/default selections too. A programmer should not have to
     // re-click an already-selected profile merely to keep it for the next save.
@@ -10670,7 +10697,9 @@ async function _loadSavedLumpCapabilities(token, wordsPayload) {
         isa_profile: approved.isa_profile || wordsPayload.isa_profile || api.isa_profile || 'LEGACY',
         execution_envelope: approved.execution_envelope || wordsPayload.execution_envelope,
         execution_digest: approved.execution_digest || wordsPayload.execution_digest,
-        compiler_record: approved.compiler_record || wordsPayload.compiler_record,
+        compiler_record: wordsPayload.source_compiler_record ||
+            approved.compiler_record || wordsPayload.compiler_record,
+        compiler_verified_source: wordsPayload.compiler_verified_source,
         capabilities,
         methods: Array.isArray(api.methods) ? api.methods : [],
         apiDefinition: content.contentFrameValid ? content.apiDefinition : null,

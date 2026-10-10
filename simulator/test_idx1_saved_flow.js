@@ -114,19 +114,27 @@ async function main() {
     const end = lumps.indexOf('\n};', start) + 3;
     vm.runInContext(lumps.slice(start, end), context);
     assert.equal((await window.showFormatLump()).ok, true);
-    assert.equal(window._pendingLumpData.candidates.api, undefined,
-        'IDX1 must not offer a source-less save that cannot be admitted on reload');
+    assert(window._pendingLumpData.candidates.api,
+        'IDX1 API-only save retains its source through the exact bundle');
     for (const formatted of Object.values(window._pendingLumpData.candidates))
         assert.equal(formatted.hasErrors, false, JSON.stringify(formatted.auditResults));
     const snapshot = window._saveNSPreparedSnapshot;
+    assert.equal(window._pendingLumpData.selectedProfile, 'api',
+        'API-only must be the actual default build/test primary');
+    vm.runInContext(extract(lumps, '_selectFormatLumpProfile'), context);
+    context._selectFormatLumpProfile('full');
+    assert.equal(window._saveNSPreparedSnapshot.pending.selectedProfile, 'full');
+    context._selectFormatLumpProfile('api');
+    assert.equal(window._saveNSPreparedSnapshot.pending.selectedProfile, 'api');
     assert.equal(snapshot.isaProfile, 'IDX1');
     assert.equal(snapshot.sourceText, source);
     assert.equal(snapshot.token, candidate.token);
     assert.equal(snapshot.registeredAt, 123);
     assert.equal(snapshot.pending.sourceText, source);
-    let durableWords = Array.from(snapshot.pending.binary);
+    const apiOnly = process.argv.includes('--api');
+    let durableWords = Array.from(window._pendingLumpData.candidates[apiOnly ? 'api' : 'full'].binary);
     const content = await LumpContentFrame.lumpInspectContentFrame(durableWords);
-    assert.equal(content.source, source);
+    assert.equal(content.source, apiOnly ? null : source);
     assert.equal(content.apiDefinition.isa_profile, 'IDX1');
     assert.deepEqual(content.apiDefinition.methods, []);
     assert.equal(content.apiDefinition.language, 'assembly');
@@ -135,7 +143,7 @@ async function main() {
     durableWords = await IDE.nameSavedCandidate(durableWords, 'SavedIDX1Test', snapshot.sourceText);
     const renamedContent = await LumpContentFrame.lumpInspectContentFrame(durableWords);
     assert.equal(renamedContent.apiDefinition.name, 'SavedIDX1Test');
-    assert.equal(renamedContent.source, source);
+    assert.equal(renamedContent.source, apiOnly ? null : source);
     assert.equal(renamedContent.profile, content.profile);
     assert.equal((await LumpContentFrame.lumpInspectContentFrame(originalWords)).apiDefinition.name, 'Assembly');
     assert.deepEqual(durableWords.slice(1, 1 + compiled.words.length), Array.from(compiled.words));
@@ -158,7 +166,9 @@ async function main() {
     durableWords[durableWords.length - 1] = sim.createGT(1, slot, { E: 1 }, 1);
     const fields = await IDE.savedFields(durableWords, snapshot.executionLayout);
     const metadata = { ...fields, source, abstraction: 'SavedIDX1',
+        compiler_verified_source: source,
         compiler_record: { isa_profile: 'IDX1', execution_digest: fields.execution_digest,
+            source_hash: crypto.createHash('sha256').update(source).digest('hex'),
             binary_hash: hash(durableWords) } };
     assert(await IDE.validateSaved(durableWords, metadata));
     // Real classic-script globals, deliberately not the CommonJS modules used
@@ -168,7 +178,7 @@ async function main() {
     browser.window = browser;
     vm.createContext(browser);
     for (const script of ['idx1.js', 'idx1-execution-envelope.js', 'idx1-memory.js',
-        'idx1-runtime.js', 'assembler.js', 'idx1-ide.js'])
+        'idx1-runtime.js', 'assembler.js', 'lump-content-frame.js', 'idx1-ide.js'])
         vm.runInContext(fs.readFileSync(__dirname + '/' + script, 'utf8'), browser, { filename: script });
     assert.equal(browser.ChurchAssembler, undefined);
     assert.equal(vm.runInContext('typeof ChurchAssembler', browser), 'function');
@@ -189,7 +199,14 @@ async function main() {
     const changed = durableWords.slice();
     changed[2] ^= 1;
     await assert.rejects(IDE.validateSaved(changed, metadata), /exact saved bytes/);
-    await assert.rejects(IDE.validateSaved(durableWords, { ...metadata, source: 'HALT' }), /compiler source/);
+    await assert.rejects(IDE.validateSaved(durableWords, { ...metadata, source: 'HALT' }), /compiler.source|source bundle/);
+    if (apiOnly) {
+        await assert.rejects(IDE.validateSaved(durableWords, { ...metadata,
+            compiler_verified_source: undefined }), /exact compiler-verified/);
+        await assert.rejects(IDE.validateSaved(durableWords, { ...metadata,
+            source: source + '\n; changed', compiler_verified_source: source + '\n; changed' }),
+            /compiler-attested revision/);
+    }
     const legacy = [sim.packLumpHeader(0, 1, 1, 0), 0, ...new Array(62).fill(0)];
     assert.equal(await IDE.validateSaved(legacy, {}), null);
     for (const typ of [1, 2]) {
@@ -206,7 +223,7 @@ async function main() {
     vm.runInContext(extract(run, '_reloadCommittedLumpArtifact'), context);
     await context._reloadCommittedLumpArtifact({ ...fields, final_binary: durableWords,
         token: 'saved', ns_slot: slot, digest: hash(durableWords) }, 'SavedIDX1',
-        { ...metadata, original_source: source });
+        { ...metadata, compiler_verified_source: undefined, original_source: source });
     assert.equal(loadedBySave, false);
     sim.loadLumpBinary = loader;
 

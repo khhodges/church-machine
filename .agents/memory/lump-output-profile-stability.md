@@ -8,8 +8,8 @@ for IDE editing, API-only for build/test, compact source for sharing. This
 supersedes the earlier single-output preference policy. Preserve explicit
 source-dependent ISA admission restrictions rather than bypassing them.
 
-**Why:** The user explicitly requested retaining all three uses together instead
-of disabling API-only to avoid source loss. Allocation changes across variants
+**Why:** Retaining all three uses together prevents source loss without
+disabling API-only. Allocation changes across variants
 are legitimate; the primary build artifact remains exact-byte authority.
 
 **How to apply:** Commit the variants atomically; resolve editing source through
@@ -22,7 +22,7 @@ Full source is the canonical editing input; API-only and compact are read-only
 derivations, not co-equal editable records. Keep a shared revision identity and
 separate binary/source hashes.
 
-**Why:** The user's architectural review emphasized prevention by derivation.
+**Why:** Derivation prevents independent source variants from drifting.
 Comment removal cannot reproduce the exact full-source seal, and generating
 consistent variants does not prove compiler metadata semantics are correct.
 

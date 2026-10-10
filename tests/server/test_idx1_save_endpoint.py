@@ -55,13 +55,15 @@ const Envelope = require('./simulator/idx1-execution-envelope.js');
  const source = '; @abstraction PrivateIDX1\nLOAD CR1, CR6, DR2\nRETURN\n';
  const assembled = IDE.compile(new Assembler(), source);
  if (assembled.errors.length) throw Error(JSON.stringify(assembled.errors));
- const caps = [{name:'SELF', rights:['E'], grants:[], compiler_owned_self:true, symbolic_self:true}];
+ const caps = assembled.capabilities.map(cap => ({...cap, name:cap.name === '__SELF__' ? 'SELF' : cap.name}));
  const text = fs.readFileSync('./simulator/app-lumps.js', 'utf8');
  const start = text.indexOf('function _formatLumpApiDefinition(');
  const context = vm.createContext({});
  vm.runInContext(text.slice(start, text.indexOf('\n}', start) + 2), context);
  const api = context._formatLumpApiDefinition('PrivateIDX1', caps);
  api.isa_profile = 'IDX1';
+ api.language = 'assembly';
+ api.methods = [];
  const frame = await Frame.lumpBuildContentFrame(api, source, {profile:__PROFILE__});
  let size = 64;
  while (size < 1 + assembled.words.length + frame.frameWords.length + caps.length) size *= 2;
@@ -112,7 +114,82 @@ def test_source_free_idx1_save_is_explicitly_unsupported(client, isolated_lumps,
     assert json.loads((isolated_lumps / "manifest.json").read_text()) == []
     assert not list(isolated_lumps.glob("PrivateIDX1*"))
 
-
+@pytest.mark.parametrize("signed", [False, True])
+def test_api_idx1_exact_bundle_reload(client, isolated_lumps, signed):
+    payload = candidate(client, tier=0) if signed else browser_candidate("api")
+    source = payload["metadata"].get("original_source") or payload["metadata"]["submitted_source"]
+    payload["metadata"].update(save_variants=True, original_source=source, source_required=True)
+    payload["metadata"]["submitted_source"] = None
+    saved, _ = save(client, payload)
+    path = isolated_lumps / saved["filename"]
+    assert app_module._inspect_lump_binary(path)["source"] is None
+    url = f'/api/lump/{saved["token"]}/words'
+    query = {"exact_filename": saved["filename"]}
+    loaded = client.get(url, query_string=query)
+    assert loaded.status_code == 200, loaded.json
+    assert loaded.json["compiler_verified_source"] == source
+    assert loaded.json["editing_source"] == source
+    latest = client.get('/api/lumps/latest-primary/PrivateIDX1')
+    assert latest.status_code == 200, latest.json
+    assert latest.json["source"] == source
+    assert latest.json["verified_bundle_source"] is True
+    assert latest.json["intrinsic_source"] is False
+    assert latest.json["words"] == loaded.json["words"]
+    assert latest.json["binary_hash"] == saved["binary_hash"]
+    detail = client.get(f'/api/lumps/{saved["token"]}/detail').json
+    browser = subprocess.run(["node", "simulator/test_idx1_saved_flow.js", "--validate-repository"],
+                             input=json.dumps({"words": loaded.json, "detail": detail}),
+                             text=True, capture_output=True)
+    assert browser.returncode == 0, browser.stderr
+    approval = app_module._matching_lump_approval(str(isolated_lumps), saved["binary_hash"])
+    loaded_data = dict(loaded.json, compiler_record=approval["compiler_record"])
+    # Exercise the actual protected browser validator with the saved bytes.
+    script = """
+const fs = require('fs'), IDE = require('./simulator/idx1-ide.js');
+const p = JSON.parse(fs.readFileSync(0, 'utf8'));
+IDE.validateSaved(p.words, {...p, source:p.editing_source})
+ .then(x => {if (!x) process.exit(2)}).catch(e => {console.error(e);process.exit(1)});
+"""
+    verified = subprocess.run(["node", "-e", script], input=json.dumps(loaded_data),
+                              text=True, capture_output=True)
+    assert verified.returncode == 0, verified.stderr
+    bundle_path = isolated_lumps / (loaded.json["variant_bundle_id"] + ".variants.json")
+    retained_bundle = bundle_path.read_bytes()
+    bundle = json.loads(retained_bundle)
+    bundle["source_sha256"] = "0" * 64
+    bundle_path.write_text(json.dumps(bundle))
+    tampered = client.get(url, query_string=query).json
+    assert "compiler_verified_source" not in tampered and "variant_error" in tampered
+    bundle_path.write_bytes(retained_bundle)
+    # Even a self-consistent bundle for identical code but another source
+    # revision cannot replace the signed source hash.
+    from server.lump_variants import build_bundle
+    wrong_source = source + "; different revision\n"
+    wrong = build_bundle(path.read_bytes(), wrong_source,
+                         hashlib.sha256(wrong_source.encode()).hexdigest(),
+                         app_module._parse_intrinsic_lump_content,
+                         loaded.json["source_compiler_record"]["compact_compile_context"])
+    (isolated_lumps / (wrong["bundle_id"] + ".variants.json")).write_text(json.dumps(wrong))
+    manifest_path = isolated_lumps / "manifest.json"
+    manifest_original = manifest_path.read_bytes()
+    manifest = json.loads(manifest_original)
+    for row in manifest:
+        if row.get("filename") == saved["filename"]:
+            row["variant_bundle_id"] = wrong["bundle_id"]
+    manifest_path.write_text(json.dumps(manifest))
+    substituted = client.get(url, query_string=query).json
+    assert "compiler_verified_source" not in substituted and "variant_error" in substituted
+    manifest_path.write_bytes(manifest_original)
+    bundle_path.unlink()
+    rejected = client.get(url, query_string=query).json
+    assert "compiler_verified_source" not in rejected
+    assert "editing_source" not in rejected
+    assert "variant_error" in rejected
+    assert client.get('/api/lumps/latest-primary/PrivateIDX1').status_code == 409
+    failed = subprocess.run(["node", "-e", script], input=json.dumps(
+        dict(rejected, compiler_record=approval["compiler_record"])),
+                            text=True, capture_output=True)
+    assert failed.returncode != 0
 def test_unsigned_browser_compact_frame_is_attested(client, isolated_lumps):
     payload = browser_candidate("compact")
     saved, _ = save(client, payload)
@@ -121,7 +198,24 @@ def test_unsigned_browser_compact_frame_is_attested(client, isolated_lumps):
     assert inspected["content_profile"] == "compact"
     assert inspected["source"] == "; @abstraction PrivateIDX1\nLOAD CR1, CR6, DR2\nRETURN\n"
 
-
+def test_api_comment_only_history_retains_exact_source(client, isolated_lumps):
+    saved_revisions = []
+    for suffix in ("; first\n", "; second\n"):
+        payload = candidate(client, suffix=suffix, tier=0)
+        source = payload["metadata"]["submitted_source"]
+        payload["metadata"].update(original_source=source, submitted_source=None,
+                                   save_variants=True, source_required=True)
+        saved, _ = save(client, payload)
+        saved_revisions.append((saved, source))
+    assert saved_revisions[0][0]["binary_hash"] == saved_revisions[1][0]["binary_hash"]
+    manifest = json.loads((isolated_lumps / "manifest.json").read_text())
+    archived = next(row for row in manifest if row.get("archived"))
+    response = client.get(f'/api/lump/{archived["token"]}/words',
+                          query_string={"archive_filename": archived["filename"]})
+    assert response.status_code == 200, response.json
+    assert response.json["compiler_verified_source"] == saved_revisions[0][1]
+    assert response.json["source_compiler_record"]["source_hash"] == hashlib.sha256(
+        saved_revisions[0][1].encode()).hexdigest()
 @pytest.mark.parametrize("attack", ["source", "code", "layout", "api"])
 def test_unsigned_browser_candidate_cannot_forge_compiler_facts(client, attack):
     payload = browser_candidate()
@@ -139,7 +233,7 @@ def test_unsigned_browser_candidate_cannot_forge_compiler_facts(client, attack):
             # Change an API byte, keeping JSON/frame lengths and envelope valid.
             raw = bytearray(original.payload)
             at = raw.index(b'"DR1"')
-            raw[at + 3] = ord("9")
+            raw[at + 3] = ord("0")
             payload["binary"] = [int.from_bytes(raw[i:i+4], "big") for i in range(0,len(raw),4)]
         raw = bytes.fromhex("".join(f"{word:08x}" for word in payload["binary"]))
         meta["payloadSha256"] = hashlib.sha256(raw).hexdigest()

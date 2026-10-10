@@ -125,3 +125,9 @@ def test_compile_plan_and_atomic_bundle_save(isolated_lumps, monkeypatch, fail_b
         else:
             assert response.status_code == 200, response.get_json()
             assert len(list(isolated_lumps.glob("*.variants.json"))) == 1
+            latest = client.get('/api/lumps/latest-primary/VariantExample')
+            assert latest.status_code == 200, latest.json
+            assert latest.json["source"] == source
+            assert latest.json["verified_bundle_source"] is True
+            assert latest.json["intrinsic_source"] is False
+            assert latest.json["words"] == payload["binary"]

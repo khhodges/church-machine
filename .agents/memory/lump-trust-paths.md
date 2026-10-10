@@ -46,6 +46,18 @@ upload. Saving and selecting the executable revision remain separate actions.
 missing-provenance rejection as an IDE defect, not a source-program mistake.
 The resulting stale boot execution must not be blamed on their LOAD operands.
 
+API-only revisions may have identical executable bytes despite different full
+source comments. Retain source compiler evidence per exact revision, not only
+in an approval store keyed by binary hash. Code equivalence never proves exact
+editor-source provenance.
+
+**Why:** A later comment-only save can replace the shared binary-hash approval's
+source hash, otherwise making an earlier valid source bundle unreloadable.
+
+**How to apply:** Resolve retained full source through the selected revision,
+verify its signed source hash, then independently reproduce code and layout.
+Missing or mismatched source must block protected API-only reload.
+
 **How to apply:** Verify both publication and downstream executable admission
 with the same immutable saved bytes. Never infer success from the Save response
 alone, and never repair missing authority by trusting a browser label or by
