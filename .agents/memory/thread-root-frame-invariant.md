@@ -46,3 +46,14 @@ by selecting a different abstraction.
 **How to apply:** Keep selected artifacts immutable, bind preparation to exact
 artifact/provenance inputs, and report incompatible execution as a release
 blocker. A corrected program/preparation needs explicit approval.
+
+Distinguish root-frame content in the generic image from the memory actually
+embedded by elaboration.
+
+**Why:** Regenerating a root-bearing generic image reproduced the existing
+bytes, while the retained RTL initializer replay showed an empty stack.
+Calling this a missing generic-image root would repair the wrong input.
+
+**How to apply:** Inspect the exact generic bytes, hardware projection, and
+retained initializer separately. A fresh generation or image hash alone does
+not prove that elaboration installed the same Thread context.
