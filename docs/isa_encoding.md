@@ -1,4 +1,12 @@
-# Church Machine ISA Encoding Reference
+# Church Machine ISA Encoding Reference — historical baseline
+
+For current encoding decisions use the
+[master ISA](instruction-set.md#retired-opcodes-and-directindirect-reference-forms).
+All baseline tables and diagrams below are historical, not a current opcode
+catalog. In particular, opcode 8 (ELOADCALL) and opcode 9 (XLOADLAMBDA) are
+retired; their operand layouts and backward-compatibility claims are obsolete.
+Current LOAD/SAVE uses the master's single-word DR-plus-signed-magnitude layout,
+not the baseline immediate-only field or the experimental IDX1 packet format.
 
 **Authority:** [Church Machine Instruction Set](instruction-set.md) is the master
 ISA document. This supporting encoding record must defer to it.

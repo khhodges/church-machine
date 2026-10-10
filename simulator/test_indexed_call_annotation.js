@@ -96,14 +96,18 @@ const encode = (op, dst, src, imm, cond = 14) =>
 const describe = (op, dst, src, imm, pets = {}, cond = 14) =>
     isolated._decompileWord(encode(op, dst, src, imm, cond), 0, 10, clistBase, pets, isolatedSnapshot).desc;
 const pets = {2: 'PreviousCapability'};
-assert.match(describe(1, 2, 6, 7, pets), /save CR2 → CR6\[7\]/);
-assert.match(describe(0, 2, 6, 7, pets), /load CR2 ← CR6\[7\]/);
+assert.match(describe(1, 2, 6, 7 << 4, pets), /save CR2 → CR6\[unsigned32\(DR0\) \+ #7\]/);
+assert.match(describe(0, 2, 6, 7 << 4, pets), /load CR2 ← CR6\[unsigned32\(DR0\) \+ #7\]/);
+assert.match(describe(1, 2, 6, 7, pets), /unsigned32\(DR7\) \+ #0/);
+assert.match(describe(0, 2, 6, 7, pets), /unsigned32\(DR7\) \+ #0/);
 assert.deepEqual(pets, {2: 'PreviousCapability'}); // rendering must not mutate aliases
 assert.equal(describe(0, 2, 6, 7, pets), describe(0, 2, 6, 7, pets));
 assert.match(describe(7, 2, 0, 0), /CR2 is not overwritten/);
 assert.match(describe(8, 2, 6, (3 << 5) | 7), /then call method #3/);
 assert.match(describe(8, 2, 6, 7), /then call fast path/);
 assert.match(describe(9, 2, 6, 7), /then lambda/);
+assert.match(describe(8, 2, 6, 7), /^RETIRED — historical decode only; execution faults:/);
+assert.match(describe(9, 2, 6, 7), /^RETIRED — historical decode only; execution faults:/);
 assert.match(describe(21, 0, 1, 0x4001), /DR0 write discarded.*NZCV from arithmetic/);
 assert.match(describe(22, 1, 0, 0x7FFF), /DR1 = DR0\(0\) − #16383/);
 assert.match(describe(23, 0, 0, 0x7FFF), /PC ← instruction PC − 1 words/);

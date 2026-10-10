@@ -645,7 +645,10 @@ function showAbstractionDetail(index, methodName) {
                     html += `<tr><td>Method Index</td><td>${regConv.index}</td></tr>`;
                     html += `<tr><td>Input</td><td>${regConv.input}</td></tr>`;
                     html += `<tr><td>Output</td><td>${regConv.output}</td></tr>`;
-                    html += `<tr><td>Dispatch</td><td><code>${regConv.dispatch}</code></td></tr>`;
+                    // Legacy convention records remain historical evidence, not
+                    // executable guidance for retired instruction encodings.
+                    const dispatch = _currentMethodDispatchDescription(regConv.dispatch);
+                    html += `<tr><td>Dispatch</td><td><code>${dispatch}</code></td></tr>`;
                     if (regConv.note) {
                         html += `<tr><td>Note</td><td>${regConv.note}</td></tr>`;
                     }
@@ -1563,6 +1566,19 @@ function absDeleteMethod(absIdx) {
     showAbstractionDetail(absIdx);
 }
 
+function _currentMethodDispatchDescription(description) {
+    if (!/\b(?:ELOADCALL|XLOADLAMBDA)\b/.test(description)) return description;
+    if (/hidden|hardware/i.test(description)) {
+        return 'Hardware IRQ dispatch; the historical fused-opcode description is not executable ISA guidance';
+    }
+    if (/\bXLOADLAMBDA\b/.test(description)) {
+        return 'LAMBDA CRn uses an X-GT already held in CRn; correct and recompile legacy source explicitly';
+    }
+    return 'CALL CRn uses a held E-GT; CALL CR6[PetName], Method selects through the caller C-List. Correct and recompile legacy source explicitly';
+}
+
+// Historical convention records. Retired dispatch strings must go through
+// _currentMethodDispatchDescription before presentation; never assemble them.
 const METHOD_REGISTER_CONVENTIONS = {
     'LED': {
         'Set':    { index: 0, input: 'none (LED = DWRITE offset 0\u20134 into LED_DEV GT)', output: 'DR0 = 1 (success) or DR0 = -1 (invalid offset)',  dispatch: 'LOAD CR3, LED0 / DWRITE DR1, CR3, #led', note: 'Boot C-list slot 4 = LED_DEV GT (MMIO 0x40000000, lim17=4). DWRITE offset 0=LED0 \u2026 4=LED4.' },

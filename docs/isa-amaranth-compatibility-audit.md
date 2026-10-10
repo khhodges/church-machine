@@ -2,6 +2,19 @@
 
 ## Direct/indirect and retirement recheck — 2026-10-10
 
+**Reconciliation follow-up:** the two failing fixture suites listed below now
+pass. The ordinary immediate LOAD expectation uses compact encoding, while
+explicit experimental IDX1 packet assertions remain intentionally separate.
+Their presence is not itself a stale-test defect or endorsement of the packet
+profile as the ordinary ISA. The annotation test now distinguishes immediate
+row 7 from runtime DR7 and labels retired instructions historical.
+
+Current direct/indirect guidance is in the master ISA, and supporting baseline
+references are explicitly historical. The IDE no longer displays retained
+retired method-dispatch strings as instructions to execute. A new guidance
+regression test and both repaired fixtures run in `check-api-reference-stale`.
+The results below preserve the original audit observations, not current failures.
+
 **Verdict: targeted execution checks pass, but documentation, IDE metadata and
 some regression fixtures remain stale. This is not whole-ISA certification.**
 

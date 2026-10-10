@@ -3,6 +3,17 @@ name: Uniform indexed operand intent
 description: User requires register-plus-immediate indexing across all indexed instructions, not just LOAD.
 ---
 
+When reconciling ISA fixtures, distinguish ordinary ISA conformance from an
+explicit experimental profile's internal consistency tests. Do not replace
+the latter's packet/layout assertions with ordinary-instruction expectations.
+
+**Why:** Mixing those contracts can make a valid experimental-layout test fail
+while incorrectly presenting that failure as an ordinary ISA defect.
+
+**How to apply:** Inspect the assembler profile selected by each fixture.
+Preserve its internal-layout coverage, but never cite experimental-profile
+success as proof of normative ISA or FPGA conformance.
+
 Static artifact-admission checks must follow each opcode's current operand
 encoding, including register-plus-immediate indexing. A shared old C-list mask
 must not be applied across instructions with different formats.

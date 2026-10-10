@@ -202,17 +202,51 @@ or compatibility profile merely to preserve earlier encodings. For example,
 operand `0x0003` now means DR3 with immediate zero, not immediate 3.
 Previously compiled binaries are not assumed compatible and may require
 recompilation. This is not permission to delete or automatically rewrite saved
-files. Assembler and simulator changes and conformance tests remain outstanding.
+files. Focused assembler, simulator and Amaranth compact LOAD/SAVE tests now
+pass; this does not certify every instruction or the currently flashed FPGA.
 
 The ordinary DREAD/DWRITE indexed forms already implement register-plus-immediate
-addition within their existing field limits. Immediate-only LOAD/SAVE c-list
-encodings are gaps relative to the uniform requirement, not exceptions.
+addition within their existing field limits. Immediate-only LOAD/SAVE now uses
+the selected compact field with DR0; it is not an exception to the uniform rule.
 Assembler, simulator and Amaranth must follow the same reconciled encoding.
 This documentation correction does not itself rewrite saved programs,
 Namespace contents or boot images. Existing binaries are not compatibility
 requirements for the new ISA.
 
-## Baseline instruction descriptions
+## Retired opcodes and direct/indirect reference forms
+
+**Current ISA guidance — 2026-10-10.** ELOADCALL (8) and XLOADLAMBDA
+(9) are reserved, retired encodings: compilation rejects their mnemonics and
+execution must fault. Neither is a callable instruction, a shorthand, nor an
+automatic replacement target. Correct old source explicitly and recompile;
+do not translate or rewrite stored binaries. A description of a historical IRQ
+as “hidden ELOADCALL” does not authorize executing opcode 8.
+
+| Form | Authority/reference used |
+|---|---|
+| `CALL CRn` | The E-GT already held in CRn; no implicit C-List lookup |
+| `CALL CR6[PetName], Method` | Select the declared PetName's GT from the caller's C-List, then the method |
+| `LOAD CRd, CRs, #n` / `SAVE CRd, CRs, #n` | Index n, encoded with DR0 and the signed magnitude |
+| `LOAD CRd, CRs, DRr + n` / `SAVE CRd, CRs, DRr - n` | Runtime unsigned DR value plus/minus magnitude, with non-wrapping arithmetic and access checks |
+| `CHANGE CRn` | The permissionless Thread GT in CRn, not `CRn[0]` |
+
+For LOAD/SAVE, the magnitude is 10 unsigned bits plus a separate sign bit
+(±1023). Immediate 7 encodes as operand `0x0070`; operand `0x0007` instead
+selects DR7 with zero offset. Do not apply this layout to CALL's C-List-row
+or method-selector fields. See the normative sections above for full rules.
+
+The explicit experimental IDX1 packet implementation has separate layout
+tests. Its continued existence is **not** authority to change the selected
+ordinary LOAD/SAVE encoding or a claim that FPGA execution supports IDX1.
+
+# Historical baseline — not current instruction guidance
+
+Everything below preserves older descriptions and repeated baseline material
+for historical inspection. In particular, fused-opcode encodings, their
+backward-compatibility claims and “hidden ELOADCALL” explanations are obsolete.
+Use the current normative corrections above, not these historical sections,
+for those instructions. Keeping this evidence does not preserve executable
+compatibility. No historical program is rewritten by this documentation change.
 
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**

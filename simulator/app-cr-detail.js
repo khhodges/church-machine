@@ -2445,7 +2445,7 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
         const target = !dynamic && crSrc === 6 && (opcode === 0 || opcode === 8 || opcode === 9)
             ? ` (${_indexedCallTarget(callContext, row)})` : '';
         const method = (imm >>> 5) & 127;
-        return out(`${verb}${cc} ${meaning}${target} if authorized${opcode === 5 ? '; destination M required and consumed on success' : ''}${opcode === 8 ? (method ? `; then call method #${method}` : '; then call fast path') : ''}${opcode === 9 ? '; then lambda' : ''}`);
+        return out(`${opcode === 8 || opcode === 9 ? 'RETIRED — historical decode only; execution faults: ' : ''}${verb}${cc} ${meaning}${target} if authorized${opcode === 5 ? '; destination M required and consumed on success' : ''}${opcode === 8 ? (method ? `; then call method #${method}` : '; then call fast path') : ''}${opcode === 9 ? '; then lambda' : ''}`);
     }
     if (opcode === 2) {
         if (crSrc === 6) {

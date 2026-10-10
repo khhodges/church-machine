@@ -23,6 +23,8 @@ function bad(source, layout = code(1), pattern) {
     if (pattern) assert.match(out.errors.map(e => e.message).join('\n'), pattern);
 }
 
+// Explicit IDX1 remains an experimental packet profile; ordinary LOAD/SAVE
+// conformance is covered by test_compact_load_save.js.
 const load = good('LOAD CR1, CR6, DR11 + 2', 2);
 assert.deepEqual(load.words, [0x52B00002, 0x070B0000]);
 assert.deepEqual(load.instructionStarts, [1]);
@@ -108,7 +110,7 @@ bad('LOAD CR1, CR6, DR1', { ...code(2), fastEntry: 2 }, /fastEntry/);
 bad('LOAD CR1, CR6, DR1', { extents: [{ startWord: 1, endWord: 2, kind: 'code' },
     { startWord: 2, endWord: 3, kind: 'data' }], dispatch: [], fastEntry: 1 },
     /cuts an instruction|misclassifies/);
-assert.deepEqual(new ChurchAssembler().assemble('LOAD CR1, CR6, 2').words, [0x070B0002]);
+assert.deepEqual(new ChurchAssembler().assemble('LOAD CR1, CR6, 2').words, [0x070B0020]);
 assert.deepEqual(new ChurchAssembler().assemble('CALL CR3, 1', { profile: 'LEGACY' }).words,
     [0x17180002]);
 console.log('IDX1 assembler synthetic tests passed');

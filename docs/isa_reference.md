@@ -1,4 +1,11 @@
-# Church Machine ISA Reference
+# Church Machine ISA Reference — historical baseline
+
+Use the [master ISA's current direct/indirect reference rules](instruction-set.md#retired-opcodes-and-directindirect-reference-forms)
+for current guidance. The appendix and baseline descriptions retained in this
+file are historical evidence, not authority to compile or execute ELOADCALL
+or XLOADLAMBDA. Their shorthand and compatibility examples are obsolete.
+Current CALL uses a held E-GT directly or an explicit caller C-List lookup;
+it does not lower to either retired fused opcode.
 
 > **Opcode retirement:** ELOADCALL (8) and XLOADLAMBDA (9) are no longer
 > executable instructions. Compilation rejects their mnemonics, and simulator
