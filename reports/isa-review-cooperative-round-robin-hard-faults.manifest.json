@@ -1,0 +1,15 @@
+{
+  "status": "review-only-unapproved-details",
+  "master_sha256": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+  "proposal_sha256": "2dfbd2ff02ffc7576e84e78a9716e75a5c7680a64f24503557edda17044d43de",
+  "html_sha256": "62b32e62686d225c3009794de32ba77e99512c3ffc25953e5d556482391cfc48",
+  "checks": [
+    "seven numbered review sections",
+    "old IRQ-return contract removed from active proposals",
+    "single boot definition",
+    "binary and hex example equality",
+    "new section navigation",
+    "complete unchanged master embedded"
+  ],
+  "master_unchanged": true
+}

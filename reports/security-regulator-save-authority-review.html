@@ -1,0 +1,183 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SecurityRegulator — authority and SAVE review</title><style>body{margin:0;background:#f3f4f6;color:#222;font:16px/1.65 system-ui,sans-serif}main{max-width:1080px;margin:28px auto;padding:36px;background:white}h1,h2{line-height:1.25}h2{margin-top:32px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #ddd;padding:12px;vertical-align:top;text-align:left}th{background:#faf4f5}code{overflow-wrap:anywhere}article{color:#a00020}@media(max-width:700px){main{margin:0;padding:18px}table{font-size:12px}th,td{padding:6px}}</style></head><body><main><article><h1>SecurityRegulator — interface proposal</h1>
+<p><strong>Review only.</strong> This defines a proposed software abstraction over the existing
+protected hardware-control word. It does not add ISA opcodes, change the master
+ISA or authorize implementation, synthesis or board actions. The user names
+the abstraction <strong>SecurityRegulator</strong>, in Babbage's tradition. The name does
+not itself allocate a canonical artifact identity or grant hardware authority.</p>
+<h2>Purpose and authority</h2>
+<p>Expose bounded functions rather than a raw register setter. Bits 0–15 control
+CR0.M–CR15.M; bits 16–31 are for hardware controls, including watchdog refresh.
+The exact watchdog bit and command semantics still require approval.</p>
+<p>The abstraction must not return or export the writable control-object GT.
+An executable GT authorizes entry, but that alone must not imply permission to
+invoke every privileged operation with arbitrary operands. Each method needs
+an explicitly authorized caller and a defined, limited effect.</p>
+<p>Existing custody is Namespace-only. The proposed interface can be supplied by
+Namespace or delegate a complete operation to it before any M bit is armed.
+Moving custody to a new standalone abstraction would be a separate reviewed
+change; merely naming <code>SecurityRegulator</code> does not grant it hardware access.</p>
+<h2>Presently known method contracts</h2>
+<p><strong>User-defined privileged cases:</strong> LOAD into CR12, CR13, CR14 or CR15, and
+SAVE a GT from CRn without requiring its B bit. Watchdog refresh is a separate
+hardware-control method. The names below are functional interface names, not
+new ISA opcodes; the current master calls the isolated-register load form
+SWITCH. Its encoding and any LOAD/SWITCH terminology change require separate
+ISA reconciliation.</p>
+<table>
+<thead>
+<tr>
+<th>Proposed method</th>
+<th>Authorized caller / GT sources</th>
+<th>Effect</th>
+<th>Must not do</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RefreshWatchdog()</code></td>
+<td>Approved scheduling authority; provider's protected control-object GT authorizes the write</td>
+<td>Restart the fixed one-second deadline through the proposed refresh command, before expiry</td>
+<td>Change the duration, clear an existing fault, grant M authority, toggle the fault LED or let an ordinary worker repeatedly feed the watchdog</td>
+</tr>
+<tr>
+<td><code>LoadCR12(sourceCList, index)</code></td>
+<td>Caller authorized to replace CR12; control-object GT authorizes CR12.M; source C-list GT independently authorizes lookup</td>
+<td>Arm CR12.M and perform the validated load into CR12</td>
+<td>Treat register replacement as a full CHANGE or implicitly save/restore a Thread</td>
+</tr>
+<tr>
+<td><code>LoadCR13(sourceCList, index)</code></td>
+<td>Caller authorized to replace CR13; control-object GT authorizes CR13.M; source C-list GT independently authorizes lookup</td>
+<td>Arm CR13.M and perform the validated load into CR13</td>
+<td>Infer an IRQ role or grant authority to another register</td>
+</tr>
+<tr>
+<td><code>LoadCR14(sourceCList, index)</code></td>
+<td>Caller authorized to replace CR14; control-object GT authorizes CR14.M; source C-list GT independently authorizes lookup</td>
+<td>Arm CR14.M and perform the validated load into CR14</td>
+<td>Assume the method's existing execution/return context remains valid after replacing code authority</td>
+</tr>
+<tr>
+<td><code>LoadCR15(sourceCList, index)</code></td>
+<td>Caller authorized to replace CR15; control-object GT authorizes CR15.M; source C-list GT independently authorizes lookup</td>
+<td>Arm CR15.M and perform the validated load into CR15</td>
+<td>Bypass validation of the replacement Namespace or assume retained capabilities automatically remain valid</td>
+</tr>
+<tr>
+<td><code>SaveGTWithoutB(sourceCRn, destinationCList, index)</code></td>
+<td>Caller authorized to export the GT from the specified CRn; control-object GT authorizes CRn.M; destination GT independently supplies Church S authority</td>
+<td>Arm the <strong>source</strong> CRn.M and SAVE that GT without requiring B=1; preserve the GT's B bit and other contents</td>
+<td>Set B in the saved GT, waive destination checks, export a substituted GT, or broaden the exception to unrelated security checks</td>
+</tr>
+</tbody>
+</table>
+<p>The SAVE case is <strong>not limited to CR12 or CR12–CR15</strong>: CRn identifies the
+source register for the authorized operation. Operand legality remains
+explicit; the broader scope is not a claim that every case is implemented.
+M authorizes this particular SAVE despite B=0; it does not convert the GT into
+one that can subsequently be delegated without M.</p>
+<p>Each method combines <strong>set the relevant M bit + the specific operation</strong>.
+Additional operations require their own contracts. No generic
+<code>SetM(register, value)</code>, raw <code>WriteControlWord(value)</code> or privileged callback
+executor is proposed for callers.</p>
+<h2>SAVE: source B and destination S are separate checks</h2>
+<p>For <code>SAVE CRd[index], CRs</code>, CRs holds the GT being saved, while CRd holds
+the capability authorizing access to the destination C-list.</p>
+<table>
+<thead>
+<tr>
+<th>Source GT B</th>
+<th>Destination GT S</th>
+<th>Authorized source CRs.M</th>
+<th>Result for these permission checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>1</td>
+<td>Not needed for the B check</td>
+<td>Ordinary B/S checks pass</td>
+</tr>
+<tr>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td>Reject: source GT is not ordinarily bindable</td>
+</tr>
+<tr>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td>SecurityRegulator's privileged SAVE passes the B/S checks</td>
+</tr>
+<tr>
+<td>Either</td>
+<td>0</td>
+<td>Either</td>
+<td>Reject: the proposed source-M exception does not grant destination S</td>
+</tr>
+</tbody>
+</table>
+<p>Every passing row is still subject to operand legality, bounds and all other
+applicable checks. In particular, the B=0, destination-S=1 case <strong>is covered</strong>:
+authorized source M permits saving that GT, with B still zero in the saved copy.
+M is authority for the operation, not a request to rewrite the GT's permissions.</p>
+<p>If B=0 and S=1 are instead <strong>both fields of one GT</strong>, that GT can authorize
+saving other eligible GTs into its own C-list, but cannot itself be saved
+by an ordinary SAVE requiring source B. SecurityRegulator can authorize that
+latter operation using source M, provided the actual destination independently
+grants S. The destination capability's own B=0 does not prevent writing through
+its S authority; source S does not substitute for destination S.</p>
+<h2>Functional requirements</h2>
+<ul>
+<li>The instruction and authorizing GT remain independent. Every applicable
+  access passes mLoad and the operation's other security checks. M contributes
+  only the authority explicitly defined for that register and operation.</li>
+<li>Caller authorization precedes arming M or refreshing the timer. Delegation
+  must not turn an unauthorized request into an authorized one merely because
+  a trusted helper forwards it.</li>
+<li>The M-authorized operation belongs inside the method. No caller callback,
+  yield or intervening CALL/RETURN may carry an armed M bit to unrelated code.
+  Current CALL/RETURN M rules must be reconciled with the method's ABI; this is
+  not equivalent to calling a setter and then executing an operation afterward.</li>
+<li>Each method must finish its M-authorized operation without leaving the
+  relevant M bit armed or newly elevating unrelated registers. Exact
+  consumption/fault rules for the generalized SAVE case require ISA
+  reconciliation; the existing isolated-register rules alone do not establish
+  implementation support for every CRn.</li>
+<li>The GT operated on must be the one named by the authorized request, not a
+  method-local register value substituted by CALL argument passing. CRn
+  selection, operand preservation and return behavior need a concrete ABI.
+  Loading CR12, CR14 or CR15 may change the very authority needed to continue
+  or return. These methods cannot be assumed to be ordinary returning wrappers:
+  their post-load continuation and any return restoration must be defined
+  without undoing the intended load or using invalidated authority.</li>
+<li>On a fault, do not claim software cleanup executed. Preserve the ISA-defined
+  fault evidence; recovery must not expose armed M authority to untrusted
+  execution. The exact fault/recovery M-state contract remains an adoption
+  requirement, not a new implicit ISA exception.</li>
+<li>A control-word write must deliberately account for the low sixteen bits.
+  Under existing full-word semantics, writing only the refresh bit would clear
+  them. Do not replay other upper command bits or assume a stale whole-word
+  value is safe. Exact preservation and readback semantics need definition.</li>
+<li>Watchdog expiry, not refresh, toggles the LED. Repeated one-second expiries
+  give the requested one-second-on / one-second-off cycle, subject to recovery
+  timing. The indicator is not a free-running heartbeat.</li>
+</ul>
+<h2>Decisions required before implementation</h2>
+<ol>
+<li>Exact method-entry authorization and delegation rules. A shared callable
+   interface must not let refresh-only callers invoke M-authorized operations.</li>
+<li>Refresh command bit, readback, unrelated-bit handling and expiry precedence.
+   Suggested command behavior is write-one refresh, no persistent hold-off.</li>
+<li>Method operands/results and their CALL/RETURN register contract.</li>
+<li>Fault and continuation postconditions for the known operations above,
+   including generalized B-free SAVE and privileged-register replacement.</li>
+<li>Reconciliation with the earlier automatic-handoff renewal proposal: explicit
+   protected refresh must not coexist with an unintended second renewal path.</li>
+</ol>
+<p>The watchdog duration remains fixed at the proposed one second; setting a new
+duration is not part of this interface. The existing red-text ISA review predates
+this interface and the save-first recovery discussion and still requires
+reconciliation before adoption.</p></article></main></body></html>

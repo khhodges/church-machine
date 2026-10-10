@@ -1,0 +1,9 @@
+{
+  "status": "review-only-unapproved",
+  "master": "docs/instruction-set.md",
+  "master_sha256": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+  "proposal_sha256": "6c13bbfb1e2adbb6f599434a686adf57a063b4fa0d9f5f0ba16eda62f00fc6c8",
+  "html_sha256": "89b73cc5aa754f784edf694b163260e4740a141166afc9fcfa26e31f88409439",
+  "numbered_review_items": 7,
+  "master_unchanged": true
+}

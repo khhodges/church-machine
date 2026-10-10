@@ -430,3 +430,451 @@ mtime_ms = 1791502393205
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6ab7ea37-a336-41d4-8c09-b514181fb5c2/d7aa2467-f6a3-427c-9c44-7b4495a0f36c"
 storage_version_token = "1791502398919274"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "K_n5dijvCo3JGzbuZrMdv"
+uri = "file://reports/isa-red-text-review.html"
+type = "html"
+title = "ISA red-text review — updated CHANGE addressing"
+description = "Updated proposal adds immediate and register-plus-immediate C-list lookup for the Thread GT, alongside direct-register CHANGE. Includes authorization, validation and fault rules; indexed binary encoding remains explicitly pending. Master ISA unchanged."
+logical_id = "551dd77a-7e49-4180-8a48-e8b75e636167"
+content_hash = "sha256:bef2103da09f6c06c49da4ac5e417004871742e222da1d0fae0dd79875d81c64"
+size = 849138
+mtime_ms = 1791545243073
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/551dd77a-7e49-4180-8a48-e8b75e636167/d6cabe4f-260a-4922-ae5d-5287e906858c"
+storage_version_token = "1791545250203257"
+content_type = "text/html"
+
+[[outputs]]
+id = "YeFOn55WljClrvoxciuXy"
+uri = "file://reports/isa-review-change-relative-addressing.html"
+type = "html"
+title = "Corrected ISA review — relative CHANGE addressing included"
+description = "Separately named corrected copy. Section 1 explicitly includes CHANGE CRlist[immediate] and CHANGE CRlist[DRr + immediate], with required authorization and validation. Review only; master ISA unchanged."
+logical_id = "3d2776c7-d3f4-44fc-91c1-0d93b0239498"
+content_hash = "sha256:e6174a7c01dfafa9c9f40cda2540752f3934939991f5fc9ca3f63a9a41c62c82"
+size = 849355
+mtime_ms = 1791545375828
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3d2776c7-d3f4-44fc-91c1-0d93b0239498/a407ba2b-441b-42b4-83d5-eff4b7a488a6"
+storage_version_token = "1791545387165164"
+content_type = "text/html"
+
+[[outputs]]
+id = "Ln4H9ipjPko7U7q2944gI"
+uri = "file://reports/isa-review-change-binary-formats.html"
+type = "html"
+title = "ISA red-text review — CHANGE binary formats"
+description = "Section 1 includes proposed 32-bit field layouts, grouped binary and hex examples for direct, immediate-relative and register-plus/minus-immediate CHANGE. Explicitly identifies revised direct encoding and pending approval; master ISA unchanged."
+logical_id = "2f752d4b-2d4c-49ce-9ade-904e97e3a3c3"
+content_hash = "sha256:84ca3261e2ef4cb5c480864f050bceafa938985c61e40e914735d8a395258fb2"
+size = 853379
+mtime_ms = 1791545652245
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2f752d4b-2d4c-49ce-9ade-904e97e3a3c3/f20d9434-ffae-4fc6-ace3-3f5b087ae6f0"
+storage_version_token = "1791545660952597"
+content_type = "text/html"
+
+[[outputs]]
+id = "BbKAbrZWN_sn5Ro571hJZ"
+uri = "file://reports/isa-review-change-split13-magnitude.html"
+type = "html"
+title = "Updated ISA red-text review — split 13-bit magnitude"
+description = "CHANGE now proposes a split 13-bit magnitude (±8191), with verified binary/hex examples, LOAD/SAVE selector and range explanations, FPGA wiring notes, and explicitly proposed replacement boot/IRQ markers. Master and implementations remain unchanged."
+logical_id = "39e412e3-28ad-4578-a56a-d362e31ae672"
+content_hash = "sha256:e480cd520b9ecbfe19853facdad69b19e59eb2f4d7315271cfee5569bdece7f7"
+size = 859098
+mtime_ms = 1791546804059
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/39e412e3-28ad-4578-a56a-d362e31ae672/82a1d648-4232-4d83-ac7d-dbcfa000e947"
+storage_version_token = "1791546813195237"
+content_type = "text/html"
+
+[[outputs]]
+id = "FcFF_R1WU4Wf1TNcVRxWl"
+uri = "file://reports/isa-review-encoding-faults-and-data-words.html"
+type = "html"
+title = "Updated ISA review — unconditional encoding faults and DATA words"
+description = "Item 2 now requires encoding validation before condition evaluation. Includes the existing WORD opcode 11110/0x1E, its 27-bit payload format, and the distinction between documented allocation and verified approval. Master and implementations unchanged."
+logical_id = "2bf73531-2e94-4d63-8085-c728285f3102"
+content_hash = "sha256:e4c3736bba76c70b225ca3719f215e017e8401128a7b2f5b47259aae4740dc48"
+size = 863349
+mtime_ms = 1791549362325
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2bf73531-2e94-4d63-8085-c728285f3102/81191397-d64e-4742-af74-e0c42ebd5e60"
+storage_version_token = "1791549392658861"
+content_type = "text/html"
+
+[[outputs]]
+id = "9RGlw_gS4LS7W1jYJaJCR"
+uri = "file://reports/isa-review-cooperative-round-robin-hard-faults.html"
+type = "html"
+title = "ISA red-text review — cooperative scheduling and watchdog hard faults"
+description = "Section 3 consolidates boot special-operation rules, withdraws IRQRETURN, and defines proposed FIFO round robin, protected budgets, scheduled device servicing, watchdog fault capture and deliberate recovery. Detailed mechanisms remain for review; master ISA and implementations are unchanged."
+logical_id = "59149b49-a354-4284-9473-0fcd097dc51b"
+content_hash = "sha256:62b32e62686d225c3009794de32ba77e99512c3ffc25953e5d556482391cfc48"
+size = 879625
+mtime_ms = 1791550367901
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/59149b49-a354-4284-9473-0fcd097dc51b/4f12aa6a-3ac9-48d8-8dc1-2058d2a4cbfa"
+storage_version_token = "1791550447920061"
+content_type = "text/html"
+
+[[outputs]]
+id = "Y-TzIbV2GOOS6Zpzk3gA6"
+uri = "file://reports/isa-review-liftoff-compatibility-policy.html"
+type = "html"
+title = "ISA review — liftoff compatibility policy"
+description = "Updated review: no legacy compatibility requirement before the first FPGA release; case-by-case decisions afterward. Master ISA and implementations remain unchanged."
+logical_id = "450fe35e-b408-4de1-9a8f-95b611f6d854"
+content_hash = "sha256:489b7a1287de0518d7488de8b978de33c64b99d86d0aefb65a179746ac57a794"
+size = 880261
+mtime_ms = 1791551040841
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/450fe35e-b408-4de1-9a8f-95b611f6d854/fc380755-14c9-46ba-b988-9f3e642a7590"
+storage_version_token = "1791551051279818"
+content_type = "text/html"
+
+[[outputs]]
+id = "G3BBgO25oIGtHTqex024I"
+uri = "file://reports/isa-review-church-turing-gt-crosscheck.html"
+type = "html"
+title = "ISA review — Church/Turing authority cross-check"
+description = "Section 3.1 now separates the instruction or event from the GT source authorizing each access. Includes boot, direct/indexed CHANGE, outgoing context save, and explicit authority boundaries for watchdog and invalid operations. Review only; master and implementations unchanged."
+logical_id = "c4c6acd3-2e8d-4493-9501-756cd4e6234a"
+content_hash = "sha256:08bb5d1182bd2e7b9d67109b7269b3a76dfc807f2fc7d70fa422eca3478b426f"
+size = 883341
+mtime_ms = 1791554062070
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/c4c6acd3-2e8d-4493-9501-756cd4e6234a/d1cd46f8-99a8-4def-86c1-5c2e97958027"
+storage_version_token = "1791554071292794"
+content_type = "text/html"
+
+[[outputs]]
+id = "lh6CVdHnA8qSkkc5IXJio"
+uri = "file://reports/isa-review-architectural-scope.html"
+type = "html"
+title = "ISA review — architectural scope"
+description = "Removed cached-base and wiring prescriptions, expressed Thread access and atomicity as architectural requirements, and separated scheduling/platform/diagnostic proposals from the ISA. Master ISA and implementations unchanged."
+logical_id = "5ebe10da-75cf-4b86-8391-c61a3c8f9f35"
+content_hash = "sha256:285045fcc85fb2b810e7e31a88775cadba1740d4c56df83eb94f7be59fc94ebf"
+size = 884472
+mtime_ms = 1791554769803
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/5ebe10da-75cf-4b86-8391-c61a3c8f9f35/65958c27-e3ff-43a5-9991-246819af7251"
+storage_version_token = "1791554777354573"
+content_type = "text/html"
+
+[[outputs]]
+id = "atPDVPglPApPnDHsb4oDU"
+uri = "file://reports/m-bit-abstraction-review.html"
+type = "html"
+title = "M-bit abstraction — proposed functional interface"
+description = "Review-only method contracts for protected watchdog refresh and CR12.M-authorized SAVE, including GT authority, device custody, CALL/RETURN boundaries and fault requirements. No implementation or hardware changes."
+logical_id = "d96efe99-e4d0-41e6-ad08-f1d46d0efaad"
+content_hash = "sha256:7d2d4a310ef2256fa22ede4aeba059a0f5fd016adb307befa00f5ea51961c7d9"
+size = 6312
+mtime_ms = 1791557536150
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d96efe99-e4d0-41e6-ad08-f1d46d0efaad/d1ead75a-2a42-4330-90c7-b233190f4369"
+storage_version_token = "1791557542482490"
+content_type = "text/html"
+
+[[outputs]]
+id = "8o4Hhz3cYp8o4E5t8SZml"
+uri = "file://reports/m-bit-known-privileged-methods-review.html"
+type = "html"
+title = "M-bit methods — privileged LOAD and B-free SAVE"
+description = "Updated review names LOAD methods for CR12–CR15 and general CRn SAVE without requiring B, with independent GT checks and explicit ABI/continuation requirements. No ISA or implementation changes."
+logical_id = "f8849682-a55b-4a9a-8ec8-1bf88b0b7d28"
+content_hash = "sha256:fe16317cfa096d7b3026c5036d1d6bda82a2d50915a373f39b417f7064b1f9fc"
+size = 9128
+mtime_ms = 1791557872029
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f8849682-a55b-4a9a-8ec8-1bf88b0b7d28/12cd4f90-35d1-43ff-9687-bf7e827ce9c1"
+storage_version_token = "1791557881570357"
+content_type = "text/html"
+
+[[outputs]]
+id = "IYVIENx-4CNgSOp-dAOWX"
+uri = "file://reports/security-regulator-save-authority-review.html"
+type = "html"
+title = "SecurityRegulator — SAVE authority review"
+description = "Renamed abstraction with explicit source-B versus destination-S checks, including privileged SAVE of a B=0 GT into an S-authorized destination and the meaning of a single GT with B=0/S=1. Review only."
+logical_id = "7ed97d3f-f55d-424e-948a-1843e42f1b4e"
+content_hash = "sha256:456ac9851a1a04ceac15e08e28bb20aa09197920634ef8196e3e3ee59a1e10d3"
+size = 10888
+mtime_ms = 1791558132705
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7ed97d3f-f55d-424e-948a-1843e42f1b4e/56427f8f-83c1-4a11-9141-e6b3a4ca96d0"
+storage_version_token = "1791558140911322"
+content_type = "text/html"
+
+[[outputs]]
+id = "YNG8h02bMR7Okx6ZiSWto"
+uri = "file://reports/security-regulator-scoped-construction-review.html"
+type = "html"
+title = "SecurityRegulator — scoped construction"
+description = "User-confirmed construction rule: every dependency GT inserted into the new object’s C-list is stored with B=0. Replaces the blanket B-preservation claim; grant lifetime and ABI remain explicit review questions. No implementation changes."
+logical_id = "0ba76553-7ebf-4a3f-b705-fdf44049a8ed"
+content_hash = "sha256:249b3a0b709b6f52311ee37c4fbe7dde579129b94fcd3c0eff9356b44270128a"
+size = 12178
+mtime_ms = 1791560356997
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/0ba76553-7ebf-4a3f-b705-fdf44049a8ed/a25e728b-5bd6-4e2a-9844-6069c6107d53"
+storage_version_token = "1791560364608357"
+content_type = "text/html"
+
+[[outputs]]
+id = "yZ_M2yACgYtaf5BpBzQq6"
+uri = "file://reports/isa-review-special-operations-row-cleanup.html"
+type = "html"
+title = "ISA review — updated special-operations table"
+description = "Removed the obsolete IRQRETURN row from section 3.1. No other proposal wording or master ISA changes."
+logical_id = "b53f8b8b-dbd5-4472-a5c0-80880f11aaba"
+content_hash = "sha256:89b73cc5aa754f784edf694b163260e4740a141166afc9fcfa26e31f88409439"
+size = 884041
+mtime_ms = 1791561995741
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b53f8b8b-dbd5-4472-a5c0-80880f11aaba/19340922-c2af-4a24-9c7c-aa06d5dce93d"
+storage_version_token = "1791562002193976"
+content_type = "text/html"
+
+[[outputs]]
+id = "3Bsn5Jjd3CA_TXuA1JlZi"
+uri = "file://reports/isa-review-architecture-only-cleaned.html"
+type = "html"
+title = "ISA red-text review — architectural content only"
+description = "Removed added scheduler, diagnostic, timer and boot-phase mechanisms. Retains discussed encodings, independent GT authority, mLoad checks and save-first recovery. Unresolved architectural choices remain explicit; master ISA unchanged."
+logical_id = "ae28b4b8-fad1-4f51-b1d9-f49bb8678dc5"
+content_hash = "sha256:03019e67780145db14c0d8d37f0de4bd2f378187373361932bcf35e9cb5fadcd"
+size = 859181
+mtime_ms = 1791562437749
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ae28b4b8-fad1-4f51-b1d9-f49bb8678dc5/4a4032d0-b795-4b2c-a344-f07b8a392077"
+storage_version_token = "1791562482470698"
+content_type = "text/html"
+
+[[outputs]]
+id = "x-wQ5k6stN4g5haSkAY7T"
+uri = "file://reports/isa-review-configurable-namespace.html"
+type = "html"
+title = "ISA review — configurable Namespace capacity"
+description = "Corrected Namespace capacity to N slots with inclusive limit N−1. No fixed 64-slot ISA restriction. Master ISA and implementation unchanged."
+logical_id = "924ee189-5d0b-4663-ae1f-04e99d4ca691"
+content_hash = "sha256:4fb8d38903f79403108a2a63f6e563e76b259c2133b02483b0866fb080a5a160"
+size = 859234
+mtime_ms = 1791563521951
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/924ee189-5d0b-4663-ae1f-04e99d4ca691/caab7703-6658-4ed6-8c4a-16958b0093f3"
+storage_version_token = "1791563528277480"
+content_type = "text/html"
+
+[[outputs]]
+id = "befDePPMgg0vuAMs630gw"
+uri = "file://reports/isa-review-church-headers.html"
+type = "html"
+title = "ISA review — Church Instructions and existing headers"
+description = "Adds the three existing header layouts, the complete Namespace header, total RAM extent and table address equations before the seven review items. Master ISA and implementations unchanged."
+logical_id = "695a33cc-a129-42c5-a54a-075d71298b82"
+content_hash = "sha256:271388b4b6b28a65fabb2a04dd849b2408beb8c9c4f9657cf67ba8c41b0d7fd1"
+size = 865597
+mtime_ms = 1791565869849
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/695a33cc-a129-42c5-a54a-075d71298b82/87735cd5-0bf3-47c0-8cd9-f348d3807520"
+storage_version_token = "1791565875432522"
+content_type = "text/html"
+
+[[outputs]]
+id = "Q48sBv8qWO0K69gozW_yJ"
+uri = "file://reports/isa-review-church-top-level-architecture.html"
+type = "html"
+title = "ISA review — Church top-level architecture"
+description = "Consolidated header formats, slot-0 metadata, Namespace address rules, header-first loading, deterministic placement, resident completion and I/O resolution. Unresolved choices remain explicit; master ISA and implementation unchanged."
+logical_id = "6d2ef814-1447-4597-9f40-171b6a19f05a"
+content_hash = "sha256:5316cb014f32d1aaa1b46d5d1f33bb97c5f6f30842f401c553d061d98303caa3"
+size = 870940
+mtime_ms = 1791569594389
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6d2ef814-1447-4597-9f40-171b6a19f05a/d3a48593-1622-4b01-8f6f-fd1c306b6266"
+storage_version_token = "1791569624126384"
+content_type = "text/html"
+
+[[outputs]]
+id = "nqn_9U6z2uw93jU1btlBC"
+uri = "file://reports/isa-review-io-definition-lump.html"
+type = "html"
+title = "ISA review — I/O-definition LUMP added"
+description = "Defines the I/O mapping case, authorization and no-device-side-effects rule. W2 now counts following member LUMPs including I/O definitions. Exact I/O binary encoding remains open; implementation unchanged."
+logical_id = "7cb23003-e4e1-48eb-8e8e-c7a1638ca7ec"
+content_hash = "sha256:6aef2c634ab893c4ec7ee2b7833d369567b01ee861adc3b5bb57d00ef88d866b"
+size = 873611
+mtime_ms = 1791570483209
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7cb23003-e4e1-48eb-8e8e-c7a1638ca7ec/103c48ac-ca46-4aef-8e47-22307f296507"
+storage_version_token = "1791570513725315"
+content_type = "text/html"
+
+[[outputs]]
+id = "3KfORUZHte_YdpZXyfe9a"
+uri = "file://reports/isa-review-hardwired-authority.html"
+type = "html"
+title = "ISA review — corrected authority and recovery decisions"
+description = "Reserved CR13 and W3; hardwired recovery and CR15; first successful CHANGE prerequisite; SecurityRegulator-only M authority; indexed CALL recognized as agreed. Master and implementation unchanged."
+logical_id = "50deffb7-7273-4d31-a4b6-84ea4bb79286"
+content_hash = "sha256:7fb3420b33e21d03d6e60fe56f8524887f8213fd77da531c8ec65ecaa233235c"
+size = 874560
+mtime_ms = 1791571978501
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/50deffb7-7273-4d31-a4b6-84ea4bb79286/d44b6bab-d1ba-42f6-b84a-e46c961bb78f"
+storage_version_token = "1791571986387418"
+content_type = "text/html"
+
+[[outputs]]
+id = "b-Ce2kKpvqX6Gdh99OrBJ"
+uri = "file://reports/isa-review-io-encoding-approved.html"
+type = "html"
+title = "ISA review — approved three-word I/O encoding"
+description = "Records the adopted W0 header/RW, W1 byte base and W2 inclusive word limit. Removes I/O encoding from open issues. Master ISA and implementation unchanged."
+logical_id = "958d283d-29ba-494e-8651-d62972d712c3"
+content_hash = "sha256:5d853122e0aed04188314818bd684dd0e66d0ae906a258bc23ca73a32e9ac698"
+size = 876678
+mtime_ms = 1791574948037
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/958d283d-29ba-494e-8651-d62972d712c3/75497313-b2bb-47bf-a778-5455ccc93a4d"
+storage_version_token = "1791574954246666"
+content_type = "text/html"
+
+[[outputs]]
+id = "SPCYpLoxJbAv2AB7MWf4f"
+uri = "file://reports/isa-review-io-standard-slot.html"
+type = "html"
+title = "ISA review — I/O arrival and standard Namespace slot"
+description = "Records the agreed size-based, header-first arrival and conversion to the existing slot layout with base in W0. Exact revised size encoding remains open; implementation unchanged."
+logical_id = "6a4bee24-124d-4a31-8fef-66a757c1bf65"
+content_hash = "sha256:8c7d2f7520b24466a8c5c9cade2baacf5a1871c302ae75b736eeebfaf36248b8"
+size = 878072
+mtime_ms = 1791575543357
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6a4bee24-124d-4a31-8fef-66a757c1bf65/98f6736c-18b3-449f-9dd5-daac6eecf11f"
+storage_version_token = "1791575550458465"
+content_type = "text/html"
+
+[[outputs]]
+id = "8hC_4pbiC1wDOdab0xaG8"
+uri = "file://reports/isa-review-io-size-finalized.html"
+type = "html"
+title = "ISA review — two-word I/O definition finalized"
+description = "I/O header contains an exact 13-bit word count and R/W rights; the second word is the device base. Standard four-word Namespace entry remains unchanged. Encoding examples verified; implementation unchanged."
+logical_id = "7a0fbd77-20f1-4cbd-b09e-0077c3d74f56"
+content_hash = "sha256:79026c67e34a0a3f86ec94e1f44b39fbcb0182452fcbffb4b0547f577f703866"
+size = 878455
+mtime_ms = 1791575594473
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7a0fbd77-20f1-4cbd-b09e-0077c3d74f56/34592f95-d25e-4230-a473-e79181861c2c"
+storage_version_token = "1791575601110112"
+content_type = "text/html"
+
+[[outputs]]
+id = "aMd20VpzD84I42_43L0ld"
+uri = "file://reports/isa-review-io-direct-exponent.html"
+type = "html"
+title = "ISA review — agreed direct size exponent"
+description = "Records size = 2^n words without a +6 bias, the two-word I/O definition and preserved Namespace slot word order. Expanded capability-bound representation remains an explicit implementation prerequisite. Master ISA and implementation unchanged."
+logical_id = "58692e21-1603-4fa3-8253-ec5cb55a09cf"
+content_hash = "sha256:174a3c05bb267300ca7b1d3b76d50f64db8694f95ba79ab737a93e5b2a5210cc"
+size = 881018
+mtime_ms = 1791576567377
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/58692e21-1603-4fa3-8253-ec5cb55a09cf/152fd422-a267-48e1-a2cb-92f95aa2810f"
+storage_version_token = "1791576572516822"
+content_type = "text/html"
+
+[[outputs]]
+id = "aMP1borNGibDAFdY1ygPY"
+uri = "file://reports/isa-review-display-interface-proposal.html"
+type = "html"
+title = "ISA review — separate I/O types and display interface proposal"
+description = "Proposes separate simple-register and framebuffer definitions, vendor-neutral display operations, simple-controller-first implementation, and later GPU drivers. Ordinary Namespace bounds remain unchanged; subtype encoding and framebuffer runtime representation are explicitly pending approval."
+logical_id = "ddcf5eb6-6758-4151-9dea-8c45abade854"
+content_hash = "sha256:17514a4abf8658ea8515c23470b725962a4b98ac3cf6b4c0198c1d24f17e83c8"
+size = 884996
+mtime_ms = 1791577753321
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ddcf5eb6-6758-4151-9dea-8c45abade854/771165f8-ce02-4e6e-b056-4c72a3edd49a"
+storage_version_token = "1791577769013323"
+content_type = "text/html"
+
+[[outputs]]
+id = "m0U8yB__HiQb85jmA7-_C"
+uri = "file://reports/isa-review-framebuffer-kind-agreed.html"
+type = "html"
+title = "ISA review — agreed framebuffer entry kind"
+description = "Records W3 kind codes, framebuffer exponent packing, protected bounds semantics and the checked 1080p example. Integrity calculation, token-cache migration and register/context packing remain explicit implementation prerequisites."
+logical_id = "3078bc63-3ed2-476e-801a-2310d2579fc2"
+content_hash = "sha256:dc537e31b0f79ec6aa9cbf93f8402fa023f346c61d4b7be7b70ebb144a91227d"
+size = 888052
+mtime_ms = 1791578684105
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3078bc63-3ed2-476e-801a-2310d2579fc2/76ddf883-3c14-48ca-b178-3c1b08b010a7"
+storage_version_token = "1791578692783687"
+content_type = "text/html"
+
+[[outputs]]
+id = "L3t3rE7_YATQ3OQ9EgBYL"
+uri = "file://reports/isa-review-gt-authority-integrity-proposal.html"
+type = "html"
+title = "ISA review — integrity extension with unchanged GT authority"
+description = "Proposes one added rotated-W3 term, protected kind preservation and explicit cache-token migration. GT encoding and authority remain unchanged. Formula and example checked; no implementation or hardware changes."
+logical_id = "6f2f9ebb-115f-4639-81b0-1cd271dfe21a"
+content_hash = "sha256:ed81eb5b88ded8ee095a0d2386a66b35d6a552808e4b06281da92f63c8b05455"
+size = 891925
+mtime_ms = 1791579217913
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6f2f9ebb-115f-4639-81b0-1cd271dfe21a/cb5bac71-6a4b-45b8-b1cd-c6c1f0c41562"
+storage_version_token = "1791579223589809"
+content_type = "text/html"
+
+[[outputs]]
+id = "vznuwM9LESzcF9PRFrjdj"
+uri = "file://reports/memory-map-audit.html"
+type = "html"
+title = "Church Machine — memory-map audit"
+description = "Read-only comparison of simulator, IDE, master ISA, review proposals and saved LUMPs. Includes the exact committed memory map, bit-field contracts, conflicts, and downloadable hashed evidence."
+logical_id = "2a3a0ff5-5699-4f2d-abde-c4016e08d19e"
+content_hash = "sha256:06f29d693109febfd8a79594b0aaeb746e0355ba46d8df079eed110e93f9d257"
+size = 132543
+mtime_ms = 1791629014848
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/2a3a0ff5-5699-4f2d-abde-c4016e08d19e/03c5ed44-3618-4911-be86-9fd8b78d51c9"
+storage_version_token = "1791629025671627"
+content_type = "text/html"
+
+[[outputs]]
+id = "R9i7gPUX_okj8-b9HiA_m"
+uri = "file://reports/memory-map-audit-bundle.json"
+type = "unspecified"
+title = "Memory-map audit — raw evidence"
+description = "Input SHA-256 hashes, all occupied slot words, catalog/header checks, resident payload comparisons and retained IDE LUMP-checker findings."
+logical_id = "bea8cf91-cd54-4a21-b7f4-fd1cc57f23fc"
+content_hash = "sha256:7aaaf19318ac7bb8d0b030e446496874d1581dff9357dae8e4d0c74407bdd072"
+size = 82419
+mtime_ms = 1791629012760
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/bea8cf91-cd54-4a21-b7f4-fd1cc57f23fc/ab606846-d182-4bfb-852a-12f58035f14c"
+storage_version_token = "1791629026439520"
+content_type = "application/octet-stream"
+
+[[outputs]]
+id = "8i2Jh697GdWUb5uACBxw_"
+uri = "file://reports/church-consolidated-contract-proposal.html"
+type = "html"
+title = "Church-Machine consolidated contract — approval proposal"
+description = "Architecture and binary contract, 14 explicit decisions, 16 acceptance-test groups, and the remaining encoding gates. No proposed implementation changes have been applied."
+logical_id = "b6b9c0fa-d270-4af9-b56d-94bd00fd4b16"
+content_hash = "sha256:a0505190761851397bd55bad878a3198e863b6e4573fc67799fdfd55e8077140"
+size = 15255
+mtime_ms = 1791631631269
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b6b9c0fa-d270-4af9-b56d-94bd00fd4b16/041fbd25-b0f3-4e39-9bd8-21db69b17612"
+storage_version_token = "1791631837213751"
+content_type = "text/html"
+
+[[outputs]]
+id = "TKJ87sCrztVcpVNPXQEt_"
+uri = "file://reports/initializer-reset-faithful-validation.html"
+type = "html"
+title = "Initializer investigation — synthesized validation results"
+description = "Exact writes, retirement evidence, input hashes and remaining release boundaries for the reset-faithful production initializer replay."
+logical_id = "70f6cd85-d0b0-4f00-ae8f-eb1431d206ac"
+content_hash = "sha256:b584a172007610f9dc38d3189b6035f99bcc5d5c6894a9731df4efb716ef8ed6"
+size = 7279
+mtime_ms = 1791632089181
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/70f6cd85-d0b0-4f00-ae8f-eb1431d206ac/2cddbc02-36d6-4ae3-be4b-89b6c639bda4"
+storage_version_token = "1791632097770428"
+content_type = "text/html"
+
+[[outputs]]
+id = "DL6DippUgRovWcz0qwGc3"
+uri = "file://generated-artifacts/initializer-reset-faithful/evidence.zip"
+type = "unspecified"
+title = "Initializer investigation — reproducible evidence bundle"
+description = "Frozen source/catalog inputs, functional models, hashes, testbenches, synthesized netlists and complete logs. No FPGA image is included."
+logical_id = "3c4db45c-5e9a-49d6-85e2-e023df66eeee"
+content_hash = "sha256:73131c1461b4d9368a03129008b65deed59aeb8480a2abd9199b3b202e16bf7b"
+size = 5243758
+mtime_ms = 1791632090082
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3c4db45c-5e9a-49d6-85e2-e023df66eeee/19ca794b-5fa0-4df8-a1ce-28df257d638d"
+storage_version_token = "1791632099199613"
+content_type = "application/octet-stream"

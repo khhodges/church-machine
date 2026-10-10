@@ -1,0 +1,322 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Church-Machine consolidated contract proposal</title><style>body{font:16px/1.6 system-ui;color:#182432;background:#f0f3f6;margin:0}main{max-width:1120px;margin:24px auto;padding:32px;background:white}h1,h2{line-height:1.25}h2{margin-top:40px;border-top:1px solid #ccc;padding-top:20px}table{display:block;overflow:auto;border-collapse:collapse;font-size:14px}td,th{border:1px solid #ccd5dd;padding:10px;text-align:left}th,pre{background:#edf3f8}pre{padding:16px;overflow:auto}code{overflow-wrap:anywhere}@media(max-width:650px){main{padding:16px;margin:0}}</style><main><h1>Consolidated Church-Machine architecture and binary contract</h1>
+<p>Status: <strong>proposal for approval, not an implementation authorization</strong>.
+Prepared 2026-10-10. Historical master/review documents and retained images
+remain unchanged. Acceptance criteria below are requirements, not reported passes.</p>
+<h2>Purpose and authority</h2>
+<p>Consolidate one capability-constrained execution architecture and one explicit
+binary representation, then establish simulator and FPGA conformance separately.
+Do not claim universal termination or flawless physical operation from simulation.
+Finite-resource failure must be defined and authority-preserving.</p>
+<p>The normative architecture specifies observable state, encodings, effects and
+faults. A separate binary contract specifies layouts and serialization.
+Implementation documents describe pipelines and verification machinery; they
+must not silently create architectural requirements.</p>
+<h2>Decision table</h2>
+<p>“Retain” records established direction. “Approve” identifies recommendations
+that this document does not adopt merely by describing them.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Status</th>
+<th>Decision / recommendation</th>
+<th>Required evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>D01</td>
+<td>Retain</td>
+<td>GT is access authority; T is IDE LUMP identity. Bootstrap equality does not make them interchangeable.</td>
+<td>A01, A02</td>
+</tr>
+<tr>
+<td>D02</td>
+<td>Approve</td>
+<td>One new resident byte-addressed profile across software and FPGA; internal word arrays convert at checked boundaries.</td>
+<td>A03</td>
+</tr>
+<tr>
+<td>D03</td>
+<td>Retain review direction; approve cutover</td>
+<td>Descending Namespace table: metadata 0, self 1, initial Thread 2. Remove the separate bottom header only in the new profile.</td>
+<td>A04</td>
+</tr>
+<tr>
+<td>D04</td>
+<td>Approve</td>
+<td>Resident W0 low bits encode kind; W3 stays T. Supersede W3-kind and rotated-W3 proposals.</td>
+<td>A05</td>
+</tr>
+<tr>
+<td>D05</td>
+<td>Retain distinction; approve encoding</td>
+<td>Simple I/O uses exact count; framebuffer uses unbiased exponent; two-word header-first definitions below.</td>
+<td>A06</td>
+</tr>
+<tr>
+<td>D06</td>
+<td>Retain</td>
+<td>Ordinary code, C-list and Heap views retain exact bounds and applicable GT permissions.</td>
+<td>A07</td>
+</tr>
+<tr>
+<td>D07</td>
+<td>Approve</td>
+<td>Prepared placement contract explicitly associates each arriving member with slot, identity, hash and allocation. No guessed arrival-order binding.</td>
+<td>A08</td>
+</tr>
+<tr>
+<td>D08</td>
+<td>Approve</td>
+<td>Recursive member count M counts direct children only; nested children belong to their own Namespace count. Namespace self is not a following child.</td>
+<td>A08</td>
+</tr>
+<tr>
+<td>D09</td>
+<td>Retain; close specification gap</td>
+<td>One canonical continuation/Thread model, including LAMBDA; optimizations must be observationally equivalent.</td>
+<td>A09</td>
+</tr>
+<tr>
+<td>D10</td>
+<td>Retain</td>
+<td>CR13 reserved; initial/recovery authority hardwired; M belongs to SecurityRegulator; retain agreed CHANGE recovery prerequisite.</td>
+<td>A10</td>
+</tr>
+<tr>
+<td>D11</td>
+<td>Approve first-release scope</td>
+<td>Advertise only physically backed, representable capacities. Larger Namespace self-view encoding must be settled before claiming support.</td>
+<td>A11</td>
+</tr>
+<tr>
+<td>D12</td>
+<td>Approve</td>
+<td>Portable LUMPs remain BE words; new image serialization remains LE words. Address units are independent of byte order.</td>
+<td>A12</td>
+</tr>
+<tr>
+<td>D13</td>
+<td>Retain</td>
+<td>No pre-release executable compatibility requirement. Preserve historical evidence, not dual runtime interpretations.</td>
+<td>A13</td>
+</tr>
+<tr>
+<td>D14</td>
+<td>Approve process</td>
+<td>Shared executable definitions plus independently authored golden vectors and calculus oracle.</td>
+<td>A14</td>
+</tr>
+</tbody>
+</table>
+<h2>Architectural execution contract</h2>
+<p>An abstraction comprises code and its capability environment. CALL validates
+entry authority, establishes the callee's environment and preserves the
+architectural continuation. RETURN restores the specified caller environment
+and validates its authority. LAMBDA executes in its specified scope and must
+not be silently given CALL's environment-switching behavior.</p>
+<p>A capability is an authority-bearing reference, not simply a lambda variable;
+CALL is not by itself a proof of beta-reduction correctness. Before freezing
+compiler conformance, specify an executable calculus model, argument/result ABI,
+evaluation strategy, closure representation and recursion/resource behavior.
+These are semantic specification deliverables, not permission to invent new
+register roles. Pure programs must match that model; effectful programs must
+also match authorized effect sequences and faults.</p>
+<p>CHANGE suspends/resumes exactly the canonical Thread state. Invalid encodings
+fault before condition evaluation as already agreed. Recovery must not depend
+on unapproved IRQ roles or newly invented architectural readiness registers.</p>
+<h2>Binary contract candidate</h2>
+<h3>GT and identity</h3>
+<p>Keep the existing 32-bit GT and its type-specific encodings unchanged.
+Do not interpret Abstract-GT payload fields using the Inform/Outform layout.
+T never grants access. Content verification uses the full pinned identity/hash
+contract; a short T is not a collision-resistant replacement for that evidence.</p>
+<h3>Namespace geometry</h3>
+<p>For aligned byte base B, capacity C words and N slots:</p>
+<pre><code>RAM:   [B, B + 4*C)
+table: [B + 4*(C - 4*N), B + 4*C)
+slot(s): B + 4*C - 16*(s+1),  0 &lt;= s &lt; N
+</code></pre>
+<p>Use widened arithmetic for end calculations; reject overflow, overlap,
+unsupported capacity and N&lt;3. Zero is a valid base. Slot 0 is metadata, never
+a capability-resolvable target:</p>
+<table>
+<thead>
+<tr>
+<th>Metadata word</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>W0</td>
+<td>Namespace header</td>
+</tr>
+<tr>
+<td>W1</td>
+<td>Base byte address B</td>
+</tr>
+<tr>
+<td>W2</td>
+<td>Direct following-member count M</td>
+</tr>
+<tr>
+<td>W3</td>
+<td>Reserved zero; no new cold-boot seal</td>
+</tr>
+</tbody>
+</table>
+<p>The existing common header positions remain:
+marker[31:27], size[26:23], count[22:10], type[9:8], cc[7:0].
+Abstraction/Thread allocation is 2^(size+6) words; Namespace capacity is
+2^(size+13) words. Count means code words, private-stack words or plain slot
+count respectively. Reserved values and unsupported sizes are rejected.</p>
+<p>Namespace capacity, table slot limit N-1 and accessible data-view extent are
+distinct. <strong>Open encoding gate:</strong> define the exact Namespace self-view rule,
+including capacities beyond a 21-bit exact limit. Do not silently use N-1 as
+a RAM word bound, truncate capacity or infer wider authority from a header.
+This gate prevents declaring the candidate implementation-ready.</p>
+<h3>Resident capability entries</h3>
+<pre><code>W0 = aligned_base_byte | kind
+kind: 0 ordinary, 1 simple I/O, 2 framebuffer, 3 invalid
+W1 ordinary/simple: limit[20:0], generation[29:21], G[30], F[31]
+W1 framebuffer: n[4:0], zero[20:5], generation[29:21], G[30], F[31]
+W2 = ROL32(W0,7) XOR ROL32(W1 &amp; 0x3fffffff,13) XOR 0xdeadbeef
+W3 = T
+</code></pre>
+<p>Check integrity on raw tagged W0; remove tags only for address arithmetic.
+Integrity is unkeyed consistency evidence. Existing authentication, authorized
+publication and GT checks are not replaced. G/F protection remains subject to
+existing authorized state transitions, not this checksum.</p>
+<p>Kind and exact bounds survive all protected copies, continuations, Thread
+transitions and M-window operations without repurposing T storage.
+<strong>Open encoding gate:</strong> enumerate and freeze their exact context representation.
+Nonresident entries require their own explicit representation; no inference
+from low address bits or small token values.</p>
+<h3>I/O definitions</h3>
+<p>Two words arrive, with no executable body or C-list:</p>
+<pre><code>simple header = 0xf8000000 | (S &lt;&lt; 10) | 0x300 | (W &lt;&lt; 1) | R
+frame header  = 0xf8000000 | (n &lt;&lt; 22) | 0x304 | (W &lt;&lt; 1) | R
+second word   = aligned device byte base
+</code></pre>
+<p>S=1..8191; n=0..30; R/W are single bits, at least one set.
+All subtype-reserved bits are zero. Simple limit=S-1; framebuffer extent=2^n
+words. Full ranges and every multiword access must fit without wraparound.
+Mapping a definition performs no device access. It cannot grant execute,
+capability-transfer, DMA or GPU-control authority.</p>
+<p>Type 11 replaces the historical Outform <em>header</em> in this new format; GT type
+encoding remains unchanged. This is an explicit cutover, not dual decoding.</p>
+<h3>Thread, boot and member binding</h3>
+<p>Preserve the canonical size-derived Thread layout: header +0, DR homes +1..16,
+protected indicator +17, Heap from +18, private stack before the final twelve
+capability homes. Preserve the poison-root frame and canonical continuation
+semantics. Resolve hardware lambda-return deviations before conformance.</p>
+<p>Prepared initial Thread authority selects the boot entry. Import/Run must not
+silently repair it from the current editor or latest catalog.</p>
+<p>Recommended loader framing: one prepared root context supplies extent and
+expected root identity; each Namespace consumes exactly M direct children,
+recursively. A prepared, authorized association supplies each child's slot,
+identity/hash and placement. Validate the complete graph before publication;
+reject missing/duplicate/extra members and cycles in containment. Do not assume
+code-call graphs are acyclic. No implicit permission widening on rebinding.</p>
+<p>The exact transported association/framing representation remains a freeze
+gate; do not invent an on-wire extension by using an implementation manifest.</p>
+<h2>Acceptance tests</h2>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Test and pass condition</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A01</td>
+<td>Hold T constant while varying local GT slot/generation: only the valid authorized GT accesses the object.</td>
+</tr>
+<tr>
+<td>A02</td>
+<td>Change T without providing a valid GT: no new access. Verify full identity/hash checks independently of short-token equality.</td>
+</tr>
+<tr>
+<td>A03</td>
+<td>Known base 0x40 resolves to internal word 0x10; bases 1,2,3 and arithmetic wrap reject. MMIO bases are not multiplied twice.</td>
+</tr>
+<tr>
+<td>A04</td>
+<td>Independent vectors for first/final slot, nonzero B, N=3 and supported larger N; metadata target access rejects; body/table overlap rejects.</td>
+</tr>
+<tr>
+<td>A05</td>
+<td>All valid kinds round-trip with T unchanged; kind 3 rejects; changing tagged W0 with stale W2 rejects; protected state preserves kind.</td>
+</tr>
+<tr>
+<td>A06</td>
+<td>Simple S=1,3,8191 and invalid 0,8192; frame n=0,21,23,30 and invalid31; last valid access passes, first invalid faults; reserved bits reject.</td>
+</tr>
+<tr>
+<td>A07</td>
+<td>Code/C-list/Heap exact endpoints and multiword crossings; permission/type/generation violations produce no unauthorized write or device effect.</td>
+</tr>
+<tr>
+<td>A08</td>
+<td>Nested M counts, truncated/extra streams, duplicate slots, mismatched identity, unauthorized placement and containment cycles reject atomically.</td>
+</tr>
+<tr>
+<td>A09</td>
+<td>Nested CALL/LAMBDA/RETURN, lambda-with-call, root RETURN, exhausted stack and CHANGE/resume match the independent continuation model.</td>
+</tr>
+<tr>
+<td>A10</td>
+<td>Fault before/after first CHANGE, recovery state preservation and unauthorized M operations obey agreed rules; reserved CR13 gains no hidden role.</td>
+</tr>
+<tr>
+<td>A11</td>
+<td>Every advertised capacity fits representation and actual target RAM; unsupported configurations fail explicitly before publication.</td>
+</tr>
+<tr>
+<td>A12</td>
+<td>Asymmetric words such as 0x01234567 survive BE LUMP / LE image conversion; addresses, hashes and localized rows match independent vectors.</td>
+</tr>
+<tr>
+<td>A13</td>
+<td>Historical formats remain inspectable as evidence but cannot be guessed or silently executed as the new profile.</td>
+</tr>
+<tr>
+<td>A14</td>
+<td>Compiler, simulator, RTL and synthesized replay agree on committed architectural effects/faults; allow latency differences, not semantic differences.</td>
+</tr>
+<tr>
+<td>A15</td>
+<td>Pure calculus corpus covers identity, constant functions, composition, captured environments, shadowing, nested application and bounded recursion. Expected results come from an independent evaluator.</td>
+</tr>
+<tr>
+<td>A16</td>
+<td>Initializer: all ordered writes, first/final, pauses, completion and uninitialized sink pass; full-system replay crosses 0x2E08 without fault with live Namespace limit63 for the retained profile.</td>
+</tr>
+</tbody>
+</table>
+<p>Tests must specify bounded execution and distinguish expected nontermination,
+resource exhaustion, tool timeout and actual pass. Finite testing is not a
+universal proof. Formal safety assertions should supplement instruction cases:
+no unauthorized effects, no out-of-range accepted accesses, no commit from an
+invalid continuation, and no lost/extra initialization write under the stated
+sink and clock assumptions.</p>
+<h2>Freeze gates and implementation sequence</h2>
+<p>Approval can accept direction without pretending the open encodings are solved.
+Before implementation, close: Namespace self-view extent, protected kind/context
+packing, nonresident representation, transported member association/framing,
+and calculus evaluation/ABI details. Publish complete bit vectors for each.</p>
+<p>Then: simulator + binary contract first; compiler/IDE integration; isolated
+candidate preparation; RTL conformance; synthesized functional conformance.
+Only separately authorized later work may route, create/program a bitstream or
+command the board. Functional synthesis evidence does not establish timing closure.</p>
+<h2>Separate initializer investigation</h2>
+<p>Use the approved retained Namespace revision ending <code>f69b502166</code>, identified by
+its full hash in the existing initializer evidence. No proposal encoding enters
+that experiment. Rehash the snapshot, isolated source and catalog before/after.
+The prior mixed replay is qualified because it substitutes a reset-bearing
+standalone initializer into a reset-less production domain. Repeat with the
+actual reset-less elaborated initializer before accepting integrated evidence.
+Retain failures and timeouts. Routing and physical operations remain prohibited.</p></main></html>

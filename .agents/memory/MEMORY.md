@@ -1,3 +1,5 @@
+- [ISA review decisions](isa-review-index.md) — scope, pre-release compatibility, encoding checks, cooperative scheduling and save-first fault recovery.
+- [Compact header grouping](compact-header-grouping.md) — left stack ends at diagnostics; execution controls remain central, with board/settings on the right.
 - [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.
 - [Editor test contracts](editor-test-contracts.md) — guarded navigation needs stable editor identity and explicit consent; missing fixture state is not a runtime failure.
 - [Declared abstraction identity](declared-abstraction-identity.md) — missing names require programmer correction, never generated fallback identities.
@@ -19,9 +21,7 @@
 - [Self-diagnosing remote build guards](self-diagnosing-remote-guards.md) — version-stamp script output and dump actual-vs-expected state on failure when the script runs on a machine you can't directly access
 - [Freshness guards on idempotent patches must be content-based](freshness-guard-content-vs-mtime.md) — if a patch's output text never changes once applied, an mtime comparison against it will eventually false-positive forever
 - [LUMP abstraction-name consistency scoping](lump-abstraction-name-consistency.md) — drift check must exempt user-compiled + dynamic/NULL lumps or it false-fails on legitimate non-registry names (also in CM_LUMP_SPECIFICATION.md §Developer Traps)
-- [NS slot migration GT-bypass trap](ns-slot-gt-bypass-trap.md) — when NS slot N migrates, audit ALL c-list fallback paths; old slot number silently maps to wrong GT (was LED_DEV, not SelfTest)
-- [Assembler nsLoaded vs _capBlockSlots slot confusion](assembler-nsloaded-slot-confusion.md) — for 2-op LOAD/SAVE, nsLoaded stores CR register number (not c-list slot); _capBlockSlots[name] is always the correct slot for a fresh c-list access
-- [IRQ LUMP lazy-load manifest guard](irq-lump-lazy-gate-guard.md) — gate on a manifest entry; pre-seeded test slots otherwise bypass it via abstractionRegistry
+- [C-list resolution pitfalls](clist-resolution-index.md) — Namespace-slot migration, CR-versus-row index confusion, and manifest-gated IRQ lazy loading.
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
 - [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
@@ -51,19 +51,16 @@
 - [SELF row click safety](self-row-click-safety.md) — compiler-owned SELF is display-only in the C-List and must never write an operand into the editor
 - [Namespace Table authority](namespace-table-bitstream-source.md) — Namespace Table first, then its assigned slots/LUMPs; manifest is never authoritative for membership or metadata
 - [Canonical dot-name LUMP integrity](canonical-dot-name-clist-integrity.md) — every LUMP is dot.name.1.token, with compiled data and dot-name C-list content covered by its integrity value
-- [Fault snapshot reboot correlation](fault-snapshot-reboot-correlation.md) — auto-reboot only after the exact fault's complete snapshot is durably promoted
+- [Fault telemetry constraints](fault-telemetry-index.md) — snapshot/reboot correlation, retained incidents, delivery blocking and serial isolation.
 - [Fault recovery boot precedence](fault-boot-selftest-order.md) — boot wins after faults; three Boot steps enter the prepared lightning-bolt target, not an implicit SelfTest
 - [Wukong UI surface ownership](wukong-ui-surface-ownership.md) — physical-board controls live only on Builder > Testing; simulator controls remain software-only
 - [Primary publish vs static artifact](primary-publish-vs-static-artifact.md) — publishing a nested artifact can replace the custom-domain root despite a correct root autoscale config
-- [Actionable transport incidents](actionable-transport-incidents.md) — latch terminal failures until proven recovery; diagnostics may escalate guidance but never replace incident identity
 - [Top-security passkey credentials](top-security-passkeys.md) — protected-object access requires an object-scoped GT plus a 128-bit proof; never treat the GT alone as a secret
 - [Bank custody zeroization](bank-custody-zeroization.md) — wipe private lockbox storage before reuse; never expose backing records as ordinary Namespace memory
 - [Bank recovery grants](bank-recovery-grants.md) — restart recovery needs server-authorized proof-free custody envelopes and a distinct NS generation
 - [Dynamic system LUMP runtime binding](dynamic-system-lump-runtime-binding.md) — dynamic LUMPs must gate dispatch on their generated canonical identity, never only a duplicated registry index
 - [Capability ABI result materialization](capability-abi-result-materialization.md) — a runtime binding must write declared CR/DR outputs and preserve protected proof state, not return authority only in host objects
 - [Bank validation gates](bank-validation-gates.md) — Bank uses structural, E/type, then mechanical identity checks; provenance remains human-vouched until a genesis verifier exists
-- [Fault trace delivery blocking](fault-trace-delivery-blocking.md) — fault packets await indefinitely for IDE trace acceptance before local reporting, so HTTPS outages surface as missing faults
-- [Fault telemetry delivery isolation](fault-telemetry-delivery-isolation.md) — serial parsing must enqueue IDE telemetry and reject stale incident completions before recovery correlation
 - [Static-slot historical variants](capabilitytest-static-variant-manifest.md) — archive older fixed-slot binaries in a shared variant group while the active manifest record names its exact artifact and sidecar
 - [Release-check registry policy](release-check-registry-policy.md) — sync configuration is required and fail-closed; every release suite must be workflow-backed or explicitly script-only
 - [UART raw-transfer ownership](uart-raw-transfer-ownership.md) — bridge control bytes must be deferred for the whole framed payload interval or they corrupt board-side binary parsers
@@ -147,6 +144,7 @@
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
 - [Thread LUMP placement](thread-lump-placement.md) — Threads are LUMPs, not special-address reservations; saved descriptors control generic placement.
 - [Generated RTL replay](generated-rtl-replay.md) — constant-only Verilog blocks can leave unknown GT bits; distinguish dialect evidence and preserve the recorded elaboration.
+- [Amaranth elaboration performance](amaranth-shape-memoization.md) — full Wukong replay must reuse release-generator AST memoization; bare traversal can stall or crash.
 - [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
 - [CHANGE programmer access](change-programmer-access.md) — CHANGE is not protected; never exempt CR12 while blocking CR13–CR15 at compile time.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.

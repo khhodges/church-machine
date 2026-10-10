@@ -13,3 +13,13 @@ hosting guarantee.
 **How to apply:** Preserve the always-on, single-process deployment requirement
 unless shared durable coordination is implemented and explicitly approved.
 Configuration changes do not establish that the live site has been republished.
+
+Use schema-validated configuration replacement when the documented deployment
+configuration callback is unavailable.
+
+**Why:** This environment can expose the deployment skill without its
+`deployConfig` callback, while also blocking direct edits to `.replit`.
+
+**How to apply:** Stage the complete updated TOML in a workspace temporary file
+and use `verifyAndReplaceDotReplit`; preserve unrelated configuration and do not
+treat configuration authorization as permission to publish.

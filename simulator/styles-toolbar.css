@@ -1,3 +1,88 @@
+/* Narrow headers keep navigation on the left and board/settings on the right.
+   display:contents preserves the existing controls and their visibility logic. */
+@media (max-width: 700px) {
+    .fixed-toolbar > header {
+        display: grid;
+        grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 0.4rem 0.65rem;
+    }
+
+    .fixed-toolbar > header > .brand-group {
+        grid-column: 1;
+        grid-row: 1;
+        min-width: 0;
+    }
+
+    .fixed-toolbar > header > .controls {
+        display: contents;
+    }
+
+    .fixed-toolbar > header .nav-target-stack {
+        grid-column: 1;
+        grid-row: 2;
+        min-width: 0;
+    }
+
+    .fixed-toolbar > header .programming-target {
+        max-width: 100%;
+    }
+
+    .fixed-toolbar > header .controls > .toolbar-group {
+        grid-column: 1 / -1;
+        min-width: 0;
+        max-width: 100%;
+        flex-wrap: wrap;
+    }
+
+    .fixed-toolbar > header #toolbarGroupSim:not(.toolbar-group--hidden) {
+        display: contents;
+    }
+
+    .fixed-toolbar > header #downloadSimDiagnosticsBtn {
+        grid-column: 1;
+        grid-row: 3;
+        justify-self: start;
+        max-width: 100%;
+    }
+
+    .fixed-toolbar > header .sim-exec-btns {
+        grid-column: 2;
+        grid-row: 1 / 4;
+        align-self: start;
+        justify-content: center;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .fixed-toolbar > header .sim-exec-btns > *,
+    .fixed-toolbar > header .execution-counter-strip > * {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .fixed-toolbar > header .execution-counter-strip {
+        flex-wrap: wrap;
+    }
+
+    .fixed-toolbar > header .execution-excluded-counters {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .fixed-toolbar > header .controls > .toolbar-group > .toolbar-group-divider {
+        display: none;
+    }
+
+    .fixed-toolbar > header .sim-controls {
+        grid-column: 3;
+        grid-row: 1 / 4;
+        flex-direction: column;
+        align-items: flex-end;
+        margin-left: 0;
+        gap: 0.4rem;
+    }
+}
 /* ── Sim icon buttons ────────────────────────────────── */
 .sim-icon-btn {
     font-size: 1.1rem;

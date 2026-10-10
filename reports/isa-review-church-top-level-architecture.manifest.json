@@ -1,0 +1,16 @@
+{
+  "status": "review-only-unapproved",
+  "master": "docs/instruction-set.md",
+  "master_sha256": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+  "proposal_sha256": "9e081bf7aad2467796950130e150a0acf74c9190c2a48b9b975c1262f7924dd4",
+  "html_sha256": "5316cb014f32d1aaa1b46d5d1f33bb97c5f6f30842f401c553d061d98303caa3",
+  "numbered_review_items": 7,
+  "master_unchanged": true,
+  "checks": [
+    "master unchanged",
+    "ten binary/hex examples",
+    "updated bootstrap slot references",
+    "Namespace address equations",
+    "seven numbered review items"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "status": "passed-functional-validation",
+  "release_approved": false,
+  "segmented_runs_over_same_inputs": true,
+  "scope": "XC7-mapped initializer, optimized full-system replay, and mapped initializer integrated into optimized full-system replay; not Vivado full-chip synthesis or routed/board evidence",
+  "snapshot": "server/build-snapshots/revisions/namespace/3a53c8ebe99bcccb3eb1c4371c8c897851853d60cd7d64d66c0343f69b502166",
+  "snapshot_unchanged": true,
+  "staged_inputs_unchanged": true,
+  "unisim_repository": "https://github.com/Xilinx/XilinxUnisimLibrary",
+  "unisim_commit": "1c8e05fd1e9a79ceb8b996a0996674122eed086f",
+  "results": [
+    {
+      "log": "generic-simulation.log",
+      "sha256": "9d357d2bb6cc9eba79f10567f908f1cde0c5d1c7b0265d478c37b2eedc61ff8b",
+      "writes": 2693,
+      "pass_marker": "PASS_INITIALIZER"
+    },
+    {
+      "log": "vendor-timed-simulation.log",
+      "sha256": "d7271ce08a789ec6f4c6f0fcbdae8a422670cb042fdd318e74330fa92b0d3f91",
+      "writes": 2693,
+      "pass_marker": "PASS_INITIALIZER"
+    },
+    {
+      "log": "extended-simulation.log",
+      "sha256": "02813dfb553b2a3fff173922ae105ea16f9ad1f35a755bec97bc8e9070b0c269",
+      "writes": 2693,
+      "pass_marker": "PASS_BOOT_PAST_2E08"
+    },
+    {
+      "log": "mixed-simulation.log",
+      "sha256": "a8a11d12a4e91752743e599377fecd45134154d48e6926ff5df6cb45c55797ef",
+      "writes": 2693,
+      "pass_marker": "PASS_BOOT_PAST_2E08"
+    }
+  ]
+}

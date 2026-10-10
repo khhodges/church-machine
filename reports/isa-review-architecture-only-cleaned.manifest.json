@@ -1,0 +1,17 @@
+{
+  "status": "review-only-unapproved",
+  "master": "docs/instruction-set.md",
+  "master_sha256": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+  "proposal_sha256": "6c98f6fc560bbd15e55c66ed7fb0558fdace33c85f49f10911ce7374330e19d1",
+  "html_sha256": "03019e67780145db14c0d8d37f0de4bd2f378187373361932bcf35e9cb5fadcd",
+  "numbered_review_items": 7,
+  "master_unchanged": true,
+  "checks": [
+    "seven numbered sections",
+    "ten binary/hex examples",
+    "removed added mechanisms",
+    "retained GT authority and save-first recovery",
+    "valid section navigation",
+    "complete unchanged master"
+  ]
+}

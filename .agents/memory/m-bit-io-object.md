@@ -3,9 +3,91 @@ name: M-bit I/O object
 description: Canonical representation and custody rule for CR M state.
 ---
 
+**Current review authority:** M belongs only to SecurityRegulator, trusted as
+part of the TSB. See [hardwired recovery and security](hardwired-recovery-security-authority.md).
+The historical interface and watchdog discussion below does not authorize
+reintroducing an IRQ/WatchdogFault role in the current review.
+
 M is represented by one 32-bit Namespace-table I/O object at fixed NS slot 13. Bits 0–15 map
 directly to CR0.M–CR15.M; a full-word write sets and clears all sixteen states,
-and bits 16–31 are reserved.
+and bits 16–31 were reserved in the earlier definition.
+
+**New review direction:** The user assigns bits 0–15 to CR M controls and
+bits 16–31 to other hardware settings, including a protected watchdog-refresh
+operation in this same word. Exact upper-bit allocation and command semantics
+remain to be specified; this does not claim implementation or master-ISA change.
+
+**Why:** Reuse the existing capability-protected hardware-control object rather
+than add an unrelated watchdog control path.
+
+**How to apply:** Distinguish refresh from configuring the fixed duration.
+Do not give ordinary workers whole-word write authority merely to refresh
+the watchdog, since that also grants M-control authority. Reconcile refresh
+writes with the existing full-word replacement semantics for the low bits.
+
+The user requires an M-bit abstraction with functional methods such as
+watchdog refresh and "set CR12.M + operation."
+The user names this abstraction **SecurityRegulator**, "in Babbage's tradition."
+Use that name in future interface discussion; naming does not allocate a GT
+or change device custody.
+
+**Why:** Encapsulate privileged control as operations instead of exposing raw
+whole-word writes or leaving M authority with the caller.
+
+**How to apply:** Design the M setting and its intended operation together.
+Do not assume a setter followed by a caller operation works across CALL/RETURN
+M-state changes. Keep method authorization distinct from raw device custody;
+this interface direction does not itself transfer Namespace-only custody.
+
+The user identifies the presently known privileged M methods as LOAD into
+CR12, CR13, CR14 or CR15, and SAVE a GT from CRn without requiring its B bit.
+
+**Why:** The earlier CR12-only SAVE example understated the intended interface.
+
+**How to apply:** The earlier proposal used destination M for privileged LOAD
+and source M for B-free SAVE. Do not limit SAVE to isolated registers or waive
+unrelated checks. The later construction proposal below reopens the M source
+and saved-B semantics; do not treat B preservation as user-approved.
+Method ABI and continuation semantics
+must account for CALL/RETURN and replacement of active privileged registers;
+functional method naming does not silently change LOAD/SWITCH opcodes.
+
+The user identifies a principal use case: dynamic abstractions/objects created
+by a service object but structured by a calling constructor, such as a compiler.
+
+**Why:** Allocation and selection/installation of an object's dependencies
+can belong to different participants.
+
+**How to apply:** Evaluate B and privileged SAVE against this construction
+flow, not just isolated-register examples. Distinguish direct constructor
+SAVE from service-mediated installation; no decision to remove B follows
+merely from the existence of SecurityRegulator.
+
+The user's concrete construction example is `objectMaker.Creat(RW, size)`
+returning `GT.new.M=true`, giving the owner an in-scope opportunity to build a
+C-list for a dynamic class instance. The user explicitly confirmed that
+**each dependency GT inserted into the new object's C-list is stored with B=0**,
+not merely the new object's own GT when published elsewhere.
+
+**Why:** The intended construction authority is associated with the newly
+returned reference, rather than privileged service mediation of every insertion.
+
+**How to apply:** Replace the previous blanket B-preserving SAVE model for
+construction: an authorized insertion stores B=0 even when source B=1.
+Do not infer source-register mutation or universal admission of dependencies.
+Reconcile scoped M
+with register-held M and CALL/RETURN semantics without silently changing
+the GT format. No implementation change is authorized.
+
+M authority applies to one CR at a time, only when that CR's M bit is set.
+Boot phase or instruction class is not a substitute for that register's bit.
+
+**Why:** The user explicitly rejected blanket boot/CALL mLoad elevation as an
+mLoad error, not an architectural exemption.
+
+**How to apply:** Audit mLoad privilege inputs against the specific CR's M
+state; do not justify global bounds, permission, or seal bypasses merely
+because execution is booting or performing CALL.
 
 **Why:** Separate target-bound ports incorrectly modeled per-register M state
 as four hidden capabilities and omitted the required hardware object from the

@@ -1,0 +1,2606 @@
+{
+  "report_sha256": "f981617d923d37f5c6ea82d5f3d2cf65ff8b86c7cb6460a3d1d67997e183f290",
+  "snapshot": {
+    "scope": "Read-only structural audit; not full admission, execution, synthesis or release evidence",
+    "image_sha256": "0ff1b24d76b7010c13b8b50737f4513a771b586be73b8d0fa80a748087070a5b",
+    "image_bytes": 65536,
+    "raw_namespace": {
+      "totalWords": 16384,
+      "maxEntries": 64,
+      "nsTableBase": 16128,
+      "header": {
+        "kind": "thread",
+        "n_minus_6": 2,
+        "cw": 32,
+        "typ": 2,
+        "cc": 12
+      },
+      "nsHeader": {
+        "slots": 64,
+        "n_minus_13": 1,
+        "cw": 64,
+        "typ": 1,
+        "cc": 0,
+        "word": 4169203968,
+        "physicalWord": 0,
+        "base": 0,
+        "tableOffset": 16128,
+        "bootSlot": 10,
+        "bootEntry": 1296,
+        "sealBoundary": 16128
+      },
+      "thread": {
+        "headerWord": 4177560076,
+        "size": 256,
+        "cr0Word": 1241513994,
+        "capsOffset": 244,
+        "count": 3,
+        "bootSlot": 10
+      },
+      "entries": [
+        {
+          "slot": 0,
+          "w0": 0,
+          "w1": 255,
+          "w2": 3736231663,
+          "w3": 0
+        },
+        {
+          "slot": 1,
+          "w0": 16,
+          "w1": 255,
+          "w2": 3736229615,
+          "w3": 0
+        },
+        {
+          "slot": 2,
+          "w0": 1073741844,
+          "w1": 2,
+          "w2": 3735942351,
+          "w3": 0
+        },
+        {
+          "slot": 3,
+          "w0": 1073741824,
+          "w1": 4,
+          "w2": 3735895759,
+          "w3": 0
+        },
+        {
+          "slot": 4,
+          "w0": 1073741864,
+          "w1": 0,
+          "w2": 3735923407,
+          "w3": 0
+        },
+        {
+          "slot": 5,
+          "w0": 1073741868,
+          "w1": 4,
+          "w2": 3735890127,
+          "w3": 0
+        },
+        {
+          "slot": 6,
+          "w0": 2320,
+          "w1": 2046,
+          "w2": 3730241263,
+          "w3": 1241513990
+        },
+        {
+          "slot": 7,
+          "w0": 272,
+          "w1": 1020,
+          "w2": 3738351343,
+          "w3": 1241513991
+        },
+        {
+          "slot": 10,
+          "w0": 1296,
+          "w1": 1012,
+          "w2": 3738285807,
+          "w3": 1241513994
+        },
+        {
+          "slot": 11,
+          "w0": 4368,
+          "w1": 255,
+          "w2": 3736786671,
+          "w3": 0
+        },
+        {
+          "slot": 12,
+          "w0": 4624,
+          "w1": 255,
+          "w2": 3736819439,
+          "w3": 0
+        },
+        {
+          "slot": 13,
+          "w0": 4294967068,
+          "w1": 0,
+          "w2": 559034512,
+          "w3": 0
+        }
+      ]
+    },
+    "slots": [
+      {
+        "slot": 0,
+        "name": "Boot.NS",
+        "table_word": 16380,
+        "raw": [
+          "00000000",
+          "000000ff",
+          "deb25eef",
+          "00000000"
+        ],
+        "limit": 255,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": []
+      },
+      {
+        "slot": 1,
+        "name": "Boot.Thread",
+        "table_word": 16376,
+        "raw": [
+          "00000010",
+          "000000ff",
+          "deb256ef",
+          "00000000"
+        ],
+        "limit": 255,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "resident_header": {
+          "raw": "f900820c",
+          "magic": 31,
+          "typ": 2,
+          "size_field": 2,
+          "count": 32,
+          "cc": 12,
+          "allocation_words": 256
+        },
+        "fits_before_table": true
+      },
+      {
+        "slot": 2,
+        "name": "UART_DEV",
+        "table_word": 16372,
+        "raw": [
+          "40000014",
+          "00000002",
+          "deadf4cf",
+          "00000000"
+        ],
+        "limit": 2,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "classification": "external/MMIO address; not an image word offset"
+      },
+      {
+        "slot": 3,
+        "name": "LED_DEV",
+        "table_word": 16368,
+        "raw": [
+          "40000000",
+          "00000004",
+          "dead3ecf",
+          "00000000"
+        ],
+        "limit": 4,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "classification": "external/MMIO address; not an image word offset"
+      },
+      {
+        "slot": 4,
+        "name": "BTN_DEV",
+        "table_word": 16364,
+        "raw": [
+          "40000028",
+          "00000000",
+          "deadaacf",
+          "00000000"
+        ],
+        "limit": 0,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "classification": "external/MMIO address; not an image word offset"
+      },
+      {
+        "slot": 5,
+        "name": "TIMER_DEV",
+        "table_word": 16360,
+        "raw": [
+          "4000002c",
+          "00000004",
+          "dead28cf",
+          "00000000"
+        ],
+        "limit": 4,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "classification": "external/MMIO address; not an image word offset"
+      },
+      {
+        "slot": 6,
+        "name": "SelfTest",
+        "table_word": 16356,
+        "raw": [
+          "00000910",
+          "000007fe",
+          "de56f6ef",
+          "4a000006"
+        ],
+        "limit": 2046,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "resident_header": {
+          "raw": "fa87d001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 500,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "fits_before_table": true,
+        "artifact_comparison": {
+          "filename": "SelfTest.1.8b19abd7.lump",
+          "artifact_sha256": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+          "pre_clist_words_compared": 2047,
+          "pre_clist_mismatch_count": 0,
+          "first_mismatches": [],
+          "clist_excluded_words": 1,
+          "saved_binary_hash_matches": true
+        }
+      },
+      {
+        "slot": 7,
+        "name": "WukongCallHome",
+        "table_word": 16352,
+        "raw": [
+          "00000110",
+          "000003fc",
+          "ded2b6ef",
+          "4a000007"
+        ],
+        "limit": 1020,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "resident_header": {
+          "raw": "fa012c03",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 75,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "fits_before_table": true,
+        "artifact_comparison": {
+          "filename": "WukongCallHome.1.b29b38e3.lump",
+          "artifact_sha256": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
+          "pre_clist_words_compared": 1021,
+          "pre_clist_mismatch_count": 0,
+          "first_mismatches": [],
+          "clist_excluded_words": 3,
+          "saved_binary_hash_matches": true
+        }
+      },
+      {
+        "slot": 10,
+        "name": "CapabilityTest",
+        "table_word": 16340,
+        "raw": [
+          "00000510",
+          "000003f4",
+          "ded1b6ef",
+          "4a00000a"
+        ],
+        "limit": 1012,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "resident_header": {
+          "raw": "fa00940b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 37,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "fits_before_table": true,
+        "artifact_comparison": {
+          "filename": "CapabilityTest.1.68be391a.lump",
+          "artifact_sha256": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
+          "pre_clist_words_compared": 1013,
+          "pre_clist_mismatch_count": 0,
+          "first_mismatches": [],
+          "clist_excluded_words": 11,
+          "saved_binary_hash_matches": true
+        }
+      },
+      {
+        "slot": 11,
+        "name": "Thread.2",
+        "table_word": 16336,
+        "raw": [
+          "00001110",
+          "000000ff",
+          "debad6ef",
+          "00000000"
+        ],
+        "limit": 255,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "resident_header": {
+          "raw": "f900820c",
+          "magic": 31,
+          "typ": 2,
+          "size_field": 2,
+          "count": 32,
+          "cc": 12,
+          "allocation_words": 256
+        },
+        "fits_before_table": true
+      },
+      {
+        "slot": 12,
+        "name": "Thread.3",
+        "table_word": 16332,
+        "raw": [
+          "00001210",
+          "000000ff",
+          "debb56ef",
+          "00000000"
+        ],
+        "limit": 255,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "resident_header": {
+          "raw": "f900820c",
+          "magic": 31,
+          "typ": 2,
+          "size_field": 2,
+          "count": 32,
+          "cc": 12,
+          "allocation_words": 256
+        },
+        "fits_before_table": true
+      },
+      {
+        "slot": 13,
+        "name": "M_BIT_DEV",
+        "table_word": 16328,
+        "raw": [
+          "ffffff1c",
+          "00000000",
+          "21523090",
+          "00000000"
+        ],
+        "limit": 0,
+        "generation": 0,
+        "integrity_ok": true,
+        "saved_descriptor_differences": [],
+        "classification": "external/MMIO address; not an image word offset"
+      }
+    ],
+    "word_regions": [
+      {
+        "name": "Namespace Header V2",
+        "start": 0,
+        "end": 16
+      },
+      {
+        "name": "Boot.Thread",
+        "start": 16,
+        "end": 272
+      },
+      {
+        "name": "WukongCallHome",
+        "start": 272,
+        "end": 1296
+      },
+      {
+        "name": "CapabilityTest",
+        "start": 1296,
+        "end": 2320
+      },
+      {
+        "name": "SelfTest",
+        "start": 2320,
+        "end": 4368
+      },
+      {
+        "name": "Thread.2",
+        "start": 4368,
+        "end": 4624
+      },
+      {
+        "name": "Thread.3",
+        "start": 4624,
+        "end": 4880
+      },
+      {
+        "name": "Namespace table",
+        "start": 16128,
+        "end": 16384
+      }
+    ],
+    "overlaps": [],
+    "catalog": [
+      {
+        "filename": "Constants.1.e494696f.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "89435c3506f5c394478b845fc64934a9725965311e2e6e6c1a719bc60f9f15f8",
+        "header": {
+          "raw": "f8005c02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 23,
+          "cc": 2,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SlideRule.Haskell.1.3542a2db.lump",
+        "archived": false,
+        "bytes": 1024,
+        "sha256": "62237f701bf8a6dfc758741c7cf05baa21baa73d6d46ae82ed9c949b6d217ad5",
+        "header": {
+          "raw": "f9022401",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 137,
+          "cc": 1,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Tunnel.1.8770bf03.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5",
+        "header": {
+          "raw": "f980b402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 45,
+          "cc": 2,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Keystone.1.86b853a1.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "539c61d244b2cd509c7840b77602c3ca7324463433bc5fa3943201cd9a25850f",
+        "header": {
+          "raw": "f8005802",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 22,
+          "cc": 2,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Ethernet.1.b169bba4.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb",
+        "header": {
+          "raw": "f9804002",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 16,
+          "cc": 2,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "36eeb671d95b19d63b3f60f5c105d8595d8259b9e775518563fa3dfa10509e94",
+        "header": {
+          "raw": "f8006808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 26,
+          "cc": 8,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Salvation.1.6be43a9d.lump",
+        "archived": false,
+        "bytes": 1024,
+        "sha256": "21ce7499e679b0b827df5ccdf2b28e601435b1705ce09a2f5a1de9a0546f75c4",
+        "header": {
+          "raw": "f9023400",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 141,
+          "cc": 0,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "BernoulliNumbers.1.656dd0e4.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "1ade69d75de8daad59d5163517f1693929a8b11b1eadccab5fb1e538def775ee",
+        "header": {
+          "raw": "f8003c01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 15,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "StringOps.1.05b56245.lump",
+        "archived": false,
+        "bytes": 2048,
+        "sha256": "336759af26eef7d0f7aa0e7ae6e9b52e68e7196a106337a53402d65ac2d02ee8",
+        "header": {
+          "raw": "f984ec00",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 315,
+          "cc": 0,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "EnglishLoops.1.19366291.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "dd96cde0bfd8aa9b8db626c46ece1d044921d064d13a9f2c1d65bc79ab6414f8",
+        "header": {
+          "raw": "f8008c00",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 35,
+          "cc": 0,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "IntegerOps.1.54c9a1e9.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "fd1447d9ac0819014fa9fe953c1e9d2a6389c69f305959086bc3aeb4f761b2f9",
+        "header": {
+          "raw": "f8005000",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 20,
+          "cc": 0,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "NoteG.1.04a720f8.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "e50f5e02d071a6cb0de36d7b97a1bbca982f130ae98ba93d281f90c4a41d53e9",
+        "header": {
+          "raw": "f8009801",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 38,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Human.Hand.1.e88911d6.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "2401e2d849f21e8cd37c187081bce54139d48a3ad0563f6f2406bca0e06311f3",
+        "header": {
+          "raw": "f8001c01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 7,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "EventRouter.1.032ca4ee.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "9110a8296cdc5b85eb1583b116345c4a9464819bbeb355013165e1eec5957fdd",
+        "header": {
+          "raw": "f8004c00",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 19,
+          "cc": 0,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Memory.1.3359e86e.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "1b5c6fbbe3775bf6839b602842ba006c9dcbf753eb28cc00db4c9fa6487c1227",
+        "header": {
+          "raw": "f8004c00",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 19,
+          "cc": 0,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Scheduler.IRQ.1.439e0ddd.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "9467635a9b627617657fa2fa215b8085569050e33c96f791988faa12c070f4e0",
+        "header": {
+          "raw": "f8000400",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 1,
+          "cc": 0,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Loader.1.19ba3a9d.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6",
+        "header": {
+          "raw": "f8000401",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 1,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "LEDFlash.1.55f1a32f.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6",
+        "header": {
+          "raw": "f8000401",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 1,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.2f3d7d46.lump",
+        "archived": true,
+        "bytes": 256,
+        "sha256": "bdd84cdd1a907ef6b9b1af9c962b2016c0293912dc5eaa04f3dac248e3216038",
+        "header": {
+          "raw": "f8000c02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 3,
+          "cc": 2,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.hw.1.1dcb7b09.lump",
+        "archived": false,
+        "bytes": 512,
+        "sha256": "c224aa1ce2f389e3d51dc8748848a2036142be94599e9834ee657e4cf5fb5300",
+        "header": {
+          "raw": "f8812402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 1,
+          "count": 73,
+          "cc": 2,
+          "allocation_words": 128
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "MorseCmOk.1.eb20fe01.lump",
+        "archived": false,
+        "bytes": 2048,
+        "sha256": "1d47217a8f99f14d7d723245ee474b0d610a1008497137185c1aa44a2985b739",
+        "header": {
+          "raw": "f985ac01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 363,
+          "cc": 1,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SlideRule.1.d960f531.lump",
+        "archived": false,
+        "bytes": 16384,
+        "sha256": "6a449f41a0048c54e2a7b31d078068300832febb88c03c4beb228b1afbff48a3",
+        "header": {
+          "raw": "fb28a801",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 6,
+          "count": 2602,
+          "cc": 1,
+          "allocation_words": 4096
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.485e71f6.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "61198bd843124c4f06f8a5d7a13d84e6d9568925bbd28685453de95a7b3173d1",
+        "header": {
+          "raw": "f987cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.71c2809c.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "06ce15ee5e6041d21a6944347dd24e8d5e276a1c63efa0181e19afc5b09dd36f",
+        "header": {
+          "raw": "fa012402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 73,
+          "cc": 2,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.2fa83c3d.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "f3e684ca009fb0a3d8ecb0e627421ef0cd45841f65ce987d800d37ffddd1d049",
+        "header": {
+          "raw": "fa012803",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 74,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.9089ba84.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "5309e1f1ce8ec976abf28e706e088d242b1059a256597cdb899ab770880808b4",
+        "header": {
+          "raw": "f9812803",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 74,
+          "cc": 3,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.b98a03c4.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "917540ff0e2a6920ffa7b2c459aebe26f988c6feca35299fde9d320f1af71ec0",
+        "header": {
+          "raw": "f9805405",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 21,
+          "cc": 5,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "NoteGAssembly.1.fed6f911.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "9490b3e536b73c28e1d30f28c6ccb46f4e84a25cdefca6571a27556aed66945a",
+        "header": {
+          "raw": "fa023401",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 141,
+          "cc": 1,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "NoteGAssembly.1.f2e2eb3e.lump",
+        "archived": false,
+        "bytes": 1024,
+        "sha256": "8d8fd4d6fe8851e9e3aa94d7fc0c9120fc2e6265ca0ab68d7166beb1948340b6",
+        "header": {
+          "raw": "f9023401",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 141,
+          "cc": 1,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Bank.1.7c58f0f4.lump",
+        "archived": false,
+        "bytes": 16384,
+        "sha256": "6aea59970919b8b62d158b9e0be3185b5bfb5dcf1a370d3a6ed8187606d94d05",
+        "header": {
+          "raw": "fb007c01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 6,
+          "count": 31,
+          "cc": 1,
+          "allocation_words": 4096
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Bank.1.a4327568.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "f3dcc15ef14f5a7311666562b2d30906353fa577df36f328fb95b01113ed37a8",
+        "header": {
+          "raw": "f8008001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 32,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "name": "PostFlashSelftest",
+        "issue": "no filename"
+      },
+      {
+        "filename": "MyAbstraction.1.827cfd7c.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
+        "header": {
+          "raw": "f8000801",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 2,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.199d8c30.lump",
+        "archived": true,
+        "bytes": 16384,
+        "sha256": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
+        "header": {
+          "raw": "fb07d005",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 6,
+          "count": 500,
+          "cc": 5,
+          "allocation_words": 4096
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
+        "archived": false,
+        "bytes": 2048,
+        "sha256": "f2df718b1b98770debc5d97f58bdde4ba0a7181ec4d7cee39aafcd484b144e7c",
+        "header": {
+          "raw": "f987d005",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 500,
+          "cc": 5,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.b49e8eca.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "26865648dfb48ecb712b7d455895afd48c9324ecf55145da8c3bf23d86cb7ff9",
+        "header": {
+          "raw": "f9805405",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 21,
+          "cc": 5,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "ide.testMbit.1.d5046b90.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "7f7049a605ce9ebdeb1ed2bf61ec33dec1cb1fe4a3aaf51be0e72791e57e051e",
+        "header": {
+          "raw": "f8004809",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 18,
+          "cc": 9,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Legacy.1.8b7fb77f.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
+        "header": {
+          "raw": "f8000401",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 1,
+          "cc": 1,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "ide.Alice.1.1eec355e.lump",
+        "archived": false,
+        "bytes": 2048,
+        "sha256": "5f929d16f484e2e8b154d7ab5060c24d77d4e8e12b53febc25722ef69e2d69b1",
+        "header": {
+          "raw": "f9802402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 9,
+          "cc": 2,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "ide.Mallory.1.0ca567b5.lump",
+        "archived": false,
+        "bytes": 1024,
+        "sha256": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f",
+        "header": {
+          "raw": "f9001402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 5,
+          "cc": 2,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.79.eceee227.lump",
+        "archived": true,
+        "bytes": 32768,
+        "sha256": "f0b34adb0d54b936778407efafeda8dcf535c351cb0098c38d6873fa2aacac18",
+        "header": {
+          "raw": "fb87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 7,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 8192
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.8ab7765f.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "8bcabcd5297eb69deb27f6be5dec271d0d42ddaa26f4481f639862a4b9c969a2",
+        "header": {
+          "raw": "fa87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.81.532be597.lump",
+        "archived": true,
+        "bytes": 32768,
+        "sha256": "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f",
+        "header": {
+          "raw": "fb87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 7,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 8192
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.82.4c1b2651.lump",
+        "archived": true,
+        "bytes": 32768,
+        "sha256": "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75",
+        "header": {
+          "raw": "fb87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 7,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 8192
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.83.c80aeda6.lump",
+        "archived": true,
+        "bytes": 32768,
+        "sha256": "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f",
+        "header": {
+          "raw": "fb87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 7,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 8192
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.d54e2115.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "6ef1ecd997d151c0a3fdff9c613b72c673c247414007056f32e5443d1913fb77",
+        "header": {
+          "raw": "fa012402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 73,
+          "cc": 2,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.823c4d65.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
+        "header": {
+          "raw": "fa012c03",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 75,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.6c161823.lump",
+        "archived": true,
+        "bytes": 2048,
+        "sha256": "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba",
+        "header": {
+          "raw": "f9808007",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 32,
+          "cc": 7,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.9bf03976.lump",
+        "archived": true,
+        "bytes": 16384,
+        "sha256": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
+        "header": {
+          "raw": "fb012808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 6,
+          "count": 74,
+          "cc": 8,
+          "allocation_words": 4096
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "TestAbs.1.71742676.lump",
+        "archived": false,
+        "bytes": 256,
+        "sha256": "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122",
+        "header": {
+          "raw": "f8002802",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 0,
+          "count": 10,
+          "cc": 2,
+          "allocation_words": 64
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.5e701b59.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "1ee2b6d937936d5261e3b00932bea2b8302fccd1ecb33011a98c998eb0cff26b",
+        "header": {
+          "raw": "fa008007",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 32,
+          "cc": 7,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.a6d49276.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea",
+        "header": {
+          "raw": "fa87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.ba638038.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "8d1c67961c6c5c338ff7c3ee5598aa425304fb49309000245966b9dc6d3ab10f",
+        "header": {
+          "raw": "fa008008",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 32,
+          "cc": 8,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.83320494.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "a8345236e95b6f964b142f99bce09f53826b3e129d9ad91549af36a50a0c85a4",
+        "header": {
+          "raw": "fa008808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 34,
+          "cc": 8,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.e794a764.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
+        "header": {
+          "raw": "fa008808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 34,
+          "cc": 8,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.e8cb2017.lump",
+        "archived": true,
+        "bytes": 16384,
+        "sha256": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+        "header": {
+          "raw": "fb012c08",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 6,
+          "count": 75,
+          "cc": 8,
+          "allocation_words": 4096
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.6fd9df21.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c",
+        "header": {
+          "raw": "fa008808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 34,
+          "cc": 8,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.225da6fc.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+        "header": {
+          "raw": "fa807c08",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 31,
+          "cc": 8,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.b5182a3d.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "e655c01275799838cbaca5e84c0899a93eb42b42119392b63829bda85d5feba4",
+        "header": {
+          "raw": "fa87cc02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 2,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.8965def2.lump",
+        "archived": true,
+        "bytes": 16384,
+        "sha256": "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc",
+        "header": {
+          "raw": "fb012808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 6,
+          "count": 74,
+          "cc": 8,
+          "allocation_words": 4096
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.74c8ff97.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
+        "header": {
+          "raw": "fa012803",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 74,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.ddd2582f.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "4e91739c8bb39115e78b6a08f808596c29b1f0839b5a8469b01b3a048055e9f8",
+        "header": {
+          "raw": "fa87cc01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.e2b69e5b.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
+        "header": {
+          "raw": "fa008808",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 34,
+          "cc": 8,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Adder.1.0f63efe0.lump",
+        "archived": false,
+        "bytes": 512,
+        "sha256": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21",
+        "header": {
+          "raw": "f8801001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 1,
+          "count": 4,
+          "cc": 1,
+          "allocation_words": 128
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.90.cf272798.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "3b107282fcc70d3702367c905382cdab7fcc9b9aec1edf8fb9749a2db54972b6",
+        "header": {
+          "raw": "fa87cc01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.14d378a6.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "3b107282fcc70d3702367c905382cdab7fcc9b9aec1edf8fb9749a2db54972b6",
+        "header": {
+          "raw": "fa87cc01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.92.cf272798.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+        "header": {
+          "raw": "fa87cc01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.d2f81664.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+        "header": {
+          "raw": "fa87cc01",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 499,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.94.c1e03ab9.lump",
+        "archived": true,
+        "bytes": 32768,
+        "sha256": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
+        "header": {
+          "raw": "fb87d002",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 7,
+          "count": 500,
+          "cc": 2,
+          "allocation_words": 8192
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.c2194804.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "194f6ffcb1a37b5ee275099671d02cd2914baead018904d6c915844b056e0088",
+        "header": {
+          "raw": "fa807c08",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 31,
+          "cc": 8,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.658e6ba8.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+        "header": {
+          "raw": "fa012803",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 74,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.aac8cfa9.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "03492fe1498f76f26547a800331e1da72424772b9dbfad3d8599f834908bc09c",
+        "header": {
+          "raw": "fa807c08",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 31,
+          "cc": 8,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.2.35647a26.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc",
+        "header": {
+          "raw": "fa807c08",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 31,
+          "cc": 8,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.95.37f37c75.lump",
+        "archived": true,
+        "bytes": 8192,
+        "sha256": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+        "header": {
+          "raw": "fa87d001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 500,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "SelfTest.1.8b19abd7.lump",
+        "archived": false,
+        "bytes": 8192,
+        "sha256": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+        "header": {
+          "raw": "fa87d001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 5,
+          "count": 500,
+          "cc": 1,
+          "allocation_words": 2048
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.ba8b8e76.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+        "header": {
+          "raw": "fa012803",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 74,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.3f7e1c54.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
+        "header": {
+          "raw": "fa00880b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 34,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.7fe59019.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "49bda45936d9bc4a668814a35f49174969a02f881ee7c8a4aadd9692a15c4283",
+        "header": {
+          "raw": "fa012c03",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 75,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.39f77d6e.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "094fd4de8634a5d6255b4d066f6a7378b8c4255110fc4fc0a3b5eb5043ce0ec7",
+        "header": {
+          "raw": "fa00880b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 34,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Tunnel.1.9381d362.lump",
+        "archived": false,
+        "bytes": 2048,
+        "sha256": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5",
+        "header": {
+          "raw": "f980b402",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 45,
+          "cc": 2,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "Ethernet.1.fc72b0e3.lump",
+        "archived": false,
+        "bytes": 2048,
+        "sha256": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb",
+        "header": {
+          "raw": "f9804002",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 3,
+          "count": 16,
+          "cc": 2,
+          "allocation_words": 512
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "ide.Alice.1.1e49ecb5.lump",
+        "archived": true,
+        "bytes": 1024,
+        "sha256": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
+        "header": {
+          "raw": "f9002001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 8,
+          "cc": 1,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "ide.Mallory.1.fdaed91d.lump",
+        "archived": false,
+        "bytes": 1024,
+        "sha256": "8a9e5540721dbb9ff2bc1a5f8c8189cfd082d3e86745cb3452d2ea14ec922b32",
+        "header": {
+          "raw": "f9001c02",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 7,
+          "cc": 2,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "ide.Alice.1.a91d33f7.lump",
+        "archived": false,
+        "bytes": 1024,
+        "sha256": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
+        "header": {
+          "raw": "f9002001",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 2,
+          "count": 8,
+          "cc": 1,
+          "allocation_words": 256
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.a9237679.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "682298ee35e8a4a024d6f6ade26098d91000baf8a9010d02268205aac28d6fc8",
+        "header": {
+          "raw": "fa008c0b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 35,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.888f5960.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "5bfb4af7478af79b929403d9ef5b436a90091eec9cc6f66c64fb349a7f60d21c",
+        "header": {
+          "raw": "fa00940b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 37,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest_v37.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+        "header": {
+          "raw": "fa00980b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 38,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest_v38.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+        "header": {
+          "raw": "fa00980b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 38,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest_v39.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+        "header": {
+          "raw": "fa00980b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 38,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.ff2e3f35.lump",
+        "archived": true,
+        "bytes": 4096,
+        "sha256": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+        "header": {
+          "raw": "fa00980b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 38,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.a28f6ee7.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "797938d068cbe8149c8baed681878d49133dd1a28742eae02c2d64c86e1572b3",
+        "header": {
+          "raw": "fa00980b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 38,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "CapabilityTest.1.68be391a.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
+        "header": {
+          "raw": "fa00940b",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 37,
+          "cc": 11,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      },
+      {
+        "filename": "WukongCallHome.1.b29b38e3.lump",
+        "archived": false,
+        "bytes": 4096,
+        "sha256": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
+        "header": {
+          "raw": "fa012c03",
+          "magic": 31,
+          "typ": 0,
+          "size_field": 4,
+          "count": 75,
+          "cc": 3,
+          "allocation_words": 1024
+        },
+        "allocation_matches_file": true
+      }
+    ],
+    "input_sha256": {
+      "docs/instruction-set.md": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+      "reports/isa-seven-items-review-proposals.md": "77527b283a4c6e463983b6f96d5da76489b9a0061ee5ae915cc6a563628924a9",
+      "shared/architecture_contracts.json": "874efb463d26c4509b6c8b92d6f587db99a1350cfb1e6ba1a33aa0b530b9319b",
+      "shared/namespace_header.py": "e1e247a6b256a81549ff741d4a6045ee653e6661a15d30635e549a4ec691f0e3",
+      "simulator/simulator.js": "023bef957432965ed7cbea9c2a7f2044acfe0d15b5ce43867ae5078cce3c0ab6",
+      "simulator/app-memory.js": "5c7b165e4ed8367c41c1bda9d9acb3284bbff2c8acf8758d34a7983ba0ddd219",
+      "simulator/app-lumps.js": "ef5463f9133fa50d5e23883c111960ce41e9853cb35f7d4dc5540a9f7ebab10a",
+      "simulator/lump-audit.js": "80e1d626a6279271a31ba82f4575644f188ece997b39db3e4d64a6143846ee82",
+      "simulator/thread_design.js": "6c9b749e878a6ba79565c19093619d5ce1ca53f50f9310c66bf566c5e55d3e60",
+      "shared/thread_design.json": "443a05f8a7bb326c3744068058c558a61ed1cce32cb144365dfdd9f7d5d51a57",
+      "server/boot_image.py": "121b5de58792256ccedad48c89aa4f40018f5eea8957e9114e7a3c58d85554c8",
+      "hardware/integrity32.py": "9af7331a0def12281b55d02440d6d8bd7c0b211f6da737b6fddfeffb9a6b7284",
+      "scripts/audit_memory_map_review.py": "20a114aef8df6c7c2f17b08a6063c8a976cf8404de2ce986352a5715f0b03943",
+      "scripts/audit_memory_map_lumps.js": "fd61076f8c3e52ddfaa8f8e90c9444f1928edcdb84a8c4232cb088a1456f1d0b",
+      "server/lumps/manifest.json": "9a610448291c737e9ee190b6315057be4be3126cfa5a3c2d3cc33f83deee720f",
+      "server/lumps/ns-state.json": "560ba972d76b6655117ffca2b4844ce312533d1d4bb0c89ee5e9a27c15f2075e",
+      "server/lumps/boot-image.bin": "0ff1b24d76b7010c13b8b50737f4513a771b586be73b8d0fa80a748087070a5b",
+      "server/lumps/Constants.1.e494696f.lump": "89435c3506f5c394478b845fc64934a9725965311e2e6e6c1a719bc60f9f15f8",
+      "server/lumps/SlideRule.Haskell.1.3542a2db.lump": "62237f701bf8a6dfc758741c7cf05baa21baa73d6d46ae82ed9c949b6d217ad5",
+      "server/lumps/Tunnel.1.8770bf03.lump": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5",
+      "server/lumps/Keystone.1.86b853a1.lump": "539c61d244b2cd509c7840b77602c3ca7324463433bc5fa3943201cd9a25850f",
+      "server/lumps/Ethernet.1.b169bba4.lump": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb",
+      "server/lumps/GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump": "36eeb671d95b19d63b3f60f5c105d8595d8259b9e775518563fa3dfa10509e94",
+      "server/lumps/Salvation.1.6be43a9d.lump": "21ce7499e679b0b827df5ccdf2b28e601435b1705ce09a2f5a1de9a0546f75c4",
+      "server/lumps/BernoulliNumbers.1.656dd0e4.lump": "1ade69d75de8daad59d5163517f1693929a8b11b1eadccab5fb1e538def775ee",
+      "server/lumps/StringOps.1.05b56245.lump": "336759af26eef7d0f7aa0e7ae6e9b52e68e7196a106337a53402d65ac2d02ee8",
+      "server/lumps/EnglishLoops.1.19366291.lump": "dd96cde0bfd8aa9b8db626c46ece1d044921d064d13a9f2c1d65bc79ab6414f8",
+      "server/lumps/IntegerOps.1.54c9a1e9.lump": "fd1447d9ac0819014fa9fe953c1e9d2a6389c69f305959086bc3aeb4f761b2f9",
+      "server/lumps/NoteG.1.04a720f8.lump": "e50f5e02d071a6cb0de36d7b97a1bbca982f130ae98ba93d281f90c4a41d53e9",
+      "server/lumps/Human.Hand.1.e88911d6.lump": "2401e2d849f21e8cd37c187081bce54139d48a3ad0563f6f2406bca0e06311f3",
+      "server/lumps/EventRouter.1.032ca4ee.lump": "9110a8296cdc5b85eb1583b116345c4a9464819bbeb355013165e1eec5957fdd",
+      "server/lumps/Memory.1.3359e86e.lump": "1b5c6fbbe3775bf6839b602842ba006c9dcbf753eb28cc00db4c9fa6487c1227",
+      "server/lumps/Scheduler.IRQ.1.439e0ddd.lump": "9467635a9b627617657fa2fa215b8085569050e33c96f791988faa12c070f4e0",
+      "server/lumps/Loader.1.19ba3a9d.lump": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6",
+      "server/lumps/LEDFlash.1.55f1a32f.lump": "2202a4436a80fcb9c78a5234063e84fa639709b2a7beca27688dc7c1b9ec89d6",
+      "server/lumps/WukongCallHome.1.2f3d7d46.lump": "bdd84cdd1a907ef6b9b1af9c962b2016c0293912dc5eaa04f3dac248e3216038",
+      "server/lumps/WukongCallHome.hw.1.1dcb7b09.lump": "c224aa1ce2f389e3d51dc8748848a2036142be94599e9834ee657e4cf5fb5300",
+      "server/lumps/MorseCmOk.1.eb20fe01.lump": "1d47217a8f99f14d7d723245ee474b0d610a1008497137185c1aa44a2985b739",
+      "server/lumps/SlideRule.1.d960f531.lump": "6a449f41a0048c54e2a7b31d078068300832febb88c03c4beb228b1afbff48a3",
+      "server/lumps/SelfTest.1.485e71f6.lump": "61198bd843124c4f06f8a5d7a13d84e6d9568925bbd28685453de95a7b3173d1",
+      "server/lumps/WukongCallHome.1.71c2809c.lump": "06ce15ee5e6041d21a6944347dd24e8d5e276a1c63efa0181e19afc5b09dd36f",
+      "server/lumps/WukongCallHome.1.2fa83c3d.lump": "f3e684ca009fb0a3d8ecb0e627421ef0cd45841f65ce987d800d37ffddd1d049",
+      "server/lumps/WukongCallHome.1.9089ba84.lump": "5309e1f1ce8ec976abf28e706e088d242b1059a256597cdb899ab770880808b4",
+      "server/lumps/CapabilityTest.1.b98a03c4.lump": "917540ff0e2a6920ffa7b2c459aebe26f988c6feca35299fde9d320f1af71ec0",
+      "server/lumps/NoteGAssembly.1.fed6f911.lump": "9490b3e536b73c28e1d30f28c6ccb46f4e84a25cdefca6571a27556aed66945a",
+      "server/lumps/NoteGAssembly.1.f2e2eb3e.lump": "8d8fd4d6fe8851e9e3aa94d7fc0c9120fc2e6265ca0ab68d7166beb1948340b6",
+      "server/lumps/Bank.1.7c58f0f4.lump": "6aea59970919b8b62d158b9e0be3185b5bfb5dcf1a370d3a6ed8187606d94d05",
+      "server/lumps/Bank.1.a4327568.lump": "f3dcc15ef14f5a7311666562b2d30906353fa577df36f328fb95b01113ed37a8",
+      "server/lumps/MyAbstraction.1.827cfd7c.lump": "5120739b4fb8cc7c6999e560ae4b48c56228c1c190a76778b4d0b56153c4fc4d",
+      "server/lumps/SelfTest.1.199d8c30.lump": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
+      "server/lumps/Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump": "f2df718b1b98770debc5d97f58bdde4ba0a7181ec4d7cee39aafcd484b144e7c",
+      "server/lumps/CapabilityTest.1.b49e8eca.lump": "26865648dfb48ecb712b7d455895afd48c9324ecf55145da8c3bf23d86cb7ff9",
+      "server/lumps/ide.testMbit.1.d5046b90.lump": "7f7049a605ce9ebdeb1ed2bf61ec33dec1cb1fe4a3aaf51be0e72791e57e051e",
+      "server/lumps/Legacy.1.8b7fb77f.lump": "388fa4a798890ee62f9745b5168495386ba4894b98cae1b881c2f4d184700865",
+      "server/lumps/ide.Alice.1.1eec355e.lump": "5f929d16f484e2e8b154d7ab5060c24d77d4e8e12b53febc25722ef69e2d69b1",
+      "server/lumps/ide.Mallory.1.0ca567b5.lump": "a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f",
+      "server/lumps/SelfTest.79.eceee227.lump": "f0b34adb0d54b936778407efafeda8dcf535c351cb0098c38d6873fa2aacac18",
+      "server/lumps/SelfTest.1.8ab7765f.lump": "8bcabcd5297eb69deb27f6be5dec271d0d42ddaa26f4481f639862a4b9c969a2",
+      "server/lumps/SelfTest.81.532be597.lump": "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f",
+      "server/lumps/SelfTest.82.4c1b2651.lump": "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75",
+      "server/lumps/SelfTest.83.c80aeda6.lump": "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f",
+      "server/lumps/WukongCallHome.1.d54e2115.lump": "6ef1ecd997d151c0a3fdff9c613b72c673c247414007056f32e5443d1913fb77",
+      "server/lumps/WukongCallHome.1.823c4d65.lump": "ff06e6976cf6694192337e600512b5b37c167532e4b16285f1ec8ca9a3973633",
+      "server/lumps/CapabilityTest.1.6c161823.lump": "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba",
+      "server/lumps/WukongCallHome.1.9bf03976.lump": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
+      "server/lumps/TestAbs.1.71742676.lump": "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122",
+      "server/lumps/CapabilityTest.2.5e701b59.lump": "1ee2b6d937936d5261e3b00932bea2b8302fccd1ecb33011a98c998eb0cff26b",
+      "server/lumps/SelfTest.1.a6d49276.lump": "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea",
+      "server/lumps/CapabilityTest.1.ba638038.lump": "8d1c67961c6c5c338ff7c3ee5598aa425304fb49309000245966b9dc6d3ab10f",
+      "server/lumps/CapabilityTest.1.83320494.lump": "a8345236e95b6f964b142f99bce09f53826b3e129d9ad91549af36a50a0c85a4",
+      "server/lumps/CapabilityTest.2.e794a764.lump": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
+      "server/lumps/WukongCallHome.1.e8cb2017.lump": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+      "server/lumps/CapabilityTest.2.6fd9df21.lump": "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c",
+      "server/lumps/CapabilityTest.2.225da6fc.lump": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+      "server/lumps/SelfTest.1.b5182a3d.lump": "e655c01275799838cbaca5e84c0899a93eb42b42119392b63829bda85d5feba4",
+      "server/lumps/WukongCallHome.1.8965def2.lump": "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc",
+      "server/lumps/WukongCallHome.1.74c8ff97.lump": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
+      "server/lumps/SelfTest.1.ddd2582f.lump": "4e91739c8bb39115e78b6a08f808596c29b1f0839b5a8469b01b3a048055e9f8",
+      "server/lumps/CapabilityTest.1.e2b69e5b.lump": "6591292b249120aa0a62306237e314f2289ffae42a64bc7556fba336f9330f19",
+      "server/lumps/Adder.1.0f63efe0.lump": "4e2a163e7c8e1c4f1174cf50fa49631a251c6037619cade8a10d38fc7c40dd21",
+      "server/lumps/SelfTest.90.cf272798.lump": "3b107282fcc70d3702367c905382cdab7fcc9b9aec1edf8fb9749a2db54972b6",
+      "server/lumps/SelfTest.1.14d378a6.lump": "3b107282fcc70d3702367c905382cdab7fcc9b9aec1edf8fb9749a2db54972b6",
+      "server/lumps/SelfTest.92.cf272798.lump": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+      "server/lumps/SelfTest.1.d2f81664.lump": "d592cc9c7694f31774cb2e3a17130a0dbb31cc5ad118802e310164de7fe1a561",
+      "server/lumps/SelfTest.94.c1e03ab9.lump": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
+      "server/lumps/CapabilityTest.2.c2194804.lump": "194f6ffcb1a37b5ee275099671d02cd2914baead018904d6c915844b056e0088",
+      "server/lumps/WukongCallHome.1.658e6ba8.lump": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+      "server/lumps/CapabilityTest.2.aac8cfa9.lump": "03492fe1498f76f26547a800331e1da72424772b9dbfad3d8599f834908bc09c",
+      "server/lumps/CapabilityTest.2.35647a26.lump": "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc",
+      "server/lumps/SelfTest.95.37f37c75.lump": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "server/lumps/SelfTest.1.8b19abd7.lump": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "server/lumps/WukongCallHome.1.ba8b8e76.lump": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+      "server/lumps/CapabilityTest.1.3f7e1c54.lump": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
+      "server/lumps/WukongCallHome.1.7fe59019.lump": "49bda45936d9bc4a668814a35f49174969a02f881ee7c8a4aadd9692a15c4283",
+      "server/lumps/CapabilityTest.1.39f77d6e.lump": "094fd4de8634a5d6255b4d066f6a7378b8c4255110fc4fc0a3b5eb5043ce0ec7",
+      "server/lumps/Tunnel.1.9381d362.lump": "3f5a0dc722efe135708178fd922fe66d204a43b888ea5b6f37a7775f5a8204b5",
+      "server/lumps/Ethernet.1.fc72b0e3.lump": "a1a2de61acb524fd6eda075113a2e471eee574b12321141630d234d42b6620eb",
+      "server/lumps/ide.Alice.1.1e49ecb5.lump": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
+      "server/lumps/ide.Mallory.1.fdaed91d.lump": "8a9e5540721dbb9ff2bc1a5f8c8189cfd082d3e86745cb3452d2ea14ec922b32",
+      "server/lumps/ide.Alice.1.a91d33f7.lump": "22e7a47e1c5f1246796731a46d59e1d0dc92eb4594556c424e56b020cf2a4de0",
+      "server/lumps/CapabilityTest.1.a9237679.lump": "682298ee35e8a4a024d6f6ade26098d91000baf8a9010d02268205aac28d6fc8",
+      "server/lumps/CapabilityTest.1.888f5960.lump": "5bfb4af7478af79b929403d9ef5b436a90091eec9cc6f66c64fb349a7f60d21c",
+      "server/lumps/CapabilityTest_v37.lump": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "server/lumps/CapabilityTest_v38.lump": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "server/lumps/CapabilityTest_v39.lump": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "server/lumps/CapabilityTest.1.ff2e3f35.lump": "f8e564ed11de5da24c4265cfe9649ef415dbc919d84ee6bf521e9b770f39c32f",
+      "server/lumps/CapabilityTest.1.a28f6ee7.lump": "797938d068cbe8149c8baed681878d49133dd1a28742eae02c2d64c86e1572b3",
+      "server/lumps/CapabilityTest.1.68be391a.lump": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
+      "server/lumps/WukongCallHome.1.b29b38e3.lump": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af"
+    },
+    "inputs_unchanged": true
+  },
+  "ide_lump_checker": [
+    {
+      "filename": "Constants.1.e494696f.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RNC",
+          "severity": "warn",
+          "message": "NULL GT in c-list \u2014 slot [0] contains a NULL GT (0x00000000).",
+          "detail": "Instruction 1 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 4 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 7 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 10 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 13 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Note: c-list slots are always 0x00000000 in a freshly compiled binary \u2014 the runtime fills them at load time. This warning is expected for any lump that has not yet been deployed to the namespace.",
+          "violations": [
+            {
+              "msg": "Instruction 1 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+              "sourceLine": null,
+              "slot": 0,
+              "wordIndex": 0
+            },
+            {
+              "msg": "Instruction 4 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+              "sourceLine": null,
+              "slot": 0,
+              "wordIndex": 3
+            },
+            {
+              "msg": "Instruction 7 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+              "sourceLine": null,
+              "slot": 0,
+              "wordIndex": 6
+            },
+            {
+              "msg": "Instruction 10 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+              "sourceLine": null,
+              "slot": 0,
+              "wordIndex": 9
+            },
+            {
+              "msg": "Instruction 13 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+              "sourceLine": null,
+              "slot": 0,
+              "wordIndex": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "SlideRule.Haskell.1.3542a2db.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RCI",
+          "severity": "error",
+          "message": "Instruction jump out of range \u2014 3 jumps land outside the code section.",
+          "detail": "Instruction 126 (BRANCH) jumps to position 141, which is outside the code section (valid range: 0 to 136). Instruction 131 (BRANCH) jumps to position 144, which is outside the code section (valid range: 0 to 136). Instruction 133 (BRANCH) jumps to position 147, which is outside the code section (valid range: 0 to 136).",
+          "violations": [
+            {
+              "msg": "Instruction 126 (BRANCH) jumps to position 141, which is outside the code section (valid range: 0 to 136).",
+              "sourceLine": null
+            },
+            {
+              "msg": "Instruction 131 (BRANCH) jumps to position 144, which is outside the code section (valid range: 0 to 136).",
+              "sourceLine": null
+            },
+            {
+              "msg": "Instruction 133 (BRANCH) jumps to position 147, which is outside the code section (valid range: 0 to 136).",
+              "sourceLine": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "filename": "Tunnel.1.8770bf03.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Keystone.1.86b853a1.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Ethernet.1.b169bba4.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Salvation.1.6be43a9d.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "BernoulliNumbers.1.656dd0e4.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "StringOps.1.05b56245.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub methods \u2014 16 methods have no code body (bare RETURN).",
+          "detail": "word\u202f15, word\u202f57, word\u202f79, word\u202f92, word\u202f105, word\u202f118, word\u202f128, word\u202f139, word\u202f140, word\u202f151, word\u202f152, word\u202f166, word\u202f171, word\u202f209, word\u202f224, word\u202f315 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "EnglishLoops.1.19366291.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub method \u2014 1 method has no code body (bare RETURN).",
+          "detail": "word\u202f13 is a bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "IntegerOps.1.54c9a1e9.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub methods \u2014 4 methods have no code body (bare RETURN).",
+          "detail": "word\u202f5, word\u202f10, word\u202f15, word\u202f20 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "NoteG.1.04a720f8.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Human.Hand.1.e88911d6.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub methods \u2014 6 methods have no code body (bare RETURN).",
+          "detail": "word\u202f2, word\u202f3, word\u202f4, word\u202f5, word\u202f6, word\u202f7 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "EventRouter.1.032ca4ee.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub methods \u2014 2 methods have no code body (bare RETURN).",
+          "detail": "word\u202f15, word\u202f19 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "Memory.1.3359e86e.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub method \u2014 1 method has no code body (bare RETURN).",
+          "detail": "word\u202f19 is a bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "Scheduler.IRQ.1.439e0ddd.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Loader.1.19ba3a9d.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "LEDFlash.1.55f1a32f.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.2f3d7d46.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.hw.1.1dcb7b09.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "MorseCmOk.1.eb20fe01.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SlideRule.1.d960f531.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.485e71f6.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.71c2809c.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.2fa83c3d.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.9089ba84.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.b98a03c4.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "NoteGAssembly.1.fed6f911.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "NoteGAssembly.1.f2e2eb3e.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Bank.1.7c58f0f4.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Bank.1.a4327568.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "MyAbstraction.1.827cfd7c.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.199d8c30.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.b49e8eca.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "ide.testMbit.1.d5046b90.lump",
+      "decoderMatches": true,
+      "findings": [
+        {
+          "ruleId": "RSM",
+          "severity": "warn",
+          "message": "Stub methods \u2014 6 methods have no code body (bare RETURN).",
+          "detail": "word\u202f13, word\u202f14, word\u202f15, word\u202f16, word\u202f17, word\u202f18 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+        }
+      ]
+    },
+    {
+      "filename": "Legacy.1.8b7fb77f.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "ide.Alice.1.1eec355e.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "ide.Mallory.1.0ca567b5.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.79.eceee227.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.8ab7765f.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.81.532be597.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.82.4c1b2651.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.83.c80aeda6.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.d54e2115.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.823c4d65.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.6c161823.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.9bf03976.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "TestAbs.1.71742676.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.5e701b59.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.a6d49276.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.ba638038.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.83320494.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.e794a764.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.6fd9df21.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.225da6fc.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.b5182a3d.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.8965def2.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.74c8ff97.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.ddd2582f.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.e2b69e5b.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Adder.1.0f63efe0.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.90.cf272798.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.14d378a6.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.92.cf272798.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.d2f81664.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.94.c1e03ab9.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.c2194804.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.658e6ba8.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.aac8cfa9.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.2.35647a26.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.95.37f37c75.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "SelfTest.1.8b19abd7.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.ba8b8e76.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.3f7e1c54.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.7fe59019.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.39f77d6e.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Tunnel.1.9381d362.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "Ethernet.1.fc72b0e3.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "ide.Alice.1.1e49ecb5.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "ide.Mallory.1.fdaed91d.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "ide.Alice.1.a91d33f7.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.a9237679.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.888f5960.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest_v37.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest_v38.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest_v39.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.ff2e3f35.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.a28f6ee7.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "CapabilityTest.1.68be391a.lump",
+      "decoderMatches": true,
+      "findings": []
+    },
+    {
+      "filename": "WukongCallHome.1.b29b38e3.lump",
+      "decoderMatches": true,
+      "findings": []
+    }
+  ]
+}

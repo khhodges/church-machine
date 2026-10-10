@@ -6,4 +6,8 @@ The rule: never derive "committed" NS entry hex or design-vs-committed fault che
 
 **Why:** a completion review rejected a drill-down that fabricated word hex from snapshot fields and used Boot.NS `limit` as a table-shape heuristic; both produced wrong values / false faults.
 
-**How to apply:** `/api/boot-image/ns-state` now attaches a `committed` block (parse_ns_table_raw in server/boot_image.py: totalWords, maxEntries, header n/cw/cc, raw w0–w3 per occupied slot). UI decoding must follow parseNSWord1 (b@31,g@29,gtType@[27:26],clistCount@[25:17],limit17) and the v2.0 GT layout (perm@[30:28],dom@27,type@[26:25],seq@[24:16],slot@[15:0]).
+**How to apply:** Prefer the endpoint's committed raw-word block for comparisons.
+Consult the current shared bit contract and decoder rather than historical
+field names such as `limit17`; old UI-era packing descriptions are not reliable
+evidence for the present ABI. Keep word-indexed image locations distinct from
+byte-addressed target profiles when displaying or interpreting those words.

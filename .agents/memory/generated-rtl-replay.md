@@ -6,6 +6,84 @@ description: Constant combinational emission and preserving the elaboration used
 Model simulation success is not evidence that emitted plain Verilog simulates
 identically. Check constant-only combinational blocks with a four-state simulator.
 
+Subsystem mapping evidence must preserve the production clock/reset domain.
+Extract the actual subsystem from the same full-top elaboration rather than
+re-elaborating a standalone replacement with an implicit reset.
+
+**Why:** A reset-bearing standalone initializer can map differently from the
+reset-less production initializer even when its reset pin is tied inactive.
+Passing that substitute does not close the production mapping question.
+
+**How to apply:** Retain the original boundary and input hashes, map the
+extracted fragment, and state separately whether the surrounding system was
+word-level synthesized or fully technology-mapped.
+
+Where successful mLoad completions are established, accept that the intended
+Namespace slots were found; do not pursue a hypothetical alternative Namespace.
+Do not equate a GT-only trace payload with a completed, no-fault load, or combine
+different trace excerpts and snapshots without matching execution identity.
+
+**Why:** The user explicitly set this diagnostic boundary after repeated
+discussion of whether plausible results could come from unrelated memory.
+
+**How to apply:** Investigate the discrepancy between successful slot lookups
+and the reported zero CR15 state, rather than trying to explain the successful
+lookups as random data.
+Keep the existing build and memory layout unchanged while diagnosing this
+failure; the user wants the defect understood before any corrective changes.
+**Why:** Replacing the layout or boot privilege behavior during diagnosis would
+change the system whose failure is being explained.
+Review simulation one instruction at a time before adopting its observations
+as expected results for physical single-step tests.
+**Why:** The user selected this workflow to resolve conflicting LOAD trace and
+snapshot evidence. Simulation agreement is not automatic ISA approval.
+**How to apply:** Read full committed register storage, preserve approved inputs,
+label the exact model, and pause for review before advancing the walkthrough.
+Physical stepping and reset still require separate authorization.
+CR8 must not be used as an architectural scratch register for boot CHANGE.
+**Why:** The user explicitly rejected CR8 involvement in the Thread/Heap setup.
+**How to apply:** Treat observed CR8 writes as an implementation discrepancy,
+not an ISA requirement; diagnosis does not authorize a corrective RTL change.
+All CM implementations must follow the authoritative ISA; successful boot is
+not permission to substitute hidden authority for required architectural state.
+**Why:** The user emphasized that CM integrity depends on conformance in every
+implementation, not merely matching visible output or reaching an instruction.
+**How to apply:** Derive acceptance expectations from the ISA, flag divergence
+as release-blocking, and never adopt a model's observed defect as the FPGA oracle.
+The agreed direction is a systematic ISA-conformance audit and correction of
+all discovered deviations before approving a replacement bitstream, not another
+isolated boot patch.
+**Why:** The user rejected piecemeal boot success as an adequate integrity gate.
+**How to apply:** Track requirements and evidence for each instruction and its
+supporting protection/context mechanisms across assembler, IDE simulator, RTL,
+mapped design, and eventually the identified physical image. Resolve unspecified
+ISA details rather than inventing them; disclose unverified coverage. Building,
+programming, and board operation remain separate authorization boundaries.
+
+Name the implementation whenever reporting a simulation result.
+**Why:** Calling both the JavaScript IDE simulator and an HDL circuit replay
+"the simulator" led to confusion about which implementation violated the ISA.
+**How to apply:** Say IDE simulator, optimized hardware-model replay, or mapped
+netlist simulation explicitly. None proves historical build approval or the
+programmed image without exact provenance.
+
+Validate state capture separately from execution and correlate by occurrence.
+**Why:** GT trace values and accepted full snapshots gave conflicting accounts;
+a CRC proves packet integrity, not that the correct registers were sampled.
+**How to apply:** Compare committed register writes, emitted trace, snapshot,
+and IDE display for the same instruction. A zero GT does not establish a zero
+base/limit. Do not dismiss either record or infer different runs solely from
+displayed timestamps.
+The intended correction for the existing 64-slot table is to seed CR15's limit
+with 63, not a temporary 18 that a later mLoad is expected to correct.
+**Why:** The user prefers a consistent bootstrap state rather than relying on
+mLoad to repair it. This does not waive normal LOAD destination writes or
+authorize applying the correction before the diagnostic walkthrough finishes.
+The user confirmed the key distinction: zero is also the intended Wukong
+Namespace base, so a zero-valued base can still locate the correct descriptors;
+the incorrect zero limit is a separate question. Do not infer a wrong table
+address solely from an all-zero CR15 snapshot.
+
 Derive post-instruction capability expectations from the instruction's memory
 inputs and semantics, not the reset/bootstrap seed.
 **Why:** A replay incorrectly expected the bootstrap Namespace GT to survive
@@ -50,6 +128,19 @@ fix. Compare addresses, data, enables, and initial outputs against the retained
 elaboration; do not infer equivalence from later valid entries or clean timing.
 Require a valid ROM output before the first write and verify both the first
 and final entries through the synthesized mapping, not behavioral RTL alone.
+
+Check whether the primitive library implements functional behavior before
+interpreting unknown mapped-BRAM output. The local Yosys RAMB36E1 model can
+contain timing declarations without functional behavior.
+
+**Why:** Such a stub can compile successfully but return unknown ROM data.
+Generic gate synthesis is independent evidence, not vendor BRAM equivalence.
+
+**How to apply:** Preserve failing logs and model hashes. Xilinx's public
+XilinxUnisimLibrary supplies functional XC7 primitives loadable by Icarus with
+a library directory and separate `glbl` root. Pin its revision and retain model
+bytes; use an explicit timescale for global startup reset. Passing this replay
+is not proof of Vivado synthesis or a routed design.
 
 Separate fetch/write phases alone do not establish startup correctness.
 **Why:** Synthesized replay of the two-phase initializer still started the ROM

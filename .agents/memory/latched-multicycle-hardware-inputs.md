@@ -17,6 +17,23 @@ values selected by temporary side-band requests. Add a regression that drops or
 changes the live input after launch and verifies the operation still uses the
 accepted value.
 
+The user states that the GT and instruction must coexist for every ISA step
+that references memory.
+The user explicitly rejects packing them together: Church and Turing remain
+independent. Operation tables must show the GT source authorizing each action,
+so their cross-check is visible, not merely implied by a valid context.
+
+**Why:** Memory activity must remain attributable to both its operation and
+its capability authority, not become an unqualified bare-address transaction.
+
+**How to apply:** Preserve that pairing throughout multi-cycle accesses.
+Separate target lookup authority from authority for subsequent target access.
+Include a distinct GT-source/authority column in ISA operation tables.
+Do not invent a memory GT for non-memory events or equate target selection
+with authorization for every access made by the operation.
+Treat this as a design constraint, not evidence of current implementation
+conformance or authorization to modify hardware.
+
 Ordinary capability conformance fixtures must finish the privileged boot
 window before measuring permission/bounds containment.
 

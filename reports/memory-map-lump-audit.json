@@ -1,0 +1,571 @@
+[
+  {
+    "filename": "Constants.1.e494696f.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RNC",
+        "severity": "warn",
+        "message": "NULL GT in c-list — slot [0] contains a NULL GT (0x00000000).",
+        "detail": "Instruction 1 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 4 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 7 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 10 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Instruction 13 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list. Note: c-list slots are always 0x00000000 in a freshly compiled binary — the runtime fills them at load time. This warning is expected for any lump that has not yet been deployed to the namespace.",
+        "violations": [
+          {
+            "msg": "Instruction 1 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+            "sourceLine": null,
+            "slot": 0,
+            "wordIndex": 0
+          },
+          {
+            "msg": "Instruction 4 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+            "sourceLine": null,
+            "slot": 0,
+            "wordIndex": 3
+          },
+          {
+            "msg": "Instruction 7 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+            "sourceLine": null,
+            "slot": 0,
+            "wordIndex": 6
+          },
+          {
+            "msg": "Instruction 10 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+            "sourceLine": null,
+            "slot": 0,
+            "wordIndex": 9
+          },
+          {
+            "msg": "Instruction 13 (LOAD) accesses capability slot 0, but that slot contains a NULL GT (0x00000000). The capability GT was not written into the c-list.",
+            "sourceLine": null,
+            "slot": 0,
+            "wordIndex": 12
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "filename": "SlideRule.Haskell.1.3542a2db.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RCI",
+        "severity": "error",
+        "message": "Instruction jump out of range — 3 jumps land outside the code section.",
+        "detail": "Instruction 126 (BRANCH) jumps to position 141, which is outside the code section (valid range: 0 to 136). Instruction 131 (BRANCH) jumps to position 144, which is outside the code section (valid range: 0 to 136). Instruction 133 (BRANCH) jumps to position 147, which is outside the code section (valid range: 0 to 136).",
+        "violations": [
+          {
+            "msg": "Instruction 126 (BRANCH) jumps to position 141, which is outside the code section (valid range: 0 to 136).",
+            "sourceLine": null
+          },
+          {
+            "msg": "Instruction 131 (BRANCH) jumps to position 144, which is outside the code section (valid range: 0 to 136).",
+            "sourceLine": null
+          },
+          {
+            "msg": "Instruction 133 (BRANCH) jumps to position 147, which is outside the code section (valid range: 0 to 136).",
+            "sourceLine": null
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "filename": "Tunnel.1.8770bf03.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Keystone.1.86b853a1.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Ethernet.1.b169bba4.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "GT.Encoding.v1.1.Hardware.Self-Test.1.254f3542.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Salvation.1.6be43a9d.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "BernoulliNumbers.1.656dd0e4.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "StringOps.1.05b56245.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub methods — 16 methods have no code body (bare RETURN).",
+        "detail": "word 15, word 57, word 79, word 92, word 105, word 118, word 128, word 139, word 140, word 151, word 152, word 166, word 171, word 209, word 224, word 315 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "EnglishLoops.1.19366291.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub method — 1 method has no code body (bare RETURN).",
+        "detail": "word 13 is a bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "IntegerOps.1.54c9a1e9.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub methods — 4 methods have no code body (bare RETURN).",
+        "detail": "word 5, word 10, word 15, word 20 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "NoteG.1.04a720f8.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Human.Hand.1.e88911d6.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub methods — 6 methods have no code body (bare RETURN).",
+        "detail": "word 2, word 3, word 4, word 5, word 6, word 7 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "EventRouter.1.032ca4ee.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub methods — 2 methods have no code body (bare RETURN).",
+        "detail": "word 15, word 19 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "Memory.1.3359e86e.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub method — 1 method has no code body (bare RETURN).",
+        "detail": "word 19 is a bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "Scheduler.IRQ.1.439e0ddd.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Loader.1.19ba3a9d.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "LEDFlash.1.55f1a32f.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.2f3d7d46.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.hw.1.1dcb7b09.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "MorseCmOk.1.eb20fe01.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SlideRule.1.d960f531.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.485e71f6.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.71c2809c.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.2fa83c3d.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.9089ba84.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.b98a03c4.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "NoteGAssembly.1.fed6f911.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "NoteGAssembly.1.f2e2eb3e.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Bank.1.7c58f0f4.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Bank.1.a4327568.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "MyAbstraction.1.827cfd7c.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.199d8c30.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.b49e8eca.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "ide.testMbit.1.d5046b90.lump",
+    "decoderMatches": true,
+    "findings": [
+      {
+        "ruleId": "RSM",
+        "severity": "warn",
+        "message": "Stub methods — 6 methods have no code body (bare RETURN).",
+        "detail": "word 13, word 14, word 15, word 16, word 17, word 18 are bare RETURN with no other instructions. This is expected for a method that only returns its own parameters unchanged; if that wasn't intended, re-compile the abstraction to fill in the missing implementation."
+      }
+    ]
+  },
+  {
+    "filename": "Legacy.1.8b7fb77f.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "ide.Alice.1.1eec355e.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "ide.Mallory.1.0ca567b5.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.79.eceee227.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.8ab7765f.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.81.532be597.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.82.4c1b2651.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.83.c80aeda6.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.d54e2115.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.823c4d65.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.6c161823.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.9bf03976.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "TestAbs.1.71742676.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.5e701b59.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.a6d49276.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.ba638038.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.83320494.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.e794a764.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.e8cb2017.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.6fd9df21.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.225da6fc.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.b5182a3d.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.8965def2.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.74c8ff97.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.ddd2582f.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.e2b69e5b.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Adder.1.0f63efe0.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.90.cf272798.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.14d378a6.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.92.cf272798.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.d2f81664.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.94.c1e03ab9.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.c2194804.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.658e6ba8.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.aac8cfa9.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.2.35647a26.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.95.37f37c75.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "SelfTest.1.8b19abd7.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.ba8b8e76.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.3f7e1c54.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.7fe59019.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.39f77d6e.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Tunnel.1.9381d362.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "Ethernet.1.fc72b0e3.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "ide.Alice.1.1e49ecb5.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "ide.Mallory.1.fdaed91d.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "ide.Alice.1.a91d33f7.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.a9237679.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.888f5960.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest_v37.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest_v38.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest_v39.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.ff2e3f35.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.a28f6ee7.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "CapabilityTest.1.68be391a.lump",
+    "decoderMatches": true,
+    "findings": []
+  },
+  {
+    "filename": "WukongCallHome.1.b29b38e3.lump",
+    "decoderMatches": true,
+    "findings": []
+  }
+]
