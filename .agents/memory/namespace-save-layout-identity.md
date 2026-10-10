@@ -2,6 +2,18 @@
 name: Namespace save layout versus identity
 description: Keep rebuilt descriptor changes separate from selected artifact substitution.
 ---
+Composite preparation must bind decoded metadata to the candidate raw image
+and compute provenance from the final metadata, all under one rollback boundary.
+Raw-only publication must still invalidate that binding.
+
+**Why:** Treating a prepared image as a raw-only write removed the binding
+immediately after preparation, so the subsequent approval rejected it. Binding
+against the previous image would instead retain a stale fingerprint.
+
+**How to apply:** Test confirmed preparation through immutable approval capture
+in private storage, as well as missing/mismatched-binding rejection and rollback.
+Do not fix this by retroactively trusting unbound historical state at freeze.
+
 Treat physical layout normalization separately from artifact selection. Preserve
 the submitted image for ordinary unchanged saves; do not bypass validation to
 avoid a rebuild when no valid image is available.

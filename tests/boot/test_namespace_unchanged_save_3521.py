@@ -12,6 +12,8 @@ import json
 import os
 import shutil
 import sys
+from pathlib import Path
+import pytest
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
@@ -109,7 +111,15 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
         monkeypatch.setattr(app_module, name, value)
 
     state_path = private_lumps / "ns-state.json"
-    initial_rows = json.loads(state_path.read_text(encoding="utf-8"))["abstractions"]
+    fixture_state = json.loads(state_path.read_text(encoding="utf-8"))
+    # The shared fixture adds a non-image Step2 allocation for unrelated
+    # tests. Approval fixtures must describe exactly the image's occupants.
+    fixture_state["abstractions"] = [
+        row for row in fixture_state["abstractions"]
+        if row.get("name") != "Step2Fixture"
+    ]
+    state_path.write_text(json.dumps(fixture_state))
+    initial_rows = fixture_state["abstractions"]
     selected_before = next(row for row in initial_rows if row.get("boot") is True)
     identity_before = _artifact_and_selection_identity(initial_rows)
 
@@ -168,3 +178,80 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
     assert read_boot_entry_info(committed_image)["entry_slot"] == (
         selected_before["slot"])
     assert private_config_path.read_bytes() == config_before
+
+    # Prepare/Run must retain the same binding that Save NS establishes.
+    # Exercise the real confirmation hook, staging, publication, and capture.
+    monkeypatch.setattr(app_module, "_load_boot_abstr_lump", lambda: None)
+    monkeypatch.setattr(app_module, "_load_boot_ns_lump", lambda: None)
+    with app_module.app.test_client() as client:
+        prepared = _confirmed_post(client, "/api/boot-image/generate", json={
+            "prepareRun": True,
+            "namespaceFingerprint": _namespace_fingerprint(
+                app_module, second_rows),
+        })
+    assert prepared.status_code == 200, prepared.get_json()
+    prepared_bytes = (private_lumps / "boot-image.bin").read_bytes()
+    prepared_state = json.loads(state_path.read_text())
+    binding = app_module._raw_namespace_fingerprint(
+        parse_ns_table_raw(prepared_bytes))
+    assert prepared_state["committed_raw_fingerprint"] == binding
+    assert _artifact_and_selection_identity(
+        prepared_state["abstractions"]) == identity_before
+    captured = app_module._capture_committed_namespace_snapshot()
+    assert captured["provenance"]["committed_raw_fingerprint"] == binding
+    provenance = json.loads(
+        (private_lumps / "boot-image.provenance.json").read_text())
+    assert provenance["source_sha256"]["ns_state"] == hashlib.sha256(
+        state_path.read_bytes()).hexdigest()
+
+    # Supply private, hash-bound elaboration fixtures (not release evidence)
+    # and exercise real immutable revision publication after preparation.
+    fpga_paths = {}
+    for key, name in (
+            ("verilog", "church_wukong_xc7a100t.v"),
+            ("rtlil", "church_wukong_xc7a100t.il"),
+            ("xdc", "wukong_xc7a100t.xdc"),
+            ("tcl", "wukong_xc7a100t.tcl")):
+        path = private_dir / name
+        path.write_bytes(("fixture-" + key).encode())
+        fpga_paths[key] = str(path)
+    digests = {
+        os.path.basename(path): hashlib.sha256(Path(path).read_bytes()).hexdigest()
+        for path in fpga_paths.values()
+    }
+    (private_dir / "church_wukong_xc7a100t.provenance.json").write_text(
+        json.dumps({
+            "schema_version": 1, "source_tree_clean": True,
+            "source_commit": "a" * 40,
+            "boot_inputs_sha256": {
+                "server/lumps/boot-image.bin": hashlib.sha256(prepared_bytes).hexdigest()},
+            "artifacts": {name: {"sha256": digest}
+                          for name, digest in digests.items()},
+            "input_files_sha256": {
+                "hardware/" + name: digest for name, digest in digests.items()},
+        }))
+    monkeypatch.setattr(app_module, "_fpga_paths",
+                        lambda _: (fpga_paths, None, None, None, None))
+    monkeypatch.setattr(app_module, "_git_full_head", lambda: "a" * 40)
+    monkeypatch.setattr(app_module, "_BUILD_SNAPSHOTS_DIR",
+                        str(private_dir / "snapshots"))
+    revision, frozen = app_module._freeze_namespace_revision("binding-regression")
+    record = app_module._artifact_revision_store().read("namespace", revision)
+    assert frozen["fingerprint"] == captured["fingerprint"]
+    assert record["files"]["boot-image.bin"] == hashlib.sha256(prepared_bytes).hexdigest()
+    assert record["files"]["namespace.json"] == hashlib.sha256(
+        json.dumps(prepared_state, sort_keys=True).encode()).hexdigest()
+
+    # Missing or stale binding must still fail closed; never repair at freeze.
+    for invalid_binding in (None, "0" * 64):
+        invalid = dict(prepared_state)
+        if invalid_binding is None:
+            invalid.pop("committed_raw_fingerprint")
+        else:
+            invalid["committed_raw_fingerprint"] = invalid_binding
+        state_path.write_text(json.dumps(invalid))
+        before_rejection = state_path.read_bytes()
+        with pytest.raises(ValueError, match="raw table revision"):
+            app_module._capture_committed_namespace_snapshot()
+        assert state_path.read_bytes() == before_rejection
+        assert (private_lumps / "boot-image.bin").read_bytes() == prepared_bytes

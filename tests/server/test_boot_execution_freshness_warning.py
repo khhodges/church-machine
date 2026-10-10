@@ -211,7 +211,7 @@ def test_prepare_generate_reports_selected_compiler_revision_current(
                         lambda *_args: b"prepared-fixture")
     monkeypatch.setattr(app_module, "_write_ns_state",
                         lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(app_module, "_write_boot_image_bytes", lambda *_args: None)
+    monkeypatch.setattr(app_module, "_write_boot_image_bytes", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(app_module, "_boot_image_preparation_status",
                         lambda *_args: {"status": "prepared"})
     response = _reviewed_post(
@@ -822,7 +822,7 @@ def test_prepare_run_endpoint_rolls_back_publication_failure(tmp_path, monkeypat
     monkeypatch.setattr(
         app_module._boot_image_gen, "validate_boot_image", lambda _image: None)
 
-    def fail_publish(_blob):
+    def fail_publish(_blob, **_kwargs):
         assert json.loads(state_path.read_text())["abstractions"][0][
             "filename"] == "Entry.new.lump"
         image_path.write_bytes(b"partial-new-image")
@@ -923,7 +923,7 @@ def test_prepare_run_endpoint_uses_real_exact_digest_validator_for_pin(
         app_module._boot_image_gen, "validate_boot_image", lambda _image: None)
     monkeypatch.setattr(
         app_module, "_write_boot_image_bytes",
-        lambda blob: image_path.write_bytes(blob))
+        lambda blob, **_kwargs: image_path.write_bytes(blob))
     monkeypatch.setattr(
         app_module, "_boot_image_preparation_status",
         lambda *_args: {"status": "prepared"})

@@ -5404,7 +5404,7 @@ def _write_boot_image_bytes(image_bytes, *, provenance_origin="generated",
     ``provenance_origin`` distinguishes a server-prepared composite from an
     imported, already-valid image.  It is metadata about the write, never a
     reason to rewrite bytes supplied by the programmer.  ``invalidate_ns_state``
-    is false only for the final phase of Save NS, where that transaction has
+    is false only for the final phase of Save NS or Prepare/Run, which has
     already installed the matching decoded state and needs provenance computed
     from those final inputs.
     """
@@ -5897,8 +5897,22 @@ def boot_image_generate():
                         artifact_pins=body.get("artifactPins"))
                     blob = _stage_prepare_run_boot_image(
                         cfg, prepared_rows, entry_slot, for_hardware)
+                    # Like Save NS, install the validated raw candidate under
+                    # the transaction lock before deriving its state binding.
+                    # The outer rollback owns image, state, and provenance.
+                    stage_path = BOOT_IMAGE_PATH + ".prepare-run.stage"
+                    try:
+                        with open(stage_path, "wb") as staged_image:
+                            staged_image.write(blob)
+                        os.replace(stage_path, BOOT_IMAGE_PATH)
+                    finally:
+                        try:
+                            os.remove(stage_path)
+                        except FileNotFoundError:
+                            pass
                     _write_ns_state(prepared_rows, allocation_config=cfg)
-                    _write_boot_image_bytes(blob)
+                    _write_boot_image_bytes(
+                        blob, invalidate_ns_state=False, boot_config=cfg)
                     next_fingerprint = _namespace_state_fingerprint(prepared_rows)
                     execution_freshness = _boot_execution_freshness(
                         {"abstractions": prepared_rows}, LUMPS_DIR)
