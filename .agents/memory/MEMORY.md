@@ -1,4 +1,5 @@
 - [ISA review decisions](isa-review-index.md) — scope, pre-release compatibility, encoding checks, cooperative scheduling and save-first fault recovery.
+- [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
 - [Compact header grouping](compact-header-grouping.md) — left stack ends at diagnostics; execution controls remain central, with board/settings on the right.
 - [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.
 - [Editor test contracts](editor-test-contracts.md) — guarded navigation needs stable editor identity and explicit consent; missing fixture state is not a runtime failure.

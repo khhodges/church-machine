@@ -1,0 +1,340 @@
+{
+  "originalLines": 17155,
+  "baselineCopies": 32,
+  "identicalCopies": 31,
+  "uniqueDifference": "RETURN (opcode 3)",
+  "headings": [
+    {
+      "level": "##",
+      "title": "Encoding Format",
+      "id": "encoding-format"
+    },
+    {
+      "level": "##",
+      "title": "Condition Codes",
+      "id": "condition-codes"
+    },
+    {
+      "level": "##",
+      "title": "Church Domain (10 Instructions)",
+      "id": "church-domain-10-instructions"
+    },
+    {
+      "level": "###",
+      "title": "LOAD (opcode 0)",
+      "id": "load-opcode-0"
+    },
+    {
+      "level": "###",
+      "title": "SAVE (opcode 1)",
+      "id": "save-opcode-1"
+    },
+    {
+      "level": "###",
+      "title": "CALL (opcode 2)",
+      "id": "call-opcode-2"
+    },
+    {
+      "level": "###",
+      "title": "RETURN (opcode 3)",
+      "id": "return-opcode-3"
+    },
+    {
+      "level": "###",
+      "title": "CHANGE (opcode 4)",
+      "id": "change-opcode-4"
+    },
+    {
+      "level": "###",
+      "title": "SWITCH (opcode 5)",
+      "id": "switch-opcode-5"
+    },
+    {
+      "level": "###",
+      "title": "TPERM (opcode 6)",
+      "id": "tperm-opcode-6"
+    },
+    {
+      "level": "####",
+      "title": "Encoding",
+      "id": "encoding"
+    },
+    {
+      "level": "####",
+      "title": "Mode 1 — Health Check (flag-setting)",
+      "id": "mode-1-health-check-flag-setting"
+    },
+    {
+      "level": "#####",
+      "title": "Conditional Execution: Zero-Cost Try-Catch",
+      "id": "conditional-execution-zero-cost-try-catch"
+    },
+    {
+      "level": "####",
+      "title": "Mode 2 — Permission Restriction (monotonic attenuation)",
+      "id": "mode-2-permission-restriction-monotonic-attenuation"
+    },
+    {
+      "level": "####",
+      "title": "Preset Table",
+      "id": "preset-table"
+    },
+    {
+      "level": "####",
+      "title": "Design Rationale",
+      "id": "design-rationale"
+    },
+    {
+      "level": "###",
+      "title": "LAMBDA (opcode 7)",
+      "id": "lambda-opcode-7"
+    },
+    {
+      "level": "###",
+      "title": "ELOADCALL (opcode 8)",
+      "id": "eloadcall-opcode-8"
+    },
+    {
+      "level": "###",
+      "title": "XLOADLAMBDA (opcode 9)",
+      "id": "xloadlambda-opcode-9"
+    },
+    {
+      "level": "##",
+      "title": "Turing Domain (10 Instructions + shared RETURN)",
+      "id": "turing-domain-10-instructions-shared-return"
+    },
+    {
+      "level": "###",
+      "title": "DREAD (opcode 16)",
+      "id": "dread-opcode-16"
+    },
+    {
+      "level": "###",
+      "title": "DWRITE (opcode 17)",
+      "id": "dwrite-opcode-17"
+    },
+    {
+      "level": "###",
+      "title": "BFEXT (opcode 18)",
+      "id": "bfext-opcode-18"
+    },
+    {
+      "level": "###",
+      "title": "BFINS (opcode 19)",
+      "id": "bfins-opcode-19"
+    },
+    {
+      "level": "###",
+      "title": "MCMP (opcode 20)",
+      "id": "mcmp-opcode-20"
+    },
+    {
+      "level": "###",
+      "title": "IADD (opcode 21)",
+      "id": "iadd-opcode-21"
+    },
+    {
+      "level": "###",
+      "title": "ISUB (opcode 22)",
+      "id": "isub-opcode-22"
+    },
+    {
+      "level": "###",
+      "title": "BRANCH (opcode 23)",
+      "id": "branch-opcode-23"
+    },
+    {
+      "level": "###",
+      "title": "SHL (opcode 24)",
+      "id": "shl-opcode-24"
+    },
+    {
+      "level": "###",
+      "title": "SHR (opcode 25)",
+      "id": "shr-opcode-25"
+    },
+    {
+      "level": "##",
+      "title": "Assembly Syntax",
+      "id": "assembly-syntax"
+    },
+    {
+      "level": "###",
+      "title": "Labels",
+      "id": "labels"
+    },
+    {
+      "level": "###",
+      "title": "Comments",
+      "id": "comments"
+    },
+    {
+      "level": "###",
+      "title": "Register Names",
+      "id": "register-names"
+    },
+    {
+      "level": "###",
+      "title": "Immediate Values",
+      "id": "immediate-values"
+    },
+    {
+      "level": "##",
+      "title": "Three-Tier Fault Recovery (Task #1077)",
+      "id": "three-tier-fault-recovery-task-1077"
+    },
+    {
+      "level": "###",
+      "title": "Tier 1 — `.catch` Method on the Faulting Abstraction",
+      "id": "tier-1-catch-method-on-the-faulting-abstraction"
+    },
+    {
+      "level": "###",
+      "title": "Tier 2 — Scheduler.IRQ (Hidden ELOADCALL)",
+      "id": "tier-2-schedulerirq-hidden-eloadcall"
+    },
+    {
+      "level": "###",
+      "title": "Tier 3 — Double-Fault (CHANGE to CR13)",
+      "id": "tier-3-double-fault-change-to-cr13"
+    },
+    {
+      "level": "###",
+      "title": "Scheduler.pause and Timer Interrupts",
+      "id": "schedulerpause-and-timer-interrupts"
+    }
+  ],
+  "originalRanges": [
+    [
+      251,
+      787
+    ],
+    [
+      788,
+      1315
+    ],
+    [
+      1316,
+      1843
+    ],
+    [
+      1844,
+      2371
+    ],
+    [
+      2372,
+      2899
+    ],
+    [
+      2900,
+      3427
+    ],
+    [
+      3428,
+      3955
+    ],
+    [
+      3956,
+      4483
+    ],
+    [
+      4484,
+      5011
+    ],
+    [
+      5012,
+      5539
+    ],
+    [
+      5540,
+      6067
+    ],
+    [
+      6068,
+      6595
+    ],
+    [
+      6596,
+      7123
+    ],
+    [
+      7124,
+      7651
+    ],
+    [
+      7652,
+      8179
+    ],
+    [
+      8180,
+      8707
+    ],
+    [
+      8708,
+      9235
+    ],
+    [
+      9236,
+      9763
+    ],
+    [
+      9764,
+      10291
+    ],
+    [
+      10292,
+      10819
+    ],
+    [
+      10820,
+      11347
+    ],
+    [
+      11348,
+      11875
+    ],
+    [
+      11876,
+      12403
+    ],
+    [
+      12404,
+      12931
+    ],
+    [
+      12932,
+      13459
+    ],
+    [
+      13460,
+      13987
+    ],
+    [
+      13988,
+      14515
+    ],
+    [
+      14516,
+      15043
+    ],
+    [
+      15044,
+      15571
+    ],
+    [
+      15572,
+      16099
+    ],
+    [
+      16100,
+      16627
+    ],
+    [
+      16628,
+      17155
+    ]
+  ],
+  "historicalSha256": "d8bb1e17b40f39a5fb63858ebf1a23e23b013ba563707df8466b3c9de39479f9",
+  "originalPreamble": "# Historical baseline — not current instruction guidance\n\nEverything below preserves older descriptions and repeated baseline material\nfor historical inspection. In particular, fused-opcode encodings, their\nbackward-compatibility claims and “hidden ELOADCALL” explanations are obsolete.\nUse the current normative corrections above, not these historical sections,\nfor those instructions. Keeping this evidence does not preserve executable\ncompatibility. No historical program is rewritten by this documentation change.\n\n"
+}

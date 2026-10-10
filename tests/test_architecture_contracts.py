@@ -237,7 +237,9 @@ def test_return_keep_mask_contract_and_normative_docs():
     assert "STACK_UNDERFLOW" in contract["hardwareBootReturn"]
     assert "lambda-fast RETURN bypasses cLoad" not in limits
     for relative in (
-        "docs/instruction-set.md", "docs/isa_reference.md",
+        # The repeated baseline (including both RETURN variants) is historical
+        # evidence, now separate from the master's current normative corrections.
+        "docs/instruction-set-history.md", "docs/isa_reference.md",
         "docs/call-stack.md", "docs/church-instructions.md",
     ):
         text = (ROOT / relative).read_text(encoding="utf-8")

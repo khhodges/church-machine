@@ -695,6 +695,20 @@ async function loadDoc(filename, anchor) {
             });
         if (body) {
             body.innerHTML = renderMarkdown(data.content);
+            // Keep relative Markdown links inside Reference, including fragments.
+            body.onclick = event => {
+                const link = event.target.closest('a');
+                if (!link || !body.contains(link)) return;
+                const href = link.getAttribute('href') || '';
+                const match = href.match(/^([a-zA-Z0-9_.-]+\.md)?(#[a-zA-Z0-9_-]+)?$/);
+                if (!match || !href) return;
+                event.preventDefault();
+                if (match[1]) loadDoc(match[1], match[2]);
+                else {
+                    const target = body.querySelector('#' + CSS.escape(match[2].slice(1)));
+                    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            };
             if (anchor) {
                 const anchorId = anchor.replace(/^#/, '');
                 const target = body.querySelector('#' + CSS.escape(anchorId));
@@ -763,10 +777,13 @@ function _mdSlug(text) {
 
 function renderMarkdown(md) {
     let html = escapeHtml(md);
+    // Only empty, ID-only anchors are admitted; arbitrary raw HTML stays escaped.
+    html = html.replace(/&lt;a id=&quot;([a-zA-Z0-9_-]+)&quot;&gt;&lt;\/a&gt;/g, '<a id="$1"></a>');
     html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (m, lang, code) => {
         return '<pre><code>' + code.trim() + '</code></pre>';
     });
     html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/^(#{4,6}) (.+)$/gm, (m, hashes, txt) => `<h${hashes.length} id="${_mdSlug(txt)}">${txt}</h${hashes.length}>`);
     html = html.replace(/^### (.+)$/gm, (m, txt) => `<h3 id="${_mdSlug(txt)}">${txt}</h3>`);
     html = html.replace(/^## (.+)$/gm, (m, txt) => `<h2 id="${_mdSlug(txt)}">${txt}</h2>`);
     html = html.replace(/^# (.+)$/gm, (m, txt) => `<h1 id="${_mdSlug(txt)}">${txt}</h1>`);

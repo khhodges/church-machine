@@ -135,7 +135,7 @@ register_suite "check-security-claims" \
     'python3 scripts/check_security_claims.py && python3 scripts/test_check_security_claims.py'
 
 register_suite "check-api-reference-stale" \
-    'node simulator/test_abs_saved_api.js && node simulator/test_current_isa_guidance.js && node simulator/assembler_idx1_test.js && node simulator/test_indexed_call_annotation.js && node scripts/gen-api-reference.js --check && node scripts/gen-thread-design.js --check && node scripts/gen-architecture-contracts.js --check && python -m pytest tests/test_architecture_contracts.py -q'
+    'node simulator/test_abs_saved_api.js && node simulator/test_current_isa_guidance.js && node simulator/test_isa_history_navigation.js && node simulator/assembler_idx1_test.js && node simulator/test_indexed_call_annotation.js && node scripts/gen-api-reference.js --check && node scripts/gen-thread-design.js --check && node scripts/gen-architecture-contracts.js --check && python -m pytest tests/test_architecture_contracts.py tests/gates/test_switch_docs_contract.py::test_current_switch_docs_share_fault_and_register_contract tests/gates/test_switch_docs_contract.py::test_current_switch_docs_do_not_claim_passkey_or_sentinel_authority -q'
 
 register_suite "check-whats-new-feed" \
     'node scripts/test_sync_whats_new.js && node scripts/sync-whats-new.js --check'
