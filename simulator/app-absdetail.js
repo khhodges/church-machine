@@ -308,7 +308,128 @@ function _renderBootNSDecoder(contentEl, abs) {
     contentEl.innerHTML = html;
 }
 
-function showAbstractionDetail(index, methodName) {
+function _absApiEscape(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function _absSavedApiHtml(inspection, identity) {
+    const esc = _absApiEscape;
+    const api = inspection && inspection.api_definition;
+    let html = `<p>Exact saved artifact: <code>${esc(identity.filename)}</code><br>` +
+        `SHA-256: <code style="overflow-wrap:anywhere">${esc(identity.binary_hash)}</code>. Historical revisions describe only their own bytes.</p>`;
+    if (!api || !Array.isArray(api.methods)) {
+        return html + '<p>Saved API unavailable for these bytes. Register descriptions and method indices are not verified. No catalog fallback is used.</p>';
+    }
+    const value = v => v === undefined || v === null ? 'Unavailable in saved API'
+        : Array.isArray(v) ? (v.length ? v.map(x => esc(typeof x === 'object' ? JSON.stringify(x) : x)).join('<br>') : 'None declared')
+        : esc(typeof v === 'object' ? JSON.stringify(v) : v);
+    html += `<p>Saved API return convention: ${value(api.returnConvention)}</p>`;
+    if (!api.methods.length) return html + '<p>The saved API declares no methods.</p>';
+    for (const method of api.methods) {
+        if (!method || typeof method !== 'object') continue;
+        // Array position and code offset do not prove a dispatch selector.
+        html += `<h4>${value(method.name)}</h4><table class="abs-reg-conv-table"><tbody>`;
+        for (const [label, field] of [
+            ['Description', method.description], ['Method Index', method.index],
+            ['Selector', method.selector], ['Input', method.inputs],
+            ['Output / return', method.outputs ?? method.returns],
+            ...(method.outputs != null && method.returns != null ? [['Returns', method.returns]] : []),
+            ['Comments', method.comments]
+        ]) html += `<tr><td>${label}</td><td>${value(field)}</td></tr>`;
+        html += '</tbody></table>';
+    }
+    return html;
+}
+
+async function _absSavedApiFromResponse(data) {
+    const inspection = data.inspection || data.binary_inspection || data;
+    if (Object.prototype.hasOwnProperty.call(inspection, 'api_definition')) return inspection;
+    // History responses can omit the API field. Inspect their exact returned
+    // words rather than consulting a sidecar or re-fetching a current token.
+    let api = null;
+    if (!data.raw_tail_hex && Array.isArray(data.words) &&
+        typeof LumpContentFrame !== 'undefined') {
+        try {
+            const content = await LumpContentFrame.lumpInspectContentFrame(data.words);
+            if (content.headerValid && content.contentFrameValid) api = content.apiDefinition;
+        } catch (_) { /* Uninspectable historical bytes remain unavailable. */ }
+    }
+    return { binary_hash: inspection.binary_hash, api_definition: api };
+}
+
+async function _absInspectSavedApi(identity, target) {
+    const request = {};
+    target._request = request;
+    target.textContent = 'Inspecting exact saved LUMP API…';
+    try {
+        if (!identity.filename || !identity.token || !/^[a-f0-9]{64}$/i.test(identity.binary_hash || '')) {
+            throw new Error('Exact filename, token and binary hash are required');
+        }
+        const url = `/api/lump/${encodeURIComponent(identity.token)}/words?exact_filename=${encodeURIComponent(identity.filename)}&binary_hash=${encodeURIComponent(identity.binary_hash)}`;
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Inspection returned HTTP ${response.status}`);
+        const data = await response.json();
+        const inspection = data.inspection || data.binary_inspection || data;
+        if ((data.filename || data.lump || data.archive_filename) !== identity.filename ||
+            String(inspection.binary_hash || '').toLowerCase() !== identity.binary_hash.toLowerCase()) {
+            throw new Error('Returned artifact identity does not match the selected revision');
+        }
+        const apiInspection = await _absSavedApiFromResponse(data);
+        if (target._request === request) target.innerHTML = _absSavedApiHtml(apiInspection, identity);
+    } catch (error) {
+        if (target._request === request) target.textContent =
+            `Saved API unavailable: ${error.message}. No data changed. Reopen the exact saved revision and retry; catalog conventions are not verified.`;
+    }
+}
+
+async function _absLoadSavedApi(name, host, exactArtifact) {
+    host.textContent = 'Loading saved artifact choices…';
+    try {
+        // An explicit inspected revision never depends on the current catalog.
+        const receipt = exactArtifact || window._editorSavedBinaryReceipt;
+        if (receipt && receipt.abstraction === name) {
+            await _absInspectSavedApi(receipt, host);
+            return;
+        }
+        const response = await fetch('/api/lumps/list', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Catalog returned HTTP ${response.status}`);
+        const rows = (await response.json()).filter(row => row.abstraction === name);
+        host.textContent = '';
+        const label = document.createElement('label');
+        label.textContent = 'Saved LUMP API — choose the exact artifact: ';
+        const select = document.createElement('select');
+        select.style.maxWidth = '100%';
+        const empty = document.createElement('option');
+        empty.textContent = 'Select a saved revision';
+        empty.value = '';
+        select.appendChild(empty);
+        rows.forEach((row, i) => {
+            const option = document.createElement('option');
+            option.value = String(i);
+            option.textContent = `${row.filename || 'Filename unavailable'} · ${row.binary_hash || 'Hash unavailable'}`;
+            select.appendChild(option);
+        });
+        label.appendChild(select);
+        host.appendChild(label);
+        const result = document.createElement('div');
+        result.textContent = rows.length ? 'Select a revision to inspect its API. Catalog information below is unverified.'
+            : 'Saved API unavailable: no saved artifact found. Catalog information below is unverified.';
+        host.appendChild(result);
+        select.onchange = () => {
+            if (select.value !== '') _absInspectSavedApi(rows[Number(select.value)], result);
+            else { result._request = null; result.textContent = 'No saved revision selected.'; }
+        };
+        if (rows.length === 1) {
+            select.value = '0';
+            select.onchange();
+        }
+    } catch (error) {
+        host.textContent = `Saved API unavailable: ${error.message}. No data changed. Reopen Abstractions to retry.`;
+    }
+}
+
+function showAbstractionDetail(index, methodName, exactArtifact) {
     selectedAbsIndex = index;
     renderAbstractions();
 
@@ -523,9 +644,12 @@ function showAbstractionDetail(index, methodName) {
         const methods = (abs.methods && abs.methods.length > 0) ? abs.methods : [];
         const uid = abs.index;
         html += '<div class="abs-detail-section abs-methods-section">';
-        html += '<div class="abs-detail-label">Methods</div>';
+        html += '<div class="abs-detail-label">Saved LUMP method API</div>';
+        html += '<div id="absSavedApi"></div>';
+        html += '<div class="abs-detail-label">Catalog methods — historical / unverified</div>';
+        html += '<p>Catalog descriptions, examples and conventions below are not verified against the selected saved LUMP. Catalog row numbers are not dispatch selectors. Use the exact saved API above.</p>';
         if (methods.length === 0) {
-            html += '<div class="abs-method-empty">No methods registered \u2014 CALL enters the abstraction directly.</div>';
+            html += '<div class="abs-method-empty">No catalog methods registered. This does not establish the saved artifact’s dispatch behavior.</div>';
             const absLvlStatus = _implStatusGet(`abs:${uid}`);
             const absStatusOpts = IMPL_STATUS_LEVELS.map(s =>
                 `<option value="${s}"${s === absLvlStatus ? ' selected' : ''}>${IMPL_STATUS_LABELS[s]}</option>`
@@ -571,9 +695,9 @@ function showAbstractionDetail(index, methodName) {
                 const isMain = m.toLowerCase() === 'main';
                 const mainTabClass = isMain ? ' abs-method-tab-main' : '';
                 html += `<span class="abs-method-tab${active}${mainTabClass}" onclick="absOpenMethodInEditor(${uid},'${m}',this,'abs-panel-${uid}-${mi}')">`;
-                html += `<span class="abs-method-selector-num" title="Selector ${mi + 1}">#${mi + 1}</span>`;
+                html += `<span class="abs-method-selector-num" title="Catalog row, not a verified selector">row ${mi + 1}</span>`;
                 html += `<span class="abs-method-tab-name">${m}</span>`;
-                if (isMain) html += `<span class="abs-method-main-badge" title="Primary entry point \u2014 CALL enters here with no selector">entry</span>`;
+                if (isMain) html += `<span class="abs-method-main-badge" title="Historical catalog entry designation; not verified for saved bytes">catalog entry</span>`;
                 html += `<span class="abs-compile-state-badge abs-compile-state-${compileState}" title="Compile state: ${csLabel}">${csLabel}</span>`;
                 html += `<span class="abs-method-status-badge abs-method-status-badge-${mStatus}" onclick="event.stopPropagation();absToggleStatusDropdown(${uid},${mi},event)" title="Status: ${IMPL_STATUS_LABELS[mStatus]} — click to change">`;
                 html += `<span class="abs-method-status-badge-dot"></span>${badgeLabel}`;
@@ -625,9 +749,9 @@ function showAbstractionDetail(index, methodName) {
                 html += `<div class="abs-method-panel-item" id="abs-panel-${uid}-${mi}"${display}>`;
                 html += `<div class="abs-method-panel-header">`;
                 html += `<div class="abs-method-panel-name">`;
-                html += `<span class="abs-method-panel-selector" title="Selector ${mi + 1}">#${mi + 1}</span>`;
+                html += `<span class="abs-method-panel-selector" title="Catalog row, not a verified selector">row ${mi + 1}</span>`;
                 html += `<span class="abs-method-panel-name-text">${abs.name}.${m}</span>`;
-                if (isMainPanel) html += ` <span class="abs-method-main-badge abs-method-main-badge-lg" title="Primary entry point \u2014 CALL without a selector goes here">primary entry point</span>`;
+                if (isMainPanel) html += ` <span class="abs-method-main-badge abs-method-main-badge-lg" title="Historical catalog entry designation; not verified for saved bytes">catalog entry (unverified)</span>`;
                 html += `<button class="btn btn-xs abs-method-copy-call-btn" title="Copy: CALL ${abs.name}.${m}" onclick="event.stopPropagation();_absCopyCall('${abs.name.replace(/'/g,"\\'")}','${m.replace(/'/g,"\\'")}',this)">copy CALL</button>`;
                 html += `</div>`;
                 html += `<div class="abs-method-panel-actions">`;
@@ -641,8 +765,9 @@ function showAbstractionDetail(index, methodName) {
                 html += `<div class="abs-method-panel-desc">${purpose}</div>`;
                 const regConv = METHOD_REGISTER_CONVENTIONS[abs.name] && METHOD_REGISTER_CONVENTIONS[abs.name][m];
                 if (regConv) {
+                    html += '<div>Historical convention — not verified for this saved artifact</div>';
                     html += '<table class="abs-reg-conv-table"><tbody>';
-                    html += `<tr><td>Method Index</td><td>${regConv.index}</td></tr>`;
+                    html += `<tr><td>Historical Method Index (unverified)</td><td>${regConv.index}</td></tr>`;
                     html += `<tr><td>Input</td><td>${regConv.input}</td></tr>`;
                     html += `<tr><td>Output</td><td>${regConv.output}</td></tr>`;
                     // Legacy convention records remain historical evidence, not
@@ -873,7 +998,7 @@ function showAbstractionDetail(index, methodName) {
 
     if (abs.name === 'SlideRule') {
         html += '<div class="abs-detail-section abs-note-security">';
-        html += '<div class="abs-detail-label">Namespace Extension Model</div>';
+        html += '<div class="abs-detail-label">Historical Namespace Extension Model — not verified for saved bytes or current dispatch</div>';
         html += '<div class="abs-note-text">SlideRule demonstrates the Church Machine\u2019s extensibility principle: ';
         html += 'one CALL opcode, one namespace entry (SlideRule — NS[16]), and 22 methods accessed via two dispatch rules.<br><br>';
         html += '<b>Rule 1 \u2014 Direct (methods 0\u201314):</b> <code>CALL d, CRs, #imm</code> \u2014 the method index is the bare number <code>d</code> ';
@@ -887,6 +1012,9 @@ function showAbstractionDetail(index, methodName) {
     }
 
     contentEl.innerHTML = html;
+
+    const apiHost = document.getElementById('absSavedApi');
+    if (apiHost) _absLoadSavedApi(abs.name, apiHost, exactArtifact);
 
     // Jump-to-method: if a specific method was requested, scroll its panel into
     // view so the user lands on the method itself rather than the top of the

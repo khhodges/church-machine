@@ -4939,8 +4939,19 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `<div class="lump-stored-src-empty">This LUMP file is empty.</div>` +
                 `</div>`;
         }
+        // API evidence must come from this same archive response, never the
+        // current catalog or a second lookup by abstraction/token.
+        const methodApiPreview = '<details class="lump-detail-section"><summary>Saved method API (this exact revision)</summary>' +
+            (typeof _absSavedApiHtml === 'function' && typeof _absSavedApiFromResponse === 'function'
+                ? _absSavedApiHtml(await _absSavedApiFromResponse(data), {
+                    filename: data.filename || data.archive_filename || archiveFilename || 'Unavailable',
+                    binary_hash: inspection && inspection.binary_hash || 'Unavailable'
+                })
+                : '<p>Saved method API viewer unavailable. No catalog fallback is used.</p>') +
+            '</details>';
+        if (document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
         _showLumpHistoryPreviewModal(
-            version, issueSummary + repairControls + sourcePreview + t
+            version, issueSummary + repairControls + sourcePreview + methodApiPreview + t
         );
         if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
         const openEditorButton = document.querySelector(

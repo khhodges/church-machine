@@ -17,3 +17,13 @@ hide an authoritative empty method table in the selected binary.
 **How to apply:** Test public compile entry points without seeded global
 conventions; include selected artifacts with empty APIs. Do not repair missing
 method metadata by guessing selector zero or mutating saved binaries.
+
+Read-only method descriptions obey the same exact-artifact boundary. Missing
+input/output or index fields mean unavailable, not permission to substitute a
+catalog convention. Historical descriptions remain explicitly unverified.
+
+**Why:** Catalog return registers and method positions can disagree with saved
+APIs. Presentation cleanup must not alter compiler or execution behavior.
+
+**How to apply:** Preserve historical convention tables used by compilation;
+isolate display evidence and keep archived previews tied to their own bytes.
