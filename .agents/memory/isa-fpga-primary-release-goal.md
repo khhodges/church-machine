@@ -49,12 +49,12 @@ only the former can promise no Namespace write events.
 Do not adopt the legacy hardware Mint writer as ide.Mint's commit primitive
 merely because it stalls CPU execution.
 
-**Why:** CPU exclusion is weaker than an authenticated, acknowledged transaction
-with interruption recovery; the draft requires the latter.
+**Why:** CPU exclusion alone does not establish external-writer exclusion,
+completed RAM writes or defined interruption handling.
 
-**How to apply:** Keep Outform containment intact while designing the commit
-interface. Require explicit old/new visibility and recovery evidence before
-enabling the writer, rather than treating an FSM completion pulse as proof.
+**How to apply:** Keep Outform containment intact. Require explicit write and
+interruption evidence before enabling the writer, rather than treating an FSM
+completion pulse as proof. A full transaction engine is not a Phase 1 requirement.
 
 Phase 1 uses run-to-suspension cooperative round-robin timesharing.
 
@@ -65,3 +65,21 @@ Mint atomicity review justified more immediate infrastructure.
 transaction engine solely for sequential Namespace writes. A bounded,
 non-suspending update can exclude other scheduled Threads; reset/fault handling
 and external writers remain separate requirements if Mint is enabled.
+
+The user's final ide.Mint direction is the Phase 1 bounded rule, not the earlier
+full transaction-engine recommendation. The authoritative Forge contract remains
+the design team's draft; the supplied scaffold is a correction log only.
+
+**Why:** The user supplied the bounded-rule and correction-log documents as the
+final word on ide.Mint. They retain draft/unapproved mechanism status and do not
+authorize implementation or saved-LUMP changes.
+
+**How to apply:** Require a single non-suspending update body (no CALL/yield),
+R1 external-writer exclusion or accepted writes, R2 bounded reset/fault drain or
+proven recovery, and R3 publication only after completed writes and the reset
+boundary. Preferred scope is exclusion plus bounded drain, create-only; the
+documents still leave create-only versus replace as a team decision and exact
+hardware bounds/real T input unresolved. Authentication and authorization gates
+remain mandatory. Revisit at true-concurrency/multi-machine boundaries. Do not
+interpret a recovery marker alone as reconstructing overwritten old words, or
+create-only as permission to ignore retained generations on reused empty slots.
