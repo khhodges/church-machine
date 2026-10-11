@@ -27,3 +27,17 @@ reserve the next Namespace's assignments.
 **How to apply:** Preserve exact saved selections and historical approvals.
 Keep architecture/hardware profile requirements explicit and separate from
 generic Namespace editing.
+
+The three-LUMP infinite loop (3LL) must include an open-ended breakout option.
+The bootstrap/test profile must not become a permanent restriction on which
+programs, abstractions or hardware drivers can run.
+
+**Why:** The user explicitly requires that Phase 1 preserve open-ended progress,
+using breakout from the 3LL as the concrete example.
+
+**How to apply:** Treat a capability-checked handoff beyond the fixed loop as an
+alignment requirement, not merely a future enhancement. Do not hard-code a
+closed list of future targets or require an ISA change for each new program.
+Preserve cooperative scheduling, validation and recovery rules. The trigger,
+target-selection authority and continuation semantics still need specification;
+this requirement alone does not authorize a saved-LUMP replacement or FPGA flash.
