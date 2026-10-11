@@ -13,3 +13,14 @@ work distracted from the later boot/root-frame correction sequence.
 exact frozen binaries to physical acceptance. Do not confuse older remote build
 completion with synthesis of subsequent corrections. Plan finalization does not
 approve unresolved red-text proposals or authorize physical operations.
+
+The user approved bit-exact golden-layout and architectural-checkpoint comparisons
+as mandatory release evidence, including the Namespace Table and three resident
+LUMPs, registers and intermediate write events.
+
+**Why:** A simulator-generated dump alone can reproduce its own bugs; generic
+image, projected memory and FPGA initializer evidence must remain distinct.
+
+**How to apply:** Independently derive expectations from approved semantics and
+frozen inputs, reuse them across simulator/RTL/synthesized/physical checks, and
+report unobservable FPGA state as an evidence gap rather than a pass.
