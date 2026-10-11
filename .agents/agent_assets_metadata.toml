@@ -906,3 +906,17 @@ mtime_ms = 1791703861233
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a544af43-4d6c-44a6-a826-1717901fc06d/9c80d843-fc90-460c-8339-22ab04a532d1"
 storage_version_token = "1791703881498562"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "BykIRKRzGUGhvH469sfp-"
+uri = "file://reports/bitstream-candidate-readiness.md"
+type = "text"
+title = "Bitstream Candidate Readiness Review"
+description = "Current evidence, blockers, bounded implementation sequence, and twelve required handoff acceptance cases."
+logical_id = "ea68574c-62f1-42c8-8f64-9ec24d60f6c1"
+content_hash = "sha256:d720c6eea351771be47b72640bb3de8b11ec1d11a4afeec437e307836bb8e5a9"
+size = 13579
+mtime_ms = 1791712515978
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ea68574c-62f1-42c8-8f64-9ec24d60f6c1/e4bdc556-202c-4e7b-804c-e3251030daa8"
+storage_version_token = "1791712529498008"
+content_type = "text/markdown"

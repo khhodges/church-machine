@@ -234,6 +234,11 @@ Keep UI enhancements and unrelated features outside this release sequence.
 
 ## Immediate next action
 
+See the [candidate-readiness review](../../reports/bitstream-candidate-readiness.md)
+for the inspected baseline, retained-test triage, bounded implementation sequence
+and required System Namespace handoff acceptance cases. Its disposition is not
+ready for synthesis; historical passes are not fresh candidate certification.
+
 Complete Gate 1's decision ledger against the red-ISA and the latest candidate
 review, then inventory current conformance gaps and failing release tests.
 Do not launch another bitstream build until its contract and frozen input gates
