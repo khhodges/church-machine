@@ -6,6 +6,11 @@ Date: 2026-10-11
 draft. This document does not claim implementation, allocate GTs or slots,
 replace saved LUMPs, enable Mint/Outform, or authorize a build or flash.
 
+The [Boot → System first-pass definition](boot-system-handoff-first-pass.md)
+proposes the initial lifecycle, selection record, ISA mapping, controlled
+transition context and recovery policy. Its recommendations remain subject to
+Design Team approval and cross-Namespace mechanism proof.
+
 ## 1. Purpose and startup sequence
 
 The first destination beyond the evolved three-LUMP diagnostic loop (3LL) is a

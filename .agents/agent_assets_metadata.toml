@@ -920,3 +920,17 @@ mtime_ms = 1791712515978
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/ea68574c-62f1-42c8-8f64-9ec24d60f6c1/e4bdc556-202c-4e7b-804c-e3251030daa8"
 storage_version_token = "1791712529498008"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "INZW9pCbs-bL-CUV_ZMvt"
+uri = "file://docs/boot-system-handoff-first-pass.md"
+type = "text"
+title = "Boot → System Namespace: First-Pass Contract"
+description = "Proposed startup lifecycle, exact selection inputs, SWITCH/CHANGE mapping, recovery policy, and decisions still requiring approval."
+logical_id = "7c077521-4c1a-4ec8-915a-99d07b5ed22b"
+content_hash = "sha256:54b922ad7ab5ef91508441ac5451981bffcf0e13652c30c8542893e1f661d6c8"
+size = 14557
+mtime_ms = 1791714101510
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7c077521-4c1a-4ec8-915a-99d07b5ed22b/9e5d353c-14e2-4df6-9b57-67bee94af3ef"
+storage_version_token = "1791714113546363"
+content_type = "text/markdown"
