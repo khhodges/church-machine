@@ -1,0 +1,145 @@
+# Red-ISA → simulator → bitstream → FPGA alignment
+
+Finalized execution plan: 2026-10-11.
+Working candidate name: **B.1.1+**. This label is not a build ID or certification.
+
+## Goal and authority
+
+One explicitly approved architectural contract, implemented consistently by the
+compiler, simulator and FPGA, with evidence tied to the exact delivered bytes.
+This is the primary project objective, not a side investigation.
+
+Finalizing this plan does not approve every red-text proposal or authorize
+flashing, destructive replacement, or a vendor build in this turn.
+Previously approved decisions remain binding. Unresolved architectural choices
+require explicit resolution; implementation behavior is not a substitute.
+
+## Starting evidence
+
+- B.1 and B1.1 have remote-build records in uploaded terminal transcripts.
+  The corrected October 8 B1 package is historical build evidence, not evidence
+  that subsequent boot CHANGE and factory-root corrections were synthesized.
+- `reports/initializer-reset-faithful-validation.md` records passing reset-faithful
+  initializer/full-system functional replay, not whole-chip timing or board proof.
+- `reports/boot-change-correction.md` records scratch-free boot CHANGE, factory
+  root preparation and boot/method-dispatch behavioral checks.
+- `reports/root-frame-candidate-review.md` records the executable-limit correction
+  and passing candidate behavioral replay. No replacement approval was frozen;
+  fresh elaboration provenance and release review remained outstanding.
+- `reports/isa-seven-items-review-proposals.md` and
+  `reports/church-consolidated-contract-proposal.md` contain both agreed directions
+  and unresolved proposals. Their draft status must not be silently promoted.
+- Existing workflow failures must be triaged against the selected source baseline;
+  earlier focused passes do not establish that the current release suite is green.
+
+## Ordered gates
+
+### 1. Freeze the approved ISA and binary contract
+
+Reconcile the red review, current normative ISA, and recorded user decisions.
+Produce an approved/deferred/unresolved decision ledger, exact encoding vectors,
+fault precedence, state effects and preserved-state rules.
+
+Resolve at least the identified open areas: TPERM special-mode encoding and NULL
+precedence; Namespace geometry/self-view bounds; resident kind and protected
+context representation; nonresident representation; member placement/framing;
+CALL/LAMBDA/RETURN/CHANGE continuation and applicable compiler ABI.
+Do not reopen settled choices without evidence of a conflict.
+Deferred features must be explicitly unsupported, not silently implemented.
+If an unresolved choice affects boot or executable bytes, stop that branch here.
+
+**Exit:** one versioned contract with no contradictory active definitions for
+the release scope. Historical text and artifacts remain evidence only.
+
+### 2. Align compiler, simulator and IDE
+
+Use that contract to complete the instruction/state/fault matrix.
+Verify immediate and DR-indexed operands, predication, malformed and retired
+encodings, permissions, bounds, GT type-specific fields, flags, and atomic faults.
+Include EXACT, Thread roots, boot CHANGE without CR8 scratch, CALL dispatch,
+RETURN continuations, LAMBDA and scheduler/recovery behavior in the agreed scope.
+Keep experimental IDX1 success separate from normative conformance.
+
+Compare against independently authored expected results, not just a shared
+implementation that could reproduce the same bug in both models.
+Reconcile IDE instruction descriptions and binary inspectors with this contract.
+Triage existing failing tests; repair stale fixtures only against approved
+semantics, never weaken an assertion simply to get a pass.
+
+**Exit:** release-scoped simulator/compiler tests pass, each excluded failure has
+an explicit non-release rationale, and no unresolved failure can affect the
+candidate's bytes, execution, authority or verification.
+
+### 3. Prepare and freeze the exact B.1.1+ inputs
+
+Prepare a new isolated candidate from explicit selected LUMP revisions.
+Preserve historical B.1/B1.1 snapshots and live catalog bytes.
+Verify root frames, prepared Thread entries, exact executable bounds, SELF and
+destination-localized C-Lists, Namespace membership, layout and integrity.
+Run the full intended boot and repeated CapabilityTest → SelfTest →
+WukongCallHome path against this exact candidate, checking returns and faults.
+
+Freeze Namespace, all selected binary hashes, boot entry, source commit,
+architectural contract version and complete hardware inputs through the approved
+revision mechanism. No mutable filenames may select downstream build inputs.
+
+**Exit:** an approved immutable input revision, with simulator evidence tied to it.
+Any later input change creates a new candidate and invalidates affected evidence.
+
+### 4. Prove RTL and synthesized functional agreement
+
+Regenerate from the frozen inputs. Compare simulator and RTL committed effects
+and faults using the same binaries and independent contract expectations.
+Run instruction conformance, method dispatch, boot CHANGE and full boot/loop
+replay. Verify reset fidelity, complete initializer writes, all relevant CR
+triples, no unauthorized writes, and correct continuation restoration.
+
+Replay the actual release-generated hardware and appropriate synthesized model.
+Label behavioral, optimized word-level, mapped-module and full mapped evidence
+separately. No partial replay, timeout, unknown-bit forcing or stale generated
+RTL counts as a pass. Retain commands, hashes, logs and explicit outcomes.
+
+**Exit:** fresh provenance and passing release-scoped functional evidence for the
+exact approved inputs. A prior mapped initializer alone does not certify the chip.
+
+### 5. Build and qualify the bitstream
+
+After build authorization, use a clean, pinned remote build directory and the
+approved inputs. Run only one vendor build at a time, with two worker threads.
+Require successful synthesis/implementation, correct board pins and clocks,
+no blocking DRC violations, nonnegative setup/hold timing and explicit completion.
+Generate both .bit and .mcs; record hashes, tool version, timing, source,
+Namespace revision and embedded version identity in a complete release bundle.
+
+**Exit:** a verified downloadable B.1.1+ bundle. This means built, not board-tested.
+
+### 6. Validate the exact bundle on the FPGA
+
+After explicit programming/board-operation authorization, program the selected
+artifact and record its identity. Check startup, cold/warm reset, stepping,
+repeated intended loops, CALL/RETURN, CHANGE, agreed fault/recovery behavior and
+selected boundary/negative cases using a reviewed hardware test procedure.
+Correlate trace/snapshot evidence with exact artifact identity and instruction
+occurrences; a version label or post-stop register snapshot alone is insufficient.
+
+Compare observable effects and faults with simulator/RTL expectations, allowing
+latency differences but not semantic differences.
+
+**Exit:** retained physical-board acceptance report tied to the exact bundle.
+Only then call this release aligned across ISA, simulator, bitstream and FPGA.
+
+## Failure and scope control
+
+Stop at the first failing gate, retain the failure and diagnose it at the earliest
+responsible layer. Do not patch historical evidence, silently substitute a LUMP,
+widen authority, or skip a gate to make progress look complete.
+Rerun affected downstream gates after corrections, not unrelated verified work.
+Keep UI enhancements and unrelated features outside this release sequence.
+
+## Immediate next action
+
+Complete Gate 1's decision ledger against the red-ISA and the latest candidate
+review, then inventory current conformance gaps and failing release tests.
+Do not launch another bitstream build until its contract and frozen input gates
+are satisfied. This prevents an older successful build from being mistaken for
+the corrected B.1.1+ release.

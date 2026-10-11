@@ -1,4 +1,5 @@
 - [ISA review decisions](isa-review-index.md) — scope, pre-release compatibility, encoding checks, cooperative scheduling and save-first fault recovery.
+- [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
 - [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
 - [Compact header grouping](compact-header-grouping.md) — left stack ends at diagnostics; execution controls remain central, with board/settings on the right.
 - [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.
