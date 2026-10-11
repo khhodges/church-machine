@@ -68,3 +68,13 @@ Keep application admission and hardware diagnostics distinct. The Namespace
 transition, diagnostic rerun policy, return and fault-recovery behavior remain
 to be specified; do not interpret this as a mandate to rerun 3LL at every
 cooperative Thread switch or as authorization to replace CR15 arbitrarily.
+
+The user calls for a standardized Namespace handoff that is safe and easy to use.
+
+**Why:** Reprogrammable breakout should not require each application or delivery
+mechanism to implement privileged transitions independently.
+
+**How to apply:** Design a common checked activation contract for IDE delivery
+and future lazy loading, keeping delivery separate from authority to activate.
+The exact API, descriptor layout and low-level transition sequence remain
+proposals until reviewed; do not invent a new ISA instruction by implication.
