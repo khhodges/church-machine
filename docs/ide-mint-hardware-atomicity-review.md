@@ -4,6 +4,17 @@ Date: 2026-10-11
 Scope: current source, not generated RTL, a frozen bitstream or physical-board
 acceptance. No hardware or saved-LUMP changes.
 
+**Subsequent bootstrap correction (2026-10-11):** the source review below
+records the original writer. The writer has since been changed in both profiles
+to use W3 = T = the full resulting runtime GT for the frozen resident
+single-machine bootstrap. The non-IoT result now includes the Church domain bit,
+matching IoT. No separate content-hash input is required in this scope.
+Ingress remains fault-closed; saved LUMPs and physical hardware are unchanged.
+The earlier recommendation for a full transaction interface is narrowed for
+Phase 1 to R1 external-writer exclusion/ack, R2 bounded reset/fault drain or proven
+recovery, and R3 ordered publication. This correction does not establish any of
+those properties or authorize dynamic replacement.
+
 ## Conclusion
 
 The existing Mint FSM provides sequential installation with local CPU execution
@@ -43,7 +54,7 @@ Both profiles in `hardware/core.py` have this sequence:
 3. MINT_WRITE_NS0: location.
 4. MINT_WRITE_NS1: authority/limit with a fixed generation.
 5. MINT_WRITE_NS2: integrity32.
-6. MINT_WRITE_NS3: zero, because no trusted content-token input exists.
+6. MINT_WRITE_NS3: originally zero; now the full resulting bootstrap GT.
 7. Copy the object's C-list to the legacy per-slot C-list area.
 8. Write the resulting E-GT into the caller's C-list.
 9. Assert Mint completion.
@@ -114,10 +125,10 @@ actively executing Mint transaction was **not run**.
   destination-slot CAS or destination authority check in the writer.
 - The C-list placement uses a legacy fixed per-slot formula. It cannot be
   adopted as the current portable/destination-localized LUMP layout.
-- W3 is written as zero rather than a verified T.
-- IoT and non-IoT returned-GT expressions differ: the IoT expression includes
-  `GT_DOM_BIT`; the non-IoT expression does not explicitly include it.
-  Resolve this against the approved encoding rather than copying either formula.
+- The original W3-zero finding is corrected for bootstrap: W3 is the full
+  resulting GT. Portable content identity remains outside this writer's scope.
+- The original profile discrepancy is corrected: both returned-GT expressions
+  now include `GT_DOM_BIT` for a Church Inform E capability.
 - Caller C-list mutation is part of this installation path. It does not implement
   the proposed DR1 return ABI.
 - Context latching is incomplete as a transaction boundary: slot/base are captured
@@ -151,6 +162,9 @@ Mode-1 containment above is a source observation.
 | Physical FPGA behavior | NOT RUN |
 
 ## Recommended contract decision
+
+**Historical broader recommendation:** for Phase 1, use the bounded-rule
+narrowing above instead of treating a full transaction interface as mandatory.
 
 Do not expose the legacy writer as the ide.Mint commit mechanism. First specify
 an authenticated transaction interface with frozen request/evidence, destination

@@ -2262,14 +2262,14 @@ class ChurchCore(Elaboratable):
                     m.next = "MINT_WRITE_NS3"
 
                 with m.State("MINT_WRITE_NS3"):
-                    # NS W3 (resident Inform cache_token32) is written ZERO here:
-                    # Mint has no trusted cache-token input, so it does not invent
-                    # authenticity (Task #2862).  W3 is non-authoritative anyway —
-                    # it never gates/authorises any writeback.
+                    # Frozen single-machine bootstrap: T is the full runtime GT,
+                    # not a portable content hash. Keep W3 identical to the GT
+                    # published below. This is not authentication or permission
+                    # to enable ingress, rebind slots, or cross machines.
                     m.d.comb += [
                         mint_ns_wr_en.eq(1),
                         mint_ns_addr.eq(mint_ns_entry_base + 12),
-                        mint_ns_wr_data.eq(0),
+                        mint_ns_wr_data.eq(mint_e_gt_d),
                     ]
                     # Precompute (lump_size − cc) into a register so the
                     # copy-loop offset expression stays binary (2-operand) and
@@ -2403,7 +2403,7 @@ class ChurchCore(Elaboratable):
             m.d.comb += mint_clist_slot_base_ni.eq(Cat(Const(0, 8), mint_slot_id_p3_ni))
 
             m.d.comb += mint_e_gt_d.eq(
-                (1 << 30) | (GT_TYPE_INFORM << 25) | (1 << 16) | mint_slot_id_reg  # ★v2.0
+                (1 << 30) | (1 << GT_DOM_BIT) | (GT_TYPE_INFORM << 25) | (1 << 16) | mint_slot_id_reg
             )
             mint_w2_ni = Signal(32, name="mint_w2_ni")
             m.d.comb += mint_w2_ni.eq((1 << 21) | (mint_lump_size_reg - 1)[:21])
@@ -2496,12 +2496,13 @@ class ChurchCore(Elaboratable):
                     m.next = "MINT_WRITE_NS3"
 
                 with m.State("MINT_WRITE_NS3"):
-                    # NS W3 (cache_token32) written ZERO: no trusted cache-token
-                    # input, non-authoritative (Task #2862).
+                    # Frozen single-machine bootstrap T === full runtime GT,
+                    # exactly as published below; not authentication. Dynamic
+                    # rebinding and portable identity remain outside this scope.
                     m.d.comb += [
                         mint_ns_wr_en.eq(1),
                         mint_ns_addr.eq(mint_ns_entry_base_ni + 12),
-                        mint_ns_wr_data.eq(0),
+                        mint_ns_wr_data.eq(mint_e_gt_d),
                     ]
                     # Precompute (lump_size − cc) — same alumacc-avoidance
                     # pattern as the IOT MINT FSM above.

@@ -95,3 +95,6 @@ for a bootstrap entry.
 is the exact full resulting runtime GT, not zero or a projected token. Do not
 extend that scope to dynamic rebinds/re-sequencing merely because scheduling is
 cooperative. This correction is not authorization to change the saved LUMP or RTL.
+The user subsequently authorized the narrow source-code correction for bootstrap
+T instead of zero, not activation of Mint, a saved-LUMP change, or a hardware build
+or flash. Keep those separate approval boundaries.

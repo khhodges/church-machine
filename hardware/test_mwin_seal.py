@@ -48,7 +48,7 @@ def _integrity32(w0, w1):
 
 # A spread of "adversarial" W3 (DR15) values to prove W3 is inert.
 _W3_VALUES = [
-    0x00000000,   # zeroed (Mint default)
+    0x00000000,   # absent/legacy token
     0xFFFFFFFF,   # all ones
     0xDEADBEEF,   # arbitrary garbage
     0x13579BDF,   # random-ish

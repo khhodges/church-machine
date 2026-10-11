@@ -8,6 +8,12 @@ not change the saved LUMP, Namespace, simulator, hardware or release selection.
 “Non-operational pending contract” is a design/release restriction here, not a
 claim that a new runtime interlock has been installed.
 
+Bootstrap correction: for the frozen resident base on one machine, T is the
+literal full runtime GT (CM_LUMP_SPECIFICATION.md, “Bootstrap Identifier”).
+The legacy writer now places that GT in W3 in both profiles; this narrow code
+correction does not approve operational Mint, resolve the gates below, or change
+saved LUMPs. Phase 1 needs the bounded R1–R3 rule, not a full transaction engine.
+
 ## 1. Scope and authority
 
 The reviewed method takes a passkey GT in CR2, a proposed base in DR3 and a
@@ -36,7 +42,7 @@ Checked against the current source and specification:
 |---|---|---|
 | `docs/CM_LUMP_SPECIFICATION.md`, Namespace entry representation | Resident Inform W0 = location, W1 = authority, W2 = integrity32, W3 = content token T | T or integrity32 as cryptographic authentication |
 | Same specification, Heap convention | CR5 is the Thread Heap GT, paired with DR5 | A spare register for this method |
-| `hardware/core.py`, Mint NS write states | Separate write states exist for the four words; the inspected path writes W3 as zero | Atomic replacement, trusted T input, or a callable software ABI |
+| `hardware/core.py`, Mint NS write states | Separate write states exist for the four words; W3 now uses the full resulting bootstrap GT | Atomic replacement, portable content identity, or a callable software ABI |
 | `hardware/church_outform.py`, ChurchOutformFSM | Outform ingress is deliberately fault-closed because trusted authenticated identity is unavailable | An available authenticated commit service for ide.Mint |
 
 These paths are evidence to investigate, not approved mechanisms to invoke.
@@ -96,7 +102,11 @@ type must be specified; this method must reject unsupported types explicitly.
 
 For a resident Inform entry use the four-word representation in section 2:
 
-- W3 is T, not an Abstract GT or textual dot-name.
+- W3 is T: for the frozen resident single-machine bootstrap, the exact full
+  resulting runtime GT, not zero, a projected SELF, or a textual dot-name.
+- A separate content-hash input is not required in that bootstrap scope.
+  Dynamic rebind/re-sequencing or a machine boundary activates the deferred
+  portable identity rules; cooperative scheduling alone does not extend scope.
 - T is a cache/index, not ownership, revocation or authentication.
 - integrity32 is local corruption detection, not cryptographic identity proof.
 - Full trusted identity remains separate from these compact fields.
@@ -113,6 +123,16 @@ DR1 is a data register: returning raw GT bits does not itself populate a
 capability register. Specify the authorized consumption/materialization path.
 
 ## 6. Commit and interruption — mechanism unresolved
+
+Phase 1 narrowing: a single non-suspending method body (no CALL/yield) excludes
+other scheduled Threads. R1 requires external-writer exclusion or accepted-write
+acknowledgements; R2 requires bounded reset/fault drain or proven recovery; R3
+publishes the GT only after all writes reached RAM and the reset boundary passed.
+Preferred form is exclusion plus bounded drain, create-only, subject to exact
+hardware bounds and the still-open create/replace decision. No general-purpose
+transaction engine is required for this scope. A marker alone cannot reconstruct
+overwritten old words. The broader obligations below are not a mandate to build
+a full transaction engine for Phase 1.
 
 Required ordering:
 
