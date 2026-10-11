@@ -3,6 +3,23 @@
 Date: 2026-10-11  
 Status: **proposal for Design Team review, not an approved ABI or implementation.**
 
+## Binding clarification: handoff errors are hard faults
+
+User clarification, 2026-10-11: any error encountered during handoff, including
+context-save/restore errors, must take the existing hard-fault path. Do not invent
+a handoff-specific recovery, rollback, retry, or partial-resume protocol.
+CHANGE must satisfy its existing normative contract: valid inputs activate the
+specified Thread; validation or transition errors hard-fault. A failure to do
+that is an implementation defect, not a new architectural decision for the user.
+
+This clarification supersedes the draft's suggestions below that a separate
+handoff recovery policy must first be selected. Tests must demonstrate correct
+CHANGE behavior and hard-fault containment, not automatic recovery after partial
+context writes. Completed writes are not presumed rolled back, and a partially
+restored context must never continue normal execution.
+Active-Namespace resolution work should proceed against the existing CHANGE
+requirements; it must not be blocked on reopening those semantics.
+
 The [isolated feasibility probe](../reports/namespace-handoff-feasibility.md)
 found that simulator resolution still uses its fixed Boot table after CR15
 changes. Narrow Amaranth lookup tests pass, but the complete handoff is blocked;

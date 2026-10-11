@@ -11,6 +11,12 @@ proposes the initial lifecycle, selection record, ISA mapping, controlled
 transition context and recovery policy. Its recommendations remain subject to
 Design Team approval and cross-Namespace mechanism proof.
 
+**User clarification — 2026-10-11:** handoff errors, including context-save/
+restore failures, must take the existing hard-fault path. Correct CHANGE
+behavior is already required; implementation defects do not require a new user
+decision. References below to recovery do not authorize a new handoff-specific
+rollback, retry, or partial-resume mechanism.
+
 ## 1. Purpose and startup sequence
 
 The first destination beyond the evolved three-LUMP diagnostic loop (3LL) is a
