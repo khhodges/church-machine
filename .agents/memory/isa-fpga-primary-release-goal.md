@@ -24,3 +24,13 @@ image, projected memory and FPGA initializer evidence must remain distinct.
 **How to apply:** Independently derive expectations from approved semantics and
 frozen inputs, reuse them across simulator/RTL/synthesized/physical checks, and
 report unobservable FPGA state as an evidence gap rather than a pass.
+
+The user identifies `ide.Mint` as a critical additional LUMP to consider in this
+alignment work.
+
+**Why:** Its capability-forging and passkey checks are part of the requested
+review, not an unrelated feature.
+
+**How to apply:** Review its exact source and authority checks before candidate
+inclusion; do not infer authorization to add a fourth resident LUMP or replace
+the existing Mint merely from this request.
