@@ -53,3 +53,18 @@ activation. Do not claim that configurable dispatch alone provides new-code
 loading. Preserve the distinction between a stopped, validated fresh bootstrap
 image and live Namespace rebind/re-sequencing; the latter exceeds the frozen-base
 T === GT simplification. No choice of delivery mechanism has yet been approved.
+
+The user expects the evolved 3LL to remain a pre-application hardware-check
+stage, with a reprogrammable breakout potentially selecting a new set of
+application Namespaces.
+
+**Why:** Open-ended application delivery must not remove the startup diagnostic
+role; applications follow the required checks rather than bypassing them.
+
+**How to apply:** Separate the trusted diagnostic/bootstrap context from
+application Namespace selection and entry-Thread activation. A pass establishes
+only the specified diagnostic coverage, not absence of all hardware defects.
+Keep application admission and hardware diagnostics distinct. The Namespace
+transition, diagnostic rerun policy, return and fault-recovery behavior remain
+to be specified; do not interpret this as a mandate to rerun 3LL at every
+cooperative Thread switch or as authorization to replace CR15 arbitrarily.
