@@ -91,3 +91,12 @@ evidence, not just another fixed loop. Separate mandatory startup diagnostics
 from development/system suites and application-specific requirements. Do not
 equate this scope with approval of every ABI, dynamic lifetime mechanism or an
 extra resident LUMP. Preserve reprogrammable selection and common activation.
+
+IDE tunnels and networked Church Machines are explicit System Namespace and
+alignment scope, not merely implied by the Ethernet driver.
+
+**Why:** The user specifically requested that both be called out.
+
+**How to apply:** Track tunnel/session and CM-to-CM authority tests separately
+from physical network connectivity, including reconnect, peer restart and
+cross-machine identity. Do not carry local bootstrap T === GT across machines.

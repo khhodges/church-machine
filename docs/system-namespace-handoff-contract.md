@@ -38,6 +38,14 @@ IDE-controlled loading and future lazy loading must feed the same admission and
 activation contract. Download completion is neither validation nor permission
 to activate. No loader may install its own unchecked CR15 transition.
 
+**IDE tunnels and networked Church Machines (CMs) are explicit system features,**
+not implicit consequences of Ethernet support. An IDE tunnel supplies an
+authorized management/data path; CM-to-CM communication crosses machine and
+Namespace authority boundaries. Neither transport connectivity nor possession
+of a remote GT grants local execution authority. Remote artifacts must pass
+local admission before activation. A local Namespace handoff must not be
+misrepresented as remote execution migration.
+
 The conceptual handoff input identifies:
 
 - Exact approved Namespace revision(s), artifact identities and allocations.
@@ -83,6 +91,8 @@ startup checks and feature-dependent application checks separately.
 | Cooperative multithreading | Multiple Threads make progress by run-to-suspension round-robin; exact register/frame isolation and expected order | Runaway Thread follows approved watchdog/fault behavior; failed context save/restore is contained; no invented preemption or CR13 role |
 | Namespace garbage collection | Reclaim only eligible unreachable objects and safely reuse their storage/slots under an approved lifetime rule | Never reclaim live Threads, stacks, pending loads, shared objects or protected roots; stale capabilities must not gain authority on reuse |
 | I/O extensions | Exercise selected board drivers, including Ethernet and HDMI when implemented and selected | Unsupported devices block dependent applications explicitly; bounded access, malformed input, timeout and isolation checks |
+| IDE tunnels | Authorized IDE-to-CM session establishment, scoped operations, target/session correlation, and explicit close/reconnect | Unauthorized endpoint or operation, stale session, disconnect during transfer/activation, lost reply and replay; no blind duplicate operation or implicit authority expansion |
+| Networked CMs | Authorized CM-to-CM exchange and remote dependency delivery with peer identity, destination-local admission and explicit capability boundaries | Wrong peer/Namespace, replay, stale remote reference, peer reboot, timeout or partition; no use of a remote GT as unchecked local authority |
 | Application rules/contracts | Admit compatible apps with exact entry, dependencies, resources, permissions and completion policy | Reject incompatible contract/profile, unauthorized grants, invalid layout or unavailable mandatory devices |
 | Mint and privileged regulators | Exact authorized effects, bootstrap T === GT where applicable, and per-operation authority checks | Authentication/authorization denials, R1–R3 interruption cases, protected-state isolation and invalid reuse |
 
@@ -98,6 +108,13 @@ loads, collection, slot reuse or retained execution across replacement.
 The dynamic identity, generation/reuse and stale-capability contracts must be
 resolved before those features are admitted. A stopped fresh-image bootstrap
 and live replacement are different operations.
+
+Cross-machine identity and authority are required for networked CMs even if each
+machine schedules cooperatively. Local bootstrap T === GT cannot be assumed to
+identify an object on another CM. Tunnel authentication, operation authorization,
+session lifetime, revocation and retry semantics require explicit contracts;
+an encrypted or reliable transport alone does not establish those guarantees.
+Do not imply a global scheduler or distributed atomic commit from local R1–R3.
 
 ide.Mint is not made operational by this document. Its
 [contract](ide-mint-forge-contract.md) still governs authentication, authorization,
@@ -140,6 +157,11 @@ capacity must be selected explicitly.
 - Diagnostic coverage, rerun/invalidation policy and per-application requirements.
 - Namespace-set scheduling, capability crossing and completion/recovery policy.
 - Lazy-load transport, proof/admission path, pending-request ownership and resume.
+- IDE tunnel endpoint/session identity, permitted operations, disconnect/reconnect,
+  revocation, request correlation and indeterminate/lost-reply handling.
+- Networked-CM peer identity, cross-machine references, capability export/import,
+  local admission, peer restart and partition behavior; supported remote operations
+  must be distinguished from deferred execution migration or distributed commit.
 - Garbage-collection roots, reachability, pending/shared-reference treatment,
   bounded progress, generation reuse and stale-capability protection.
 - Driver resource inventory and supported A7 board/carrier profile, including

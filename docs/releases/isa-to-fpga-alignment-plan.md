@@ -24,7 +24,8 @@ Namespace(s) and entry Threads.
 The [standard handoff contract](../system-namespace-handoff-contract.md) defines
 the draft requirements and unresolved mechanisms. System validation covers lazy
 loading, cooperative multithreading, Namespace garbage collection, I/O extensions
-including Ethernet/HDMI, application rules/contracts, and privileged services
+including Ethernet/HDMI, **IDE tunnels, networked Church Machines (CMs)**,
+application rules/contracts, and privileged services
 including ide.Mint. Delivery and activation are separate; IDE reload and future
 lazy loading must not introduce incompatible handoff paths.
 
@@ -35,6 +36,13 @@ the full A7 board rather than only the minimal MMIO implementation.
 This direction does not allocate new slots, approve extra boot-resident LUMPs,
 enable dormant Mint, or authorize physical operations. Detailed handoff and
 dynamic-identity contracts remain to be resolved before implementation.
+
+IDE tunnels and CM-to-CM networking need separate acceptance evidence from
+Ethernet connectivity: authenticated peers/sessions, scoped operation authority,
+destination-local admission, disconnect/reconnect, peer restart, replay and
+lost-reply handling. The frozen local T === GT rule does not establish
+cross-machine identity. Neither networking nor a local handoff implies approved
+execution migration or distributed atomicity.
 
 ## Starting evidence
 
