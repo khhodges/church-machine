@@ -69,6 +69,118 @@ const snippet = [
     '}',
 ].join('\n');
 const snippetBefore = snippet;
+
+// ide.Mint's rejection branch uses a separate condition operand. Both spellings
+// must use method-local relocation, not a one-statement assembler label table.
+for (const spelling of ['BRANCH NE, denied', 'BRANCH NE denied', 'BRANCHNE denied', 'branch ne, denied']) {
+    const source = `abstraction ide.Mint {
+capabilities { SELF E, nstab RW, pkref E }
+method Forge_GT_At_Slot {
+    LOAD CR3, pkref
+    TPERM CR2, EXACT, CR3
+    ${spelling} ; must immediately follow EXACT
+    LOAD CR5, nstab
+    RETURN
+denied:
+    RETURN
+}
+}`;
+    const result = compile(source);
+    const words = result.methods[0].code;
+    assert.equal(words[2] >>> 0, ((23 << 27) | (1 << 23) | 3) >>> 0, spelling);
+    // Independent one-step branch expectations: mismatch skips the protected
+    // LOAD and success RETURN; equality falls through to the LOAD.
+    for (const z of [false, true]) {
+        const next = z ? 3 : 2 + (words[2] & 0x7fff);
+        assert.equal(next, z ? 3 : 5);
+        assert.equal(words[next] >>> 27, z ? 0 : 3);
+    }
+}
+for (const spelling of ['BRANCH NE, start', 'BRANCH NE start', 'BRANCHNE start']) {
+    const result = compile(`abstraction Backward {
+capabilities { SELF E }
+method Run {
+start:
+IADD DR1, DR0, #1
+${spelling}
+RETURN
+}
+}`);
+    assert.equal(result.methods[0].code[1] & 0x7fff, 0x7fff);
+}
+for (const [body, expected] of [
+    ['BRANCH NE, absent\nRETURN', /Undefined label: absent/],
+    ['BRANCH NE, constructor\nRETURN', /Undefined label: constructor/],
+    ['same:\nIADD DR1, DR0, #0\nsame:\nRETURN', /Duplicate label: same/],
+]) {
+    const result = new CLOOMCCompiler().compile(`abstraction Invalid {
+capabilities { SELF E }
+method Run {
+${body}
+}
+}`, []);
+    assert.ok(result.errors.some(e => expected.test(e.message)), JSON.stringify(result.errors));
+}
+const scoped = new CLOOMCCompiler().compile(`abstraction Scoped {
+capabilities { SELF E }
+method First {
+BRANCH NE, elsewhere
+RETURN
+}
+method Second {
+elsewhere:
+RETURN
+}
+}`, []);
+assert.ok(scoped.errors.some(e => /Undefined label: elsewhere/.test(e.message)));
+
+// Preserve the assembler's numeric and condition-only forms, for every NZCV
+// condition. A condition token without a target is not an unresolved label.
+for (const condition of Object.keys(new CLOOMCCompiler().conditions)) {
+    for (const instruction of [`BRANCH ${condition}`, `BRANCH ${condition}, #0`]) {
+        const expected = new global.ChurchAssembler().assemble(instruction);
+        assert.deepEqual(expected.errors, []);
+        const actual = compile(`abstraction Numeric {
+capabilities { SELF E }
+method Run {
+${instruction}
+RETURN
+}
+}`);
+        assert.equal(actual.methods[0].code[0] >>> 0, expected.words[0] >>> 0, instruction);
+    }
+}
+// Execute the compiled mismatch branch in the real simulator, with the two Z
+// states. This checks actual branch semantics rather than only our decoding.
+global.window = global.window || {};
+const Simulator = require('./simulator.js');
+const branchCode = compile(`abstraction Guard {
+capabilities { SELF E }
+method Run {
+BRANCH NE, denied
+IADD DR1, DR0, #1
+RETURN
+denied:
+RETURN
+}
+}`).methods[0].code;
+for (const equal of [false, true]) {
+    const sim = new Simulator();
+    sim.bootComplete = false;
+    sim.writeNSEntry(22, 0x400, 63, 0, 0, 1, 0, 0, 0);
+    sim.bootComplete = true;
+    sim.markLive(22);
+    sim.cr[14] = {word0: sim.createGT(0, 22, {R: 1, X: 1}, 1), word1: 0x400, word2: 63, word3: 0, m: 0};
+    sim.cr[12] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
+    sim.memory[0x400] = ((31 << 27) | (branchCode.length << 10)) >>> 0;
+    branchCode.forEach((word, i) => { sim.memory[0x401 + i] = word; });
+    sim.pc = 0;
+    sim.flags = {N: false, Z: equal, C: false, V: false};
+    sim.fault = (kind, message) => assert.fail(`${kind}: ${message}`);
+    assert.ok(sim.step());
+    assert.equal(sim.pc, equal ? 1 : 3);
+}
+
 const snippetResult = compile(snippet);
 assert.equal(snippet, snippetBefore, 'compile must not mutate source text');
 assert.deepEqual(snippetResult.capabilities.map(cap => cap.name), ['SELF']);

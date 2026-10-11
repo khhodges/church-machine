@@ -1970,7 +1970,7 @@ class CLOOMCCompiler {
             }
         }
 
-        const labels = {};
+        const labels = Object.create(null);
         const labelRefs = [];
         this._crossMethodRefs = [];
 
@@ -2005,6 +2005,10 @@ class CLOOMCCompiler {
 
             const labelMatch = compiledStmt.text.match(/^(\w+):$/);
             if (labelMatch) {
+                if (Object.hasOwn(labels, labelMatch[1])) {
+                    errors.push({ line: statementLine, message: `Duplicate label: ${labelMatch[1]}` });
+                    continue;
+                }
                 labels[labelMatch[1]] = code.length;
                 manifest.push({ src: compiledStmt.lineNum, addr: code.length, desc: `label ${labelMatch[1]}` });
                 continue;
@@ -2019,6 +2023,10 @@ class CLOOMCCompiler {
                 errors.push({ line: ref.lineNum, message: `Undefined label: ${ref.label}`, ...CLOOMCCompiler._tokenCols(ref.rawLine, ref.label) });
             } else {
                 const relOffset = target - ref.addr;
+                if (relOffset < -16384 || relOffset > 16383) {
+                    errors.push({ line: ref.lineNum, message: `Branch to "${ref.label}" is out of range (-16384..16383 words).` });
+                    continue;
+                }
                 code[ref.addr] = (code[ref.addr] & ~0x7FFF) | (relOffset & 0x7FFF);
                 code[ref.addr] = code[ref.addr] >>> 0;
             }
@@ -2367,12 +2375,24 @@ class CLOOMCCompiler {
             // own label pass requires the whole source.  Keep method-local labels
             // in this compiler pass so both forward and backward native branches
             // resolve after every statement has been seen.
-            const symbolicBranch = nativeInstruction.opcode === 'BRANCH'
-                ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+([A-Za-z_]\w*)$/)
-                : null;
+            // Match the assembler's space-separated condition form as well as
+            // BRANCHNE label. A bare condition (BRANCH NE) must still reach the
+            // assembler, where it means a conditional zero-offset branch.
+            const branchParts = text.trim().split(/[\s,]+/);
+            let branchCondition = nativeInstruction.condition;
+            let branchTargetIndex = 1;
+            if (nativeInstruction.opcode === 'BRANCH' &&
+                    Object.hasOwn(this.conditions, (branchParts[1] || '').toUpperCase())) {
+                branchCondition = branchParts[1].toUpperCase();
+                branchTargetIndex = 2;
+            }
+            const symbolicBranch = nativeInstruction.opcode === 'BRANCH' &&
+                branchParts.length === branchTargetIndex + 1 &&
+                /^[A-Za-z_]\w*$/.test(branchParts[branchTargetIndex])
+                ? branchParts[branchTargetIndex] : null;
             if (symbolicBranch) {
-                const suffix = nativeInstruction.condition;
-                const label = symbolicBranch[1];
+                const suffix = branchCondition;
+                const label = symbolicBranch;
                 const branchAddr = code.length;
                 code.push(this.encode(this.opcodes.BRANCH, this.conditions[suffix], 0, 0, 0));
                 labelRefs.push({
