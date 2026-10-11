@@ -34,3 +34,13 @@ whatever artifacts their names select later.
 
 **Why:** Catalog movement can otherwise make a compact derivation appear to
 change semantics even when only the selected dependency changed.
+
+Profile selection during Format review must switch the displayed binary and
+the captured save candidate together, including non-IDX1 drafts. This does not
+authorize changing the server's linked-variant retention or build-primary policy.
+
+**Why:** A visible profile control that silently ignores clicks cannot provide
+an exact review of the selected artifact.
+
+**How to apply:** Verify byte equality between each selected candidate and its
+save snapshot; keep publication approval and compiler attestation mandatory.

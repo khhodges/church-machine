@@ -9125,6 +9125,8 @@ window.editorSaveLump = function() {
         }
     };
 
+    const activeCandidate = window.IDEActionState && window.IDEActionState.get().candidate;
+    const indexedView = window.ChurchIDX1IDE && window.ChurchIDX1IDE.saveView(activeCandidate);
     var _regEntry = indexedView || (window.LumpRegistry
         ? window.LumpRegistry.resolve(window.LumpRegistry.getCurrent())
         : null);
@@ -9402,11 +9404,6 @@ function _selectFormatLumpProfile(profile) {
     if (typeof _saveNSRequestInFlight !== 'undefined' && _saveNSRequestInFlight) return;
     var pending = window._pendingLumpData;
     if (!pending || !pending.candidates || !pending.candidates[profile]) return;
-    if (pending.isaProfile !== 'IDX1' &&
-            typeof pending.sourceText === 'string' && pending.sourceText.trim().length > 0) {
-        // These are retained siblings, not competing publication choices.
-        return;
-    }
     pending.selectedProfile = profile;
     if (pending.abstractionName) {
         try {
@@ -9546,13 +9543,15 @@ window.showFormatLump = async function() {
         var _profile = _profiles[_profileIndex];
         var _built = await _lcf.lumpBuildContentFrame(_apiObj, _srcText, { profile: _profile });
         var _frameWds = _built.frameWords;
-    var _svLumpSize = _selectedCandidate.lumpSize;
+        // Each profile starts with its own allocation and buffer. Selection
+        // happens only after all complete candidates have been validated.
+        var _svLumpSize = 64;
         var _fsStart = 1 + _svCW;
         while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) _svLumpSize = _svLumpSize << 1;
         var _svNm6 = 0;
         while ((64 << _svNm6) < _svLumpSize) _svNm6++;
-    var _svHdr = _selectedCandidate.binary[0] >>> 0;
-    var _svBinary = _selectedCandidate.binary;
+        var _svHdr = ((0x1F << 27) | (_svNm6 << 23) | (_svCW << 10) | _svCC) >>> 0;
+        var _svBinary = new Array(_svLumpSize).fill(0);
         _svBinary[0] = _svHdr;
         for (var _wordIndex = 0; _wordIndex < _svCW; _wordIndex++) {
             _svBinary[1 + _wordIndex] = _svWords[_wordIndex] >>> 0;

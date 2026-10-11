@@ -108,6 +108,7 @@ async function main() {
     vm.createContext(context);
     vm.runInContext(fs.readFileSync(__dirname + '/lump-audit.js', 'utf8'), context);
     vm.runInContext(extract(lumps, '_formatLumpApiDefinition') +
+        extract(lumps, '_renderFormatLumpCandidate') +
         extract(run, '_cloneLumpSaveCapabilities') + extract(run, '_captureLumpSaveSnapshot'), context);
     context.showSaveToNamespace = () => { window._saveNSPreparedSnapshot = context._captureLumpSaveSnapshot(); };
     const start = lumps.indexOf('window.showFormatLump = async function()');
@@ -122,10 +123,15 @@ async function main() {
     assert.equal(window._pendingLumpData.selectedProfile, 'api',
         'API-only must be the actual default build/test primary');
     vm.runInContext(extract(lumps, '_selectFormatLumpProfile'), context);
-    context._selectFormatLumpProfile('full');
-    assert.equal(window._saveNSPreparedSnapshot.pending.selectedProfile, 'full');
-    context._selectFormatLumpProfile('api');
-    assert.equal(window._saveNSPreparedSnapshot.pending.selectedProfile, 'api');
+    for (const profile of ['compact', 'full', 'api']) {
+        context._selectFormatLumpProfile(profile);
+        const reviewed = window._pendingLumpData.candidates[profile].binary;
+        assert.equal(window._pendingLumpData.binary, reviewed);
+        assert.equal(window._saveNSPreparedSnapshot.pending.selectedProfile, profile);
+        assert.deepEqual(Array.from(window._saveNSPreparedSnapshot.pending.binary), Array.from(reviewed));
+        assert.deepEqual(Array.from(reviewed.slice(1, 1 + compiled.words.length)), Array.from(compiled.words));
+        assert.equal((await LumpContentFrame.lumpInspectContentFrame(reviewed)).profile, profile);
+    }
     assert.equal(snapshot.isaProfile, 'IDX1');
     assert.equal(snapshot.sourceText, source);
     assert.equal(snapshot.token, candidate.token);
