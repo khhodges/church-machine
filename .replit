@@ -618,12 +618,12 @@ outputType = "console"
 name = "lump-roundtrip"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node simulator/test_lump_roundtrip.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_lump_roundtrip.js && node simulator/test_lump_candidate_limits.js"
 
 [[workflows.workflow]]
 name = "boot-entry-sync-tests"

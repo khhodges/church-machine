@@ -45,6 +45,39 @@
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+// CM_LUMP_SPECIFICATION.md: Lump Size and Header Word 0. The four-bit
+// exponent can encode larger sizes, but Mint supports only n-6 <= 9.
+const LUMP_FORMAT_LIMITS = Object.freeze({
+    codeWords: 0x1FFF,
+    clistCount: 0xFF,
+    allocationWords: 32768,
+    minimumWords: 64,
+});
+
+function lumpCandidateLayout(cw, cc, frameWords = 0) {
+    function reject(reason, action) {
+        throw new Error('Cannot format this LUMP: ' + reason +
+            '. No LUMP was saved; your draft is unchanged. ' + action);
+    }
+    for (const [label, value, max, action] of [
+        ['Code-word count', cw, LUMP_FORMAT_LIMITS.codeWords, 'Split the code into smaller LUMPs and compile again.'],
+        ['C-list count', cc, LUMP_FORMAT_LIMITS.clistCount, 'Reduce capability declarations and compile again.'],
+        ['Embedded frame word count', frameWords, LUMP_FORMAT_LIMITS.allocationWords, 'Reduce embedded source or API content and retry.'],
+    ]) {
+        if (!Number.isSafeInteger(value) || value < 0 || value > max)
+            reject(label + ' ' + value + ' is outside the supported range 0..' + max, action);
+    }
+    const required = 1 + cw + cc + frameWords;
+    if (required > LUMP_FORMAT_LIMITS.allocationWords)
+        reject('Required allocation ' + required + ' words exceeds the supported maximum ' +
+            LUMP_FORMAT_LIMITS.allocationWords + ' words',
+            'Reduce code, capabilities, or embedded source/API content and retry.');
+    let lumpSize = LUMP_FORMAT_LIMITS.minimumWords;
+    let nMinus6 = 0;
+    while (lumpSize < required) { lumpSize *= 2; nMinus6++; }
+    return { lumpSize, nMinus6 };
+}
+
 /**
  * UTF-8 encode a string to a byte array.
  * Uses TextEncoder when available (browser + Node ≥ 11); manual fallback
@@ -500,6 +533,8 @@ async function lumpDecodeContentFrame(serverWords) {
 
 // ── Module export (Node.js) / browser global ──────────────────────────────────
 var _lcfExports = {
+    LUMP_FORMAT_LIMITS,
+    lumpCandidateLayout,
     lumpFrameUtf8Bytes:    lumpFrameUtf8Bytes,
     lumpFramePackBE:       lumpFramePackBE,
     lumpFrameStripComments: lumpFrameStripComments,

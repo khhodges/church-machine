@@ -96,6 +96,24 @@ const response = (status, body) => ({ status, ok: status < 400, text: async () =
         assert.equal(reviews, 0);
     }
     context.fetch = async () => response(200, '{"node":"test.ide"}');
+    const originalFrameBuilder = context.LumpContentFrame;
+    context.LumpContentFrame = { ...originalFrameBuilder,
+        lumpBuildContentFrame: async (api, src, options) =>
+            options.profile === 'full'
+                ? { frameWords: new Array(32769).fill(0) }
+                : originalFrameBuilder.lumpBuildContentFrame(api, src, options),
+    };
+    assert.equal((await context.showFormatLump()).ok, true);
+    assert.equal(context._pendingLumpData.selectedProfile, 'api');
+    assert(context._pendingLumpData.candidates.api);
+    assert(!context._pendingLumpData.candidates.full);
+    assert.match(context._pendingLumpData.profileErrors.full, /No LUMP was saved/);
+    assert.match(elements.fmtOutputProfiles.innerHTML, /disabled/);
+    assert.match(elements.fmtOutputProfiles.innerHTML, /Reduce embedded source/);
+    assert.equal(editor.value, source);
+    context._closeFormatLumpDialog();
+    context.LumpContentFrame = originalFrameBuilder;
+    reviews = 0;
     const valid = await context.showFormatLump();
     assert.equal(valid.ok, true, valid.error);
     assert.equal(reviews, 1);

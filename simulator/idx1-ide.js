@@ -38,9 +38,7 @@
         const built = await frame.lumpBuildContentFrame(
             { ...inspected.apiDefinition, name }, source, { profile: inspected.profile });
         const cw = (words[0] >>> 10) & 8191, cc = words[0] & 255;
-        let size = 64;
-        while (size < 1 + cw + built.frameWords.length + cc) size *= 2;
-        if (size > 2 ** 21) throw new Error('Renamed IDX1 content exceeds LUMP geometry');
+        const { lumpSize: size } = frame.lumpCandidateLayout(cw, cc, built.frameWords.length);
         const result = new Array(size).fill(0);
         result[0] = ((words[0] & ~0x07800000) | ((Math.log2(size) - 6) << 23)) >>> 0;
         result.splice(1, cw, ...words.slice(1, cw + 1));

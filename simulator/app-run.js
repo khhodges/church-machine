@@ -17024,6 +17024,14 @@ async function confirmSaveToNamespace() {
             // silently discarding source and even the API frame.
             var _svCC = _caps.length;
             var _svCW = _svWords.length;
+            try {
+                LumpContentFrame.lumpCandidateLayout(_svCW, _svCC);
+            } catch (error) {
+                window._pendingLumpData = null;
+                window._saveNSPreparedSnapshot = null;
+                alert(error.message);
+                return;
+            }
             var _fallbackSourceEl = document.getElementById('asmEditor');
             var _fallbackSourceText = _saveSnapshot &&
                 typeof _saveSnapshot.sourceText === 'string'
@@ -17055,13 +17063,18 @@ async function confirmSaveToNamespace() {
                 _snapshotPending, false, _fallbackProfile, _fallbackSourceText);
             var _fallbackFrameWords = _fallbackFrame.frameWords;
             var _fallbackFrameStart = 1 + _svCW;
-            var _svLumpSize = 64;
-            while ((_svLumpSize - _svCC - _fallbackFrameStart) <
-                    _fallbackFrameWords.length) {
-                _svLumpSize = _svLumpSize << 1;
+            var _fallbackLayout;
+            try {
+                _fallbackLayout = LumpContentFrame.lumpCandidateLayout(
+                    _svCW, _svCC, _fallbackFrameWords.length);
+            } catch (error) {
+                window._pendingLumpData = null;
+                window._saveNSPreparedSnapshot = null;
+                alert(error.message);
+                return;
             }
-            var _svNm6 = 0;
-            while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+            var _svLumpSize = _fallbackLayout.lumpSize;
+            var _svNm6 = _fallbackLayout.nMinus6;
             var _svHdr = (((0x1F & 0x1F) << 27) |
                           ((_svNm6 & 0x0F)  << 23) |
                           ((_svCW  & 0x1FFF) << 10) |

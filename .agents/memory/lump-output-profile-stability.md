@@ -44,3 +44,13 @@ an exact review of the selected artifact.
 
 **How to apply:** Verify byte equality between each selected candidate and its
 save snapshot; keep publication approval and compiler attestation mandatory.
+
+Format review must bound each output profile independently. An oversized
+embedded-source variant disables that choice, not an otherwise valid API-only
+candidate. This does not waive publication's source-retention requirements.
+
+**Why:** Exact source can be retained in the revision bundle independently of
+the selected execution binary; rejecting every profile loses a valid save path.
+
+**How to apply:** Show why a profile is unavailable, retain valid choices, and
+recheck allocation after destination-name repacking as metadata can grow.

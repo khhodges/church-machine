@@ -9312,7 +9312,9 @@ function _renderFormatLumpCandidate(pending) {
                 pending.sourceText.trim().length > 0;
             var disabled = !item;
             var detail = disabled
-                ? (item && profile === 'api' && sourceRequired
+                ? (pending.profileErrors && pending.profileErrors[profile]
+                    ? pending.profileErrors[profile]
+                    : item && profile === 'api' && sourceRequired
                     ? 'Source retention requires an embedded source frame'
                     : 'Requires saved source')
                 : info.detail + (sourceRequired ? ' · Saved together' : '');
@@ -9448,6 +9450,8 @@ window.showFormatLump = async function() {
     var _regToken = indexedView ? activeCandidate.token : window.LumpRegistry
         ? window.LumpRegistry.getCurrent()
         : null;
+    LumpContentFrame.lumpCandidateLayout(
+        _regMem.memory.words.length, (_regMem.memory.capabilities || []).length);
     var _svWords = _regMem.memory.words.slice();
     var _caps    = (_regMem.memory.capabilities || []).map(cap =>
         cap && typeof cap === 'object' ? { ...cap } : cap);
@@ -9535,6 +9539,7 @@ window.showFormatLump = async function() {
         _apiObj.methods = [];
     }
     var _candidates = {};
+    var _profileErrors = {};
     // API-only execution retains exact compiler-attested source in its bundle.
     var _profiles = ['api'];
     if (_srcText.trim().length > 0) _profiles.push('compact', 'full');
@@ -9545,11 +9550,18 @@ window.showFormatLump = async function() {
         var _frameWds = _built.frameWords;
         // Each profile starts with its own allocation and buffer. Selection
         // happens only after all complete candidates have been validated.
-        var _svLumpSize = 64;
         var _fsStart = 1 + _svCW;
-        while ((_svLumpSize - _svCC - _fsStart) < _frameWds.length) _svLumpSize = _svLumpSize << 1;
-        var _svNm6 = 0;
-        while ((64 << _svNm6) < _svLumpSize) _svNm6++;
+        var _layout;
+        try {
+            _layout = _lcf.lumpCandidateLayout(_svCW, _svCC, _frameWds.length);
+        } catch (error) {
+            // A large optional source frame must not retire a valid API-only
+            // candidate. Keep the unsupported choice visibly disabled.
+            _profileErrors[_profile] = error.message;
+            continue;
+        }
+        var _svLumpSize = _layout.lumpSize;
+        var _svNm6 = _layout.nMinus6;
         var _svHdr = ((0x1F << 27) | (_svNm6 << 23) | (_svCW << 10) | _svCC) >>> 0;
         var _svBinary = new Array(_svLumpSize).fill(0);
         _svBinary[0] = _svHdr;
@@ -9633,6 +9645,9 @@ window.showFormatLump = async function() {
             hasWarnings: (typeof lumpAuditHasWarnings === 'function') ? lumpAuditHasWarnings(_auditResults) : false
         };
     }
+    if (!Object.keys(_candidates).length) {
+        throw new Error(Object.values(_profileErrors).join('\n'));
+    }
     // Content-frame encoding yields to the event loop. Reject navigation or
     // edits that occurred during that wait rather than reviewing an old
     // candidate under a different editor owner.
@@ -9665,10 +9680,10 @@ window.showFormatLump = async function() {
     }
     var _selectedProfile = _preferredProfile && _candidates[_preferredProfile]
         ? _preferredProfile
-        : (_candidates.full ? 'full' : 'api');
+        : (_candidates.full ? 'full' : Object.keys(_candidates)[0]);
     // Full editor source is retained independently in the exact revision
     // bundle; the approved build/test primary can therefore be API-only.
-    if (_srcText.trim().length > 0) {
+    if (_srcText.trim().length > 0 && _candidates.api) {
         _selectedProfile = 'api';
     }
     // Persist inferred/default selections too. A programmer should not have to
@@ -9690,6 +9705,7 @@ window.showFormatLump = async function() {
         resolvedCaps: _selectedCandidate.resolvedCaps,
         registeredAt: _svRegisteredAt,
         candidates: _candidates,
+        profileErrors: _profileErrors,
         selectedProfile: _selectedProfile,
         abstractionName: _absName,
         sourceText: _srcText,
