@@ -38,6 +38,23 @@ operational accountability remain with the Design Team; physical flashing and
 live activation remain explicit approval boundaries. Ownership is not a request
 to rewrite all drivers immediately or bypass unresolved security gates.
 
+The user's revised Ownership Agreement confirms no peripheral exemption:
+security responsibility follows authority held and operations exposed, separately
+from resource class. Record both runtime capability holder and accountability
+owner. Decompose rights where hardware enforces them; otherwise mediate through
+a trusted driver, with explicit justification for broad grants.
+
+**Why:** The user supplied the corrected agreement after review of the mistaken
+peripheral exemption and device-encoding claim. Design Team owns contracts and
+sign-off; Replit Agent implements drivers, privileged abstractions, RTL, tests
+and fixes; the independent reviewer challenges and records, never signs off.
+
+**How to apply:** Apply this division to all hand-crafted authority, including
+device banks and protected storage. Separate callable driver identity from its
+underlying resource capability; the policy is not an encoding specification.
+The uploaded document retains a proposed-status heading; preserve the original
+attachment rather than rewriting its historical status.
+
 Outside that assignment or a specific implementation request, agent authority
 remains read-only review, diagnosis, and recommendations. Do not infer authority
 to change unrelated saved LUMPs or Namespace data, or run hardware operations.
