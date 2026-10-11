@@ -78,3 +78,16 @@ mechanism to implement privileged transitions independently.
 and future lazy loading, keeping delivery separate from authority to activate.
 The exact API, descriptor layout and low-level transition sequence remain
 proposals until reviewed; do not invent a new ISA instruction by implication.
+
+The user selected a System Namespace as the first handoff destination and system
+validation environment before application Namespaces.
+
+**Why:** It must prove the handoff and exercise lazy loading, cooperative
+multithreading, Namespace garbage collection, I/O extensions (Ethernet, HDMI and
+others), and application rules/contracts before relying on them for applications.
+
+**How to apply:** Use the System Namespace to organize explicit per-feature
+evidence, not just another fixed loop. Separate mandatory startup diagnostics
+from development/system suites and application-specific requirements. Do not
+equate this scope with approval of every ABI, dynamic lifetime mechanism or an
+extra resident LUMP. Preserve reprogrammable selection and common activation.

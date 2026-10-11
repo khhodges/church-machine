@@ -14,6 +14,28 @@ flashing, destructive replacement, or a vendor build in this turn.
 Previously approved decisions remain binding. Unresolved architectural choices
 require explicit resolution; implementation behavior is not a substitute.
 
+## System Namespace and open-ended handoff
+
+The approved direction now extends beyond proving the three-LUMP loop:
+required startup diagnostics → a reprogrammable, checked handoff to a
+**System Namespace** → system feature validation → admitted application
+Namespace(s) and entry Threads.
+
+The [standard handoff contract](../system-namespace-handoff-contract.md) defines
+the draft requirements and unresolved mechanisms. System validation covers lazy
+loading, cooperative multithreading, Namespace garbage collection, I/O extensions
+including Ethernet/HDMI, application rules/contracts, and privileged services
+including ide.Mint. Delivery and activation are separate; IDE reload and future
+lazy loading must not introduce incompatible handoff paths.
+
+These requirements apply across the gates below. Record feature-specific
+supported/deferred status and exact simulator/RTL/FPGA evidence. A passing 3LL
+alone is not proof of application handoff or these system features. Inventory
+the full A7 board rather than only the minimal MMIO implementation.
+This direction does not allocate new slots, approve extra boot-resident LUMPs,
+enable dormant Mint, or authorize physical operations. Detailed handoff and
+dynamic-identity contracts remain to be resolved before implementation.
+
 ## Starting evidence
 
 - B.1 and B1.1 have remote-build records in uploaded terminal transcripts.
