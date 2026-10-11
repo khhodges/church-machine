@@ -3,6 +3,10 @@
 Date: 2026-10-11  
 Disposition: **BLOCKED — not an implemented or approved Boot → System handoff.**
 
+Follow-on [ordinary full-core evidence](namespace-handoff-full-core.md) now
+reproduces a separate hardware blocker: permissionless CHANGE faults after a
+successful SWITCH. Context-write interruption and recovery remain unproved.
+
 Scope: isolated in-memory simulator fixtures and an Amaranth SWITCH-unit test.
 No IDE, runtime implementation, catalog, saved Namespace, LUMP, synthesis or
 physical-board changes. These are synthetic architectural fixtures, not admitted

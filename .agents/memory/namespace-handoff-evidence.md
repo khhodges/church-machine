@@ -15,3 +15,13 @@ do not establish destination-authoritative resolution.
 lookup. Never repair a probe by changing a host-side table-base variable after
 SWITCH. Separate expected-blocker characterization from positive release gates,
 and unit lookup evidence from complete core transition/recovery evidence.
+
+Do not grant L/S to a permissionless Thread operand or seed active ownership
+to make a full-core handoff fixture proceed. Ordinary activation must establish
+the owned bridge before interruption of its suspension can be evidence.
+
+**Why:** A legacy execution path or scheduler bypass can reach context writes
+without establishing that the normative programmatic instruction can do so.
+
+**How to apply:** Stop at an ordinary-instruction blocker, retain a fail-closed
+acceptance gate, and label unreachable write/recovery checkpoints unproved.

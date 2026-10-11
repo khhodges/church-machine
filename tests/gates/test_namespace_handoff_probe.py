@@ -1,5 +1,8 @@
 """Narrow Amaranth Namespace-root probe, NOT full core handoff certification.
 
+See test_namespace_handoff_core.py for ordinary full-core instruction evidence
+and its explicitly failing handoff gate. These unit successes do not waive it.
+
 Two actual ChurchSwitch transactions share external register/memory models.
 The second resolves a slot populated only under the root installed by the first.
 Units here are bytes and ascending RTL descriptors, unlike the JS fixture's
