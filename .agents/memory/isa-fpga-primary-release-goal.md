@@ -55,3 +55,13 @@ with interruption recovery; the draft requires the latter.
 **How to apply:** Keep Outform containment intact while designing the commit
 interface. Require explicit old/new visibility and recovery evidence before
 enabling the writer, rather than treating an FSM completion pulse as proof.
+
+Phase 1 uses run-to-suspension cooperative round-robin timesharing.
+
+**Why:** The user explicitly restated this scope when questioning whether the
+Mint atomicity review justified more immediate infrastructure.
+
+**How to apply:** Do not assume preemptive software concurrency or require a new
+transaction engine solely for sequential Namespace writes. A bounded,
+non-suspending update can exclude other scheduled Threads; reset/fault handling
+and external writers remain separate requirements if Mint is enabled.
