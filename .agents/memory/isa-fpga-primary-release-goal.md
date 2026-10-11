@@ -98,3 +98,16 @@ cooperative. This correction is not authorization to change the saved LUMP or RT
 The user subsequently authorized the narrow source-code correction for bootstrap
 T instead of zero, not activation of Mint, a saved-LUMP change, or a hardware build
 or flash. Keep those separate approval boundaries.
+
+The physical-abstraction inventory must cover the full A7 board, not only the
+minimal currently implemented bitstream. The user explicitly includes Ethernet,
+HDMI and other board options.
+
+**Why:** A minimal MMIO catalog omitted board resources and was mistaken for a
+complete driver inventory during alignment review.
+
+**How to apply:** Separate board-present, RTL-implemented, capability-exposed and
+physically verified status for each resource. Verify the exact board/carrier
+revision before claiming an exhaustive connector list or assigning GTs. Include
+deferred resources in the inventory without making all of them Phase 1 release
+requirements by implication.
