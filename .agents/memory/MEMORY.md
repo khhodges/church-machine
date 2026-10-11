@@ -154,3 +154,4 @@
 - [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.
 - [Bitfield width decision](bitfield-width-decision.md) — BFEXT/BFINS width zero is invalid; user selected widths 1–31, not a zero-means-32 convention.
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
+- [Namespace handoff evidence](namespace-handoff-evidence.md) — mirrored tables can hide wrong-root lookup; require destination-only cases and separate probes from release gates.

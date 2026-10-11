@@ -3,6 +3,11 @@
 Date: 2026-10-11  
 Status: **proposal for Design Team review, not an approved ABI or implementation.**
 
+The [isolated feasibility probe](../reports/namespace-handoff-feasibility.md)
+found that simulator resolution still uses its fixed Boot table after CR15
+changes. Narrow Amaranth lookup tests pass, but the complete handoff is blocked;
+the proposed mapping below has not been established.
+
 This refines the [standard handoff contract](system-namespace-handoff-contract.md).
 It does not amend the ISA, assign slots/register operands, replace LUMPs, authorize
 hardware operations, or certify the candidate. Replit Agent implements the approved

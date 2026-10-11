@@ -934,3 +934,17 @@ mtime_ms = 1791714101510
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/7c077521-4c1a-4ec8-915a-99d07b5ed22b/9e5d353c-14e2-4df6-9b57-67bee94af3ef"
 storage_version_token = "1791714113546363"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "y7ANZqa-cT5klDX-e1fB6"
+uri = "file://reports/namespace-handoff-feasibility.md"
+type = "text"
+title = "Two-Namespace Handoff Feasibility"
+description = "Reproduced simulator wrong-root blocker, passing narrow hardware lookup tests, and remaining transition proof requirements."
+logical_id = "13dce714-d36c-46d7-bb11-3efbf8e84562"
+content_hash = "sha256:784d2e136d0450cfb5ba1d1e5948389a4931eccc151195e2a5b3de4f79bfe497"
+size = 4986
+mtime_ms = 1791717934141
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/13dce714-d36c-46d7-bb11-3efbf8e84562/5cee8572-b890-4985-8810-76f21ca5395e"
+storage_version_token = "1791718078470453"
+content_type = "text/markdown"
