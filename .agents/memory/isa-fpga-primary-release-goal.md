@@ -83,3 +83,15 @@ hardware bounds/real T input unresolved. Authentication and authorization gates
 remain mandatory. Revisit at true-concurrency/multi-machine boundaries. Do not
 interpret a recovery marker alone as reconstructing overwritten old words, or
 create-only as permission to ignore retained generations on reused empty slots.
+
+For the ide.Mint bootstrap discussion, apply the frozen-base T === GT rule
+before asking for a separate content-token input.
+
+**Why:** The user corrected the review's carryover of deferred portable-token
+requirements into Phase 1. Missing a content hash is not a reason to write zero
+for a bootstrap entry.
+
+**How to apply:** Within the frozen resident single-machine scope, proposed W3
+is the exact full resulting runtime GT, not zero or a projected token. Do not
+extend that scope to dynamic rebinds/re-sequencing merely because scheduling is
+cooperative. This correction is not authorization to change the saved LUMP or RTL.
