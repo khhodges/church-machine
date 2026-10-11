@@ -6,6 +6,7 @@ from .layouts import (GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT,
                       LUMP_HEADER_LAYOUT, WORD2_LAYOUT)
 from .mload import ChurchMLoad
 from .boot_change import BootChange
+from .ordinary_change import OrdinaryChange
 from .stack_frame import stack_slot_addr
 from .thread_design import (
     THREAD_CAP_WORDS,
@@ -20,6 +21,8 @@ from .thread_design import (
 class ChurchChange(Elaboratable):
     def __init__(self):
         self.change_start = Signal()
+        # Explicit decoded programmatic operation; not a scheduler request.
+        self.ordinary = Signal()
         self.cr_src = Signal(4)
         self.index = Signal(16)
         self.change_mask = Signal(16)
@@ -90,6 +93,13 @@ class ChurchChange(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
+        m.submodules.ordinary = ordinary = OrdinaryChange(self)
+        ordinary_selected = Signal()
+        with m.If(self.change_start):
+            m.d.sync += ordinary_selected.eq(self.ordinary)
+        for name in ordinary.INPUTS:
+            m.d.comb += getattr(ordinary, name).eq(getattr(self, name))
+        m.d.comb += ordinary.change_start.eq(self.change_start & self.ordinary)
 
         RESERVED_MASK = 0b1000_0001_1000_0000
 
@@ -393,7 +403,7 @@ class ChurchChange(Elaboratable):
                 m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
                 m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
                 m.d.sync += restore_homes_after_hdr.eq(0)
-                with m.If(self.change_start):
+                with m.If(self.change_start & ~self.ordinary):
                     m.d.sync += [
                         index_latched.eq(self.index),
                         mask_latched.eq(self.change_mask),
@@ -1136,4 +1146,16 @@ class ChurchChange(Elaboratable):
             self.fault_type.eq(fault_type_latched),
         ]
 
+        with m.If(ordinary_selected):
+            for name in ordinary.OUTPUTS:
+                if name == "thread_hdr_out":
+                    continue
+                m.d.comb += getattr(self, name).eq(getattr(ordinary, name))
+        # Admission headers are speculative. A failed CHANGE must not replace
+        # the running Thread's hidden stack geometry consumed by CALL/RETURN.
+        published_header = Signal(32)
+        with m.If(self.change_complete):
+            m.d.sync += published_header.eq(
+                Mux(ordinary_selected, ordinary.thread_hdr_out, thread_hdr_reg))
+        m.d.comb += self.thread_hdr_out.eq(published_header)
         return m

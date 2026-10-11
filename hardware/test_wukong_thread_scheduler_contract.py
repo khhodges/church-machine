@@ -358,15 +358,17 @@ def _thread_switch_core_image(decoded_change, corruption=None):
     dmem[source_word] = pack_lump_header(3, 400, 2, 0)
     if decoded_change:
         dmem[source_word + 1] = encode_church(
+            ChurchOpcode.LOAD, CondCode.AL, cr_dst=1, cr_src=6, imm=0x0010)
+        dmem[source_word + 2] = encode_church(
             ChurchOpcode.CHANGE,
             CondCode.AL,
-            cr_dst=14,
-            cr_src=15,
-            imm=target_thread_slot,
+            cr_dst=1,
+            cr_src=1,
+            imm=0,
         )
-        dmem[source_word + 2] = encode_turing(
-            TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=1, imm=1)
         dmem[source_word + 3] = encode_turing(
+            TuringOpcode.IADD, CondCode.AL, dr_dst=1, dr_src=1, imm=1)
+        dmem[source_word + 4] = encode_turing(
             TuringOpcode.BRANCH, CondCode.AL, imm=0)
     else:
         dmem[source_word + 1] = encode_turing(
@@ -394,14 +396,17 @@ def _thread_switch_core_image(decoded_change, corruption=None):
     elif corruption is not None:
         raise ValueError(f"unknown Thread-switch corruption: {corruption}")
     prepare_synthetic_boot(dmem)
+    dmem[target_word + 4095] = target_gt
+    if decoded_change:
+        dmem[source_word + 511] = 0x0200000B
     return (
         dmem,
-        source_code_base + 4,
-        source_code_base + 8,
+        source_code_base + (8 if decoded_change else 4),
+        source_code_base + (12 if decoded_change else 8),
         target_code_base + 4,
         dmem[target_word + 1],
-        dmem[source_word + (2 if decoded_change else 1)],
-        dmem[source_word + 1] if decoded_change else None,
+        dmem[source_word + (3 if decoded_change else 1)],
+        dmem[source_word + 2] if decoded_change else None,
     )
 
 
@@ -617,9 +622,9 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
     change_back = encode_church(
         ChurchOpcode.CHANGE,
         CondCode.AL,
-        cr_dst=14,
-        cr_src=15,
-        imm=1,
+        cr_dst=1,
+        cr_src=1,
+        imm=0,
     )
     branch_on_restored_flag = encode_turing(
         TuringOpcode.BRANCH, condition, imm=3)
@@ -636,6 +641,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
     ]
     target_thread_word = 0x7000 // 4
     target_layout = thread_layout(thread_body_words(2), 32)
+    dmem[target_thread_word + target_layout["caps_start"] + 1] = 0x02000001
     target_frame_word = target_thread_word + target_layout["stack_end"]
     dmem[target_frame_word] |= saved_flags << 28
     dut = BootRomHarness(dmem)

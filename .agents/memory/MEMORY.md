@@ -155,3 +155,4 @@
 - [Bitfield width decision](bitfield-width-decision.md) — BFEXT/BFINS width zero is invalid; user selected widths 1–31, not a zero-means-32 convention.
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
 - [Namespace handoff evidence](namespace-handoff-evidence.md) — mirrored tables can hide wrong-root lookup; require destination-only cases and separate probes from release gates.
+- [Hardware CHANGE fetch addresses](hardware-change-fetch-address.md) — use actual imem_addr and absolute saved NIAs; completion alone does not prove executable activation.

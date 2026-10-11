@@ -1274,20 +1274,8 @@ class ChurchCore(Elaboratable):
         runtime_wr_en = [Signal(name=f"rt_cap{i}_wr_en") for i in range(16)]
         runtime_wr_gt = [Signal(GT_LAYOUT, name=f"rt_cap{i}_wr_gt") for i in range(16)]
 
-        if not self.iot_profile:
-            change_gt_sync_active = Signal()
-            m.d.comb += change_gt_sync_active.eq(
-                self.boot_complete & cond_exec_enable & is_church_op & ~any_unit_busy &
-                (church_op == ChurchOpcode.CHANGE)
-            )
-
-            switch_src_gt = Signal(GT_LAYOUT)
-            m.d.comb += switch_src_gt.eq(cr_rd_data_gt)
-
-            with m.If(change_gt_sync_active):
-                for i in range(8):
-                    with m.If(i == 0):
-                        m.d.comb += [runtime_wr_en[8 + i].eq(1), runtime_wr_gt[8 + i].eq(switch_src_gt)]
+        # CHANGE owns its entire publication. Never deposit the operand
+        # into CR8 before its permission/context validation has succeeded.
 
         for i in range(16):
             m.d.comb += [
@@ -1805,6 +1793,7 @@ class ChurchCore(Elaboratable):
             )
             m.d.comb += [
                 u_change.change_start.eq(change_start_sig),
+                u_change.ordinary.eq(~thread_switch_start_sig & ~boot_microcode_active),
                 u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
                 u_change.cr_dst.eq(Mux(thread_switch_start_sig, 14, cr_dst)),
                 u_change.m_elevated.eq(
@@ -1834,7 +1823,7 @@ class ChurchCore(Elaboratable):
                 m.d.sync += [
                     change_issuer_nia.eq(nia_reg),
                     decoded_thread_change_inflight.eq(
-                        (cr_dst == 14) | (cr_dst == 15)),
+                        ~boot_microcode_active),
                 ]
             with m.If(clear_all):
                 m.d.sync += decoded_thread_change_inflight.eq(0)
@@ -1863,6 +1852,9 @@ class ChurchCore(Elaboratable):
                     self.active_thread_base.eq(u_change.thread_base_restore_val),
                     self.active_thread_owned.eq(1),
                 ]
+            with m.If(u_change.cr_wr_en & (u_change.cr_wr_addr == 12)):
+                m.d.sync += self.active_thread_slot.eq(
+                    View(CAP_REG_LAYOUT, u_change.cr_wr_data).word0_gt.slot_id)
             m.d.comb += [
                 self.thread_switch_busy.eq(scheduler_inflight | thread_switch_start_sig),
                 self.thread_switch_complete.eq(u_change.change_complete & scheduler_inflight),

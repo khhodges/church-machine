@@ -45,7 +45,8 @@ def image(operand=1):
         memory[base] = 0xF900820C  # 256 words, 32 stack words, 12 cap homes
         memory[base + 17 * 4] = 0x10EF  # prepared suspension STO=239, SZ=1
         memory[base + 240 * 4] = entry
-        memory[base + 241 * 4] = 0x10F1  # entry PC=0, retained root STO=241
+        code_base = TARGET_CODE if base == TARGET else BRIDGE_CODE
+        memory[base + 241 * 4] = (((code_base + 4) // 4) << 13) | 0x10F1
         memory[base + 242 * 4] = entry
         memory[base + 243 * 4] = (0x7FFF << 13) | 0x10F3  # poison root
         memory[base + 244 * 4] = entry
@@ -73,10 +74,33 @@ def image(operand=1):
     return memory, cr
 
 
-def run_probe(*, operand=1, action="change", m_authorized=True):
+def run_probe(*, operand=1, action="change", m_authorized=True,
+              owned_bridge=False, mutate=None):
     """Return complete architectural checkpoints and accepted bus writes."""
     core = ChurchCore()
     memory, initial_cr = image(operand)
+    memory[0] = memory[BRIDGE_CODE + 4]
+    memory[4] = memory[BRIDGE_CODE + 8]
+    if owned_bridge:
+        # Enter a genuinely prepared bridge with an ordinary instruction.
+        # CR13 is a pre-admitted target token, not a resolved source-table home.
+        # No ownership/debug deposit occurs after this initial boundary.
+        initial_cr[12] = [0x02000001, BRIDGE, 255]
+        initial_cr[13] = [THREAD_GT, 0, 0]
+        initial_cr[14] = [0x52000002, 0xA000, 3]
+        memory[0] = instruction(4, 12, 12)
+        memory[BRIDGE + 17 * 4] = 0x10EF
+        memory[BRIDGE + 241 * 4] |= 2 << 28
+        memory[BRIDGE_CODE] = 0xF8001002
+        memory[BRIDGE_CODE + 62 * 4] = 0x4A000002
+        memory[BRIDGE_CODE + 63 * 4] = 0x1A000003
+        memory[BRIDGE_CODE + 4] = instruction(5, 15, 6, 1)
+        memory[BRIDGE_CODE + 8] = instruction(4, 13, 13)
+        if action == "self":
+            memory[BRIDGE_CODE + 4] = instruction(4, 12, 12)
+            memory[BRIDGE_CODE + 8] = encode_iadd(1, 0, 37)
+    if mutate:
+        mutate(memory, initial_cr)
     original = dict(memory)
     result = {"checkpoints": {}, "writes": [], "reads": [], "retirements": []}
 
@@ -111,7 +135,7 @@ def run_probe(*, operand=1, action="change", m_authorized=True):
             pending = read
 
         async def execute():
-            address = ctx.get(core.debug_cr_words[14][1]) + ctx.get(core.nia)
+            address = ctx.get(core.imem_addr)
             word = memory.get(address, 0)
             assert word, f"no fixture instruction at {address:#x}"
             ctx.set(core.imem_data, word)
@@ -150,6 +174,13 @@ def run_probe(*, operand=1, action="change", m_authorized=True):
         await ctx.tick()
         ctx.set(core.free_run_start, 0)
         ctx.set(core.defer_fault_reset, 1)
+        if owned_bridge:
+            result["activation_fault"] = await execute()
+            result["checkpoints"]["owned_bridge"] = snapshot()
+            result["activation_writes"] = list(result["writes"])
+            if result["activation_fault"]:
+                result["memory_unchanged"] = memory == original
+                return
         result["checkpoints"]["before_switch"] = snapshot()
         if action != "reset_before":
             result["switch_fault"] = await execute()
@@ -165,6 +196,9 @@ def run_probe(*, operand=1, action="change", m_authorized=True):
             else:
                 raise AssertionError("reboot did not complete")
             result["checkpoints"]["after_reset"] = snapshot()
+        elif action == "self" and not result["switch_fault"]:
+            result["target_fault"] = await execute()
+            result["checkpoints"]["after_target"] = snapshot()
         elif not result["switch_fault"]:
             result["change_fault"] = await execute()
             result["checkpoints"]["after_change"] = snapshot()
@@ -172,7 +206,12 @@ def run_probe(*, operand=1, action="change", m_authorized=True):
             for _ in range(8):
                 await tick_bus()
             result["checkpoints"]["held_fault"] = snapshot()
+            if not result["change_fault"]:
+                # This fetch is selected only by the hardware-restored CR14/NIA.
+                result["target_fault"] = await execute()
+                result["checkpoints"]["after_target"] = snapshot()
         result["memory_unchanged"] = memory == original
+        result["memory"] = memory
 
     sim = Simulator(core)
     sim.add_clock(1e-6)

@@ -1,4 +1,4 @@
-"""Full-core blocker characterization; passing here is NOT handoff acceptance.
+"""Full-core ordinary activation evidence; NOT complete handoff acceptance.
 
 CM_REQUIRE_NAMESPACE_HANDOFF=1 enables the deliberately fail-closed acceptance
 check. Never replace the ordinary CHANGE operand with a scheduler request.
@@ -6,9 +6,10 @@ check. Never replace the ordinary CHANGE operand with a scheduler request.
 import os
 
 import pytest
+from hardware.integrity32 import integrity32
 
 from .namespace_handoff_core_fixture import (
-    BOOT, SYSTEM, BRIDGE, TARGET, TARGET_CODE, THREAD_GT, ENTRY_GT,
+    BOOT, SYSTEM, BRIDGE, BRIDGE_CODE, TARGET, TARGET_CODE, THREAD_GT, ENTRY_GT,
     image, instruction, run_probe,
 )
 
@@ -30,11 +31,11 @@ def golden_active():
     expected = switched()
     expected["cr"][:12] = [[0, 0, 0] for _ in range(12)]
     expected["cr"][0] = [ENTRY_GT, TARGET_CODE, 63]
-    expected["cr"][5] = [0x32000000, TARGET + 72, 193]
+    expected["cr"][5] = [0x3200000B, TARGET + 72, 193]
     expected["cr"][6] = [0x1A00000C, TARGET_CODE + 252, 0]
     expected["cr"][12] = [THREAD_GT, TARGET, 255]
     expected["cr"][14] = [0x5200000C, TARGET_CODE + 4, 3]
-    expected.update(nia=0, flags=0, owned=1, active_base=TARGET)
+    expected.update(nia=TARGET_CODE + 4, flags=0, owned=1, active_base=TARGET)
     return expected
 
 
@@ -69,27 +70,136 @@ def test_fixture_is_discriminating_and_regions_do_not_overlap():
     assert len(set(a for a, _ in golden_owned_writes())) == 32
 
 
-@pytest.mark.parametrize("operand,fault", [(1, 4), (12, 5), (13, 5)])
-def test_ordinary_change_exposes_permission_blocker_after_switch(operand, fault):
+@pytest.mark.parametrize("operand", [1, 12, 13])
+def test_ordinary_change_activates_destination_only_thread(operand):
     result = run_probe(operand=operand)
     checkpoints = result["checkpoints"]
     assert checkpoints["before_switch"] == before(operand)
     assert result["switch_fault"] == 0
     assert checkpoints["after_switch"] == switched(operand)
-    assert result["change_fault"] == fault  # observed PERM_L / PERM_S, not ISA policy
-    expected = switched(operand)
-    # The full core publishes the operand GT to CR8 before reporting the fault.
-    # Freeze this non-atomic observation rather than claiming no register writes.
-    expected["cr"][8] = [THREAD_GT, 0, 0]
+    assert result["change_fault"] == 0
+    expected = golden_active()
+    if operand == 13:
+        expected["cr"][13] = [THREAD_GT, TARGET, 255]
     assert checkpoints["after_change"] == expected
     assert checkpoints["held_fault"] == expected
     assert result["retirements"] == [
         (0, instruction(5, 15, 6), False),
-        (4, instruction(4, operand, operand), True)]
-    assert not result["writes"] and result["memory_unchanged"]
-    # Failure occurs before destination Thread validation: lookup success from
-    # the earlier unit test cannot fill this evidence gap.
-    assert SYSTEM + 11 * 16 not in result["reads"]
+        (4, instruction(4, operand, operand), False),
+        (TARGET_CODE + 4, result["memory"][TARGET_CODE + 4], False)]
+    assert result["writes"] == [(TARGET + 68, 0x10F1)]
+    assert SYSTEM + 11 * 16 in result["reads"]
+    assert BOOT + 11 * 16 not in result["reads"]
+    assert result["target_fault"] == 0
+    expected["dr"][1] = 37
+    expected["nia"] += 4
+    assert result["checkpoints"]["after_target"] == expected
+
+
+def test_ordinary_activation_owns_bridge_then_suspends_it():
+    result = run_probe(owned_bridge=True)
+    assert result["activation_fault"] == result["switch_fault"] == result["change_fault"] == 0
+    owned = result["checkpoints"]["owned_bridge"]
+    assert owned["owned"] == 1 and owned["active_base"] == BRIDGE
+    assert owned["nia"] == BRIDGE_CODE + 4
+    assert result["activation_writes"] == [(BRIDGE + 68, (2 << 28) | 0x10F1)]
+    saved = result["checkpoints"]["after_switch"]
+    expected_writes = (
+        [(BRIDGE + (244 + i) * 4, saved["cr"][i][0]) for i in range(12)] +
+        [(BRIDGE + 240 * 4, 0x4A000002),
+         (BRIDGE + 241 * 4, (2 << 28) | (((BRIDGE_CODE + 12) // 4) << 13) | 0x10F1),
+         (BRIDGE + 68, (2 << 28) | 0x10EF)] +
+        [(BRIDGE + (i + 1) * 4, 0) for i in range(16)] +
+        [(TARGET + 68, 0x10F1)])
+    assert result["writes"] == result["activation_writes"] + expected_writes
+    expected = golden_active()
+    expected["cr"][13] = [THREAD_GT, 0, 0]
+    assert result["checkpoints"]["after_change"] == expected
+    assert result["target_fault"] == 0
+    assert result["checkpoints"]["after_target"]["dr"][1] == 37
+    for base in (BRIDGE, TARGET):
+        assert result["memory"][base + 243 * 4] == (0x7FFF << 13) | 0x10F3
+
+
+def test_self_change_resumes_new_continuation_without_consuming_root():
+    result = run_probe(owned_bridge=True, action="self")
+    assert result["activation_fault"] == result["switch_fault"] == result["target_fault"] == 0
+    assert result["checkpoints"]["after_switch"]["nia"] == BRIDGE_CODE + 8
+    assert result["checkpoints"]["after_target"]["dr"][1] == 37
+    assert result["memory"][BRIDGE + 68] == (2 << 28) | 0x10F1
+    assert result["memory"][BRIDGE + 243 * 4] == (0x7FFF << 13) | 0x10F3
+
+
+@pytest.mark.parametrize("perm", range(1, 8))
+@pytest.mark.parametrize("domain", [0, 1])
+def test_permission_bearing_operand_fails_without_publication(perm, domain):
+    def corrupt(memory, cr):
+        cr[1][0] |= (perm << 28) | (domain << 27)
+    result = run_probe(mutate=corrupt)
+    assert result["change_fault"] == 5
+    assert result["checkpoints"]["after_change"] == result["checkpoints"]["after_switch"]
+    assert result["writes"] == []
+
+
+@pytest.mark.parametrize("kind,fault", [
+    ("poison", 19), ("frame", 18), ("self", 18), ("entry_perm", 6),
+    ("seal", 10), ("generation", 9), ("header", 8), ("clist", 8),
+    ("legacy", 11),
+])
+def test_rejected_context_is_read_only(kind, fault):
+    def corrupt(memory, cr):
+        if kind == "poison":
+            memory[TARGET + 68] = 0x10F1
+        elif kind == "frame":
+            memory[TARGET + 241 * 4] ^= 1
+        elif kind == "self":
+            memory[TARGET_CODE + 252] = 0x4A000002
+        elif kind == "entry_perm":
+            memory[TARGET + 240 * 4] = 0x1A00000C
+        elif kind == "seal":
+            memory[SYSTEM + 11 * 16 + 8] ^= 1
+        elif kind == "generation":
+            cr[1][0] |= 1 << 16
+        elif kind == "header":
+            memory[TARGET] ^= 1
+        elif kind == "clist":
+            memory[TARGET_CODE] &= ~255
+        elif kind == "legacy":
+            memory[4] |= 1
+    result = run_probe(mutate=corrupt)
+    assert result["change_fault"] == fault
+    assert result["checkpoints"]["after_change"] == result["checkpoints"]["after_switch"]
+    assert result["checkpoints"]["held_fault"] == result["checkpoints"]["after_change"]
+    assert result["writes"] == []
+
+
+def test_owned_bridge_is_not_saved_when_destination_admission_fails():
+    def corrupt(memory, cr):
+        memory[TARGET + 241 * 4] ^= 1
+    result = run_probe(owned_bridge=True, mutate=corrupt)
+    assert result["activation_fault"] == result["switch_fault"] == 0
+    assert result["change_fault"] == 18
+    assert result["writes"] == result["activation_writes"]
+    assert result["checkpoints"]["after_change"] == result["checkpoints"]["after_switch"]
+
+
+def test_activation_preserves_nonzero_generation_in_derived_views():
+    def reissue(memory, cr):
+        cr[1][0] |= 3 << 16
+        for slot in (11, 12):
+            address = SYSTEM + slot * 16
+            memory[address + 4] |= 3 << 21
+            memory[address + 8] = integrity32(memory[address], memory[address + 4])
+        for address in (TARGET + 240 * 4, TARGET + 242 * 4,
+                        TARGET + 244 * 4, TARGET_CODE + 252):
+            memory[address] |= 3 << 16
+    result = run_probe(mutate=reissue)
+    assert result["change_fault"] == result["target_fault"] == 0
+    expected = golden_active()
+    for i in (0, 5, 6, 12, 14):
+        expected["cr"][i][0] |= 3 << 16
+        expected["cr"][i][2] |= 3 << 21
+    assert result["checkpoints"]["after_change"] == expected
 
 
 def test_denied_m_leaves_every_register_and_memory_unchanged():
@@ -118,10 +228,8 @@ def test_reboot_at_instruction_boundaries_discards_seeded_authority(action):
                     reason="explicit release gate; characterization is not acceptance")
 def test_require_full_handoff():
     result = run_probe()
-    assert not result.get("change_fault"), (
-        "HANDOFF BLOCKED: ordinary permissionless CHANGE faults before Thread "
-        "validation; owned-context writes, recovery and containment are unproved")
+    assert not result.get("change_fault"), "Ordinary activation regressed"
     assert result["checkpoints"]["after_change"] == golden_active()
-    pytest.fail("HANDOFF BLOCKED: owned bridge suspension, all write-boundary "
-                "interruptions, recovery execution and first target retirement "
+    pytest.fail("HANDOFF BLOCKED: all write-boundary "
+                "interruptions, recovery execution and authority containment "
                 "must be implemented before removing this fail-closed gate")

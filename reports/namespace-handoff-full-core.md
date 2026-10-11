@@ -1,4 +1,59 @@
-# Ordinary full-core Namespace handoff: blocked
+# Ordinary full-core Thread activation: proved; System handoff acceptance blocked
+
+## Updated hardware evidence (2026-10-11)
+
+The permission blocker characterized below is fixed for ordinary CHANGE.
+`hardware/ordinary_change.py`, selected explicitly by `hardware/change.py` and
+the full core, consumes the single permissionless Inform GT. It does not invoke
+the scheduler, synthesize L/S authority, elevate the Namespace gate, or enter
+the boot window. Nonzero permissions and legacy indexed instruction words fault.
+The supported word is the existing assembler one-operand spelling (equal
+register fields and zero immediate); this does not migrate historical binaries
+or approve an IRQ-return encoding.
+
+Read-only admission validates the sealed, generation-matching destination
+descriptor, Thread allocation, protected indicator, non-poison continuation,
+Enter GT, executable bounds, C-List SELF and resolvable Inform rows, and saved
+register homes. Abstract locks and unoccupied rows retain their meanings.
+Incoming data and capabilities are staged internally before any outgoing write.
+Rejected contexts leave the architectural registers and memory unchanged,
+including CR8. Boot and the external scheduler retain their separate paths.
+
+The full-core fixture now first executes ordinary CHANGE CR12 into a prepared
+bridge. Only this successful activation establishes ownership. The bridge then
+executes SWITCH and CHANGE CR13, suspends into its own backing memory, activates
+the destination-only Thread, and retires its IADD with DR1=37. The source table
+has no target Thread descriptor and has a conflicting executable binding.
+The test verifies the complete target register checkpoint, consumed transition
+M bit, exact 32-write suspension/pop ledger, and retained poison roots.
+Independent cases cover CR1/CR12/CR13, all seven nonzero permission combinations
+in both domains, malformed frames/C-Lists, stale generation, bad seals, poison
+roots, and self-target continuation without accumulating frames.
+
+The probe also corrected a measurement error in its earlier harness: production
+ChurchCore NIA and imem_addr are absolute byte addresses, not CR14-relative
+offsets. Instruction fetch now uses actual imem_addr. Frame NIAs are absolute
+word addresses and are checked against the resolved executable's byte range.
+This matters because an apparent CHANGE completion with relative NIA zero
+cannot pass the real fetch fence or retire the destination instruction.
+
+Reproduction:
+
+```sh
+python3 -m pytest tests/gates/test_namespace_handoff_core.py \
+  tests/gates/test_namespace_handoff_probe.py hardware/test_boot_change.py \
+  hardware/test_wukong_thread_scheduler_contract.py -q
+```
+
+**This is ordinary activation evidence, not System handoff release approval.**
+The opt-in `CM_REQUIRE_NAMESPACE_HANDOFF=1` gate remains deliberately
+fail-closed. Interrupted-write recovery, first-fault/epoch retention, transition
+authority reacquisition and execution-time writer exclusion are still separate
+unproved obligations. No simulator Namespace-resolution change, live LUMP
+replacement, release RTL generation, bitstream build, or FPGA operation is
+claimed.
+
+## Historical blocker characterization (superseded by the evidence above)
 
 Date: 2026-10-11
 
