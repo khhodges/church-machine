@@ -21,9 +21,26 @@ Bind each downstream result to exact inputs and report newer available inputs
 without substituting them. This is a design requirement, not evidence that the
 current implementation already provides isolation or permission to implement it.
 
-Agent authority is read-only review, diagnosis, and recommendations unless the
-user explicitly changes this restriction. Do not edit code, LUMPs, or Namespace
-data, or set up/run the user's LUMP tests, builds, or flashes.
+The earlier read-only restriction below is superseded for hardware-driver
+implementation by the adopted ownership policy (2026-10-11). The user assigned
+Replit Agent implementation responsibility for all hardware drivers, including
+privileged Security Resolver / Regulator abstractions such as ide.Mint.
+
+**Why:** The user adopted the Security Resolver / Regulator ownership policy and
+explicitly assigned implementation to this agent. The policy assigns ownership
+and final sign-off to the Design Team; its separate Claude reviewer/recorder role
+does not restrict Replit Agent to review-only work.
+
+**How to apply:** Take responsibility for driver contracts, CLOOMC++ bodies,
+dependent RTL, tests and evidence as the team's implementation agent. Keep
+assumed, modelled and proven behavior distinct. Final release sign-off and
+operational accountability remain with the Design Team; physical flashing and
+live activation remain explicit approval boundaries. Ownership is not a request
+to rewrite all drivers immediately or bypass unresolved security gates.
+
+Outside that assignment or a specific implementation request, agent authority
+remains read-only review, diagnosis, and recommendations. Do not infer authority
+to change unrelated saved LUMPs or Namespace data, or run hardware operations.
 
 **Why:** After the review, the user explicitly reserved setup/testing and all code,
 LUMP, and Namespace changes to themselves, correcting an offer to fix IDE code.
