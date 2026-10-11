@@ -45,3 +45,13 @@ against inferring permission for arbitrary Namespace writes from a valid passkey
 **How to apply:** Treat unresolved mechanisms as release blockers, not invented
 ABIs. Distinguish ordinary pre-commit denial from interruption after commitment;
 only the former can promise no Namespace write events.
+
+Do not adopt the legacy hardware Mint writer as ide.Mint's commit primitive
+merely because it stalls CPU execution.
+
+**Why:** CPU exclusion is weaker than an authenticated, acknowledged transaction
+with interruption recovery; the draft requires the latter.
+
+**How to apply:** Keep Outform containment intact while designing the commit
+interface. Require explicit old/new visibility and recovery evidence before
+enabling the writer, rather than treating an FSM completion pulse as proof.

@@ -43,6 +43,11 @@ These paths are evidence to investigate, not approved mechanisms to invoke.
 In particular, a four-state writer is neither proof of atomicity nor proof of
 its absence: visibility, exclusion, interruption and recovery must be examined.
 
+The subsequent [hardware atomicity review](ide-mint-hardware-atomicity-review.md)
+finds local CPU busy exclusion but no acknowledged, interruption-safe transaction
+mechanism. Ordinary Outform ingress remains fault-closed. The legacy writer must
+not be treated as the resolved commit mechanism for this draft.
+
 ## 3. Authentication contract — mechanism unresolved
 
 Before protected work, verify both the supplied object-scoped GT and its

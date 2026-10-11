@@ -892,3 +892,17 @@ mtime_ms = 1791703229782
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/85de5fd1-293c-408b-8cfb-f0b78d90c557/f8ac4ff0-d846-474f-8a10-5e4d45c6834a"
 storage_version_token = "1791703242515682"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "qlAKCqKc47Luf32s_SsPG"
+uri = "file://docs/ide-mint-hardware-atomicity-review.md"
+type = "text"
+title = "ide.Mint hardware atomicity review"
+description = "Source-based findings, limited guarantees, reset/arbitration gaps, and explicitly scoped test evidence. No hardware or saved LUMPs changed."
+logical_id = "a544af43-4d6c-44a6-a826-1717901fc06d"
+content_hash = "sha256:234bc1fcac44a98a0fc9df160a318f3382eea9dda25c2c17d029bd180b794ccd"
+size = 8019
+mtime_ms = 1791703861233
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/a544af43-4d6c-44a6-a826-1717901fc06d/9c80d843-fc90-460c-8339-22ab04a532d1"
+storage_version_token = "1791703881498562"
+content_type = "text/markdown"
