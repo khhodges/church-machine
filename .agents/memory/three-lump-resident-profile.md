@@ -41,3 +41,15 @@ closed list of future targets or require an ISA change for each new program.
 Preserve cooperative scheduling, validation and recovery rules. The trigger,
 target-selection authority and continuation semantics still need specification;
 this requirement alone does not authorize a saved-LUMP replacement or FPGA flash.
+
+The breakout must be reprogrammable, not a hard-coded escape to another fixed
+program. IDE reload and lazy loading must be considered as delivery mechanisms.
+
+**Why:** The user explicitly clarified that open-ended progress requires changing
+the breakout destination and brought IDE reload/lazy loading back into scope.
+
+**How to apply:** Separate target selection, code delivery/admission, and safe
+activation. Do not claim that configurable dispatch alone provides new-code
+loading. Preserve the distinction between a stopped, validated fresh bootstrap
+image and live Namespace rebind/re-sequencing; the latter exceeds the frozen-base
+T === GT simplification. No choice of delivery mechanism has yet been approved.
