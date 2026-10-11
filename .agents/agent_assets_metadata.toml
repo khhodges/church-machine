@@ -878,3 +878,17 @@ mtime_ms = 1791632090082
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3c4db45c-5e9a-49d6-85e2-e023df66eeee/19ca794b-5fa0-4df8-a1ce-28df257d638d"
 storage_version_token = "1791632099199613"
 content_type = "application/octet-stream"
+
+[[outputs]]
+id = "N9SENRm0U89mYX7ONJcHN"
+uri = "file://docs/ide-mint-forge-contract.md"
+type = "text"
+title = "ide.Mint — Forge_GT_At_Slot contract draft"
+description = "Contract-first design covering authority, proof requirements, atomic commit, representation, exit guarantees and acceptance tests. Unresolved mechanisms are explicitly marked; saved LUMPs are unchanged."
+logical_id = "85de5fd1-293c-408b-8cfb-f0b78d90c557"
+content_hash = "sha256:419b66eedca97bf5629ebf4177e181f786fafeee30f26448a6f899f2c76cf01b"
+size = 10386
+mtime_ms = 1791703229782
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/85de5fd1-293c-408b-8cfb-f0b78d90c557/f8ac4ff0-d846-474f-8a10-5e4d45c6834a"
+storage_version_token = "1791703242515682"
+content_type = "text/markdown"

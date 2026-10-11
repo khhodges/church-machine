@@ -34,3 +34,14 @@ review, not an unrelated feature.
 **How to apply:** Review its exact source and authority checks before candidate
 inclusion; do not infer authorization to add a fourth resident LUMP or replace
 the existing Mint merely from this request.
+
+Draft the ide.Mint contract before completing its instruction bodies; keep the
+saved LUMP untouched while authentication, operation authorization, commit
+atomicity and exit guarantees are unresolved.
+
+**Why:** The supplied review explicitly endorses contract-first work and warns
+against inferring permission for arbitrary Namespace writes from a valid passkey.
+
+**How to apply:** Treat unresolved mechanisms as release blockers, not invented
+ABIs. Distinguish ordinary pre-commit denial from interruption after commitment;
+only the former can promise no Namespace write events.
