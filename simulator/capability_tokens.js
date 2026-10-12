@@ -527,6 +527,18 @@
     }
 
     function validateClist(words, clistStart, resolvedCaps, context) {
+        const node = typeof module !== 'undefined' && module.exports;
+        const frame = node ? require('./lump-content-frame') : globalThis.LumpContentFrame;
+        const stored = frame && frame.lumpDecodeContentFrameApi(words);
+        if (stored && stored.methods && !Array.isArray(stored.methods) &&
+                resolvedCaps.every(cap => cap.canonical_unresolved === true)) {
+            const check = materialize(resolvedCaps, Array.from(words), clistStart,
+                {...context,canonicalArtifact:true});
+            if (!check.ok) return check;
+            const errors = resolvedCaps.flatMap((_, row) => (words[clistStart + row] >>> 0) !== 0
+                ? ['Canonical artifact row ' + row + ' contains a destination GT; linking must occur after compilation.'] : []);
+            return {ok:errors.length === 0,errors,results:check.results};
+        }
         context = context || {};
         const errors = [];
         const results = [];
@@ -588,6 +600,32 @@
     }
 
     function materialize(caps, words, clistStart, context) {
+        const node = typeof module !== 'undefined' && module.exports;
+        const frame = node ? require('./lump-content-frame') : globalThis.LumpContentFrame;
+        const stored = frame && frame.lumpDecodeContentFrameApi(words);
+        if (context && context.canonicalArtifact === true &&
+                stored && stored.methods && !Array.isArray(stored.methods)) {
+            const codec = node ? require('./lump-api-codec') : globalThis.LumpApiCodec;
+            try {
+                const declarations = codec.expand(stored, words).capabilities;
+                if (declarations.length !== caps.length) throw new Error('Canonical C-list count differs');
+                const resolvedCaps = caps.map((cap, row) => {
+                    const name = cap.canonical_leaf || cap.N || cap.identity_string || cap.name;
+                    const declared = declarations[row];
+                    if (row && name !== (declared.canonical_leaf || declared.N || declared.name))
+                        throw new Error('Canonical capability name differs at row ' + row);
+                    if ([...normalizeRights(cap)].sort().join('') !== [...declared.rights].sort().join(''))
+                        throw new Error('Canonical permissions differ at row ' + row);
+                    words[clistStart + row] = 0;
+                    return {...cap,rights:declared.rights,pending_symbolic:true,
+                        symbolic_self:row === 0,canonical_unresolved:true};
+                });
+                return {ok:true,errors:[],resolvedCaps,
+                    results:resolvedCaps.map(() => ({ok:true,error:null}))};
+            } catch (error) {
+                return {ok:false,errors:[error.message],resolvedCaps:[]};
+            }
+        }
         const resolvedCaps = resolveCapabilities(caps, context || {});
         const resolutionErrors = resolvedCaps.filter(cap => cap.error).map(cap => cap.error);
         if (resolutionErrors.length > 0) {

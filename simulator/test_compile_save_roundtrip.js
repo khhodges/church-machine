@@ -60,6 +60,8 @@ serverWords[0] = ((0x1F << 27) | (codeWords.length << 10) | 1) >>> 0;
 serverWords.splice(1, codeWords.length, ...codeWords);
 const apiBytes = Buffer.from(JSON.stringify({
     name: 'Task3430RoundTrip',
+    language: 'javascript',
+    methods: [{name:'Ping', index:0, branchOffset:17, inputs:[], returns:{register:'DR1'}}],
     capabilities: [{ name: 'SELF', rights: ['E'], compiler_owned_self: true }],
 }));
 serverWords[3] = (0xAB000000 | apiBytes.length) >>> 0;
@@ -192,7 +194,6 @@ const context = {
     lumpAuditHasWarnings() { return false; },
     alert() {},
     _makeModalFocusTrap() { return function() {}; },
-    _formatLumpApiDefinition() { return {}; },
     _renderFormatLumpCandidate() {},
     _renderFormatLumpVersionHistory() {},
     showSaveToNamespace() {
@@ -208,6 +209,7 @@ vm.createContext(context);
 // Use the production registry and canonical token helper rather than a test
 // double.  The save-plan callback is the only intentionally cancelled piece.
 vm.runInContext(registrySource, context);
+vm.runInContext(extractBlock(lumpsSource, 'function _formatLumpApiDefinition('), context);
 vm.runInContext(
     extractBlock(editorSource, 'function packHdr(') + '\n' +
     extractBlock(editorSource, 'window._computeLumpToken = function') + ';',
@@ -263,6 +265,7 @@ vm.runInContext(
         'candidate must retain the exact server artifact');
 
     // Exercise the actual hamburger Save Lump handler and its real formatter.
+    context.LumpContentFrame.lumpBuildContentFrame = LumpContentFrame.lumpBuildContentFrame;
     context.fetch = async () => ({ ok: true, status: 200, json: async () => ({ node: 'test.ide' }) });
     vm.runInContext(
         extractBlock(lumpsSource, 'window.showFormatLump = async function') + ';' +
@@ -290,6 +293,13 @@ vm.runInContext(
         Array.from(pending.candidates.full.binary.slice(1, 1 + codeWords.length)),
         codeWords,
         'hamburger Save Lump changed the exact code words in its candidate');
+    for (const profile of ['api', 'compact', 'full']) {
+        const inspected = await LumpContentFrame.lumpInspectContentFrame(pending.candidates[profile].binary);
+        assert.deepStrictEqual(inspected.apiDefinition.methods.map(m => m.name), ['Ping'],
+            `${profile} must retain methods from the compilation, not boot selection`);
+        assert.strictEqual(inspected.apiDefinition.methods[0].branchOffset, 17,
+            'Save must retain the server compiler record, not reconstruct a browser method');
+    }
 
     // Once the in-memory candidate is unavailable, the compatibility Save
     // entry point must report the prerequisite rather than compiling behind

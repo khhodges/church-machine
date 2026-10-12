@@ -26,6 +26,62 @@ Namespace structure, slot capacity and table bounds.
 definition. Do not equate the slot limit N−1 with the RAM address limit or
 invent field encodings without review.
 
+The user clarified active Namespace placement: its base is the first free
+memory address, starting at zero for Boot.Namespace. System.Namespace starts
+at the next free address and follows the header rules. The header defines
+memory size; the table starts with metadata at the high end of that Namespace
+allocation and counts downward.
+
+**Why:** A raw table-base interpretation of CR15 cannot represent the user's
+whole-allocation geometry, and ascending hardware descriptors conflict with
+the requested ordering.
+
+**How to apply:** Derive each active table from its own allocation base and
+header-defined capacity, not host configuration or the inspected Namespace.
+Do not treat zero as a missing Namespace base. Preserve existing saved artifacts
+and approval boundaries; this clarification alone does not settle migration
+of their GT slot numbering.
+
+The user subsequently approved a whole-allocation word limit (size minus one)
+for CR15, then reopened that choice for design review: consider a low-end,
+ascending NST with CR15 covering only the table and the full memory range
+described by slot-0 metadata. This is a proposal for comment, not authorization
+to migrate artifacts or implement the ascending alternative.
+
+**Why:** The user wants to evaluate FPGA and testing simplicity before
+continuing implementation. Treat neither the earlier descending direction
+nor the proposed ascending replacement as permission to bypass this review.
+
+**How to apply:** Pause geometry-dependent runtime integration during this
+review. Distinguish table capability bounds, full memory-range metadata,
+and the enforcement that keeps member descriptors inside that range.
+
+In the subsequent table-only bounds review, the user answered “OK?? Next”
+after the recommendation to use a word extent. The working interpretation,
+stated back to the user, is CR15.limit = 4*N - 1 for N four-word slots,
+including metadata slot 0, rather than N - 1 as a slot-index limit.
+
+**Why:** Table bounds must not be confused with the full memory allocation
+described by Namespace metadata. This replaces the earlier whole-allocation
+limit in the proposed table-only design.
+
+**How to apply:** Check the complete four-word entry against the word extent,
+and keep metadata slot 0 separate from capability targets. This bounds
+decision does not by itself authorize migration of saved artifacts or
+complete the combined SWITCH/CHANGE and fault-management specification.
+
+The user requires the IDE Namespace design page to support several Namespace
+LUMPs. Each LUMP's size and header determine its metadata; metadata placement
+is not an independently configurable design input.
+
+**Why:** The user rejected treating header discovery and table geometry as
+unrelated configuration choices when the Namespace LUMP is deterministic.
+
+**How to apply:** Model named Namespace designs separately, derive allocation
+and metadata locations from their headers and sizes, and keep the IDE's
+selected design separate from execution's active CR15. Do not ask the user to
+manually supply derived metadata addresses.
+
 The user's latest proposal reserves top-of-memory slot 0 for Namespace
 metadata: W0 header, W1 base address always present, W2 following-member count,
 and W3 reserved, with no cold-boot seal for now. The Namespace self-entry moves
@@ -40,6 +96,34 @@ Keep metadata separate from capability-resolvable entries. Four-word slots
 are numbered W0–W3. Do not invent seal semantics or change retained boot
 inputs. The user directs bootstrap to trust the IDE builder and the seals;
 this does not introduce a W3 seal or waive applicable mLoad checks.
+
+In the later ascending-table review, the user explicitly chose slot 0 as the
+physical Namespace header, replacing the old separate sixteen-word physical
+header. For the new layout, metadata occupies base+0..3, Namespace self occupies
+base+4..7, and the entry Thread descriptor occupies base+8..11.
+
+**Why:** A low-end ascending NST must not overlap a second physical header.
+Header-first transfer does not require a duplicate header allocation in RAM.
+
+**How to apply:** Use one four-word metadata/header slot in the new in-memory
+layout. The earlier top-of-memory placement above is superseded by low-end
+ascending placement. Do not retain a sixteen-word prefix, add padding for it,
+or reinterpret metadata as an ordinary capability. Preserve retained images;
+this design approval is not authority to rewrite their bytes in place.
+
+The user authorized preparation of a new-format boot Namespace revision for
+approval before runtime cutover, including an explicit non-conflicting UART
+assignment. This does not authorize installation or changing the selected
+resident artifacts.
+
+**Why:** Metadata/self/Thread slots 0/1/2 conflict with the historical
+Namespace/Thread/UART assignments. A staged, reviewed replacement preserves
+the existing artifacts and approval boundaries.
+
+**How to apply:** Freeze exact inputs, preserve the three selected residents,
+and expose affected bindings and relocation decisions for review. Never
+present a layout-only proposal as an execution-approved image or silently
+patch concrete GTs inside immutable resident LUMPs.
 
 The user assumes LUMPs arrive in order, header first. Under that proposed
 arrival contract, an incoming Namespace's header is available before its

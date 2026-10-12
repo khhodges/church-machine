@@ -14,6 +14,13 @@ function _sameLumpToken(left, right) {
         String(right).replace(/^0x/i, '').toLowerCase();
 }
 
+function _openLumpVariantInspector(token) {
+    const key = _lumpTokenIdentity(token);
+    if (!document.getElementById(`lumpVariantInspector_${key}`)) showLumpDetail(token);
+    const button = document.getElementById(`lumpVersionBadge_${key}`);
+    if (button) button.click();
+}
+
 function showLumpDetail(token) {
     _lumpEditDirty = false;
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
@@ -136,7 +143,8 @@ function showLumpDetail(token) {
     {
         const _verNum = lump.lump_version != null ? parseInt(lump.lump_version) : null;
         if (_verNum != null)
-            _headerStrip += `<span class="lump-hs-chip lump-version-badge" id="lumpVersionBadge_${_tk}"><span class="lump-hs-label">Ver</span>v${_verNum}</span>`;
+            _headerStrip += `<button type="button" class="lump-hs-chip lump-version-badge" id="lumpVersionBadge_${_tk}" title="Inspect Full, Compact and API forms of this exact revision; click again to cycle focus" aria-controls="lumpVariantInspector_${_tk}" style="cursor:pointer;color:inherit;"><span class="lump-hs-label">V#</span>v${_verNum}</button>` +
+                `<button type="button" class="lump-hs-btn lump-compare-forms" aria-controls="lumpVariantInspector_${_tk}">Compare 3 forms</button>`;
     }
     _headerStrip += `<span class="lump-hs-chip" id="lumpSizeChip_${_tk}"><span class="lump-hs-label">Size</span>unavailable</span>`;
     _headerStrip += `<span class="lump-hs-chip" id="lumpCwChip_${_tk}"><span class="lump-hs-label">CW</span>unavailable</span>`;
@@ -181,10 +189,12 @@ function showLumpDetail(token) {
     if (_hasDna) {
         _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','dna');_renderLumpDnaTab('${_tk}')" title="DNA \u2014 reachability graph from this LUMP\u2019s C-List">DNA</button>`;
     }
+    _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','internals')">Internals</button>`;
     _tabBar += `<button class="lump-tab" onclick="_switchLumpTab('${_tk}','hexdump')">Hex Dump</button></div>`;
 
-    let html = _headerStrip + _tabBar +
+    let html = _headerStrip + `<section id="lumpVariantInspector_${_tk}" hidden style="padding:12px;border:1px solid #555;" aria-label="Exact revision variant inspector"></section>` + _tabBar +
         `<div class="lump-tab-panel${!isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabApi_${_tk}"></div>` +
+        `<div class="lump-tab-panel" id="lumpTabInternals_${_tk}"></div>` +
         `<div class="lump-tab-panel" id="lumpTabClooms_${_tk}"></div>` +
         `<div class="lump-tab-panel${isNamespace ? ' lump-tab-panel-active' : ''}" id="lumpTabOverview_${_tk}"><div class="lump-detail-sections">`;
 
@@ -426,6 +436,17 @@ function showLumpDetail(token) {
             `<div id="lumpBinBody_${_tk}" class="lump-hex-loading">Loading\u2026</div></div>`;
 
     contentEl.innerHTML = html;
+    contentEl.querySelectorAll('.lump-version-badge, .lump-compare-forms').forEach(button => button.addEventListener('click', () => {
+        switchLumpWsTab('binary');
+        const panel = document.getElementById(`lumpVariantInspector_${_tk}`);
+        LumpVariantInspector.open(lump, panel, button);
+        if (panel) {
+            panel.tabIndex = -1;
+            panel.style.scrollMarginTop = '90px';
+            panel.focus({preventScroll: true});
+            if (typeof panel.scrollIntoView === 'function') panel.scrollIntoView({block: 'start', behavior: 'instant'});
+        }
+    }));
     // Asynchronously patch CC badge + shrink button + malformed chip from binary.
     _patchCcFromBinary(token, lump, _tk);
     const delBtn = contentEl.querySelector('.lump-delete-btn[data-delete-token]');
@@ -1170,11 +1191,11 @@ function _populateLumpLogicCatalog() {
         const _isGold = _lumpVer > 0;
         const _badgeClass = _isGold ? 'lump-ver-badge lump-ver-badge-gold' : 'lump-ver-badge lump-ver-badge-grey';
         const _clickHandler = _lumpTk
-            ? `event.stopPropagation();showLumpDetail('${_lumpTk}');_switchLumpTab('${_lumpTk}','history')`
+            ? `event.stopPropagation();_openLumpVariantInspector('${_lumpTk}')`
             : 'event.stopPropagation()';
         const _badgeCursor = _lumpTk ? '' : ' style="cursor:default"';
-        const _badgeTitle = _lumpTk ? 'LUMP version \u2014 click to open History tab' : 'LUMP version \u2014 not yet compiled';
-        const _verBadgeHtml = `<span class="${_badgeClass}" onclick="${_clickHandler}"${_badgeCursor} title="${_badgeTitle}">v${_lumpVer}</span>`;
+        const _badgeTitle = _lumpTk ? 'Inspect Full, Compact and API forms of this revision' : 'LUMP version \u2014 not yet compiled';
+        const _verBadgeHtml = `<button type="button" class="${_badgeClass}" onclick="${_clickHandler}"${_badgeCursor} title="${_badgeTitle}" ${_lumpTk ? '' : 'disabled'}>v${_lumpVer}</button>`;
 
         html += `<div class="abs-item" onclick="showAbstractionDetail(${abs.index})" ondblclick="event.stopPropagation();_goToLumpByAbstractionName(abstractionRegistry.getAbstraction(${abs.index}).name)" title="Double-click to jump to this abstraction\u2019s LUMP in the Repository">`;
         html += `<div class="abs-item-row1">`;
@@ -3210,6 +3231,7 @@ function _switchLumpTab(tk, tab) {
     _lumpActiveTab[tk] = tab;
     const tabMap = {
         api: `lumpTabApi_${tk}`,
+        internals: `lumpTabInternals_${tk}`,
         clooms: `lumpTabClooms_${tk}`,
         overview: `lumpTabOverview_${tk}`,
         history: `lumpTabHistory_${tk}`,
@@ -3224,7 +3246,7 @@ function _switchLumpTab(tk, tab) {
     if (bar) {
         const btns = bar.querySelectorAll('.lump-tab');
         btns.forEach(btn => {
-            const labelMap = { api: 'API', clooms: 'CLOOMC', overview: 'Overview', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
+            const labelMap = { api: 'API', internals: 'Internals', clooms: 'CLOOMC', overview: 'Overview', history: 'History', dna: 'DNA', hexdump: 'Hex Dump' };
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
@@ -3232,6 +3254,9 @@ function _switchLumpTab(tk, tab) {
     const token = lump ? lump.token : tk;
     if (tab === 'api' && lump) {
         _populateLumpApiTab(lump, `lumpTabApi_${tk}`);
+    }
+    if (tab === 'internals' && lump) {
+        _populateLumpApiTab(lump, `lumpTabInternals_${tk}`, true);
     }
     if (tab === 'clooms' && lump) {
         _populateLumpSourceTab(lump, `lumpTabClooms_${tk}`);
@@ -3680,7 +3705,7 @@ function _displayLumpCapabilityName(cap, row) {
     return rawName || '\u2014';
 }
 
-function _populateLumpApiTab(lump, panelId) {
+function _populateLumpApiTab(lump, panelId, internal = false) {
     const el = document.getElementById(panelId);
     if (!el || el._apiLoaded) return;
     el._apiLoaded = true;
@@ -3700,20 +3725,26 @@ function _populateLumpApiTab(lump, panelId) {
             if (!inspect) throw new Error('Binary content inspector is unavailable');
             const result = await inspect(data.words || []);
             lump.api_definition = result.contentFrameValid ? result.apiDefinition : null;
+            lump.canonical_api = result.contentFrameValid ? result.canonicalApiDefinition : null;
             lump.api_definition_source = result.contentFrameValid ? 'binary-inspection' : 'unavailable';
             lump._apiInspectionHeader = result.headerValid ? result.header : null;
             lump._apiInspectionProfile = result.contentFrameValid ? result.profile : null;
             lump._apiInspectionComplete = true;
             el._apiLoaded = false;
-            _populateLumpApiTab(lump, panelId);
+            _populateLumpApiTab(lump, panelId, internal);
         }).catch(() => {
             lump._apiInspectionComplete = true;
             lump.api_definition = null;
             el._apiLoaded = false;
-            _populateLumpApiTab(lump, panelId);
+            _populateLumpApiTab(lump, panelId, internal);
         });
     }
     const e = _escHtml;
+    if (!internal) {
+        el.innerHTML = LumpPublicApi.render(lump.canonical_api || lump.api_definition || null,
+            lump.token && !lump._apiInspectionComplete);
+        return;
+    }
     const nsSlot = (lump.ns_slot !== null && lump.ns_slot !== undefined) ? parseInt(lump.ns_slot) : null;
     const grants  = lump.grants || [];
     const apiDefinition = lump.api_definition || null;
@@ -9227,27 +9258,50 @@ function _renderFormatLumpVersionHistory(absName) {
     }
 }
 
-function _formatLumpApiDefinition(absName, caps) {
-    var _manifest = (typeof _lumpManifests !== 'undefined' &&
-                     typeof bootEntrySlot !== 'undefined' &&
-                     Number.isInteger(bootEntrySlot) &&
-                     _lumpManifests[bootEntrySlot])
-        ? _lumpManifests[bootEntrySlot] : null;
-    var _methods = _manifest && Array.isArray(_manifest._methods) ? _manifest._methods : [];
+function _formatLumpApiDefinition(absName, caps, compilation) {
+    // Only the result that owns these words may describe their interface.
+    // Boot selection, simulator state and editor text are not API authority.
+    var retained = compilation && compilation.apiDefinition;
+    if (retained && retained.methods && !Array.isArray(retained.methods)) {
+        if (retained.name !== absName)
+            throw new Error('Canonical API name changed. Recompile before saving under a different name.');
+        return JSON.parse(JSON.stringify(retained));
+    }
+    var _methods = retained ? retained.methods : compilation && compilation.methods;
+    if (!Array.isArray(_methods)) {
+        throw new Error('Compiled method declarations are unavailable. Compile the current source again before saving; no API was inferred from the selected boot LUMP.');
+    }
+    var clone = value => JSON.parse(JSON.stringify(value));
+    var methods = retained ? clone(_methods) : _methods.map(function(method, index) {
+        if (method._internal || method.visibility === 'private') return null;
+        var dr = 1, cr = 1;
+        var specs = Array.isArray(method.parameterSpecs) ? method.parameterSpecs :
+            (method.params || []).map(function(param) {
+                var text = String(param).trim();
+                var cap = text.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*capability\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+([RWXLES]+))?$/i);
+                return cap ? {name:cap[1], kind:'capability', secure_type:cap[2],
+                    rights:cap[3] ? [...new Set(cap[3].toUpperCase().split(''))] : []} :
+                    {name:text, kind:'value'};
+            });
+        var inputs = Array.isArray(method.inputs) ? clone(method.inputs) : specs.map(function(param) {
+            return param.kind === 'capability' ? {
+                name:param.name, register:'CR' + cr++, kind:'capability',
+                secure_type:param.secure_type, rights:clone(param.rights || [])
+            } : {name:param.name, register:'DR' + dr++, kind:'value'};
+        });
+        return {
+            name:method.name,
+            index:index,
+            inputs:inputs,
+            returns:method.returns !== undefined ? clone(method.returns) : {name:'result',register:'DR1'}
+        };
+    }).filter(Boolean);
     return {
         name: absName || '',
-        language: (typeof sim !== 'undefined' && sim && sim._lastCompiledLanguage) || 'assembly',
-        returnConvention: { register: 'DR1', description: 'return value' },
-        methods: _methods.filter(function(method) { return !method._internal; }).map(function(method, index) {
-            var _drPets = (method.pet_names && method.pet_names.DR) || {};
-            return {
-                name: method.name || ('method' + index),
-                index: index,
-                inputs: Object.keys(_drPets).sort(function(a, b) { return Number(a) - Number(b); })
-                    .map(function(reg) { return { name: _drPets[reg], register: 'DR' + reg }; }),
-                returns: { name: 'result', register: 'DR1' }
-            };
-        }),
+        language: (retained && retained.language) || compilation.language || 'assembly',
+        returnConvention: retained && retained.returnConvention
+            ? clone(retained.returnConvention) : { register: 'DR1', description: 'return value' },
+        methods: methods,
         capabilities: (caps || []).map(function(cap) {
             if (typeof cap === 'string') return { name: cap, rights: [], grants: [] };
             return {
@@ -9530,7 +9584,7 @@ window.showFormatLump = async function() {
                 cap.compiler_owned_self !== true) return cap;
         return Object.assign({}, cap, { name: 'SELF' });
     });
-    var _apiObj = _formatLumpApiDefinition(_absName, _caps);
+    var _apiObj = _formatLumpApiDefinition(_absName, _caps, _regMem.memory);
     if (indexedView) {
         _apiObj.isa_profile = 'IDX1';
         _apiObj.language = activeCandidate.language || 'assembly';
@@ -9572,6 +9626,7 @@ window.showFormatLump = async function() {
             _svBinary[_fsStart + _frameIndex] = _frameWds[_frameIndex] >>> 0;
         }
         var _capMaterialized = CapabilityTokens.materialize(_caps, _svBinary, _svLumpSize - _svCC, {
+            canonicalArtifact: true,
             ideHierarchy,
             sim: (typeof sim !== 'undefined' ? sim : null),
             lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],

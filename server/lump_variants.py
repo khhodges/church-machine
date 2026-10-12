@@ -36,7 +36,7 @@ process.stdout.write(JSON.stringify(out));
 """
     proc = subprocess.run(
         ["node", "-e", script], cwd=Path(__file__).resolve().parents[1],
-        input=json.dumps({"words": words, "api": frame["api_definition"], "source": source,
+        input=json.dumps({"words": words, "api": frame.get("canonical_api", frame["api_definition"]), "source": source,
                           "language": (compile_context or {}).get("source_language") or
                           (compile_context or {}).get("inputs", {}).get("language")}),
         capture_output=True, text=True, timeout=15, check=True)

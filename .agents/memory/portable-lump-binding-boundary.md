@@ -17,6 +17,18 @@ derive candidates from verified bytes plus live Namespace records, bind on a
 private copy, and commit only after every relocation succeeds. Catalog/API
 projections must preserve explicit grants, type, and authorization fail-closed.
 
+The compiler must not populate destination Golden Tokens. The linking loader
+owns their resolution for both bitstream boot-image construction and lazy loading.
+
+**Why:** The user explicitly assigns Golden Token materialization to the linking
+loader, not the compiler; compilation must not import the compiling Namespace's
+authority into a portable artifact.
+
+**How to apply:** Keep symbolic declarations in compiler output. Validate and
+materialize them only in the destination executable copy, preserving the saved
+artifact and existing approval boundaries. Do not describe this agreed boundary
+as proof that every current compilation and loading path already implements it.
+
 LUMPs without a PetName must be recompiled by the programmer.
 
 **Why:** The user explicitly requires programmer-owned recompilation, rather

@@ -60,7 +60,7 @@ const Envelope = require('./simulator/idx1-execution-envelope.js');
  const start = text.indexOf('function _formatLumpApiDefinition(');
  const context = vm.createContext({});
  vm.runInContext(text.slice(start, text.indexOf('\n}', start) + 2), context);
- const api = context._formatLumpApiDefinition('PrivateIDX1', caps);
+ const api = context._formatLumpApiDefinition('PrivateIDX1', caps, {methods:[], language:'assembly'});
  api.isa_profile = 'IDX1';
  api.language = 'assembly';
  api.methods = [];

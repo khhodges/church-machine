@@ -241,7 +241,7 @@ register_suite "catalog-compile-tests" \
     'node simulator/test_catalog_compile.js'
 
 register_suite "boot-entry-sync-tests" \
-    'node simulator/test_boot_entry_sync.js && node simulator/test_boot_fault_register_context.js'
+    'node simulator/test_namespace_handoff_target.js && node simulator/test_namespace_design_source_notice.js && node simulator/test_namespace_handoff_probe.js --require-handoff && node simulator/test_namespace_runtime_view.js && node simulator/test_namespace_runtime_browser.js && node simulator/test_boot_entry_sync.js && node simulator/test_boot_fault_register_context.js'
 
 register_suite "three-instruction-boot-tests" \
     'node tests/simulator/sim_boot_three_instruction.js'
@@ -373,7 +373,10 @@ register_suite "bootstrap-resident-identity-tests" \
     'python3 -m pytest tests/server/test_bootstrap_identity_3321.py tests/server/test_bootstrap_migration_atomic_3321.py -v && node simulator/test_bootstrap_resident_identity.js && node simulator/test_bootstrap_token_audit.js'
 
 register_suite "attested-compiler-admission-tests" \
-    'node scripts/check_assembler_browser_freshness.js && python3 -m pytest tests/server/test_compiler_attestation.py -q && node simulator/test_task3488_real_admission_flow.js && node simulator/test_lump_admission_task3488.js'
+    'node scripts/check_assembler_browser_freshness.js && python3 -m pytest tests/server/test_compiler_attestation.py tests/server/test_compiled_api_save_plan.py -q && node simulator/test_task3488_real_admission_flow.js && node simulator/test_lump_admission_task3488.js'
+
+register_suite "compact-lump-api-contract-tests" \
+    'node simulator/test_lump_api_contract.js && node simulator/test_lump_api_codec.js && node simulator/test_canonical_api_browser_compile.js'
 
 register_suite "boot-image-loads-and-boots" \
     'python -m pytest tests/boot/test_boot_image_loads_and_boots.py -v'
@@ -415,7 +418,7 @@ register_suite "pipeline-health-stages-tests" \
     'node simulator/test_pipeline_health_stages.js'
 
 register_suite "deep-dive-annotations-tests" \
-    'node simulator/test_deep_dive_annotations.js'
+    'node simulator/test_deep_dive_annotations.js && node simulator/test_lump_public_api.js && node simulator/test_compiled_api_ownership.js && node simulator/test_lump_variant_inspector.js'
 
 register_suite "versions-view-tests" \
     'python3 -m pytest tests/server/test_versions_view_fields.py -v'

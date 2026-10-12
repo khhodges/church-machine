@@ -215,6 +215,14 @@ args = "wukong-boot-rom-guard"
 task = "workflow.run"
 args = "boot-change-validation"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "attested-compiler-admission-tests"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "compact-lump-api-contract-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -883,13 +891,13 @@ isValidation = true
 name = "attested-compiler-admission-tests"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 -m pytest tests/server/test_compiler_attestation.py -q && node simulator/test_task3488_real_admission_flow.js && node simulator/test_lump_admission_task3488.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest tests/server/test_compiler_attestation.py tests/server/test_compiled_api_save_plan.py -q && node simulator/test_task3488_real_admission_flow.js && node simulator/test_lump_admission_task3488.js"
 
 [[workflows.workflow]]
 name = "editor-roundtrip-tests"
@@ -1202,3 +1210,14 @@ args = "python3 -m pytest hardware/test_boot_change.py hardware/test_wukong_thre
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "compact-lump-api-contract-tests"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node simulator/test_lump_api_contract.js && node simulator/test_lump_api_codec.js && node simulator/test_canonical_api_browser_compile.js"

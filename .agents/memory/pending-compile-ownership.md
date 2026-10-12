@@ -14,3 +14,15 @@ Keep editor language selection distinct from the compiler's internal dialect lab
 **Why:** Automatic detection can label JavaScript-like source as `cloomc` internally while the editor selects `javascript`; comparing those labels directly rejects an unchanged, successful candidate.
 
 **How to apply:** Bind freshness to the source surface and its selected language identity; retain the compiler dialect separately for formatting and diagnostics.
+
+Save must retain the server compiler's canonical embedded API, not reconstruct
+an equivalent-looking public interface from browser method metadata.
+
+**Why:** Attestation compares complete method records, including internal
+dispatch fields. A browser projection can show the right method name while
+still producing an artifact the server correctly rejects.
+
+**How to apply:** Keep the compiler's exact method records with its words.
+Apply black-box filtering only for display. Regression coverage must include
+the real save-plan attestation boundary, with a changed internal field rejected;
+a successful browser serialization roundtrip alone is insufficient.

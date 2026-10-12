@@ -1051,6 +1051,142 @@
         "signature": "7b91db75446e79d494fd0957d6c68ce40f7dc9a75f6cfed510d135b3e6d3e720"
       },
       "identity_hash": "473e10b59da35e59c92b34ab1923b3d6cec3be829d69bb076fe4fd6cc6684c9c"
+    },
+    "7063b718007e06115755042a302d957c0d85a7c941085c3837d66955caec3f02": {
+      "binary_hash": "7063b718007e06115755042a302d957c0d85a7c941085c3837d66955caec3f02",
+      "dot_name": "SelfTest",
+      "issue_n": 1,
+      "abstraction": "SelfTest",
+      "filename": "SelfTest.1.fcf2c79d.lump",
+      "compiled_at": 1791758691.9866285,
+      "portable_binding": {
+        "schema": "church.portable-lump-binding/v1",
+        "owner": "SelfTest#1",
+        "dependencies": [
+          {
+            "N": "SelfTest#1",
+            "dot_name": "SelfTest",
+            "issue_n": 1,
+            "T": null,
+            "binary_hash": null,
+            "identity_hash": null,
+            "rights": [
+              "E"
+            ],
+            "capability_type": 1,
+            "relocation_row": 0,
+            "symbolic_self": true
+          }
+        ],
+        "compatibility": "strong",
+        "canonical_gt_words": "unresolved"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "7063b718007e06115755042a302d957c0d85a7c941085c3837d66955caec3f02",
+        "source_hash": "a7bf2ee4f57b52a16eae906e9124b5fbbf5a3b746469ea595fed6e82fc2c54d3",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "5659d6d5c110037e4485b2b7cba5fb508ece51e8445b07941e9cf4533861a493",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "kjhh1",
+              "aliases": {
+                "Thread.2": "kjhh1.Thread2",
+                "Thread.3": "kjhh1.Thread3",
+                "Boot.Thread": "kjhh1.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "340bd92d6d88ce771cf0c86fb20f4f64eae2ac655109e9be68c29a81f60a7d21"
+      },
+      "identity_hash": "41a2785e87d5d0d23f73b6ff25d297af33e38e72e8dbbbbff4bb3f6adb309f25"
+    },
+    "898573e60736723b4cea265574b4d92b4a8fcd2c23ec2feadbeec884102e2a2c": {
+      "binary_hash": "898573e60736723b4cea265574b4d92b4a8fcd2c23ec2feadbeec884102e2a2c",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "abstraction": "WukongCallHome",
+      "filename": "WukongCallHome.1.4fd1bfc5.lump",
+      "compiled_at": 1791803277.043361,
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "898573e60736723b4cea265574b4d92b4a8fcd2c23ec2feadbeec884102e2a2c",
+        "source_hash": "8c92a82112d7ee758e95d7602ce61ae41546e5dedb14eafbbdb36f3ffcbd1d08",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "ad4f4e173251baf48971f849c05558f7fc4776bdd4f0dbaca6f0789450ac1c26",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "kjhh1",
+              "aliases": {
+                "Thread.2": "kjhh1.Thread2",
+                "Thread.3": "kjhh1.Thread3",
+                "Boot.Thread": "kjhh1.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "d04d70fa5477db794735199ac9c33f21c19b916402b73d6af8eee8af7e75c685"
+      },
+      "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90"
+    },
+    "811ebe9b9d892692e1ca1e96263407bfdc9714758e27fe474b39ab9b8618e525": {
+      "binary_hash": "811ebe9b9d892692e1ca1e96263407bfdc9714758e27fe474b39ab9b8618e525",
+      "dot_name": "WukongCallHome",
+      "issue_n": 1,
+      "abstraction": "WukongCallHome",
+      "filename": "WukongCallHome.1.2a55fd48.lump",
+      "compiled_at": 1791806693.4307718,
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "811ebe9b9d892692e1ca1e96263407bfdc9714758e27fe474b39ab9b8618e525",
+        "source_hash": "8c92a82112d7ee758e95d7602ce61ae41546e5dedb14eafbbdb36f3ffcbd1d08",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "f17f85df53ab70297fde81e6f9abd7a1e0db9f3e51a00580adde8c83d794313a",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "kjhh1",
+              "aliases": {
+                "Thread.2": "kjhh1.Thread2",
+                "Thread.3": "kjhh1.Thread3",
+                "Boot.Thread": "kjhh1.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "0ee2008d9c6b1e4c66087d208e1c417b3c2c27de505c96e4b158e082ec093a8d"
+      },
+      "identity_hash": "b2c8f3d7d7e755f24ac3ab22726514cfaa9a604d037ab661891c198a0f5d8b90"
     }
   }
 }

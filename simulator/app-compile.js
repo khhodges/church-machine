@@ -1982,8 +1982,25 @@ async function compileAndBuild(options) {
         showNextSteps('error');
         return { ok: false, kind: 'cloomc', error: _frameError };
     }
-    const _frameApi = typeof _formatLumpApiDefinition === 'function'
-        ? _formatLumpApiDefinition(absName, caps)
+    const _compilerFrame = Array.isArray(result.words) && result.compiler_record
+        ? await _frameBuilder.lumpInspectContentFrame(result.words) : null;
+    if (_compilerFrame && (!_compilerFrame.contentFrameValid ||
+            !Array.isArray(_compilerFrame.apiDefinition?.methods))) {
+        const methods = _compilerFrame.apiDefinition?.methods;
+        if (_compilerFrame.contentFrameValid && methods &&
+                typeof methods === 'object' && !Array.isArray(methods)) {
+            throw new Error('The browser API reader does not support the compiler API format. ' +
+                'Your source was not changed and no save candidate was created. ' +
+                'Preserve your editor text, reload the IDE to load matching browser code, then compile again.');
+        }
+        throw new Error('Server compiler output has no valid embedded method interface: ' +
+            (_compilerFrame.error || 'decoded method declarations are missing') +
+            '. Your source was not changed and no save candidate was created.');
+    }
+    const _frameApi = _compilerFrame
+        ? JSON.parse(JSON.stringify(_compilerFrame.canonicalApiDefinition || _compilerFrame.apiDefinition))
+        : typeof _formatLumpApiDefinition === 'function'
+        ? _formatLumpApiDefinition(absName, caps, result)
         : {
             name: absName,
             language: result.language || 'javascript',
@@ -2470,7 +2487,8 @@ async function compileAndBuild(options) {
     if (_compiledToken && window.LumpRegistry) {
         window.LumpRegistry.registerMemory(
             _compiledToken, absName, _registeredCodeWords, _compiledCapabilities,
-            { sourceText: source, language: result.language || 'javascript' }
+            { sourceText: source, language: result.language || 'javascript',
+                apiDefinition: _frameApi }
         );
         window.LumpRegistry.setCurrent(_compiledToken);
         window._pendingLumpData = null;
@@ -2719,6 +2737,7 @@ function auditLumpOnly() {
         return;
     }
     const _auditCapMaterialized = CapabilityTokens.materialize(caps, lumpWords, _auditClistStart, {
+        canonicalArtifact: true,
         sim,
         lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
     });
@@ -2886,6 +2905,10 @@ function loadCLOOMCIntoSim() {
             window.LumpRegistry.registerMemory(_cmpTok, sim.programName, words.slice(), _asmCaps, {
                 sourceText: source,
                 language: result.language || 'javascript',
+                apiDefinition: typeof _formatLumpApiDefinition === 'function'
+                    ? _formatLumpApiDefinition(sim.programName, _asmCaps,
+                        {...result, methods:result.methods || []})
+                    : {name:sim.programName, language:result.language || 'assembly', methods:[]},
             });
             window.LumpRegistry.setCurrent(_cmpTok);
             // A new compile invalidates any pending Format Lump binary.

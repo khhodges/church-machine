@@ -293,7 +293,15 @@ function lumpDecodeContentFrameApi(serverWords) {
             _bytes.push((_word >>> 24) & 0xFF, (_word >>> 16) & 0xFF,
                         (_word >>> 8) & 0xFF, _word & 0xFF);
         }
-        return JSON.parse(new TextDecoder().decode(new Uint8Array(_bytes.slice(0, _byteLength))));
+        const text = new TextDecoder().decode(new Uint8Array(_bytes.slice(0, _byteLength)));
+        const api = JSON.parse(text);
+        if (api && api.methods && !Array.isArray(api.methods)) {
+            const contract = typeof module !== 'undefined' && module.exports
+                ? require('./lump-api-contract') : globalThis.LumpApiContract;
+            if (!contract) throw new Error('Canonical API validator is unavailable');
+            return contract.parse(text, {cw:(serverWords[0] >>> 10) & 8191,cc:serverWords[0] & 255});
+        }
+        return api;
     } catch (_e) { return null; }
 }
 
@@ -382,6 +390,14 @@ async function lumpInspectContentFrame(serverWords) {
         result.profile = flags === 0x00 ? 'api' :
             (flags === 0x01 || flags === 0x05 ? 'compact' : 'full');
         result.apiDefinition = lumpDecodeContentFrameApi(serverWords);
+        result.canonicalApiDefinition = result.apiDefinition;
+        if (result.apiDefinition && result.apiDefinition.methods &&
+                !Array.isArray(result.apiDefinition.methods)) {
+            const codec = typeof module !== 'undefined' && module.exports
+                ? require('./lump-api-codec') : globalThis.LumpApiCodec;
+            if (!codec) throw new Error('Canonical API decoder is unavailable');
+            result.apiDefinition = codec.expand(result.canonicalApiDefinition, serverWords);
+        }
         if (!result.apiDefinition) {
             result.error = 'Embedded API definition is malformed';
             return result;

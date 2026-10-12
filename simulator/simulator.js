@@ -127,6 +127,26 @@ const BOOT_NS_SLOT_THREAD = ARCH_BOOT.minimalSlots['Boot.Thread'];
 // boot-entry E-GT (Thread.caps[0]).  No trampoline instructions needed.
 
 class ChurchSimulator {
+    static _embeddedApiView(text, words) {
+        const api = JSON.parse(text);
+        if (!api || !api.methods || Array.isArray(api.methods)) return api;
+        const codec = typeof module !== 'undefined' && module.exports
+            ? require('./lump-api-codec') : globalThis.LumpApiCodec;
+        if (!codec) throw new Error('Canonical API decoder is unavailable');
+        return codec.expand(api, words);
+    }
+    // Explicit profile selection: historical images keep their original loader.
+    // This constructs an inert execution instance; it neither saves nor approves
+    // the supplied bytes. The caller explicitly starts the entry Thread.
+    static fromNamespaceImage(memory, cr15) {
+        const Core = typeof ChurchNamespaceRuntimeCore !== 'undefined'
+            ? ChurchNamespaceRuntimeCore
+            : (typeof module !== 'undefined' && module.exports
+                ? require('./namespace-runtime-core') : null);
+        if (!Core) throw new Error('Namespace runtime scripts are not loaded');
+        return new Core(memory, cr15);
+    }
+
     #builtinNamespaceWriteDepth = 0;
     #namespaceSaveWriteDepth = 0;
 
@@ -2235,7 +2255,7 @@ class ChurchSimulator {
                         bytes[offset] = (copy[frame + 1 + (offset >>> 2)] >>>
                             (24 - 8 * (offset & 3))) & 255;
                     }
-                    const api = JSON.parse(new TextDecoder().decode(bytes));
+                    const api = ChurchSimulator._embeddedApiView(new TextDecoder().decode(bytes), copy);
                     const self = api.capabilities && api.capabilities[0];
                     embeddedCompilerSelf = Array.isArray(api.capabilities) &&
                         api.capabilities.length === hdr.cc && self &&
@@ -2946,7 +2966,8 @@ class ChurchSimulator {
                     bytes[offset] = (this.memory[frame + 1 + (offset >>> 2)] >>>
                         (24 - 8 * (offset & 3))) & 255;
                 }
-                const api = JSON.parse(new TextDecoder().decode(bytes));
+                const api = ChurchSimulator._embeddedApiView(new TextDecoder().decode(bytes),
+                    this.memory.slice(base, base + header.lumpSize));
                 if (!Array.isArray(api.capabilities) || api.capabilities.length !== header.cc) {
                     throw new Error('embedded API C-list geometry differs');
                 }
@@ -6251,7 +6272,8 @@ class ChurchSimulator {
                 bytes[i * 4 + 2] = word >>> 8;
                 bytes[i * 4 + 3] = word;
             }
-            const api = JSON.parse(new TextDecoder().decode(bytes.slice(0, byteLength)));
+            const api = ChurchSimulator._embeddedApiView(new TextDecoder().decode(bytes.slice(0, byteLength)),
+                this.memory.slice(base, base + hdr.lumpSize));
             if (!api || !Array.isArray(api.methods) || api.methods.length === 0) return null;
             const methods = [];
             for (const method of api.methods) {
@@ -8708,7 +8730,7 @@ class ChurchSimulator {
         return null;
     }
 
-    _activateChangeThread(threadGT, d, continuationPC) {
+    _activateChangeThread(threadGT, d, continuationPC, allowRoot = false) {
         const parsed = this.parseGT(threadGT);
         if (ChurchSimulator.isNullGT(threadGT) || parsed.malformed || parsed.type !== 1) {
             this.fault('TYPE', 'CHANGE requires a non-null Inform Thread GT');
@@ -8793,7 +8815,7 @@ class ChurchSimulator {
                 `CHANGE restore CR5 heap GT for Thread slot ${targetIdx}: ${heapCheck.message}`);
             return null;
         }
-        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend, false);
+        const resume = this._readThreadResumeFrame(tBase, targetLayout, targetIdx, selfSuspend, allowRoot);
         if (!resume) return null;
         // Validate the actual C-List backing the saved executable context before
         // suspending the outgoing Thread or publishing any incoming registers.

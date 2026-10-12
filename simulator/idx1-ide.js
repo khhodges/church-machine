@@ -15,7 +15,8 @@
         if (!candidate || candidate.isaProfile !== 'IDX1') return null;
         return { abstraction: candidate.abstraction, sources: {
             memory: { words: Array.from(candidate.words), capabilities: Array.from(candidate.capabilities),
-                sourceText: candidate.source, registeredAt: candidate.createdAt },
+                sourceText: candidate.source, registeredAt: candidate.createdAt,
+                apiDefinition: {name:candidate.abstraction, language:candidate.language, methods:[]} },
             server: { language: candidate.language },
         } };
     }

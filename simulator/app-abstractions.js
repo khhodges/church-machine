@@ -1282,7 +1282,7 @@ async function renderLumps() {
                      ? _lumpContentTypeLabel(lump) : (lump.lump_type || lump.content_type || 'LUMP');
                  const version = lump.lump_version != null ? `v${lump.lump_version}`
                      : (lump.version ? `v${lump.version}` : '');
-                 const meta = [type, version, lump.lump_size ? `${lump.lump_size}w` : '',
+                 const meta = [type, lump.lump_size ? `${lump.lump_size}w` : '',
                      lump.ns_slot != null ? `NS ${lump.ns_slot}` : 'saved'].filter(Boolean).join(' · ');
                  // Source documentation tier dot: green=2 (full), amber=1 (uncommented), grey=0 (none), neutral=legacy
                  const _isNs = (lump.lump_type || '').toLowerCase() === 'namespace' || lump.typ === 1;
@@ -1302,7 +1302,9 @@ async function renderLumps() {
                  html += `<div class="lump-item" data-lump-token="${_escHtml(token)}" tabindex="0" role="button" aria-label="View ${_escHtml(name)}">`
                      + `<div class="lump-item-header"><span class="lump-item-name-group"><span class="lump-item-name">${_escHtml(name)}</span>${_tierDotHtml}</span>`
                      + `<button type="button" class="lump-deep-dive-btn" data-deep-dive-token="${_escHtml(token)}" aria-haspopup="dialog" aria-expanded="false" title="Open recursive DNA dependency graph">Deep Dive</button></div>`
-                     + `<div class="lump-item-meta"><span class="lump-token">0x${_escHtml(token)}</span><span>${_escHtml(meta)}</span></div></div>`;
+                     + `<div class="lump-item-meta"><span class="lump-token">0x${_escHtml(token)}</span>`
+                     + (version ? `<button type="button" class="lump-hs-btn lump-revision-inspect" data-variant-token="${_escHtml(token)}" title="Inspect Full, Compact and API forms">${_escHtml(version)}</button>` : '')
+                     + `<span>${_escHtml(meta)}</span></div></div>`;
              }
              html += `</div>`;
         }
@@ -1312,8 +1314,14 @@ async function renderLumps() {
              const token = item.dataset.lumpToken;
              item.addEventListener('click', () => lumpPickerChanged(token));
              item.addEventListener('keydown', ev => {
-                 if (ev.target.closest && ev.target.closest('.lump-deep-dive-btn')) return;
+                 if (ev.target.closest && ev.target.closest('button')) return;
                  if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); lumpPickerChanged(token); }
+             });
+         });
+         listEl.querySelectorAll('.lump-revision-inspect').forEach(btn => {
+             btn.addEventListener('click', ev => {
+                 ev.stopPropagation();
+                 _openLumpVariantInspector(btn.dataset.variantToken);
              });
          });
          listEl.querySelectorAll('.lump-deep-dive-btn').forEach(btn => {

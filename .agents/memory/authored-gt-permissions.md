@@ -33,6 +33,28 @@ Permission changes to a register-held Golden Token are a runtime M-bit concern, 
 
 Alias-key syntax and canonical hierarchy syntax are different contracts. Legacy Thread PetNames, including numeric and hash-separated instances, need exact configured aliases rather than fabricated canonical identities.
 
+Offline candidate compilation must enforce the same trusted hierarchy as normal
+IDE compilation. Successful worker output without that context is not evidence
+that a selected historical artifact can be republished.
+
+**Why:** Recovering an older artifact's source can compile syntactically while
+its Thread references still lack the explicit canonical aliases or foreign
+definitions required by current ownership policy.
+
+**How to apply:** Retain exact source and diagnostics, supply trusted authoring
+context, and request the missing identity decisions. Do not omit ownership
+checks, invent aliases, or patch old executable bytes to obtain a passing build.
+
+The user confirmed local IDE ownership of the generated Boot Namespace's
+`Thread.2`, `Thread.3`, and `Boot.Thread` identities and authorized explicit
+canonical aliases for these references.
+
+**Why:** Their legacy display names alone did not establish authoring ownership.
+
+**How to apply:** Preserve the explicit identity mappings rather than inferring
+ownership from a slot, Thread type, or absence of permissions. This confirmation
+does not extend to arbitrary imported Thread identities.
+
 **Why:** Applying canonical-path grammar to alias keys blocked legitimate permissionless Thread declarations and made their intended configuration workaround invalidate unrelated authoring.
 
 **How to apply:** Accept supported PetNames as alias keys while retaining strict canonical targets and exact-parent ownership. Test permissionless Thread references through actual compilation and saved-artifact publication, not just the policy helper.

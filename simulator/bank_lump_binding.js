@@ -187,6 +187,12 @@
                 ? new TextDecoder().decode(bytes.subarray(apiStart, apiEnd))
                 : Buffer.from(bytes.subarray(apiStart, apiEnd)).toString('utf8');
             api = JSON.parse(apiText);
+            if (api && api.methods && !Array.isArray(api.methods)) {
+                const codec = typeof module !== 'undefined' && module.exports
+                    ? require('./lump-api-codec') : root.LumpApiCodec;
+                if (!codec) throw new Error('Canonical API decoder is unavailable');
+                api = codec.expand(api, Array.from({length:1 + cw}, (_, i) => readWord(i * 4)));
+            }
         } catch (_) {
             return fail('LUMP embedded API is not valid JSON');
         }

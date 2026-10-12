@@ -1,4 +1,9 @@
 'use strict';
+// Default/strict mode exercises the approved slot-0-header, combined SWITCH
+// contract. The historical tail-table investigation remains explicitly runnable.
+if (!process.argv.includes('--legacy-probe')) {
+    require('./test_namespace_runtime_core.js');
+} else {
 // Feasibility probe, not a release conformance pass. No file/board/UI writes.
 // --require-handoff makes the known Namespace-selection gap a failing gate.
 const assert = require('node:assert/strict');
@@ -145,3 +150,4 @@ function switchFirst(f) {
     }
 }
 console.log('Probe complete. Expected-blocker mode is NOT successful handoff certification.');
+}

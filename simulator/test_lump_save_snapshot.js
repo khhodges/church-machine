@@ -51,6 +51,7 @@ const context = {
                         words: [1, 2, 3],
                         capabilities: [{ name: 'New.CapTest', rights: ['E'], grants: ['E'] }],
                         registeredAt: 101,
+                        apiDefinition: {name:'Snapshot.Test', methods:[{name:'Run',index:0}]},
                     },
                     server: { language: 'assembly' },
                 },
@@ -78,6 +79,9 @@ if (snapshot.sourceText !== 'method Main { RETURN }') {
 }
 if (snapshot.words.join(',') !== '1,2,3') throw new Error('compiled words were not captured');
 if (snapshot.registeredAt !== 101) throw new Error('registeredAt was not captured');
+if (!snapshot.apiDefinition || snapshot.apiDefinition.methods[0].name !== 'Run') {
+    throw new Error('compiled API was not captured with the saved words');
+}
 if (!snapshot.editorBaseIdentity ||
     snapshot.editorBaseIdentity.token !== 'old-token' ||
     snapshot.editorBaseIdentity.source_hash !== 'old-source-hash') {

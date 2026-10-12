@@ -331,7 +331,10 @@ function embedSelfDefinition(words, api, source, tier, sourceLanguage) {
     const need = 1 + apiPacked.words.length +
                  (tier >= 1 ? 1 + srcPacked.words.length : 0);
 
-    let n = nMinus6 + 6;
+    // The source-free canonical form is the tight build derivative. Full and
+    // Compact retain their original allocation floors.
+    let n = tier === 0 && api && api.methods && !Array.isArray(api.methods)
+        ? 6 : nMinus6 + 6;
     while (((1 << n) - 1 - cw - cc) < need && n < N_MAX) n++;
     if (((1 << n) - 1 - cw - cc) < need) {
         throw new Error(`content frame (${need} words) does not fit the biggest lump`);

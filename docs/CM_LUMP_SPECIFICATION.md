@@ -2849,9 +2849,12 @@ list only the abstractions their application references.
 
 ## Namespace LUMP Header Word (Word 0)
 
-A Namespace LUMP uses the ratified Header V2 `typ=01` (Namespace/data)
-interpretation. Its Word 0 is followed by the remaining fifteen physical
-header words; it is neither a Thread nor a `typ=10` clist-only lump.
+A Namespace LUMP uses the Header V2 `typ=01` (Namespace/data) word
+interpretation. Under the approved [active Namespace geometry](instruction-set.md#active-namespace-geometry),
+this word is W0 of metadata slot 0. The four-word metadata slot is the
+physical Namespace header; there is no additional sixteen-word prefix.
+It is neither a Thread nor a `typ=10` clist-only lump. Existing saved images
+with the older physical layout are not silently converted by this correction.
 
 ```
 31      27 26    23 22                10 9   8 7              0
@@ -2864,7 +2867,7 @@ header words; it is neither a Thread nor a `typ=10` clist-only lump.
 |-------|--------------|---------|
 | magic | 0x1F | Traps if executed out-of-sequence |
 | n-13 | 0..9 | `capacity_words = 2^(field+13)`: 8K through 4M words |
-| cw | 0..8,191 | Plain NS-table entry count |
+| cw | 0..8,191 | NS-table slot capacity, including metadata slot 0; the defined boot layout requires at least slots 0–2 |
 | typ | 01 | Namespace/data |
 | cc | 0 | Reserved; a loader rejects nonzero |
 
@@ -2872,29 +2875,35 @@ header words; it is neither a Thread nor a `typ=10` clist-only lump.
 
 ## Physical Memory Map
 
-The Namespace LUMP's E-GT (Word 1 = base, Word 2 limit_offset) defines
-the **complete physical address range** the application owns. No memory
-outside this range is accessible to the application — Mint refuses to
-issue GTs that reference addresses beyond the NS LUMP's limit.
+The Namespace metadata defines the **complete memory allocation**: W0
+contains its header-defined capacity, W1 its memory base, W2 its
+following-member count, and W3 is reserved. CR15 instead bounds the NST:
+location is the low-end table base and limit_offset is `N*4 - 1` words.
+Do not interpret that table limit as the full allocation's memory extent.
 
 ```
 ┌─────────────────────────────────────────────────────────┐  ← base
-│  Words 0..15  Namespace Header V2                       │
-│  Words 16..NS_TABLE_START-1  Resident bodies / work area│
-│  Words NS_TABLE_START..NS_TABLE_END  NS Table           │  ← N × 4 words (Binary Data)
+│  Words 0..3    Slot 0: physical header / metadata       │
+│  Words 4..7    Slot 1: Namespace self-entry             │
+│  Words 8..11   Slot 2: Boot/entry Thread descriptor     │
+│  Remaining NST slots, ascending                       │  ← N × 4 words total
+│  Resident bodies / work area after NST                │
 └─────────────────────────────────────────────────────────┘  ← base + capacity_words - 1
 ```
 
-The NS Table is tail-anchored: `NS_TABLE_START = capacity_words − N×4`,
-where `N` is Word 0 `cw`. It has exactly four words per entry and cannot
-overlap the 16-word header or resident bodies.
+The NST is head-anchored: `NS_TABLE_START = base`, and slot `i` starts at
+`base + 4*i`, where N is header `cw`. Metadata is included in those N slots
+and cannot be used as an ordinary capability target. Resident bodies must
+not overlap the NST. This replaces the historical tail-anchored physical
+map for the new format; it does not authorize rewriting retained images.
 
 ---
 
 ## Namespace Table — Entry Format
 
-The NS Table is a flat array of **N entries × 4 words**. N is the total
-number of object slots in the namespace. Only the object owner holds
+The NS Table is a flat array of **N slots × 4 words**. N includes metadata
+slot 0; the ordinary entry format below applies to capability slots 1 onward.
+Only the object owner holds
 GT Word 0 (the per-holder credential) in their c-list — GT Word 0 is
 never stored in the NS Table.
 

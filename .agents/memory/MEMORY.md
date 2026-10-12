@@ -1,3 +1,5 @@
+- [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [Hardware CHANGE fetch addresses](hardware-change-fetch-address.md) — use actual imem_addr and absolute saved NIAs; completion alone does not prove executable activation.
 - [ISA review decisions](isa-review-index.md) — scope, pre-release compatibility, encoding checks, cooperative scheduling and save-first fault recovery.
 - [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
 - [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
@@ -81,7 +83,7 @@
 - [Board-state acknowledgement correlation](board-state-ack-correlation.md) — state-changing UART acknowledgements need a request nonce, atomic receive, and bounded partial-frame recovery
 - [M-bit I/O object](m-bit-io-object.md) — one Namespace-held 32-bit I/O word; bits 0–15 map CR0.M–CR15.M and full-word writes set/clear all bits
 - [Wukong one-shot Skip Fault](wukong-skip-fault-protocol.md) — explicit post-snapshot skip needs authenticated FPGA-sequence proof; lost correlation requires reboot
-- [LUMP output profile stability](lump-output-profile-stability.md) — persist API/Compact/Full per abstraction; allocation changes reflect embedded content, not code size alone
+- [LUMP output profiles](lump-output-profile-stability.md) — linked editing/sharing/build forms, allocation semantics, and black-box public API boundary.
 - [LUMP save vs boot rebuild](lump-save-boot-rebuild-boundary.md) — an approved LUMP save must not roll back because an unchanged boot-image dependency cannot rebuild
 - [SelfTest dynamic allocation](selftest-dynamic-allocation.md) — SelfTest authority comes from one active manifest+NS binding; size, slot, sequence, and resident layout are never legacy constants
 - [C-List picker programmer authority](clist-picker-programmer-authority.md) — capability declarations may use live, committed, library-only, or not-yet-created pet names
@@ -154,5 +156,4 @@
 - [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.
 - [Bitfield width decision](bitfield-width-decision.md) — BFEXT/BFINS width zero is invalid; user selected widths 1–31, not a zero-means-32 convention.
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
-- [Namespace handoff evidence](namespace-handoff-evidence.md) — mirrored tables can hide wrong-root lookup; require destination-only cases and separate probes from release gates.
-- [Hardware CHANGE fetch addresses](hardware-change-fetch-address.md) — use actual imem_addr and absolute saved NIAs; completion alone does not prove executable activation.
+- [Namespace handoff authority](namespace-handoff-evidence.md) — no hidden caches; entry GT version 0; faulting CR identifies software blacklisting; hardware never changes versions.

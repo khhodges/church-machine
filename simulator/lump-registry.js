@@ -92,6 +92,9 @@
                 registeredAt:  Date.now()
             };
             if (snapshot && typeof snapshot === 'object') {
+                if (snapshot.apiDefinition && typeof snapshot.apiDefinition === 'object') {
+                    entry.sources.memory.apiDefinition = JSON.parse(JSON.stringify(snapshot.apiDefinition));
+                }
                 if (typeof snapshot.sourceText === 'string') {
                     entry.sources.memory.sourceText = snapshot.sourceText;
                 }

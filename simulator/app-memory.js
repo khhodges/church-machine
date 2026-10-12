@@ -4153,6 +4153,20 @@ function handleBootImageUpload(input) {
         });
 }
 
+function _namespaceDesignSourceNotice(state) {
+    const rows = state && Array.isArray(state.abstractions) ? state.abstractions : [];
+    const legacy = rows.some(row => row.slot === 0 && row.name === 'Boot.NS') &&
+        rows.some(row => row.slot === 1 && row.name === 'Boot.Thread');
+    return '<div id="nsDesignSourceNotice" role="note" style="padding:10px;border:1px solid #88703e;background:#302719;color:#f0d79c;font-size:0.8rem;line-height:1.5;">' +
+        '<strong>Saved Namespace design — not active CR15 state.</strong> ' +
+        'Rows show saved assignments and any unsaved edits, not proof of an installed or running image.' +
+        (legacy ? '<br><strong>Legacy layout — new-format adoption pending.</strong> ' +
+            'This design still assigns Boot.NS to slot 0 and Boot.Thread to slot 1. ' +
+            'The approved new layout is: slot 0 metadata/header, slot 1 Namespace self, slot 2 entry Thread. ' +
+            'The new-format design has not replaced these saved rows.' : '') +
+        '<br>Save Namespace Table saves row edits only; it does not migrate the layout or activate an image.</div>';
+}
+
 function updateNamespace() {
     const container = document.getElementById('namespaceTable');
     if (!container) return;
@@ -4189,9 +4203,9 @@ function updateNamespace() {
     const _cntFree = _nsSnapshot.counts.free;
     const _statChip = (label, val, color, title) =>
         `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 7px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);font-size:0.72rem;white-space:nowrap;" title="${title}"><span style="color:${color};font-weight:600;">${label}</span><span style="color:#ccc;">${val}</span></span>`;
-    let html = '';
+    let html = _namespaceDesignSourceNotice(window._nsState);
     html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
-    html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Total NS slots available in this boot image');
+    html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Slot capacity of this Namespace design; not evidence of the active image');
     html += _statChip('Assigned', _nsSnapshot.counts.assigned, '#a0c0e0', 'Approved assignments and explicit local drafts; not proof of image installation');
     html += _statChip('Resident policy', _cntResident, '#4ec9b0', 'Selected policy or architectural object kind, not proof of installed bytes');
     html += _statChip('Lazy policy',_cntLazy,     '#f0a040', 'Selected next-build policy, not observed hardware state');

@@ -282,8 +282,12 @@ if (isMainThread) {
     // never claim successful standalone output for a legacy fallback.
     const tier = Number.isInteger(payload.tier) ? payload.tier : 2;
     try {
-        const api = buildApiDefinition(compileResult, words);
-        words = embedSelfDefinition(words, api, source, tier);
+        let api = buildApiDefinition(compileResult, words);
+        if (!executionLayout && !api.isa_profile && api.capabilities && api.capabilities.length) {
+            api = require('../simulator/lump-api-codec').encode(api,
+                {cw:(words[0] >>> 10) & 8191,cc:words[0] & 255});
+        }
+        words = embedSelfDefinition(words, api, source, tier, language);
     } catch (err) {
         parentPort.postMessage({ ok: false, language,
             error: `LUMP self-definition failed: ${err.message}. No standalone candidate was produced; no saved data changed.` });

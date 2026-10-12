@@ -2,9 +2,13 @@
 
 ## Contract
 
-`SWITCH CRd, CRs, #row` is the special LOAD form for isolated capability
-registers CR12–CR15. It is not a register swap, a PassKey install, or an
-authority carried by the source.
+`SWITCH CRd, CRs, #row` retains its existing encoding. CR12–CR14 destinations
+perform isolated-register LOAD. A CR15 destination performs the complete
+Namespace-and-Thread handoff defined in the master ISA. It is not a register
+swap, a PassKey install, or an authority carried by the source.
+
+These are architectural requirements, not a claim that existing simulator,
+RTL, saved programs, or boot images already implement the CR15 correction.
 
 At instruction acceptance the machine latches the complete destination index
 and that destination register's M bit. Execution succeeds only when:
@@ -34,24 +38,45 @@ required right fails closed without changing M.
 
 ## Operation lifecycle
 
+Successful combined `SWITCH CR15` clears CR13 completely, including M. The
+destination Thread manager explicitly installs its own IRQ Thread. The outgoing
+IRQ capability is not carried into the destination, and a non-NULL CR13 is not
+an additional rejection precondition. This is not automatic fault recovery.
+
 1. Namespace presents the M-bit I/O capability and writes the complete M word.
 2. The instruction decoder accepts `SWITCH`, latching CRd and CRd.M.
 3. The destination and encoding are validated.
 4. The ordinary LOAD pipeline validates `CRs[row]`. No source-M bypass exists.
-5. On success the loaded capability replaces CRd and CRd.M clears.
+5. For CR12–CR14, the loaded capability replaces CRd and CRd.M clears.
+   For CR15, the validated value must identify a Namespace: save the outgoing
+   Thread under the old Namespace, load CR15 at the microcode midpoint, and
+   activate the destination's slot-2 Thread using a hardwired permissionless
+   Inform GT with version 0. Successful handoff consumes CR15.M.
 6. A subsequent SWITCH to that register fails until Namespace authorizes it
    again through the matching device capability.
 
 The latch prevents a concurrent or later M-device transition from changing the
 authorization decision for an already accepted instruction.
 
-## Fault atomicity
+There is no ordinary instruction boundary inside the CR15 handoff, no extra
+Thread operand, and no required following CHANGE. Other SWITCH destinations
+do not gain these Thread-transition side effects. Fixed entry selection must
+still validate the actual descriptor, version, Thread, frame, and C-List.
+
+## Fault behavior
 
 An M-clear destination faults with `PERM_L`. A CR0–CR11 destination, CR12–CR15
 source, or malformed encoding faults with `INVALID_OP`. A NULL or non-L source,
 out-of-bounds row, stale token, or integrity failure faults before
-architectural commit. No failure may mutate any capability register, M bit,
-Namespace entry, memory word, or source capability.
+source admission completes. For CR12–CR14, no failure may mutate any capability
+register, M bit, Namespace entry, memory word, or source capability.
+
+For CR15, outgoing-save writes are not transactionally rolled back if a later
+phase fails. Default to hard fault, not retry, alternate target, silent repair,
+or continued execution of partial state. Fault attribution follows the GT in
+the faulting CR. Hardware and transition/fault microcode never change versions;
+authorized software management owns version-based blacklisting. A stale GT
+still faults without causing another slot-version change.
 
 Conditional instructions whose condition is false are skipped normally and do
 not consume M authorization.
@@ -61,9 +86,9 @@ not consume M authorization.
 Bootstrapping isolated registers is a trusted boot operation. After boot,
 runtime reauthorization is exclusively the Namespace-owned M-bit device
 protocol above. Successful SWITCH consumes the destination's M state; faults
-do not silently grant, move, or infer M. Recovery therefore starts from either
-the unchanged pre-fault state or a separately specified reset path, never a
-partially installed capability.
+do not silently grant, move, or infer M. A Boot Thread fault leaves the CM in
+purgatory. Do not assume management remains reachable or add a new recovery
+strategy to complete a failed Namespace handoff.
 
 ## Security consequences
 
@@ -71,7 +96,8 @@ partially installed capability.
   placement into an isolated register.
 - A source carrying unrelated machine metadata gains no additional authority.
 - Device capability attenuation cannot change its bound destination.
-- CR12–CR15 have identical encoding and authorization rules.
+- CR12–CR15 retain the existing encoding and destination-M authorization;
+  only CR15 adds the Namespace/Thread transition.
 - The Namespace/device boundary, not an Abstract sentinel value, is the root
   of runtime SWITCH authority.
 

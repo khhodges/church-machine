@@ -22,6 +22,18 @@ Full source is the canonical editing input; API-only and compact are read-only
 derivations, not co-equal editable records. Keep a shared revision identity and
 separate binary/source hashes.
 
+For caller-visible encapsulation, see [Black-box public API](black-box-public-api.md):
+public contracts exclude implementation dependencies, while binding evidence stays intact.
+
+Version inspection should expose all three forms together, with repeated version
+clicks cycling Full → Compact → API focus, not selecting another revision.
+
+**Why:** The user wants one comparison view opened from the V# cell, rather than
+three separately navigated artifacts.
+
+**How to apply:** Keep inspection read-only and bind every pane to the exact
+revision bundle. Only the full-source form offers editor navigation.
+
 **Why:** Derivation prevents independent source variants from drifting.
 Comment removal cannot reproduce the exact full-source seal, and generating
 consistent variants does not prove compiler metadata semantics are correct.

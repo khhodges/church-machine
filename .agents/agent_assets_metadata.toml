@@ -948,3 +948,17 @@ mtime_ms = 1791717934141
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/13dce714-d36c-46d7-bb11-3efbf8e84562/5cee8572-b890-4985-8810-76f21ca5395e"
 storage_version_token = "1791718078470453"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "biwNmhHq3cAOtZyZ4Gchz"
+uri = "file://generated-artifacts/namespace-device-aliases/review.html"
+type = "html"
+title = "Target Namespace — proposed device aliases"
+description = "Review-only aliases bound to the frozen target layout. No live changes or execution approval."
+logical_id = "729249e0-7545-4758-a03a-19b7a42fa308"
+content_hash = "sha256:a50f905fd78a5a8212f6901f920c2fa32437863ae6f1a3a4b68864f0a38afdaf"
+size = 1221
+mtime_ms = 1791812524555
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/729249e0-7545-4758-a03a-19b7a42fa308/abb121ce-cab4-4710-85ea-349cdc48bb62"
+storage_version_token = "1791812539855442"
+content_type = "text/html"

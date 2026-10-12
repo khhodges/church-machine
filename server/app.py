@@ -10871,9 +10871,11 @@ def _parse_intrinsic_lump_content(words):
     try:
         api_raw = _struct.pack(
             f">{api_words}I", *words[start + 1:start + 1 + api_words])[:api_len]
-        api = json.loads(api_raw.decode("utf-8"))
+        from server.lump_api import reject_duplicate_keys, binding_view
+        api = json.loads(api_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_keys)
         if not isinstance(api, dict):
             return None
+        decoded_api = binding_view(api, words)
     except (ValueError, UnicodeDecodeError, _struct.error):
         return None
     source = None
@@ -10905,7 +10907,7 @@ def _parse_intrinsic_lump_content(words):
         content_words += 1 + source_words
     return {"tier": tiers[flags], "flags": flags, "api_len": api_len,
             "content_words": content_words, "source": source,
-            "api_definition": api}
+            "api_definition": decoded_api, "canonical_api": api}
 
 
 def _content_frame_extent_error(words):
@@ -11068,6 +11070,7 @@ def _inspect_lump_binary(binary_or_path, *, allow_compact_fit=False):
         "content_profile": content_profile,
         "sourceStorageTier": frame["tier"] if frame else None,
         "api_definition": frame["api_definition"] if frame else None,
+        "canonical_api": frame["canonical_api"] if frame else None,
         "source": frame["source"] if frame else None,
         "content_frame_error": content_frame_error,
         "clist_entries": _extract_clist_from_words(words),
@@ -11209,9 +11212,15 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
         raise ValueError("IDX1 candidate embedded source differs from compiler source/profile")
     api = inspected["api_definition"]
     compiler_api = _inspect_lump_binary(compiled_raw)["api_definition"]
+    canonical_api = inspected.get("canonical_api")
+    compact_api = isinstance((canonical_api or {}).get("methods"), dict)
+    if compact_api and (execution is not None
+            or canonical_api != _inspect_lump_binary(compiled_raw).get("canonical_api")
+            or canonical_api.get("name") != metadata.get("abstraction")):
+        raise ValueError("Canonical API differs from the exact compiler interface")
     allowed_methods = [[]] if execution is not None else [
         [], (compiler_api or {}).get("methods", [])]
-    if (not isinstance(api, dict) or api.get("name") != metadata.get("abstraction")
+    if not compact_api and (not isinstance(api, dict) or api.get("name") != metadata.get("abstraction")
             or api.get("language") not in ("assembly", language)
             or api.get("methods") not in allowed_methods
             or (execution is not None and api.get("isa_profile", "IDX1") != "IDX1")
@@ -11246,7 +11255,7 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
 
     expected_caps = declarations(compiled["capabilities"])
     if (inspected["cc"] != len(expected_caps)
-            or declarations(api.get("capabilities")) != expected_caps
+            or (not compact_api and declarations(api.get("capabilities")) != expected_caps)
             or declarations(metadata.get("capabilities")) != expected_caps):
         raise ValueError("IDX1 candidate capability declarations differ from compiler source")
     record = sign_compiler_record({

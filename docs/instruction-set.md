@@ -94,9 +94,11 @@ the permissionless Thread GT supplied to CHANGE. The proposed M-gated hidden
 IRQ return is also a separate operation, not an added prerequisite for general
 programmatic CHANGE.
 
-Loading a GT into a register with SWITCH and activating its Thread with CHANGE
-are distinct operations. `CHANGE CR13` is a programmatic use of the GT in CR13;
-it must not be interpreted as installing an interrupt-handler GT into CR13.
+Loading a GT into CR12–CR14 with SWITCH and activating its Thread with CHANGE
+are distinct operations. The Namespace-targeting `SWITCH CR15` defined below
+is the explicit exception: its outgoing save and incoming activation are part
+of that single instruction. `CHANGE CR13` is a programmatic use of the GT in
+CR13; it must not be interpreted as installing an interrupt-handler GT into CR13.
 
 ### Boot exception
 
@@ -250,11 +252,47 @@ The explicit experimental IDX1 packet implementation has separate layout
 tests. Its continued existence is **not** authority to change the selected
 ordinary LOAD/SAVE encoding or a claim that FPGA execution supports IDX1.
 
-## SWITCH: isolated-register LOAD
+## Active Namespace geometry
 
-**Current contract retained from the existing SWITCH specification.** This
-concise definition and [SWITCH lifecycle](switch-lifecycle.md) describe the
-same register, authorization, and fault rules; no new encoding is introduced.
+**Approved layout correction.** A Namespace allocation starts at its assigned
+base, with Boot.Namespace starting at zero and following Namespace allocations
+using the next free address under the header rules. Its header determines the
+full memory allocation size. The Namespace table (NST) starts at the allocation's
+low end and grows upward in four-word slots.
+
+Slot 0 is the **four-word physical Namespace header/metadata**, not a capability
+target. It replaces the older separate sixteen-word physical Namespace header:
+
+| Offset from Namespace base | Meaning |
+|---|---|
+| 0..3 | Slot 0 metadata: W0 Namespace header, W1 memory base, W2 following-member count, W3 reserved |
+| 4..7 | Slot 1: Namespace self-entry |
+| 8..11 | Slot 2: designated Boot/entry Thread descriptor |
+| `4*i`..`4*i+3` | Subsequent slot `i` |
+
+The header's table count N includes metadata slot 0. Member count is not table
+capacity. CR15 describes the **NST only**, with its location at the table base
+and a word-offset limit of **`4*N - 1`**. The full memory allocation extent is
+derived from metadata, not from CR15's table-only limit. No separate physical
+header precedes the NST; resident bodies must not overlap its slots.
+
+Runtime lookup derives slot addresses and bounds from the active CR15 and
+that Namespace's metadata, never the IDE's inspected Namespace, saved
+configuration, or a host-updated table-base variable. Different Namespaces
+are isolated: matching slot numbers, generations, names, or contents do not
+establish shared authority. No hidden Namespace lookup cache or automatic
+rebinding is part of this contract. Invalid authority or geometry hard-faults.
+
+This is the new architectural layout, not an in-place migration of saved
+Namespace images, catalogs, resident LUMPs, or deployment approvals.
+
+## SWITCH: isolated-register LOAD and Namespace handoff
+
+**Approved semantic correction.** The existing encoding is retained.
+Destinations CR12–CR14 retain isolated-register LOAD behavior; CR15 performs
+the complete Namespace-and-Thread handoff below. This specification does not
+claim simulator or RTL conformance, rewrite saved programs, regenerate boot
+images, or approve hardware. See also [SWITCH lifecycle](switch-lifecycle.md).
 
 `SWITCH CRd, CRs, #row` is the special LOAD form for isolated registers.
 CRd must be CR12–CR15, and its M bit is latched at instruction acceptance.
@@ -263,18 +301,65 @@ permission. Source M is not consulted. The selected `CRs[row]` passes normal
 LOAD bounds, version, integrity, and type checks; reserved encoding bits
 must be zero.
 
-On success, the selected capability replaces CRd and destination M clears.
+For CR12–CR14, on success the selected capability replaces CRd and destination M clears.
 Namespace must reauthorize that exact destination through the corresponding
 bit in the single-word M-bit I/O object before another SWITCH to it.
 M is register state, not a GT permission.
 
+### Namespace destination: CR15
+
+`SWITCH CR15, CRs, #row` uses the same operand encoding and source checks.
+The selected capability must identify the destination Namespace. The current
+CR15.M authorizes the operation; ordinary CHANGE does not acquire an M requirement.
+
+The single instruction:
+
+1. Performs CHANGE's outgoing Thread save under the outgoing Namespace.
+2. Loads the validated destination Namespace capability into CR15 at the
+   microcode midpoint.
+3. Performs incoming Thread activation under the destination Namespace using
+   the **hardwired permissionless Inform GT for slot 2, version 0**.
+
+There is no programmer-visible instruction boundary between these phases and
+no additional Thread operand or following CHANGE instruction is required.
+Successful handoff consumes CR15.M. Successful Namespace handoff also clears
+CR13 completely, including its M bit. No outgoing interrupt-Thread capability
+is carried into the destination Namespace. The destination's Thread manager
+must explicitly install its own interrupt Thread. This clearing is part of
+the successful instruction, not a fault-recovery action.
+
+Fixed entry selection does not waive
+Thread type, GT version, saved-frame, or C-List checks. Never construct an
+entry GT using the descriptor's current version or remember a last-active
+Thread as a substitute. Namespace and Thread management are explicit software
+responsibilities, not hidden execution caches.
+
+As with boot entry, the destination entry Thread may begin from its canonical
+poison-root sentinel; this starts its declared entry at NIA 0. A suspended
+entry Thread instead resumes its validated saved continuation. Ordinary CHANGE
+still rejects a poison-root sentinel as a suspended continuation.
+
+### Fault behavior
+
 A non-isolated destination, isolated source, or malformed operand encoding
 faults with `INVALID_OP`. An otherwise well-formed SWITCH whose latched
 destination M is clear faults with `PERM_L`. Invalid sources, bounds,
-version, integrity, and type failures fault before commit. No failure may
-change any capability register, M bit, Namespace entry, memory word, or
-source capability. A false condition skips the instruction without consuming
-M authorization.
+version, integrity, and type failures during source admission fault before
+beginning the handoff.
+
+For CR12–CR14, failure leaves capability registers, M bits, Namespace entries,
+memory words, and the source capability unchanged. For CR15, this is not a
+promise of rollback after outgoing-save writes have begun. **Any failure is a
+hard fault:** do not retry, substitute a Thread, silently repair state, or
+continue executing a partially transitioned context. A false condition skips
+the instruction without consuming M authorization.
+
+Fault attribution follows the GT in the faulting CR, not a blanket choice of
+source Namespace, destination Namespace, or current Thread. **Hardware never
+changes version numbers.** Authorized software management performs version-based
+blacklisting; an already-stale GT does not cause another slot-version change.
+A Boot Thread fault leaves the CM in purgatory, not an automatically reachable
+management or fallback Thread.
 
 # Historical baseline — not current instruction guidance
 

@@ -13334,6 +13334,8 @@ function _captureLumpSaveSnapshot() {
             entry && entry.abstraction || '',
         words: memory && Array.isArray(memory.words) ? memory.words.slice() : [],
         capabilities: _cloneLumpSaveCapabilities(memory && memory.capabilities),
+        apiDefinition: memory && memory.apiDefinition
+            ? JSON.parse(JSON.stringify(memory.apiDefinition)) : null,
         registeredAt: registeredAt,
         sourceText: sourceText,
         editorSourceText: editorSourceText,
@@ -17055,7 +17057,9 @@ async function confirmSaveToNamespace() {
                 return;
             }
             var _fallbackFrame = await LumpContentFrame.lumpBuildContentFrame(
-                _formatLumpApiDefinition(_svAbsName, _caps),
+                _formatLumpApiDefinition(_svAbsName, _caps, _saveSnapshot || (
+                    window.LumpRegistry && window.LumpRegistry.resolve(window.LumpRegistry.getCurrent()) || {}
+                ).sources?.memory),
                 _fallbackSourceText,
                 { profile: _fallbackProfile }
             );
@@ -17096,6 +17100,7 @@ async function confirmSaveToNamespace() {
                 _svBinary,
                 _svLumpSize - _svCC,
                 {
+                    canonicalArtifact: true,
                     sim,
                     lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)) ? _lumpsCache : [],
                 }
