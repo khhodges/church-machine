@@ -69,6 +69,11 @@
       "type": "Inform"
     },
     {
+      "artifact_pin": {
+        "filename": "SelfTest.1.8b19abd7.lump",
+        "revision": 98,
+        "token": "4a000006"
+      },
       "binary_hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
       "boot_resident": true,
       "f": 0,
@@ -87,18 +92,13 @@
       "seq": 0,
       "slot": 6,
       "token": "4a000006",
-      "type": "Inform",
-      "artifact_pin": {
-        "filename": "SelfTest.1.8b19abd7.lump",
-        "token": "4a000006",
-        "revision": 98
-      }
+      "type": "Inform"
     },
     {
       "artifact_pin": {
         "filename": "WukongCallHome.1.b29b38e3.lump",
-        "token": "313e637c",
-        "revision": 17
+        "revision": 17,
+        "token": "313e637c"
       },
       "binary_hash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
       "boot_resident": true,
@@ -122,8 +122,8 @@
     {
       "artifact_pin": {
         "filename": "CapabilityTest.1.68be391a.lump",
-        "token": "39700a92",
-        "revision": 42
+        "revision": 42,
+        "token": "39700a92"
       },
       "binary_hash": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
       "boot": true,
@@ -188,6 +188,5 @@
     "8": 1,
     "9": 1
   },
-  "save_mode": "table-only",
-  "committed_raw_fingerprint": "9544f696da646c61d5c9840c9d4aba7f68dbd866563075069f6e38b7494fa117"
+  "save_mode": "table-only"
 }

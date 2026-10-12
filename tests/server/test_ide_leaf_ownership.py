@@ -40,6 +40,27 @@ def compile_candidate(client, declaration, extra=None):
     assert response.status_code == 200
     return source, response.get_json()
 
+def test_project_thread_design_ownership_compiles(setup):
+    """Reproduce the operator-approved, instance-local Thread design mappings."""
+    client, _, config_path = setup
+    # Instance provisioning is deliberately untracked; clean checkouts must not
+    # inherit this IDE's ownership merely by cloning the repository.
+    project_config = {
+        "node": "kjhh1",
+        "aliases": {"Thread.2": "kjhh1.Thread2", "Thread.3": "kjhh1.Thread3",
+                    "Boot.Thread": "kjhh1.BootThread"},
+        "definitions": {},
+    }
+    config_path.write_text(json.dumps(project_config))
+    _, compiled = compile_candidate(client, "Thread.2, Thread.3, Boot.Thread")
+    assert compiled["ok"], compiled
+    caps = compiled["capabilities"][1:]
+    assert [cap["canonical_leaf"] for cap in caps] == [
+        "kjhh1.Thread2", "kjhh1.Thread3", "kjhh1.BootThread"]
+    assert all(cap["rights"] == [] for cap in caps)
+    decisions = ide_leaf_policy.validate(caps)
+    assert all(item["ownership"] == "local" for item in decisions)
+
 
 def test_hierarchy_read_only_route_contract(setup):
     client, root, config_path = setup

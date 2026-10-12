@@ -5,6 +5,12 @@ description: IDE-instance leaf ownership controls authored definitions; runtime 
 
 Each IDE instance owns its leaves in the global dot.name hierarchy and may establish or change their permissions. Human users need not be identified. This supersedes the earlier human-ownership and universally frozen-owner-permissions assumptions.
 
+The user explicitly confirmed that `Thread.2`, `Thread.3`, and `Boot.Thread` belong to this IDE through the Thread design page.
+
+**Why:** These are locally authored Thread definitions, not foreign imports; their dotted display names alone had incorrectly triggered foreign/malformed hierarchy checks.
+
+**How to apply:** Preserve their pet names and use trusted exact aliases under the assigned IDE node. This confirmation does not establish ownership of arbitrary imported Thread names.
+
 **Why:** The user explicitly confirmed IDE-instance ownership, including allowing the owning IDE's UART_TX RW declaration despite the historical W default. SELF remains compiler-owned E.
 
 **How to apply:** Resolve ownership from the canonical global dot.name and trusted IDE hierarchy configuration, never short names, broad textual prefixes, human accounts, device defaults, mutable live grants, or client ownership claims. Foreign references preserve their definitions. Missing hierarchy configuration requires an actionable configuration error, not inferred ownership. Changes create ordinary new saved revisions; never rewrite history or implicitly install or change Namespace state.
