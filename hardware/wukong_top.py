@@ -448,10 +448,9 @@ class ChurchWukongXC7A100T(Elaboratable):
 
         self.led = [Signal(name=f"led{i}") for i in range(2)]
 
-        # ── ILA / debug observation ports ─────────────────────────────────────
-        # These are top-level output ports (no physical pin — ILA probes them
-        # internally over JTAG).  The Vivado TCL connects them to the ILA core
-        # so Vivado Hardware Manager can display Church Machine state in real-time.
+        # ── Internal ILA observation nets (never board ports) ─────────────────
+        # Preserve names through Yosys and Vivado for optional post-synthesis
+        # ILA insertion. UART telemetry does not depend on ILA being enabled.
         #
         #   dbg_boot_complete  — CM has exited the boot phase and is executing user code
         #   dbg_fault_valid    — live CM fault signal (any fault type, any cycle)
@@ -461,10 +460,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         #                          bit[5]     = retire_fault_valid (fault on this retire)
         #                          bits[10:6] = retire_fault_code (5-bit fault type)
         #                          bits[31:11] = fault_gt[20:0] (GT word0 upper 21 bits)
-        self.dbg_boot_complete = Signal()      # out — CM boot done
-        self.dbg_fault_valid   = Signal()      # out — live fault
-        self.dbg_nia           = Signal(32)    # out — retired NIA
-        self.dbg_fault         = Signal(32)    # out — packed fault telemetry
+        self.dbg_boot_complete = Signal(attrs={"keep": "true", "mark_debug": "true"})
+        self.dbg_fault_valid   = Signal(attrs={"keep": "true", "mark_debug": "true"})
+        self.dbg_nia           = Signal(32, attrs={"keep": "true", "mark_debug": "true"})
+        self.dbg_fault         = Signal(32, attrs={"keep": "true", "mark_debug": "true"})
 
         # ── Halt-state signals — exposed for testability ───────────────────────
         # Declared here so simulation testbenches can read them as top-level
@@ -1860,11 +1859,7 @@ class ChurchWukongXC7A100T(Elaboratable):
                 self.led[1].eq(~fault_latched),
             ]
 
-        # ── ILA debug observation port wiring ─────────────────────────────────
-        # Route internal CM signals to the top-level debug output ports so the
-        # Vivado ILA (inserted by wukong_xc7a100t.tcl after synthesis) can probe
-        # them.  These ports have no physical pin constraints — they are consumed
-        # entirely by the on-chip ILA core over the board's built-in JTAG chain.
+        # Internal observation wiring for optional ILA; no extra package pins.
         m.d.comb += [
             self.dbg_boot_complete.eq(core.boot_complete),
             self.dbg_fault_valid.eq(core.fault_valid),

@@ -245,6 +245,37 @@ def test_symbolic_row_requires_embedded_exact_name_and_rights(isolated_lumps):
     assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
 
 
+@pytest.mark.parametrize("alias,rights", [
+    ("LED0", ["R", "W"]), ("Thread.2", []), ("Boot.Thread", []),
+])
+def test_symbolic_alias_matches_only_exact_embedded_canonical_identity(
+        isolated_lumps, alias, rights):
+    canonical = "LocalNode." + alias.replace(".", "")
+    api = {"capabilities": [
+        {"name": "SELF", "rights": ["E"]},
+        {"name": canonical, "canonical_leaf": canonical, "rights": rights},
+    ]}
+    encoded = json.dumps(api).encode()
+    words = [0] * 128
+    words[0] = (0x1f << 27) | (1 << 23) | (1 << 10) | 2
+    words[1] = 0x18000000
+    words[2] = (0xab << 24) | len(encoded)
+    for offset in range(0, len(encoded), 4):
+        words[3 + offset // 4] = int.from_bytes(
+            encoded[offset:offset + 4].ljust(4, b"\0"), "big")
+    caps = [dict(api["capabilities"][0], compiler_owned_self=True),
+            dict(api["capabilities"][1], name=alias)]
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0, 1}
+    caps[1]["canonical_leaf"] = "OtherNode.Device"
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
+    caps[1]["canonical_leaf"] = canonical
+    caps[1]["rights"] = ["E"]
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
+    caps[1]["rights"] = rights
+    words[-1] = 0x02000003
+    assert app_module._symbolic_declared_clist_rows(words, caps) == {0}
+
+
 def _approved_payload(client, words, token="7c501001", name="LumpSaveTest",
                       submitted_source=None, save_as_latest=False,
                       editor_base=None):

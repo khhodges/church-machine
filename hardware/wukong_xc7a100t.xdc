@@ -38,9 +38,5 @@ set_property -dict { PACKAGE_PIN F3  IOSTANDARD LVCMOS33 } [get_ports { uart_rx_
 set_false_path -from [get_ports { rst_n }];
 set_false_path -from [get_ports { uart_rx_pin }];
 
-## ── ILA observation ports (dbg_*) — no physical pin, no IO standard needed ───
-## These ports exist solely so the ILA TCL can probe them by name when INSERT_ILA=1.
-## With a BASIC license (INSERT_ILA=0) they are undriven outputs; downgrade the
-## DRC checks so write_bitstream still succeeds without assigning phantom pins.
-set_property SEVERITY {Warning} [get_drc_checks NSTD-1];
-set_property SEVERITY {Warning} [get_drc_checks UCIO-1];
+## ILA observations are internal nets, never unconstrained package pins.
+## Keep Vivado's NSTD-1 and UCIO-1 checks at their default Error severity.

@@ -2,6 +2,20 @@
 name: Approved revision input isolation
 description: Immutable downstream deliverables must retain bytes, not mutable upstream catalog locators.
 ---
+Unsigned candidates in ignored staging directories are not durable saved LUMPs.
+Verify that their bytes actually exist in the current workspace before describing
+them as available for installation.
+
+**Why:** A later task workspace retained candidate hashes in a preview but not
+the ignored candidate files or the private IDE ownership aliases needed to
+reproduce them. Recompilation with current compiler inputs produced different
+hashes even though the embedded source and allocation sizes were unchanged.
+
+**How to apply:** Recover exact retained inputs where available. If recompiling,
+record the new identity, restore only explicitly authorized local ownership,
+and use normal compiler attestation and reviewed publication. Never claim the
+new output is the old frozen candidate merely because its size matches.
+
 An approved Namespace retains its selected LUMP bytes and generated build inputs;
 an approved bitstream retains the exact Namespace revision and source commit.
 Compatibility filenames and current catalog rows are not historical authority.

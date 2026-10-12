@@ -10986,6 +10986,14 @@ def _symbolic_declared_clist_rows(words, capabilities):
             name = inner_name = "SELF"
         thread_name = isinstance(name, str) and re.fullmatch(
             r"(?:Boot\.Thread|Thread[.#]\d+)", name, re.IGNORECASE)
+        # The compiler retains the authored alias in its capability rows while
+        # the embedded API spells the same leaf canonically. Require that exact
+        # canonical identity on both sides; never infer aliases from names.
+        canonical = declared.get("canonical_leaf")
+        if (isinstance(canonical, str) and canonical
+                and canonical == intrinsic.get("canonical_leaf")
+                and inner_name == canonical):
+            name = canonical
         if (not isinstance(name, str) or name != inner_name
                 or not (thread_name or re.fullmatch(r"(?:[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*|0x[0-9a-fA-F]{8,})", name))):
             continue

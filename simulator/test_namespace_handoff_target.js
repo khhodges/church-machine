@@ -11,6 +11,17 @@ assert.equal(p.rows.find(r => r.slot === 2).location, 256);
 assert.equal(p.rows.find(r => r.slot === 8).sequence, 1);
 assert.equal(p.rows.find(r => r.slot === 7).words, 4096);
 assert.equal(p.rows.find(r => r.slot === 10).words, 2048);
+// These are now reviewed saved artifacts, not hashes of ephemeral candidates.
+for (const [slot, filename] of [
+    [7, 'WukongCallHome.1.7084172e.lump'],
+    [10, 'CapabilityTest.1.1feaf30b.lump'],
+]) {
+    const row = p.rows.find(r => r.slot === slot);
+    const raw = fs.readFileSync(__dirname + '/../server/lumps/' + filename);
+    assert.equal(raw.length, row.words * 4);
+    assert.equal(require('crypto').createHash('sha256').update(raw).digest('hex'), row.hash);
+    assert.match(row.source, /Saved Full-source.*not installed/);
+}
 assert.equal(p.end, 9216);
 assert.equal(p.rows.filter(r => r.hash).length, 3);
 let end = p.tableWords;

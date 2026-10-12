@@ -114,6 +114,28 @@ set_property top ${TOP} [current_fileset]
 update_compile_order -fileset sources_1
 
 ## ── Synthesis ────────────────────────────────────────────────────────────
+## Fail closed on stale generated RTL, changed constraints, or weakened DRC.
+## Kept in this script so existing build-host staging includes the guard.
+proc assert_wukong_board_io {} {
+    set pins [dict create clk M21 rst_n M6 uart_rx_pin F3 uart_tx_pin E3 led0 G21 led1 G20]
+    set actual [lsort [get_property NAME [get_ports -quiet *]]]
+    if {$actual ne [lsort [dict keys $pins]]} {
+        error "Unsafe Wukong board ports: expected exactly [dict keys $pins]; got $actual"
+    }
+    dict for {name pin} $pins {
+        set port [get_ports -quiet $name]
+        if {[get_property PACKAGE_PIN $port] ne $pin ||
+            [get_property IOSTANDARD $port] ne "LVCMOS33"} {
+            error "Unsafe Wukong I/O $name: requires PACKAGE_PIN=$pin IOSTANDARD=LVCMOS33"
+        }
+    }
+    foreach rule {NSTD-1 UCIO-1} {
+        if {[get_property SEVERITY [get_drc_checks $rule]] ne "Error"} {
+            error "Unsafe Wukong DRC severity: $rule must remain Error"
+        }
+    }
+}
+
 puts "\n═══ Synthesis starting (may take 5–15 min) ═══"
 launch_runs synth_1 -jobs ${JOBS}
 wait_on_run synth_1
@@ -122,6 +144,8 @@ if {[get_property PROGRESS [get_runs synth_1]] ne "100%"} {
     error "Synthesis FAILED — check: $log"
 }
 puts "Synthesis complete."
+open_run synth_1
+assert_wukong_board_io
 
 ## ── ILA debug probe insertion (post-synthesis, Standard/Enterprise only) ──
 ## A Xilinx ILA (Integrated Logic Analyzer) core is inserted into the
@@ -144,8 +168,12 @@ puts "Synthesis complete."
 ## Enable by passing --insert-ila on the command line or setting INSERT_ILA 1 above.
 
 if {$INSERT_ILA} {
-    open_run synth_1 -name synth_1
-
+    # Internal nets must survive synthesis at their full declared widths.
+    foreach {pattern width} {dbg_boot_complete 1 dbg_fault_valid 1 {dbg_nia[*]} 32 {dbg_fault[*]} 32} {
+        if {[llength [get_nets -quiet $pattern]] != $width} {
+            error "ILA probe $pattern missing or wrong width (expected $width internal nets)"
+        }
+    }
     set ila [create_debug_core u_ila_0 ila]
     set_property C_DATA_DEPTH        1024  $ila
     set_property C_TRIGIN_EN         false $ila
@@ -192,11 +220,11 @@ if {$INSERT_ILA} {
     connect_debug_port u_ila_0/probe4 [lsort -dictionary [get_nets {led0 led1}]]
 
     implement_debug_core
-    close_design
     puts "ILA debug core inserted — Hardware Manager will show 5 named probes."
 } else {
     puts "ILA skipped (INSERT_ILA=0 or BASIC license). Building plain bitstream."
 }
+close_design
 
 ## ── Implementation ───────────────────────────────────────────────────────
 puts "\n═══ Implementation starting (may take 10–25 min) ═══"
@@ -234,15 +262,10 @@ if {$wns ne "" && $wns < 0} {
 }
 
 ## ── Bitstream generation ─────────────────────────────────────────────────
-## NOTE: We call write_bitstream directly (not via launch_runs -to_step) so that
-## the DRC severity overrides already set in this session (NSTD-1, UCIO-1) are
-## still in effect.  launch_runs -to_step write_bitstream spawns a fresh Vivado
-## sub-process that re-opens the routed checkpoint, losing all in-session property
-## overrides — causing spurious DRC failures on the unassigned ILA debug ports.
+## Recheck the routed design; never waive unassigned-pin or I/O-standard DRC.
 puts "\n═══ Generating bitstream ═══"
 open_run impl_1 -name impl_1
-set_property SEVERITY {Warning} [get_drc_checks NSTD-1]
-set_property SEVERITY {Warning} [get_drc_checks UCIO-1]
+assert_wukong_board_io
 write_bitstream -force ${TOP}.bit
 
 puts "\n═══════════════════════════════════════════════════════════════════"

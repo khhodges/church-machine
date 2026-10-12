@@ -1459,5 +1459,111 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "0ee2008d9c6b1e4c66087d208e1c417b3c2c27de505c96e4b158e082ec093a8d"
     }
+  },
+  {
+    "token": "232f0de4",
+    "abstraction": "WukongCallHome",
+    "filename": "WukongCallHome.1.7084172e.lump",
+    "lump_version": 20,
+    "compiled_at": 1791820025.0699892,
+    "operation_id": "ebc2395c802143219efba8cb2db3a801",
+    "output_variants": {
+      "api": {
+        "sha256": "1b51f2bc3ab2d636e3acc167f83484d5e7a9892c3547b4b415f890fdc1966890",
+        "bytes": 512,
+        "url": "/api/lump-variants/d11c992c14d0b3e38218d8a5cf81ea431dfcd2a56329ac242b21a7e2b1924f01/api"
+      },
+      "compact": {
+        "sha256": "da42617789c2df1e76ce59ade5a49f871059262ca689af59369b8ee4f5091df9",
+        "bytes": 16384,
+        "url": "/api/lump-variants/d11c992c14d0b3e38218d8a5cf81ea431dfcd2a56329ac242b21a7e2b1924f01/compact"
+      },
+      "full": {
+        "sha256": "549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738",
+        "bytes": 16384,
+        "url": "/api/lump-variants/d11c992c14d0b3e38218d8a5cf81ea431dfcd2a56329ac242b21a7e2b1924f01/full"
+      }
+    },
+    "variant_primary_hash": "549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738",
+    "variant_bundle_id": "d11c992c14d0b3e38218d8a5cf81ea431dfcd2a56329ac242b21a7e2b1924f01",
+    "variant_compiler_record": {
+      "binary_hash": "549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738",
+      "source_hash": "8c92a82112d7ee758e95d7602ce61ae41546e5dedb14eafbbdb36f3ffcbd1d08",
+      "language": "english",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "4a5dbb885d8f3519b19cb9e1adad9644f2d6a727d41abdbc1ab2994761ab5b84",
+        "inputs": {
+          "_ide_hierarchy": {
+            "aliases": {
+              "Boot.Thread": "kjhh1.BootThread",
+              "Thread.2": "kjhh1.Thread2",
+              "Thread.3": "kjhh1.Thread3"
+            },
+            "definitions": {},
+            "node": "kjhh1"
+          },
+          "_resolved_call_api_authorities": {},
+          "language": "english"
+        }
+      },
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "23ae539e3f95dfb54d70a57a660b66e3dfe121d01676f5434c8e39d951911b90"
+    }
+  },
+  {
+    "token": "17fc5571",
+    "abstraction": "CapabilityTest",
+    "filename": "CapabilityTest.1.1feaf30b.lump",
+    "lump_version": 45,
+    "compiled_at": 1791820029.457756,
+    "operation_id": "54ffface197446fabbd8dd324acfa51e",
+    "output_variants": {
+      "api": {
+        "sha256": "fed77e08cfbf7334443eed98f7c7ba1bc7cfd162bf17c64f240eb8c83a13ddc8",
+        "bytes": 1024,
+        "url": "/api/lump-variants/b1420b81f7cee261d39b70b5ee8be590fc0650a5a0b1c826ecf7ee4f49de10c8/api"
+      },
+      "compact": {
+        "sha256": "f1a79ffb2220ff56f6a8ff21eb89ac498894e8c5eef10307734ee7cb6fd6786f",
+        "bytes": 8192,
+        "url": "/api/lump-variants/b1420b81f7cee261d39b70b5ee8be590fc0650a5a0b1c826ecf7ee4f49de10c8/compact"
+      },
+      "full": {
+        "sha256": "e41b861a87a13066e4a7cb76e5a01d39c62857bfddfffc5e3f2ffdcb12dd8c21",
+        "bytes": 8192,
+        "url": "/api/lump-variants/b1420b81f7cee261d39b70b5ee8be590fc0650a5a0b1c826ecf7ee4f49de10c8/full"
+      }
+    },
+    "variant_primary_hash": "e41b861a87a13066e4a7cb76e5a01d39c62857bfddfffc5e3f2ffdcb12dd8c21",
+    "variant_bundle_id": "b1420b81f7cee261d39b70b5ee8be590fc0650a5a0b1c826ecf7ee4f49de10c8",
+    "variant_compiler_record": {
+      "binary_hash": "e41b861a87a13066e4a7cb76e5a01d39c62857bfddfffc5e3f2ffdcb12dd8c21",
+      "source_hash": "9cc3afe2134d75db0d0501926e3ef5002da862f1962e3946a2e20496e20105e9",
+      "language": "english",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "4a5dbb885d8f3519b19cb9e1adad9644f2d6a727d41abdbc1ab2994761ab5b84",
+        "inputs": {
+          "_ide_hierarchy": {
+            "aliases": {
+              "Boot.Thread": "kjhh1.BootThread",
+              "Thread.2": "kjhh1.Thread2",
+              "Thread.3": "kjhh1.Thread3"
+            },
+            "definitions": {},
+            "node": "kjhh1"
+          },
+          "_resolved_call_api_authorities": {},
+          "language": "english"
+        }
+      },
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "77270d779208b2a8cf6bc9ff85652d614c021123b5c6f2ba2de4e364e5240324"
+    }
   }
 ]

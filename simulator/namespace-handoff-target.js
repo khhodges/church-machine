@@ -1,15 +1,15 @@
 (function(root) {
     'use strict';
-    // Frozen review inputs: the approved layout and the two privately compiled
-    // Full-source candidates. This projection is not an image or an admission.
+    // Frozen review inputs: the approved layout and the two reviewed, saved
+    // Full-source revisions. This projection is not an installed image.
     const inputs = {
         capacityWords: 16384, slotCount: 64,
         residents: [
             {slot: 2, name: 'Boot.Thread', words: 256, source: 'Fresh entry Thread · version 0'},
-            {slot: 7, name: 'WukongCallHome', words: 4096, source: 'Prepared Full-source candidate',
-                hash: '971a41bc744fc40c73a09430b486cda47019f5d300042255586ba96271d78631'},
-            {slot: 10, name: 'CapabilityTest', words: 2048, source: 'Prepared Full-source candidate · boot target',
-                hash: 'e07e1c39608fc8e87265db192a417b6fc894279ed1aa738d58cf0046beee4e8b'},
+            {slot: 7, name: 'WukongCallHome', words: 4096, source: 'Saved Full-source revision 20 · not installed',
+                hash: '549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738'},
+            {slot: 10, name: 'CapabilityTest', words: 2048, source: 'Saved Full-source revision 45 · boot target · not installed',
+                hash: 'e41b861a87a13066e4a7cb76e5a01d39c62857bfddfffc5e3f2ffdcb12dd8c21'},
             {slot: 6, name: 'SelfTest', words: 2048, source: 'Preserved selected artifact',
                 hash: '65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de'},
             {slot: 11, name: 'Thread.2', words: 256, source: 'Fresh Thread · local alias kjhh1.Thread2'},
@@ -71,7 +71,7 @@
                 </tbody></table>
                 <p style="padding:8px;color:#aab">Addresses are word addresses. Slot 0 is metadata, not a capability.
                 UART moves from slot 2 to slot 8 with retained version 1. Resident addresses include the
-                prepared Full-source sizes, not the old 1,024-word allocations. Integrity values are not
+                saved Full-source sizes, not the old 1,024-word allocations. Integrity values are not
                 shown as finalized before image binding.</p>`;
         } catch (error) {
             host.textContent = 'Target layout unavailable: ' + error.message + '. No saved state was changed.';

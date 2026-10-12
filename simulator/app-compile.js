@@ -58,6 +58,8 @@ function renderReference() {
     turingList.innerHTML = '';
 
     INSTRUCTION_DATA.forEach(instr => {
+        // Retired opcodes remain available for historical inspection only.
+        if (instr.mnemonic === 'ELOADCALL' || instr.mnemonic === 'XLOADLAMBDA') return;
         const card = document.createElement('div');
         card.className = 'instr-card' + (selectedInstr === instr.opcode ? ' active' : '');
         const mBadge = instr.mState ? `<span class="instr-mstate-badge mstate-${instr.mState}">${_mStateBadgeText(instr.mState)}</span>` : '';

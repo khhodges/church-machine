@@ -142,7 +142,6 @@
 - [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
 - [RETURN incident evidence](return-incident-evidence.md) — distinguish reset, caller continuation, and trace mislabeling using protected frames and live identity, not post-stop flags
 - [Instruction commentary evidence](instruction-commentary-evidence.md) — static meaning stays symbolic; historical effects need exact immutable occurrence evidence, never live-register recomputation
-- [Uniform indexed operand intent](register-indexed-load-intent.md) — all indexed instructions should support runtime DR value plus immediate; parser limitations are not intended semantics.
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
 - [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
@@ -150,10 +149,9 @@
 - [Generated RTL replay](generated-rtl-replay.md) — constant-only Verilog blocks can leave unknown GT bits; distinguish dialect evidence and preserve the recorded elaboration.
 - [Amaranth elaboration performance](amaranth-shape-memoization.md) — full Wukong replay must reuse release-generator AST memoization; bare traversal can stall or crash.
 - [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
-- [CHANGE programmer access](change-programmer-access.md) — CHANGE is not protected; never exempt CR12 while blocking CR13–CR15 at compile time.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
 - [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.
-- [Bitfield width decision](bitfield-width-decision.md) — BFEXT/BFINS width zero is invalid; user selected widths 1–31, not a zero-means-32 convention.
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
 - [Namespace handoff authority](namespace-handoff-evidence.md) — no hidden caches; entry GT version 0; faulting CR identifies software blacklisting; hardware never changes versions.
+- [Internal Wukong probes](wukong-internal-probe-preservation.md) — keep optional ILA observations internal and preserve attributes until Vivado; Yosys may copy attributes to aliases.

@@ -15,8 +15,8 @@ This script catches that drift at CI time:
   2. Derives the Amaranth attribute name for each net (strips ``[*]``/``[N]``
      glob suffixes; folds numeric-suffixed variants like ``led0``/``led1`` back
      to their parent attribute ``led``).
-  3. Checks that ``hardware/gen_rtlil.py`` references ``top.<attr>`` **inside
-     the ``ports = (…)`` assignment block** that is passed to ``convert()``.
+  3. Checks each probe is either a board port or an internal Signal carrying
+     keep/mark_debug attributes, with attributes preserved by the generator.
   4. Checks that ``hardware/wukong_top.py`` declares ``self.<attr>`` as a
      Signal.
 
@@ -33,6 +33,7 @@ Usage:
 """
 
 import argparse
+import ast
 import re
 import sys
 
@@ -192,6 +193,31 @@ def check_top_signal(top_text, attr_name):
     ))
 
 
+def check_internal_probe(gen_text, top_text, attr_name):
+    """Accept explicitly preserved internal nets, not arbitrary Signal names."""
+    if "write_verilog -noattr" in gen_text:
+        return False
+    for node in ast.walk(ast.parse(top_text)):
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(isinstance(t, ast.Attribute) and
+                   isinstance(t.value, ast.Name) and t.value.id == "self" and
+                   t.attr == attr_name for t in node.targets):
+            continue
+        if not isinstance(node.value, ast.Call) or not isinstance(node.value.func, ast.Name):
+            continue
+        if node.value.func.id != "Signal":
+            continue
+        for kw in node.value.keywords:
+            if kw.arg == "attrs":
+                try:
+                    attrs = ast.literal_eval(kw.value)
+                except (ValueError, TypeError):
+                    return False
+                return all(attrs.get(k) == "true" for k in ("keep", "mark_debug"))
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -251,6 +277,8 @@ def main():
         print(f"    Attribute(s) needed: {attrs}")
         for attr in attrs:
             gen_ok, gen_reason  = check_gen_rtlil_ports(gen_text, attr)
+            if not gen_ok and check_internal_probe(gen_text, top_text, attr):
+                gen_ok, gen_reason = True, "preserved internal ILA net"
             top_ok              = check_top_signal(top_text, attr)
 
             gen_status = "OK" if gen_ok else "MISSING"
@@ -260,7 +288,7 @@ def main():
             if not gen_ok:
                 failures.append(
                     f"Probe {port} net '{net_patterns}': "
-                    f"'top.{attr}' not found in ports = (...) block in {args.gen}.\n"
+                    f"'{attr}' is neither a board port nor a preserved internal ILA net.\n"
                     f"    Detail: {gen_reason}\n"
                     f"    Vivado's connect_debug_port will silently get an empty net list — "
                     f"the probe will be disconnected in Hardware Manager."
@@ -282,8 +310,9 @@ def main():
         print(file=sys.stderr)
         print(
             "To fix: ensure every net name in connect_debug_port calls has a matching\n"
-            "Signal attribute in wukong_top.py AND is included in the ports= list in\n"
-            "gen_rtlil.py.  The ILA probe net names are derived from the Amaranth Signal\n"
+            "Signal attribute in wukong_top.py with keep/mark_debug attributes preserved\n"
+            "by gen_rtlil.py (or an existing board port). Never add debug board ports.\n"
+            "The ILA probe net names are derived from the Amaranth Signal\n"
             "name; renaming a Signal without updating both files breaks probe connectivity.",
             file=sys.stderr,
         )

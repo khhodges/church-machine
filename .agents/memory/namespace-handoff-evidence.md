@@ -31,6 +31,29 @@ and unit lookup evidence from complete core transition/recovery evidence.
 
 ## Runtime authority — user review decisions
 
+The user explicitly confirmed that the physical Namespace header itself must
+occupy four words (16 bytes), not merely that a descriptor or UI row should
+display four words.
+
+**Why:** The user rejected the capacity table's sixteen-word header reservation
+and selected a physical format correction, not a relabeling of that reservation.
+
+**How to apply:** Use the approved ascending NST contract: metadata in slot 0,
+self in slot 1, entry Thread in slot 2. Do not invent a compact variant of the
+old tail-table format or shrink its constant while retaining fields past word 3.
+Keep historical images and their actual geometry distinct from new-format images.
+
+The user authorized migrating the saved design and rebuilding its bindings,
+rather than keeping the change only as a separate proposed image. Historical
+images must be preserved.
+
+**Why:** After being told that the four-word format moves self to slot 1 and the
+entry Thread to slot 2, the user explicitly selected saved-design migration.
+
+**How to apply:** This is consent to the saved-design cutover and binding rebuild,
+not to hardware programming or activation. Preserve immutable source artifacts
+and historical images, and validate the new-format consumers before publication.
+
 The approved target must be visible as the primary Namespace design for inspection;
 a warning above the old layout is not a substitute for showing that target.
 

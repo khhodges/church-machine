@@ -302,7 +302,8 @@ def _rtlil_to_verilog(il_path, v_path, module_name=None):
         f"techmap; "
         f"clean; "
         f"{rename_pass}"
-        f"write_verilog -noattr {v_path}"
+        # Preserve keep/mark_debug on internal ILA nets through to Vivado.
+        f"write_verilog {v_path}"
     )
     try:
         result = subprocess.run(
@@ -337,10 +338,6 @@ def generate_rtlil_wukong(output_dir="build"):
         [top.clk, top.rst_n]
         + list(top.led)
         + [top.uart_tx_pin, top.uart_rx_pin]
-        # ILA observation ports — exposed as top-level outputs so Vivado can
-        # connect them to the ILA core by net name (wukong_xc7a100t.tcl).
-        # No physical pin constraints are needed; the ILA probes internally.
-        + [top.dbg_boot_complete, top.dbg_fault_valid, top.dbg_nia, top.dbg_fault]
     )
 
     import gc
