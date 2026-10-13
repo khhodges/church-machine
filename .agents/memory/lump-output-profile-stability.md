@@ -66,3 +66,15 @@ the selected execution binary; rejecting every profile loses a valid save path.
 
 **How to apply:** Show why a profile is unavailable, retain valid choices, and
 recheck allocation after destination-name repacking as metadata can grow.
+
+The RedISA replacement bitstream must use the small API-only executable LUMP
+variants, not full-source or compact-source editing/sharing variants.
+
+**Why:** The user explicitly reaffirmed this memory-saving requirement when
+questioning the rebuild memory map. Successful full-source compilation is not
+evidence that the correct hardware footprint has been selected.
+
+**How to apply:** Verify the embedded profile of each exact selected executable
+binary before freezing the map. Recalculate allocations, placements, bounds
+and localized bindings from API-only bytes; keep source variants in the IDE.
+Thread runtime allocations remain separate from executable content profiles.
