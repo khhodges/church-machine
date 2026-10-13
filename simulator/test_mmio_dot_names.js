@@ -18,6 +18,21 @@ const lump=buildLump(good);
 assert.equal(lump.words[lump.clistStart+1],0,'portable UART dependency remains unbound');
 assert.equal(lump.words[lump.clistStart+2],0,'portable LED dependency remains unbound');
 assert.deepEqual(buildApiDefinition(good,lump.words).capabilities.map(c=>c.name),['SELF','ide.UART','ide.LED']);
+for (const name of ['ide.Thread.2', 'ide.Thread.3']) {
+    const result = compiler.compile(source(name), []);
+    assert.deepEqual(global.ChurchAssembler.objectNameErrors({
+        abstractionName: name, capabilities: []
+    }), []);
+    assert.deepEqual(result.errors, [], name);
+    const binary = buildLump(result);
+    assert.equal(buildApiDefinition(result, binary.words).capabilities[1].name, name);
+    assert.equal(binary.words[binary.clistStart + 1], 0);
+}
+for (const name of ['ide..Thread', 'ide.Thread.', '.Thread.2', '2', '2.Thread']) {
+    assert(global.ChurchAssembler.objectNameErrors({
+        abstractionName: 'ide.Example', capabilities: [{ name }]
+    }).length, `malformed/unqualified name ${name} remains invalid`);
+}
 for(const name of ['UART','UART_TX','UART_RX','LED0','UART_DEV','Service','0x40000014']) {
     assert(compiler.compile(source(name),[]).errors.length,`${name} must not compile as object identity`);
     const forged={...good,capabilities:[good.capabilities[0],{name,rights:['R','W']}]};
@@ -43,6 +58,10 @@ for(const language of ['auto','javascript']) {
     };
     const accepted=run(source());
     assert.equal(accepted.ok,true,JSON.stringify(accepted));
+    for (const name of ['ide.Thread.2', 'ide.Thread.3']) {
+        const numeric = run(source(name));
+        assert.equal(numeric.ok, true, JSON.stringify(numeric));
+    }
     const rejected=run(source('UART_TX'));
     assert.equal(rejected.ok,false);
     assert.match(rejected.error,/canonical dot-name/);

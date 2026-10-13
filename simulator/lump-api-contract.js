@@ -3,9 +3,9 @@
 // Step-one contract only. Not wired into compilation, loading or publication.
 // Structural validation is not admission or destination binding approval.
 (function(root) {
-    const NAME = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)*$/;
-    const LEAF = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)+$/;
-    const ISSUED = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z][A-Za-z0-9_-]*)+#[1-9][0-9]*$/;
+    const NAME = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_][A-Za-z0-9_-]*)*$/;
+    const LEAF = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_][A-Za-z0-9_-]*)+$/;
+    const ISSUED = /^[A-Za-z][A-Za-z0-9_-]*(?:\.[A-Za-z0-9_][A-Za-z0-9_-]*)+#[1-9][0-9]*$/;
     const HEX64 = /^[0-9a-f]{64}$/;
     const TYPES = ['Inform', 'Outform', 'Abstract'];
     const fail = message => { throw new Error('LUMP API: ' + message); };

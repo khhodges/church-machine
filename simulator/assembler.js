@@ -3103,7 +3103,7 @@ class ChurchAssembler {
     static objectNameErrors(result) {
         const errors = [];
         const valid = name => typeof name === 'string' &&
-            /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+(?:#[1-9][0-9]*)?$/.test(name);
+            /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+(?:#[1-9][0-9]*)?$/.test(name);
         if (!valid(result.abstractionName)) errors.push({line:null,
             message:'The LUMP object requires a declared canonical dot-name (for example ide.Service). Correct the source and recompile; no name is inferred.'});
         for (const [row, cap] of (result.capabilities || []).entries()) {

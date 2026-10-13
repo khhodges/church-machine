@@ -35,6 +35,15 @@ The user supplied `ide.UART` as an example of the required MMIO dot-name form.
 Treat it as naming guidance, not blanket authorization to rename historical
 artifacts or infer canonical names for other devices.
 
+Qualified dot-names may contain numeric components, for example `ide.Thread.2`
+and `ide.Thread.3`; do not impose a letter-first rule on every component.
+
+**Why:** Numeric Thread components are legitimate object names, not missing
+qualification or MMIO shorthand.
+
+**How to apply:** Preserve those names exactly when validating compiler identities,
+while still rejecting unqualified names and empty dotted components.
+
 **Why:** The user explicitly assigns Golden Token materialization to the linking
 loader, not the compiler; compilation must not import the compiling Namespace's
 authority into a portable artifact.
