@@ -9,6 +9,7 @@ const path = require('path');
 const vm = require('vm');
 const CapabilityTokens = require('./capability_tokens.js');
 const LumpContentFrame = require('./lump-content-frame.js');
+const LumpApiCodec = require('./lump-api-codec.js');
 
 function extractBlock(source, marker) {
     const start = source.indexOf(marker);
@@ -38,13 +39,17 @@ signedWords[1] = codeWords[0];
 signedWords[2] = codeWords[1];
 const api = {
     name: 'FullSelfTest',
+    methods: [{ name: 'Run', index: 0 }],
     capabilities: [
         { name: 'SELF', rights: ['E'], compiler_owned_self: true },
         { name: 'Next', rights: ['E'], N: 'example.Next#1',
             T: 'abcdef01', binary_hash: 'a'.repeat(64), identity_hash: 'b'.repeat(64) },
     ],
 };
-const apiBytes = Buffer.from(JSON.stringify(api));
+// The server embeds the compact API contract. Candidate admission must expand
+// its import rows from these exact authenticated bytes, not browser metadata.
+const compactApi = LumpApiCodec.encode(api, { cw: codeWords.length, cc: 2 });
+const apiBytes = Buffer.from(JSON.stringify(compactApi));
 signedWords[3] = (0xAB000000 | apiBytes.length) >>> 0;
 LumpContentFrame.lumpFramePackBE([...apiBytes]).forEach((word, i) => {
     signedWords[4 + i] = word;
@@ -109,6 +114,7 @@ const context = {
         ...CapabilityTokens,
         materialize() { throw new Error('Compilation attempted destination materialization'); },
     },
+    LumpApiCodec,
     ChurchSimulator: { SELF_CAPABILITY_PLACEHOLDER: 0xFEED5E1F },
     LumpContentFrame: {
         ...LumpContentFrame,
@@ -210,12 +216,21 @@ vm.runInContext([
     // A missing definition must fail without borrowing browser declarations or
     // replacing the last candidate. No saved files or real simulator involved.
     const last = context.window._lastCLOOMCLump;
-    signedWords[3] = 0;
+    const incompleteApiBytes = Buffer.from(JSON.stringify({
+        name: 'FullSelfTest', methods: [],
+    }));
+    signedWords[3] = (0xAB000000 | incompleteApiBytes.length) >>> 0;
+    LumpContentFrame.lumpFramePackBE([...incompleteApiBytes]).forEach((word, i) => {
+        signedWords[4 + i] = word;
+    });
     const rejected = await context.compileAndBuild();
     assert.equal(rejected.ok, false);
     assert.match(rejected.error, /embedded C-list definition/);
     assert.strictEqual(context.window._lastCLOOMCLump, last);
     signedWords[3] = (0xAB000000 | apiBytes.length) >>> 0;
+    LumpContentFrame.lumpFramePackBE([...apiBytes]).forEach((word, i) => {
+        signedWords[4 + i] = word;
+    });
     console.log('PASS full-source authenticated candidate admission with pending Next');
 })().catch(error => {
     console.error(error);

@@ -986,15 +986,54 @@ function _isCompilerSelfCapability(cap) {
         (name === 'SELF' || name === '__SELF__'));
 }
 
-function _readCompiledCandidateCapabilities(words) {
+function _readCompiledCandidateCapabilities(words, compilerRecord) {
     const api = typeof LumpContentFrame !== 'undefined' &&
         typeof LumpContentFrame.lumpDecodeContentFrameApi === 'function'
         ? LumpContentFrame.lumpDecodeContentFrameApi(words) : null;
     const cc = words[0] & 0xFF;
-    if (!api || !Array.isArray(api.capabilities) || api.capabilities.length !== cc) {
+    let definition = api;
+    // Trusted server artifacts use the canonical compact API representation:
+    // methods is an object and C-list rows are stored under imports. Expand
+    // only from that authenticated embedded definition and the same header;
+    // never fill missing rows from browser metadata or the live catalog.
+    if (definition && definition.methods && !Array.isArray(definition.methods)) {
+        const codec = typeof LumpApiCodec !== 'undefined' ? LumpApiCodec : null;
+        if (!codec || typeof codec.expand !== 'function') {
+            throw new Error('Authenticated compact API cannot be expanded into its embedded C-list definition.');
+        }
+        try {
+            definition = codec.expand(definition, words);
+        } catch (error) {
+            throw new Error(`Authenticated compact API has no valid complete C-list definition: ${error.message}`);
+        }
+        const compilerRows = compilerRecord &&
+            Array.isArray(compilerRecord.capability_rows)
+            ? compilerRecord.capability_rows : null;
+        if (!compilerRows || compilerRows.length !== cc) {
+            throw new Error('Authenticated compact API has no matching signed C-list row table.');
+        }
+        definition.capabilities = definition.capabilities.map((cap, row) => {
+            const recordRow = compilerRows[row];
+            const rights = value => Array.isArray(value)
+                ? [...new Set(value.map(item => String(item).toUpperCase()))].sort().join('')
+                : '';
+            if (!recordRow || !Number.isInteger(recordRow.relocation_row) ||
+                    recordRow.relocation_row !== row ||
+                    typeof recordRow.name !== 'string' || !recordRow.name.trim() ||
+                    rights(recordRow.rights) !== rights(cap && cap.rights)) {
+                throw new Error(`Authenticated compact API row ${row} disagrees with its signed compiler row.`);
+            }
+            // The compact import records the canonical leaf/identity, while the
+            // signed compiler row retains the exact source PetName used by the
+            // pending-row admission check and the editor.
+            return { ...cap, name: recordRow.name };
+        });
+    }
+    if (!definition || !Array.isArray(definition.capabilities) ||
+            definition.capabilities.length !== cc) {
         throw new Error('Authenticated artifact is missing a complete embedded C-list definition.');
     }
-    return api.capabilities.map((cap, row) => {
+    return definition.capabilities.map((cap, row) => {
         if (!cap || typeof cap.name !== 'string' || !cap.name.trim() ||
                 !Array.isArray(cap.rights)) {
             throw new Error(`Embedded C-list row ${row} has no declared name or rights array.`);
@@ -2104,7 +2143,8 @@ async function compileAndBuild(options) {
         if (!Array.isArray(result.words) || !result.compiler_record) {
             throw new Error('No authenticated server artifact was supplied.');
         }
-        resolvedCaps = _readCompiledCandidateCapabilities(lumpWords);
+        resolvedCaps = _readCompiledCandidateCapabilities(
+            lumpWords, result.compiler_record);
     } catch (error) {
         const message = `Compile failed — ${error.message}\nNo candidate or saved data changed. Recompile; if this repeats, report the compiler artifact error.`;
         if (con) con.textContent = message;
