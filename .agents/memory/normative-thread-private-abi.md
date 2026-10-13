@@ -8,3 +8,7 @@ Thread suspension identity belongs only to the canonical two-word CHURCH return 
 **Why:** The user rejected the invented executable-identity field. CR0 is mutable state and can intentionally name a different abstraction from the code being resumed.
 
 **How to apply:** Use the shared Thread layout for geometry. Seed, suspend, and resume through the established CHURCH frame and RETURN-equivalent Enter-GT/NIA validation while preserving the existing private CR/DR homes.
+
+Related durable constraints:
+- [Protected Thread indicator](protected-thread-indicator.md) — protected packing and save/restore ownership.
+- [Thread object runtime authority](thread-object-runtime-authority.md) — single context authority, lifecycle labels, and continuation semantics.

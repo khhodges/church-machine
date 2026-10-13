@@ -78,5 +78,54 @@
 .church-next .cn-field input, .church-next .cn-field select, .church-next .cn-search { background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
 .church-next .cn-check { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--muted); margin: 17px 0; }
 .church-next .cn-check input { accent-color: var(--accent); }
+.church-next .cn-open-prototype, .church-next .cn-sidebar-open { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 13px; background: var(--accent); border: 1px solid var(--accent); border-radius: 4px; color: #f2f7ee; font-size: 12px; font-weight: 700; letter-spacing: .1px; white-space: nowrap; }
+.church-next .cn-open-prototype:hover, .church-next .cn-sidebar-open:hover { background: #1e5147; }
+.church-next .cn-sidebar-open { margin: 16px 5px 8px; }
+.church-next .cn-design-split { align-items: start; }
+.church-next .cn-design-subhead { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 17px 0 12px; }
+.church-next .cn-design-subhead p { font-size: 11px; margin-top: 3px; }
+.church-next .cn-assignment { display: grid; grid-template-columns: minmax(92px,.55fr) minmax(120px,1fr) minmax(105px,.7fr) 32px; gap: 10px; align-items: end; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.church-next .cn-assignment label, .church-next .cn-entry-fields label { display: grid; gap: 5px; font-size: 10px; color: var(--muted); }
+.church-next .cn-assignment input, .church-next .cn-assignment select, .church-next .cn-entry-fields input, .church-next .cn-entry-fields select { width: 100%; min-width: 0; padding: 7px 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 3px; }
+.church-next .cn-icon-btn { display: inline-grid; place-items: center; width: 31px; height: 31px; color: var(--muted); border: 1px solid var(--line); border-radius: 3px; background: var(--panel); }
+.church-next .cn-icon-btn:hover { color: var(--accent); background: var(--soft); }
+.church-next .cn-icon-btn.danger:hover { color: #8b493b; background: #f2e6d3; }
+.church-next .cn-validation { display: flex; align-items: flex-start; gap: 9px; margin-top: 16px; padding: 12px; border: 1px solid var(--line); font-size: 11px; }
+.church-next .cn-validation strong { display: block; margin-bottom: 4px; }
+.church-next .cn-validation.invalid { color: #80582d; background: #f3eadb; border-color: #e3d4b9; }
+.church-next .cn-validation.valid { color: var(--accent); background: var(--soft); }
+.church-next .cn-thread-layout { display: flex; flex-direction: column; gap: 5px; }
+.church-next .cn-layout-zone { min-height: 58px; padding: 10px 12px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 0 10px; border: 1px solid var(--line); background: #f2f5ef; }
+.church-next .cn-layout-zone span { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.church-next .cn-layout-zone strong { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; }
+.church-next .cn-layout-zone small { color: var(--muted); font-size: 10px; }
+.church-next .cn-layout-zone.header { border-top: 3px solid #758f87; }
+.church-next .cn-layout-zone.data { background: #edf2e9; }
+.church-next .cn-layout-zone.protected { background: #f3eadb; border-color: #e3d4b9; color: #775934; }
+.church-next .cn-layout-zone.heap { min-height: 74px; }
+.church-next .cn-layout-zone.stack { min-height: 98px; background: #e7eee8; }
+.church-next .cn-layout-zone.capabilities { border-bottom: 3px solid var(--accent); }
+.church-next .cn-layout-caption { font-size: 11px; margin-top: 14px; }
+.church-next .cn-body-size { display: flex; justify-content: space-between; gap: 12px; margin-top: 12px; padding: 10px 12px; background: var(--soft); color: var(--muted); font-size: 11px; }
+.church-next .cn-body-size strong { color: var(--accent); font-family: 'JetBrains Mono', monospace; }
+.church-next .cn-entry-edit { border: 1px solid var(--line); background: #f6f8f2; padding: 13px; margin: 12px 0; }
+.church-next .cn-entry-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 11px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.church-next .cn-entry-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.church-next .cn-entry-edit .cn-check { margin-bottom: 0; }
+.church-next .cn-preview-root { border: 1px solid var(--line); background: #f6f8f2; }
+.church-next .cn-preview-root-head { padding: 15px; display: grid; gap: 4px; border-bottom: 1px solid var(--line); }
+.church-next .cn-preview-root-head strong { font-family: 'JetBrains Mono', monospace; font-size: 14px; }
+.church-next .cn-preview-root-head small { color: var(--muted); }
+.church-next .cn-foundation-label { display: flex; align-items: center; gap: 7px; padding: 12px 13px 6px; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+.church-next .cn-foundation { margin: 5px 10px; padding: 9px 10px; display: flex; justify-content: space-between; gap: 8px; border: 1px dashed #c5d0c7; color: var(--muted); font-size: 11px; }
+.church-next .cn-foundation strong { color: var(--copper); font-size: 10px; }
+.church-next .cn-preview-entry { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 12px; border-top: 1px solid var(--line); }
+.church-next .cn-preview-entry div { min-width: 0; display: grid; gap: 3px; }
+.church-next .cn-preview-entry strong { font-family: 'JetBrains Mono', monospace; font-size: 11px; overflow-wrap: anywhere; }
+.church-next .cn-preview-entry small { color: var(--muted); font-size: 10px; }
+.church-next .cn-empty { padding: 18px; margin-top: 12px; background: #f4f6f0; border: 1px dashed var(--line); }
+.church-next .cn-empty strong { font-size: 12px; }
+.church-next .cn-empty p { font-size: 11px; margin-top: 4px; }
+.church-next .cn-empty.compact { margin: 8px; font-size: 11px; color: var(--muted); }
 @media (max-width: 1100px) { .church-next .cn-main { padding: 25px 22px; } .church-next .cn-split { grid-template-columns: minmax(0,1fr) 270px; } .church-next .cn-top-right { gap: 12px; } .church-next .cn-brand { font-size: 15px; } }
-@media (max-width: 767px) { .church-next .cn-top { height: auto; min-height: 74px; padding: 16px; flex-wrap: wrap; gap: 10px; } .church-next .cn-top-right { width: 100%; margin-left: 0; flex-wrap: wrap; } .church-next .cn-shell { display: block; } .church-next .cn-sidebar { padding: 10px; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); } .church-next .cn-sidebar .cn-eyebrow, .church-next .cn-sidebar-bottom, .church-next .cn-nav span:last-child { display: none; } .church-next .cn-nav { white-space: nowrap; padding: 8px; gap: 6px; font-size: 11px; } .church-next .cn-main { padding: 22px 15px; } .church-next .cn-split, .church-next .cn-inspect { grid-template-columns: 1fr; } .church-next .cn-heading { align-items: flex-start; flex-direction: column; gap: 13px; } .church-next h1 { font-size: 26px; } .church-next .cn-step { grid-template-columns: 26px 1fr; } .church-next .cn-step .cn-btn { grid-column: 2; justify-self: start; } .church-next .cn-flow { flex-wrap: wrap; } }
+@media (max-width: 767px) { .church-next .cn-top { height: auto; min-height: 74px; padding: 16px; flex-wrap: wrap; gap: 10px; } .church-next .cn-top-right { width: 100%; margin-left: 0; flex-wrap: wrap; gap: 9px; } .church-next .cn-top-right .cn-badge { order: 3; } .church-next .cn-shell { display: block; } .church-next .cn-sidebar { padding: 10px; flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); } .church-next .cn-sidebar .cn-eyebrow, .church-next .cn-sidebar-bottom, .church-next .cn-nav span:last-child { display: none; } .church-next .cn-nav { white-space: nowrap; padding: 8px; gap: 6px; font-size: 11px; } .church-next .cn-sidebar-open { flex: 0 0 auto; margin: 0 4px; padding: 8px 10px; } .church-next .cn-main { padding: 22px 15px; } .church-next .cn-split, .church-next .cn-inspect { grid-template-columns: 1fr; } .church-next .cn-heading { align-items: flex-start; flex-direction: column; gap: 13px; } .church-next h1 { font-size: 26px; } .church-next .cn-step { grid-template-columns: 26px 1fr; } .church-next .cn-step .cn-btn { grid-column: 2; justify-self: start; } .church-next .cn-flow { flex-wrap: wrap; } .church-next .cn-assignment { grid-template-columns: minmax(72px,.55fr) minmax(105px,1fr) 31px; } .church-next .cn-assignment label:nth-child(3) { grid-column: 2; } .church-next .cn-assignment .cn-icon-btn { grid-column: 3; grid-row: 1 / span 2; } .church-next .cn-entry-fields { grid-template-columns: 1fr; } .church-next .cn-design-subhead { align-items: flex-start; } }

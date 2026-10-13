@@ -1,6 +1,25 @@
-export type View = 'namespace' | 'codeedit' | 'lump' | 'build';
+export type View = 'namespace' | 'codeedit' | 'lump' | 'build' | 'thread-design' | 'namespace-design';
 export type Artifact = { slot: string; version: number; source: string; id: string };
 export type Slot = { name: string; kind: string; placed: number; bytes: number };
+export type ThreadDraft = {
+  name: string; bodyWords: number;
+  registers: { register: number; value: string }[];
+  capabilities: { register: number; target: string; policy: string }[];
+};
+export type NamespaceEntry = { id: number; name: string; node: string; slot: string; policy: string; boot: boolean };
+export type NamespaceDraft = { name: string; ideNode: string; bootChoice: string; entries: NamespaceEntry[] };
+export const initialThreadDraft = (): ThreadDraft => ({
+  name: 'Boot.Thread', bodyWords: 256,
+  registers: [{register: 0, value: '0'}, {register: 1, value: '0'}],
+  capabilities: [{register: 0, target: 'UART_DEV', policy: 'write'}],
+});
+export const initialNamespaceDraft = (): NamespaceDraft => ({
+  name: 'Boot.NS draft', ideNode: 'Wukong', bootChoice: 'Thread.2',
+  entries: [
+    {id: 1, name: 'Thread.2', node: 'Wukong', slot: '3', policy: 'Resident', boot: true},
+    {id: 2, name: 'UART_DEV', node: 'Wukong', slot: '2', policy: 'Resident', boot: false},
+  ],
+});
 export const initialSlots: Slot[] = [
   { name: 'Boot.NS', kind: 'Namespace', placed: 12, bytes: 384 },
   { name: 'Boot.Thread', kind: 'Thread', placed: 34, bytes: 608 },

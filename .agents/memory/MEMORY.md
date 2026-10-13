@@ -73,10 +73,8 @@
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
-- [Normative Thread private ABI](normative-thread-private-abi.md) — size-derived layout keeps protected context at +17 and Heap at +18; CHURCH suspension uses the canonical private-stack frame
-- [Protected Thread indicator](protected-thread-indicator.md) — word +17 packs FLAGS/SZ/STO outside CR5; frame words save the prior indicator state
+- [Thread private ABI and authority](normative-thread-private-abi.md) — private-frame geometry, protected indicator, runtime ownership, and continuation rules.
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
-- [Thread object runtime authority](thread-object-runtime-authority.md) — a suspended Thread's executable context is its canonical CHURCH frame; never add parallel identity caches
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
 - [CALL E-GT identity flow](call-egt-identity-flow.md) — CALL resolves source/callee E-GTs directly; RETURN frames must carry normalized caller E authority, never transient CR6 L authority
 - [Bridge-causal retirement gates](bridge-causal-retirement-gates.md) — UART write→retirement proofs must use bridge-side counters, not server receive order
@@ -157,4 +155,4 @@
 - [Internal Wukong probes](wukong-internal-probe-preservation.md) — keep optional ILA observations internal and preserve attributes until Vivado; Yosys may copy attributes to aliases.
 - [Ascending-v1 candidate boundary](ascending-v1-candidate-boundary.md) — profile approval is separate from Header V2 approval and never authorizes installation, activation, or hardware programming.
 - [Authenticated compact API admission](authenticated-compact-api-admission.md) — expand embedded rows from exact bytes; recover source PetNames only from matching signed compiler rows.
-- [Alternative IDE prototype](alternative-ide-prototype.md) — prioritize four core views; prototype at a separate URL without touching live artifacts or hardware.
+- [Alternative IDE prototype](alternative-ide-prototype.md) — include Thread/Namespace authoring; separate URL and demo state, with no live artifact or hardware changes.

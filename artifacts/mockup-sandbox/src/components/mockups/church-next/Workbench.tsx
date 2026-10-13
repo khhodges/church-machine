@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Boxes, Code2, Columns2, Cpu, ExternalLink, Layers3, RotateCcw, X } from 'lucide-react';
+import { Boxes, Code2, Columns2, Cpu, ExternalLink, Layers3, RotateCcw, X, Workflow, Network } from 'lucide-react';
 import { BuildPage, EditorPage, InspectPage, NamespacePage } from './_shared/Pages';
-import { initialArtifacts, initialSlots, type Artifact, type DemoSnapshot, type Slot, type View } from './_shared/model';
+import { initialArtifacts, initialNamespaceDraft, initialSlots, initialThreadDraft, type Artifact, type DemoSnapshot, type NamespaceDraft, type Slot, type ThreadDraft, type View } from './_shared/model';
+import { NamespaceDesignPage, ThreadDesignPage } from './_shared/DesignPages';
 import './_group.css';
 
 const views: {id:View;label:string;icon:typeof Boxes}[] = [
   {id:'namespace',label:'Namespace',icon:Boxes},{id:'codeedit',label:'CodeEdit',icon:Code2},
   {id:'lump',label:'LUMP Side-by-Side',icon:Columns2},{id:'build',label:'Build & Test',icon:Cpu},
+  {id:'thread-design',label:'Thread Design',icon:Workflow},{id:'namespace-design',label:'Namespace Design',icon:Network},
 ];
 function getView():View { const v = window.location.hash.replace('#/',''); return views.some(p=>p.id===v) ? v as View : 'namespace'; }
 export function Workbench() {
@@ -24,6 +26,10 @@ export function Workbench() {
   const [snapshot,setSnapshot] = useState<DemoSnapshot|null>(null);
   const [stage,setStage] = useState(0);
   const [resetConfirm,setResetConfirm] = useState(false);
+  const [threadDraft,setThreadDraft] = useState<ThreadDraft>(initialThreadDraft);
+  const [threadSaved,setThreadSaved] = useState(false);
+  const [namespaceDraft,setNamespaceDraft] = useState<NamespaceDraft>(initialNamespaceDraft);
+  const [namespaceSaved,setNamespaceSaved] = useState(false);
   useEffect(()=>{ const handle = ()=>setView(getView()); window.addEventListener('hashchange',handle); return ()=>window.removeEventListener('hashchange',handle); },[]);
   const navigate = (v:View) => {window.location.hash=`/${v}`;setView(v);};
   const edit = (a:Artifact) => {
@@ -39,11 +45,12 @@ export function Workbench() {
     setSlots(initialSlots.map(s=>({...s})));setArtifacts(a);setSelected('SelfTest');setBase(b);
     setDraftState(b.source);setSavedDraft(b.source);setCompiled(null);setError('');
     setInspected(a.find(x=>x.slot==='SelfTest' && x.version===98)!);setSnapshot(null);setStage(0);
+    setThreadDraft(initialThreadDraft());setThreadSaved(false);setNamespaceDraft(initialNamespaceDraft());setNamespaceSaved(false);
     setResetConfirm(false);setNotice('Only this prototype session has been reset.');navigate('namespace');
   };
   return <div className="church-next">
-    <header className="cn-top"><a href="#/namespace" className="cn-brand"><span className="cn-mark"><Layers3 size={20}/></span>CHURCH MACHINE <span className="cn-muted" style={{fontSize:11,fontWeight:400,letterSpacing:0}}>workbench</span></a><div className="cn-top-right"><span className="cn-badge">Prototype / sample data / no live writes</span><a href="/simulator/?view=namespace" target="_blank" rel="noopener noreferrer" className="cn-actions">Open original IDE <ExternalLink size={12}/></a><a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" rel="noopener noreferrer" className="cn-actions" title="Open prototype in new tab">Open prototype in new tab <ExternalLink size={12}/></a></div></header>
-    <div className="cn-shell"><aside className="cn-sidebar"><div className="cn-eyebrow">Engineering workspace</div>{views.map((v,i)=><a key={v.id} href={`#/${v.id}`} className={`cn-nav ${view===v.id ? 'active' : ''}`} aria-current={view===v.id ? 'page' : undefined}><v.icon size={16}/><span>{v.label}</span><span>0{i+1}</span></a>)}<div className="cn-sidebar-bottom"><div className="cn-eyebrow" style={{padding:0,marginBottom:9}}>Isolated session</div><p>Local sample state.<br/>Nothing leaves this workspace.</p><button className="cn-btn text" style={{marginTop:20}} onClick={()=>setResetConfirm(true)}><RotateCcw size={13}/>Reset demo</button></div></aside>
+     <header className="cn-top"><a href="#/namespace" className="cn-brand"><span className="cn-mark"><Layers3 size={20}/></span>CHURCH MACHINE <span className="cn-muted" style={{fontSize:11,fontWeight:400,letterSpacing:0}}>workbench</span></a><div className="cn-top-right"><span className="cn-badge">Prototype / sample data / no live writes</span><a href="/simulator/?view=namespace" target="_blank" rel="noopener noreferrer" className="cn-actions">Open original IDE <ExternalLink size={12}/></a><a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" rel="noopener noreferrer" className="cn-open-prototype">Open Prototype <ExternalLink size={13}/></a></div></header>
+     <div className="cn-shell"><aside className="cn-sidebar"><div className="cn-eyebrow">Engineering workspace</div>{views.map((v,i)=><a key={v.id} href={`#/${v.id}`} className={`cn-nav ${view===v.id ? 'active' : ''}`} aria-current={view===v.id ? 'page' : undefined}><v.icon size={16}/><span>{v.label}</span><span>{String(i+1).padStart(2,'0')}</span></a>)}<a href={typeof window !== 'undefined' ? window.location.href : '#'} target="_blank" rel="noopener noreferrer" className="cn-sidebar-open">Open Prototype <ExternalLink size={13}/></a><div className="cn-sidebar-bottom"><div className="cn-eyebrow" style={{padding:0,marginBottom:9}}>Isolated session</div><p>Local sample state.<br/>Nothing leaves this workspace.</p><button className="cn-btn text" style={{marginTop:20}} onClick={()=>setResetConfirm(true)}><RotateCcw size={13}/>Reset demo</button></div></aside>
     <main className="cn-main">
       {resetConfirm && <div className="cn-note"><strong>Reset this demo session?</strong> Drafts, demo revisions, placement, and build results will be cleared.<div className="cn-actions" style={{marginTop:9}}><button className="cn-btn" onClick={reset}>Reset this prototype</button><button className="cn-btn" onClick={()=>setResetConfirm(false)}>Keep working</button></div></div>}
       {notice && <div className="cn-toast" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={()=>setNotice('')}><X size={14}/></button></div>}
@@ -51,6 +58,8 @@ export function Workbench() {
       {view==='codeedit' && <EditorPage draft={draft} setDraft={s=>{setDraftState(s);setCompiled(null);setError('');}} base={base} compiled={compiled} savedDraft={savedDraft} onSaveDraft={()=>{setSavedDraft(draft);setNotice('Draft saved in this prototype’s session memory only. No real artifact written.');}} onCompile={()=>{if(!draft.trim()){setError('Source is empty. Add some sample source before compiling.');setCompiled(null);}else{setCompiled(draft);setError('');setNotice('Demo fixture ready. This is not actual assembler output.');}}} onSaveLump={()=>{if(compiled === null)return;const version=Math.max(...artifacts.filter(a=>a.slot===base.slot).map(a=>a.version))+1;const a={slot:base.slot,version,source:compiled,id:`DEMO-${base.slot}-${version}`};setArtifacts(old=>[...old,a]);setBase(a);setSavedDraft(draft);setCompiled(null);setNotice(`Saved ${base.slot} v${version} as a demo revision. Namespace placement has not changed.`);}} error={error}/>}
       {view==='lump' && <InspectPage artifact={inspected} artifacts={artifacts} onChange={setInspected}/>}
       {view==='build' && <BuildPage slots={slots} snapshot={snapshot} stage={stage} setSnapshot={setSnapshot} setStage={n=>{setStage(n);if(n===0)setSnapshot(null);}} notify={setNotice}/>}
+       {view==='thread-design' && <ThreadDesignPage draft={threadDraft} setDraft={value=>{setThreadDraft(value);setThreadSaved(false);}} saved={threadSaved} onSave={()=>{setThreadSaved(true);setNotice('Thread design saved in this session only. No artifact or live state was written.');}}/>}
+       {view==='namespace-design' && <NamespaceDesignPage draft={namespaceDraft} setDraft={value=>{setNamespaceDraft(value);setNamespaceSaved(false);}} saved={namespaceSaved} onSave={()=>{setNamespaceSaved(true);setNotice('Namespace design saved in this session only. It remains separate from runnable sample revisions.');}}/>}
       <footer className="cn-footer"><span className="cn-actions"><span style={{width:5,height:5,borderRadius:'50%',background:'var(--accent)'}}/>LOCAL DEMO · NO LIVE CONNECTION</span><span>Draft ≠ saved revision ≠ Namespace placement</span><button className="cn-btn text" style={{fontSize:10}} onClick={()=>setResetConfirm(true)}>Reset demo</button></footer>
     </main></div>
   </div>;
