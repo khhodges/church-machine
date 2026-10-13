@@ -1,5 +1,6 @@
 'use strict';
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const Simulator = require('./simulator');
 const Assembler = require('./assembler');
 
@@ -156,6 +157,85 @@ function reason(sim) { return sim.faultLog.map(f => f.rawDiagnosticReason || f.m
     assert.match(reason(sim), /L|perm/i);
     assert.equal(sim.cr[15].word1, 0);
     assert.deepEqual(sim.memory, before);
+}
+
+function runGeneratedAscendingSwitch(imagePath) {
+    const image = fs.readFileSync(imagePath);
+    const makeSim = ({missingIncomingThread = false} = {}) => {
+        const sim = Simulator.fromAscendingNamespaceImage(image, {
+            word0: 0x02000001, word1: 0, word2: 255, word3: 0, m: 1,
+        });
+        if (missingIncomingThread) {
+            sim.memory.fill(0, 8192 + 2 * 4, 8192 + 3 * 4);
+        }
+        assert(sim.startEntryThread(), reason(sim));
+        assert.equal(sim.cr[12].word1, 256, 'version-0 entry Thread starts in generated Namespace A');
+        sim.cr[3] = {
+            word0: sim.cr[14].word0, word1: sim.cr[14].word1,
+            word2: sim.cr[14].word2, word3: 0, m: 0,
+        };
+        sim.cr[13] = {
+            word0: 0x02000002, word1: 256, word2: 255, word3: 0, m: 1,
+        };
+        sim.dr[3] = 0x12345678;
+        sim.flags = {N: true, Z: false, C: true, V: true};
+        return sim;
+    };
+
+    {
+        const sim = makeSim();
+        const oldThread = sim.cr[12].word1;
+        const layout = sim._threadLayoutAtBase(oldThread);
+        assert(layout);
+        const savedCapability = sim.cr[3].word0;
+        assert(sim.step(), reason(sim));
+        assert.equal(sim.cr[15].word1, 8192, 'generated Namespace B becomes the active root');
+        const activeRootGT = sim.parseGT(sim.cr[15].word0);
+        assert.equal(activeRootGT.index, 4, 'CR15 retains the selected Namespace capability');
+        assert.equal(activeRootGT.permissions.L, 1);
+        assert.equal(sim.cr[15].m, 0, 'SWITCH consumes destination M');
+        assert.equal(sim.cr[12].word1, 8192 + 256, 'generated version-0 Thread B is active');
+        assert.deepEqual(sim.cr[13], sim.emptyCapability(), 'successful SWITCH clears CR13');
+
+        assert.equal(sim.memory[oldThread + 1 + 3], 0x12345678,
+            'outgoing DR3 is saved in the generated Thread home');
+        assert.equal(sim.memory[oldThread + layout.capsStart + 3], savedCapability,
+            'outgoing CR3 is saved in the generated Thread capability home');
+        const indicator = sim._unpackProtectedIndicator(sim.memory[oldThread + 17]);
+        const frame = sim._unpackFrameWord(sim.memory[oldThread + indicator.sto + 2]);
+        assert.equal(frame.returnPC, 1, 'saved context resumes after SWITCH');
+        assert.deepEqual(frame.flags, {N: true, Z: false, C: true, V: true},
+            'saved Thread context retains condition flags');
+        assert.equal(sim.pc, 0, 'incoming generated Thread starts at its entry program');
+        assert(sim.step(), reason(sim));
+        assert.equal(sim.dr[1], 202, 'incoming generated program executes under Namespace B');
+        assert.deepEqual(sim.faultLog, []);
+    }
+
+    {
+        const sim = makeSim({missingIncomingThread: true});
+        const oldThread = sim.cr[12].word1;
+        const layout = sim._threadLayoutAtBase(oldThread);
+        assert(layout);
+        assert.equal(sim.step(), null, 'missing incoming Thread faults after installing the root');
+        assert(sim.halted);
+        assert.match(reason(sim), /Namespace SWITCH|Thread GT|Namespace slot/i);
+        assert.equal(sim.cr[15].word1, 8192,
+            'fault does not roll back the already-installed Namespace root');
+        assert.notDeepEqual(sim.cr[13], sim.emptyCapability(),
+            'faulting activation does not clear CR13');
+        const indicator = sim._unpackProtectedIndicator(sim.memory[oldThread + 17]);
+        const frame = sim._unpackFrameWord(sim.memory[oldThread + indicator.sto + 2]);
+        assert.equal(frame.returnPC, 1, 'outgoing save remains committed on activation fault');
+    }
+    console.log('Generated ascending-image SWITCH context and fault tests passed.');
+}
+
+const generatedSwitchIndex = process.argv.indexOf('--generated-switch');
+if (generatedSwitchIndex !== -1) {
+    const imagePath = process.argv[generatedSwitchIndex + 1];
+    assert(imagePath, '--generated-switch requires a composed ascending image path');
+    runGeneratedAscendingSwitch(imagePath);
 }
 console.log('New-format private-core SWITCH tests passed; IDE activation remains separate.');
 module.exports = {fixture};

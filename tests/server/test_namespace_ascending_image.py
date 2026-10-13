@@ -1,4 +1,6 @@
+import copy
 import hashlib
+import json
 from pathlib import Path
 import struct
 import subprocess
@@ -41,6 +43,82 @@ def fixture():
 def build():
     state, config, artifacts = fixture()
     return generate_image(state, config, None, image_format=FORMAT, artifacts=artifacts)
+
+
+def _assembled_lump(source, clist):
+    assemble_script = r"""
+const fs = require('node:fs');
+const Assembler = require('./simulator/assembler');
+const assembler = new Assembler();
+const result = assembler.assemble(fs.readFileSync(0, 'utf8'));
+if (assembler.errors.length) {
+  console.error(JSON.stringify(assembler.errors));
+  process.exit(1);
+}
+process.stdout.write(JSON.stringify(result.words));
+"""
+    completed = subprocess.run(
+        ["node", "-e", assemble_script], cwd=ROOT,
+        input=source, text=True, capture_output=True, check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    instructions = __import__("json").loads(completed.stdout)
+    words = [0] * 64
+    words[0] = boot_image.pack_lump_header(0, len(instructions), len(clist), 0)
+    words[1:1 + len(instructions)] = instructions
+    words[-len(clist):] = clist
+    return struct.pack(f">{len(words)}I", *words)
+
+
+def _generated_switch_pair():
+    state, config, _ = fixture()
+    self_gt = boot_image.create_gt(0, 3, {"E": 1}, 1)
+    namespace_gt = boot_image.create_gt(0, 4, {"L": 1}, 1)
+    source_artifact = _assembled_lump(
+        "SWITCH CR15, CR6, #1\nIADD DR1, DR0, #41\nHALT",
+        [self_gt, namespace_gt],
+    )
+    destination_artifact = _assembled_lump(
+        "IADD DR1, DR0, #202\nHALT", [self_gt],
+    )
+
+    def image_for(artifact):
+        target_state = copy.deepcopy(state)
+        target_state["abstractions"][2]["binary_hash"] = hashlib.sha256(
+            artifact).hexdigest()
+        target_state["abstractions"][2]["limit"] = (
+            struct.unpack(">I", artifact[:4])[0] >> 10
+        ) & 8191
+        return generate_image(
+            target_state, config, None, image_format=FORMAT,
+            artifacts={"EntryProgram.lump": artifact},
+        )[0]
+
+    namespace_a = image_for(source_artifact)
+    namespace_b = image_for(destination_artifact)
+    words = list(struct.unpack(f"<{len(namespace_a) // 4}I", namespace_a))
+    base_b = len(words)
+    words.extend(struct.unpack(f"<{len(namespace_b) // 4}I", namespace_b))
+
+    # Relocate the separately generated Namespace B into a disjoint RAM range.
+    words[base_b + 1] = base_b
+    for slot in range(1, 64):
+        offset = base_b + slot * 4
+        entry = words[offset:offset + 4]
+        if any(entry) and entry[0] < base_b:
+            location = entry[0] + base_b
+            words[offset:offset + 4] = [
+                location, entry[1], boot_image.integrity32(location, entry[1]), entry[3]
+            ]
+
+    # NS[4] is generated as a live placeholder target, then bound to the exact
+    # generated Namespace B root that SWITCH will install.
+    root_offset = 4 * 4
+    root_authority = boot_image.pack_ns_word1(255)
+    words[root_offset:root_offset + 4] = [
+        base_b, root_authority, boot_image.integrity32(base_b, root_authority), 0
+    ]
+    return struct.pack(f"<{len(words)}I", *words)
 
 
 def test_ascending_image_has_four_word_header_ascending_slots_and_version_zero_entry():
@@ -86,6 +164,18 @@ assert.equal(sim.halted, true);
         text=True, capture_output=True, check=False,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+def test_generated_ascending_namespaces_switch_preserves_context_and_faults_cleanly(tmp_path):
+    path = tmp_path / "generated-switch-pair.bin"
+    path.write_bytes(_generated_switch_pair())
+    completed = subprocess.run(
+        ["node", "simulator/test_namespace_runtime_core.js",
+         "--generated-switch", str(path)],
+        cwd=ROOT, text=True, capture_output=True, check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    assert "Generated ascending-image SWITCH context and fault tests passed." in completed.stdout
 
 
 def test_candidate_cli_stages_only_validated_output_and_preserves_all_inputs(tmp_path, monkeypatch):
