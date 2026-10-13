@@ -3100,8 +3100,7 @@ class ChurchAssembler {
                /^(UART|UART_TX|UART_RX|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
     }
 
-    static objectNameErrors(result, source) {
-        const errors = [];
+    static objectSourceLocations(result, source) {
         // Locate diagnostics in the original editor text, not generated assembly
         // or normalized C-list metadata (which may have no source positions).
         const text = typeof source === 'string' ? source : '';
@@ -3131,6 +3130,12 @@ class ChurchAssembler {
             }
             return {line: cap && cap.line || null};
         };
+        return {declarationLocation, capabilityLocation};
+    }
+
+    static objectNameErrors(result, source) {
+        const errors = [];
+        const {declarationLocation, capabilityLocation} = ChurchAssembler.objectSourceLocations(result, source);
         const valid = name => typeof name === 'string' &&
             /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+(?:#[1-9][0-9]*)?$/.test(name);
         if (!valid(result.abstractionName)) errors.push({...declarationLocation,

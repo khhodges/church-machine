@@ -84,4 +84,37 @@ for(const language of ['auto','javascript']) {
     assert.match(rejected.error,/canonical dot-name/);
 }
 function processExec(){return process.execPath;}
+const foreignSource = [
+    '// ide.SelfTest in a comment is not a declaration',
+    'abstraction ide.CapabilityTest {',
+    ' capabilities {',
+    '  SELF E,',
+    '  ide.SelfTest E,',
+    '  ide.LED_DEV RW,',
+    '  ide.UART_DEV RW,',
+    '  ide.BTN_DEV R,',
+    '  ide.TIMER_DEV RW,',
+    '  ide.M_BIT_DEV RW,',
+    '  ide.WukongCallHome E,',
+    '  ide.Thread.2,',
+    '  ide.Thread.3,',
+    '  Boot.Thread',
+    ' }',
+    ' method Run() { return 1; }',
+    '}'
+].join('\n');
+const foreignRun = spawnSync(process.execPath,['server/compile_worker.js'],{
+    input:JSON.stringify({source:foreignSource,language:'auto',_ide_hierarchy:{
+        node:'ide1', aliases:{'Boot.Thread':'ide1.BootThread'},definitions:{}
+    }}),encoding:'utf8',timeout:15000});
+assert.equal(foreignRun.status,0,foreignRun.stderr);
+const foreignResult=JSON.parse(foreignRun.stdout);
+const ownershipErrors=foreignResult.errors;
+assert.equal(ownershipErrors.filter(e=>/Foreign leaf/.test(e.message)).length,7);
+assert.equal(ownershipErrors.filter(e=>/Malformed canonical leaf/.test(e.message)).length,2);
+assert.equal(ownershipErrors.length,9,JSON.stringify(foreignResult.errors));
+assert.deepEqual(ownershipErrors.map(e=>e.line),[5,6,7,8,9,10,11,12,13]);
+assert.deepEqual(ownershipErrors.map(e=>foreignSource.split('\n')[e.line-1].slice(e.colStart,e.colEnd)),
+    ['ide.SelfTest','ide.LED_DEV','ide.UART_DEV','ide.BTN_DEV','ide.TIMER_DEV',
+        'ide.M_BIT_DEV','ide.WukongCallHome','ide.Thread.2','ide.Thread.3']);
 console.log('PASS canonical MMIO dot-names: compiler, API/binary builders, raw operand resolution, and server worker');

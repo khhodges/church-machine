@@ -9,6 +9,13 @@ The programmer configures the IDE node on Namespace Design, not by editing a
 server file or changing the browser Pet name preference. Save it explicitly with
 confirmation; do not rename saved artifacts or alter the installed Namespace.
 
+All declaration diagnostics must retain original editor locations through server
+validation and response normalization, not only the browser compiler.
+**Why:** A browser-only fix left ownership failures showing “Line 0” on real
+compilation requests; the user repeatedly reported missing highlights.
+**How to apply:** Cover the actual server ownership-error response with a
+multi-capability source fixture and assert every returned line and name span.
+
 **Why:** The user requested the ownership node as a programmer-facing Namespace
 Design setting after compilation was blocked by a server-only node mismatch.
 

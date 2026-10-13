@@ -220,18 +220,19 @@ if (isMainThread) {
     // from browser ownership claims. Persist resolved names in the binary.
     if (Object.prototype.hasOwnProperty.call(payload, '_ide_hierarchy')) {
         const policy = require(path.join(SIM_DIR, 'capability_tokens.js'));
+        const locations = global.ChurchAssembler.objectSourceLocations(compileResult, source);
         for (const cap of compileResult.capabilities || []) {
             const decision = policy.checkLeafOwnership(cap, payload._ide_hierarchy);
             if (decision.error) {
                 compileResult.errors = [...(compileResult.errors || []),
-                    { line: 0, message: decision.error }];
+                    { ...locations.capabilityLocation(cap), message: decision.error }];
             } else if (decision.canonical) cap.canonical_leaf = decision.canonical;
         }
     }
 
     // ── Compile errors ────────────────────────────────────────────────────────
     const errors   = compileResult.errors   || [];
-    for (const diagnostic of global.ChurchAssembler.objectNameErrors(compileResult)) {
+    for (const diagnostic of global.ChurchAssembler.objectNameErrors(compileResult, source)) {
         if (!errors.some(error => error.message === diagnostic.message)) errors.push(diagnostic);
     }
     const warnings = compileResult.warnings || [];
@@ -239,7 +240,7 @@ if (isMainThread) {
     if (errors.length > 0) {
         const normErrors = errors.map(e =>
             (e && typeof e === 'object' && 'message' in e)
-                ? { line: e.line || 0, message: String(e.message) }
+                ? { line: e.line || null, colStart: e.colStart, colEnd: e.colEnd, message: String(e.message) }
                 : { line: 0, message: String(e) }
         );
         parentPort.postMessage({
