@@ -234,10 +234,8 @@
     async function save() {
         if(state.saving || !state.document) return;
         state.saving=true; render();
-        let nodeChanged=false;
         try {
             if (!root.NamespaceIdeNode) throw Error('IDE node setting is unavailable. Reload the page before saving.');
-            nodeChanged=root.NamespaceIdeNode.hasPending();
             if (!await root.NamespaceIdeNode.savePending()) {
                 state.error='IDE node was not saved. Namespace design save stopped; your edits are retained.';
                 return;
@@ -245,7 +243,7 @@
             accept(await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)}));
         }
         catch(e) { state.error=e.message+
-            (nodeChanged?' Check the IDE node status above: its save is separate and may already have completed. ':' ')+
+            ' Check the IDE node status above: its save is separate and may already have completed. '+
             'No executable image was changed. Your Namespace draft is retained.'; }
         finally { state.saving=false; render(); }
     }

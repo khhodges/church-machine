@@ -6,9 +6,11 @@ const policy = require('./capability_tokens');
 const config = JSON.parse(fs.readFileSync(
     path.join(__dirname, '../server/ide-hierarchy.json'), 'utf8'));
 const approved = {
-    'Thread.2': 'kjhh1.Thread2',
-    'Thread.3': 'kjhh1.Thread3',
-    'Boot.Thread': 'kjhh1.BootThread',
+    'Thread.2': `${config.node}.Thread2`,
+    'Thread.3': `${config.node}.Thread3`,
+    'ide.Thread.2': `${config.node}.Thread2`,
+    'ide.Thread.3': `${config.node}.Thread3`,
+    'Boot.Thread': `${config.node}.BootThread`,
 };
 for (const [name, canonical] of Object.entries(approved)) {
     const cap = {name, rights: []};

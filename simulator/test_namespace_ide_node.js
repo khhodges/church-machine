@@ -16,7 +16,7 @@ vm.runInNewContext(fs.readFileSync(__dirname + '/namespace-ide-node.js', 'utf8')
         if(options.method === 'PUT') {
             puts++;
             const body = JSON.parse(options.body);
-            assert.deepEqual(body.expected, original);
+        assert.deepEqual(body.expected, saved);
             assert.equal(body.confirmed,true);
             saved = {node:body.node,aliases:{'Thread.2':'ide.Thread2'},definitions:{}};
         }
@@ -36,9 +36,16 @@ vm.runInNewContext(fs.readFileSync(__dirname + '/namespace-ide-node.js', 'utf8')
     assert.equal(puts,1);
     assert(messages.some(m=>m.includes('Thread.2: kjhh1.Thread2 → ide.Thread2')));
     assert.match(elements.namespaceIdeNodeStatus.textContent,/Saved IDE node: ide/);
-    assert.equal(elements.namespaceIdeNodeSave.disabled,true);
+    assert.equal(elements.namespaceIdeNodeSave.disabled,false,'Save remains available to verify server state');
     await elements.namespaceIdeNodeReload.events.click();
     await new Promise(resolve=>setImmediate(resolve));
     assert.equal(input.value,'ide');
+    // Another tab changed the server after this tab loaded ide. Returning the
+    // input to ide must not silently skip the write based on cached equality.
+    saved = {...original, node:'ide1'};
+    input.value='ide'; input.events.input();
+    await elements.namespaceIdeNodeForm.events.submit({preventDefault(){}});
+    assert.equal(saved.node,'ide');
+    assert.equal(puts,2);
     console.log('PASS Namespace IDE node: load, confirmation, cancellation, save and reload');
 })().catch(error=>{console.error(error);process.exitCode=1;});

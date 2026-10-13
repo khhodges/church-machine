@@ -5,6 +5,12 @@ description: IDE-instance leaf ownership controls authored definitions; runtime 
 
 Each IDE instance owns its leaves in the global dot.name hierarchy and may establish or change their permissions. Human users need not be identified. This supersedes the earlier human-ownership and universally frozen-owner-permissions assumptions.
 
+The project's chosen IDE node is `ide`; `ide1` was used while investigating save persistence.
+**Why:** The user explicitly chose to restore `ide` to match the existing `ide.*` source.
+**How to apply:** Do not leave temporary test node names saved. The approved local
+Thread aliases include `ide.Thread.2` and `ide.Thread.3`, mapped to `ide.Thread2`
+and `ide.Thread3`; do not extend this to arbitrary dotted names.
+
 The programmer configures the IDE node on Namespace Design, not by editing a
 server file or changing the browser Pet name preference. Save it explicitly with
 confirmation; do not rename saved artifacts or alter the installed Namespace.
@@ -28,6 +34,12 @@ unsaved, so reload appeared to revert a successful save. An unchanged readback
 is a persistence/interaction issue to investigate, not proof the user did not edit it.
 **How to apply:** Verify the main page Save path, not only a dedicated field button;
 stop on node-save rejection and disclose partial completion if the later table save fails.
+
+An unchanged-looking node field must still be checked against the live server on Save.
+**Why:** Another session can change the saved node while this tab retains the original
+value; cached equality previously skipped saving the user's intended value.
+**How to apply:** Keep Save available, compare against fresh state, preserve explicit
+confirmation and CAS, and verify readback before reporting success in either design view.
 
 The user explicitly confirmed that `Thread.2`, `Thread.3`, and `Boot.Thread` belong to this IDE through the Thread design page.
 

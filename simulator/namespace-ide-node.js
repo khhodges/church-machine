@@ -14,7 +14,8 @@
     function controls() {
         input.disabled = busy || config === undefined;
         reload.disabled = busy;
-        save.disabled = input.disabled || !input.value.trim() || input.value.trim() === (config && config.node);
+        // Even an unchanged-looking field may differ from another tab's save.
+        save.disabled = input.disabled || !input.value.trim();
     }
     async function request(options) {
         const response = await fetch('/api/ide-hierarchy', {cache:'no-store', ...options});
@@ -49,11 +50,19 @@
             status.textContent = 'IDE node is not ready. Reload the setting before saving the design.';
             return false;
         }
-        if (!hasPending()) return true;
         const node = input.value.trim();
         if (!node) {
             status.textContent = 'IDE node cannot be empty. Nothing was saved.';
             return false;
+        }
+        busy = true; controls();
+        try {
+        // Reconcile against the server, never treat cached equality as proof
+        // that the user's requested value is already persisted.
+        config = await request();
+        if (config && config.node === node) {
+            status.textContent = 'Verified saved IDE node: ' + node + '.';
+            return true;
         }
         const aliases = Object.entries(config && config.aliases || {})
             .filter(([, target]) => target.slice(0, target.lastIndexOf('.')) === config.node)
@@ -65,11 +74,14 @@
             status.textContent = 'Save cancelled. The IDE node edit is still unsaved.';
             return false;
         }
-        busy = true; controls();
-        try {
             config = await request({method:'PUT',
                 headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign'},
                 body:JSON.stringify({node, expected:config, confirmed:true})});
+            const verified = await request();
+            if (!verified || verified.node !== node) {
+                throw Error('The server readback does not match the requested node ' + node + '. Another save may have changed it.');
+            }
+            config = verified;
             input.value = config.node;
             status.textContent = 'Saved IDE node: ' + config.node + '. Recompile to apply the new ownership setting. No LUMPs or Namespace rows changed.';
             return true;

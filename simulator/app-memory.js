@@ -952,7 +952,13 @@ window._nsTableDirty = false;
 window._nsTableSaveError = null;
 window._nsTableSaveCancelled = false;
 
-function _nsTableSaveClick(btn) {
+async function _nsTableSaveClick(btn) {
+    if (!window.NamespaceIdeNode) {
+        window._nsTableSaveError = 'IDE node setting is unavailable. Reload the page before saving.';
+        _setNsDirty(window._nsTableDirty);
+        return false;
+    }
+    if (!await window.NamespaceIdeNode.savePending()) return false;
     if (window._nsTableSaveCancelled) {
         window._nsTableSaveCancelled = false;
         _setNsDirty(window._nsTableDirty);
