@@ -1,0 +1,376 @@
+"""Explicit private-image codec for the ascending Namespace layout.
+
+This is deliberately separate from boot_image.py and namespace_image_refresh.py.
+The caller must select FORMAT explicitly and provide already-migrated target
+rows. It never rewrites the saved Namespace, approves artifacts, or activates an
+image.
+"""
+from __future__ import annotations
+
+import hashlib
+import os
+from pathlib import Path
+import struct
+
+from shared.namespace_header import pack_namespace_word0, unpack_namespace_word0
+from server import boot_image as boot
+
+
+FORMAT = "ascending-nst-metadata-slot0-v1"
+ENTRY_WORDS = 4
+MIN_WORDS = 1 << 13
+MAX_WORDS = 1 << 22
+THREAD_SLOT = 2
+SELF_SLOT = 1
+
+
+def _integer(value, label):
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ValueError(f"{label} must be an explicit integer")
+    result = int(value, 0) if isinstance(value, str) else value
+    if result < 0:
+        raise ValueError(f"{label} must be nonnegative")
+    return result
+
+
+def _sha(raw):
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _load_lump(row, lumps_dir, artifacts):
+    filename = row.get("filename")
+    expected = row.get("binary_hash") or row.get("binaryHash")
+    if not isinstance(filename, str) or not filename or Path(filename).name != filename:
+        raise ValueError(f"NS[{row['slot']}] requires an exact local LUMP filename")
+    if not isinstance(expected, str) or len(expected) != 64:
+        raise ValueError(f"NS[{row['slot']}] requires an exact SHA-256 binding")
+    if artifacts is not None:
+        try:
+            raw = artifacts[filename]
+        except KeyError as exc:
+            raise ValueError(f"NS[{row['slot']}] selected LUMP is not in the frozen inputs") from exc
+    else:
+        path = Path(lumps_dir) / filename
+        if path.is_symlink() or not path.resolve().is_relative_to(Path(lumps_dir).resolve()):
+            raise ValueError(f"NS[{row['slot']}] selected LUMP must remain in the saved library")
+        raw = path.read_bytes()
+    if _sha(raw) != expected.lower():
+        raise ValueError(f"NS[{row['slot']}] exact LUMP hash mismatch")
+    if len(raw) < 4 or len(raw) % 4:
+        raise ValueError(f"NS[{row['slot']}] LUMP is not word-aligned")
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    header = words[0]
+    size = 1 << (((header >> 23) & 15) + 6)
+    cw, cc, typ = (header >> 10) & 8191, header & 255, (header >> 8) & 3
+    if (header >> 27 != 31 or size != len(words) or 1 + cw + cc > size):
+        raise ValueError(f"NS[{row['slot']}] selected LUMP has invalid header/allocation")
+    return words, typ, cw, cc
+
+
+def _write_entry(memory, slot, location, limit, sequence, cache_token=0):
+    authority = boot.pack_ns_word1(limit, gt_seq=sequence, g=0, f=0)
+    offset = slot * ENTRY_WORDS
+    memory[offset:offset + ENTRY_WORDS] = [
+        location, authority, boot.integrity32(location, authority), cache_token
+    ]
+
+
+def _decode_gt(word):
+    return {
+        "slot": word & 0xFFFF,
+        "sequence": (word >> 16) & 0x1FF,
+        "type": (word >> 25) & 0x3,
+        "domain": (word >> 27) & 1,
+        "permissions": (word >> 28) & 0x7,
+    }
+
+
+def validate_image(image, *, image_format):
+    """Validate the explicit ascending-v1 byte stream, never a historical image."""
+    if image_format != FORMAT:
+        raise ValueError(f"Explicit format selection must be {FORMAT!r}")
+    if not isinstance(image, (bytes, bytearray, memoryview)) or len(image) % 4:
+        raise ValueError("Ascending Namespace image must be a whole-word byte stream")
+    if len(image) < MIN_WORDS * 4:
+        raise ValueError("Ascending Namespace image is smaller than 8K words")
+    words = list(struct.unpack(f"<{len(image) // 4}I", image))
+    if words[1] != 0:
+        if words[1] == 0x4E534832:
+            raise ValueError("Historical Namespace Header V2 is not an ascending-v1 image")
+        raise ValueError("Ascending-v1 metadata base must be word zero")
+    header = unpack_namespace_word0(words[0])
+    total, slots = header["total_words"], header["slots"]
+    if total != len(words):
+        raise ValueError("Image byte length does not match the Namespace metadata capacity")
+    if not 3 <= slots <= 0x1FFF or slots * ENTRY_WORDS > total:
+        raise ValueError("Ascending Namespace slot count is outside supported geometry")
+    table_words = slots * ENTRY_WORDS
+    member_count = words[2]
+    if words[3] != 0:
+        raise ValueError("Ascending Namespace reserved metadata word must be zero")
+    if member_count > slots - 2:
+        raise ValueError("Ascending Namespace member count exceeds non-self slot capacity")
+    if (words[2] != sum(
+            1 for slot in range(2, slots)
+            if any(words[slot * ENTRY_WORDS:(slot + 1) * ENTRY_WORDS]))):
+        raise ValueError("Ascending Namespace member count disagrees with live descriptors")
+
+    live = {}
+    body_ranges = [(0, table_words, "Namespace metadata and ascending table")]
+    for slot in range(1, slots):
+        offset = slot * ENTRY_WORDS
+        location, authority, seal, _cache = words[offset:offset + ENTRY_WORDS]
+        if not (location or authority or seal or _cache):
+            continue
+        sequence = boot._ns_word1_get(authority, "gt_seq")
+        limit = boot._ns_word1_get(authority, "limit_offset")
+        if boot._ns_word1_get(authority, "f_flag"):
+            raise ValueError(f"NS[{slot}] is marked free but contains a descriptor")
+        if seal != boot.integrity32(location, authority):
+            raise ValueError(f"NS[{slot}] integrity seal does not match its authority")
+        if slot == SELF_SLOT:
+            if (location, limit, sequence) != (0, table_words - 1, 0):
+                raise ValueError("NS[1] must be the version-0 Namespace self descriptor")
+            if _cache != 0:
+                raise ValueError("NS[1] metadata self descriptor must not carry a cache token")
+        else:
+            if location < table_words and location < total:
+                raise ValueError(f"NS[{slot}] body overlaps the ascending table")
+            if limit >= total and location < total:
+                raise ValueError(f"NS[{slot}] limit extends beyond Namespace RAM")
+        live[slot] = {
+            "location": location, "limit": limit, "sequence": sequence,
+        }
+
+    if SELF_SLOT not in live or THREAD_SLOT not in live:
+        raise ValueError("Ascending Namespace requires self at slot 1 and entry Thread at slot 2")
+    thread = live[THREAD_SLOT]
+    if thread["sequence"] != 0 or thread["location"] >= total:
+        raise ValueError("Entry Thread must be a resident version-0 body")
+    if thread["location"] < table_words:
+        raise ValueError("Entry Thread body overlaps the ascending table")
+    thread_header = words[thread["location"]]
+    thread_size = 1 << (((thread_header >> 23) & 15) + 6)
+    thread_cw = (thread_header >> 10) & 8191
+    if (thread_header >> 27 != 31 or ((thread_header >> 8) & 3) != 2
+            or thread_size + thread["location"] > total
+            or thread["limit"] < thread_size - 1):
+        raise ValueError("NS[2] does not describe a complete in-range Thread LUMP")
+    layout = boot.thread_layout(thread_size, thread_cw)
+    if not layout["valid"]:
+        raise ValueError("NS[2] Thread body has invalid stack/capability geometry")
+    body_ranges.append((thread["location"], thread["location"] + thread_size, "Entry Thread"))
+
+    entry_gt = words[thread["location"] + layout["caps_start"]]
+    decoded = _decode_gt(entry_gt)
+    if (entry_gt >> 31 or decoded["type"] != 1 or decoded["domain"] != 1
+            or decoded["permissions"] != 0b100):
+        raise ValueError("Entry Thread CR0 must contain an executable Inform GT")
+    target = live.get(decoded["slot"])
+    if (decoded["slot"] < 3 or target is None
+            or decoded["sequence"] != target["sequence"]
+            or target["location"] >= total):
+        raise ValueError("Entry Thread CR0 does not bind to a live destination Namespace slot")
+    target_header = words[target["location"]]
+    if (target["location"] < table_words
+            or target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0):
+        raise ValueError("Entry Thread CR0 target is not an ordinary in-range code LUMP")
+
+    for slot, entry in live.items():
+        if slot in (SELF_SLOT, THREAD_SLOT):
+            continue
+        location, limit = entry["location"], entry["limit"]
+        if location >= total:
+            continue  # Explicit external/device address; no RAM body is claimed.
+        lump_header = words[location]
+        size = 1 << (((lump_header >> 23) & 15) + 6)
+        cw, cc, typ = (lump_header >> 10) & 8191, lump_header & 255, (lump_header >> 8) & 3
+        if (lump_header >> 27 != 31 or typ != 0 or location + size > total
+                or 1 + cw + cc > size or limit < cw):
+            raise ValueError(f"NS[{slot}] is not a bounded ordinary executable LUMP")
+        body_ranges.append((location, location + size, f"NS[{slot}] LUMP"))
+        expected_self = boot.create_gt(entry["sequence"], slot, {"E": 1}, 1)
+        if cc < 1 or words[location + size - cc] != expected_self:
+            raise ValueError(f"NS[{slot}] LUMP C-list row zero is not its exact destination SELF GT")
+        for index, gt in enumerate(words[location + size - cc:location + size]):
+            fields = _decode_gt(gt)
+            if fields["type"] != 1:
+                continue
+            destination = live.get(fields["slot"])
+            if (gt >> 31 or fields["slot"] == 0 or destination is None
+                    or destination["sequence"] != fields["sequence"]):
+                raise ValueError(
+                    f"NS[{slot}] C-list row {index} carries an absent or stale local Inform GT")
+
+    body_ranges.sort()
+    cursor = 0
+    owned = []
+    for start, end, label in body_ranges:
+        if start < cursor:
+            raise ValueError(f"{label} overlaps another allocated region")
+        if any(words[cursor:start]):
+            raise ValueError(f"Unowned nonzero image word at 0x{cursor:X}")
+        cursor = end
+        owned.append({"startWord": start, "endWord": end, "owner": label})
+    if any(words[cursor:]):
+        raise ValueError(f"Unowned nonzero image word at 0x{cursor:X}")
+
+    return {
+        "format": FORMAT,
+        "baseWord": 0,
+        "capacityWords": total,
+        "slotCount": slots,
+        "tableWords": table_words,
+        "memberCount": member_count,
+        "entryThread": {"slot": THREAD_SLOT, "sequence": 0, "gt": "02000002"},
+        "cr15": {"word0": "02000001", "word1": 0,
+                 "word2": table_words - 1, "word3": 0, "m": 1},
+        "bootTarget": {"slot": decoded["slot"], "sequence": decoded["sequence"]},
+        "liveSlots": sorted(live),
+        "ownedRanges": owned,
+        "hardwareCertified": False,
+        "activationAllowed": False,
+    }
+
+
+def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
+    """Generate and structurally validate a private image from explicit target rows.
+
+    Rows must already use the new slot identities and exact selected artifacts.
+    This routine does not migrate old rows or rewrite C-lists; stale bindings
+    fail closed and must be recompiled/reapproved before a candidate can run.
+    """
+    if image_format != FORMAT or not isinstance(state, dict) or state.get("namespaceFormat") != FORMAT:
+        raise ValueError(f"Input state and explicit selection must both be {FORMAT!r}")
+    if not isinstance(config, dict) or not isinstance(config.get("step1"), dict):
+        raise ValueError("New-format image generation requires explicit Step 1 geometry")
+    step = config["step1"]
+    total = _integer(step.get("totalNamespaceWords"), "totalNamespaceWords")
+    slots = _integer(step.get("nsSlotsMax"), "nsSlotsMax")
+    if (not MIN_WORDS <= total <= MAX_WORDS or total & (total - 1)
+            or not 3 <= slots <= 0x1FFF or slots * ENTRY_WORDS > total):
+        raise ValueError("Unsupported ascending Namespace capacity or slot count")
+    rows = state.get("abstractions")
+    if not isinstance(rows, list):
+        raise ValueError("New-format Namespace abstractions must be a list")
+    by_slot = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("New-format Namespace row must be an object")
+        slot = _integer(row.get("slot"), "Namespace slot")
+        if slot == 0 or slot >= slots or slot in by_slot:
+            raise ValueError("Slot 0 is metadata; other slots must be unique and in range")
+        if row.get("archived") is True or row.get("symbolic") is True or row.get("implementationMissing") is True:
+            raise ValueError(f"NS[{slot}] is not a live executable assignment")
+        by_slot[slot] = dict(row)
+    self_row, thread_row = by_slot.get(SELF_SLOT), by_slot.get(THREAD_SLOT)
+    if not self_row or self_row.get("name") != "Boot.NS":
+        raise ValueError("New-format target rows must assign Boot.NS self to slot 1")
+    if (self_row.get("type") != "Inform" or self_row.get("filename")
+            or _integer(self_row.get("location", 0), "NS[1] location") != 0
+            or _integer(self_row.get("seq"), "NS[1] sequence") != 0):
+        raise ValueError("NS[1] must be a version-0 Inform self descriptor at the Namespace base")
+    if not thread_row or thread_row.get("name") != "Boot.Thread" or thread_row.get("type") != "Thread":
+        raise ValueError("New-format target rows must assign the entry Thread to slot 2")
+    if (_integer(thread_row.get("seq"), "NS[2] sequence") != 0
+            or thread_row.get("filename")):
+        raise ValueError("NS[2] entry Thread must be rebuilt as a fresh version-0 image")
+    boot_rows = [row for slot, row in by_slot.items()
+                 if slot >= 3 and row.get("boot") is True and row.get("backing") != "mmio"]
+    if len(boot_rows) != 1:
+        raise ValueError("Exactly one live executable row at slot 3 or above must be boot-selected")
+
+    loaded = {}
+    for slot, row in sorted(by_slot.items()):
+        if slot in (SELF_SLOT, THREAD_SLOT) or row.get("backing") == "mmio":
+            continue
+        if row.get("type") not in ("Inform", "Resident"):
+            raise ValueError(f"NS[{slot}] requires an executable Inform/Resident LUMP")
+        body, typ, cw, cc = _load_lump(row, lumps_dir, artifacts)
+        if typ != 0 or cw < 1:
+            raise ValueError(f"NS[{slot}] selected artifact is not an ordinary executable LUMP")
+        sequence = _integer(row.get("seq"), f"NS[{slot}] sequence")
+        if sequence > 511:
+            raise ValueError(f"NS[{slot}] sequence is outside the 9-bit range")
+        expected_self = boot.create_gt(sequence, slot, {"E": 1}, 1)
+        if cc < 1 or body[-cc] != expected_self:
+            raise ValueError(
+                f"NS[{slot}] exact artifact must already contain its destination SELF GT; "
+                "recompile/reapprove rather than patching saved bytes")
+        loaded[slot] = body
+
+    memory = [0] * total
+    table_words = slots * ENTRY_WORDS
+    member_count = len(rows) - 1
+    memory[:4] = [pack_namespace_word0(total, slots), 0, member_count, 0]
+    _write_entry(memory, SELF_SLOT, 0, table_words - 1, 0)
+    body_cursor = table_words
+    live_rows = {SELF_SLOT}
+
+    boot_row = boot_rows[0]
+    boot_slot = _integer(boot_row["slot"], "boot target slot")
+    boot_sequence = _integer(boot_row.get("seq"), "boot target sequence")
+    if boot_sequence > 511:
+        raise ValueError("Boot target sequence is outside the 9-bit range")
+    entry_gt = boot.create_gt(boot_sequence, boot_slot, {"E": 1}, 1)
+    thread_size = _integer(thread_row.get("allocationWords", step.get("threadLumpWords")),
+                           "entry Thread allocationWords")
+    stack_words = _integer(thread_row.get("stackWords", step.get("threadStackWords", 32)),
+                           "entry Thread stackWords")
+    layout = boot.thread_layout(thread_size, stack_words)
+    if not layout["valid"]:
+        raise ValueError("Entry Thread allocation/stack geometry is invalid")
+    thread_body = [0] * thread_size
+    thread_body[0] = boot.pack_lump_header(
+        thread_size.bit_length() - 7, stack_words, boot.THREAD_CAP_WORDS, 2)
+    sto = layout["stack_end"] - 2
+    thread_body[boot.THREAD_STO_OFFSET] = (1 << 12) | sto
+    thread_body[layout["caps_start"]] = entry_gt
+    thread_body[sto + 1] = entry_gt
+    thread_body[sto + 2] = (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
+    thread_location = body_cursor
+    memory[thread_location:thread_location + thread_size] = thread_body
+    body_cursor += thread_size
+    _write_entry(memory, THREAD_SLOT, thread_location, thread_size - 1, 0)
+    live_rows.add(THREAD_SLOT)
+
+    for slot, row in sorted(by_slot.items()):
+        if slot < 3:
+            continue
+        sequence = _integer(row.get("seq"), f"NS[{slot}] sequence")
+        if not 0 <= sequence <= 511:
+            raise ValueError(f"NS[{slot}] sequence is outside the 9-bit range")
+        limit = _integer(row.get("limit"), f"NS[{slot}] limit")
+        if limit > 0x1FFFFF:
+            raise ValueError(f"NS[{slot}] limit exceeds the architecture field")
+        if row.get("backing") == "mmio":
+            location = _integer(row.get("location"), f"NS[{slot}] MMIO address")
+            if location < total:
+                raise ValueError(f"NS[{slot}] MMIO address must be outside Namespace RAM")
+        else:
+            body = loaded[slot]
+            size = len(body)
+            location = body_cursor
+            memory[location:location + size] = body
+            body_cursor += size
+            if limit < ((body[0] >> 10) & 8191):
+                raise ValueError(f"NS[{slot}] limit does not cover its executable code words")
+        if body_cursor > total:
+            raise ValueError("Ascending Namespace bodies exceed configured capacity")
+        _write_entry(memory, slot, location, limit, sequence)
+        live_rows.add(slot)
+
+    if member_count != len(live_rows) - 1:
+        raise ValueError("New-format member count must exclude only Namespace self slot 1")
+    image = struct.pack(f"<{total}I", *memory)
+    validation = validate_image(image, image_format=image_format)
+    if validation["bootTarget"] != {"slot": boot_slot, "sequence": boot_sequence}:
+        raise ValueError("Generated Thread CR0 differs from the explicit boot selection")
+    return image, {
+        **validation,
+        "purpose": "private-new-format-candidate",
+        "imageSha256": _sha(image),
+        "hardwareCertified": False,
+        "approvalEligible": False,
+        "activationAllowed": False,
+    }

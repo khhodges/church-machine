@@ -146,6 +146,38 @@ class ChurchSimulator {
         if (!Core) throw new Error('Namespace runtime scripts are not loaded');
         return new Core(memory, cr15);
     }
+    // Explicit new-format byte-stream entrypoint. Historical boot-image loading
+    // remains unchanged and is never routed through this factory implicitly.
+    static fromAscendingNamespaceImage(image, cr15) {
+        let memory;
+        if (image instanceof Uint32Array) {
+            memory = new Uint32Array(image);
+        } else {
+            let bytes;
+            if (image instanceof ArrayBuffer) {
+                bytes = new Uint8Array(image);
+            } else if (ArrayBuffer.isView(image)) {
+                bytes = new Uint8Array(image.buffer, image.byteOffset, image.byteLength);
+            } else {
+                throw new TypeError('Ascending Namespace image must be bytes or Uint32Array words');
+            }
+            if (bytes.byteLength % 4 !== 0) {
+                throw new RangeError('Ascending Namespace image must contain whole words');
+            }
+            const viewBytes = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+            memory = new Uint32Array(bytes.byteLength / 4);
+            for (let i = 0; i < memory.length; i++) {
+                memory[i] = viewBytes.getUint32(i * 4, true);
+            }
+        }
+        const view = typeof ChurchNamespaceRuntimeView !== 'undefined'
+            ? ChurchNamespaceRuntimeView
+            : (typeof module !== 'undefined' && module.exports
+                ? require('./namespace-runtime-view') : null);
+        if (!view) throw new Error('Namespace runtime view scripts are not loaded');
+        view.geometry(memory, cr15);
+        return ChurchSimulator.fromNamespaceImage(memory, cr15);
+    }
 
     #builtinNamespaceWriteDepth = 0;
     #namespaceSaveWriteDepth = 0;

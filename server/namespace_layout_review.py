@@ -131,11 +131,11 @@ def plan(state, config, artifacts):
         "selectedArtifacts": selected, "affectedBindings": bindings,
         "residentWordsEnd": cursor,
         "blockers": [
-            "New-format image generation and validation are not implemented.",
-            "The current approval/activation path accepts the historical layout only.",
-            "Resident binding changes require rebuilding or verified localization; source bytes are frozen, not patched.",
-            "Generated Thread images must be prepared for the new layout and checked.",
-            "Combined SWITCH and active-CR15 simulator acceptance remain unproved.",
+            "This review is not an already-migrated target state; the separate ascending-v1 generator requires explicit target rows.",
+            "The existing approval/activation path still accepts the historical layout only.",
+            "Changed resident bindings require recompilation or verified localization; saved source bytes are never patched.",
+            "Private entry-Thread startup is checked, but combined Namespace SWITCH/context handoff remains unproved.",
+            "No new-format image is approved, installed, or activated by this review.",
         ],
     }
 
@@ -161,8 +161,10 @@ table{{border-collapse:collapse;width:100%}}th,td{{padding:8px;text-align:left;b
 aside{{padding:16px;background:#fff4d8;border-left:4px solid #a36600}}code{{overflow-wrap:anywhere}}</style>
 <h1>Boot Namespace layout candidate</h1>
 <aside><strong>Review only — not approved or executable.</strong>
-No candidate boot binary was produced. Live Namespace, catalogs, selected boot image,
-and saved LUMPs were not changed. This report cannot authorize activation.</aside>
+This legacy-to-new-layout review does not emit a candidate binary. The separate
+ascending-v1 generator requires a completed, explicitly migrated target state.
+Live Namespace, catalogs, selected boot image, and saved LUMPs were not changed.
+This report cannot authorize activation.</aside>
 <p>Review digest: <code>{esc(record['reviewId'])}</code></p>
 <h2>Geometry</h2><p>{p['capacityWords']} words; {p['slotCount']} ascending four-word slots.
 Slot 0 is the physical header; self is slot 1; entry Thread is slot 2, version 0.

@@ -5,15 +5,19 @@ description: Agreed architectural rules for the CM boot namespace — hardwired 
 
 ## Rules (all user-confirmed)
 
-### 1. Only two slots are hardwired by number
-Boot.NS (slot 0) and Boot.Thread (slot 1) are the only slots the hardware boot program
-addresses by index. Every other slot in the system is addressed exclusively by pet name —
-a Golden Token held in a c-list. Never reference a slot by number above slot 1 in code,
-docs, or conversation.
+### 1. Slot numbering is profile-specific
+The historical image profile hardwires Boot.NS at slot 0 and Boot.Thread at slot 1.
+The separately selected `ascending-nst-metadata-slot0-v1` profile has a four-word
+metadata block at slot 0, Namespace self at slot 1, and the version-0 entry Thread
+at slot 2. Never infer or silently convert between these profiles. In either profile,
+ordinary programmable assignments are addressed by pet name rather than numeric slot.
 
-**Why:** The ISA boot program is 3 instructions: LOAD CR15[0], CHANGE CR12[1], CALL CR0.
-Slots 0 and 1 are the only positions that are architecturally fixed. All others are
-IDE/program-controlled.
+**Why:** The user approved the ascending layout as a distinct boot-image ABI while
+requiring historical image handling to remain byte-for-byte separate.
+
+**How to apply:** Require explicit format selection at generation and validation.
+The ascending profile starts ordinary resident bodies after its ascending four-word
+table; its private candidate is not approval, installation, or hardware activation.
 
 ### 2. Namespace liveness rule
 A slot must not exist in the namespace until its LUMP exists and its methods are callable.
