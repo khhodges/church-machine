@@ -93,6 +93,7 @@
         host.innerHTML=html;
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
+        saveButton.textContent='Save Namespace Design';
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
         host.querySelector('#nsSaveLayoutNote').textContent=state.error ||
@@ -233,8 +234,19 @@
     async function save() {
         if(state.saving || !state.document) return;
         state.saving=true; render();
-        try { accept(await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)})); }
-        catch(e) { state.error=e.message+' No executable image was changed. Your draft is retained.'; }
+        let nodeChanged=false;
+        try {
+            if (!root.NamespaceIdeNode) throw Error('IDE node setting is unavailable. Reload the page before saving.');
+            nodeChanged=root.NamespaceIdeNode.hasPending();
+            if (!await root.NamespaceIdeNode.savePending()) {
+                state.error='IDE node was not saved. Namespace design save stopped; your edits are retained.';
+                return;
+            }
+            accept(await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)}));
+        }
+        catch(e) { state.error=e.message+
+            (nodeChanged?' Check the IDE node status above: its save is separate and may already have completed. ':' ')+
+            'No executable image was changed. Your Namespace draft is retained.'; }
         finally { state.saving=false; render(); }
     }
     root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity};

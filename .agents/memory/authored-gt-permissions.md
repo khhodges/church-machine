@@ -15,9 +15,12 @@ Design setting after compilation was blocked by a server-only node mismatch.
 **How to apply:** Treat node changes as ordinary validated project configuration,
 retain exact foreign definitions, and disclose any retargeted local aliases.
 
-The user selected `ide` as this project's IDE node, replacing `kjhh1`.
-**Why:** They explicitly reported changing that setting; an unchanged server
-readback is a persistence issue to investigate, not evidence they did not edit it.
+Namespace Design's main Save action must include a pending IDE node edit.
+**Why:** A separately saved node field caused the page Save action to leave it
+unsaved, so reload appeared to revert a successful save. An unchanged readback
+is a persistence/interaction issue to investigate, not proof the user did not edit it.
+**How to apply:** Verify the main page Save path, not only a dedicated field button;
+stop on node-save rejection and disclose partial completion if the later table save fails.
 
 The user explicitly confirmed that `Thread.2`, `Thread.3`, and `Boot.Thread` belong to this IDE through the Thread design page.
 
