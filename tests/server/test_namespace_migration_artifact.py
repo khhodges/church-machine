@@ -53,15 +53,24 @@ def _fixture():
     )
 
 
-def _make_review(tmp_path, *, stale_gt=False, unresolved_gt=False):
+def _make_review(tmp_path, *, stale_gt=False, unresolved_gt=False,
+                 outform_binding=None):
     state, config, artifacts = _fixture()
-    if stale_gt or unresolved_gt:
+    if stale_gt or unresolved_gt or outform_binding is not None:
         raw = bytearray(artifacts["WukongCallHome.lump"])
         if stale_gt:
             # A source GT with a sequence that does not match source NS[2].
             value = create_gt(1, 2, {"R": 1, "W": 1}, 1)
+        elif outform_binding == "stale-sequence":
+            value = create_gt(1, 2, {"R": 1, "W": 1}, 2)
+        elif outform_binding == "unmapped-slot":
+            value = create_gt(0, 99, {"R": 1, "W": 1}, 2)
+        elif outform_binding == "moved":
+            value = create_gt(0, 2, {"R": 1, "W": 1}, 2)
         else:
-            value = 0xFEED0000
+            value = 0xFEED0000 if unresolved_gt else None
+            if value is None:
+                raise ValueError(f"Unknown Outform fixture {outform_binding!r}")
         struct.pack_into(">I", raw, 63 * 4, value)
         artifacts["WukongCallHome.lump"] = bytes(raw)
         next(row for row in state["abstractions"]
@@ -136,6 +145,24 @@ def test_migration_package_localizes_private_residents_and_preserves_saved_desig
     assert moved[1]["destinationSlot"] == 4
     assert moved[2]["destinationSlot"] == 2
     assert moved[2]["destinationGT"] == "4a000002"
+
+def test_migration_localizes_moved_outform_to_exact_destination_generation(tmp_path):
+    root, review_dir, _review, _before = _make_review(
+        tmp_path, outform_binding="moved")
+
+    record = prepare_migration(
+        review_dir, root / "migration", staging_root=root)
+
+    wukong = next(r for r in record["localizedResidents"]
+                  if r["name"] == "WukongCallHome")
+    binding = wukong["clist"][1]
+    assert binding["type"] == 2
+    assert binding["sourceSlot"] == 2
+    assert binding["sourceSequence"] == 0
+    assert binding["destinationSlot"] == 4
+    assert binding["destinationSequence"] == 7
+    assert binding["destinationGT"] == "34070004"
+    assert wukong["destinationCListVerified"] is True
 
 
 def test_migration_builds_and_validates_complete_private_ascending_image(tmp_path):
@@ -244,3 +271,27 @@ def test_migration_rejects_tampered_review_and_existing_output(tmp_path):
     output.mkdir(parents=True)
     with pytest.raises(ValueError, match="existing"):
         prepare_migration(review_dir, output, staging_root=root)
+
+@pytest.mark.parametrize(
+    ("outform_binding", "message"),
+    [
+        ("stale-sequence", "stale source sequence"),
+        ("unmapped-slot", "unmapped Namespace slot 99"),
+    ],
+)
+def test_migration_rejects_invalid_outform_without_changing_saved_lump(
+        tmp_path, outform_binding, message):
+    root, review_dir, _review, before = _make_review(
+        tmp_path, outform_binding=outform_binding)
+    output = root / "migration"
+
+    with pytest.raises(ValueError, match=message):
+        prepare_migration(review_dir, output, staging_root=root)
+
+    saved_lump = tmp_path / "live" / "WukongCallHome.lump"
+    assert saved_lump.read_bytes() == before[str(saved_lump)]
+    assert not output.exists()
+    assert before == {
+        str(path): path.read_bytes()
+        for path in (tmp_path / "boot-config.json", *(tmp_path / "live").iterdir())
+    }
