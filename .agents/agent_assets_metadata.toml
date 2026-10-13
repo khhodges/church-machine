@@ -976,3 +976,17 @@ mtime_ms = 1791905472372
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/beac702e-8818-4369-a914-be934b5d55d8/cad5e626-0d72-4061-bbb7-f801237aeab8"
 storage_version_token = "1791905477340098"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "adwOWk-aghoJpLFzk4Dxl"
+uri = "file://generated-artifacts/redisa-api-map-review/memory-map.html"
+type = "html"
+title = "RedISA API-only memory map — review proposal"
+description = "Measured API-only allocations, proposed word/byte addresses, exact input hashes, and the SelfTest identity discrepancy. No build or installation performed."
+logical_id = "e4eb8dd2-1d87-4788-a2e9-570b8da2add1"
+content_hash = "sha256:5626b7e09626aac261f172191e08f52f327343834403e7103b129c978bfd3c34"
+size = 5163
+mtime_ms = 1791920066272
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e4eb8dd2-1d87-4788-a2e9-570b8da2add1/2b1ce974-701e-4e0b-85e6-c083c7789cc2"
+storage_version_token = "1791920073343944"
+content_type = "text/html"
