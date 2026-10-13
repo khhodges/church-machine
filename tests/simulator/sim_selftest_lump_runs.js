@@ -20,11 +20,15 @@ try {
     // detect a torn snapshot; neither copying nor execution repairs any input.
     for (const name of ['manifest.json', 'ns-state.json', 'approvals.json'])
         fs.copyFileSync(path.join(input, name), path.join(isolated, name));
-    const manifest = JSON.parse(fs.readFileSync(path.join(isolated, 'manifest.json')));
-    const rows = manifest.filter(e => e.abstraction === 'SelfTest' && !e.archived);
-    if (rows.length !== 1 || path.basename(rows[0].filename) !== rows[0].filename)
-        throw new Error('missing or ambiguous selected SelfTest');
-    fs.copyFileSync(path.join(input, rows[0].filename), path.join(isolated, rows[0].filename));
+    const state = JSON.parse(fs.readFileSync(path.join(isolated, 'ns-state.json')));
+    const bindings = (state.abstractions || []).filter(e =>
+        e.name === 'SelfTest' && !e.archived && e.symbolic !== true);
+    if (bindings.length !== 1 || typeof bindings[0].filename !== 'string' ||
+        path.basename(bindings[0].filename) !== bindings[0].filename)
+        throw new Error('missing or ambiguous live Namespace SelfTest binding');
+    fs.copyFileSync(
+        path.join(input, bindings[0].filename),
+        path.join(isolated, bindings[0].filename));
     const selected = inspectSelectedSelfTest(isolated);
     report.selectedFilename = selected.entry.filename;
     report.selectedHash = selected.hash;

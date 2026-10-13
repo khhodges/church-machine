@@ -10,11 +10,18 @@ const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 
 function inspectSelectedSelfTest(dir) {
     const read = name => JSON.parse(fs.readFileSync(path.join(dir, name), 'utf8'));
-    const rows = read('manifest.json').filter(e => e.abstraction === 'SelfTest' && !e.archived);
-    const bindings = (read('ns-state.json').abstractions || []).filter(e => e.name === 'SelfTest');
-    if (rows.length !== 1 || bindings.length !== 1)
-        throw new Error('SelfTest requires exactly one selected manifest and Namespace binding');
-    const entry = rows[0], binding = bindings[0];
+    const bindings = (read('ns-state.json').abstractions || []).filter(e =>
+        e.name === 'SelfTest' && !e.archived && e.symbolic !== true);
+    if (bindings.length !== 1)
+        throw new Error('SelfTest requires exactly one live Namespace binding');
+    const binding = bindings[0];
+    const rows = read('manifest.json').filter(e =>
+        e.abstraction === 'SelfTest' && !e.archived &&
+        e.filename === binding.filename && e.token === binding.token &&
+        e.lump_version === binding.lump_version);
+    if (rows.length !== 1)
+        throw new Error('Namespace-selected SelfTest requires exactly one matching manifest locator');
+    const entry = rows[0];
     if (typeof entry.filename !== 'string' || path.basename(entry.filename) !== entry.filename)
         throw new Error('invalid selected SelfTest filename');
     const bytes = fs.readFileSync(path.join(dir, entry.filename));

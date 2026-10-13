@@ -53,6 +53,25 @@ def test_selftest_lump_dr1_is_zero_and_dr0_is_hardwired_zero(selected_run):
     assert report["dr1"] == 0 and report["dr0"] == 0, report
 
 
+def test_runner_uses_namespace_selected_revision_with_other_live_manifest_rows(
+        built_fixture, tmp_path):
+    directory = tmp_path / "multiple-revisions"
+    shutil.copytree(built_fixture, directory)
+    manifest_path = directory / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest.append({
+        "abstraction": "SelfTest",
+        "filename": "SelfTest.999.deadbeef.lump",
+        "token": "4a000029",
+        "lump_version": 999,
+    })
+    manifest_path.write_text(json.dumps(manifest))
+
+    report, code, stderr = run_selected(directory)
+    assert code == 0, stderr
+    assert report["pass"] and report["terminatedBy"] == "RETURN", report
+
+
 @pytest.fixture(scope="module")
 def built_fixture(tmp_path_factory):
     """Synthetic offline approval, never admission of modified live bytes."""

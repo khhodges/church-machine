@@ -206,13 +206,14 @@ if (CANDIDATE_DIR) {
 }
 if (CHECK_ONLY) {
     const failures = [];
+    let selectedArtifact = null;
     try {
-        require('./selftest_selected_artifact').inspectSelectedSelfTest(LUMPS_DIR);
+        selectedArtifact =
+            require('./selftest_selected_artifact').inspectSelectedSelfTest(LUMPS_DIR);
     } catch (error) {
         failures.push(`selected identity/structure: ${error.message}`);
     }
-    const activeRows = manifest.filter(e => e.abstraction === DOT_NAME && !e.archived);
-    const activeRow = activeRows.length === 1 ? activeRows[0] : null;
+    const activeRow = selectedArtifact?.entry || null;
     const activeIssue = activeRow?.issue_n || activeRow?.lump_version;
     const activeIdentityString = Number.isInteger(activeIssue) && activeIssue > 0
         ? `${DOT_NAME}#${activeIssue}` : null;
