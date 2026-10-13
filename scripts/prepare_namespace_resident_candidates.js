@@ -9,6 +9,8 @@ const cp = require('node:child_process');
 const frame = require('../simulator/lump-content-frame');
 const ROOT = path.resolve(__dirname, '..');
 const ALLOWED = ['WukongCallHome', 'CapabilityTest'];
+const CAPABILITY_TEST_THREADS = ['Thread.2', 'Thread.3', 'Boot.Thread'];
+const CAPABILITY_TEST_CALL_APIS = ['SelfTest', 'WukongCallHome'];
 const sha = data => crypto.createHash('sha256').update(data).digest('hex');
 const escape = value => String(value).replace(/[&<>"']/g, c =>
     ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
@@ -56,6 +58,78 @@ function checkOutput(result, source, name) {
         throw Error(`${name}: expected unresolved compiler C-List including symbolic SELF`);
     }
     return raw;
+}
+
+function capabilityTestPreflight(source, hierarchy, review, frozen) {
+    const blockers = [];
+    const policy = require('../simulator/capability_tokens.js');
+    const validHierarchy = policy.validateHierarchyConfiguration(hierarchy);
+    if (!validHierarchy.ok) {
+        blockers.push(`Thread permissions are not trusted: ${validHierarchy.error}`);
+    } else {
+        for (const name of CAPABILITY_TEST_THREADS) {
+            const canonical = hierarchy.aliases &&
+                Object.prototype.hasOwnProperty.call(hierarchy.aliases, name)
+                ? hierarchy.aliases[name] : null;
+            if (!canonical) {
+                blockers.push(`Thread permission is not trusted: add the exact ${name} alias to server/ide-hierarchy.json.`);
+                continue;
+            }
+            const decision = policy.checkLeafOwnership(
+                {name, rights: [], canonical_leaf: canonical}, hierarchy);
+            if (decision.error || decision.ownership !== 'local') {
+                blockers.push(`Thread permission is not trusted for ${name}: ${
+                    decision.error || `configured target ${canonical} is not owned by this IDE`}`);
+            }
+        }
+    }
+
+    const authorities = {};
+    const selectedArtifacts = review && review.proposal &&
+        Array.isArray(review.proposal.selectedArtifacts)
+        ? review.proposal.selectedArtifacts : [];
+    for (const name of CAPABILITY_TEST_CALL_APIS) {
+        const matches = selectedArtifacts.filter(item => item && item.name === name);
+        if (matches.length !== 1) {
+            blockers.push(`CALL API is not trusted for ${name}: the frozen review must select exactly one matching artifact.`);
+            continue;
+        }
+        const selected = matches[0];
+        const raw = frozen && frozen[`lumps/${selected.filename}`];
+        if (!raw || sha(raw) !== selected.sha256) {
+            blockers.push(`CALL API is not trusted for ${name}: exact frozen selected binary is unavailable or mismatched.`);
+            continue;
+        }
+        const words = Array.from({length: raw.length / 4},
+            (_, i) => raw.readUInt32BE(i * 4));
+        const api = frame.lumpDecodeContentFrameApi(words);
+        if (!api || !Array.isArray(api.methods)) {
+            blockers.push(`CALL API is not trusted for ${name}: selected binary has no valid embedded method API.`);
+            continue;
+        }
+        const token = String(selected.token || selected.T || '');
+        const revision = sha(raw);
+        authorities[name] = {
+            source: 'embedded-binary',
+            embedded: true,
+            token,
+            selectedToken: token,
+            revision,
+            selectedRevision: revision,
+            api,
+        };
+    }
+
+    if (Object.keys(authorities).length === CAPABILITY_TEST_CALL_APIS.length) {
+        const Compiler = require('../simulator/cloomc_compiler.js');
+        const diagnostics = new Compiler()._callApiDiagnostics(source, {
+            callApiAuthorities: authorities,
+        });
+        for (const diagnostic of [...diagnostics.warnings, ...diagnostics.errors]) {
+            blockers.push(`CALL API is not trusted: ${diagnostic.message}`);
+        }
+    }
+    return {blockers, callApiAuthorities: authorities};
 }
 
 function html(record) {
@@ -134,6 +208,16 @@ async function prepare(reviewDirectory, outputDirectory, authorized) {
         const input = {source: decoded.source, language: 'english', tier: 2,
             namespace_hint: {allocation_words: words.length},
             _ide_hierarchy: JSON.parse(compiler['server/ide-hierarchy.json'])};
+        if (name === 'CapabilityTest') {
+            const preflight = capabilityTestPreflight(
+                decoded.source, input._ide_hierarchy, review, frozen);
+            if (preflight.blockers.length) {
+                const error = `Blocked before compilation:\n${preflight.blockers.join('\n')}`;
+                failures.push({name, input, result: {ok: false, error}, error});
+                continue;
+            }
+            input._resolved_call_api_authorities = preflight.callApiAuthorities;
+        }
         const result = JSON.parse(cp.execFileSync(process.execPath,
             [path.join(ROOT, 'server/compile_worker.js')], {
                 input: JSON.stringify(input), timeout: 15000, maxBuffer: 8 * 1024 * 1024,
@@ -206,4 +290,6 @@ if (require.main === module) {
         if (record.failures.length) process.exitCode = 2;
     }).catch(error => { console.error(error.message); process.exitCode = 1; });
 }
-module.exports = {prepare, readFrozen, checkOutput, html};
+module.exports = {
+    prepare, readFrozen, checkOutput, html, capabilityTestPreflight,
+};
