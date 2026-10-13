@@ -2,15 +2,19 @@
 
 This is deliberately separate from boot_image.py and namespace_image_refresh.py.
 The caller must select FORMAT explicitly and provide already-migrated target
-rows. It never rewrites the saved Namespace, approves artifacts, or activates an
-image.
+rows. It never rewrites the saved Namespace, approves LUMP artifacts, or
+activates an image. Candidate review records are handled by a distinct,
+profile-specific store.
 """
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from pathlib import Path
 import struct
+import tempfile
+from datetime import datetime, timezone
 
 from shared.namespace_header import pack_namespace_word0, unpack_namespace_word0
 from server import boot_image as boot
@@ -35,6 +39,177 @@ def _integer(value, label):
 
 def _sha(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+class AscendingCandidateStore:
+    """Profile-specific review and approval records for private image candidates.
+
+    This store never modifies candidates or writes into the historical LUMP
+    approval registry. A profile approval records review of exact bytes only;
+    it does not authorize installation, activation, or hardware programming.
+    """
+
+    def __init__(self, candidate_root):
+        self.candidate_root = Path(candidate_root)
+        self.approval_root = self.candidate_root / "ascending-v1-approvals"
+
+    def _candidate_id(self, candidate_id):
+        if (not isinstance(candidate_id, str) or not candidate_id
+                or len(candidate_id) > 128
+                or candidate_id in (".", "..")
+                or any(char not in "abcdefghijklmnopqrstuvwxyz"
+                       "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in candidate_id)):
+            raise ValueError("Candidate must be a single generated-artifacts directory name")
+        if candidate_id == self.approval_root.name:
+            raise ValueError("Reserved profile-approval directory is not a candidate")
+        return candidate_id
+
+    def candidate_paths(self, candidate_id):
+        name = self._candidate_id(candidate_id)
+        root = self.candidate_root.resolve()
+        if self.candidate_root.is_symlink():
+            raise ValueError("Candidate staging root must not be a symlink")
+        folder = self.candidate_root / name
+        if folder.is_symlink() or not folder.resolve().is_relative_to(root):
+            raise ValueError("Candidate must remain in generated-artifacts")
+        return folder, folder / "candidate.bin", folder / "candidate.json"
+
+    def approval_path(self, digest):
+        if not isinstance(digest, str) or len(digest) != 64 or any(
+                char not in "0123456789abcdef" for char in digest):
+            raise ValueError("Invalid ascending-v1 candidate digest")
+        return self.approval_root / f"{digest}.json"
+
+    def protected_paths(self, candidate_id):
+        _folder, image_path, record_path = self.candidate_paths(candidate_id)
+        record = {}
+        if record_path.is_file() and not record_path.is_symlink():
+            try:
+                record = json.loads(record_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                pass
+        digest = record.get("imageSha256")
+        paths = [image_path, record_path]
+        if isinstance(digest, str) and len(digest) == 64:
+            paths.append(self.approval_path(digest))
+        return paths
+
+    def review(self, candidate_id):
+        candidate_id = self._candidate_id(candidate_id)
+        folder, image_path, record_path = self.candidate_paths(candidate_id)
+        if (not folder.is_dir() or image_path.is_symlink() or record_path.is_symlink()
+                or not image_path.is_file() or not record_path.is_file()):
+            raise ValueError("Candidate must contain regular candidate.bin and candidate.json files")
+        image = image_path.read_bytes()
+        try:
+            candidate_bytes = record_path.read_bytes()
+            candidate = json.loads(candidate_bytes)
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("Candidate metadata is not valid JSON") from exc
+        if not isinstance(candidate, dict):
+            raise ValueError("Candidate metadata must be an object")
+        if (candidate.get("format") != FORMAT
+                or candidate.get("purpose") != "private-new-format-candidate"
+                or candidate.get("status") != "private-candidate"):
+            raise ValueError("Candidate is not a private ascending-v1 candidate")
+        if (candidate.get("approvalEligible") is not False
+                or candidate.get("installationAllowed") is not False
+                or candidate.get("activationAllowed") is not False
+                or candidate.get("hardwareProgrammingAllowed") is not False
+                or candidate.get("hardwareCertified") is not False):
+            raise ValueError("Candidate approval and activation flags must remain false")
+        digest = _sha(image)
+        if candidate.get("imageSha256") != digest:
+            raise ValueError("Candidate image hash does not match its metadata")
+        validation = validate_image(image, image_format=FORMAT)
+        for key in ("capacityWords", "slotCount", "tableWords", "memberCount",
+                    "bootTarget", "liveSlots", "ownedRanges"):
+            if candidate.get(key) != validation[key]:
+                raise ValueError(f"Candidate {key} metadata differs from validated image")
+        review = {
+            "format": FORMAT,
+            "candidate": candidate_id,
+            "imageSha256": digest,
+            "candidateMetadataSha256": _sha(candidate_bytes),
+            "capacityWords": validation["capacityWords"],
+            "slotCount": validation["slotCount"],
+            "memberCount": validation["memberCount"],
+            "bootTarget": validation["bootTarget"],
+            "liveSlots": validation["liveSlots"],
+            "status": "profile-review-ready",
+            "historicalApprovalEligible": False,
+            "profileApproved": False,
+            "installationAllowed": False,
+            "activationAllowed": False,
+            "hardwareProgrammingAllowed": False,
+        }
+        review["reviewId"] = _sha(json.dumps(
+            review, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        return review
+
+    def approve(self, candidate_id, review_id):
+        review = self.review(candidate_id)
+        if not isinstance(review_id, str) or review_id != review["reviewId"]:
+            raise ValueError("Review identity is stale or does not match this candidate")
+        approval = {
+            "format": FORMAT,
+            "candidate": review["candidate"],
+            "imageSha256": review["imageSha256"],
+            "candidateMetadataSha256": review["candidateMetadataSha256"],
+            "reviewId": review["reviewId"],
+            "status": "profile-approved",
+            "profileApprovalEligible": True,
+            "profileApproved": True,
+            "approvalScope": "ascending-v1-profile-review-only",
+            "historicalApprovalEligible": False,
+            "installationAllowed": False,
+            "activationAllowed": False,
+            "hardwareProgrammingAllowed": False,
+            "hardwareCertified": False,
+            "approvedAt": datetime.now(timezone.utc).isoformat(),
+        }
+        self.approval_root.mkdir(parents=True, exist_ok=True)
+        if self.approval_root.is_symlink():
+            raise ValueError("Profile approval directory must not be a symlink")
+        target = self.approval_path(review["imageSha256"])
+        if target.is_symlink():
+            raise ValueError("Profile approval record must not be a symlink")
+
+        def existing_approval():
+            existing_record = json.loads(target.read_text(encoding="utf-8"))
+            expected = {key: value for key, value in approval.items()
+                        if key != "approvedAt"}
+            if (not isinstance(existing_record, dict)
+                    or any(existing_record.get(key) != value
+                           for key, value in expected.items())
+                    or not isinstance(existing_record.get("approvedAt"), str)):
+                raise ValueError("A conflicting profile approval already exists")
+            return existing_record
+
+        existing = None
+        if target.exists():
+            return existing_approval()
+
+        fd, temp_name = tempfile.mkstemp(prefix=".approval-", dir=self.approval_root)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as output:
+                json.dump(approval, output, indent=2, sort_keys=True)
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            try:
+                os.link(temp_name, target)
+            except FileExistsError:
+                return existing_approval()
+            directory_fd = os.open(self.approval_root, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        finally:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+        return approval
 
 
 def _load_lump(row, lumps_dir, artifacts):

@@ -5342,6 +5342,39 @@ def _image_refresh_owner():
     return session.setdefault("_image_refresh_owner", secrets.token_urlsafe(32))
 
 
+def _ascending_candidate_store():
+    from server.namespace_ascending_image import AscendingCandidateStore
+    project_root = Path(__file__).resolve().parent.parent
+    return AscendingCandidateStore(project_root / "generated-artifacts")
+
+
+@app.route("/api/namespace/ascending/review", methods=["POST"])
+def namespace_ascending_candidate_review():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) != {"candidate"}:
+        return jsonify(error="Expected candidate directory name only"), 400
+    try:
+        return jsonify(_ascending_candidate_store().review(payload["candidate"]))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return jsonify(error=str(exc), approvalEligible=False,
+                       activationAllowed=False), 409
+
+
+@app.route("/api/namespace/ascending/approve", methods=["POST"])
+def namespace_ascending_candidate_approve():
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) != {"candidate", "reviewId"}:
+        return jsonify(error="Expected candidate and reviewId only",
+                       profileApproved=False), 400
+    try:
+        approval = _ascending_candidate_store().approve(
+            payload["candidate"], payload["reviewId"])
+        return jsonify(approval)
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return jsonify(error=str(exc), profileApproved=False,
+                       activationAllowed=False), 409
+
+
 @app.route("/api/namespace/image-refresh/prepare", methods=["POST"])
 def namespace_image_refresh_prepare():
     try:
@@ -5408,6 +5441,17 @@ def _write_boot_image_bytes(image_bytes, *, provenance_origin="generated",
     already installed the matching decoded state and needs provenance computed
     from those final inputs.
     """
+    # Ascending-v1 has its own candidate review record and must never pass
+    # through the historical Header V2 publication path.
+    try:
+        from server.namespace_ascending_image import FORMAT as _ascending_format
+        from server.namespace_ascending_image import validate_image as _validate_ascending
+        _validate_ascending(image_bytes, image_format=_ascending_format)
+    except ValueError:
+        pass
+    else:
+        raise ValueError(
+            "Ascending-v1 candidate cannot be published as a historical Header V2 boot image")
     # This shared publication path must refuse invalid images before it
     # invalidates raw Namespace state or writes either publication artifact.
     _boot_image_gen.validate_boot_image(image_bytes)
@@ -27778,6 +27822,12 @@ def _change_confirmation_paths():
                      if path.name != _LUMP_LEASE_REGISTRY)
     paths.extend((root / "simulator" / "examples").rglob("*"))
     payload = request.get_json(silent=True)
+    if request.path == "/api/namespace/ascending/approve" and isinstance(payload, dict):
+        try:
+            paths.extend(_ascending_candidate_store().protected_paths(
+                payload.get("candidate")))
+        except (OSError, ValueError, TypeError):
+            pass
     if request.path == "/api/source-file/save" and isinstance(payload, dict):
         candidate = (root / str(payload.get("path", ""))).resolve()
         if candidate.is_relative_to(root):
@@ -27886,6 +27936,21 @@ def _describe_protected_change(payload):
     from pathlib import Path
     if not isinstance(payload, dict):
         return ["Binary or multipart request: review its exact digest above; the existing upload validation still applies."]
+    if request.path == "/api/namespace/ascending/approve":
+        try:
+            review = _ascending_candidate_store().review(payload.get("candidate"))
+            if payload.get("reviewId") != review["reviewId"]:
+                raise ValueError("Candidate review identity changed; review it again")
+            return [
+                "Ascending-v1 profile-specific candidate approval.",
+                f"Candidate: {review['candidate']}; image SHA-256: {review['imageSha256']}.",
+                f"Ascending-v1 capacity: {review['capacityWords']} words; "
+                f"{review['slotCount']} slots; boot target NS[{review['bootTarget']['slot']}].",
+                "This approval is separate from historical Header V2 approvals.",
+                "No image is installed or published; activation and hardware programming are not authorized.",
+            ]
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise ValueError(str(exc)) from exc
     root = Path(__file__).resolve().parent.parent
     if request.path == "/api/namespace/image-refresh/commit":
         if set(payload) != {"operationId"}:

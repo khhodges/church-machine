@@ -69,6 +69,8 @@ def prepare(state_path, config_path, lumps_dir, output, *, image_format):
         "status": "private-candidate",
         "approvalEligible": False,
         "activationAllowed": False,
+        "installationAllowed": False,
+        "hardwareProgrammingAllowed": False,
         "inputSha256": frozen_inputs,
     }
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -101,4 +103,5 @@ if __name__ == "__main__":
                      image_format=args.format)
     print(f"Private candidate: {args.output / 'candidate.bin'}")
     print(f"SHA-256: {record['imageSha256']}")
-    print("Validated as ascending-v1 only; not approval-eligible, activated, or hardware-certified.")
+    print("Validated as ascending-v1 only; profile review is required. "
+          "Not installed, activated, or hardware-programming eligible.")

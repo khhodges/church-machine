@@ -18,6 +18,7 @@ from server.simulation_preparation import (
 )
 
 PROFILE = "clean-saved-namespace-v1"
+ASCENDING_PROFILE = "ascending-nst-metadata-slot0-v1"
 
 
 def sha(raw):
@@ -45,6 +46,11 @@ def design_thread_slots(rows, config):
 
 def reconstruct(config, rows, directory, *, compact=False):
     """Two independent passes: numeric slots, then every address including gaps."""
+    if any(isinstance(row, dict) and row.get("slot") == 1
+           and row.get("name") == "Boot.NS" for row in rows):
+        raise ValueError(
+            "Ascending-v1 Namespace rows require the profile-specific review path; "
+            "historical Header V2 refresh cannot publish them")
     validate_namespace_rows(rows)
     rows = sorted(copy.deepcopy(rows), key=lambda row: row["slot"])
     step = config["step1"]
@@ -265,6 +271,10 @@ class RefreshStore:
     def prepare(self, owner):
         before = self.inputs()
         state = json.loads(self.state_path.read_bytes())
+        if state.get("namespaceFormat") == ASCENDING_PROFILE:
+            raise ValueError(
+                "Ascending-v1 candidates cannot use historical Header V2 refresh; "
+                "use the profile-specific review and approval boundary")
         rows = state["abstractions"]
         cfg = json.loads(self.config_path.read_bytes())
         image, evidence = reconstruct(cfg, rows, self.directory, compact=True)

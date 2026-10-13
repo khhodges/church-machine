@@ -381,6 +381,7 @@ def protected_request(path, method):
         "/api/namespace/resolve-preview",
         "/api/namespace/review-upgrades",
         "/api/namespace/image-refresh/prepare",
+        "/api/namespace/ascending/review",
     }
     if path in exempt or path.startswith("/api/lumps/lease"):
         return False
@@ -727,6 +728,11 @@ def install(app, paths, commit_guard, describe=None, store_path=None,
                       "boot image/provenance. Review the exact Namespace and selected "
                       "saved-revision effects below.")
             title = "Review Namespace image generation"
+        elif request.path == "/api/namespace/ascending/approve":
+            reason = ("Approve only this exact ascending-v1 candidate in its separate "
+                      "profile review record. This does not install the image, authorize "
+                      "activation, or permit hardware programming.")
+            title = "Review ascending-v1 candidate"
         else:
             title = "Review protected change"
         try:

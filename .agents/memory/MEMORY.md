@@ -155,3 +155,4 @@
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
 - [Namespace handoff authority](namespace-handoff-evidence.md) — no hidden caches; entry GT version 0; faulting CR identifies software blacklisting; hardware never changes versions.
 - [Internal Wukong probes](wukong-internal-probe-preservation.md) — keep optional ILA observations internal and preserve attributes until Vivado; Yosys may copy attributes to aliases.
+- [Ascending-v1 candidate boundary](ascending-v1-candidate-boundary.md) — profile approval is separate from Header V2 approval and never authorizes installation, activation, or hardware programming.
