@@ -4167,21 +4167,22 @@ function _namespaceDesignSourceNotice(state) {
         '<br>Save Namespace Table saves row edits only; it does not migrate the layout or activate an image.</div>';
 }
 
-function updateNamespace() {
-    if (window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active) {
+function updateNamespace(useAscendingDesign) {
+    const ascending = window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active;
+    if (ascending && useAscendingDesign !== true) {
         window.NamespaceDesignV1.render();
         return;
     }
     const container = document.getElementById('namespaceTable');
     if (!container) return;
     if (!sim) return;
-    if (!window._nsState || !Array.isArray(window._nsState.abstractions)) {
+    if (!ascending && (!window._nsState || !Array.isArray(window._nsState.abstractions))) {
         container.textContent = window._nsStateError
             ? 'Namespace unavailable: ' + window._nsStateError + '. Reload to retry; runtime and catalog names are not authoritative.'
             : 'Loading approved Namespace…';
         return;
     }
-    _hydrateNsSymbolicState();
+    if (!ascending) _hydrateNsSymbolicState();
     if (window._nsPrefetchDirty === undefined) window._nsPrefetchDirty = false;
     // Lazily warm the LumpRegistry server list so Source buttons appear even on
     // first NS view load, before the user has visited the Repository view.
@@ -4199,7 +4200,7 @@ function updateNamespace() {
     // --- Slot count stats ---
     // Rows and chips consume the same snapshot so policy edits cannot leave the
     // header describing a different Namespace than the table underneath it.
-    const _nsSnapshot = _namespaceSummarySnapshot();
+    const _nsSnapshot = ascending ? window.NamespaceDesignV1.snapshot() : _namespaceSummarySnapshot();
     const _cntMax = _nsSnapshot.counts.max;
     const _cntResident = _nsSnapshot.counts.resident;
     const _cntLazy = _nsSnapshot.counts.lazy;
@@ -4207,7 +4208,7 @@ function updateNamespace() {
     const _cntFree = _nsSnapshot.counts.free;
     const _statChip = (label, val, color, title) =>
         `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 7px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);font-size:0.72rem;white-space:nowrap;" title="${title}"><span style="color:${color};font-weight:600;">${label}</span><span style="color:#ccc;">${val}</span></span>`;
-    let html = _namespaceDesignSourceNotice(window._nsState);
+    let html = ascending ? '' : _namespaceDesignSourceNotice(window._nsState);
     html += `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px 10px 4px;border-bottom:1px solid rgba(255,255,255,0.07);">`;
     html += _statChip('Max',      _cntMax,      '#a0a0b0', 'Slot capacity of this Namespace design; not evidence of the active image');
     html += _statChip('Assigned', _nsSnapshot.counts.assigned, '#a0c0e0', 'Approved assignments and explicit local drafts; not proof of image installation');
@@ -4268,14 +4269,14 @@ function updateNamespace() {
     // Keep the canonical identity compact in the Namespace Table.  The
     // complete dot.name/T-ID pair belongs in a row-local popup so long names
     // do not stretch the table or get confused with the policy control.
-    window._nsShowIdentity = function(slot) {
+    window._nsShowIdentity = function(slot, designRow) {
         const existing = document.getElementById('_nsIdentityModalOverlay');
         if (existing) existing.remove();
 
-        const entry = sim && typeof sim.readNSEntry === 'function' ? sim.readNSEntry(slot) : null;
-        const src = (typeof _findSrcLump === 'function' && entry)
+        const entry = designRow ? {label:designRow.name} : sim && typeof sim.readNSEntry === 'function' ? sim.readNSEntry(slot) : null;
+        const src = designRow ? designRow.selection : (typeof _findSrcLump === 'function' && entry)
             ? _findSrcLump(slot, entry.label) : null;
-        const identity = sim && typeof sim.getSlotIdentity === 'function'
+        const identity = !designRow && sim && typeof sim.getSlotIdentity === 'function'
             ? sim.getSlotIdentity(slot) : null;
         const dotName = (identity && identity.dotName) ||
             (src && (src.dotName || src.dot_name || src.abstraction)) ||
@@ -4504,6 +4505,10 @@ function updateNamespace() {
             }
         }
     };
+    if (ascending) {
+        window.NamespaceDesignV1.renderRows(html, container);
+        return;
+    }
     for (let i = 0; i < _nsSnapshot.displayCount; i++) {
         const _snapshotRow = _nsSnapshot.slots[i];
         const e = _snapshotRow.entry;
@@ -4960,6 +4965,9 @@ function _nsUpdatePlacementButton() {
 }
 
 async function _nsAddPlacementConfirm() {
+    if (window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active) {
+        return window.NamespaceDesignV1.addFromOriginal();
+    }
     if (sim && sim.simulationConfiguration && _blockFrozenSimulationEdit('Add Namespace placement')) return false;
     const nameEl = document.getElementById('_nsPlacementName');
     const slotEl = document.getElementById('_nsPlacementSlot');
@@ -5367,6 +5375,10 @@ function _nsFindDraftSlot() {
 }
 
 function _nsTableAddConfirm() {
+    if (window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active) {
+        window.alert('Use Add to Namespace (design) for the new layout. Executable installation requires separate image approval.');
+        return false;
+    }
     const sel = document.getElementById('_nsAddSelect');
     const errEl = document.getElementById('_nsAddError');
     const confirmBtn = document.getElementById('_nsAddConfirmBtn');
