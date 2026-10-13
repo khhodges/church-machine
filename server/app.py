@@ -16007,11 +16007,15 @@ def list_lumps():
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 409
     result = []
+    requested_abstraction = request.args.get("abstraction")
+    include_archived = request.args.get("include_archived") == "1"
     for entry in manifest:
+        if requested_abstraction and entry.get("abstraction") != requested_abstraction:
+            continue
         # Archived manifest rows are immutable historical evidence, not active
         # catalogue entries. They remain available through detail/words routes
         # and are grouped under the active abstraction's History response.
-        if entry.get("archived") is True:
+        if entry.get("archived") is True and not include_archived:
             continue
         token8 = entry.get('token', '')
         row = dict(entry)
@@ -16055,10 +16059,10 @@ def list_lumps():
     # Prepend system LUMPs extracted live from boot-image.bin.
     # Boot.NS (slot 0, typ=1) comes first so it heads the list; Boot.Abstr (slot 6)
     # follows immediately after.  Filter any stale manifest duplicates first.
-    if _BOOT_ABSTR_META:
+    if _BOOT_ABSTR_META and not requested_abstraction:
         result = [e for e in result if e.get('token') not in SERVER_MANAGED_TOKENS]
         result = [dict(_BOOT_ABSTR_META)] + result
-    if _BOOT_NS_META:
+    if _BOOT_NS_META and not requested_abstraction:
         result = [e for e in result if e.get('token') != '00000000']
         result = [dict(_BOOT_NS_META)] + result
 

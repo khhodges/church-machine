@@ -3,6 +3,14 @@ name: Latest saved LUMP selection
 description: Separates live execution identity from the artifact selected for editor and simulator loading.
 ---
 
+Namespace Design's Open LUMP action means latest saved source, not the pinned
+placement revision. Keep exact-history and inspection actions pinned.
+**Why:** The user opened SelfTest through this button and received an older
+source despite a newer saved revision existing; design binding and editor
+selection had been conflated.
+**How to apply:** Resolve fresh catalog metadata before exact editor handoff;
+leave the Namespace placement and installed image unchanged and retain draft consent.
+
 The live CR14/Namespace token identifies what is executing now. It must not automatically become the editor or Run artifact when a newer saved revision exists for the same abstraction. A History row synthesized from fleet telemetry may name a different active token; selection and preview must follow that exact token rather than the token of the panel that displayed the row.
 
 Choose the editor/Run artifact by most recent compilation date and time, including immutable-history rows. Use LUMP version only to break equal-timestamp ties. If the newest artifact fails binary or canonical identity validation, keep it selected and present a prominent fault; never silently substitute an older valid revision.

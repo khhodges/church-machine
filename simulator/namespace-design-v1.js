@@ -156,10 +156,50 @@
         dialog(`Namespace slot ${slot} — design inspection`,
             `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button>`:''}`);
     }
-    function source(slot) {
+    let sourceRequest = 0;
+    async function source(slot) {
         const row=state.document.rows.find(r=>r.slot===slot);
+        if (!row) return;
         if (row.kind!=='lump') return inspect(slot);
-        root._nsOpenDesignSelection({name:row.name, selection:row.selection || {status:'missing'}},slot);
+        const requestId=++sourceRequest;
+        root._explicitEditorNavigationClaimed=true;
+        const guard=root._captureEditorWriteGuard('open latest Namespace source: '+row.name);
+        try {
+            const response=await fetch('/api/lumps/list?abstraction='+encodeURIComponent(row.name)+
+                '&include_archived=1',{cache:'no-store'});
+            const catalog=await response.json();
+            if (!response.ok || !Array.isArray(catalog)) throw Error(catalog.error || 'Saved LUMP catalog could not be read.');
+            if(requestId!==sourceRequest || !guard.accepts()) return;
+            const time=r=>{
+                if (r.compiled_at == null || r.compiled_at==='') return 0;
+                const n=Number(r.compiled_at);
+                return Number.isFinite(n)?n:Date.parse(r.compiled_at)/1000 || 0;
+            };
+            const candidates=catalog.filter(r=>r.abstraction===row.name).sort((a,b)=>
+                time(b)-time(a) || Number(b.lump_version || 0)-Number(a.lump_version || 0));
+            const latest=candidates[0];
+            if (!latest) throw Error('No saved revision exists for '+row.name+'.');
+            if (candidates[1] && time(latest)===time(candidates[1]) &&
+                    Number(latest.lump_version)===Number(candidates[1].lump_version))
+                throw Error('The latest saved revision is ambiguous; inspect the repository before opening.');
+            // Never substitute an older valid revision for invalid newest bytes.
+            if (latest.binary_valid===false) throw Error(
+                'Latest '+row.name+' v'+latest.lump_version+' failed validation: '+
+                (latest.validation_errors || []).join('; '));
+            if(!/^[0-9a-f]{8}$/i.test(latest.token || '') ||
+                !/^[^/\\]+\.lump$/.test(latest.filename || '') ||
+                !/^[0-9a-f]{64}$/i.test(latest.binary_hash || ''))
+                throw Error('Latest saved revision lacks a complete exact binary identity.');
+            return await root._nsOpenDesignSelection({name:row.name, selection:{
+                token:latest.token, filename:latest.filename, binaryHash:latest.binary_hash,
+                revision:latest.lump_version
+            }},slot);
+        } catch(error) {
+            if(requestId!==sourceRequest || !guard.accepts()) return;
+            state.error='Open latest LUMP failed: '+error.message+
+                ' Editor and Namespace placement were not replaced. Inspect the repository and retry.';
+            render();
+        }
     }
     function clear(slot) {
         if(state.saving) return;
