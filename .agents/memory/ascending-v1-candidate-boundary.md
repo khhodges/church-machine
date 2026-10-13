@@ -41,3 +41,14 @@ old editor while leaving the new header and slots in a separate display.
 **How to apply:** Persist the new-format draft separately from installed image
 authority until installation is explicitly approved. Keep older views available
 without allowing them to overwrite or impersonate the selected new-format draft.
+
+Preserve the original working table's renderer, columns, controls, popups and
+interactions. A new simplified editable table is not an acceptable substitute,
+even if it displays the correct new slots and supports ADD/Save.
+
+**Why:** The user rejected the replacement as "nothing like the prior table
+that worked." The request is a data/geometry adaptation, not a redesign.
+
+**How to apply:** Change the original table's data adapter and format-dependent
+header/slot interpretation. Verify feature parity against the original view,
+including version, type, F/G, limit, sequence, integrity and Source controls.
