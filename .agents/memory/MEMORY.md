@@ -157,3 +157,4 @@
 - [Internal Wukong probes](wukong-internal-probe-preservation.md) — keep optional ILA observations internal and preserve attributes until Vivado; Yosys may copy attributes to aliases.
 - [Ascending-v1 candidate boundary](ascending-v1-candidate-boundary.md) — profile approval is separate from Header V2 approval and never authorizes installation, activation, or hardware programming.
 - [Authenticated compact API admission](authenticated-compact-api-admission.md) — expand embedded rows from exact bytes; recover source PetNames only from matching signed compiler rows.
+- [Alternative IDE prototype](alternative-ide-prototype.md) — prioritize four core views; prototype at a separate URL without touching live artifacts or hardware.
