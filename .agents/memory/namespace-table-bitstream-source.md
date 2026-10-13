@@ -129,11 +129,14 @@ entry, generation and startup inspection must report the actionable authority
 error rather than infer a target from config, manifest history, browser state,
 or image bytes.
 
-NS slots 8 and 9 must be empty in the intended configuration.
+In the historical pre-migration configuration, NS slots 8 and 9 were intended
+to be empty. This is not a rule for the new ascending layout: its reviewed
+assignments move UART_DEV to slot 8 while slot 9 remains empty.
 
 **Why:** The user explicitly confirmed these are empty slots, not legacy Tunnel
 or Ethernet assignments to restore from catalog defaults.
 
 **How to apply:** Do not populate missing Namespace rows from catalog positions.
+Use the selected layout's explicit assignments, not old-format slot rules.
 If an image contains occupants at 8 or 9, correct generation and retest the new
 image rather than adding metadata to legitimize those occupants.

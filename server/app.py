@@ -5071,6 +5071,27 @@ def namespace_save_table():
                        dataChanged=False), 500
 
 
+@app.route("/api/namespace/design-v1", methods=["GET", "PUT"])
+def namespace_design_v1():
+    """New-format editor persistence, strictly separate from executable stores."""
+    from pathlib import Path
+    from urllib.parse import urlparse
+    from server.namespace_design_v1 import DesignStore
+    store = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" / "ascending-v1.json",
+                        LUMPS_DIR, NS_STATE_PATH)
+    try:
+        if request.method == "PUT":
+            if not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign":
+                return jsonify(ok=False, error="Expected an IDE JSON design request"), 403
+            origin = request.headers.get("Origin")
+            if origin and urlparse(origin).netloc != request.host:
+                return jsonify(ok=False, error="Cross-origin design writes are not allowed"), 403
+            return jsonify(store.save(request.get_json(silent=True)))
+        return jsonify(store.read())
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
+
+
 @app.route("/api/namespace/inspect", methods=["GET"])
 def namespace_inspect():
     """Inspect exact saved rows, never the enriched/runtime Namespace projection."""
@@ -27815,6 +27836,8 @@ def _change_confirmation_paths():
     root = Path(__file__).resolve().parent.parent
     paths = [BOOT_CONFIG_PATH, NS_STATE_PATH, LUMPS_MANIFEST_PATH,
              BOOT_IMAGE_PATH, BOOT_IMAGE_PROVENANCE_PATH]
+    if request.path == "/api/namespace/design-v1":
+        paths.append(Path(NS_STATE_PATH).parent / "design-drafts" / "ascending-v1.json")
     for pattern in ("*.lump", "*.json", "*.bin"):
         # Lease heartbeats are coordination state, not reviewed artifacts.
         # Exclude only the registry; manifests and other JSON stay protected.
@@ -27966,6 +27989,16 @@ def _describe_protected_change(payload):
             "Frozen Namespace: " + record["namespace_fingerprint"],
             "Image SHA-256: " + record["image_sha256"],
             *record["stages"], *record["slotResults"], *record["addressResults"],
+        ]
+    if request.path == "/api/namespace/design-v1":
+        from server.namespace_design_v1 import validate
+        document = validate(payload.get("document"))
+        return [
+            "Save the editable ascending Namespace design only.",
+            "Slot 0: four-word header; slot 1: Namespace self; slot 2: entry Thread.",
+            "API-only output profile. No LUMP, committed image, bitstream or simulator state is changed.",
+            *[f"NS[{row['slot']}] {row['name']} — {row['policy']}"
+              for row in sorted(document["rows"], key=lambda row: row["slot"])],
         ]
     if request.path == "/api/namespace/save-table":
         state, rows = _namespace_table_candidate(payload)

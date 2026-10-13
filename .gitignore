@@ -65,3 +65,4 @@ server/lumps/.lump-transition-*
 # Provision each independent IDE separately; cloning must not copy ownership.
 server/ide-hierarchy.json
 /generated-artifacts/
+/server/lumps/design-drafts/

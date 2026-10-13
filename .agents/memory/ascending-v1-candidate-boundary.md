@@ -29,3 +29,15 @@ ordinary design editing.
 **How to apply:** Reuse the existing design workspace across build options.
 Keep historical layout snapshots secondary and clearly separate from editable
 state; never present their fixed membership or full-source sizes as a live build.
+
+Restoring access to the old table is not sufficient: the main editable table
+must itself show the new four-word metadata header at slot 0, self at slot 1,
+entry Thread at slot 2 and the new member slots. ADD/Save must operate on that
+same new-format design, not leave the new layout as a static text reference.
+
+**Why:** The user explicitly corrected an attempted fix that merely unhid the
+old editor while leaving the new header and slots in a separate display.
+
+**How to apply:** Persist the new-format draft separately from installed image
+authority until installation is explicitly approved. Keep older views available
+without allowing them to overwrite or impersonate the selected new-format draft.

@@ -4168,6 +4168,10 @@ function _namespaceDesignSourceNotice(state) {
 }
 
 function updateNamespace() {
+    if (window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active) {
+        window.NamespaceDesignV1.render();
+        return;
+    }
     const container = document.getElementById('namespaceTable');
     if (!container) return;
     if (!sim) return;

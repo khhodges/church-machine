@@ -44,11 +44,10 @@ assert.match(host.innerHTML, /not the installed image/);
 assert.match(host.innerHTML, /slot 2, version 0/);
 const page = fs.readFileSync(__dirname + '/index.html', 'utf8');
 const markup = page.slice(page.indexOf('<div id="namespace"'), page.indexOf('<!-- Hello Mum'));
-assert(markup.indexOf('id="namespaceTable"') < markup.indexOf('<details'),
-    'the editable Namespace and its ADD/Save controls must not be hidden by build references');
-assert(markup.indexOf('id="namespaceTable"') < markup.indexOf('id="namespaceHandoffTarget"'));
-assert.match(markup, /Historical handoff layout reference/);
-assert.match(markup, /must not be used as the API-only bitstream memory map/);
+assert.doesNotMatch(markup, /namespaceHandoffTarget/,
+    'new-format data must be in the editable table, never a second static display');
+assert.match(markup, /value="ascending" selected/);
+assert.match(page, /namespace-design-v1\.js/);
 assert.match(markup, /Add unfinished LUMPs such as ide.Mint as design placements/);
 assert.equal((markup.match(/id="namespaceTable"/g) || []).length, 1,
     'all build options reuse the existing Namespace editor');

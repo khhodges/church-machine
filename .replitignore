@@ -68,3 +68,4 @@ build/uart_test.asc
 # Synthesis log (large text, not served):
 build/synth.log
 /generated-artifacts/
+/server/lumps/design-drafts/

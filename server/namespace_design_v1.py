@@ -1,0 +1,244 @@
+"""Editable ascending Namespace design. Never publishes executable image bytes."""
+import copy
+import fcntl
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import struct
+import tempfile
+
+FORMAT = "ascending-nst-metadata-slot0-v1"
+PINS = [
+    (7, "WukongCallHome", "WukongCallHome.1.7084172e.lump",
+     "549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738", 20, "232f0de4"),
+    (10, "CapabilityTest", "CapabilityTest.1.1feaf30b.lump",
+     "e41b861a87a13066e4a7cb76e5a01d39c62857bfddfffc5e3f2ffdcb12dd8c21", 45, "17fc5571"),
+    (6, "SelfTest", "SelfTest.1.8b19abd7.lump",
+     "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de", 98, "4a000006"),
+]
+
+
+def digest(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def seed(legacy):
+    rows = [
+        dict(slot=1, name="Boot.NS", kind="namespace", policy="Resident", sequence=0),
+        dict(slot=2, name="Boot.Thread", kind="thread", policy="Resident", sequence=0, words=256),
+    ]
+    for slot, name, filename, binary_hash, revision, token in PINS:
+        rows.append(dict(slot=slot, name=name, kind="lump", policy="Resident", sequence=0,
+                         selection=dict(filename=filename, binaryHash=binary_hash,
+                                        token=token, revision=revision),
+                         boot=slot == 10))
+    for slot, name in [(11, "Thread.2"), (12, "Thread.3")]:
+        rows.append(dict(slot=slot, name=name, kind="thread", policy="Resident", sequence=0, words=256))
+    for slot, name, address, limit, seq in [
+        (3, "LED_DEV", 0x40000000, 4, 0), (4, "BTN_DEV", 0x40000028, 0, 0),
+        (5, "TIMER_DEV", 0x4000002c, 4, 0), (8, "UART_DEV", 0x40000014, 2, 1),
+        (13, "M_BIT_DEV", 0xffffff1c, 0, 0),
+    ]:
+        rows.append(dict(slot=slot, name=name, kind="mmio", policy="Hardware",
+                         sequence=seq, address=address, limit=limit))
+    # Carry existing non-core design membership, never silently discard it.
+    names = {r["name"] for r in rows}
+    used = {r["slot"] for r in rows}
+    for old in legacy.get("abstractions", []):
+        if old["name"] in names:
+            continue
+        slot = old["slot"]
+        if slot < 3 or slot in used:
+            raise ValueError(f"Saved design member {old['name']} conflicts with new slot {slot}; resolve explicitly")
+        selection = copy.deepcopy(old.get("selection"))
+        if not selection and old.get("filename") and old.get("binary_hash"):
+            selection = dict(filename=old["filename"], binaryHash=old["binary_hash"],
+                             token=old.get("token", ""), revision=old.get("lump_version"))
+        row = dict(slot=slot, name=old["name"], kind="lump", policy="Lazy",
+                   sequence=old.get("seq", 0))
+        if selection:
+            row["selection"] = selection
+        rows.append(row)
+        used.add(slot)
+        names.add(old["name"])
+    return dict(format=FORMAT, capacityWords=16384, slotCount=64,
+                outputProfile="api", rows=sorted(rows, key=lambda r: r["slot"]))
+
+
+def validate(document):
+    if not isinstance(document, dict) or set(document) != {
+        "format", "capacityWords", "slotCount", "outputProfile", "rows"
+    }:
+        raise ValueError("Expected a complete Namespace design")
+    if (document["format"], document["capacityWords"], document["slotCount"],
+            document["outputProfile"]) != (FORMAT, 16384, 64, "api"):
+        raise ValueError("This design uses ascending-v1, 64 slots, 16384 words and API-only output")
+    rows = document["rows"]
+    if not isinstance(rows, list) or len(rows) > 63:
+        raise ValueError("Invalid Namespace member count")
+    slots, names = set(), set()
+    for row in rows:
+        if not isinstance(row, dict) or set(row) - {
+            "slot", "name", "kind", "policy", "sequence", "selection", "boot",
+            "words", "address", "limit",
+        }:
+            raise ValueError("Unexpected Namespace row fields")
+        slot, name = row.get("slot"), row.get("name")
+        if type(slot) is not int or not 1 <= slot < 64 or slot in slots:
+            raise ValueError("Choose a unique slot from 1 to 63; slot 0 is metadata")
+        if not isinstance(name, str) or not name.strip() or name != name.strip() or len(name) > 128 or re.search(r"[\x00-\x1f\x7f]", name) or name in names:
+            raise ValueError("Each row requires a unique, nonempty pet name")
+        slots.add(slot)
+        names.add(name)
+        if type(row.get("sequence")) is not int or not 0 <= row["sequence"] <= 511:
+            raise ValueError("Invalid Namespace generation")
+        kind = row.get("kind")
+        if kind not in ("namespace", "thread", "mmio", "lump"):
+            raise ValueError("Invalid member kind")
+        if row.get("policy") not in ("Resident", "Lazy", "Hardware"):
+            raise ValueError("Invalid load policy")
+        if kind != "lump" and row["policy"] != ("Hardware" if kind == "mmio" else "Resident"):
+            raise ValueError("Architectural objects retain their residency")
+        if kind == "thread" and row.get("words") != 256:
+            raise ValueError("Thread design allocation must remain 256 words")
+        if kind == "mmio":
+            if any(type(row.get(k)) is not int or not 0 <= row[k] <= 0xffffffff for k in ("address", "limit")):
+                raise ValueError("Invalid MMIO address/limit")
+        if kind == "namespace" and slot != 1:
+            raise ValueError("Namespace self belongs at slot 1")
+        if "boot" in row and (type(row["boot"]) is not bool or row["boot"] and kind != "lump"):
+            raise ValueError("Only an executable design member may be the boot target")
+        selected = row.get("selection")
+        if selected is not None:
+            if not isinstance(selected, dict):
+                raise ValueError("Invalid saved artifact selection")
+            filename = selected.get("filename")
+            if filename is not None and (not isinstance(filename, str) or not re.fullmatch(r"[^/\\]+\.lump", filename) or ".." in filename):
+                raise ValueError("Selection filename must be a local LUMP basename")
+            for field, width in (("binaryHash", 64), ("token", 8)):
+                value = selected.get(field)
+                if value and (not isinstance(value, str) or not re.fullmatch(rf"[0-9a-fA-F]{{{width}}}", value)):
+                    raise ValueError(f"Invalid selection {field}")
+    by_slot = {r["slot"]: r for r in rows}
+    if (by_slot.get(1, {}).get("name"), by_slot.get(1, {}).get("kind"),
+        by_slot.get(2, {}).get("name"), by_slot.get(2, {}).get("kind"),
+        by_slot.get(2, {}).get("sequence")) != ("Boot.NS", "namespace", "Boot.Thread", "thread", 0):
+        raise ValueError("Slot 1 must be Namespace self; slot 2 must be entry Thread version 0")
+    if sum(bool(r.get("boot")) for r in rows) != 1:
+        raise ValueError("Keep exactly one selected boot target")
+    return document
+
+
+def api_size(row, lumps):
+    selection = row.get("selection") or {}
+    filename, expected = selection.get("filename"), selection.get("binaryHash")
+    if not filename or not expected:
+        raise ValueError("Unfinished/unresolved LUMP — no exact saved binary selected")
+    path = lumps / filename
+    if path.is_symlink():
+        raise ValueError("Selected artifact must not be a symlink")
+    raw = path.read_bytes()
+    if hashlib.sha256(raw).hexdigest() != expected:
+        raise ValueError("Selected binary hash has changed")
+    if not raw or len(raw) % 4:
+        raise ValueError("Invalid binary length")
+    words = struct.unpack(f">{len(raw)//4}I", raw)
+    header = words[0]
+    cw, cc = (header >> 10) & 8191, header & 255
+    if header >> 27 != 31 or len(words) != 64 << ((header >> 23) & 15) or cw + 2 >= len(words):
+        raise ValueError("Invalid LUMP header")
+    frame = words[cw+1]
+    length = frame & 65535
+    if frame >> 24 != 0xAB or not length or cw+2+math.ceil(length/4) > len(words)-cc:
+        raise ValueError("Invalid embedded API frame")
+    api = json.loads(raw[(cw+2)*4:(cw+2)*4+length])
+    needed = cw + cc + 2 + math.ceil(length/4)
+    allocation = max(64, 1 << (needed-1).bit_length())
+    warning = None if api.get("name") == row["name"] else f"Embedded API names {api.get('name')}, not {row['name']}; identity needs review"
+    return allocation, warning
+
+
+def project(document, lumps):
+    validate(document)
+    rows, cursor, warnings = [], 256, []
+    # Keep the reviewed resident order, then place added residents by slot.
+    order = {slot: index for index, slot in enumerate([1, 2, 7, 10, 6, 11, 12])}
+    for original in sorted(document["rows"], key=lambda r: (order.get(r["slot"], 100+r["slot"]))):
+        row = copy.deepcopy(original)
+        row["entryWord"] = row["slot"] * 4
+        row["allocationWords"] = 0
+        row["location"] = None
+        if row["kind"] == "namespace":
+            row.update(location=0, limit=255)
+        elif row["kind"] == "mmio":
+            row["location"] = row["address"]
+        elif row["kind"] == "thread":
+            row["allocationWords"] = row["words"]
+        elif row["policy"] == "Resident":
+            try:
+                row["allocationWords"], warning = api_size(row, lumps)
+                if warning:
+                    warnings.append(f"{row['name']}: {warning}")
+            except (OSError, ValueError, KeyError, IndexError, struct.error) as exc:
+                warnings.append(f"{row['name']}: {exc}")
+                row["unresolved"] = True
+                cursor = None
+        if row["allocationWords"]:
+            row["location"] = cursor
+            row["limit"] = row["allocationWords"] - 1
+            if cursor is not None:
+                cursor += row["allocationWords"]
+        rows.append(row)
+    if cursor is not None and cursor > document["capacityWords"]:
+        warnings.append("Resident allocations exceed Namespace capacity; design remains editable")
+    header = ((31 << 27) | ((14-13) << 23) | (64 << 10) | (1 << 8))
+    return dict(rows=sorted(rows, key=lambda r: r["slot"]),
+                metadataWords=[header, 0, len(rows)-1, 0], tableWords=256,
+                usedWords=cursor, warnings=warnings, activationAllowed=False,
+                buildReady=False, addressesAreProposed=True)
+
+
+class DesignStore:
+    def __init__(self, path, lumps, legacy_path):
+        self.path, self.lumps, self.legacy_path = Path(path), Path(lumps), Path(legacy_path)
+
+    def read_document(self):
+        if self.path.exists():
+            return validate(json.loads(self.path.read_text()))
+        legacy = json.loads(self.legacy_path.read_text())
+        return validate(seed(legacy))
+
+    def response(self, document):
+        return dict(ok=True, document=document, fingerprint=digest(document),
+                    persisted=self.path.exists(), projection=project(document, self.lumps))
+
+    def read(self):
+        return self.response(self.read_document())
+
+    def save(self, payload):
+        if not isinstance(payload, dict) or set(payload) != {"fingerprint", "document"}:
+            raise ValueError("Expected reviewed fingerprint and design")
+        document = validate(copy.deepcopy(payload["document"]))
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(str(self.path)+".lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if payload["fingerprint"] != digest(self.read_document()):
+                raise ValueError("Namespace design changed in another tab. Draft retained; reload before retrying")
+            # All validation precedes the atomic save. Projection is advisory;
+            # missing unfinished implementations do not prohibit design saves.
+            response = self.response(document)
+            fd, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".namespace-design-")
+            try:
+                with os.fdopen(fd, "w") as out:
+                    json.dump(document, out, indent=2)
+                    out.flush()
+                    os.fsync(out.fileno())
+                os.replace(temporary, self.path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            response["persisted"] = True
+            return response
