@@ -15,6 +15,10 @@ Design setting after compilation was blocked by a server-only node mismatch.
 **How to apply:** Treat node changes as ordinary validated project configuration,
 retain exact foreign definitions, and disclose any retargeted local aliases.
 
+The user selected `ide` as this project's IDE node, replacing `kjhh1`.
+**Why:** They explicitly reported changing that setting; an unchanged server
+readback is a persistence issue to investigate, not evidence they did not edit it.
+
 The user explicitly confirmed that `Thread.2`, `Thread.3`, and `Boot.Thread` belong to this IDE through the Thread design page.
 
 **Why:** These are locally authored Thread definitions, not foreign imports; their dotted display names alone had incorrectly triggered foreign/malformed hierarchy checks.
