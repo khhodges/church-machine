@@ -962,3 +962,17 @@ mtime_ms = 1791812524555
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/729249e0-7545-4758-a03a-19b7a42fa308/abb121ce-cab4-4710-85ea-349cdc48bb62"
 storage_version_token = "1791812539855442"
 content_type = "text/html"
+
+[[outputs]]
+id = "APZlYARgAX72AakruUhvb"
+uri = "file://reports/isa-amendment-reconciliation-2026-10-13.md"
+type = "text"
+title = "ISA amendment reconciliation — updated provenance"
+description = "Includes the revised four-page PDF and its explicit corrections; reported October 12 decisions remain unverified."
+logical_id = "beac702e-8818-4369-a914-be934b5d55d8"
+content_hash = "sha256:443724ef096d47be1e2bbcf3958cab2f6d42e51f901bc1058b8160b8fc3f67c6"
+size = 11154
+mtime_ms = 1791905472372
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/beac702e-8818-4369-a914-be934b5d55d8/cad5e626-0d72-4061-bbb7-f801237aeab8"
+storage_version_token = "1791905477340098"
+content_type = "text/markdown"
