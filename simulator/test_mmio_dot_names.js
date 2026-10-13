@@ -40,6 +40,23 @@ for(const name of ['UART','UART_TX','UART_RX','LED0','UART_DEV','Service','0x400
     assert.throws(()=>buildApiDefinition(forged,[]),/canonical dot-name/);
 }
 assert(compiler.compile(source('ide.UART','Example'),[]).errors.some(e=>/LUMP object/.test(e.message)));
+// Canonical-name diagnostics must point to editor declarations, not uses or
+// generated assembly. Preserve CRLF and ignore misleading names in comments.
+for (const newline of ['\n', '\r\n']) {
+    const raw = ['; heading', '; Abstraction: WukongCallHome', '',
+        'capabilities { SELF,', ' ; LED0 and UART_TX are mentioned here',
+        ' LED0 RW,', ' UART_TX W', '}', 'NOP'].join(newline);
+    const errors = compiler.compile(raw, [], {language:'assembly'}).errors
+        .filter(e=>/canonical dot-name/.test(e.message));
+    assert.deepEqual(errors.map(e=>e.line),[2,6,7]);
+    assert.deepEqual(errors.map(e=>raw.split(newline)[e.line-1].slice(e.colStart,e.colEnd)),
+        ['WukongCallHome','LED0','UART_TX']);
+}
+const jsErrors = compiler.compile(source('UART_TX','Example'),[]).errors
+    .filter(e=>/canonical dot-name/.test(e.message));
+assert.deepEqual(jsErrors.map(e=>e.line),[1,2]);
+assert.deepEqual(jsErrors.map(e=>source('UART_TX','Example').split('\n')[e.line-1].slice(e.colStart,e.colEnd)),
+    ['Example','UART_TX']);
 const another=compiler.compile(source('other.UART'),[]);
 assert.deepEqual(another.errors,[]);
 assert.notDeepEqual(buildApiDefinition(good,lump.words),buildApiDefinition(another,buildLump(another).words),

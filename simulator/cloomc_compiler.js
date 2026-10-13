@@ -470,7 +470,7 @@ class CLOOMCCompiler {
             }
         }
         // All frontends share the same object identity rule, including MMIO.
-        result.errors.push(...ChurchAssembler.objectNameErrors(result));
+        result.errors.push(...ChurchAssembler.objectNameErrors(result, source));
         return result;
     }
 

@@ -3100,17 +3100,46 @@ class ChurchAssembler {
                /^(UART|UART_TX|UART_RX|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
     }
 
-    static objectNameErrors(result) {
+    static objectNameErrors(result, source) {
         const errors = [];
+        // Locate diagnostics in the original editor text, not generated assembly
+        // or normalized C-list metadata (which may have no source positions).
+        const text = typeof source === 'string' ? source : '';
+        const masked = text.replace(/;[^\n]*|\/\/[^\n]*|\/\*[\s\S]*?\*\//g,
+            comment => comment.replace(/[^\r\n]/g, ' '));
+        const location = (offset, length) => {
+            const before = text.slice(0, offset);
+            const colStart = offset - before.lastIndexOf('\n') - 1;
+            return {line: before.split('\n').length, colStart, colEnd: colStart + length};
+        };
+        const declaration = /^[ \t]*(?:;[ \t]*(?:Abstraction:|@abstraction)|abstraction)[ \t]+([^\s{]+)/im.exec(text);
+        const declarationLocation = declaration
+            ? location(declaration.index + declaration[0].lastIndexOf(declaration[1]), declaration[1].length)
+            : {line: result.abstractionLine || null};
+        const block = /\bcapabilities\s*\{([^}]*)\}/i.exec(masked);
+        let cursor = 0;
+        const capabilityLocation = cap => {
+            if (block && cap && typeof cap.name === 'string') {
+                const escaped = cap.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const match = new RegExp('(^|[^A-Za-z0-9_.#])(' + escaped + ')(?=$|[^A-Za-z0-9_.#])')
+                    .exec(block[1].slice(cursor));
+                if (match) {
+                    const start = cursor + match.index + match[1].length;
+                    cursor = start + cap.name.length;
+                    return location(block.index + block[0].indexOf('{') + 1 + start, cap.name.length);
+                }
+            }
+            return {line: cap && cap.line || null};
+        };
         const valid = name => typeof name === 'string' &&
             /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+(?:#[1-9][0-9]*)?$/.test(name);
-        if (!valid(result.abstractionName)) errors.push({line:null,
+        if (!valid(result.abstractionName)) errors.push({...declarationLocation,
             message:'The LUMP object requires a declared canonical dot-name (for example ide.Service). Correct the source and recompile; no name is inferred.'});
         for (const [row, cap] of (result.capabilities || []).entries()) {
             if (cap && ((row === 0 && cap.compiler_owned_self &&
                 ['SELF','__SELF__'].includes(cap.name)) || (cap.null_row === true && cap.name === 'NULL'))) continue;
             const target = cap && cap.name;
-            if (!valid(target)) errors.push({line:cap && cap.line || null,
+            if (!valid(target)) errors.push({...capabilityLocation(cap),
                 message:`C-list row ${row} (${cap && cap.name || 'unnamed'}) requires a declared canonical dot-name, including MMIO (for example ide.UART). Fixed slots, addresses and device shorthand are not object identities.`});
         }
         return errors;
