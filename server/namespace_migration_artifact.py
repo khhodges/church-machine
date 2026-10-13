@@ -240,9 +240,8 @@ def _target_state(review, source_state, config, inputs, output_lumps):
             source["allocationWords"] = _int(
                 descriptor["allocationWords"], "fresh Thread allocation")
             source["requiresFreshThreadImage"] = True
-            if source["name"] == "Boot.Thread":
-                source["stackWords"] = _int(
-                    config["step1"].get("threadStackWords", 32), "Thread stack words")
+            source["stackWords"] = _int(
+                config["step1"].get("threadStackWords", 32), "Thread stack words")
         elif source["name"] == "Boot.NS":
             source["type"] = "Inform"
         if source.get("location", 0) >= _int(
@@ -311,6 +310,55 @@ def prepare_migration(review_directory, output, *, compiler_candidates=None,
     target_state, localized_records = _target_state(
         review, source_state, config, inputs, localized_lumps)
     target_by_slot = {row["slot"]: row for row in target_state["abstractions"]}
+    target_by_name = {row["name"]: row for row in target_state["abstractions"]}
+    from server.namespace_ascending_image import build_fresh_thread_lump
+
+    fresh_thread_records = []
+    for row in target_state["abstractions"]:
+        if not row.get("requiresFreshThreadImage") or row["name"] == "Boot.Thread":
+            continue
+        ordinal_text = row["name"].removeprefix("Thread.")
+        if not ordinal_text.isdigit() or int(ordinal_text) < 2:
+            raise ValueError(f"{row['name']}: fresh Thread destination identity is not explicit")
+        entry_name = "CapabilityTest" if int(ordinal_text) <= 3 else "SelfTest"
+        entry = target_by_name.get(entry_name)
+        if entry is None or entry.get("type") not in ("Inform", "Resident"):
+            raise ValueError(f"{row['name']}: fresh Thread requires a live {entry_name} target")
+        destination_slot = _int(row["slot"], f"{row['name']} destination slot")
+        destination_sequence = _int(row["seq"], f"{row['name']} destination sequence")
+        entry_slot = _int(entry["slot"], f"{entry_name} destination slot")
+        entry_sequence = _int(entry["seq"], f"{entry_name} destination sequence")
+        raw = build_fresh_thread_lump(
+            allocation_words=_int(row["allocationWords"], f"{row['name']} allocation"),
+            stack_words=_int(row["stackWords"], f"{row['name']} stack"),
+            entry_slot=entry_slot, entry_sequence=entry_sequence)
+        filename = f"{row['name']}.ascending-thread.lump"
+        if filename in localized_lumps:
+            raise ValueError(f"{row['name']}: duplicate fresh Thread image filename")
+        localized_lumps[filename] = raw
+        binding = {
+            "format": "fresh-thread-continuation-v1",
+            "destinationSlot": destination_slot,
+            "destinationSequence": destination_sequence,
+            "entryName": entry_name,
+            "entrySlot": entry_slot,
+            "entrySequence": entry_sequence,
+            "sha256": _sha(raw),
+        }
+        row["filename"] = filename
+        row["binary_hash"] = _sha(raw)
+        row["freshThreadImage"] = binding
+        fresh_thread_records.append({
+            "name": row["name"], "filename": filename, "sha256": _sha(raw),
+            "destinationSlot": destination_slot,
+            "destinationSequence": destination_sequence,
+            "entryName": entry_name, "entrySlot": entry_slot,
+            "entrySequence": entry_sequence,
+            "allocationWords": row["allocationWords"],
+            "stackWords": row["stackWords"],
+            "zeroInitialized": True,
+            "approvalEligible": False, "activationAllowed": False,
+        })
     for record in localized_records:
         raw = localized_lumps[record["filename"]]
         target_row = next(
@@ -367,6 +415,7 @@ def prepare_migration(review_directory, output, *, compiler_candidates=None,
          "reason": "fresh Thread image is required before image generation"}
         for row in target_state["abstractions"]
         if row.get("requiresFreshThreadImage") and row["name"] != "Boot.Thread"
+        and not row.get("freshThreadImage")
     ]
     report = {
         "schema": SCHEMA,
@@ -377,6 +426,7 @@ def prepare_migration(review_directory, output, *, compiler_candidates=None,
         "sourceNamespaceSha256": review["inputs"]["ns-state.json"],
         "targetNamespaceSha256": _canonical_digest(target_state),
         "localizedResidents": localized_records,
+        "freshThreadImages": fresh_thread_records,
         "affectedBindingsVerified": affected_binding_evidence,
         "unbuiltThreadRows": unresolved_threads,
         "compilerCandidates": compiler_summary,
@@ -385,7 +435,7 @@ def prepare_migration(review_directory, output, *, compiler_candidates=None,
         "imageGenerated": False,
         "blockers": [
             "This package is a private migration artifact; no saved Namespace, LUMP, approval, or active image was changed.",
-            "Thread.2 and Thread.3 require fresh destination Thread images before a complete ascending-v1 image can be generated.",
+            "Fresh Thread images are private destination derivatives and carry no approval authority.",
             "Compiler outputs are not selected automatically; localized copies are private derivatives with no approval authority.",
         ],
     }

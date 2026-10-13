@@ -123,7 +123,7 @@ class AscendingCandidateStore:
             raise ValueError("Candidate image hash does not match its metadata")
         validation = validate_image(image, image_format=FORMAT)
         for key in ("capacityWords", "slotCount", "tableWords", "memberCount",
-                    "bootTarget", "liveSlots", "ownedRanges"):
+                    "bootTarget", "threadRows", "liveSlots", "ownedRanges"):
             if candidate.get(key) != validation[key]:
                 raise ValueError(f"Candidate {key} metadata differs from validated image")
         review = {
@@ -260,6 +260,63 @@ def _decode_gt(word):
     }
 
 
+def build_fresh_thread_lump(*, allocation_words, stack_words, entry_slot,
+                            entry_sequence):
+    """Build a zero-initialized Thread with an explicit fresh entry continuation."""
+    size = _integer(allocation_words, "Thread allocationWords")
+    stack = _integer(stack_words, "Thread stackWords")
+    target_slot = _integer(entry_slot, "Thread entry slot")
+    target_sequence = _integer(entry_sequence, "Thread entry sequence")
+    if target_slot == 0 or target_sequence > 511:
+        raise ValueError("Fresh Thread entry binding is outside the GT fields")
+    layout = boot.thread_layout(size, stack)
+    if not layout["valid"]:
+        raise ValueError("Fresh Thread allocation/stack geometry is invalid")
+
+    entry_gt = boot.create_gt(target_sequence, target_slot, {"E": 1}, 1)
+    words = [0] * size
+    words[0] = boot.pack_lump_header(
+        size.bit_length() - 7, stack, boot.THREAD_CAP_WORDS, 2)
+    root_sto = layout["stack_end"] - 2
+    resume_sto = root_sto - 2
+    words[boot.THREAD_STO_OFFSET] = (1 << 12) | resume_sto
+    words[layout["caps_start"]] = entry_gt
+    words[resume_sto - 1] = entry_gt
+    words[resume_sto] = (1 << 12) | root_sto
+    words[root_sto + 1] = entry_gt
+    words[root_sto + 2] = (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
+    return struct.pack(f">{size}I", *words)
+
+
+def _fresh_thread_words(raw, label):
+    if len(raw) < 4 or len(raw) % 4:
+        raise ValueError(f"{label}: fresh Thread image is not word-aligned")
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    header = words[0]
+    size = 1 << (((header >> 23) & 15) + 6)
+    stack_words = (header >> 10) & 8191
+    cap_words = header & 255
+    if (header >> 27 != 31 or ((header >> 8) & 3) != 2 or size != len(words)
+            or cap_words != boot.THREAD_CAP_WORDS):
+        raise ValueError(f"{label}: fresh Thread image has invalid header/allocation")
+    layout = boot.thread_layout(size, stack_words)
+    if not layout["valid"]:
+        raise ValueError(f"{label}: fresh Thread image has invalid private layout")
+    entry_gt = words[layout["caps_start"]]
+    fields = _decode_gt(entry_gt)
+    if (entry_gt >> 31 or fields["type"] != 1 or fields["domain"] != 1
+            or fields["permissions"] != 0b100):
+        raise ValueError(f"{label}: fresh Thread CR0 is not an executable Inform GT")
+    expected = struct.unpack(
+        f">{len(words)}I",
+        build_fresh_thread_lump(
+            allocation_words=len(words), stack_words=stack_words,
+            entry_slot=fields["slot"], entry_sequence=fields["sequence"]))
+    if tuple(words) != expected:
+        raise ValueError(f"{label}: Thread image is not a zero-state fresh continuation")
+    return words, fields, layout
+
+
 def validate_image(image, *, image_format):
     """Validate the explicit ascending-v1 byte stream, never a historical image."""
     if image_format != FORMAT:
@@ -351,6 +408,7 @@ def validate_image(image, *, image_format):
             or target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0):
         raise ValueError("Entry Thread CR0 target is not an ordinary in-range code LUMP")
 
+    thread_rows = []
     for slot, entry in live.items():
         if slot in (SELF_SLOT, THREAD_SLOT):
             continue
@@ -360,8 +418,36 @@ def validate_image(image, *, image_format):
         lump_header = words[location]
         size = 1 << (((lump_header >> 23) & 15) + 6)
         cw, cc, typ = (lump_header >> 10) & 8191, lump_header & 255, (lump_header >> 8) & 3
-        if (lump_header >> 27 != 31 or typ != 0 or location + size > total
-                or 1 + cw + cc > size or limit < cw):
+        if lump_header >> 27 != 31 or location + size > total:
+            raise ValueError(f"NS[{slot}] has an invalid LUMP header or allocation")
+        if typ == 2:
+            if limit < size - 1:
+                raise ValueError(f"NS[{slot}] Thread limit does not cover its fresh allocation")
+            body = words[location:location + size]
+            _thread_words, target_fields, layout = _fresh_thread_words(
+                struct.pack(f">{size}I", *body), f"NS[{slot}]")
+            destination = live.get(target_fields["slot"])
+            if (destination is None or target_fields["slot"] < 3
+                    or destination["sequence"] != target_fields["sequence"]
+                    or destination["location"] >= total):
+                raise ValueError(
+                    f"NS[{slot}] fresh Thread continuation does not bind to a live destination row")
+            target_header = words[destination["location"]]
+            target_size = 1 << (((target_header >> 23) & 15) + 6)
+            target_cw = (target_header >> 10) & 8191
+            if (target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0
+                    or target_cw == 0 or destination["location"] + target_size > total):
+                raise ValueError(f"NS[{slot}] fresh Thread continuation target is not executable code")
+            thread_rows.append({
+                "slot": slot, "sequence": entry["sequence"],
+                "entrySlot": target_fields["slot"],
+                "entrySequence": target_fields["sequence"],
+                "allocationWords": size,
+                "stackWords": layout["stack_words"],
+            })
+            body_ranges.append((location, location + size, f"NS[{slot}] fresh Thread"))
+            continue
+        if typ != 0 or 1 + cw + cc > size or limit < cw:
             raise ValueError(f"NS[{slot}] is not a bounded ordinary executable LUMP")
         body_ranges.append((location, location + size, f"NS[{slot}] LUMP"))
         expected_self = boot.create_gt(entry["sequence"], slot, {"E": 1}, 1)
@@ -401,6 +487,7 @@ def validate_image(image, *, image_format):
         "cr15": {"word0": "02000001", "word1": 0,
                  "word2": table_words - 1, "word3": 0, "m": 1},
         "bootTarget": {"slot": decoded["slot"], "sequence": decoded["sequence"]},
+        "threadRows": sorted(thread_rows, key=lambda row: row["slot"]),
         "liveSlots": sorted(live),
         "ownedRanges": owned,
         "hardwareCertified": False,
@@ -459,19 +546,53 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
     for slot, row in sorted(by_slot.items()):
         if slot in (SELF_SLOT, THREAD_SLOT) or row.get("backing") == "mmio":
             continue
-        if row.get("type") not in ("Inform", "Resident"):
-            raise ValueError(f"NS[{slot}] requires an executable Inform/Resident LUMP")
+        if row.get("type") not in ("Inform", "Resident", "Thread"):
+            raise ValueError(f"NS[{slot}] requires an executable Inform/Resident/Thread LUMP")
         body, typ, cw, cc = _load_lump(row, lumps_dir, artifacts)
-        if typ != 0 or cw < 1:
-            raise ValueError(f"NS[{slot}] selected artifact is not an ordinary executable LUMP")
         sequence = _integer(row.get("seq"), f"NS[{slot}] sequence")
         if sequence > 511:
             raise ValueError(f"NS[{slot}] sequence is outside the 9-bit range")
-        expected_self = boot.create_gt(sequence, slot, {"E": 1}, 1)
-        if cc < 1 or body[-cc] != expected_self:
-            raise ValueError(
-                f"NS[{slot}] exact artifact must already contain its destination SELF GT; "
-                "recompile/reapprove rather than patching saved bytes")
+        if row.get("type") == "Thread":
+            binding = row.get("freshThreadImage")
+            if not isinstance(binding, dict):
+                raise ValueError(f"NS[{slot}] Thread requires an explicit fresh image binding")
+            if (binding.get("format") != "fresh-thread-continuation-v1"
+                    or _integer(binding.get("destinationSlot"), "Thread destination slot") != slot
+                    or _integer(binding.get("destinationSequence"), "Thread destination sequence") != sequence):
+                raise ValueError(f"NS[{slot}] fresh Thread image does not bind to its exact destination identity")
+            ordinal_text = str(row.get("name", "")).removeprefix("Thread.")
+            expected_entry_name = (
+                "CapabilityTest" if ordinal_text.isdigit() and int(ordinal_text) <= 3
+                else "SelfTest")
+            if binding.get("entryName") != expected_entry_name:
+                raise ValueError(
+                    f"NS[{slot}] fresh Thread must explicitly target {expected_entry_name}")
+            captest = next((candidate for candidate in by_slot.values()
+                            if candidate.get("name") == expected_entry_name), None)
+            if captest is None:
+                raise ValueError(
+                    f"NS[{slot}] fresh Thread has no destination {expected_entry_name} row")
+            entry_slot = _integer(captest.get("slot"), f"{expected_entry_name} slot")
+            entry_sequence = _integer(captest.get("seq"), f"{expected_entry_name} sequence")
+            if (_integer(binding.get("entrySlot"), "Thread entry slot") != entry_slot
+                    or _integer(binding.get("entrySequence"), "Thread entry sequence") != entry_sequence):
+                raise ValueError(
+                    f"NS[{slot}] fresh Thread has a stale {expected_entry_name} binding")
+            expected = build_fresh_thread_lump(
+                allocation_words=_integer(row.get("allocationWords"), "Thread allocationWords"),
+                stack_words=_integer(row.get("stackWords"), "Thread stackWords"),
+                entry_slot=entry_slot, entry_sequence=entry_sequence)
+            actual = struct.pack(f">{len(body)}I", *body)
+            if typ != 2 or actual != expected or _sha(actual) != binding.get("sha256"):
+                raise ValueError(f"NS[{slot}] Thread bytes do not match the fresh destination initializer")
+        else:
+            if typ != 0 or cw < 1:
+                raise ValueError(f"NS[{slot}] selected artifact is not an ordinary executable LUMP")
+            expected_self = boot.create_gt(sequence, slot, {"E": 1}, 1)
+            if cc < 1 or body[-cc] != expected_self:
+                raise ValueError(
+                    f"NS[{slot}] exact artifact must already contain its destination SELF GT; "
+                    "recompile/reapprove rather than patching saved bytes")
         loaded[slot] = body
 
     memory = [0] * total
@@ -528,7 +649,10 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
             location = body_cursor
             memory[location:location + size] = body
             body_cursor += size
-            if limit < ((body[0] >> 10) & 8191):
+            if row.get("type") == "Thread":
+                if limit < size - 1:
+                    raise ValueError(f"NS[{slot}] limit does not cover its fresh Thread allocation")
+            elif limit < ((body[0] >> 10) & 8191):
                 raise ValueError(f"NS[{slot}] limit does not cover its executable code words")
         if body_cursor > total:
             raise ValueError("Ascending Namespace bodies exceed configured capacity")
