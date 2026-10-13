@@ -537,34 +537,7 @@ class ChurchAssembler {
         const clistKey = ChurchAssembler._nameKey(this._clistSlots, name);
         if (clistKey !== null) return { slot: this._clistSlots[clistKey], key: clistKey };
 
-        // 3. LED<N> shorthand — all LED0–LED5 share the LED_DEV GT at boot
-        //    c-list slot 3 (clistGTs[3] = LED_DEV, MMIO 0x40000000, lim17=4).
-        //    LOAD CR3, LED0  →  LOAD CR3, CR6, #3  (same slot for all LEDs;
-        //    individual LEDs are selected by the DWRITE offset: 0=LED0…4=LED4).
-        //    Legacy bracket form LED[N] is still accepted for back-compat.
-        const ledMatch = name.match(/^LED(\d)$/i) || name.match(/^LED\[(\d)\]$/i);
-        if (ledMatch) {
-            const n = parseInt(ledMatch[1], 10);
-            if (n >= 0 && n <= 5) return { slot: 3, key: name };   // all LEDs → LED_DEV GT at clistGTs[3]
-        }
-
-        // 3.2. Hardware device shorthands — boot c-list positions in the current
-        //      11-slot DEMO_CLIST built by _getHardwareBootCatalog:
-        //        [2] UART_DEV  [3] LED_DEV  [4] BTN_DEV  [5] TIMER_DEV
-        //      These are checked AFTER nsSymbols so that an explicit namespace table
-        //      (set via setNamespace) takes priority when the abstraction is mounted
-        //      in the Namespace Table for method dispatch (ELOADCALL).  When no
-        //      namespace entry is present — e.g. in bare LOAD instructions without a
-        //      capabilities block — the name falls through to here and resolves to the
-        //      fixed boot c-list slot for that hardware device.
-        //      SlideRule is omitted — it is not a boot hardware device; if installed
-        //      it appears in the Namespace Table and resolves via nsSymbols above.
-        {
-            const nameUC = name.toUpperCase();
-            if (nameUC === 'UART' || nameUC === 'UART_TX' || nameUC === 'UART_RX')  return { slot: 2, key: name };
-            if (nameUC === 'BTN')   return { slot: 4, key: name };
-            if (nameUC === 'TIMER') return { slot: 5, key: name };
-        }
+        // No implicit MMIO slots. Devices require declared object identities.
 
         // 3.5. Boot-image fixed capability names — always present in the boot c-list
         //      regardless of which abstractions are installed.
@@ -834,7 +807,6 @@ class ChurchAssembler {
             }
             for (const cap of parsed.caps) {
                 if (!cap.null_row && cap.rights.length === 0 &&
-                    !ChurchAssembler._isHardwareCapName(cap.name) &&
                     !ChurchAssembler._isThreadCapName(cap.name)) {
                     this.errors.push({ line: lineNum + 1, ...this._tokenCols(this._currentLineText, cap.name),
                         message: `Capability "${cap.name}" has no permission letters — add at least one of E, R, W, X after the name.\n  Example: capabilities { ${cap.name} E }` });
@@ -3121,12 +3093,27 @@ class ChurchAssembler {
     //   • Word 0x00000000 is emitted as "HALT".
 
     // _isHardwareCapName(name)
-    // Returns true for hardware-fixed capability names whose permissions are defined
-    // by the boot image and do not need to be spelled out in the source.
-    // These names are exempt from the bare-name (no rights letters) validation.
+    // Recognize historical shorthand for diagnostics/inspection only.
+    // Recognition confers neither a fixed slot nor a compilation exemption.
     static _isHardwareCapName(name) {
         return /^LED[0-5]$/i.test(name) ||
                /^(UART|UART_TX|UART_RX|BTN|SlideRule|Timer|Display|Boot\.Nucs|Boot\.Abstr)$/i.test(name);
+    }
+
+    static objectNameErrors(result) {
+        const errors = [];
+        const valid = name => typeof name === 'string' &&
+            /^[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+(?:#[1-9][0-9]*)?$/.test(name);
+        if (!valid(result.abstractionName)) errors.push({line:null,
+            message:'The LUMP object requires a declared canonical dot-name (for example ide.Service). Correct the source and recompile; no name is inferred.'});
+        for (const [row, cap] of (result.capabilities || []).entries()) {
+            if (cap && ((row === 0 && cap.compiler_owned_self &&
+                ['SELF','__SELF__'].includes(cap.name)) || (cap.null_row === true && cap.name === 'NULL'))) continue;
+            const target = cap && cap.name;
+            if (!valid(target)) errors.push({line:cap && cap.line || null,
+                message:`C-list row ${row} (${cap && cap.name || 'unnamed'}) requires a declared canonical dot-name, including MMIO (for example ide.UART). Fixed slots, addresses and device shorthand are not object identities.`});
+        }
+        return errors;
     }
 
     static _isThreadCapName(name) {

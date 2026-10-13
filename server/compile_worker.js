@@ -230,6 +230,9 @@ if (isMainThread) {
 
     // ── Compile errors ────────────────────────────────────────────────────────
     const errors   = compileResult.errors   || [];
+    for (const diagnostic of global.ChurchAssembler.objectNameErrors(compileResult)) {
+        if (!errors.some(error => error.message === diagnostic.message)) errors.push(diagnostic);
+    }
     const warnings = compileResult.warnings || [];
 
     if (errors.length > 0) {

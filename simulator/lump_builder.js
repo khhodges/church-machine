@@ -57,6 +57,8 @@
  * }}
  */
 function buildLump(result, opts) {
+    const nameErrors = require('./assembler.js').objectNameErrors(result);
+    if (nameErrors.length) throw new Error(nameErrors.map(e => e.message).join('\n'));
     opts = opts || {};
     const methods = result.methods || [];
     const caps    = result.capabilities || [];
@@ -217,6 +219,8 @@ function validateSuppliedIdentity(cap, row) {
 }
 
 function buildApiDefinition(result, words) {
+    const nameErrors = require('./assembler.js').objectNameErrors(result);
+    if (nameErrors.length) throw new Error(nameErrors.map(e => e.message).join('\n'));
     for (const [row, cap] of (result.capabilities || []).entries()) {
         if (!cap || typeof cap.name !== 'string' || !cap.name.trim()) {
             throw new Error(`C-list row ${row} has no PetName. The programmer must supply the declaration and recompile; no name was inferred or repaired.`);
