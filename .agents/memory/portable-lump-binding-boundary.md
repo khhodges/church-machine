@@ -20,6 +20,17 @@ projections must preserve explicit grants, type, and authorization fail-closed.
 The compiler must not populate destination Golden Tokens. The linking loader
 owns their resolution for both bitstream boot-image construction and lazy loading.
 
+The compiler's canonical dot-name identity rule applies to every referenced
+object, including MMIO. Device shorthand, a fixed Namespace slot, or a physical
+address must not substitute for the declared target identity in compiler output.
+
+**Why:** The user explicitly requires the LUMP compiler to use a dot-name for
+all objects, including MMIO; devices are not a naming exception.
+
+**How to apply:** Preserve the declared device identity through compilation and
+integrity coverage. Resolve it through destination linking, rather than guessing
+a target from LED/UART shorthand or inventing a missing device pet name.
+
 **Why:** The user explicitly assigns Golden Token materialization to the linking
 loader, not the compiler; compilation must not import the compiling Namespace's
 authority into a portable artifact.
