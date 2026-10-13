@@ -5,6 +5,16 @@ description: IDE-instance leaf ownership controls authored definitions; runtime 
 
 Each IDE instance owns its leaves in the global dot.name hierarchy and may establish or change their permissions. Human users need not be identified. This supersedes the earlier human-ownership and universally frozen-owner-permissions assumptions.
 
+The programmer configures the IDE node on Namespace Design, not by editing a
+server file or changing the browser Pet name preference. Save it explicitly with
+confirmation; do not rename saved artifacts or alter the installed Namespace.
+
+**Why:** The user requested the ownership node as a programmer-facing Namespace
+Design setting after compilation was blocked by a server-only node mismatch.
+
+**How to apply:** Treat node changes as ordinary validated project configuration,
+retain exact foreign definitions, and disclose any retargeted local aliases.
+
 The user explicitly confirmed that `Thread.2`, `Thread.3`, and `Boot.Thread` belong to this IDE through the Thread design page.
 
 **Why:** These are locally authored Thread definitions, not foreign imports; their dotted display names alone had incorrectly triggered foreign/malformed hierarchy checks.

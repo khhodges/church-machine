@@ -4475,13 +4475,24 @@ def _validate_step1(target_board, step1):
                 f"reserved for the namespace table)")
     return None
 
-@app.route("/api/ide-hierarchy", methods=["GET"])
+@app.route("/api/ide-hierarchy", methods=["GET", "PUT"])
 def get_ide_hierarchy():
-    from server.ide_leaf_policy import configuration
+    from server.ide_leaf_policy import configuration, save_node
+    from urllib.parse import urlparse
     try:
+        if request.method == "PUT":
+            if not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign":
+                return jsonify(error="Expected an IDE JSON design request", dataChanged=False), 403
+            origin = request.headers.get("Origin")
+            if origin and urlparse(origin).netloc != request.host:
+                return jsonify(error="Cross-origin design writes are not allowed", dataChanged=False), 403
+            return jsonify(save_node(request.get_json(silent=True)))
         return jsonify(configuration())
     except ValueError as exc:
-        return jsonify(error=str(exc)), 422
+        return jsonify(error=str(exc), dataChanged=False), 422
+    except (OSError, subprocess.SubprocessError) as exc:
+        return jsonify(error="IDE node could not be saved. Check server configuration access and retry.",
+                       dataChanged=False), 500
 
 
 @app.route("/api/boot-config", methods=["GET"])

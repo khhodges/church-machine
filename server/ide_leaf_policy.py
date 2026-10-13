@@ -1,7 +1,58 @@
-"""Trusted, file-provisioned IDE hierarchy; the browser cannot configure ownership."""
+"""Trusted IDE hierarchy, explicitly configured through Namespace Design."""
 import json
 import os
 import subprocess
+import copy
+import fcntl
+import tempfile
+
+
+def save_node(payload):
+    """CAS and atomic publication; only exact locally owned aliases move."""
+    if not isinstance(payload, dict) or set(payload) != {"node", "expected", "confirmed"}:
+        raise ValueError("Expected node, expected configuration and explicit confirmation.")
+    if payload["confirmed"] is not True:
+        raise ValueError("Confirm the IDE node change before saving.")
+    with open(CONFIG_PATH + ".lock", "a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        previous = configuration()
+        if previous != payload["expected"]:
+            raise ValueError("IDE configuration changed in another session. Reload the setting and review again.")
+        if previous is not None and (not isinstance(previous, dict) or
+                not isinstance(previous.get("aliases", {}), dict)):
+            raise ValueError("Existing configuration is malformed. Correct it before changing the IDE node.")
+        candidate = copy.deepcopy(previous) if previous is not None else {"aliases": {}, "definitions": {}}
+        old = candidate.get("node")
+        node = payload["node"]
+        candidate["node"] = node
+        if isinstance(node, str):
+            for alias, target in candidate.get("aliases", {}).items():
+                if isinstance(target, str) and target.rpartition(".")[0] == old:
+                    candidate["aliases"][alias] = node + "." + target.rpartition(".")[2]
+        script = """const p=require(process.argv[1]);let s='';
+process.stdin.on('data',c=>s+=c);process.stdin.on('end',()=>{
+console.log(JSON.stringify(p.validateHierarchyConfiguration(JSON.parse(s))));});"""
+        result = subprocess.run(["node", "-e", script, _TOKENS],
+                                input=json.dumps(candidate), capture_output=True,
+                                text=True, timeout=10, check=True)
+        verdict = json.loads(result.stdout)
+        if not verdict["ok"]:
+            raise ValueError(verdict["error"])
+        filename = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
+                                             dir=os.path.dirname(CONFIG_PATH), delete=False) as handle:
+                filename = handle.name
+                json.dump(candidate, handle, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(filename, CONFIG_PATH)
+            filename = None
+        finally:
+            if filename:
+                os.unlink(filename)
+        return candidate
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ide-hierarchy.json")
 _TOKENS = os.path.join(os.path.dirname(__file__), "..", "simulator", "capability_tokens.js")
