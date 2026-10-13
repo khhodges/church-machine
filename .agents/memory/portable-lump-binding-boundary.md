@@ -31,6 +31,10 @@ all objects, including MMIO; devices are not a naming exception.
 integrity coverage. Resolve it through destination linking, rather than guessing
 a target from LED/UART shorthand or inventing a missing device pet name.
 
+The user supplied `ide.UART` as an example of the required MMIO dot-name form.
+Treat it as naming guidance, not blanket authorization to rename historical
+artifacts or infer canonical names for other devices.
+
 **Why:** The user explicitly assigns Golden Token materialization to the linking
 loader, not the compiler; compilation must not import the compiling Namespace's
 authority into a portable artifact.
