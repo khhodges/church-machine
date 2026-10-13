@@ -1163,11 +1163,14 @@
 
     <div id="namespace" class="view">
         <div class="panel">
-            <div class="panel-title">Namespace Design — Approved Handoff Target</div>
-            <div id="namespaceHandoffTarget">Loading approved target layout…</div>
-            <details style="margin-top:16px;">
-                <summary style="cursor:pointer;padding:10px;">Saved legacy design and committed-image controls (not the target)</summary>
+            <div class="panel-title">Namespace Design</div>
+            <p id="namespaceDesignEditingNotice" role="note">ADD, Save, and inspection remain available while build options evolve. Add unfinished LUMPs such as ide.Mint as design placements; this does not install or enable executable code. Build-format validation applies when preparing an image, not when editing the design.</p>
             <div id="namespaceTable"></div>
+            <details id="namespaceHandoffReference" style="margin-top:16px;">
+                <summary style="cursor:pointer;padding:10px;">Historical handoff layout reference — read-only, not the current design</summary>
+                <p>This fixed snapshot does not follow ADD or Save. It retains full-source sizes and must not be used as the API-only bitstream memory map. The editable Namespace table above remains the design workspace.</p>
+                <div id="namespaceHandoffTarget">Loading historical layout reference…</div>
+            </details>
             <section id="bootCapacityPanel" aria-label="Boot capacity" style="padding:12px;border:1px solid #444;border-radius:6px;margin:10px 0;">
                 <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
                     <strong>Boot capacity — committed image</strong>
@@ -1179,7 +1182,6 @@
                 <pre id="namespaceImageRefreshResult" role="status" aria-live="polite" style="white-space:pre-wrap;max-height:320px;overflow:auto;"></pre>
                 <div id="bootCapacityReport" role="status" aria-live="polite" style="margin-top:8px;">Refresh to inspect the committed image. This report never installs a LUMP.</div>
             </section>
-            </details>
         </div>
     </div>
 
@@ -3603,7 +3605,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <link rel="stylesheet" href="namespace-inspector.css">
     <script src="namespace-inspector.js"></script>
     <script src="app-memory.js?v=sha256-7afb7754f90c"></script>
-    <script src="namespace-handoff-target.js?v=sha256-bfe029dc50df"></script>
+    <script src="namespace-handoff-target.js?v=design-workspace-restored"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
     <script src="app-abstractions.js?v=sha256-ff7d5881a6b7"></script>
     <script src="app-ns-dna.js"></script>

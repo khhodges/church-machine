@@ -38,11 +38,19 @@ const context = vm.createContext({document: {readyState: 'complete',
     getElementById: id => id === 'namespaceHandoffTarget' ? host : null}});
 vm.runInContext(fs.readFileSync(__dirname + '/namespace-handoff-target.js', 'utf8'), context);
 assert.match(host.innerHTML, /Metadata \/ physical header/);
-assert.match(host.innerHTML, /Approved target/);
+assert.match(host.innerHTML, /Historical reference/);
 assert.match(host.innerHTML, /0x00002400|9,216/);
 assert.match(host.innerHTML, /not the installed image/);
 assert.match(host.innerHTML, /slot 2, version 0/);
 const page = fs.readFileSync(__dirname + '/index.html', 'utf8');
-assert(page.indexOf('id="namespaceHandoffTarget"') < page.indexOf('id="namespaceTable"'));
-assert.match(page, /Saved legacy design and committed-image controls \(not the target\)/);
-console.log('PASS approved Namespace target: geometry, allocation, retained generations and browser rendering');
+const markup = page.slice(page.indexOf('<div id="namespace"'), page.indexOf('<!-- Hello Mum'));
+assert(markup.indexOf('id="namespaceTable"') < markup.indexOf('<details'),
+    'the editable Namespace and its ADD/Save controls must not be hidden by build references');
+assert(markup.indexOf('id="namespaceTable"') < markup.indexOf('id="namespaceHandoffTarget"'));
+assert.match(markup, /Historical handoff layout reference/);
+assert.match(markup, /must not be used as the API-only bitstream memory map/);
+assert.match(markup, /Add unfinished LUMPs such as ide.Mint as design placements/);
+assert.equal((markup.match(/id="namespaceTable"/g) || []).length, 1,
+    'all build options reuse the existing Namespace editor');
+assert.doesNotMatch(markup, /Approved Handoff Target|Saved legacy design and committed-image controls/);
+console.log('PASS Namespace workspace stays primary; historical reference retains geometry and evidence');

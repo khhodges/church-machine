@@ -1,7 +1,7 @@
 (function(root) {
     'use strict';
-    // Frozen review inputs: the approved layout and the two reviewed, saved
-    // Full-source revisions. This projection is not an installed image.
+    // Historical review snapshot, not the editable design or a build selector.
+    // Full-source sizes are retained as evidence, never as API-only sizing.
     const inputs = {
         capacityWords: 16384, slotCount: 64,
         residents: [
@@ -51,7 +51,7 @@
         try {
             const p = build();
             host.innerHTML = `<div style="padding:12px;border:1px solid #4ec9b0;line-height:1.6">
-                <strong>Approved target — Boot Namespace</strong>
+                <strong>Historical reference — Boot Namespace</strong>
                 <div>${p.slotCount} slots · ${p.capacityWords.toLocaleString()} words · ascending NST at word 0 ·
                 CR15 limit ${hex(p.tableWords - 1)} · entry Thread slot 2, version 0</div>
                 <div>Layout check: fits. NST + allocated bodies: ${p.end.toLocaleString()} words;

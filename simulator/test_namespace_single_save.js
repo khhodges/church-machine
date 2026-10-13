@@ -111,6 +111,28 @@ function harness() {
     assert.strictEqual(draftRows[2].seal, '0x000003DB', 'no automatic resealing');
     assert.strictEqual(draftRows[2].resident, undefined, 'no inferred residency');
 
+    // Unfinished service design remains editable regardless of image-build
+    // options. Exercise the same placement helper used by Namespace ADD.
+    h = harness();
+    h.sim.MAX_NS_ENTRIES = 64;
+    vm.runInContext(source.slice(source.indexOf('function _nsDraftSequence(slot)'),
+        source.indexOf('// Capture only authoritative rows')), h.context);
+    const mint = vm.runInContext(
+        '_nsStageDesignPlacement("ide.Mint", 15, {status:"missing", diagnostic:"Unfinished implementation"})',
+        h.context);
+    h.win._nsDraftAssignments['15'] = mint;
+    const mintMemory = Array.from(h.sim.memory);
+    assert.strictEqual(await h.win._nsTableSave(), true);
+    const savedMint = JSON.parse(h.calls[0].options.body).ns_state.abstractions
+        .find(row => row.name === 'ide.Mint');
+    assert.strictEqual(savedMint.symbolic, true);
+    assert.strictEqual(savedMint.implementationMissing, true);
+    assert.strictEqual(savedMint.resident, false);
+    assert.strictEqual(savedMint.selection.status, 'missing');
+    assert.strictEqual(savedMint.location, 0);
+    assert.deepStrictEqual(Array.from(h.sim.memory), mintMemory);
+    assert.strictEqual(h.calls[0].url, '/api/namespace/save-table');
+
     h = harness();
     h.context.error = new Error('Namespace changed since review; reload');
     assert.strictEqual(await h.win._nsTableSave(), false);
