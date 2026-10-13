@@ -121,9 +121,11 @@ test('prepare records missing authority without invoking the compiler', async ()
     const reviewDir = fs.mkdtempSync(path.join(staging, 'resident-preflight-review-'));
     const output = path.join(staging, `resident-preflight-output-${crypto.randomUUID()}`);
     const inputsDir = path.join(reviewDir, 'inputs');
+    const hierarchyPath = path.join(ROOT, 'server/ide-hierarchy.json');
     fs.mkdirSync(path.join(inputsDir, 'lumps'), {recursive: true});
     let invokedCompiler = false;
     const originalExecFileSync = childProcess.execFileSync;
+    const originalReadFileSync = fs.readFileSync;
     try {
         const artifacts = [];
         const binaryInputs = {
@@ -153,6 +155,16 @@ test('prepare records missing authority without invoking the compiler', async ()
             invokedCompiler = true;
             throw new Error('compiler must not run when trusted aliases are missing');
         };
+        // This negative-path fixture must not depend on the developer's live,
+        // user-approved IDE hierarchy aliases.
+        fs.readFileSync = function (filename, ...args) {
+            if (path.resolve(String(filename)) === hierarchyPath) {
+                return Buffer.from(JSON.stringify({
+                    node: 'kjhh1', aliases: {}, definitions: {},
+                }));
+            }
+            return originalReadFileSync.call(this, filename, ...args);
+        };
         const record = await prepare(reviewDir, output, ['CapabilityTest']);
         assert.equal(invokedCompiler, false);
         assert.equal(record.candidates.length, 0);
@@ -164,6 +176,7 @@ test('prepare records missing authority without invoking the compiler', async ()
         assert.equal(fs.existsSync(path.join(output, 'CapabilityTest/candidate.lump')), false);
     } finally {
         childProcess.execFileSync = originalExecFileSync;
+        fs.readFileSync = originalReadFileSync;
         fs.rmSync(reviewDir, {recursive: true, force: true});
         fs.rmSync(output, {recursive: true, force: true});
     }
