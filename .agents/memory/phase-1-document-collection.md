@@ -306,3 +306,13 @@ requires the verifier to reject it, not merely compare equal bits.
 complete proof presence without zero defaults, and preserve bindings through
 use. Never accept caller-controlled expected state or claim bit equality proves
 validity. Keep explicit negative cases in acceptance requirements.
+
+Separate deliberate NULL testing from EXACT equality.
+
+**Why:** The user agreed a dedicated TPERM NULL test is worth adding after
+proposing that EXACT hard-fault on either NULL operand.
+
+**How to apply:** TPERM NULL tests architectural NULL type (including nonzero
+NULL encodings), sets Z=1 for NULL and Z=0 otherwise, without faulting or changing
+the GT. Pair with NULL-before-equality hard faults for EXACT. Encoding and other
+flag/conditional-execution details remain open; no implementation is implied.

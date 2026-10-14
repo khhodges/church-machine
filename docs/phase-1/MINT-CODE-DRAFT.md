@@ -236,6 +236,13 @@ presence, and the intended object/authorization binding. Missing state must
 never default to a zero GT or zero proof. Do not equate a proof's numeric value
 with presence; no special all-zero-proof rule has been selected.
 
+**Agreed TPERM design direction:** A dedicated `TPERM CRn, NULL` tests the
+architectural NULL type without faulting or changing the capability (Z=1 for
+NULL, Z=0 otherwise). The paired EXACT change hard-faults if either operand is
+NULL before comparing bits. These semantics are not implemented yet; encoding
+and remaining flag/conditional-execution details still need specification.
+Neither test replaces trusted issuance, validity or proof checks.
+
 Required acceptance cases include NULL/NULL (including nonzero NULL encodings),
 NULL/valid, valid/NULL, equal invalid tokens, uninitialized trusted records,
 missing/truncated proofs, caller-substituted reference state, stale/revoked
