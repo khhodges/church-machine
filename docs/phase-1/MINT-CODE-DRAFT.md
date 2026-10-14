@@ -40,7 +40,12 @@ in-use safeguards, update ordering and interruption handling still need definiti
 release version without another increment. Preserve this value across slot
 clearing; it belongs to the slot, not the memory block. Example: 7 → release to
 8 → reallocate using 8. A retained 511 can be allocated; another release cannot
-increment it. Initial version selection and retention representation remain open.
+increment it. Retention representation remains open.
+
+**Approved initial version:** The first allocation into a genuinely never-used
+Mint slot uses **0**. Existing/freed slots retain their history, even when empty.
+Proof of never-used status still needs a bookkeeping mechanism. Zero version
+is not NULL type and does not authorize resets or wraparound.
 
 ## 1. ide.Mint
 
@@ -171,9 +176,10 @@ Mint(request, credential):
     UNRESOLVED_REQUIRE_WITHIN_PHASE1_HALF_MEMORY_BUDGET(frozen)
 
     # Software selects generation; hardware only checks equality.
-    # Pool release increments to 1..511 without wrap; initial assignment and
-    # reallocation uses the slot's retained release version, with no increment.
-    # Initial assignment and direct-replacement sequencing remain to be defined.
+    # First allocation into a proven never-used slot uses 0.
+    # Pool release increments to 1..511 without wrap; reallocation uses the
+    # slot's retained release version without another increment.
+    # Direct-replacement sequencing and bookkeeping remain to be defined.
     generation = UNRESOLVED_SELECT_SOFTWARE_GENERATION(current, frozen)
     UNRESOLVED_REQUIRE_GENERATION_IN_RANGE(generation, 0, 511)
     candidate = UNRESOLVED_PREPARE_OBJECT_AND_FOUR_WORD_ENTRY(

@@ -155,15 +155,19 @@ verification; no new executable opcode or HALT substitution is approved.
 authorized software sets `next_version = current_version + 1`, requiring
 `1 <= next_version <= 511`. 510→511 is permitted; at current version 511,
 the attempted release hard-faults without freeing the block. No wrap to zero
-and no hardware increment. This defines the release increment, not initial
-version selection or permission to release a protected/in-use object.
+and no hardware increment. This does not grant permission to release a
+protected/in-use object.
 
 **Approved reallocation rule:** Retain the release version with the Namespace
 slot and use it for the next GT allocated into that slot; do not increment again
 or reset it when clearing the slot. Versions follow slots, not free memory
 blocks. A retained 511 may be allocated, but cannot subsequently be incremented
-for another release. Initial version selection and storage representation remain
-to be defined.
+for another release. Storage representation remains to be defined.
+
+**Approved initial version:** Use version **0** for the first allocation into
+a genuinely never-used Mint slot. Existing or previously freed slots retain
+their history; never infer never-used from an empty entry alone. Version 0 is
+not NULL, which is determined by GT type. No existing version reset is approved.
 
 **Allocation requirement:** Track used and free memory blocks per LUMP size
 class in Phase 1, independently of Namespace-slot availability and generations.

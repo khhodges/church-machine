@@ -367,7 +367,16 @@ second increment.
 
 **How to apply:** Keep the version with the slot, not the memory block, and never
 reset it when clearing a free slot. Retained 511 may be allocated but cannot
-support another release increment. Initial version selection remains open.
+support another release increment.
+
+The first allocation into a genuinely never-used Mint slot uses version 0.
+
+**Why:** The user explicitly approved initial version 0, distinct from retained
+versions on freed slots.
+
+**How to apply:** Preserve existing/freed-slot history; empty alone does not
+prove never-used. Version 0 is not NULL type. Do not reset versions or introduce
+wrap; the mechanism establishing never-used status remains to be specified.
 
 Inspect F/G via authorized Namespace reads and BFEXT; setting GT B=true, if
 needed, belongs to a privileged function, not a set-B instruction.
