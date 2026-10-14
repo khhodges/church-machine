@@ -34,7 +34,11 @@ for this pair or copy a live descriptor version to satisfy a check. Check slot 1
 during Namespace admission, then slot 2 during Thread admission before activation.
 A second-stage failure may leave CR15 changed: hard-fault without rollback and
 do not activate the target Thread. Other slot policies remain unchanged.
-Configuration identity and generation/provisioning remain TBD.
+Generate the pair once on approval of a new boot configuration and retain it
+with that configuration. Unchanged rebuilds, exports, uploads, resets and
+unrelated application LUMP changes reuse it. Only explicit approval of a changed
+boot configuration generates a new pair. Detailed configuration identity,
+storage schema and provisioning mechanics remain TBD.
 **CONFIDENTIAL**
 
 The Boot ROM and RAM are defined by the FPGA bitstream used to flash the FPGA. It is defined by the IDE under program control, size is defined in words (4 bytes each). The ROM is read-only instruction memory, carried from the IDE to the FPGA in `hardware/boot_rom.py` and instantiated as the `BootRom` class with the following three CLOOMC boot instructions: LOAD CR15, CHANGE that suspends the current thread and starts Boot.Thread, and CALL CR0, the programmer-selected lightning bolt slot in the IDE-defined namespace as Lazy Load.

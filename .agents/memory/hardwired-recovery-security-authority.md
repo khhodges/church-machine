@@ -16,6 +16,10 @@ random halves assigned by the IDE and expected values embedded in the bitstream.
 The guard identifies the approved slot-1/slot-2 boot configuration, not every
 image revision. Unrelated application edits and normal runtime Namespace
 updates must not force a new value; changed boot configuration does.
+Generate the pair once at explicit approval of a new boot configuration and
+retain it with that configuration. Unchanged rebuilds, exports, uploads and
+resets reuse it; bitstream builds alone never regenerate it. Storage schema
+and detailed configuration identity/provisioning mechanics remain undecided.
 This replaces identical full-value metadata copies. Referencing GTs use the
 assigned versions; reset/handoff into this boot pair uses the embedded expected
 slot-2 version, not mandatory zero or a version copied from live state. Other
@@ -29,6 +33,8 @@ threat to address, rather than deliberate unauthorized substitution, and chose
 boot-core pairing to avoid requiring matching bitstream rebuilds for unrelated
 application changes. They chose concatenation to avoid extra storage, accepting
 18-bit whole-pair but only 9-bit single-object accidental-mismatch coverage.
+They approved retaining the pair so unchanged rebuilds do not unexpectedly
+change boot-slot versions and referring GTs.
 
 Reloading CR15 requires activation of the incoming Namespace's slot-2 Thread
 under the same authority, with no second Thread-activation grant. SWITCH's
