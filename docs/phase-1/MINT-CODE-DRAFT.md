@@ -419,6 +419,14 @@ not proof that the additional issuance/list-enforcement code fits those sizes.
 
 ## 5. From this draft to measurable code
 
+**Approved acceptance requirement, with Genesis override:** Require simulator,
+RTL-test and physical FPGA evidence tied to the exact release build for
+TPERM NULL/EXACT (NULL/NULL and condition skips included), HARDFAULT with correct
+IDE fault location/reason, and exclusive single-slot updates with publication
+only after confirmed writes. Genesis may override this evidence requirement;
+identify that acceptance as an override, not as a passed or observed test.
+This approval exercises no override and authorizes no build/upload/flash.
+
 Resolve the `UNRESOLVED_*` contracts one at a time, then translate into CLOOMC
 with an explicit C-List and preserved/clobbered register ABI. In particular,
 nstab's slot assignment alone does not confer authority: the approved same-scope

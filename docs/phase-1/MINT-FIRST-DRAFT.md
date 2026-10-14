@@ -207,7 +207,19 @@ nstab is table access, not a third executable service body needing doubled
 code space. Its exact descriptor/bounds must cover the approved Namespace-table
 view; rights must not silently expand to unrelated memory.
 
-## 5. Decisions to finish in this Q&A
+## 5. Acceptance requirement — approved with Genesis override
+
+Require simulator, RTL-test and exact-release-build physical FPGA evidence for
+TPERM NULL/EXACT (including NULL/NULL and skipped conditions), HARDFAULT with
+correct IDE location/reason, and exclusive single-slot updates with GT
+publication only after confirmed writes.
+
+Genesis may override this evidence requirement. An exercised override must be
+identified separately from a passed test; missing/failed/unobservable evidence
+does not become verified. No override has been exercised by this approval,
+and no hardware operation is authorized. Detailed evidence remains outstanding.
+
+## 6. Decisions to finish in this Q&A
 
 - Approve or revise growth headroom; select supported object types and methods.
 - Identify callers, nstab custody/delegation and operation authorization.

@@ -405,3 +405,14 @@ replacement rule, explicitly classifying it as software work to be determined.
 
 **How to apply:** Do not treat that proposal as approved or infer it from the
 separately approved pool-release/reallocation rules. Preserve those prior rules.
+
+Phase 1 acceptance for TPERM NULL/EXACT, HARDFAULT diagnostics and exclusive
+Mint publication requires simulator, RTL and exact-build physical FPGA evidence,
+with Genesis override authority.
+
+**Why:** The user approved the proposed three-layer evidence requirement and
+explicitly added “with Genesis override.”
+
+**How to apply:** Keep exercised overrides distinguishable from passed tests;
+report missing/failed/unobservable evidence honestly. Authority to override
+is not an exercised blanket waiver or authorization to build/upload/flash.
