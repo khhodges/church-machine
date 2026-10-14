@@ -22,7 +22,12 @@ slot_recheck:
     BRANCH TODO_RECHECK_SINGLE_SLOT_AND_REJECT_RESIDENT_REPLACEMENT
 slot_write:
     ; READ mode must not fall through to writes; mode dispatch is TBD.
-    ; Commit mode: define write exclusion, accepted writes and ordering.
+    ; Approved: complete verification/preparation before first table write.
+    ; No CALL/CHANGE/SWITCH/yield until all required writes are confirmed.
+    ; Exclude other writers; readers must not use partially updated entries.
+    ; Publish the resulting GT only after confirmed write completion.
+    ; Exclusion, confirmation and interruption containment mechanisms are TBD.
+    ; No watchdog/reset/fault exemption is implied.
     ; Four DWRITEs alone do NOT establish atomicity.
     ; Faults hard-fault; already accepted writes are not implicitly undone.
     BRANCH TODO_SINGLE_SLOT_WRITE_PROTOCOL

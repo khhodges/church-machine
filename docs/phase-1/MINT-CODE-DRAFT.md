@@ -72,6 +72,15 @@ Every table access requiring NSRW-GT, including initial reads and commit-time
 rechecks, goes through this LAMBDA. Single-slot operation does not establish
 atomic four-word writes, external-writer exclusion or reset/fault safety.
 
+**Approved update boundary:** Finish verification and preparation before the
+first Namespace write. From that write through confirmed completion, the
+single-slot LAMBDA must not CALL, CHANGE, SWITCH or otherwise yield. Exclude
+other writers and prevent readers from using partial entries. Publish the
+resulting GT only after all required writes are confirmed. Faults hard-fault;
+no rollback is promised. This is not a watchdog/reset/fault exemption.
+The concrete exclusion, write confirmation and interrupted-write containment
+mechanisms remain unresolved and must be verified before operational use.
+
 **Approved fault rule:** Any fault in Mint, its same-scope LAMBDA or pkverify
 is a **hard fault**. Failed verification, authorization, validation, destination
 checks and commit checks do not return a recoverable rejection. `HARD_FAULT`

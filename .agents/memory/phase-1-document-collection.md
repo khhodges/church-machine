@@ -378,3 +378,13 @@ required privilege for setting B.
 **How to apply:** No new TPERM F/G presets or Phase 1 GC. Keep Mint reads within
 the same-scope single-slot LAMBDA. Do not invent the set-B function's authority
 or ABI, approve TESTB by implication, or change the existing clear-B modifier.
+
+Mint's single-slot update must be exclusive and non-yielding, with verification
+and preparation finished before the first table write.
+
+**Why:** The user approved the proposed update boundary before GT publication.
+
+**How to apply:** No CALL, CHANGE, SWITCH or yield during writes; exclude other
+writers and prevent readers from using partial entries. Confirm all writes
+before publishing the GT. Faults hard-fault without rollback; no watchdog/reset
+exemption. Verify actual exclusion and interruption containment, not just order.

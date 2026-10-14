@@ -104,6 +104,14 @@ external-writer exclusion or interruption behavior.
 These roles do not assign scratch CRs, DRs, proof storage or cryptographic
 primitives. Existing draft ABI assignments are not adopted merely by reference.
 
+**Approved update boundary:** Finish verification and preparation before the
+first table write. The same-scope single-slot LAMBDA makes no CALL, CHANGE,
+SWITCH or other yield during the writes; exclude other writers and prevent use
+of partially updated entries. Publish the GT only after all required writes
+are confirmed. Faults hard-fault without promised rollback. This does not
+disable faults, reset or the watchdog; exclusion and interrupted-write
+containment remain implementation/verification obligations.
+
 **Proof requirement — approved:** pkverify requires both the passkey-GT and a
 separate **128-bit proof**. **Mint creates the proof when it forges the PassKey.**
 Missing or invalid proof hard-faults. Generation mechanism, protected storage,
