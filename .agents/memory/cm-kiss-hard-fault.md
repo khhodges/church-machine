@@ -53,3 +53,14 @@ Use the exact loaded artifact identity; missing maps show raw locations, not
 guessed labels. Keep strings outside Tiny LUMPs if appropriate. Static data
 only initially. Verify a non-returning lowering and pre-recovery fault-location
 capture before implementation; neither HALT nor a new opcode is approved.
+
+The user approved lowering HARDFAULT to one designated non-executable word
+using the existing INVALID_OP path.
+
+**Why:** It avoids a new executable opcode, reporting CALL and scratch registers
+while using the exact-artifact map for software reasons.
+
+**How to apply:** Select and verify the exact word, flags/register preservation
+and original fault-location capture before use. Keep the word non-executable
+in future ISA revisions. Do not interpret every INVALID_OP as intentional;
+only an exact matching fault-map site establishes that distinction.

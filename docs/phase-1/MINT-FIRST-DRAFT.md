@@ -134,8 +134,12 @@ with an exact-artifact IDE fault map from instruction offset to reason, method,
 source line and explanation. Start with static diagnostics only, no runtime
 reporting CALL or diagnostic scratch registers. Tiny LUMPs need not carry
 explanatory strings. If no matching map exists, show the raw fault location.
-The actual non-returning machine-code sequence and reliable capture of its
-fault location still require verification; no new opcode or HALT substitution.
+**Approved lowering approach:** One designated non-executable word invokes the
+existing INVALID_OP hard-fault path; the exact-artifact map supplies the reason
+and distinguishes intentional HARDFAULT sites from accidental invalid code.
+Keep that word non-executable in future ISA revisions. The exact word,
+flags/register preservation and reliable fault-location capture still require
+verification; no new executable opcode or HALT substitution is approved.
 
 ## 4. Growth headroom — proposal pending
 

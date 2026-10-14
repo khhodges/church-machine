@@ -110,8 +110,16 @@ not necessarily in Tiny LUMPs. There is no runtime message construction,
 reporting CALL, network dependency or diagnostic scratch-register requirement
 in this basic design. Compiler-generated checks may use the same construct.
 
-The exact lowering sequence and preservation of an identifiable fault location
-before recovery changes state must be verified against the ISA and target.
+**Lowering approach — approved:** Emit one designated non-executable word
+that triggers the existing `INVALID_OP` hard-fault path. The exact-artifact
+fault map identifies intentional HARDFAULT sites and supplies their reasons;
+do not label every INVALID_OP as an intentional software fault. No new
+executable opcode, scratch register or reporting CALL is introduced. The
+designated word must remain non-executable in future ISA revisions.
+
+The exact word, preservation of flags/registers and capture of an identifiable
+fault location before recovery changes state must still be verified against
+the ISA and target. Approval selects the approach, not a numeric encoding.
 `HALT` is not a substitute. Map serialization, capture/transport details and
 implementation remain open. No rollback or continuation is implied.
 
