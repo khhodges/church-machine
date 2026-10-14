@@ -64,8 +64,11 @@ No wrap/reuse policy is inferred.
 
 **Passkey-GT direction — approved:** Mint creates the passkey-GT and shares it
 as Mint is permitted by the design structure, TBD as a **list of approved GTs**.
-List membership, ownership, representation, enforcement and issuance/sharing
-mechanics remain unresolved. Do not infer IDE-only access, unrestricted CM
+**Genesis is responsible for defining and approving that list and permitted
+sharing structure for Phase 1.** Mint creates/shares under Genesis's policy;
+it does not choose approved recipients. List contents, representation,
+enforcement and issuance/sharing mechanics remain unresolved.
+Do not infer IDE-only access, unrestricted CM
 access, onward-sharing permission or NSRW-GT delegation. The pkverify proof
 contract remains open; GT equality alone is not implicitly approved as proof.
 

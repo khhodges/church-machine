@@ -269,6 +269,9 @@ TBD as a list of approved GTs.
 **Why:** The user supplied this authority model instead of selecting the proposed
 IDE-only versus explicitly authorized CM-caller alternatives.
 
-**How to apply:** Preserve Mint's creation/sharing responsibility. Do not invent
-the list, its owner or issuance/bootstrap/onward-sharing rules. Do not equate
+**How to apply:** Preserve Mint's creation/sharing responsibility. Genesis owns
+definition and approval of the Phase 1 GT list and permitted sharing structure,
+as explicitly clarified by the user. Mint enforces that policy rather than
+choosing approved recipients. Do not invent list entries or
+issuance/bootstrap/onward-sharing rules. Do not equate
 passkey possession with NSRW-GT access or silently settle pkverify's proof ABI.

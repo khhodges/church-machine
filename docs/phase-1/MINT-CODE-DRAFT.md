@@ -121,7 +121,10 @@ the initial read. This draft supplies no automatic retry or rollback strategy.
 **Approved:** Mint creates a **passkey-GT** and shares it as permitted by the
 design structure, to be defined as a **list of approved GTs**. This is the
 selected authority direction, not an IDE-only or unrestricted-CM caller rule.
-The list's membership, ownership, representation and enforcement remain TBD.
+**Phase 1 policy responsibility belongs to Genesis.** Genesis defines and
+approves the GT list and permitted sharing structure; Mint implements that
+policy, not its own selection of approved recipients.
+The actual list, representation and enforcement mechanics remain TBD.
 Do not invent approved entries or infer that possessing Mint's E capability
 alone permits receiving or further sharing the passkey-GT.
 
@@ -132,7 +135,7 @@ or token/proof format. All failed checks hard-fault.
 ```text
 # Mint responsibility; exact callable interface TBD.
 Mint_create_and_share_passkey(request):
-    policy = UNRESOLVED_GET_DESIGN_APPROVED_GT_LIST()
+    policy = UNRESOLVED_GET_GENESIS_APPROVED_GT_LIST()
     UNRESOLVED_REQUIRE_ISSUANCE_AND_SHARING_PERMITTED(request, policy)
     passkey_gt = UNRESOLVED_CREATE_PASSKEY_GT(request, policy)
     UNRESOLVED_SHARE_ONLY_AS_DESIGN_PERMITS(passkey_gt, request, policy)
