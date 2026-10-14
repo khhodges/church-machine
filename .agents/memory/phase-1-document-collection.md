@@ -23,3 +23,14 @@ Phase 1 document reviews must cover the collection but stay within it.
 **How to apply:** Use the collection manifest as the audit boundary. Treat
 references to excluded code or documents as unverified dependencies, not
 permission to expand the review or claim runtime conformance.
+
+Resolve the completeness-review findings with the user one at a time in
+priority/dependency order, recording a resolution per item in the review.
+
+**Why:** The user explicitly requested guided, sequential decisions rather
+than a batch of inferred architectural approvals.
+
+**How to apply:** Explain the current finding and the proposed resolution,
+obtain the user's decision, and update its resolution before moving on.
+Keep proposed decisions distinct from approved ones and from implementation
+or hardware authorization.
