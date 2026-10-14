@@ -40,8 +40,13 @@ not executable implementations.
   and proof. Validate non-NULL, valid, actively issued/bound reference state,
   independent of caller-controlled expected values; no missing-state zero
   defaults. EXACT alone does not authenticate.
-- Proof generation, protected storage/transfer, ABI, revocation/replay, list
-  representation and bootstrap issuance remain software TBD.
+- **Credential lifetime — approved:** The PassKey GT and separate proof are
+  reusable until revoked. Successful use does not consume the pair or require
+  reissuance. Every operation still requires current credential validation
+  and operation authorization; reuse is not one-time-use replay protection.
+  Revoked or otherwise invalid credentials hard-fault.
+- Proof generation, protected storage/transfer, ABI, concrete revocation
+  mechanics, list representation and bootstrap issuance remain software TBD.
 - Track used/free blocks per LUMP size class, separately from slots/generations.
   **No GC in Phase 1.** G-setting location/control is Phase 2 TBD.
 - Software versions are 9 bits. A genuinely never-used slot starts at 0.

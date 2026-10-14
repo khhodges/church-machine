@@ -123,6 +123,12 @@ Missing or invalid proof hard-faults. Generation mechanism, protected storage,
 transfer and verification ABI remain unresolved; this does not authorize
 exposing proof material in public results, traces or diagnostics.
 
+**Credential lifetime — approved:** Reuse the PassKey GT/proof pair until
+revoked; successful use does not consume it or require a newly issued pair.
+Validate current credential state and operation authorization on every use.
+Revoked or invalid credentials hard-fault. This is not one-time-use replay
+protection; concrete revocation mechanics remain unresolved.
+
 **Validity before equality:** NULL/NULL must never pass pkverify. EXACT alone
 is bit comparison, not PassKey validation. Validate both supplied and trusted
 GTs as non-NULL, valid and actively issued/bound credentials; require initialized
@@ -225,7 +231,8 @@ and no hardware operation is authorized. Detailed evidence remains outstanding.
 
 - Approve or revise growth headroom; select supported object types and methods.
 - Identify callers, nstab custody/delegation and operation authorization.
-- Define pkverify, credential issuance/storage, proof ABI, revocation and replay.
+- Define pkverify, credential issuance/storage, proof ABI and concrete revocation
+  mechanics under the approved reusable-until-revoked lifetime.
 - Define request/results, scratch/clobbers and authorized GT materialization.
 - Define create/replacement validation, expected-state checks and in-use rules.
 - Define write exclusion, reset/fault behavior and GT publication timing.

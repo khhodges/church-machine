@@ -295,7 +295,11 @@ Mint as the proof creator at forging time.
 
 **How to apply:** Require both, hard-fault on missing/invalid proof, and never
 substitute GT equality alone. Generation mechanism, protected storage, transfer,
-verification ABI, revocation and replay rules still require explicit decisions.
+verification ABI and concrete revocation mechanics still require explicit
+decisions. The user subsequently approved reusing the GT/proof pair until
+revoked: successful use does not consume it, and every operation still checks
+current credential validity and authorization. This is not one-time-use replay
+protection.
 
 Keep the requested CLOOMC review drafts deliberately unbuildable at unresolved
 contract boundaries rather than supplying accepting placeholder methods.

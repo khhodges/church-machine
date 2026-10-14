@@ -379,6 +379,13 @@ before bitstream build; alternatively a validated reloadable-LUMP path, never
 unfinished services at release. The [Mint contract](ide-mint-forge-contract.md)
 governs the approved scope, single-slot LAMBDA, proof and publication boundaries.
 
+**PassKey lifetime — approved:** The issued PassKey GT and separate 128-bit
+proof are reusable until revoked. Successful use does not consume the pair.
+Every operation still requires current credential validation and authorization;
+revoked or otherwise invalid credentials hard-fault. This does not provide
+one-time-use replay protection or select proof storage, transfer, ABI or
+concrete revocation mechanics.
+
 Require simulator, RTL and exact-release-build physical FPGA evidence for
 TPERM NULL/EXACT, HARDFAULT/IDE attribution and Mint's exclusive update/publication,
 **with Genesis override authority**. Identify exercised overrides separately
