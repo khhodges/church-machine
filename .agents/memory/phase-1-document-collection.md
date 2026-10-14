@@ -58,13 +58,14 @@ documents; keep watchdog policy a separate decision and preserve historical
 proposals unchanged.
 
 The user approved the Master's ascending layout as the sole new Phase 1
-Namespace layout and requested three trailing additions in this order:
-`ide.Mint E`, `nstab RW` (hand-crafted Namespace-table RW capability, “the
-power”), and `pkverify E` (a new, yet-to-be-defined LUMP).
+Namespace layout and explicitly assigned Namespace Table slot 9 to `ide.Mint E`,
+slot 14 to `nstab RW` (hand-crafted Namespace-table RW capability, “the power”),
+and slot 15 to `pkverify E` (a new, yet-to-be-defined LUMP). The user stated
+slot 9 is empty. These exact assignments replace “three trailing additions.”
 
 **Why:** These are explicit user requirements accompanying layout approval,
 not inferred runtime provisioning or a completed verifier design.
 
-**How to apply:** Preserve the order and exact requested rights. Establish
-which table and capability holder the user means before assigning rows or
-granting authority; do not invent pkverify behavior.
+**How to apply:** Preserve the approved Namespace slots and requested rights.
+Capability holders/issuance and pkverify behavior still require their own
+contracts; do not treat Namespace placement as blanket authority issuance.
