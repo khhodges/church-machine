@@ -143,3 +143,13 @@ replacing the earlier frozen-bootstrap versus portable-content framing.
 or automatically redefine T as a hash on local rebinding. Network representation,
 issuance and authorization are not yet specified by this definition; do not
 invent them. This decision supersedes older bootstrap-only applicability claims.
+
+The IDE may identify non-memory objects with T values greater than the Namespace
+slot count (virtualGTs) when resident + lazy + new LUMPs exceed table capacity.
+
+**Why:** The user explicitly extended the T model so IDE object identity is
+not constrained by physical Namespace capacity.
+
+**How to apply:** Preserve this optional virtualGT ID space without requiring
+live slots for every IDE-known object. Do not infer a packed encoding, hardware
+access authority, or virtual-to-resident binding algorithm from this statement.
