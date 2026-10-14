@@ -31,7 +31,8 @@ Tiny service estimates do not separately cost it.
 **Approved pool-release version rule:** Software increments the corresponding
 Namespace-entry version before returning its block to the free pool.
 `next_version = current_version + 1` must be in **1–511 inclusive**, with no
-wrap to zero. At current version 511, hard-fault before freeing the block.
+wrap to zero. Ordinary issued versions are 0–510; 510→511 destroys and
+permanently retires the slot. Never issue or reallocate ordinary version 511.
 Check the untruncated increment; masking 512 to zero is forbidden. Namespace
 updates remain inside the same-scope single-slot LAMBDA. Release authority,
 in-use safeguards, update ordering and interruption handling still need definition.
@@ -39,8 +40,9 @@ in-use safeguards, update ordering and interruption handling still need definiti
 **Approved reallocation rule:** Mint uses the freed Namespace slot's retained
 release version without another increment. Preserve this value across slot
 clearing; it belongs to the slot, not the memory block. Example: 7 → release to
-8 → reallocate using 8. A retained 511 can be allocated; another release cannot
-increment it. Retention representation remains open.
+8 → reallocate using 8. A retained 511 is permanently retired, not allocatable.
+Retention representation remains open. Boot-pair random versions need separate
+reconciliation with the retirement reservation.
 
 **Approved initial version:** The first allocation into a genuinely never-used
 Mint slot uses **0**. Existing/freed slots retain their history, even when empty.
@@ -181,12 +183,12 @@ Mint(request, credential):
 
     # Software selects generation; hardware only checks equality.
     # First allocation into a proven never-used slot uses 0.
-    # Pool release increments to 1..511 without wrap; reallocation uses the
-    # slot's retained release version without another increment.
+    # Pool release increments without wrap; 510->511 retires the slot.
+    # Reallocation uses retained 1..510 without another increment.
     # Direct replacement's slot/version policy: software issue, TBD by user.
     # Same-slot/version-plus-one replacement was proposed, NOT approved.
     generation = UNRESOLVED_SELECT_SOFTWARE_GENERATION(current, frozen)
-    UNRESOLVED_REQUIRE_GENERATION_IN_RANGE(generation, 0, 511)
+    UNRESOLVED_REQUIRE_GENERATION_IN_RANGE(generation, 0, 510)
     candidate = UNRESOLVED_PREPARE_OBJECT_AND_FOUR_WORD_ENTRY(
         frozen, destination, generation)
     candidate.W2 = integrity32(candidate.W0, candidate.W1)

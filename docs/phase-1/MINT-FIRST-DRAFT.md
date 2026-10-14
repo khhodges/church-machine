@@ -73,8 +73,9 @@ arbitrary active or protected objects.
 **Outstanding GTs — approved:** Authorized Destroy may invalidate existing
 GTs rather than prove no copies remain. Later stale-GT accesses must fault.
 Use the approved software release rules: increment before freeing, no wrap,
-hard-fault without freeing at version 511, and retain the slot version on
-reuse. No reference enumeration/cleanup is required by this decision.
+510→511 destroys and permanently retires the slot. Issue ordinary versions
+0–510 only; reuse retained usable versions without another increment.
+No reference enumeration/cleanup is required by this decision.
 Active/protected-target safeguards and safe reclamation mechanics remain
 separate requirements.
 
@@ -206,16 +207,19 @@ verification; no new executable opcode or HALT substitution is approved.
 
 **Approved release-version rule:** Before returning a block to the free pool,
 authorized software sets `next_version = current_version + 1`, requiring
-`1 <= next_version <= 511`. 510→511 is permitted; at current version 511,
-the attempted release hard-faults without freeing the block. No wrap to zero
-and no hardware increment. This does not grant permission to release a
-protected/in-use object.
+`1 <= next_version <= 511`. Ordinary issued versions are 0–510; 511 is
+reserved for permanent slot retirement. 510→511 destroys and retires the
+slot; never issue, reallocate, reset or wrap a retired ordinary slot.
+Memory-block reclamation remains subject to safe-release checks, distinct
+from slot retirement. No hardware increment. This does not grant permission
+to release a protected/in-use object.
 
 **Approved reallocation rule:** Retain the release version with the Namespace
 slot and use it for the next GT allocated into that slot; do not increment again
 or reset it when clearing the slot. Versions follow slots, not free memory
-blocks. A retained 511 may be allocated, but cannot subsequently be incremented
-for another release. Storage representation remains to be defined.
+blocks. Only retained versions 1–510 may be reallocated; 511 is permanently
+retired. Storage representation remains to be defined. The separate random
+boot-pair version exception needs reconciliation with this reservation.
 
 **Approved initial version:** Use version **0** for the first allocation into
 a genuinely never-used Mint slot. Existing or previously freed slots retain

@@ -43,8 +43,8 @@ not executable implementations.
   invalidate outstanding GTs under the approved software slot-version release
   rules, without finding/removing every copy or proving none remain.
   Subsequent stale-GT accesses must fault. Increment before freeing, never
-  wrap, and hard-fault without freeing at version 511; retain the slot version
-  for reuse. This does not waive active/protected-target eligibility checks
+  wrap; 510→511 destroys and permanently retires the slot. Reuse only retained
+  versions 1–510, never 511. This does not waive active/protected-target eligibility checks
   or resolve safe reclamation and interrupted-write mechanics.
 - **PassKey required in each case — approved:** Each supported Mint request
   requires a valid, appropriately authorized PassKey GT and its separate
@@ -89,9 +89,12 @@ not executable implementations.
 - Track used/free blocks per LUMP size class, separately from slots/generations.
   **No GC in Phase 1.** G-setting location/control is Phase 2 TBD.
 - Software versions are 9 bits. A genuinely never-used slot starts at 0.
-  Release increments to 1–511 inclusive before freeing; at 511, hard-fault
-  without freeing, never wrap. Retain version with slot and reuse it without
-  another increment. **Direct replacement's slot/version policy is software
+  Ordinary issued versions are 0–510; 511 is reserved for permanent retirement.
+  Release increments before freeing; 510→511 destroys and retires the slot.
+  Never wrap, reset or reallocate a retired slot. Retain usable versions with
+  the slot and reuse without another increment. Memory reclamation remains
+  separate from slot retirement. The boot-pair version exception needs explicit
+  reconciliation. **Direct replacement's slot/version policy is software
   TBD**; do not infer same-slot/+1 approval. Release authority, bookkeeping and
   in-use safeguards still need definition.
 - Use ascending 256-slot starting geometry and **half the FPGA memory**.

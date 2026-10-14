@@ -132,7 +132,8 @@ involved beyond checking equality.
 does not approve modulo wrap or generation reuse; never infer that policy.
 Keep any reuse/exhaustion policy in software. The earlier general no-wrap
 proposal was not approved then; the subsequent pool-release decision below
-explicitly approves software increment to 1–511 without wrap for release.
+approves software increment without wrap for release; the later retirement
+decision reserves 511 and permits ordinary issued versions 0–510 only.
 
 Keep the existing integrity32 formula, ignoring both F and G in its input.
 No further formula revision is authorized.
@@ -384,16 +385,16 @@ and generations. This is explicit management, not GC; pool ownership, release,
 reuse and sizing remain open. Do not infer splitting/coalescing, generation
 wrap or RESIDENT reclamation. Budget pool bookkeeping within Phase 1 memory.
 
-Pool release increments the Namespace-entry version in software to 1–511
-inclusive, with no wrap to zero.
+Pool release increments the Namespace-entry version in software without wrap.
+Ordinary issued versions are 0–510; 511 means permanently retired.
 
-**Why:** The user explicitly chose the inclusive upper bound after proposing
-version increment as part of returning a used block to its free pool.
+**Why:** The user corrected the earlier inclusive usable range, confirming that
+510→511 destroys and permanently retires the slot.
 
-**How to apply:** Allow 510→511; reject an attempted increment from 511 with a
-hard fault before freeing the block. Never truncate/wrap the arithmetic or
-have hardware increment it. This settles release-version progression only,
-not initial versions, release authority or all in-use/interruption safeguards.
+**How to apply:** Allow authorized Destroy at 510 to advance to 511. Never
+issue ordinary GTs at 511, reuse retired slots, reset or wrap their versions.
+Hardware never increments. Memory reclamation and target eligibility remain
+separate; the random boot-pair version exception needs explicit reconciliation.
 
 Reallocation uses the Namespace slot's retained release version, without a
 second increment.
@@ -401,8 +402,8 @@ second increment.
 **Why:** The user explicitly approved retaining and reusing the release version.
 
 **How to apply:** Keep the version with the slot, not the memory block, and never
-reset it when clearing a free slot. Retained 511 may be allocated but cannot
-support another release increment.
+reset it when clearing a free slot. Only retained versions 1–510 may be
+allocated; retained 511 means permanent retirement.
 
 The first allocation into a genuinely never-used Mint slot uses version 0.
 
@@ -500,7 +501,7 @@ including after slot reuse.
 **Why:** The user selected invalidation rather than a no-outstanding-GTs
 precondition for Destroy.
 
-**How to apply:** Preserve software increment-before-free, no wrap, rejection
-without freeing at version 511, and retained slot versions. Do not infer
+**How to apply:** Preserve software increment-before-free, no wrap, permanent
+retirement at 511, and retained usable slot versions. Do not infer
 permission to destroy active/protected objects or skip safe reclamation
 and interruption safeguards.

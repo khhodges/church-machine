@@ -342,9 +342,15 @@ faults on mismatch; software alone manages versions. Never add a hardware
 increment, wrap/exhaustion policy or wrap-rate timer.
 
 For genuinely never-used Mint slots, initial version is 0. Before authorized
-pool release, software increments to 1–511 inclusive; no wrap. At current 511,
-release hard-faults before freeing. Retain that version with the Namespace slot,
-not the memory block; reallocation uses it without a second increment.
+pool release, software increments before freeing; no wrap. Ordinary issued
+versions are **0–510** (511 values). **511 is permanently retired**, never an
+ordinary issued GT version. Destroy at 510 advances to 511 and retires the
+slot rather than preventing destruction. Never reallocate a retired slot or
+reset its version. Retain usable release versions 1–510 with the Namespace
+slot, not the memory block; reallocation uses them without a second increment.
+Backing-memory reclamation remains subject to safe-release checks and is
+distinct from retiring the slot. The random boot-pair version exception still
+needs reconciliation with this reservation; no boot guard is changed here.
 Empty does not mean never-used. **Direct replacement's slot/version policy is
 software TBD**, not inferred from release. Track used/free blocks per LUMP
 size separately from slot/version availability; ownership, bookkeeping and
@@ -399,8 +405,9 @@ or active objects is approved.
 **Destroy with outstanding GTs — approved:** Authorized Destroy may invalidate
 outstanding GTs without locating every copy or proving no references remain.
 Subsequent stale-GT accesses must fault. Apply the approved software
-increment-before-free/no-wrap/retained-slot-version rules, including hard fault
-without freeing at version 511. This does not authorize destroying active or
+increment-before-free/no-wrap/retained-slot-version rules: 510→511 destroys
+and permanently retires the slot; never issue or reuse ordinary version 511.
+This does not authorize destroying active or
 protected objects or settle safe reclamation and interruption mechanisms.
 
 **PassKey required in each Mint case — approved:** Require the valid PassKey
