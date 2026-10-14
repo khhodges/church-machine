@@ -72,3 +72,12 @@ not inferred runtime provisioning or a completed verifier design.
 **How to apply:** Preserve the approved Namespace slots and requested rights.
 Capability holders/issuance and pkverify behavior still require their own
 contracts; do not treat Namespace placement as blanket authority issuance.
+
+The user approved the single combined SWITCH CR15 handoff and explicitly
+retained ordinary CHANGE without a Namespace change.
+
+**Why:** Their clarification was “Switch is a special case of CHANGE but Change
+without CR15 remains.” The combined handoff must not eliminate ordinary CHANGE.
+
+**How to apply:** Supersede the two-instruction SWITCH-then-CHANGE recipe;
+preserve ordinary CHANGE and do not reinterpret SWITCH CR12–CR14 behavior.
