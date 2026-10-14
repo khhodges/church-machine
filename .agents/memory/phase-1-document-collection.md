@@ -316,8 +316,11 @@ proposing that EXACT hard-fault on either NULL operand.
 **How to apply:** TPERM NULL tests architectural NULL type (including nonzero
 NULL encodings), sets Z=1 for NULL and Z=0 otherwise, without faulting or changing
 the GT. The user approved the full NULL-test flags: Z=is-NULL, N=not-NULL,
-C=0, V=0. Pair with NULL-before-equality hard faults for EXACT. Encoding and
-conditional-execution details remain open; no implementation is implied.
+C=0, V=0. Pair with NULL-before-equality hard faults for EXACT.
+The user approved complete condition skip: false-condition TPERM performs no
+operand checks, raises no TPERM fault, and preserves flags/capabilities,
+including NULL/EXACT. Independent fetch/watchdog faults remain separate.
+Encoding remains open; no implementation is implied.
 
 No GC in Phase 1. The PP250 garbage-to-NULL suggestion is withdrawn.
 

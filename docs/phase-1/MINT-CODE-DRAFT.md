@@ -270,8 +270,12 @@ architectural NULL type without faulting or changing the capability (Z=1 for
 NULL, Z=0 otherwise). The paired EXACT change hard-faults if either operand is
 NULL before comparing bits. **Approved NULL-test flags:** Z=is-NULL,
 N=not-NULL, C=0, V=0 (NULL: NZCV=0100; non-NULL: NZCV=1000).
-These semantics are not implemented yet; encoding and conditional-execution
-details still need specification.
+**Approved conditional execution:** When TPERM's condition is false, it performs
+no operand checks, raises no TPERM fault, and preserves flags and capabilities.
+This applies to both NULL and EXACT; a skipped EXACT cannot fault on NULL.
+Independent fetch faults and watchdog expiry are not suppressed.
+These design changes are not implemented here; encoding and fault attribution
+still need specification and implementation evidence.
 Neither test replaces trusted issuance, validity or proof checks.
 
 Required acceptance cases include NULL/NULL (including nonzero NULL encodings),
