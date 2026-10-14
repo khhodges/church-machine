@@ -277,8 +277,11 @@ Independent fetch faults and watchdog expiry are not suppressed.
 **Approved EXACT fault rule:** An executed EXACT with either operand NULL
 hard-faults before changing flags or operands. The captured fault location
 identifies EXACT itself, even if subsequent architectural fault handling runs.
-These design changes are not implemented here; encoding and implementation
-evidence, including pre-fault state and location capture, remain outstanding.
+**Approved encoding:** NULL uses TPERM preset **15 (`0x0F`)**, with the
+TPERM opcode unchanged. No modifier variant is approved by this assignment.
+These design changes are not implemented here; matching assembler/simulator/RTL
+support and evidence, including pre-fault state and location capture, remain
+outstanding. Current reserved-preset rejection must not be mistaken for support.
 Neither test replaces trusted issuance, validity or proof checks.
 
 Required acceptance cases include NULL/NULL (including nonzero NULL encodings),

@@ -322,7 +322,9 @@ operand checks, raises no TPERM fault, and preserves flags/capabilities,
 including NULL/EXACT. Independent fetch/watchdog faults remain separate.
 The user approved EXACT-on-NULL faulting before flags/operands change, with
 the captured location attributed to EXACT itself rather than later recovery.
-Encoding remains open; no implementation is implied.
+The user approved preset 15 (0x0F) for plain TPERM NULL, with the opcode
+unchanged. No modifier variant or implementation is implied; existing reserved
+encoding behavior must be reconciled and verified before use.
 
 No GC in Phase 1. The PP250 garbage-to-NULL suggestion is withdrawn.
 
