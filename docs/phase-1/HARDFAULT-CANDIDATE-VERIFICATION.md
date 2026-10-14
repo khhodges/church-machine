@@ -1,13 +1,22 @@
 # HARDFAULT candidate verification
 
-Status: **Genesis selected `0xF7000000` after reviewing this evidence. Compiler
-lowering remains disabled; integration and physical acceptance remain open.**
+**Standalone verification superseded by Phase 1 bitstream work, per user
+direction.** Retain the simulation results below as historical evidence, not
+release approval. The outstanding release checks and exact-bitstream/physical
+acceptance belong to Phase 1; closing this standalone investigation does not
+turn incomplete checks into passes or authorize hardware use.
+
+Status of original selection record: **Genesis selected `0xF7000000` after
+reviewing the isolated evidence. Compiler lowering remains disabled.**
+The integration supplement below does not make or renew an encoding selection.
+Exact-artifact attribution and physical acceptance remain open.
 Release approval is deferred by the user; closing this investigation does not
 authorize emission, deployment, or hardware use.
 The approach approved in [the ISA](../instruction-set.md#standard-software-hard-fault)
-and [Mint draft](MINT-CODE-DRAFT.md) remains unchanged. No compiler, simulator,
-decoder, runtime fault handling, live LUMP, or hardware image was changed by
-this investigation. Only isolated tests and documentation were added.
+and [Mint draft](MINT-CODE-DRAFT.md) remains unchanged. The original investigation
+changed no compiler, simulator, decoder, runtime fault handling, live LUMP, or
+hardware image. The subsequent full-top supplement documents its narrow RTL
+corrections separately.
 
 ## Encoding returned and selected
 
@@ -126,7 +135,7 @@ intrinsic halt latch. Source inspection of `hardware/wukong_top.py` finds:
 `hardware/core.py` also exposes immediate retire NIA/instruction and latched
 instruction/stage, but `fault_gt` and `fault_cr14` remain zero placeholders.
 The separate architectural CR14 snapshot must not be confused with that
-placeholder field. A complete top-level fault-to-snapshot test remains open.
+placeholder field. See the full-top fault-to-snapshot supplement below.
 Explicit reboot and privileged one-shot Skip Fault are separate existing
 operator actions, not a return emitted by this candidate.
 
@@ -158,14 +167,17 @@ cryptographic artifact verification.
 Hardware retire NIA is byte-addressed. Simulator memory and LUMP offsets here
 are word-addressed. For hardware mapping, use the **captured code capability
 base and exact installed layout**, verify alignment/bounds, and compute the
-header-relative offset `(faultNIA - codeBaseBytes) / 4`. Never use a later live
+code-relative offset `(faultNIA - codeBaseBytes) / 4`. The header-relative
+offset requires the independently verified installed LUMP base, as demonstrated
+in the supplement below. Never use a later live
 CR14, current slot occupant, latest catalog revision, or editor selection to
 infer the historical origin.
 
 Hardware snapshot fields alone do not carry the simulator's secure artifact
 identity and complete code evidence. Raw NIA/CR14 or a matching word cannot
 establish the exact loaded artifact. This investigation has **not proved**
-hardware-to-IDE exact-artifact attribution or serial delivery.
+hardware-to-IDE exact-artifact attribution. Simulated serial delivery is now
+covered by the supplement below; physical serial delivery is not.
 
 There is currently **no HARDFAULT reason-map emitter, serialization contract,
 authenticated map lookup, or intentional-site classifier**. Existing
@@ -189,7 +201,7 @@ registers or export proof/private-authority material.
 4. Keep any generated-RTL and physical acceptance evidence separate.
    **Physical behavior is NOT VERIFIED; no board was flashed or contacted.**
 
-No runtime implementation gap has been silently “fixed” or accepted as PASS.
+The original isolated investigation did not fix runtime implementation gaps.
 The returned result is a selected encoding with isolated evidence and explicit
 integration and attribution limits, to resolve before compiler emission.
 
@@ -211,3 +223,57 @@ The isolated candidate evidence above remains valid. Re-run and obtain
 terminal release results before release approval; additionally satisfy the
 map, target integration, and physical acceptance gates appropriate to the
 intended use. Deferring release approval does not waive any of those gates.
+
+## Full Wukong integration simulation supplement
+
+The evidence above describing an isolated investigation is historical. The
+full-top tests now extend it without enabling compiler emission, selecting an
+encoding, publishing an image, contacting a board, or granting physical acceptance.
+Any numeric selection/enablement approval is external to this test.
+
+`python3 -m pytest hardware/test_hardfault_candidate.py -q` now includes two
+production `ChurchWukongXC7A100T` simulations (negative and zero flag states).
+They substitute only process-local candidate code in the installed test image.
+Real ROM LOAD/CHANGE/CALL boot, method dispatch, synchronous DMEM fetch, sixteen
+arithmetic instructions, recovery gating, snapshot capture, serializer and UART
+all execute. No injected fault or testbench fetch suppression is used.
+
+* Exactly one INVALID_OP retirement identifies `0xF7000000` at the expected
+  byte-addressed NIA. The following DR2 write never retires.
+* All 16 three-word CRs, 16 DRs, flags, M-bit state, isolated-M state and NIA
+  remain unchanged throughout snapshot transmission (over 1,000 held cycles).
+  No core DMEM, Namespace or C-list writes occur while held.
+* Architectural CR14 is nonzero and retained. `core.fault_cr14` is explicitly
+  checked as a zero placeholder, never used as the snapshot CR14.
+* An independent 8N1 receiver samples the top-level TX pin. The resulting
+  reason-2 frame passes the production bridge's length/CRC/parser checks.
+  Its entire register bank, NIA and flags match the fault-edge state.
+* The actual decoded snapshot passes through the bridge's incident envelope
+  and `simulator/test_hardfault_wukong_snapshot.js`, which runs production IDE
+  snapshot/fault readers. Correlation IDs here are synthetic; HTTP delivery
+  and browser rendering are not under test.
+* The IDE test retains raw NIA, CR14 and INVALID_OP. Even a saved binary with
+  the same candidate word cannot acquire a source highlight without captured
+  artifact identity and complete code evidence. Neither the test fixture nor
+  a current catalog revision is promoted into historical provenance.
+
+**Offset correction to the original discussion:** observed CR14.base is the
+first word *after* the LUMP header. `(NIA - CR14.base) / 4` is code-relative
+word 17 in this fixture; `(NIA - installedLumpBaseBytes) / 4` is header-relative
+word 18. The latter requires independently verified installed layout. Alignment
+and bounds alone do not establish artifact identity. With the present wire
+protocol's missing installation provenance, attribution fails closed to the raw
+byte location; no exact-artifact reason is claimed.
+
+Two implementation issues surfaced and were corrected in `wukong_top.py`:
+the CRC combinational calculation now uses named per-bit signals to avoid
+exponential expression expansion in full-top simulation (same polynomial and
+wire bytes); trace flags now serialize V,C,Z,N into bits 0,1,2,3, matching the
+documented NZCV wire order, snapshot serializer and bridge/IDE readers. The
+previous trace expression serialized the internal N,Z,C,V layout instead.
+These changes require ordinary release gates before any future hardware use.
+
+The prior statement that full-top fault-to-snapshot and simulated serial
+delivery remain open is superseded by this supplement. Exact installed-artifact
+provenance/maps, generated-Verilog replay, synthesis/timing and physical
+acceptance remain separate, unproved gates. No board was flashed or contacted.

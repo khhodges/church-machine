@@ -113,6 +113,8 @@ function buildFaultObj(data, sim_) {
 }
 
 const applySnapshotBody = extractFunctionBody(appRunSrc, '_wukongApplySnapshot', 'data');
+global._wukongHardwareRegisters = { cr: [], dr: [], snapshot: null };
+global._wukongRenderHardwareRegisters = function() {};
 const _wukongApplySnapshot = new Function(
     'data', 'sim', 'updateCRDisplay', 'updateDRDisplay', 'updateFlagsDisplay',
     'updateInfoDisplay', '_wukongSetHwCursor', 'renderMemoryView',
@@ -495,7 +497,7 @@ assert('T6e: hw disconnected + sim not booted → RESET',
         td.hideCalls === 0, 'hideCalls=' + td.hideCalls);
 }
 
-// ── T8: crSnapshot copies sim.cr state into the fault object ─────────────────
+// ── T8: trace-only hardware faults never borrow simulator registers ──────────
 {
     const fakeSim = {
         cr: Array.from({ length: 16 }, (_, i) => ({
@@ -505,12 +507,8 @@ assert('T6e: hw disconnected + sim not booted → RESET',
     };
     const ev = { fault_code: 1, fault_valid: true, nia: 0x100, ev_type: 0, flags: 0 };
     const f  = buildFaultObj(ev, fakeSim);
-    assert('T8a: crSnapshot[6].word0 matches sim.cr[6]',
-        f.crSnapshot[6] && (f.crSnapshot[6].word0 >>> 0) === 0xABCD0006,
-        'got ' + (f.crSnapshot[6] ? '0x' + (f.crSnapshot[6].word0 >>> 0).toString(16) : 'null'));
-    assert('T8b: crSnapshot[14].word0 matches sim.cr[14]',
-        f.crSnapshot[14] && (f.crSnapshot[14].word0 >>> 0) === 0xABCD000E,
-        'got ' + (f.crSnapshot[14] ? '0x' + (f.crSnapshot[14].word0 >>> 0).toString(16) : 'null'));
+    assert('T8a: trace does not invent hardware CR6', f.crSnapshot[6] === undefined);
+    assert('T8b: trace does not invent hardware CR14', f.crSnapshot[14] === undefined);
 }
 
 // ── T9: complete fault snapshot upgrades Last Fault before Boot.0 ─────────────
@@ -522,7 +520,9 @@ assert('T6e: hw disconnected + sim not booted → RESET',
         }
     };
     const result = _wukongApplySnapshot(
-        { snapshot: true, reason: 2, nia: 0x164 },
+        { snapshot: true, reason: 2, nia: 0x164, crc_valid: true,
+          cr: Array.from({length: 16}, (_, i) => [i, 0, 0]),
+          dr: Array(16).fill(0) },
         fakeSim, function() {}, function() {}, function() {}, function() {},
         function() {}, function() {}, function() { fetchLastFaultCalls++; }
     );
@@ -537,7 +537,9 @@ assert('T6e: hw disconnected + sim not booted → RESET',
     let fetchLastFaultCalls = 0;
     const fakeSim = { applyHardwareSnapshot: function() { return { ok: true }; } };
     _wukongApplySnapshot(
-        { snapshot: true, reason: 3, nia: 0x164 },
+        { snapshot: true, reason: 3, nia: 0x164, crc_valid: true,
+          cr: Array.from({length: 16}, (_, i) => [i, 0, 0]),
+          dr: Array(16).fill(0) },
         fakeSim, function() {}, function() {}, function() {}, function() {},
         function() {}, function() {}, function() { fetchLastFaultCalls++; }
     );

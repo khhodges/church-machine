@@ -55,6 +55,18 @@ py-spy record --pid $PID --duration 60 --output /tmp/pyspy.svg --format speedsco
 
 ## If future Amaranth upgrades regress convert() speed
 
+Full-top Python simulation can still expand shared combinational CRC expressions
+exponentially even after the elaboration caches are installed. Use intermediate
+combinational signals at recurrence steps rather than recursively inlining the
+previous value into both branches.
+
+**Why:** A multi-byte CRC seed can elaborate with caches yet hang or exhaust the
+Python simulation compiler; traversal memoization does not bound generated
+expression text.
+
+**How to apply:** Preserve the same polynomial and bit order, and verify the
+serialized result with an independent host CRC decoder.
+
 Re-run py-spy, find the new hot function, add another id()-keyed cache in
 `generate_rtlil_wukong()` before the `convert()` call.  The pattern is always:
 uncached recursive tree traversal → add an instance-level visited set/dict.

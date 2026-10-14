@@ -1516,7 +1516,9 @@ class ChurchWukongXC7A100T(Elaboratable):
                     # Capture per-instruction shared fields
                     m.d.sync += [
                         tq_nia.eq(core.retire_nia),
-                        tq_flags.eq(Cat(core.retire_flags.as_value()[:4], C(0, 4))),
+                        tq_flags.eq(Cat(
+                            core.retire_flags.V, core.retire_flags.C,
+                            core.retire_flags.Z, core.retire_flags.N, C(0, 4))),
                         tq_fault.eq(Cat(
                             core.retire_fault_code[:5],   # bits[4:0]
                             C(0, 1),                       # bit[5] reserved
@@ -1632,8 +1634,13 @@ class ChurchWukongXC7A100T(Elaboratable):
             value = crc
             for shift in range(8):
                 top = value[15] ^ byte[7 - shift]
-                value = (value << 1) & 0xFFFF
-                value = Mux(top, value ^ 0x1021, value)
+                shifted = (value << 1) & 0xFFFF
+                # Keep the CRC DAG bounded for full-top simulation as well as
+                # synthesis. Inlining the previous expression twice per bit
+                # expands exponentially across the six-byte header seed.
+                step = Signal(16)
+                m.d.comb += step.eq(Mux(top, shifted ^ 0x1021, shifted))
+                value = step
             return value
 
         # The host validates the header and payload together.  Seed the

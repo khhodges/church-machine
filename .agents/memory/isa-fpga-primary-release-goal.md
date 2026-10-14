@@ -6,6 +6,16 @@ description: User-designated main objective and separation of release stages.
 Align the approved red-ISA, simulator, bitstream and physical FPGA as the primary
 project objective. The next corrected candidate is provisionally called B.1.1+.
 
+Standalone HARDFAULT FPGA snapshot verification is superseded by Phase 1
+bitstream work.
+
+**Why:** The user explicitly moved this verification into Phase 1 rather than
+continuing its standalone release-validation cycle.
+
+**How to apply:** Preserve existing simulation evidence, but obtain remaining
+release and physical acceptance against the Phase 1 bitstream. Do not interpret
+standalone closure as a passing release gate or permission to flash.
+
 **Why:** The user explicitly identified this as the main event after unrelated
 work distracted from the later boot/root-frame correction sequence.
 
