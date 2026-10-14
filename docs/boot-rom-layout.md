@@ -21,9 +21,12 @@
 
 **New Phase 1 guard scope:** The proposed slot-1/slot-2 build/image matching
 guard is intended to catch accidental wrong-image loading, not authenticate
-against malicious replacement. Its representation, placement, provisioning
-and update rules remain TBD in the master ISA; no legacy layout field is
-implicitly repurposed.
+against malicious replacement. It identifies the approved slot-1/slot-2 boot
+configuration, not every complete image revision. Unrelated application LUMP
+changes and normal runtime Namespace updates do not require a new value;
+a changed boot configuration requires matching bitstream and boot metadata.
+Representation, placement and provisioning remain TBD in the master ISA;
+no legacy layout field is implicitly repurposed.
 **CONFIDENTIAL**
 
 The Boot ROM and RAM are defined by the FPGA bitstream used to flash the FPGA. It is defined by the IDE under program control, size is defined in words (4 bytes each). The ROM is read-only instruction memory, carried from the IDE to the FPGA in `hardware/boot_rom.py` and instantiated as the `BootRom` class with the following three CLOOMC boot instructions: LOAD CR15, CHANGE that suspends the current thread and starts Boot.Thread, and CALL CR0, the programmer-selected lightning bolt slot in the IDE-defined namespace as Lazy Load.

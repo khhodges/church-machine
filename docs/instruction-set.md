@@ -166,7 +166,7 @@ code containing the same word, software M manipulation, invalid slot-2 state,
 post-acceptance faults that must not re-arm admission, fresh-reset re-arming,
 and wrong entry context, using simulator, RTL and exact-build FPGA evidence.
 
-#### Boot-image matching guard — purpose approved; mechanism TBD
+#### Boot-image matching guard — purpose and scope approved; mechanism TBD
 
 For the proposed IDE-generated hardware guards associated with Namespace
 slot 1 and entry-Thread slot 2, the user selected protection against
@@ -174,8 +174,17 @@ slot 1 and entry-Thread slot 2, the user selected protection against
 build/image matching guard, not authentication against deliberate substitution.
 A matching identifier alone does not authenticate slot contents.
 
+**Binding scope — approved:** Identify the approved boot configuration for
+**slots 1 and 2**, not every complete boot-image revision. Changing that
+approved Namespace/entry-Thread configuration requires a new matching guard
+value in the bitstream and boot metadata. Unrelated application LUMP changes
+and normal runtime Namespace updates do not themselves change this value.
+The guard is not a hash of all mutable Namespace contents and does not certify
+the entire image. Ordinary object validation remains required. Detailed
+configuration identity/canonicalization still needs definition.
+
 Guard width, shared versus separate identifiers, storage, comparison timing,
-image/update binding and provisioning remain TBD. No repurposing of the
+concrete binding representation and provisioning remain TBD. No repurposing of the
 9-bit version, GT, integrity32 or T fields is approved. Retain ordinary
 capability, version, integrity and Thread checks. This does not resolve the
 unanswered reset-entry GT-version question or alter SWITCH's approved version-0
