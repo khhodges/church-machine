@@ -278,7 +278,11 @@ Independent fetch faults and watchdog expiry are not suppressed.
 hard-faults before changing flags or operands. The captured fault location
 identifies EXACT itself, even if subsequent architectural fault handling runs.
 **Approved encoding:** NULL uses TPERM preset **15 (`0x0F`)**, with the
-TPERM opcode unchanged. No modifier variant is approved by this assignment.
+TPERM opcode unchanged. **Plain NULL only is approved:** the B-modified
+instruction encoding 31 (`0x1F`) remains reserved, rejected by assembly and
+hard-faulting when executed; condition-skipped instructions still skip.
+The GT operand's own B bit is irrelevant to its NULL type and is ignored by
+the NULL test. That does not mean ignoring the instruction's B modifier.
 These design changes are not implemented here; matching assembler/simulator/RTL
 support and evidence, including pre-fault state and location capture, remain
 outstanding. Current reserved-preset rejection must not be mistaken for support.

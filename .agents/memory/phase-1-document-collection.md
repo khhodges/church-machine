@@ -323,7 +323,10 @@ including NULL/EXACT. Independent fetch/watchdog faults remain separate.
 The user approved EXACT-on-NULL faulting before flags/operands change, with
 the captured location attributed to EXACT itself rather than later recovery.
 The user approved preset 15 (0x0F) for plain TPERM NULL, with the opcode
-unchanged. No modifier variant or implementation is implied; existing reserved
+unchanged. The user selected plain NULL only: instruction encoding 31 (0x1F)
+remains reserved, rejected by assembly and faulting when executed (not when
+condition-skipped). The GT operand's B bit is irrelevant to the NULL-type test;
+do not confuse that with ignoring the instruction modifier. Existing reserved
 encoding behavior must be reconciled and verified before use.
 
 No GC in Phase 1. The PP250 garbage-to-NULL suggestion is withdrawn.
