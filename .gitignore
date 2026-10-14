@@ -32,7 +32,10 @@ server/church_machine.db-journal
 server/github-sync-status.json
 
 # Agent screenshot attachments — LFS-tracked by Replit internally; exclude from pushes
-attached_assets/
+attached_assets/*
+# Approved unchanged Phase 1 source references; keep all other uploads excluded.
+!attached_assets/mint-phase1-bounded-rule_1791705504631.md
+!attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791978480955.txt
 
 # FPGA build artifact — large generated ZIP; tracked by LFS but too big to push via Replit
 project.zip
