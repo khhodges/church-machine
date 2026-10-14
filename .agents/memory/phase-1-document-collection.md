@@ -46,16 +46,17 @@ the repeated “slot 1” in the initial comment was clarified by the user.
 documents. It does not authorize migrating existing images or settle other
 reset instruction/authority questions.
 
-CR13 is reserved in Phase 1 with no automatic interrupt or watchdog-Thread
-role. Successful SWITCH CR15 still clears CR13 including M; ordinary CHANGE
-gets no new clearing rule.
+CR13 is reserved, NULL and never touched in Phase 1: no IRQ/watchdog role,
+SWITCH destination, restore or explicit handoff clearing.
 
-**Why:** The user approved reserving CR13 rather than retaining the conflicting
-requirement to install an interrupt Thread after Namespace handoff.
+**Why:** The user corrected the assistant's retention of CR13 in protected-load
+forms: “CR13 was IRQ and is now reserved (NULL), never touched in Phase 1.”
+This supersedes the earlier interpretation that SWITCH CR15 still clears it.
 
-**How to apply:** Remove that installation requirement when reconciling current
-documents; keep watchdog policy a separate decision and preserve historical
-proposals unchanged.
+**How to apply:** Remove both interrupt-Thread installation and explicit CR13
+handoff clearing when reconciling current documents. Exclude CR13 from SWITCH
+destinations; do not infer permission to write NULL merely to preserve NULL.
+Keep historical proposals unchanged and watchdog policy separate.
 
 The user approved the Master's ascending layout as the sole new Phase 1
 Namespace layout and explicitly assigned Namespace Table slot 9 to `ide.Mint E`,
@@ -80,4 +81,5 @@ retained ordinary CHANGE without a Namespace change.
 without CR15 remains.” The combined handoff must not eliminate ordinary CHANGE.
 
 **How to apply:** Supersede the two-instruction SWITCH-then-CHANGE recipe;
-preserve ordinary CHANGE and do not reinterpret SWITCH CR12–CR14 behavior.
+preserve ordinary CHANGE. CR13 is excluded under the user's later reserved-NULL
+clarification; do not otherwise reinterpret SWITCH CR12/CR14 behavior.
