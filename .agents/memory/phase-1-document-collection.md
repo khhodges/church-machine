@@ -397,3 +397,11 @@ and preparation finished before the first table write.
 writers and prevent readers from using partial entries. Confirm all writes
 before publishing the GT. Faults hard-fault without rollback; no watchdog/reset
 exemption. Verify actual exclusion and interruption containment, not just order.
+
+Direct replacement's slot/version policy is a software issue, TBD.
+
+**Why:** The user declined to select the proposed same-slot/version-plus-one
+replacement rule, explicitly classifying it as software work to be determined.
+
+**How to apply:** Do not treat that proposal as approved or infer it from the
+separately approved pool-release/reallocation rules. Preserve those prior rules.

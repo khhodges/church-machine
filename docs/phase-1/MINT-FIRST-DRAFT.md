@@ -64,6 +64,9 @@ The RESIDENT exclusion is already decided, not an unresolved eligibility option.
 It applies to Mint and pkverify too if they are RESIDENT; their required
 reloadability cannot be justified through Mint replacement in that case.
 Hardware only checks generation equality; software owns generation management.
+Direct replacement's slot/version policy is **a software issue, TBD**, as
+directed by the user. The proposed same-slot/version-plus-one rule is not
+approved; do not extend the approved pool-release rule to replacement implicitly.
 Apply the explicitly approved pool-release increment/no-wrap rule below;
 do not infer other reuse policies.
 

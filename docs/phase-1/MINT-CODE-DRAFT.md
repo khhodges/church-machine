@@ -179,7 +179,8 @@ Mint(request, credential):
     # First allocation into a proven never-used slot uses 0.
     # Pool release increments to 1..511 without wrap; reallocation uses the
     # slot's retained release version without another increment.
-    # Direct-replacement sequencing and bookkeeping remain to be defined.
+    # Direct replacement's slot/version policy: software issue, TBD by user.
+    # Same-slot/version-plus-one replacement was proposed, NOT approved.
     generation = UNRESOLVED_SELECT_SOFTWARE_GENERATION(current, frozen)
     UNRESOLVED_REQUIRE_GENERATION_IN_RANGE(generation, 0, 511)
     candidate = UNRESOLVED_PREPARE_OBJECT_AND_FOUR_WORD_ENTRY(
