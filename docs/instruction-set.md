@@ -60,7 +60,8 @@ SWITCH has fixed Namespace destination **CR15**, then fixed Thread destination
 a general-purpose isolated-register LOAD in Phase 1. Thread save/load still
 updates the associated execution context, not just these GT registers.
 The CR13 reservation continues to apply. Ordinary CHANGE now uses the approved
-direct layout below; SWITCH/reset field allocations remain separate decisions.
+direct layout below; SWITCH's destination field is also settled below.
+The SWITCH row encoding and reset allocation remain separate decisions.
 
 **SWITCH source — approved:** Retain the authorized C-List row lookup.
 CRs in CR0–CR11 supplies an L-capable C-List capability; the selected row
@@ -68,7 +69,12 @@ supplies the incoming Namespace GT after ordinary bounds, generation,
 integrity and type validation. SWITCH does not directly consume a Namespace GT
 already held in CRs. Current CR15.M authorization remains required; source M
 does not authorize the operation. Fixed destinations do not waive these checks.
-The exact SWITCH encoding remains a separate decision.
+**SWITCH destination encoding — approved:** Bits **22:19 must be zero**.
+The opcode implies Namespace destination CR15 and entry-Thread activation into
+CR12; zero does not select CR0. Authorization latches **CR15.M**, never the
+M bit indexed by the zero field. The C-List source and row lookup remain;
+the row encoding is not selected by this destination-field decision.
+Do not emit the old explicit-destination value 15 as the new canonical form.
 
 #### Ordinary CHANGE encoding — approved
 
@@ -601,7 +607,9 @@ The CR15 handoff below retains ordinary admission checks; this does not
 claim simulator or RTL conformance, rewrite saved programs, regenerate boot
 images, or approve hardware. See also [SWITCH lifecycle](switch-lifecycle.md).
 
-For the CR15 form `SWITCH CR15, CRs, #row`, CR15.M is latched at instruction acceptance.
+In the descriptive notation `SWITCH CR15, CRs, #row`, CR15 denotes the fixed
+destination, not bits to encode as 15. Machine bits 22:19 are required zero.
+CR15.M is latched at instruction acceptance; the zero field never selects CR0.M.
 CRs must be CR0–CR11 and hold a valid ordinary c-list capability with L
 permission. Source M is not consulted. The selected `CRs[row]` passes normal
 LOAD bounds, version, integrity, and type checks; reserved encoding bits
@@ -612,7 +620,8 @@ other SWITCH destinations; CR13 operations are excluded from Phase 1.
 
 ### Namespace destination: CR15
 
-`SWITCH CR15, CRs, #row` uses the same operand encoding and source checks.
+`SWITCH CR15, CRs, #row` retains the source checks and authorized row lookup.
+The fixed-destination field is zero; exact row encoding remains to be selected.
 The selected capability must identify the destination Namespace. The current
 CR15.M authorizes the operation; ordinary CHANGE does not acquire an M requirement.
 

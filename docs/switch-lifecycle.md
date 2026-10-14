@@ -9,7 +9,8 @@ CR12 without changing CR15. There is no general-purpose isolated-register
 LOAD through CHANGE or SWITCH in Phase 1. Context save/load still changes
 the associated execution state. CR13 stays reserved.
 Ordinary CHANGE now has an approved direct encoding in the master ISA.
-SWITCH's exact instruction-field allocation remains a separate decision.
+SWITCH bits 22:19 are now approved as required zero, with CR15 implicit.
+The exact row-operand allocation remains a separate decision.
 
 **Source selection explicitly reaffirmed:** Keep the authorized C-List row
 lookup through CR0–CR11 with L permission, not a direct Namespace GT source.
@@ -27,17 +28,17 @@ swap, a PassKey install, or an authority carried by the source.
 These are architectural requirements, not a claim that existing simulator,
 RTL, saved programs, or boot images already implement the CR15 correction.
 
-At instruction acceptance the machine latches the complete destination index
-and that destination register's M bit. Execution succeeds only when:
+At instruction acceptance the machine latches **CR15.M**, independently of
+the zero unused destination field. Execution succeeds only when:
 
-1. This approved handoff uses CRd=CR15; CR13 is not an available destination.
-2. The latched CRd.M value is set.
+1. Bits 22:19 are zero; the implicit Namespace destination is CR15, not CR0.
+2. The latched CR15.M value is set.
 3. CRs is exactly CR0–CR11 and holds a valid ordinary c-list capability with L permission.
 4. `CRs[row]` passes the normal LOAD bounds, version, integrity, and type checks.
 5. Reserved encoding bits are zero.
 
-Retain the destination field without aliasing/truncation. Other destinations
-are not approved by this Phase 1 handoff contract. Source M is never consulted.
+Do not encode 15 in the unused field or use its zero value to consult CR0.M.
+Other destinations are not approved. Source M is never consulted.
 
 ## M-bit device and custody
 
@@ -59,7 +60,7 @@ Successful combined `SWITCH CR15` never loads, restores or clears CR13.
 No IRQ Thread is installed in Phase 1. Ordinary CHANGE leaves CR15 unchanged.
 
 1. Namespace presents the M-bit I/O capability and writes the complete M word.
-2. The instruction decoder accepts `SWITCH`, latching CRd and CRd.M.
+2. The instruction decoder accepts `SWITCH`, latching CR15.M.
 3. The destination and encoding are validated.
 4. The ordinary LOAD pipeline validates `CRs[row]`. No source-M bypass exists.
 5. For CR15, the validated value must identify a Namespace: save the outgoing
@@ -78,8 +79,9 @@ still validate the actual descriptor, version, Thread, frame, and C-List.
 
 ## Fault behavior
 
-An M-clear destination faults with `PERM_L`. A CR0–CR11 destination, CR12–CR15
-source, or malformed encoding faults with `INVALID_OP`. A NULL or non-L source,
+Clear CR15.M faults with `PERM_L`; CR0.M is irrelevant. A CR12–CR15 source
+or malformed encoding faults with `INVALID_OP`. Bits 22:19 are required zero,
+not an explicit destination selector. A NULL or non-L source,
 out-of-bounds row, stale token, or integrity failure faults before
 source admission completes. An executed SWITCH targeting CR13 faults
 `INVALID_OP` before any instruction effects, including Thread save or source
