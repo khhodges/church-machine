@@ -17,7 +17,22 @@ method Verify {
     ; Define safe transfer and obtain trusted state independently of caller.
     ; Require both GT and all 128 proof bits. Do not log either proof copy.
     BRANCH TODO_SECURE_INPUT_AND_TRUSTED_STATE_ABI
+validate_passkeys:
+    ; EXACT is only bit equality: NULL == NULL and invalid == invalid can pass.
+    ; Reject BOTH supplied and expected NULL GTs by architectural NULL type,
+    ; not merely word == 0. Reject wrong-type/malformed/stale credentials.
+    ; Require an initialized, active Mint-issued trusted record, with the
+    ; intended object/authority binding. Missing state must never become zeros.
+    ; No caller-controlled expected GT or expected proof; freeze/check bindings
+    ; so validated values cannot change before comparison and authorization.
+    BRANCH TODO_VALIDATE_BOTH_PASSKEYS_AND_TRUSTED_ISSUANCE
+validate_proof_presence:
+    ; Require explicit complete 128-bit proof presence on BOTH sides, backed
+    ; by initialized trusted state. Zero-filled buffers are not presence.
+    ; Do not invent a rule that all-zero proof bits alone mean absent/valid.
+    BRANCH TODO_REQUIRE_COMPLETE_BOUND_PROOFS
 verify_gt:
+    ; Reached only AFTER validity/provenance checks; EXACT is not validation.
     TPERM CR2, EXACT, CR3
     BRANCH NE, fault
 verify_proof:

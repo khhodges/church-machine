@@ -295,3 +295,14 @@ drafting permission must not silently become operational admission.
 **How to apply:** Use explicit unresolved branch targets, mark proposed ABIs,
 and keep drafts out of the live catalog. Replace blockers only with settled
 mechanisms; do not treat partial compiler output as a usable LUMP.
+
+PassKey validation must precede EXACT: NULL/NULL and equal invalid credentials
+must never authorize.
+
+**Why:** The user explicitly challenged the example's NULL-equality hole and
+requires the verifier to reject it, not merely compare equal bits.
+
+**How to apply:** Validate both GTs and active trusted Mint issuance, require
+complete proof presence without zero defaults, and preserve bindings through
+use. Never accept caller-controlled expected state or claim bit equality proves
+validity. Keep explicit negative cases in acceptance requirements.

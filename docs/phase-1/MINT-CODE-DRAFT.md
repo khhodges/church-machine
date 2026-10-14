@@ -204,6 +204,11 @@ pkverify(credential, frozen_request):
     # Passkey-GT sharing follows the Genesis-approved GT list.
     # Issuance mechanics, private storage and proof transport remain undecided.
     trusted = UNRESOLVED_GET_PRIVATE_VERIFICATION_STATE(credential)
+    # Equality is not validity: NULL==NULL or invalid==invalid must not pass.
+    UNRESOLVED_REQUIRE_INITIALIZED_ACTIVE_MINT_ISSUANCE(trusted)
+    UNRESOLVED_VALIDATE_BOTH_NON_NULL_PASSKEYS_AND_LIVE_BINDINGS(credential, trusted)
+    UNRESOLVED_REQUIRE_COMPLETE_PROOF_PRESENCE_ON_BOTH_SIDES(credential, trusted)
+    UNRESOLVED_KEEP_VALIDATED_CREDENTIAL_AND_TRUSTED_STATE_STABLE()
     UNRESOLVED_CHECK_CREDENTIAL_BINDING_AND_REVOCATION(trusted, credential)
     UNRESOLVED_REQUIRE_PASSKEY_GT_AND_128_BIT_PROOF(credential)
     UNRESOLVED_VERIFY_PASSKEY_GT_AND_128_BIT_PROOF(trusted, credential, frozen_request)
@@ -221,6 +226,22 @@ Fault attribution and private-state protection still need explicit contracts;
 the linear notation does not imply that fault/reset reaches software cleanup.
 No cryptographic primitive, proof register or credential storage layout is
 selected here.
+
+**Mandatory validity before equality:** `TPERM ... EXACT ...` compares bits,
+not valid PassKey authority. Reject NULL on either side using architectural
+NULL-type semantics, not merely a zero-word test. Equal malformed, wrong-type,
+stale or revoked credentials cannot pass. Require initialized trusted Mint
+issuance state independent of caller-supplied expected values, complete proof
+presence, and the intended object/authorization binding. Missing state must
+never default to a zero GT or zero proof. Do not equate a proof's numeric value
+with presence; no special all-zero-proof rule has been selected.
+
+Required acceptance cases include NULL/NULL (including nonzero NULL encodings),
+NULL/valid, valid/NULL, equal invalid tokens, uninitialized trusted records,
+missing/truncated proofs, caller-substituted reference state, stale/revoked
+credentials and changed state between validation and use. All must hard-fault
+without publishing authority or modifying the Namespace. Include a valid issued
+GT/proof control. These are required tests, not completed runtime evidence.
 
 ## 3. Approved integrity calculation
 

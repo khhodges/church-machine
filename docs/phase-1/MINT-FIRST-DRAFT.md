@@ -97,6 +97,13 @@ Missing or invalid proof hard-faults. Generation mechanism, protected storage,
 transfer and verification ABI remain unresolved; this does not authorize
 exposing proof material in public results, traces or diagnostics.
 
+**Validity before equality:** NULL/NULL must never pass pkverify. EXACT alone
+is bit comparison, not PassKey validation. Validate both supplied and trusted
+GTs as non-NULL, valid and actively issued/bound credentials; require initialized
+trusted reference state and complete proof presence independently of bit values.
+Never fill missing credentials with zeros or trust caller-provided expected
+values. Preserve validated bindings through use. Failure hard-faults.
+
 **Approved fault rule:** Any fault in Mint, its same-scope LAMBDA or pkverify
 is a **hard fault**, including failed authorization, verification, validation
 and destination/commit checks. No recoverable rejection return, retry, rollback
