@@ -10,13 +10,18 @@ LOAD through CHANGE or SWITCH in Phase 1. Context save/load still changes
 the associated execution state. CR13 stays reserved.
 Ordinary CHANGE now has an approved direct encoding in the master ISA.
 SWITCH bits 22:19 are now approved as required zero, with CR15 implicit.
-The exact row-operand allocation remains a separate decision.
+Bits 14:0 now reuse LOAD/SAVE's index format: sign at 14, unsigned 10-bit
+magnitude at 13:4, DR selector at 3:0. Calculate `DR[index] ± magnitude`
+without wraparound and apply ordinary C-List bounds checks. DR0 is zero;
+fixed row 7 has operand 0x0070. The magnitude limit is not a total-row limit.
+Opcode 5, ordinary condition and source CRs in bits 18:15 are retained.
 
 **Source selection explicitly reaffirmed:** Keep the authorized C-List row
 lookup through CR0–CR11 with L permission, not a direct Namespace GT source.
 Retain ordinary source/row/Namespace validation and current CR15.M authorization.
-This approval preserves the lookup contract, not the old general destination
-selection or an independently selected machine encoding.
+This preserves the lookup contract, not the old general destination selection.
+The separate destination and row-format approvals above define the new fields;
+they do not certify implementation.
 
 For Phase 1, CHANGE is THREADSAVE → THREADLOAD; SWITCH inserts LOAD
 NAMESPACE(CR15) between those halves. CR13 is reserved NULL and never touched.

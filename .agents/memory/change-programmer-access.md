@@ -16,6 +16,8 @@ SWITCH retains authorized C-List row lookup through an L-capable source;
 it does not take a Namespace GT directly from CRn. CR15.M authorization remains.
 The user also approved an implicit SWITCH destination with the unused field
 required zero. Always consult CR15.M, not CR0.M selected by that zero field.
+SWITCH row selection reuses LOAD/SAVE's DR-index plus/minus 10-bit-magnitude
+format; this approval does not extend to indexed CHANGE.
 
 **Why:** After fixing destinations, the user explicitly chose to retain the
 existing source-authorization contract rather than introduce a direct-GT form.

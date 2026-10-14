@@ -61,7 +61,7 @@ a general-purpose isolated-register LOAD in Phase 1. Thread save/load still
 updates the associated execution context, not just these GT registers.
 The CR13 reservation continues to apply. Ordinary CHANGE now uses the approved
 direct layout below; SWITCH's destination field is also settled below.
-The SWITCH row encoding and reset allocation remain separate decisions.
+The SWITCH row encoding is now selected below; reset allocation remains separate.
 
 **SWITCH source — approved:** Retain the authorized C-List row lookup.
 CRs in CR0–CR11 supplies an L-capable C-List capability; the selected row
@@ -73,8 +73,29 @@ does not authorize the operation. Fixed destinations do not waive these checks.
 The opcode implies Namespace destination CR15 and entry-Thread activation into
 CR12; zero does not select CR0. Authorization latches **CR15.M**, never the
 M bit indexed by the zero field. The C-List source and row lookup remain;
-the row encoding is not selected by this destination-field decision.
+the subsequent row-format decision is recorded below.
 Do not emit the old explicit-destination value 15 as the new canonical form.
+
+#### SWITCH row encoding — approved
+
+Reuse the selected LOAD/SAVE index format for bits 14:0:
+
+| Bits | Meaning |
+|---|---|
+| 14 | Sign: 0 adds the magnitude; 1 subtracts it |
+| 13:4 | Unsigned offset magnitude, 0–1023 |
+| 3:0 | DR index selector |
+
+The C-List row is `DR[index] ± magnitude`, calculated without wraparound and
+checked against the source capability's bounds. The 1023 limit applies to the
+offset, not the total row number. DR0 supplies zero for immediate-only rows;
+row 7 has operand **0x0070**, not 0x0007 (DR7 with offset zero).
+Reject out-of-range source magnitudes rather than truncating them.
+Retain opcode 5, ordinary condition bits, source CRs in bits 18:15, and the
+approved required-zero bits 22:19. CR15.M still authorizes the handoff.
+This is indexed row selection for SWITCH, not approval of indexed CHANGE.
+Compiler/simulator/RTL agreement and exact-build physical evidence remain
+downstream requirements, not consequences of this documentation approval.
 
 #### Ordinary CHANGE encoding — approved
 
@@ -621,7 +642,8 @@ other SWITCH destinations; CR13 operations are excluded from Phase 1.
 ### Namespace destination: CR15
 
 `SWITCH CR15, CRs, #row` retains the source checks and authorized row lookup.
-The fixed-destination field is zero; exact row encoding remains to be selected.
+The fixed-destination field is zero; bits 14:0 use the approved sign,
+10-bit magnitude and DR-selector row format above.
 The selected capability must identify the destination Namespace. The current
 CR15.M authorizes the operation; ordinary CHANGE does not acquire an M requirement.
 
