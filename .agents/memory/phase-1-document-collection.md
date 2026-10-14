@@ -185,6 +185,16 @@ belong to Phase 2.
 layout, networking mechanism or hardware authorization. The approved Phase 1
 one-IDE/several-CM scope remains unchanged.
 
+Phase 1 memory is one half of the FPGA memory size, leaving the other half for
+the second Namespace in the Phase 2 networking test.
+
+**Why:** The user explicitly made the future two-Namespace test a present
+Phase 1 memory-budget constraint.
+
+**How to apply:** Fit the Phase 1 Namespace table, LUMP allocations and growth
+headroom within that half; do not budget against the entire FPGA memory.
+Establish target bytes and placement separately rather than inventing them.
+
 Phase 1 requires working ide.Mint, pkverify and controlled nstab RW use, not
 only reserved slots. The agent owns delivery of these services.
 

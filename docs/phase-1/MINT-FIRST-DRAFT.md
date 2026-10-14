@@ -27,6 +27,11 @@ Two Phase 1 Namespaces sharing one CM FPGA's memory to test CM networking are
 the approved Phase 1 scope of one IDE managing several CMs or specify the future
 test's memory layout or networking mechanism.
 
+**Approved Phase 1 memory budget:** one half of the FPGA memory size; the other
+half is left for the second Namespace in Phase 2. The Namespace table, LUMP
+allocations and service growth headroom must all fit within the Phase 1 half.
+Exact bytes and placement remain to be established against the target memory.
+
 The user requests a first draft with enough space to grow. The allocation policy
 below is proposed to satisfy that requirement; no exact byte allocation has
 been approved or measured.
@@ -86,7 +91,7 @@ For each executable service LUMP, ide.Mint and pkverify:
    change; never overwrite the next object or silently relocate it.
 
 This provides at least 100% headroom relative to the first complete payload,
-subject to a real total-memory budget. It does not assert that the current board
+subject to the approved half-FPGA-memory Phase 1 budget. It does not assert that the current board
 has enough free memory. Exact initial capacities must follow compilation and
 layout checks; guessing byte counts now would not establish usable headroom.
 
