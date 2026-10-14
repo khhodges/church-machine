@@ -1050,7 +1050,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
         `got 0x${(r12w2.words[0]>>>0).toString(16)} vs 0x${(r12w1.words[0]>>>0).toString(16)}`);
 
     // P12x: TPERM reserved presets (10/11/12/15) → compile-time error naming RSVn
-    for (const [code, rsvName] of [[10,'RSV3'],[11,'RSV4'],[12,'RSV5'],[15,'RSV1']]) {
+    for (const [code, rsvName] of [[10,'RSV3'],[11,'RSV4'],[12,'RSV5']]) {
         const ax = new ChurchAssembler();
         ax.assemble(`TPERM CR0, ${code}`);
         assert(`P12x TPERM CR0,${code} (${rsvName}): error emitted`,
@@ -1061,7 +1061,7 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     }
 
     // P12y: TPERM B-modifier reserved variants (26=RSV3B, 27=RSV4B, 28=RSV5B, 31=RSV1B) → error
-    for (const [code, rsvName] of [[26,'RSV3'],[27,'RSV4'],[28,'RSV5'],[31,'RSV1']]) {
+    for (const [code, rsvName] of [[26,'RSV3'],[27,'RSV4'],[28,'RSV5'],[31,'NULLB']]) {
         const ay = new ChurchAssembler();
         ay.assemble(`TPERM CR0, ${code}`);
         assert(`P12y TPERM CR0,${code} (${rsvName}B): error emitted`,

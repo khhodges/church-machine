@@ -10,7 +10,7 @@ class ChurchTperm(Elaboratable):
         self.tperm_start = Signal()
         self.cr_target = Signal(4)   # CRd — target CR to attenuate (or compare for EXACT)
         self.cr_src    = Signal(4)   # CRs — reference CR for EXACT mode
-        self.preset = Signal(4)
+        self.preset = Signal(5)
 
         # FRAME preset input: 1 if a real return frame exists on the call stack
         # (i.e. RETURN would not underflow into the boot sentinel).
@@ -26,7 +26,8 @@ class ChurchTperm(Elaboratable):
         # Semantics by path:
         #   CLEAR / exact permission preset → 1
         #   same-domain permission mismatch → 0 (no write, no fault)
-        #   EXACT (CHECK_EXACT)        → word0 equality, without fault or write
+        #   EXACT (CHECK_EXACT)        → non-NULL word0 equality; NULL hard-faults
+        #   NULL                      → architectural type test, no write
         #   FRAME (CHECK_FRAME)        → stack_has_frame (1 if real return frame exists)
         # Valid only when tperm_complete is high.
         self.tperm_z_result = Signal()
@@ -48,7 +49,7 @@ class ChurchTperm(Elaboratable):
         ref_cap = Signal(CAP_REG_LAYOUT)          # latched for EXACT comparison
         ref_view = View(CAP_REG_LAYOUT, ref_cap)
 
-        preset_reg   = Signal(4)
+        preset_reg   = Signal(5)
         fault_flag   = Signal()
         fault_latched = Signal(4)
         z_result_reg = Signal()   # latched Z value, forwarded to tperm_z_result on COMPLETE
@@ -59,6 +60,7 @@ class ChurchTperm(Elaboratable):
         is_clear = Signal()
         is_exact  = Signal()   # preset == TpermPreset.EXACT
         is_frame  = Signal()   # preset == TpermPreset.FRAME
+        is_null = Signal()
 
         # Decode target GT dom+perm[2:0] → 6-bit logical perms for comparison.
         #   Turing (dom=0): logical[2:0] = perm (XWR), [5:3] = 0
@@ -71,7 +73,7 @@ class ChurchTperm(Elaboratable):
             )
         )
 
-        with m.Switch(preset_reg):
+        with m.Switch(preset_reg[:4]):
             with m.Case(TpermPreset.CLEAR):
                 m.d.comb += [new_perms.eq(0), is_clear.eq(1)]
             with m.Case(TpermPreset.R):
@@ -96,6 +98,8 @@ class ChurchTperm(Elaboratable):
                 m.d.comb += [new_perms.eq(0), is_exact.eq(1)]
             with m.Case(TpermPreset.FRAME):
                 m.d.comb += [new_perms.eq(0), is_frame.eq(1)]
+            with m.Case(TpermPreset.NULL):
+                m.d.comb += [is_null.eq(~preset_reg[4]), is_reserved.eq(preset_reg[4])]
             with m.Default():
                 m.d.comb += [new_perms.eq(0), is_reserved.eq(1)]
 
@@ -135,6 +139,9 @@ class ChurchTperm(Elaboratable):
                     m.next = "FAULT"
                 with m.Elif(is_exact):
                     m.next = "READ_CR2"
+                with m.Elif(is_null):
+                    m.d.sync += z_result_reg.eq(target_gt.gt_type == GT_TYPE_NULL)
+                    m.next = "COMPLETE"
                 with m.Elif(is_frame):
                     m.next = "CHECK_FRAME"
                 with m.Elif(is_clear):
@@ -167,9 +174,14 @@ class ChurchTperm(Elaboratable):
                 m.next = "CHECK_EXACT"
 
             with m.State("CHECK_EXACT"):
-                # EXACT is a pure comparison of all 32 GT bits, never a write.
-                m.d.sync += z_result_reg.eq(target_view.word0_gt == ref_view.word0_gt)
-                m.next = "COMPLETE"
+                # Reject NULL before producing flags or writing either operand.
+                with m.If((target_gt.gt_type == GT_TYPE_NULL) |
+                          (ref_view.word0_gt.gt_type == GT_TYPE_NULL)):
+                    m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.d.sync += z_result_reg.eq(target_view.word0_gt == ref_view.word0_gt)
+                    m.next = "COMPLETE"
 
             with m.State("APPLY"):
                 # Reached only for an exact ordinary permission-set match → Z=1.

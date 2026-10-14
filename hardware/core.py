@@ -615,6 +615,12 @@ class ChurchCore(Elaboratable):
                 cond_exec_enable & is_church_op & ~any_unit_busy &
                 ~boot_microcode_active &
                 (church_op != ChurchOpcode.CHANGE) &
+                # NULL and EXACT own their type checks in the TPERM unit.
+                # The generic NULL gate would reject the NULL query itself
+                # and attribute EXACT failures to the wrong pipeline stage.
+                ~((church_op == ChurchOpcode.TPERM) &
+                  ((u_decoder.tperm_preset[:4] == TpermPreset.NULL) |
+                   (u_decoder.tperm_preset[:4] == TpermPreset.EXACT))) &
                 # RETURN has no CR source operand. Its frame companion (or
                 # LAMBDA code identity) supplies authority, not decoded CR0,
                 # which a preceding RETURN MASK 0 correctly clears.

@@ -78,6 +78,10 @@ originating EXACT fault location through subsequent fault handling. Validate
 PassKey issuance, type, generation, binding and proof separately; equal malformed
 or stale GTs must not authorize an operation. No read-only TESTB is approved.
 
+Implementation evidence is limited to assembler/simulator tests and RTL
+simulation. Physical FPGA verification remains outstanding; this change does
+not authorize a bitstream build, flash, or saved-image migration.
+
 F/G are Namespace Word-1 bits 31/30, inspected through authorized reads and
 BFEXT, not new TPERM presets. Within Mint, only the same-scope single-slot
 LAMBDA references NSRW-GT. Setting GT B=true, if required, is a privileged

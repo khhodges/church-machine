@@ -237,6 +237,7 @@ class ChurchAssembler {
             'E': 8, 'LS': 9,
             'FRAME': 13,   // call-stack query: Z=1 if a real return frame exists (RETURN would not underflow)
             'EXACT': 14,   // 32-bit identity check: CRd.word0 === CRs.word0 → Z=1
+            'NULL': 15,    // architectural type test; plain form only
             'B': 0x10, 'RB': 0x11, 'RWB': 0x12, 'XB': 0x13,
             'RXB': 0x14, 'RWXB': 0x15, 'LB': 0x16, 'SB': 0x17,
             'EB': 0x18, 'LSB': 0x19,
@@ -2411,15 +2412,15 @@ class ChurchAssembler {
                 } else {
                     imm = this._parseImm(parts[2], lineNum) & 0x1F;
                 }
-                // Guard: presets 10 (RSV3), 11 (RSV4), 12 (RSV5), 15 (RSV1) and their
-                // B-modifier variants (26, 27, 28, 31) are hardware-reserved.  Assembling
+                // Guard: presets 10–12, their B variants, and modified NULL (31)
+                // are hardware-reserved. Assembling
                 // them would produce a TPERM_RSV fault at runtime with no diagnostic.
-                const _RSV_NAMES = { 10: 'RSV3', 11: 'RSV4', 12: 'RSV5', 15: 'RSV1' };
+                const _RSV_NAMES = { 10: 'RSV3', 11: 'RSV4', 12: 'RSV5' };
                 const _baseCode = imm & 0xF;
-                if (_RSV_NAMES[_baseCode] !== undefined) {
+                if (_RSV_NAMES[_baseCode] !== undefined || imm === 31) {
                     this.errors.push({ line: lineNum,
                         ...this._tokenCols(this._currentLineText, parts[2] || '0'),
-                        message: `TPERM preset ${_RSV_NAMES[_baseCode]} (code ${_baseCode}) is reserved — using it causes a TPERM_RSV fault on hardware. Valid presets are CLEAR..LS (0-9), FRAME (13), EXACT (14), and their B-modifier variants.` });
+                        message: `TPERM preset ${_RSV_NAMES[_baseCode] || 'NULLB'} (code ${imm}) is reserved — using it causes a TPERM_RSV fault on hardware. Valid presets are CLEAR..LS (0-9), FRAME (13), EXACT (14), their existing B-modifier variants, and plain NULL (15).` });
                 }
                 // TPERM EXACT (preset 14): optional third CR operand — the reference GT.
                 // Syntax: TPERM CRd, EXACT, CRs  (compares CRd.word0 vs CRs.word0 → Z)
@@ -3429,10 +3430,11 @@ class ChurchAssembler {
                 return `${mnemonic}  CR${crDst}, CR${crSrc}, #${hexOff(imm)}`;
             // TPERM CRd, preset[B]  — assert/attenuate permission
             case 6: {
-                const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','RSV1'];
+                const presetNames = ['CLEAR','R','RW','X','RX','RWX','L','S','E','LS','RSV3','RSV4','RSV5','FRAME','EXACT','NULL'];
                 const bFlag    = (imm >>> 4) & 1;
                 const baseCode = imm & 0xF;
                 const baseName = presetNames[baseCode] || 'RSV';
+                if (baseCode === 15 && bFlag) return `${mnemonic}  CR${crDst}, #31`;
                 if (baseCode === 14) {
                     // EXACT mode: display reference CR (crSrc field)
                     return `${mnemonic}  CR${crDst}, EXACT, CR${crSrc}`;

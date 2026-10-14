@@ -303,7 +303,7 @@ class TpermPreset(IntEnum):
     RSV5  = 12
     FRAME = 13   # Call-stack query: Z=1 if a real return frame exists (RETURN would not underflow). No GT read.
     EXACT = 14   # Credential identity check: CRd word0 == CRs word0 (all 32 bits); faults BIND if not equal.
-    RSV1  = 15
+    NULL  = 15
 
 
 TPERM_MASKS = {
@@ -322,7 +322,7 @@ TPERM_MASKS = {
     TpermPreset.RSV5:  0x00,
     TpermPreset.FRAME: None,   # FRAME is a call-stack query, not a permission preset
     TpermPreset.EXACT: None,   # EXACT is a comparison, not a restriction preset
-    TpermPreset.RSV1:  0x00,
+    TpermPreset.NULL:  0x00,
 }
 
 

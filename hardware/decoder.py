@@ -52,7 +52,7 @@ class ChurchDecoder(Elaboratable):
         self.cr_src = Signal(4)
         self.immediate = Signal(15)
 
-        self.tperm_preset = Signal(4)
+        self.tperm_preset = Signal(5)
         self.cap_index = Signal(15)
         self.call_mask = Signal(15)
         self.return_mask = Signal(12)
@@ -90,7 +90,7 @@ class ChurchDecoder(Elaboratable):
 
         m.d.comb += [
             self.cap_index.eq(imm_field),
-            self.tperm_preset.eq(imm_field[:4]),   # TODO: field is 4 bits; B-modifier (bit 4 of 5-bit preset) is decoded by the assembler and simulator but is NOT synthesised to silicon — hardware ignores bit 4 until the preset field is widened to 5 bits in a future revision
+            self.tperm_preset.eq(imm_field[:5]),   # bit 4 retained to reject modified NULL
             self.call_mask.eq(0),            # Scrub mask: fixed 0; imm15 now carries method index, not mask
             self.return_mask.eq(imm_field[:12]),
             self.call_imm.eq(imm_field),     # CALL method index from imm15 bits[14:0]
@@ -217,11 +217,7 @@ class ChurchDecoder(Elaboratable):
                     self.fault_valid.eq(1),
                     self.fault.eq(FaultType.INVALID_OP),
                 ]
-            with m.Elif((opcode_field == ChurchOpcode.TPERM) &
-                         (imm_field[:4] == TpermPreset.RSV1)):
-                m.d.comb += [
-                    self.fault_valid.eq(1),
-                    self.fault.eq(FaultType.TPERM_RSV),
-                ]
+            # Reserved TPERM presets are checked by the condition-gated unit,
+            # not here: a false predicate must suppress all TPERM checks.
 
         return m

@@ -9200,10 +9200,14 @@ class ChurchSimulator {
         const presetMasks = this.tpermPresetMasks;
 
         // TPERM EXACT (preset 14): pure 32-bit word0 comparison, not a BIND assertion.
-        // Mode encoding, B variants and NULL precedence remain separate contract questions.
+        // NULL operands hard-fault before flags or operands change.
         if (presetMasks[presetCode] === 'EXACT') {
             const crdGT = this.cr[d.crDst].word0 >>> 0;
             const crsGT = this.cr[d.crSrc].word0 >>> 0;
+            if (ChurchSimulator.isNullGT(crdGT) || ChurchSimulator.isNullGT(crsGT)) {
+                this.fault('NULL_CAP', `TPERM EXACT: CR${d.crDst} or CR${d.crSrc} has architectural NULL type`);
+                return null;
+            }
             // General TPERM flag convention: N=!Z, C=0, V=0.
             const matches = crdGT === crsGT;
             this.flags.Z = matches; this.flags.N = !matches; this.flags.C = false; this.flags.V = false;
@@ -9212,6 +9216,16 @@ class ChurchSimulator {
             this.pc++;
             this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
             return { pc: this.pc - 1, instr: d, desc: descExact };
+        }
+
+        if (presetCode === 15 && !bSet) {
+            const isNull = ChurchSimulator.isNullGT(gt);
+            this.flags = {N: !isNull, Z: isNull, C: false, V: false};
+            const desc = `TPERM CR${d.crDst}, NULL — Z=${isNull ? 1 : 0}`;
+            this.output += desc + '\n';
+            this.pc++;
+            this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
+            return {pc: this.pc - 1, instr: d, desc};
         }
 
         // TPERM FRAME (preset 13): call-stack query — does a real return frame exist?
