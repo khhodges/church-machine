@@ -1004,3 +1004,17 @@ mtime_ms = 1791979476681
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9191887d-4dbb-4702-b16a-87405b505045/9c4ed580-9274-40ac-8f36-3c3d3fff002b"
 storage_version_token = "1791979520247766"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "9qHcOIfJoPxXZmdwEy_lI"
+uri = "file://docs/phase-1/MINT-FIRST-DRAFT.md"
+type = "text"
+title = "Phase 1 Mint services — first contract draft"
+description = "Approved create-and-replace scope, proposed growth headroom, and the remaining Mint, nstab and pkverify decisions for this Q&A."
+logical_id = "1931870d-e068-416a-b51d-13091e086ede"
+content_hash = "sha256:bc061bff46b7c9b5d481f6f62796141ddd0dc2a373af0ee27ecfddc4a7ad77ba"
+size = 5260
+mtime_ms = 1791986499939
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1931870d-e068-416a-b51d-13091e086ede/d2bcfc5e-2ba8-4326-8741-c716b1f4d3f6"
+storage_version_token = "1791986541486101"
+content_type = "text/markdown"

@@ -198,3 +198,19 @@ by this present Q&A.”
 for scope, ownership, proof/ABI, validation, writes/publication, failures,
 loading/reloading and acceptance. Do not treat a reserved slot or operational
 requirement as approval of an unspecified implementation.
+
+Phase 1 Mint must support both creation and authorized replacement, but
+**RESIDENT LUMPs are excluded from replacement**, even for authorized callers.
+The user
+also requires a first draft of Mint and related services with room to grow.
+
+**Why:** The user selected “Create and authorized replacement” and explicitly
+requested growth space, rather than a tightly sized first implementation.
+They then explicitly clarified that authorized replacement does not apply to
+RESIDENT LUMPs.
+
+**How to apply:** Do not revert to the older create-only proposal. Define
+replacement safeguards in the Q&A. Reserve service growth capacity once its
+policy and actual memory budget are established; no fixed size was approved.
+Do not use growth space or Mint's replacement operation to justify updating a
+RESIDENT service. Any separate resident reload/update path needs its own contract.
