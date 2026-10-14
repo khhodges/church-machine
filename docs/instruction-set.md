@@ -166,6 +166,21 @@ code containing the same word, software M manipulation, invalid slot-2 state,
 post-acceptance faults that must not re-arm admission, fresh-reset re-arming,
 and wrong entry context, using simulator, RTL and exact-build FPGA evidence.
 
+#### Boot-image matching guard — purpose approved; mechanism TBD
+
+For the proposed IDE-generated hardware guards associated with Namespace
+slot 1 and entry-Thread slot 2, the user selected protection against
+**accidentally loading the wrong boot image**. Treat this as a non-secret
+build/image matching guard, not authentication against deliberate substitution.
+A matching identifier alone does not authenticate slot contents.
+
+Guard width, shared versus separate identifiers, storage, comparison timing,
+image/update binding and provisioning remain TBD. No repurposing of the
+9-bit version, GT, integrity32 or T fields is approved. Retain ordinary
+capability, version, integrity and Thread checks. This does not resolve the
+unanswered reset-entry GT-version question or alter SWITCH's approved version-0
+rule. No random value, image, bitstream or implementation is generated here.
+
 #### Reset-ROM instruction-fetch authority — approved
 
 Hardware permits instruction fetch only from the designated **immutable reset

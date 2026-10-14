@@ -8,6 +8,13 @@ Thread and initial CR15 authority are hardwired. Trust the IDE builder and
 the seals without introducing a new W3 cold-boot seal or waiving applicable
 Church checks.
 
+The proposed IDE-generated bitstream guards for slots 1 and 2 are for
+accidental boot-image mismatch detection, not secret authentication.
+Representation/provisioning remain undecided; keep GT version checks separate.
+
+**Why:** The user explicitly selected accidental wrong-image loading as the
+threat to address, rather than deliberate unauthorized substitution.
+
 Reloading CR15 requires activation of the incoming Namespace's slot-2 Thread
 under the same authority, with no second Thread-activation grant. SWITCH's
 CR15.M covers both; reset retains authorized bootstrap and its marker sequence.
