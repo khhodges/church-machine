@@ -368,3 +368,13 @@ second increment.
 **How to apply:** Keep the version with the slot, not the memory block, and never
 reset it when clearing a free slot. Retained 511 may be allocated but cannot
 support another release increment. Initial version selection remains open.
+
+Inspect F/G via authorized Namespace reads and BFEXT; setting GT B=true, if
+needed, belongs to a privileged function, not a set-B instruction.
+
+**Why:** The user approved the existing-instruction F/G approach and explicitly
+required privilege for setting B.
+
+**How to apply:** No new TPERM F/G presets or Phase 1 GC. Keep Mint reads within
+the same-scope single-slot LAMBDA. Do not invent the set-B function's authority
+or ABI, approve TESTB by implication, or change the existing clear-B modifier.

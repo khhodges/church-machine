@@ -288,6 +288,13 @@ support and evidence, including pre-fault state and location capture, remain
 outstanding. Current reserved-preset rejection must not be mistaken for support.
 Neither test replaces trusted issuance, validity or proof checks.
 
+**Approved F/G and B boundaries:** Use an authorized Namespace Word-1 read and
+BFEXT to inspect F[31]/G[30], not new TPERM presets. In Mint, the read is confined
+to the same-scope single-slot LAMBDA; no GC is introduced. If B=true must be set
+on a GT, use a privileged function, not a new set-B instruction. Its authority,
+ABI and implementation still require definition. The read-only TESTB proposal
+is not approved by this decision, and the clear-B modifier is unchanged.
+
 Required acceptance cases include NULL/NULL (including nonzero NULL encodings),
 NULL/valid, valid/NULL, equal invalid tokens, uninitialized trusted records,
 missing/truncated proofs, caller-substituted reference state, stale/revoked

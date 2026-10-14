@@ -69,6 +69,12 @@ do not infer other reuse policies.
 
 ## 3. Service separation — LAMBDA and passkey direction approved; details pending
 
+**Flag-access boundary — approved:** Inspect Namespace F/G through authorized
+reads and BFEXT, without new TPERM F/G presets or Phase 1 GC. Mint table reads
+remain in its single-slot same-scope LAMBDA. Setting GT B=true, if required,
+belongs to a privileged function, not a new set-B instruction. That function's
+authority and interface remain open; no read-only TESTB instruction is approved.
+
 **Passkey-GT direction — approved:** Mint creates the passkey-GT and shares it
 as Mint is permitted by the design structure, TBD as a **list of approved GTs**.
 **Genesis is responsible for defining and approving that list and permitted
