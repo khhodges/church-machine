@@ -64,7 +64,8 @@ The RESIDENT exclusion is already decided, not an unresolved eligibility option.
 It applies to Mint and pkverify too if they are RESIDENT; their required
 reloadability cannot be justified through Mint replacement in that case.
 Hardware only checks generation equality; software owns generation management.
-No wrap/reuse policy is inferred.
+Apply the explicitly approved pool-release increment/no-wrap rule below;
+do not infer other reuse policies.
 
 ## 3. Service separation — LAMBDA and passkey direction approved; details pending
 
@@ -131,6 +132,13 @@ The actual non-returning machine-code sequence and reliable capture of its
 fault location still require verification; no new opcode or HALT substitution.
 
 ## 4. Growth headroom — proposal pending
+
+**Approved release-version rule:** Before returning a block to the free pool,
+authorized software sets `next_version = current_version + 1`, requiring
+`1 <= next_version <= 511`. 510→511 is permitted; at current version 511,
+the attempted release hard-faults without freeing the block. No wrap to zero
+and no hardware increment. This defines the release increment, not initial
+version selection or permission to release a protected/in-use object.
 
 **Allocation requirement:** Track used and free memory blocks per LUMP size
 class in Phase 1, independently of Namespace-slot availability and generations.

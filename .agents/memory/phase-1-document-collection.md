@@ -120,8 +120,9 @@ involved beyond checking equality.
 
 **How to apply:** Align active descriptions with this width. Width approval alone
 does not approve modulo wrap or generation reuse; never infer that policy.
-Keep any reuse/exhaustion policy in software. The suggested no-wrap rule was
-not approved; do not turn it into a hardware or software requirement.
+Keep any reuse/exhaustion policy in software. The earlier general no-wrap
+proposal was not approved then; the subsequent pool-release decision below
+explicitly approves software increment to 1–511 without wrap for release.
 
 Keep the existing integrity32 formula, ignoring both F and G in its input.
 No further formula revision is authorized.
@@ -337,3 +338,14 @@ slot/version combinations from actual memory available for Mint creation.
 and generations. This is explicit management, not GC; pool ownership, release,
 reuse and sizing remain open. Do not infer splitting/coalescing, generation
 wrap or RESIDENT reclamation. Budget pool bookkeeping within Phase 1 memory.
+
+Pool release increments the Namespace-entry version in software to 1–511
+inclusive, with no wrap to zero.
+
+**Why:** The user explicitly chose the inclusive upper bound after proposing
+version increment as part of returning a used block to its free pool.
+
+**How to apply:** Allow 510→511; reject an attempted increment from 511 with a
+hard fault before freeing the block. Never truncate/wrap the arithmetic or
+have hardware increment it. This settles release-version progression only,
+not initial versions, release authority or all in-use/interruption safeguards.

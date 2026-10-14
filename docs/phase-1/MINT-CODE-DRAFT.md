@@ -28,6 +28,14 @@ release/reuse remain unresolved; this does not introduce GC or permit RESIDENT
 reclamation. Include pool bookkeeping in the half-memory budget; the earlier
 Tiny service estimates do not separately cost it.
 
+**Approved pool-release version rule:** Software increments the corresponding
+Namespace-entry version before returning its block to the free pool.
+`next_version = current_version + 1` must be in **1–511 inclusive**, with no
+wrap to zero. At current version 511, hard-fault before freeing the block.
+Check the untruncated increment; masking 512 to zero is forbidden. Namespace
+updates remain inside the same-scope single-slot LAMBDA. Release authority,
+in-use safeguards, update ordering and interruption handling still need definition.
+
 ## 1. ide.Mint
 
 The shared entry below represents both approved operations. Whether the public
@@ -140,7 +148,8 @@ Mint(request, credential):
     UNRESOLVED_REQUIRE_WITHIN_PHASE1_HALF_MEMORY_BUDGET(frozen)
 
     # Software selects generation; hardware only checks equality.
-    # Do not infer wrap, increment or no-wrap policy here.
+    # Pool release increments to 1..511 without wrap; initial assignment and
+    # allocation/replacement bookkeeping must respect that separate rule.
     generation = UNRESOLVED_SELECT_SOFTWARE_GENERATION(current, frozen)
     UNRESOLVED_REQUIRE_GENERATION_IN_RANGE(generation, 0, 511)
     candidate = UNRESOLVED_PREPARE_OBJECT_AND_FOUR_WORD_ENTRY(
