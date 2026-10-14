@@ -8,6 +8,16 @@ requirement or rewrite programmer-authored CHANGE into SWITCH. Later Phase 1
 approval reserves CR13: executed CHANGE CR13 and SWITCH-to-CR13 fault INVALID_OP
 before instruction effects; condition-false forms skip the CR13 check.
 
+Phase 1 has fixed destinations: CHANGE CRn selects the incoming Thread from CRn
+and activates CR12, leaving CR15 unchanged; SWITCH loads CR15 then activates
+CR12 from the incoming Namespace's slot 2. Neither is a general isolated LOAD.
+
+**Why:** The user explicitly chose fixed destinations with a selectable CHANGE
+source to simplify Phase 1 without losing Thread selection.
+
+**How to apply:** Do not confuse CRn with the destination or restrict CHANGE to
+self-target CR12. This semantic agreement does not select the machine encoding.
+
 Self-target CHANGE is valid. The user regards CHANGE CR12 as a useful save/restore
 test without an M-bit merely to supply the operand. The earlier approval of
 CHANGE CR13 was superseded by the explicit Phase 1 reserved-CR13 decision.

@@ -52,6 +52,16 @@ and loads the Thread under the incoming Namespace; no following CHANGE is
 required. CR13 is reserved NULL and **never touched** in Phase 1: no IRQ role,
 load, restore or explicit clearing, including on SWITCH.
 
+**Phase 1 fixed destinations — approved:** `CHANGE CRn` takes the incoming
+Thread GT from the selected source CRn and activates it into **CR12**; CRn
+is not a destination selector. Ordinary CHANGE leaves CR15 unchanged.
+SWITCH has fixed Namespace destination **CR15**, then fixed Thread destination
+**CR12** using the incoming Namespace's slot-2 entry. Neither instruction is
+a general-purpose isolated-register LOAD in Phase 1. Thread save/load still
+updates the associated execution context, not just these GT registers.
+The CR13 reservation continues to apply. Exact machine-field allocation remains
+unselected; this semantic simplification does not approve a candidate word.
+
 An executed `CHANGE CR13` or `SWITCH` targeting CR13 hard-faults through
 existing **INVALID_OP**, before any instruction effects (including Thread
 save, register/M changes or Namespace writes). A condition-false instruction
@@ -303,13 +313,17 @@ CRn supplies the GT already held in that register. It is not a destination
 register or a C-list to index. CHANGE suspends the current Thread and activates
 the Thread identified by that GT. There is no second register operand,
 Namespace-slot operand, or implicit `[0]` lookup. CHANGE is not a protected
-instruction; CR13 must not be rejected while CR12 is specially exempted.
-Capability and Thread-context validation remain execution concerns.
+instruction; there is no general operand-M requirement. Its activation
+destination is fixed at CR12, independently of the source CRn. The Phase 1
+CR13 reservation is an explicit exception: executed CHANGE CR13 faults
+INVALID_OP before instruction effects. Other capability and Thread-context
+validation remains an execution concern.
 
 Self-target CHANGE is valid, including `CHANGE CR12` when CR12 identifies the
 running Thread. Save and restore the newly captured continuation and resume
 after CHANGE; do not restore an older dormant snapshot or accumulate frames.
-Neither CR12.M nor CR13.M is required merely to supply the operand GT.
+CR12.M is not required merely to supply the operand GT. CR13 is reserved,
+not an alternative permitted by granting its M bit.
 
 **Thread GT permissions and microcode authority:** The GT supplied for a valid
 CHANGE has **no permissions**. This deliberately prevents programmer access to
