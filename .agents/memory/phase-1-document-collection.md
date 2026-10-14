@@ -90,12 +90,15 @@ second**, except in IDE Debug or IDE Trace mode. Instruction retirement does
 not renew the deadline. Every successful CHANGE or SWITCH starts a fresh second,
 including self-transfers and helper-Thread transfers; renewal is not restricted
 to scheduler handoffs.
+When normal execution resumes with neither IDE Debug nor IDE Trace active,
+start a fresh second rather than restoring a partially spent interval.
 
 **Why:** The user selected bounded turns and explicitly fixed “ONE second to
 Hard Fault unless in IDE debug or IDE Trace mode.” They then explicitly selected
 every successful CHANGE/SWITCH as the renewal event.
+They also explicitly selected a fresh second on return from Debug/Trace.
 
 **How to apply:** Preserve the duration, exceptions and transfer-based renewal.
 Do not introduce scheduler-only renewal, or claim this guarantees useful progress
-or return to a scheduler. Mode-exit accounting and broader maintenance exemptions
-must not be inferred. CR13 remains untouched.
+or return to a scheduler. Preserve fresh-second mode exit; broader maintenance
+exemptions must not be inferred. CR13 remains untouched.
