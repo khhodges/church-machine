@@ -75,6 +75,14 @@ requested authority and expected destination state. These are conceptual inputs,
 not approved register assignments or a new wire protocol. Determine whether
 one method or separate methods implement them during the Q&A.
 
+**PassKey in every case — approved:** Each Create, authorized Replace and
+explicit Destroy request for an application Abstraction, Thread, LS C-list or
+RW data object requires a valid PassKey GT and its separate 128-bit proof.
+Validate authority for that operation and target, not merely pair validity.
+Missing, invalid, revoked or insufficiently authorized credentials hard-fault
+before protected changes. This neither assigns separate credentials per type
+nor changes ordinary ISA access checks; bootstrap issuance remains unresolved.
+
 Replacement is not blanket permission to overwrite executing code, the active
 Thread, the Namespace itself, Mint or pkverify. Eligibility, exclusion, old
 capabilities, generation changes and failure semantics remain explicit decisions.

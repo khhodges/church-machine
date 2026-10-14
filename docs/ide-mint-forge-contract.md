@@ -39,6 +39,15 @@ not executable implementations.
   authorization, per-type eligibility, in-use safeguards, memory reclamation,
   interruption behavior and ABI remain to be defined; this is not blanket
   permission to destroy protected or active objects.
+- **PassKey required in each case — approved:** Each supported Mint request
+  requires a valid, appropriately authorized PassKey GT and its separate
+  128-bit proof. This includes Create, authorized Replace and explicit Destroy
+  for application Abstractions, Threads, LS C-list objects and RW data objects.
+  Possession does not authorize every operation or target; validate the
+  requested case against Genesis-approved authority. Missing, invalid, revoked
+  or insufficiently authorized credentials hard-fault before protected changes.
+  This does not assign a distinct credential per type or settle bootstrap
+  issuance, and does not add proof checks to ordinary ISA LS/RW accesses.
 - **Only a same-scope LAMBDA references NSRW-GT**, one Namespace slot at a time,
   including reads and commit rechecks. No separate LAMBDA service LUMP or
   automatic delegation to callers/pkverify.

@@ -480,3 +480,15 @@ Threads, and it does not settle the direct-replacement version policy.
 Keep LS and RW as the respective object permissions. Destroy is not GC or
 PassKey-only revocation; preserve approved pool-release version rules while
 leaving its authority, target eligibility and safe reclamation mechanics open.
+
+Every supported Mint Create, authorized Replace and explicit Destroy case
+requires a valid, appropriately authorized PassKey GT plus its 128-bit proof,
+including LS C-list and RW data objects.
+
+**Why:** The user explicitly clarified “A passkey is needed for each case”
+after adding LS C-list objects, RW data and Destroy to the required scope.
+
+**How to apply:** Validate both credential state and authority for the requested
+operation/target; hard-fault failures before protected changes. Do not infer
+distinct credentials per type, a bootstrap bypass or new proof checks for
+ordinary ISA LS/RW accesses.
