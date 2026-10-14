@@ -62,6 +62,9 @@ Namespace layout and explicitly assigned Namespace Table slot 9 to `ide.Mint E`,
 slot 14 to `nstab RW` (hand-crafted Namespace-table RW capability, “the power”),
 and slot 15 to `pkverify E` (a new, yet-to-be-defined LUMP). The user stated
 slot 9 is empty. These exact assignments replace “three trailing additions.”
+The user also explicitly assigned UART to Namespace slot 8, supported by their
+Namespace View screenshot; do not carry the legacy UART-at-slot-2 requirement
+into the new Phase 1 map.
 
 **Why:** These are explicit user requirements accompanying layout approval,
 not inferred runtime provisioning or a completed verifier design.
