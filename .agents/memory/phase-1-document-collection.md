@@ -233,3 +233,12 @@ replacement safeguards in the Q&A. Reserve service growth capacity once its
 policy and actual memory budget are established; no fixed size was approved.
 Do not use growth space or Mint's replacement operation to justify updating a
 RESIDENT service. Any separate resident reload/update path needs its own contract.
+
+Draft Mint and related service code before asking to approve growth headroom.
+
+**Why:** The user answered the proposed 100% allowance with “Draft the code first,”
+not approval of that allowance.
+
+**How to apply:** Use the draft to expose remaining decisions and obtain actual
+sizing once compilable. Keep unresolved contracts explicit; drafting permission
+does not supersede the requirement to settle Mint's full scope in the Q&A.

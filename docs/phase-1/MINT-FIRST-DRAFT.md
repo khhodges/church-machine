@@ -75,6 +75,10 @@ primitives. Existing draft ABI assignments are not adopted merely by reference.
 
 ## 4. Growth headroom — proposal pending
 
+**User direction:** Draft the code first. The 100% growth-headroom proposal
+below was not approved. The [code draft](MINT-CODE-DRAFT.md) exposes the proposed
+control flow and unresolved mechanisms; it is not an executable or size estimate.
+
 For each executable service LUMP, ide.Mint and pkverify:
 
 1. Measure the complete required object size for the selected output profile:
