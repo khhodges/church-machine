@@ -131,3 +131,15 @@ formula beyond ignoring both F and G.”
 
 **How to apply:** Reconcile prose that mentions only G with the two-flag mask.
 Do not treat calculation masking as a stored-flag write or an authority grant.
+
+T identifies networked objects in networked IDE/CM systems, including one IDE
+with several CMs: think of it as a networked Golden Token. Without a network,
+T === GT.
+
+**Why:** The user explicitly restarted F8's definition around network scope,
+replacing the earlier frozen-bootstrap versus portable-content framing.
+
+**How to apply:** Do not limit no-network equality to frozen resident objects
+or automatically redefine T as a hash on local rebinding. Network representation,
+issuance and authorization are not yet specified by this definition; do not
+invent them. This decision supersedes older bootstrap-only applicability claims.
