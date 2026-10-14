@@ -13,7 +13,9 @@
 > data/table permissions and cannot be software-enabled. Retain final ROM
 > **CALL CR0**, with normal CALL validation; successful transfer ends reset-ROM
 > fetch authority. Consume marker admission at valid acceptance before activation;
-> faults do not re-arm it, only fresh reset does. Grant handling remains open.
+> faults do not re-arm it, only fresh reset does. No additional CR12.M grant is
+> required or issued solely for the marker. Initial Namespace authority,
+> ordinary M-bit rules and Thread validation remain unchanged.
 > No additional ROM CALL is introduced for CHANGE or SWITCH.
 
 > **Status:** Current architecture rule summary, backed by implementation and

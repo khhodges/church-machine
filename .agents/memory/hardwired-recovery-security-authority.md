@@ -18,7 +18,9 @@ apply after handoff. The user explicitly retained the final reset-ROM CALL CR0:
 normal CALL validation applies and successful transfer ends ROM fetch authority.
 No additional ROM CALL is implied for ordinary CHANGE or SWITCH. Consume marker
 authorization on valid acceptance before activation; faults never restore it,
-only fresh reset re-arms it. Grant handling remains unresolved.
+only fresh reset re-arms it. No additional CR12.M grant is required or issued
+solely for the marker: the user chose reset-context authorization with ordinary
+Thread validation, unchanged initial Namespace authority and unchanged M rules.
 
 **Why:** The user selected a distinct reset exception, not indexed CHANGE or
 a general software privilege, and subsequently chose to retain the checked CALL

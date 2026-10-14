@@ -12,7 +12,9 @@
 > permissions or software enablement. Retain final ROM **CALL CR0** with normal
 > CALL validation; successful transfer ends reset-ROM fetch authority.
 > Consume marker admission at valid acceptance before activation. Faults do not
-> re-arm it; only fresh reset does. Grant handling remains open.
+> re-arm it; only fresh reset does. No additional CR12.M grant is required or
+> issued solely for the marker; initial Namespace authority and ordinary
+> validation/M rules are unchanged.
 > No image migration or ROM rebuild follows.
 
 **v1.1 — 2026-07-23**
