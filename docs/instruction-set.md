@@ -52,6 +52,13 @@ and loads the Thread under the incoming Namespace; no following CHANGE is
 required. CR13 is reserved NULL and **never touched** in Phase 1: no IRQ role,
 load, restore or explicit clearing, including on SWITCH.
 
+An executed `CHANGE CR13` or `SWITCH` targeting CR13 hard-faults through
+existing **INVALID_OP**, before any instruction effects (including Thread
+save, register/M changes or Namespace writes). A condition-false instruction
+is skipped, with no CR13 operand checks or instruction effects. This is the
+approved reserved-operand disposition, not permission to execute CR13 operations
+or a waiver of independent fetch/encoding faults.
+
 The watchdog is **one second of elapsed time to hard fault**, except in IDE
 Debug or IDE Trace mode. Every successful CHANGE/SWITCH renews a full second,
 including self/helper transfers. Retirement, CALL and RETURN do not renew it;
@@ -190,7 +197,7 @@ These remain requests for confirmation, not established supersessions.
 | Indexed CHANGE | Remains a proposal, not an enabled form under the one-GT correction. A reported INDEX deferral needs its decision record and exact scope; it must not be inferred to cancel the selected compact indexed LOAD/SAVE rules. |
 | Direct CHANGE encoding | Semantic approval does not approve `0x27060000`, its proposed IDX field, or a binary migration policy. Confirm this allocation separately from any INDEX decision. |
 | Reset boot | Incoming-half-only activation remains the baseline; initial entry is NS[2]. Candidate marker `0x27000001`, CR12-only M grant, reset-ROM fetch authority and final-CALL removal remain unapproved. Canonical frame preparation alone does not remove CALL. |
-| CR13 | Reserved NULL and never touched in Phase 1: no IRQ role, CHANGE/SWITCH activation, load, restore or explicit clearing. Earlier IRQ-swap proposals are superseded for Phase 1. Reserved-operation encoding/fault disposition remains TBD. |
+| CR13 | Reserved NULL and never touched in Phase 1. Executed CHANGE CR13 or SWITCH targeting CR13 faults INVALID_OP before instruction effects; condition-false instructions skip the CR13 check. Earlier IRQ-swap proposals are superseded. |
 | Other amendment items | Keep their individual proposed/baseline/user-decided status. No blanket approval is implied for transition fault numbers, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
 
 Namespace handoff and reset entry remain distinct contracts, but both now
@@ -253,7 +260,7 @@ encoding, saved-image migration, ROM build, or hardware operation is certified.
 The following remain visible approval blockers rather than implied defaults:
 reset-ROM fetch authority; boot entry/grant/final-CALL binding (slot 2 is settled);
 watchdog memory-backed capture authority; protected configuration interface;
-target timing-source implementation; reserved-CR13 operation fault disposition; and the
+target timing-source implementation; and the
 proposed `THREAD_CONTEXT` (`0x1D`), `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG`
 (`0x1F`) fault allocations.
 

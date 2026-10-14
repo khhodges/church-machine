@@ -66,8 +66,12 @@ still validate the actual descriptor, version, Thread, frame, and C-List.
 An M-clear destination faults with `PERM_L`. A CR0–CR11 destination, CR12–CR15
 source, or malformed encoding faults with `INVALID_OP`. A NULL or non-L source,
 out-of-bounds row, stale token, or integrity failure faults before
-source admission completes. Reserved CR13 operation disposition needs explicit
-encoding/fault definition; it is not an enabled isolated-load path.
+source admission completes. An executed SWITCH targeting CR13 faults
+`INVALID_OP` before any instruction effects, including Thread save or source
+admission effects. Condition-false instructions skip the CR13 check and have no
+instruction effects. The same rule applies to `CHANGE CR13`; CR13 is not an
+enabled isolated-load or Thread-activation path. Independent fetch/encoding
+faults are not waived.
 
 For CR15, outgoing-save writes are not transactionally rolled back if a later
 phase fails. Default to hard fault, not retry, alternate target, silent repair,

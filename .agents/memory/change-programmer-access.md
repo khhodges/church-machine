@@ -3,11 +3,14 @@ name: CHANGE programmer access
 description: One-GT CHANGE is programmer-accessible but uses microcode authority on a permissionless Thread GT.
 ---
 
-CHANGE is not a protected instruction. Do not block CR13–CR15 at compilation while exempting CR12, or rewrite programmer-authored CHANGE into SWITCH.
+CHANGE is not a protected instruction. Do not invent a general operand-M
+requirement or rewrite programmer-authored CHANGE into SWITCH. Later Phase 1
+approval reserves CR13: executed CHANGE CR13 and SWITCH-to-CR13 fault INVALID_OP
+before instruction effects; condition-false forms skip the CR13 check.
 
-Self-target CHANGE is valid. The user explicitly confirmed that CHANGE CR12
-should work as well as CHANGE CR13, and regards self-targeting as a useful
-save/restore test. Neither requires an M-bit merely to supply the operand.
+Self-target CHANGE is valid. The user regards CHANGE CR12 as a useful save/restore
+test without an M-bit merely to supply the operand. The earlier approval of
+CHANGE CR13 was superseded by the explicit Phase 1 reserved-CR13 decision.
 
 **Why:** An implementation's dormant-only guard is not architectural authority.
 
