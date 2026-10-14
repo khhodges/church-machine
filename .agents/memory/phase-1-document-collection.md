@@ -164,3 +164,14 @@ letting a small physical table constrain the IDE's object catalog.
 Recalculate resident placement without renumbering slots. Approval selects the
 target, not migration or hardware conformance; validate the matching image and
 bitstream before hardware use.
+
+Phase 1 requires **one IDE managing several CMs**, including object identity
+and management across those CMs. Direct CM-to-CM and multiple networked IDEs
+are deferred.
+
+**Why:** The user explicitly chose this middle release scope, not single-CM
+only and not the full networked-IDE/CM scope.
+
+**How to apply:** Treat networked T support for that topology as a release
+requirement, not merely future documentation. Do not infer a transport or
+expand the requirement to direct CM-to-CM operations.
