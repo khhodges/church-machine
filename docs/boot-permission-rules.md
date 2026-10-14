@@ -22,7 +22,12 @@ For Phase 1, authority to establish/reload CR15 also authorizes the required
 slot-2 Thread activation into CR12. Reset uses its authorized bootstrap context
 and approved one-shot marker; no separate Thread-activation grant is requested.
 This does not waive Thread validation, alter the reset instruction sequence,
-or independently select the reset entry GT's version.
+or independently select the reset entry GT's version. The subsequent boot-pair
+guard decision now selects IDE-assigned versions for slots 1 and 2:
+`guard18 = (slot1_version << 9) | slot2_version`. Reset uses the bitstream's
+expected slot-2 version, not a live-descriptor-derived value or mandatory zero.
+GTs referencing either boot object carry its assigned version. This exception
+does not change ordinary allocatable-slot version policy.
 
 > **Status:** Current architecture rule summary, backed by implementation and
 > executable tests for specific paths; not a formal proof of isolation. Wukong A7

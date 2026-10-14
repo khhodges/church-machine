@@ -78,7 +78,9 @@ No IRQ Thread is installed in Phase 1. Ordinary CHANGE leaves CR15 unchanged.
 5. For CR15, the validated value must identify a Namespace: save the outgoing
    Thread under the old Namespace, load CR15 at the microcode midpoint, and
    activate the destination's slot-2 Thread using a hardwired permissionless
-   Inform GT with version 0. Successful handoff consumes CR15.M.
+   Inform GT with version 0, except for the guarded boot pair, which uses
+   its bitstream-assigned slot-2 version. Never derive that expected version
+   from the live descriptor. Successful handoff consumes CR15.M.
 6. A subsequent SWITCH to that register fails until Namespace authorizes it
    again through the matching device capability.
 

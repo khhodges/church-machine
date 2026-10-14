@@ -223,6 +223,13 @@ Thread fault.
 
 ## Hardwired entry-Thread GT
 
+**Later approved boot-pair exception:** Slots 1 and 2 of the guarded boot
+configuration receive IDE-assigned nine-bit versions whose concatenation is
+the 18-bit accidental-mismatch guard. Reset and handoff into this pair use the
+bitstream's expected slot-2 version, not necessarily zero. The version-0 rule
+below still applies to other Namespace handoffs. Never synthesize either
+expected version from live descriptors. See hardwired-recovery-security-authority.md.
+
 The user specifies that Namespace SWITCH obtains the destination's slot-2
 Thread GT from “a hardwired value with a version number!”
 
