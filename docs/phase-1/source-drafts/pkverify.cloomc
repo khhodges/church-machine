@@ -1,0 +1,47 @@
+; REVIEW DRAFT ONLY — deliberately does not compile.
+; TODO_* labels are undefined compilation blockers, not runtime instructions.
+; Missing/invalid GT or proof => HARD FAULT, never a rejection return.
+;
+; PROPOSED comparison-only scratch ABI (not a selected transfer/storage ABI):
+; CR2 supplied passkey-GT; CR3 independently trusted expected passkey-GT.
+; DR1..DR4 supplied 128-bit proof; DR6..DR9 independently trusted proof words.
+; Word order, secure loading, preservation, cleanup and trace protection TBD.
+; Expected values MUST NOT be accepted as caller-provided trusted inputs.
+; CR13 and NSRW-GT are never referenced by executable code here.
+; Early-out comparisons are a REVIEW PROPOSAL, not constant-time verification.
+
+abstraction pkverify {
+capabilities { SELF E }
+
+method Verify {
+    ; Define safe transfer and obtain trusted state independently of caller.
+    ; Require both GT and all 128 proof bits. Do not log either proof copy.
+    BRANCH TODO_SECURE_INPUT_AND_TRUSTED_STATE_ABI
+verify_gt:
+    TPERM CR2, EXACT, CR3
+    BRANCH NE, fault
+verify_proof:
+    ; These concrete CLOOMC comparisons illustrate all four 32-bit words.
+    ; They do not implement secure input loading or authenticate caller state.
+    MCMP DR1, DR6
+    BRANCH NE, fault
+    MCMP DR2, DR7
+    BRANCH NE, fault
+    MCMP DR3, DR8
+    BRANCH NE, fault
+    MCMP DR4, DR9
+    BRANCH NE, fault
+verify_policy:
+    ; Revocation, object/request binding and replay policy remain undecided.
+    BRANCH TODO_BINDING_REVOCATION_AND_REPLAY_RULES
+verified:
+    ; Remove private scratch safely and return only nonsecret verification.
+    ; Verification is not blanket authorization to Mint an arbitrary object.
+    BRANCH TODO_SUCCESS_CLEANUP_AND_RESULT_ABI
+    RETURN
+fault:
+    ; Must become the approved non-returning hard-fault path.
+    ; Do not replace with HALT, RETURN, retry or rollback.
+    BRANCH TODO_NONRETURNING_HARD_FAULT
+}
+}

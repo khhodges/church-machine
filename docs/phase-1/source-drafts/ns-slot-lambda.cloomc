@@ -1,0 +1,32 @@
+; REVIEW DRAFT — RAW SAME-SCOPE LAMBDA BODY, not a separate service LUMP.
+; Deliberate undefined labels block assembly. Never install this fragment alone.
+; Must be bound inside Mint's scope using the eventual approved X-code binding.
+;
+; Proposed scratch binding: CR4 = nstab / NSRW-GT (NOT approved ABI).
+; nstab provisioning in the shared scope, preservation and cleanup are TBD.
+; This is the ONLY source-draft code that references NSRW-GT.
+; One selected Namespace slot per invocation, no iteration across slots.
+; Never return this authority, add a public method for it, or touch CR13.
+
+slot_entry:
+    ; Validate mode, exact slot, caller policy and frozen request first.
+    BRANCH TODO_SLOT_INPUTS_AUTHORIZATION_AND_SCOPE_BINDING
+    LOAD CR4, nstab
+    ; Require 0 <= slot < configured count. Approved default count is 256.
+    ; Four words per slot; physical access must stay within this exact slot.
+    ; Arithmetic, offset units and descriptor read ABI must be defined.
+    BRANCH TODO_READ_EXACT_SINGLE_SLOT
+slot_recheck:
+    ; CREATE: empty. REPLACE: occupied, not RESIDENT, expected identity/state.
+    ; Recheck generation, allocation and permission evidence before any write.
+    BRANCH TODO_RECHECK_SINGLE_SLOT_AND_REJECT_RESIDENT_REPLACEMENT
+slot_write:
+    ; READ mode must not fall through to writes; mode dispatch is TBD.
+    ; Commit mode: define write exclusion, accepted writes and ordering.
+    ; Four DWRITEs alone do NOT establish atomicity.
+    ; Faults hard-fault; already accepted writes are not implicitly undone.
+    BRANCH TODO_SINGLE_SLOT_WRITE_PROTOCOL
+slot_complete:
+    BRANCH TODO_CONFIRM_WRITES_AND_REMOVE_SCRATCH_AUTHORITY
+    ; Confirm LAMBDA continuation/return behavior for the approved ABI.
+    BRANCH TODO_LAMBDA_RETURN_CONVENTION

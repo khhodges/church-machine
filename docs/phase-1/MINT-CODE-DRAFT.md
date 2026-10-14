@@ -3,6 +3,11 @@
 Status: **review-only algorithm draft, not executable CLOOMC**.
 Written before choosing growth headroom, at the user's request.
 
+The subsequent requested **CLOOMC source drafts** are in
+[source-drafts/](source-drafts/README.md). They use actual instruction syntax,
+with undefined labels deliberately blocking compilation of unresolved contracts.
+They are not operational services or measured Tiny LUMPs.
+
 This draft makes control flow visible without inventing register assignments,
 method numbers, credential formats or a Namespace commit mechanism. Uppercase
 `UNRESOLVED_*` calls below are missing contracts, not accepting stubs. They have

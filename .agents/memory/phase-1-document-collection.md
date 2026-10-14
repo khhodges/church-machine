@@ -285,3 +285,13 @@ Mint as the proof creator at forging time.
 **How to apply:** Require both, hard-fault on missing/invalid proof, and never
 substitute GT equality alone. Generation mechanism, protected storage, transfer,
 verification ABI, revocation and replay rules still require explicit decisions.
+
+Keep the requested CLOOMC review drafts deliberately unbuildable at unresolved
+contract boundaries rather than supplying accepting placeholder methods.
+
+**Why:** The user requested source before completing the guided contracts;
+drafting permission must not silently become operational admission.
+
+**How to apply:** Use explicit unresolved branch targets, mark proposed ABIs,
+and keep drafts out of the live catalog. Replace blockers only with settled
+mechanisms; do not treat partial compiler output as a usable LUMP.

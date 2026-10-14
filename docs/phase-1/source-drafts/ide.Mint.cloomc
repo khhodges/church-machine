@@ -1,0 +1,73 @@
+; REVIEW DRAFT ONLY — deliberately does not compile.
+; No catalog entry, binary, Namespace placement or hardware installation.
+; TODO_* labels are intentionally UNDEFINED: they are compilation blockers,
+; not executable stubs, accepting checks or runtime fault implementations.
+;
+; Proposed public methods: Create, Replace, ForgePassKey. Not an approved ABI.
+; CR10 is a PROPOSED binding to the same-scope slot LAMBDA (X authority).
+; Provisioning that binding, preserving caller state and dispatch are TBD.
+; Only ns-slot-lambda.cloomc may reference the nstab / NSRW-GT capability.
+; CR13 is never touched. No method may replace a RESIDENT LUMP.
+; Every failed runtime check must hard-fault. No retries or rollback.
+
+abstraction ide.Mint {
+capabilities { SELF E, pkverify E }
+
+method Create {
+    ; Define/freeze the request, destination CM, Namespace, slot and object.
+    BRANCH TODO_CREATE_REQUEST_ABI
+create_authorize:
+    ; pkverify must verify the GT AND its Mint-created 128-bit proof.
+    ; Marshalling and pkverify's result/preservation convention are unresolved.
+    BRANCH TODO_CREATE_PROOF_AND_GENESIS_AUTHORIZATION
+create_validate:
+    ; Require empty destination, supported type, valid identity/permissions,
+    ; allocation, bounds, nonoverlap and Phase 1 half-memory budget.
+    ; The slot LAMBDA performs all reads requiring NSRW-GT.
+    BRANCH TODO_CREATE_VALIDATE_AND_PREPARE_ENTRY
+create_slot:
+    ; Bind CR10 and pass exactly one validated slot and its prepared entry.
+    BRANCH TODO_CREATE_BIND_SLOT_LAMBDA_AND_INPUTS
+    LAMBDA CR10
+create_publish:
+    ; Return an authorized result only after confirmed writes.
+    BRANCH TODO_CREATE_CONFIRM_COMMIT_AND_MATERIALIZE_GT
+    RETURN
+}
+
+method Replace {
+    BRANCH TODO_REPLACE_REQUEST_ABI
+replace_authorize:
+    BRANCH TODO_REPLACE_PROOF_AND_GENESIS_AUTHORIZATION
+replace_validate:
+    ; Require occupied destination and reject RESIDENT with a hard fault.
+    ; Recheck RESIDENT and expected destination within the slot LAMBDA.
+    ; Define in-use protection, generation selection and old-capability rules.
+    BRANCH TODO_REPLACE_SAFETY_AND_PREPARE_ENTRY
+replace_slot:
+    BRANCH TODO_REPLACE_BIND_SLOT_LAMBDA_AND_INPUTS
+    LAMBDA CR10
+replace_publish:
+    BRANCH TODO_REPLACE_CONFIRM_COMMIT_AND_MATERIALIZE_GT
+    RETURN
+}
+
+method ForgePassKey {
+    ; Genesis defines the approved GT list and permitted sharing structure.
+    BRANCH TODO_FORGE_REQUEST_AND_GENESIS_POLICY
+forge:
+    ; Create the PassKey GT AND its separate 128-bit proof at forging time.
+    ; Do not substitute a fixed constant, GT-derived value or accepting stub.
+    BRANCH TODO_FORGE_GT_AND_GENERATE_128_BIT_PROOF
+protect:
+    ; Private storage, proof transfer and successful cleanup are unresolved.
+    ; No proof material in ordinary results, traces or diagnostics.
+    BRANCH TODO_PROTECT_AND_BIND_PROOF
+share:
+    ; No recipient selection by Mint beyond Genesis's approved policy.
+    ; Any NSRW access must use the same-scope single-slot LAMBDA.
+    BRANCH TODO_SHARE_AS_GENESIS_PERMITS
+    BRANCH TODO_FORGE_SUCCESS_RESULT_AND_CLEANUP
+    RETURN
+}
+}
