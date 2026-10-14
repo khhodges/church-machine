@@ -26,3 +26,8 @@ permission to add recovery machinery inside the CM.
 Existing explicitly agreed architectural fault behavior is not authorization
 to invent additional recovery mechanisms, nor does this principle authorize
 silently deleting existing fault handling or altering retained artifacts.
+
+The user reaffirmed this rule during the Phase 1 Mint Q&A: “Any fault is a hard
+fault.” Apply it to Mint, its same-scope NSRW-GT LAMBDA and pkverify, including
+failed authorization/verification/validation checks, rather than drafting
+recoverable rejection returns. Hard faults do not imply rollback of prior writes.

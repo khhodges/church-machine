@@ -17,6 +17,37 @@ interface has one method or separate Create/Replace methods remains undecided.
 `request`, `credential`, `result` and locals are symbolic values, not CR/DR
 assignments. A result must not expose verifier private state or nstab.
 
+**Approved authority boundary:** Mint uses a **LAMBDA in the same scope**.
+Only that LAMBDA's code references `NSRW-GT`, on a **single Namespace slot at a
+time**. The surrounding Mint code and pkverify do not reference it. This is not
+a separate service LUMP or permission to pass the table capability to callers.
+Exact LAMBDA syntax, capture/register handling and calling convention remain
+unresolved; same scope alone is not evidence of hardware-enforced isolation.
+
+The symbolic wrapper below expresses this boundary without selecting those
+mechanisms. READ and COMMIT are draft internal actions, not new public methods.
+
+```text
+# Within Mint's scope; sole code reference to NSRW-GT.
+slot_access = LAMBDA(single_destination_slot, action, inputs):
+    UNRESOLVED_REQUIRE_EXACTLY_ONE_VALIDATED_SLOT(single_destination_slot)
+    return UNRESOLVED_SLOT_ACCESS_AND_COMMIT_RULES(
+        NSRW-GT, single_destination_slot, action, inputs)
+    # Never return NSRW-GT or operate on a second slot in this invocation.
+```
+
+Every table access requiring NSRW-GT, including initial reads and commit-time
+rechecks, goes through this LAMBDA. Single-slot operation does not establish
+atomic four-word writes, external-writer exclusion or reset/fault safety.
+
+**Approved fault rule:** Any fault in Mint, its same-scope LAMBDA or pkverify
+is a **hard fault**. Failed verification, authorization, validation, destination
+checks and commit checks do not return a recoverable rejection. `HARD_FAULT`
+below is non-returning symbolic notation, not a selected instruction encoding or
+fault-code assignment. Every unresolved check must obey this rule when defined.
+No retry, rollback, repair or continuation is introduced. A hard fault does not
+undo earlier writes or prove atomicity; write visibility still needs definition.
+
 ```text
 Mint(request, credential):
     result = NON_SUCCESS_WITHOUT_CAPABILITY
@@ -24,28 +55,28 @@ Mint(request, credential):
     # Freeze requested inputs without granting authority or writing the table.
     frozen = UNRESOLVED_CAPTURE_REQUEST(request)
     if frozen.operation not in {CREATE, REPLACE}:
-        return UNRESOLVED_PUBLIC_REJECTION(UNSUPPORTED_OPERATION)
+        HARD_FAULT(UNSUPPORTED_OPERATION)
 
     # Authentication does not itself authorize creation or replacement.
     verified = pkverify(credential, frozen)
     if not verified.accepted:
-        return UNRESOLVED_PUBLIC_REJECTION(VERIFICATION_FAILED)
+        HARD_FAULT(VERIFICATION_FAILED)
 
     authorized = UNRESOLVED_AUTHORIZE_OPERATION(verified, frozen)
     if not authorized:
-        return UNRESOLVED_PUBLIC_REJECTION(NOT_AUTHORIZED)
+        HARD_FAULT(NOT_AUTHORIZED)
 
     # Bind networked T / virtualGT to this exact destination; no T-as-hash rule.
     destination = UNRESOLVED_RESOLVE_CM_NAMESPACE_AND_SLOT(frozen)
-    current = UNRESOLVED_READ_TRUSTED_DESTINATION_STATE(destination)
+    current = slot_access(destination, READ, frozen)
 
     if frozen.operation == CREATE and current.occupied:
-        return UNRESOLVED_PUBLIC_REJECTION(DESTINATION_OCCUPIED)
+        HARD_FAULT(DESTINATION_OCCUPIED)
     if frozen.operation == REPLACE:
         if not current.occupied:
-            return UNRESOLVED_PUBLIC_REJECTION(DESTINATION_EMPTY)
+            HARD_FAULT(DESTINATION_EMPTY)
         if current.RESIDENT:
-            return UNRESOLVED_PUBLIC_REJECTION(RESIDENT_REPLACEMENT_FORBIDDEN)
+            HARD_FAULT(RESIDENT_REPLACEMENT_FORBIDDEN)
         UNRESOLVED_REQUIRE_REPLACEMENT_SAFETY(current, frozen)
 
     # Missing validation is a blocker, never an implicit successful check.
@@ -65,15 +96,15 @@ Mint(request, credential):
     candidate.W3 = UNRESOLVED_BIND_NETWORK_T_OR_LOCAL_GT(frozen, candidate)
 
     # This is an unresolved boundary, NOT a claim that four DWRITEs are atomic.
-    committed = UNRESOLVED_COMMIT_WITH_EXCLUSION_AND_INTERRUPTION_RULES(
-        destination, current, candidate,
+    committed = slot_access(destination, COMMIT, {
+        current, candidate,
         mandatory_rechecks = {
             authorization,
             expected_destination,
             allocation,
             generation,
             reject_REPLACE_if_destination_is_RESIDENT
-        })
+        }})
 
     # Fault/reset or a lost return is not an ordinary "nothing changed" denial.
     UNRESOLVED_REQUIRE_CONFIRMED_COMMIT(committed)
@@ -100,12 +131,13 @@ pkverify(credential, frozen_request):
     # Equality of GT bits alone is not a substitute for required proof.
     # This result is verification evidence, not blanket operation authorization.
     result = UNRESOLVED_FORM_NONSECRET_VERIFICATION_RESULT(trusted)
-    UNRESOLVED_CLEAN_PRIVATE_SCRATCH_ON_ALL_DEFINED_EXIT_PATHS()
+    UNRESOLVED_CLEAN_PRIVATE_SCRATCH_BEFORE_SUCCESS_RETURN()
     return result
 ```
 
-Denial, hard-fault, cleanup and public error behavior need explicit contracts;
-the linear notation does not imply that fault/reset always reaches cleanup.
+Failed checks hard-fault; pkverify returns only after successful verification.
+Fault attribution and private-state protection still need explicit contracts;
+the linear notation does not imply that fault/reset reaches software cleanup.
 No cryptographic primitive, proof register or credential storage layout is
 selected here.
 
@@ -155,7 +187,7 @@ counted once, not once per entry point.
 | Allocation, bounds and overlap checks | 32 | 128 |
 | Entry construction and integrity calculation | 16 | 64 |
 | Commit, exclusion and destination recheck | 48 | 192 |
-| Result, rejection and cleanup paths | 24 | 96 |
+| Success result, hard-fault branches and cleanup paths | 24 | 96 |
 | **Code subtotal** | **304** | **1,216** |
 | Header, dispatch, C-List, minimal metadata and local data allowance | 80 | 320 |
 | **Estimated payload** | **384** | **1,536** |
@@ -200,8 +232,10 @@ half the FPGA memory. No board-fit claim follows from these estimates.
 
 Resolve the `UNRESOLVED_*` contracts one at a time, then translate into CLOOMC
 with an explicit C-List and preserved/clobbered register ABI. In particular,
-nstab's slot assignment does not decide who holds its RW capability. No scratch
-CR is assigned here; CR13 must remain NULL and untouched.
+nstab's slot assignment alone does not confer authority: the approved same-scope
+LAMBDA is the sole code reference to NSRW-GT. Its provisioning and register
+handling still need definition. No scratch CR is assigned here; CR13 must remain
+NULL and untouched.
 
 Measure compiled complete LUMPs only after those mechanisms exist. This draft's
 line count is not a code-size estimate. All Phase 1 allocations must fit within

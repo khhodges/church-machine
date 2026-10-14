@@ -60,18 +60,32 @@ reloadability cannot be justified through Mint replacement in that case.
 Hardware only checks generation equality; software owns generation management.
 No wrap/reuse policy is inferred.
 
-## 3. Service separation — proposal pending
+## 3. Service separation — LAMBDA boundary approved; other details pending
+
+**Approved:** Mint uses a **same-scope LAMBDA** as the only code referencing
+`NSRW-GT`, accessing **one Namespace slot at a time**. Surrounding Mint code and
+pkverify do not reference that capability. Route table reads and writes requiring
+it through the LAMBDA; do not introduce a separate service LUMP.
+This does not settle the LAMBDA ABI, capability provisioning, atomicity,
+external-writer exclusion or interruption behavior.
 
 - Mint performs authorized creation/replacement and Namespace publication.
 - pkverify verifies the agreed proof/credential contract; token equality alone
   must not be silently substituted for any required proof.
-- nstab supplies the actual table-write capability. Its holder and permitted
-  delegation must be decided, not inferred from a caller's E access to Mint.
+- nstab supplies the actual table-write capability, referenced only by the
+  same-scope LAMBDA above. Provisioning must still be defined; a caller's E access
+  to Mint does not confer NSRW-GT.
 - A verification success must not silently authorize every possible operation.
   Define how the requested destination, object and rights are authorized.
 
 These roles do not assign scratch CRs, DRs, proof storage or cryptographic
 primitives. Existing draft ABI assignments are not adopted merely by reference.
+
+**Approved fault rule:** Any fault in Mint, its same-scope LAMBDA or pkverify
+is a **hard fault**, including failed authorization, verification, validation
+and destination/commit checks. No recoverable rejection return, retry, rollback
+or automatic continuation is introduced. A hard fault does not undo writes
+already made; write visibility and interruption boundaries still need definition.
 
 ## 4. Growth headroom — proposal pending
 

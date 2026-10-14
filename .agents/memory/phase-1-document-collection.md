@@ -252,3 +252,13 @@ were explicitly presented as conditional guesses with growth still undecided.
 **How to apply:** Preserve that distinction. The small-verifier assumption is
 not approval of a verification mechanism; compilation and the settled contract
 must determine actual size before allocation.
+
+Mint must use a same-scope LAMBDA as the only code referencing NSRW-GT,
+on one Namespace slot at a time.
+
+**Why:** The user refined the proposed Mint-held authority model with this
+explicit code-access and single-slot boundary.
+
+**How to apply:** Keep NSRW-GT references inside that LAMBDA, not surrounding
+Mint code or pkverify. Do not turn it into a separate LUMP, infer capability
+provisioning or treat single-slot access as proof of atomicity or fault safety.
