@@ -84,3 +84,14 @@ distracted from it by retaining separate SWITCH protected-load qualifications.
 **How to apply:** Use the exact two-halves/inserted-Namespace-load formulation
 in reconciliation. These are internal phases, not separate instructions.
 Do not treat the assistant's withdrawn CR12/CR14 qualification as user approval.
+
+Phase 1 uses bounded execution turns with a watchdog hard fault at **one
+second**, except in IDE Debug or IDE Trace mode. Instruction retirement does
+not renew the deadline.
+
+**Why:** The user selected bounded turns and explicitly fixed “ONE second to
+Hard Fault unless in IDE debug or IDE Trace mode.”
+
+**How to apply:** Preserve that duration and those exceptions. Do not invent
+renewal events, mode-exit accounting or broader maintenance exemptions; these
+need explicit resolution. CR13 remains untouched.
