@@ -25,7 +25,9 @@ against malicious replacement. It identifies the approved slot-1/slot-2 boot
 configuration, not every complete image revision. Unrelated application LUMP
 changes and normal runtime Namespace updates do not require a new value;
 a changed boot configuration requires matching bitstream and boot metadata.
-Representation, placement and provisioning remain TBD in the master ISA;
+Use one shared expected value in the bitstream and the boot metadata associated
+with each of slots 1 and 2; both must match. Width, placement, exact check timing
+and provisioning remain TBD in the master ISA;
 no legacy layout field is implicitly repurposed.
 **CONFIDENTIAL**
 

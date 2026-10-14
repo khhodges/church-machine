@@ -183,7 +183,13 @@ The guard is not a hash of all mutable Namespace contents and does not certify
 the entire image. Ordinary object validation remains required. Detailed
 configuration identity/canonicalization still needs definition.
 
-Guard width, shared versus separate identifiers, storage, comparison timing,
+**Shared value — approved:** Use one guard value for the boot pair. The
+bitstream holds the expected value; boot metadata associated with slot 1 and
+slot 2 each carries that same value. Both must match before the guarded boot
+transition proceeds. This is not two independently issued object guards.
+The metadata locations and exact check point are not selected by this decision.
+
+Guard width, storage, comparison timing,
 concrete binding representation and provisioning remain TBD. No repurposing of the
 9-bit version, GT, integrity32 or T fields is approved. Retain ordinary
 capability, version, integrity and Thread checks. This does not resolve the

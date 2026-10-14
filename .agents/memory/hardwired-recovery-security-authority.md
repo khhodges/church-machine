@@ -14,11 +14,13 @@ Representation/provisioning remain undecided; keep GT version checks separate.
 The guard identifies the approved slot-1/slot-2 boot configuration, not every
 image revision. Unrelated application edits and normal runtime Namespace
 updates must not force a new value; changed boot configuration does.
+Use one shared guard for the pair, not independent per-object values: both
+objects' associated boot metadata must match the bitstream's expected value.
 
 **Why:** The user explicitly selected accidental wrong-image loading as the
 threat to address, rather than deliberate unauthorized substitution, and chose
 boot-core pairing to avoid requiring matching bitstream rebuilds for unrelated
-application changes.
+application changes. They then chose one shared identifier for that boot pair.
 
 Reloading CR15 requires activation of the incoming Namespace's slot-2 Thread
 under the same authority, with no second Thread-activation grant. SWITCH's
