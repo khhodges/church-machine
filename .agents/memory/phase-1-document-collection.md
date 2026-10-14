@@ -87,11 +87,15 @@ Do not treat the assistant's withdrawn CR12/CR14 qualification as user approval.
 
 Phase 1 uses bounded execution turns with a watchdog hard fault at **one
 second**, except in IDE Debug or IDE Trace mode. Instruction retirement does
-not renew the deadline.
+not renew the deadline. Every successful CHANGE or SWITCH starts a fresh second,
+including self-transfers and helper-Thread transfers; renewal is not restricted
+to scheduler handoffs.
 
 **Why:** The user selected bounded turns and explicitly fixed “ONE second to
-Hard Fault unless in IDE debug or IDE Trace mode.”
+Hard Fault unless in IDE debug or IDE Trace mode.” They then explicitly selected
+every successful CHANGE/SWITCH as the renewal event.
 
-**How to apply:** Preserve that duration and those exceptions. Do not invent
-renewal events, mode-exit accounting or broader maintenance exemptions; these
-need explicit resolution. CR13 remains untouched.
+**How to apply:** Preserve the duration, exceptions and transfer-based renewal.
+Do not introduce scheduler-only renewal, or claim this guarantees useful progress
+or return to a scheduler. Mode-exit accounting and broader maintenance exemptions
+must not be inferred. CR13 remains untouched.
