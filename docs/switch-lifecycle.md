@@ -8,7 +8,8 @@ Namespace into CR15 and then activates its slot-2 Thread into CR12. Ordinary
 CR12 without changing CR15. There is no general-purpose isolated-register
 LOAD through CHANGE or SWITCH in Phase 1. Context save/load still changes
 the associated execution state. CR13 stays reserved.
-This settles destinations, not the pending exact instruction-field allocation.
+Ordinary CHANGE now has an approved direct encoding in the master ISA.
+SWITCH's exact instruction-field allocation remains a separate decision.
 
 For Phase 1, CHANGE is THREADSAVE → THREADLOAD; SWITCH inserts LOAD
 NAMESPACE(CR15) between those halves. CR13 is reserved NULL and never touched.

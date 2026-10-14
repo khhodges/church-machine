@@ -16,7 +16,12 @@ CR12 from the incoming Namespace's slot 2. Neither is a general isolated LOAD.
 source to simplify Phase 1 without losing Thread selection.
 
 **How to apply:** Do not confuse CRn with the destination or restrict CHANGE to
-self-target CR12. This semantic agreement does not select the machine encoding.
+self-target CR12. The subsequent explicit encoding approval makes CR12 implicit:
+ordinary CHANGE has zero unused destination and low fields, with selectable
+source CRn. Do not infer approval of indexed CHANGE or the reset/SWITCH layouts.
+
+**Why:** The user reviewed the bit fields and chose an implicit destination to
+remove redundant destination selection from the Phase 1 definition.
 
 Self-target CHANGE is valid. The user regards CHANGE CR12 as a useful save/restore
 test without an M-bit merely to supply the operand. The earlier approval of

@@ -59,8 +59,29 @@ SWITCH has fixed Namespace destination **CR15**, then fixed Thread destination
 **CR12** using the incoming Namespace's slot-2 entry. Neither instruction is
 a general-purpose isolated-register LOAD in Phase 1. Thread save/load still
 updates the associated execution context, not just these GT registers.
-The CR13 reservation continues to apply. Exact machine-field allocation remains
-unselected; this semantic simplification does not approve a candidate word.
+The CR13 reservation continues to apply. Ordinary CHANGE now uses the approved
+direct layout below; SWITCH/reset field allocations remain separate decisions.
+
+#### Ordinary CHANGE encoding — approved
+
+| Bits | Meaning |
+|---|---|
+| 31:27 | Opcode 4 (`00100`) |
+| 26:23 | Ordinary condition code |
+| 22:19 | Reserved, required zero; destination CR12 is implicit |
+| 18:15 | Source CRn holding the incoming Thread GT |
+| 14:0 | Reserved, required zero |
+
+For condition AL (`1110`), `CHANGE CR12` is **0x27060000**:
+`00100 | 1110 | 0000 | 1100 | 000000000000000`.
+Zero in the unused destination field does not select CR0.
+This selects direct CHANGE only, not an IDX flag, C-list lookup or indexed form.
+The former repeated-register word 0x27660000 is not a canonical ordinary CHANGE
+under this layout. Do not silently reinterpret it as an indexed operation.
+Reset-specific words remain separately unresolved; no saved artifact migration,
+assembler/RTL modification or bitstream build is authorized by this selection.
+Consumer agreement, noncanonical-word rejection and exact-build FPGA evidence
+remain downstream release requirements.
 
 An executed `CHANGE CR13` or `SWITCH` targeting CR13 hard-faults through
 existing **INVALID_OP**, before any instruction effects (including Thread
@@ -205,7 +226,7 @@ These remain requests for confirmation, not established supersessions.
 |---|---|
 | Ordinary CHANGE | The one permissionless Thread GT already held in CRn is authoritative. No implicit C-List lookup, extra operand, or general operand-M requirement is introduced. |
 | Indexed CHANGE | Remains a proposal, not an enabled form under the one-GT correction. A reported INDEX deferral needs its decision record and exact scope; it must not be inferred to cancel the selected compact indexed LOAD/SAVE rules. |
-| Direct CHANGE encoding | Semantic approval does not approve `0x27060000`, its proposed IDX field, or a binary migration policy. Confirm this allocation separately from any INDEX decision. |
+| Direct CHANGE encoding | Approved: opcode 4, ordinary condition, bits 22:19 zero, source CRn in 18:15, bits 14:0 zero; destination CR12 implicit. AL CHANGE CR12 = `0x27060000`. No IDX field or migration policy is approved. |
 | Reset boot | Incoming-half-only activation remains the baseline; initial entry is NS[2]. Candidate marker `0x27000001`, CR12-only M grant, reset-ROM fetch authority and final-CALL removal remain unapproved. Canonical frame preparation alone does not remove CALL. |
 | CR13 | Reserved NULL and never touched in Phase 1. Executed CHANGE CR13 or SWITCH targeting CR13 faults INVALID_OP before instruction effects; condition-false instructions skip the CR13 check. Earlier IRQ-swap proposals are superseded. |
 | Other amendment items | Keep their individual proposed/baseline/user-decided status. No blanket approval is implied for transition fault numbers, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
@@ -213,15 +234,15 @@ These remain requests for confirmation, not established supersessions.
 Namespace handoff and reset entry remain distinct contracts, but both now
 explicitly use slot 2. Neither operation touches CR13, including clearing it.
 
-### CHANGE binary disposition — approval still required
+### CHANGE binary disposition — direct form approved; reset still open
 
-These words are evidence or candidates, **not newly authorized encodings**.
+The direct form is now selected; other words below remain evidence or candidates.
 No collision or current execution defect is claimed by this inventory.
 
 | Word | Provenance / meaning in its source | Disposition before cutover |
 |---|---|---|
-| `0x27660000` | Earlier repeated-register direct `CHANGE CR12` word; legacy fields repeat CR12 and immediate is zero. | Record explicitly whether retained, rejected, or migrated under the approved target profile; do not silently reinterpret it. |
-| `0x27060000` | October 9 candidate direct `CHANGE CR12` allocation. | Unapproved new binary allocation; semantic one-GT approval alone is insufficient. |
+| `0x27660000` | Earlier repeated-register direct `CHANGE CR12` word; legacy fields repeat CR12 and immediate is zero. | Noncanonical under the approved ordinary CHANGE layout; do not reinterpret as indexed CHANGE. Existing binaries remain unchanged pending an authorized release rebuild. |
+| `0x27060000` | Approved AL direct `CHANGE CR12`. | CR12 destination implicit; source in bits 18:15; unused fields zero. Implementation and exact-build conformance remain unverified by this selection. |
 | `0x27678001` | Source-derived legacy reset-ROM CHANGE, encoded with destination CR12, source CR15, immediate 1. | Existing ROM evidence, not either proposed direct word or the proposed boot marker. Verify the exact release image and decoder before changing its meaning. |
 | `0x27000001` | Candidate one-shot boot marker in the review editions. | Unapproved; specify boot phase, fetch authority, consumption/replay, entry and slot contract before adoption. |
 | `0x276E8000` | Repeated-register `CHANGE CR13` word also discussed as a hidden-return trigger in a separate proposal. | Not approved as an IRQ-return trigger by a successful round trip. Any retained ordinary meaning and any proposed special meaning must be distinguished explicitly. |
@@ -400,13 +421,13 @@ and the return authorization/consumption rules remain to be agreed.
 
 ### Encoding and implementation status
 
-This correction documents semantics only. It does not assign a new bit-field
-layout, change the compiler/simulator/RTL, regenerate saved LUMPs, or approve a
-bitstream. The legacy `CRd, CRs, idx` implementation is not ISA authority.
+The approved ordinary CHANGE layout is specified above. It does not change the
+compiler/simulator/RTL, regenerate saved LUMPs, or approve a bitstream.
+The legacy `CRd, CRs, idx` implementation is not ISA authority.
 In particular, expanding `CHANGE CR13` to `CHANGE CR13, CR13[0x0000]` and emitting
 `0x276E8000` is not established as a conforming encoding by assembler/disassembler
-round-trip tests. Neither the corrected word nor a binary migration policy is
-specified here. Implementation conformance remains separate work.
+round-trip tests. CR13 remains reserved. A binary migration policy is not
+specified here; implementation conformance remains separate work.
 
 ## Uniform indexed operands
 
