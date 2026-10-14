@@ -46,6 +46,12 @@ been approved or measured.
 
 ## 2. Draft operations — supported scope approved, ABI pending
 
+**LUMP type scope — approved:** Application Abstractions and Threads within an
+existing Namespace are required in Phase 1. Creating Namespace LUMPs through
+Mint is deferred to Phase 2. PassKey forging remains separately required.
+Type support does not waive replacement eligibility checks or authorize
+replacement of an active Thread or a RESIDENT LUMP.
+
 **Create:** request installation into an empty destination entry.
 
 **Replace:** request replacement of an occupied destination entry with explicit
@@ -239,7 +245,8 @@ and no hardware operation is authorized. Detailed evidence remains outstanding.
 
 ## 6. Decisions to finish in this Q&A
 
-- Approve or revise growth headroom; select supported object types and methods.
+- Approve or revise growth headroom; define methods and type-specific validation
+  for the approved application-Abstraction/Thread scope and PassKey forging.
 - Identify callers, nstab custody/delegation and operation authorization.
 - Define pkverify, credential issuance/storage, proof ABI and concrete revocation
   mechanics under the approved reusable-until-revoked lifetime.

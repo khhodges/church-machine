@@ -463,3 +463,14 @@ loading and continuation in Phase 1.
 **How to apply:** Keep automatic lazy-load lifecycle acceptance out of Phase 1,
 while retaining explicit-load admission checks and service-delivery evidence.
 This scope decision alone does not authorize removing existing runtime code.
+
+Phase 1 Mint supports application Abstractions and Threads within an existing
+Namespace; creating Namespace LUMPs through Mint is deferred to Phase 2.
+PassKey forging remains required.
+
+**Why:** The user explicitly selected Abstractions and Threads, rather than
+Abstractions alone or adding Namespace creation to Phase 1.
+
+**How to apply:** Preserve replacement restrictions and unresolved eligibility
+mechanics. Type support is not permission to replace RESIDENT LUMPs or active
+Threads, and it does not settle the direct-replacement version policy.

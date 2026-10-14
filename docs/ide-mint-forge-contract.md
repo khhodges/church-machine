@@ -24,6 +24,11 @@ not executable implementations.
 - Mint supports create and authorized replacement, **never replacement of a
   RESIDENT LUMP**, including Mint/pkverify if resident. Any resident update path
   requires its own contract. Growth space does not waive this exclusion.
+- **LUMP type scope — approved:** Support application Abstractions and Threads
+  within an existing Namespace in Phase 1. Defer creating Namespace LUMPs
+  through Mint to Phase 2. PassKey forging remains required. This type scope
+  does not waive replacement restrictions or authorize replacing an active
+  Thread; replacement eligibility and safeguards remain separate requirements.
 - **Only a same-scope LAMBDA references NSRW-GT**, one Namespace slot at a time,
   including reads and commit rechecks. No separate LAMBDA service LUMP or
   automatic delegation to callers/pkverify.

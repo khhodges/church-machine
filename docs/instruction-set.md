@@ -379,6 +379,12 @@ before bitstream build; alternatively a validated reloadable-LUMP path, never
 unfinished services at release. The [Mint contract](ide-mint-forge-contract.md)
 governs the approved scope, single-slot LAMBDA, proof and publication boundaries.
 
+**Mint LUMP type scope — approved:** Phase 1 supports application Abstractions
+and Threads within an existing Namespace. Creating Namespace LUMPs through
+Mint is deferred to Phase 2. PassKey forging remains required. Existing
+replacement restrictions remain unchanged; this is not authorization to
+replace RESIDENT LUMPs or an active Thread.
+
 **PassKey lifetime — approved:** The issued PassKey GT and separate 128-bit
 proof are reusable until revoked. Successful use does not consume the pair.
 Every operation still requires current credential validation and authorization;
