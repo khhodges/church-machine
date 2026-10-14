@@ -990,3 +990,17 @@ mtime_ms = 1791920066272
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/e4eb8dd2-1d87-4788-a2e9-570b8da2add1/2b1ce974-701e-4e0b-85e6-c083c7789cc2"
 storage_version_token = "1791920073343944"
 content_type = "text/html"
+
+[[outputs]]
+id = "CGuJ1iLJemvYwEgszI-gr"
+uri = "file://docs/phase-1/REVIEW-2026-10-14.md"
+type = "text"
+title = "Phase 1 — conflicts and completeness review"
+description = "Review of all 45 Phase 1 collection files: eight conflicts or scope ambiguities, five outstanding contract/evidence areas, source citations and full coverage inventory."
+logical_id = "9191887d-4dbb-4702-b16a-87405b505045"
+content_hash = "sha256:209e82a26f78b0e62f851b36f5b302b2b0006078919940b5e90bb3b55e12227a"
+size = 18195
+mtime_ms = 1791979476681
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/9191887d-4dbb-4702-b16a-87405b505045/9c4ed580-9274-40ac-8f36-3c3d3fff002b"
+storage_version_token = "1791979520247766"
+content_type = "text/markdown"

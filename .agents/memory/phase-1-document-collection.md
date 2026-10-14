@@ -15,3 +15,11 @@ Preserve a single authoritative original and existing paths rather than creating
 competing copies. Keep historical evidence and unapproved proposals visibly
 separate from controlling specifications; collection membership does not grant
 approval.
+
+Phase 1 document reviews must cover the collection but stay within it.
+
+**Why:** The user explicitly asked to review “all but only Phase 1 documents.”
+
+**How to apply:** Use the collection manifest as the audit boundary. Treat
+references to excluded code or documents as unverified dependencies, not
+permission to expand the review or claim runtime conformance.

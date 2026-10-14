@@ -1,0 +1,227 @@
+[
+  {
+    "path": "docs/instruction-set.md",
+    "sha256": "e53d9932092087a84f72b45257c43a79d266ff98360bcb9301c4c3e61748b19d",
+    "lines": 753
+  },
+  {
+    "path": "docs/cloomc-petname-execution-model-phase-1.md",
+    "sha256": "e42b5be41342167e827f3161a2649122965d169d3e53d7af70d39cbc9697f18e",
+    "lines": 800
+  },
+  {
+    "path": "docs/architecture.md",
+    "sha256": "2c5f734d105fac0cdaba0cc014727d1782bba43d40f89ca01f9244f810907b4b",
+    "lines": 1351
+  },
+  {
+    "path": "docs/mload.md",
+    "sha256": "0ac1c4d1e5d9421f68e6c0eb17ea9a601e4d82e94d246ccf408a09d2c8357234",
+    "lines": 457
+  },
+  {
+    "path": "docs/switch-lifecycle.md",
+    "sha256": "1d974a85bae62ed8c7ae99b48e23b7610b66b111eb2aab6ea752d7e002638fdd",
+    "lines": 118
+  },
+  {
+    "path": "docs/isa-indexed-operands-proposal.md",
+    "sha256": "f5ad0c69b24a5ba6813e4b29155e483a72b8b0dd0c1cc409abdce6b9541d2cd4",
+    "lines": 313
+  },
+  {
+    "path": "docs/isa-indexed-encoding.md",
+    "sha256": "aa248e3b19c2733ca7b4902f4937d4acfeddc30a55878cb17477857872b45ed7",
+    "lines": 395
+  },
+  {
+    "path": "docs/isa-indexed-profile.md",
+    "sha256": "de09983b3570f054acadfcf91e827f0745abebbec0869de80459a0219ac51485",
+    "lines": 446
+  },
+  {
+    "path": "docs/isa-indexed-containment.md",
+    "sha256": "42de24678d5cc93929488535ddeacc13eb1ae9ed41e291c17e47d43c84b8825e",
+    "lines": 256
+  },
+  {
+    "path": "docs/golden-tokens.md",
+    "sha256": "800244440e3306a91ebe468c536a00aa5e19ebb220dd99610367265ee07b284a",
+    "lines": 379
+  },
+  {
+    "path": "docs/golden-tokens-v2.md",
+    "sha256": "faac5e06a1103c8990f3da24b960abc7f159dcba6644f1836c7557840f31b5c9",
+    "lines": 619
+  },
+  {
+    "path": "docs/GoldenDetails.md",
+    "sha256": "857616e307280cd6ad186825f43e05ed4281d045c75d4501cc41d67815ad6486",
+    "lines": 494
+  },
+  {
+    "path": "docs/abstract-gt.md",
+    "sha256": "05376e11d5594fe241bacbedcf5b390df8af805bc4e93ee8b5ef3574a812ddf5",
+    "lines": 329
+  },
+  {
+    "path": "docs/gt-parity-integrity.md",
+    "sha256": "301ac9d1855d91d967601ee5e8c684fb429fb61cb9c00fb508dcd2b07c030a7f",
+    "lines": 235
+  },
+  {
+    "path": "docs/CM_LUMP_SPECIFICATION.md",
+    "sha256": "fe3e271137beb678e0359deb28396343f2906d16066a790cd1e14728a7f50bed",
+    "lines": 3382
+  },
+  {
+    "path": "docs/compact-lump-api-contract.md",
+    "sha256": "9b60657ea5bd18e81a481a7c43cf93a27b283d7cb151141ee4368fd0be155470",
+    "lines": 117
+  },
+  {
+    "path": "docs/TRUSTED_COMPILER_AND_UNTRUSTED_LUMP_ADMISSION.md",
+    "sha256": "c80ee10e4ad8366811171844da99772af363e503ee54fd843255c0efb4e53f56",
+    "lines": 224
+  },
+  {
+    "path": "docs/namespace-security.md",
+    "sha256": "4634ebb49109049d0fa1c72abae47ecb08491864d49da259a9429b2538d22ae1",
+    "lines": 236
+  },
+  {
+    "path": "docs/trusted-security-base.md",
+    "sha256": "97bae62a2b23af44c6b84ba189c5b82ac27758ea67e9c69f489350a06a5bf995",
+    "lines": 258
+  },
+  {
+    "path": "docs/boot-permission-rules.md",
+    "sha256": "3037c9fecc9d1163002cf991e7556169dad1cda4c8ba6c45bfdeed1c26e7e3cf",
+    "lines": 118
+  },
+  {
+    "path": "docs/phase-1-security-todo.md",
+    "sha256": "0bee778263cc4ca68d12dfa181e6c463e0be32259c3d9a4437b06cb8cadb4ee1",
+    "lines": 371
+  },
+  {
+    "path": "docs/system-namespace-handoff-contract.md",
+    "sha256": "2cd74c09c8d5be84681344b8e406666799cfa604385f557d0940fabe691dd3b4",
+    "lines": 182
+  },
+  {
+    "path": "docs/boot-system-handoff-first-pass.md",
+    "sha256": "2c82b986fec707c1322a1b591a34eaf9e340a6f48802e19806bd6632f66b9656",
+    "lines": 239
+  },
+  {
+    "path": "docs/namespace-plan-contract.md",
+    "sha256": "62a681160e0828716840f8b90eae8f033351d352699e8a7df2eb799017095f68",
+    "lines": 50
+  },
+  {
+    "path": "docs/prepared-thread-release-evidence.md",
+    "sha256": "0805e229f93dbe3264d46214a525f949c0cd2c31a79324f3cb525b8a7742784b",
+    "lines": 147
+  },
+  {
+    "path": "docs/boot-rom-layout.md",
+    "sha256": "dc09c47e89bcc3e53739ebd5f1d26aeb0efd2c2731506e6a3630818e3caf4e53",
+    "lines": 68
+  },
+  {
+    "path": "docs/ide-mint-forge-contract.md",
+    "sha256": "7127539284d04c51599799a6d33228d3d12cc006c343d61ebce3e7f82de92e3c",
+    "lines": 214
+  },
+  {
+    "path": "docs/ide-mint-hardware-atomicity-review.md",
+    "sha256": "ba87e88d62a4105e0bf7c9989b8ce275ee05f7d477226b432c1a0a0dc7923bb3",
+    "lines": 176
+  },
+  {
+    "path": "attached_assets/mint-phase1-bounded-rule_1791705504631.md",
+    "sha256": "01fac401f3d16619a36bb1378377e72eac3a9748dfdbce28721c44d80e6f2642",
+    "lines": 160
+  },
+  {
+    "path": "docs/releases/isa-to-fpga-alignment-plan.md",
+    "sha256": "e2e0fb5f0bfb458183f4ca5d02e7e0390ad347a2e03ca58faa6d763b4be0cd09",
+    "lines": 246
+  },
+  {
+    "path": "reports/bitstream-candidate-readiness.md",
+    "sha256": "d720c6eea351771be47b72640bb3de8b11ec1d11a4afeec437e307836bb8e5a9",
+    "lines": 147
+  },
+  {
+    "path": "docs/wukong-boot-verification.md",
+    "sha256": "2e867ff5ee9c8f91023121e4868ebfd5204deebc42d0b36dc57ee215bc6c8bec",
+    "lines": 361
+  },
+  {
+    "path": "docs/portable-lump-compilation-and-fpga-loading.md",
+    "sha256": "c287386dddb1e5917ec60a96d4d49ab9dc8d9e25e4350b7babe601d264e33a99",
+    "lines": 588
+  },
+  {
+    "path": "reports/isa-amendment-reconciliation-2026-10-13.md",
+    "sha256": "443724ef096d47be1e2bbcf3958cab2f6d42e51f901bc1058b8160b8fc3f67c6",
+    "lines": 133
+  },
+  {
+    "path": "attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791978480955.txt",
+    "sha256": "6c9c24e92e70b718615e37595541a186b753d43defd4f29c7cdfed2a3504de5b",
+    "lines": 31
+  },
+  {
+    "path": "reports/isa-review-cooperative-round-robin-hard-faults.html",
+    "sha256": "62b32e62686d225c3009794de32ba77e99512c3ffc25953e5d556482391cfc48",
+    "lines": 18034
+  },
+  {
+    "path": "reports/isa-review-cooperative-round-robin-hard-faults.manifest.json",
+    "sha256": "e9deedd9829cabb0aa69fcaf06e9c3fde1eb42c2f3c44da24fa8d8d2bdde6061",
+    "lines": 15
+  },
+  {
+    "path": "reports/isa-review-change-split13-magnitude.html",
+    "sha256": "e480cd520b9ecbfe19853facdad69b19e59eb2f4d7315271cfee5569bdece7f7",
+    "lines": 17701
+  },
+  {
+    "path": "reports/isa-review-change-split13-magnitude.manifest.json",
+    "sha256": "0d353f22ed2ba22c4d3dc1c18409cd5444388df128f78ac6cac44cbc2e114164",
+    "lines": 12
+  },
+  {
+    "path": "reports/isa-review-hardwired-authority.html",
+    "sha256": "7fb3420b33e21d03d6e60fe56f8524887f8213fd77da531c8ec65ecaa233235c",
+    "lines": 18080
+  },
+  {
+    "path": "reports/isa-review-hardwired-authority.manifest.json",
+    "sha256": "13b1f2969b1e6f899986c49d28cc2a7bc64163e1932752d61ed500b124b0b3bc",
+    "lines": 9
+  },
+  {
+    "path": "docs/instruction-set-history.md",
+    "sha256": "34d7d88d750b0c9ac0eb6b06a96d311971a9c09a9aedbd757516987d6d79d977",
+    "lines": 604
+  },
+  {
+    "path": "docs/instruction-set-history-inventory.json",
+    "sha256": "d4d568364c73b13b7bab9b08de080c425be3a676b53ee4c54fd18e57ae2b73bc",
+    "lines": 340
+  },
+  {
+    "path": "docs/isa_reference.md",
+    "sha256": "e85d7846b9a6b30a4bb69758504b5aa3d8e512549dedf1838c21e7f0d07ce313",
+    "lines": 1786
+  },
+  {
+    "path": "docs/isa_encoding.md",
+    "sha256": "6c3c6642511ff768e88b4a4f6f3e32242fe846663d919d26f73f0bf85f23ec44",
+    "lines": 324
+  }
+]

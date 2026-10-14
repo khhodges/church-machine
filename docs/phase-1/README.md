@@ -2,6 +2,8 @@
 
 **Start with the [Master ISA](../instruction-set.md).**
 
+Latest collection review: [conflicts and missing information — 2026-10-14](REVIEW-2026-10-14.md).
+
 This folder brings the Phase 1 architecture, contracts, implementation plans,
 review evidence and security work into one place. The files in its numbered
 sections are **relative symbolic links to the existing originals**, not copies.
