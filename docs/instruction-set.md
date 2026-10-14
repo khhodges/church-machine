@@ -215,8 +215,12 @@ configuration requiring explicit approval before generating the new pair;
 propagate that pair consistently to the bitstream, slot versions and referring
 GTs. Neither mode bypasses ordinary validation or disables guard checks.
 **Default — approved: retain the existing guard.** The new-guard mode remains
-an explicit IDE option. Setting persistence/scope remain undecided. This is an
-IDE policy choice, not authorization for hardware to change versions.
+an explicit IDE option. **Setting scope — approved:** Save the selected policy
+with each boot configuration, not as an IDE-wide preference. Preserve it when
+the configuration is shared or reopened; different configurations may select
+different policies. New configurations default to retaining the existing guard.
+The concrete storage schema remains TBD. This is an IDE policy choice, not
+authorization for hardware to change versions.
 
 All GTs referencing these boot objects must use their corresponding assigned
 versions. For this guarded boot pair only, reset and any handoff into the pair
