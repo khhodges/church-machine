@@ -3,6 +3,7 @@
 ## Navigation
 
 - [Document authority](#document-authority)
+- [October 2026 amendment reconciliation](#october-2026-amendment-reconciliation)
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
 - [Uniform indexed operands](#uniform-indexed-operands)
@@ -27,6 +28,116 @@ The one-GT CHANGE and indexed-operand corrections below are authoritative.
 Existing encoding tables and repeated instruction descriptions elsewhere in
 this document remain baseline records pending reconciliation; they do not
 override these corrections or establish a new encoding layout.
+
+## October 2026 amendment reconciliation
+
+**Documentation correction — 2026-10-14.** This section reconciles the
+[October 13 completeness review](../attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791978480955.txt)
+with this master and the
+[Design Team reconciliation](../reports/isa-amendment-reconciliation-2026-10-13.md).
+It clarifies authority and release requirements; it does **not** approve an
+unresolved instruction encoding, boot replacement, watchdog mechanism, or
+implementation cutover.
+
+### Edition identification and decision status
+
+The two October 9 review editions are different historical proposals:
+
+* [Special operations and cooperative scheduling](../reports/isa-review-cooperative-round-robin-hard-faults.html)
+  proposes cooperative scheduling and withdraws the earlier IRQRETURN proposal
+  within the review series.
+* [Split 13-bit CHANGE magnitude](../reports/isa-review-change-split13-magnitude.html)
+  contains the earlier IRQ exchange/IRQRETURN alternative.
+
+Keep both editions and their manifests unchanged. Neither their dates, their
+embedded copies of the master, nor withdrawal within a proposal series amend
+this master by themselves. The revised completeness review retracts its earlier
+claim that two reported October 12 decisions already superseded this document.
+No independent decision record establishing the reported Phase-1 INDEX deferral
+or the replacement reset-boot contract was identified in the reconciliation.
+These remain requests for confirmation, not established supersessions.
+
+| Subject | Controlling interpretation |
+|---|---|
+| Ordinary CHANGE | The one permissionless Thread GT already held in CRn is authoritative. No implicit C-List lookup, extra operand, or general operand-M requirement is introduced. |
+| Indexed CHANGE | Remains a proposal, not an enabled form under the one-GT correction. A reported INDEX deferral needs its decision record and exact scope; it must not be inferred to cancel the selected compact indexed LOAD/SAVE rules. |
+| Direct CHANGE encoding | Semantic approval does not approve `0x27060000`, its proposed IDX field, or a binary migration policy. Confirm this allocation separately from any INDEX decision. |
+| Reset boot | Incoming-half-only Thread activation remains the semantic baseline. Neither candidate marker `0x27000001` nor the reported CR12-only M grant / canonical-frame entry / ROM CALL removal combination is approved here. Confirm entry, grant consumption, reset-ROM fetch authority, initial slot and final CALL together. Canonical frame preparation alone does not remove CALL. |
+| CR13 | Reservation with no automatic IRQ/WatchdogFault role is supported review direction, not approval of a new entry/return mechanism. The earlier IRQ-swap correction below is a conflicting prior record, not a settled release contract. Full NULL-clearing on every ordinary CHANGE requires confirmation; do not infer it from the specific `SWITCH CR15` handoff rule. Ordinary `CHANGE CR13` is not made privileged or forbidden by that reservation direction. |
+| Other amendment items | Keep their individual proposed/baseline/user-decided status. No blanket approval is implied for transition fault numbers, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
+
+Namespace handoff and reset entry are distinct contracts. The currently stated
+`SWITCH CR15` handoff uses its own incoming slot and explicitly clears CR13;
+it neither selects the reset-boot slot nor establishes clearing on every CHANGE.
+The reviewed proposals disagree about initial slot NS[1] versus NS[2]; do not
+resolve that disagreement by copying the handoff slot into reset boot.
+
+### CHANGE binary disposition — approval still required
+
+These words are evidence or candidates, **not newly authorized encodings**.
+No collision or current execution defect is claimed by this inventory.
+
+| Word | Provenance / meaning in its source | Disposition before cutover |
+|---|---|---|
+| `0x27660000` | Earlier repeated-register direct `CHANGE CR12` word; legacy fields repeat CR12 and immediate is zero. | Record explicitly whether retained, rejected, or migrated under the approved target profile; do not silently reinterpret it. |
+| `0x27060000` | October 9 candidate direct `CHANGE CR12` allocation. | Unapproved new binary allocation; semantic one-GT approval alone is insufficient. |
+| `0x27678001` | Source-derived legacy reset-ROM CHANGE, encoded with destination CR12, source CR15, immediate 1. | Existing ROM evidence, not either proposed direct word or the proposed boot marker. Verify the exact release image and decoder before changing its meaning. |
+| `0x27000001` | Candidate one-shot boot marker in the review editions. | Unapproved; specify boot phase, fetch authority, consumption/replay, entry and slot contract before adoption. |
+| `0x276E8000` | Repeated-register `CHANGE CR13` word also discussed as a hidden-return trigger in a separate proposal. | Not approved as an IRQ-return trigger by a successful round trip. Any retained ordinary meaning and any proposed special meaning must be distinguished explicitly. |
+| `0x276E8001` | Earlier IRQ-return trigger candidate, withdrawn in the review series; later candidate indexed space can overlap it. | No current IRQ-return authorization. Approve an explicit disposition and test against accidental reauthorization. |
+| `0x27000002` | Earlier `IRQRETURN` candidate in the split-magnitude review, subsequently withdrawn within the review series. | No executable IRQRETURN allocation is approved here; include this exact word in negative/disposition checks. |
+
+The source observation for `0x27678001` is the three-instruction
+`BOOT_PROGRAM` in [hardware/boot_rom.py](../hardware/boot_rom.py):
+LOAD, CHANGE, CALL. Its legacy encoder computes
+`(4 << 27) | (14 << 23) | (12 << 19) | (15 << 15) | 1`.
+This is not verification of generated ROM bytes, FPGA decoding, flashed
+hardware, or successful execution.
+
+### Required evidence for an approved encoding cutover
+
+Before releasing a separately approved encoding or boot change:
+
+1. Record the approved field layout, legal selectors, reserved fields,
+   predicates, direct/indexed scope and any distinct boot operation. Record
+   unresolved alternatives as pending, not as implementation defaults.
+2. Require identical golden words **and architectural meaning** across the
+   assembler, disassembler, simulator, RTL decoder and exact release ROM image.
+   Bind the evidence to source revisions and image bytes/hash. Textual
+   assembler/disassembler round trips alone do not establish conformance.
+3. Include every word in the disposition table above, plus malformed and
+   unsupported variants. Check direct activation and self-target continuation,
+   approved boot entry, wrong phase/replay, and conditional variants. Retired
+   trigger candidates must not silently become authorized special operations.
+4. Verify encoding-before-condition behavior to the extent explicitly adopted
+   by the controlling instruction contract. The amendment's broader generic
+   ordering remains proposed; the already approved retired-opcode checks stay
+   in force. If indexed forms are approved, independently verify full magnitude
+   reconstruction, overflow/underflow and non-wrapping bounds before access.
+5. Check applicable permissionless Thread-GT, incoming frame and C-List rules
+   before context publication. No encoding decision waives authority checks.
+6. Preserve historical LUMPs unchanged. Migration, recompilation, ROM rebuild
+   and hardware release need their own authorization. Record every unexecuted
+   consumer check as **NOT RUN**; source inspection is not execution evidence.
+
+**Evidence status for this documentation reconciliation:** all five consumer
+conformance checks and exact-image/board acceptance are **NOT RUN**. No new
+encoding, saved-image migration, ROM build, or hardware operation is certified.
+
+### Open authority and platform decisions
+
+The following remain visible approval blockers rather than implied defaults:
+reset-ROM fetch authority; boot entry/grant/slot/final-CALL binding;
+watchdog memory-backed capture authority; protected configuration interface;
+timebase, refresh and numeric budgets; exact CR13 clearing semantics; and the
+proposed `THREAD_CONTEXT` (`0x1D`), `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG`
+(`0x1F`) fault allocations.
+
+Indexed CALL's exact binary-field transcription must be reconciled separately:
+do not copy CHANGE's candidate layout. This is a missing encoding record, not
+evidence that the already agreed indexed-CALL feature was rejected or deferred.
+GT-layout completeness is a separate track; this amendment does not select
+or alter a Golden Token bit layout.
 
 ## BFEXT/BFINS: bitfield contract
 
@@ -118,7 +229,16 @@ Boot uses the **back half** of the Thread transition: the incoming Thread is
 loaded into CR12. There is no outgoing programmatic Thread context to suspend.
 This special initialization path does not add operands to programmatic CHANGE.
 
-### IRQ hardware exception
+### Earlier IRQ hardware exception — unresolved against later review direction
+
+**Status clarification — 2026-10-14:** The following paragraphs retain the
+earlier semantic correction and its distinction between CHANGE and IRQ return.
+Later review direction reserves CR13 without an automatic IRQ/WatchdogFault
+role. The resulting conflict has no confirmed entry/return allocation or
+complete replacement contract. Do not treat these prior paragraphs as approval
+to implement IRQ swapping, add an IRQRETURN opcode, or repurpose ordinary
+`CHANGE CR13`. Resolve the contract explicitly before release; see the
+[reconciliation status](#october-2026-amendment-reconciliation).
 
 IRQ entry is **not a CHANGE instruction**. Hardware can swap CR12 and CR13
 directly, without the additional work of the general programmatic CHANGE path.
