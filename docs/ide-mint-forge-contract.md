@@ -24,11 +24,21 @@ not executable implementations.
 - Mint supports create and authorized replacement, **never replacement of a
   RESIDENT LUMP**, including Mint/pkverify if resident. Any resident update path
   requires its own contract. Growth space does not waive this exclusion.
-- **LUMP type scope — approved:** Support application Abstractions and Threads
-  within an existing Namespace in Phase 1. Defer creating Namespace LUMPs
-  through Mint to Phase 2. PassKey forging remains required. This type scope
+- **Object scope — approved:** Support application Abstractions, Threads,
+  **LS C-list objects and RW data objects** within an existing Namespace in
+  Phase 1. LS and RW describe the respective object permissions, not a combined
+  LS/RW grant. **MMIO objects are excluded from Phase 1 Mint scope.**
+  Defer creating Namespace LUMPs through Mint to Phase 2.
+  PassKey forging remains required. This type scope
   does not waive replacement restrictions or authorize replacing an active
   Thread; replacement eligibility and safeguards remain separate requirements.
+- **Explicit Destroy — required:** Phase 1 must provide explicit authorized
+  object destruction, not automatic garbage collection or merely PassKey
+  revocation. For pool release, preserve the approved software-managed
+  increment-before-free, no-wrap and retained-slot-version rules. Destroy
+  authorization, per-type eligibility, in-use safeguards, memory reclamation,
+  interruption behavior and ABI remain to be defined; this is not blanket
+  permission to destroy protected or active objects.
 - **Only a same-scope LAMBDA references NSRW-GT**, one Namespace slot at a time,
   including reads and commit rechecks. No separate LAMBDA service LUMP or
   automatic delegation to callers/pkverify.

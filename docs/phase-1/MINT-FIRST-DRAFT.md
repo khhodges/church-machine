@@ -46,8 +46,11 @@ been approved or measured.
 
 ## 2. Draft operations — supported scope approved, ABI pending
 
-**LUMP type scope — approved:** Application Abstractions and Threads within an
-existing Namespace are required in Phase 1. Creating Namespace LUMPs through
+**Object scope — approved:** Application Abstractions, Threads, **LS C-list
+objects and RW data objects** within an existing Namespace are required in
+Phase 1. LS and RW are the respective permissions, not a combined grant.
+**MMIO objects are excluded from Phase 1 Mint scope.** This does not remove
+platform hardware I/O. Creating Namespace LUMPs through
 Mint is deferred to Phase 2. PassKey forging remains separately required.
 Type support does not waive replacement eligibility checks or authorize
 replacement of an active Thread or a RESIDENT LUMP.
@@ -60,7 +63,14 @@ RESIDENT LUMP even for an otherwise authorized caller. Create-only restrictions
 in the older draft no longer describe the selected Phase 1 scope, but the
 RESIDENT exclusion is mandatory.
 
-Both operations need a defined destination CM/Namespace, object, allocation,
+**Destroy — required:** Explicitly destroy an authorized object; do not
+substitute automatic GC or PassKey-only revocation. Preserve the approved
+increment-before-free/no-wrap/retained-slot-version rules when releasing to
+the pool. Authority, eligible targets, in-use safeguards, reclamation and
+interruption semantics remain unresolved. This is not permission to destroy
+arbitrary active or protected objects.
+
+These operations need a defined destination CM/Namespace, object, allocation,
 requested authority and expected destination state. These are conceptual inputs,
 not approved register assignments or a new wire protocol. Determine whether
 one method or separate methods implement them during the Q&A.
@@ -246,7 +256,10 @@ and no hardware operation is authorized. Detailed evidence remains outstanding.
 ## 6. Decisions to finish in this Q&A
 
 - Approve or revise growth headroom; define methods and type-specific validation
-  for the approved application-Abstraction/Thread scope and PassKey forging.
+  for application Abstractions, Threads, LS C-list objects, RW data objects
+  and PassKey forging; exclude MMIO.
+- Define explicit Destroy authorization, per-type eligibility, in-use checks,
+  reclamation and interruption behavior under the approved pool-release rules.
 - Identify callers, nstab custody/delegation and operation authorization.
 - Define pkverify, credential issuance/storage, proof ABI and concrete revocation
   mechanics under the approved reusable-until-revoked lifetime.

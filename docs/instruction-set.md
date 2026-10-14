@@ -379,11 +379,22 @@ before bitstream build; alternatively a validated reloadable-LUMP path, never
 unfinished services at release. The [Mint contract](ide-mint-forge-contract.md)
 governs the approved scope, single-slot LAMBDA, proof and publication boundaries.
 
-**Mint LUMP type scope — approved:** Phase 1 supports application Abstractions
-and Threads within an existing Namespace. Creating Namespace LUMPs through
-Mint is deferred to Phase 2. PassKey forging remains required. Existing
+**Mint object scope — approved:** Phase 1 supports application Abstractions,
+Threads, **LS C-list objects and RW data objects** within an existing Namespace.
+The LS and RW permissions apply to their respective object classes, not a
+combined permission grant. **MMIO objects are excluded from Mint's Phase 1
+scope**; this does not remove existing platform hardware I/O.
+Creating Namespace LUMPs through Mint is deferred to Phase 2.
+PassKey forging remains required. Existing
 replacement restrictions remain unchanged; this is not authorization to
 replace RESIDENT LUMPs or an active Thread.
+
+**Explicit Destroy — required:** Include an explicit authorized object-destruction
+operation in Phase 1. This is neither GC nor simply revoking a PassKey pair.
+Preserve the approved software slot-version and pool-release rules. Destroy's
+authority, per-type eligibility, in-use safeguards, reclamation, interruption
+behavior and ABI still need definition; no unrestricted destruction of protected
+or active objects is approved.
 
 **PassKey lifetime — approved:** The issued PassKey GT and separate 128-bit
 proof are reusable until revoked. Successful use does not consume the pair.

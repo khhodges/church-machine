@@ -464,13 +464,19 @@ loading and continuation in Phase 1.
 while retaining explicit-load admission checks and service-delivery evidence.
 This scope decision alone does not authorize removing existing runtime code.
 
-Phase 1 Mint supports application Abstractions and Threads within an existing
-Namespace; creating Namespace LUMPs through Mint is deferred to Phase 2.
+Phase 1 Mint supports application Abstractions, Threads, LS C-list objects and
+RW data objects within an existing Namespace, with explicit Destroy required.
+MMIO objects are excluded from Mint scope, not from the platform's existing
+hardware I/O. Creating Namespace LUMPs through Mint is deferred to Phase 2;
 PassKey forging remains required.
 
-**Why:** The user explicitly selected Abstractions and Threads, rather than
-Abstractions alone or adding Namespace creation to Phase 1.
+**Why:** After selecting Abstractions and Threads, the user corrected the
+incomplete list: “No MMIO but LS c-list and RW data are required to gether
+with explicite destroy”.
 
 **How to apply:** Preserve replacement restrictions and unresolved eligibility
 mechanics. Type support is not permission to replace RESIDENT LUMPs or active
 Threads, and it does not settle the direct-replacement version policy.
+Keep LS and RW as the respective object permissions. Destroy is not GC or
+PassKey-only revocation; preserve approved pool-release version rules while
+leaving its authority, target eligibility and safe reclamation mechanics open.
