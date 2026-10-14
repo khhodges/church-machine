@@ -205,6 +205,18 @@ approval of a changed boot configuration, not automatically on every bitstream
 build. The matching bitstream, slot versions and referring GTs must use the
 retained pair. This selects the value's lifetime, not a storage schema.
 
+**CR0-only startup selection — approved IDE option:** The IDE must offer a
+setting choosing whether changing only the boot Thread's CR0 startup selection
+retains the existing guard or requires a new guard and matching bitstream.
+This option concerns selecting the first abstraction, not replacing the boot
+Namespace or entry Thread. In retain mode, normal final `CALL CR0` validation
+still applies. In new-guard mode, treat the selection change as a changed boot
+configuration requiring explicit approval before generating the new pair;
+propagate that pair consistently to the bitstream, slot versions and referring
+GTs. Neither mode bypasses ordinary validation or disables guard checks.
+The default and setting persistence/scope remain undecided. This is an IDE
+policy choice, not authorization for hardware to change versions.
+
 All GTs referencing these boot objects must use their corresponding assigned
 versions. For this guarded boot pair only, reset and any handoff into the pair
 use the bitstream's expected entry-Thread version rather than assuming zero.

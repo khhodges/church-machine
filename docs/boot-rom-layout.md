@@ -41,6 +41,11 @@ with that configuration. Unchanged rebuilds, exports, uploads, resets and
 unrelated application LUMP changes reuse it. Only explicit approval of a changed
 boot configuration generates a new pair. Detailed configuration identity,
 storage schema and provisioning mechanics remain TBD.
+For changes only to the boot Thread's CR0 startup selection, an IDE setting
+chooses retaining the guard or requiring a new guard and matching bitstream.
+The latter follows explicit changed-configuration approval; both retain normal
+`CALL CR0` validation and guard enforcement. This does not cover replacement
+of the boot Namespace or entry Thread. Default and setting scope remain TBD.
 **CONFIDENTIAL**
 
 The Boot ROM and RAM are defined by the FPGA bitstream used to flash the FPGA. It is defined by the IDE under program control, size is defined in words (4 bytes each). The ROM is read-only instruction memory, carried from the IDE to the FPGA in `hardware/boot_rom.py` and instantiated as the `BootRom` class with the following three CLOOMC boot instructions: LOAD CR15, CHANGE that suspends the current thread and starts Boot.Thread, and CALL CR0, the programmer-selected lightning bolt slot in the IDE-defined namespace as Lazy Load.
