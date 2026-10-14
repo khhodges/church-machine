@@ -176,6 +176,15 @@ only and not the full networked-IDE/CM scope.
 requirement, not merely future documentation. Do not infer a transport or
 expand the requirement to direct CM-to-CM operations.
 
+Two Phase 1 Namespaces sharing one CM FPGA's memory to test CM networking
+belong to Phase 2.
+
+**Why:** The user explicitly assigned this future networking test to Phase 2.
+
+**How to apply:** Keep this test out of Phase 1 acceptance; do not infer a memory
+layout, networking mechanism or hardware authorization. The approved Phase 1
+one-IDE/several-CM scope remains unchanged.
+
 Phase 1 requires working ide.Mint, pkverify and controlled nstab RW use, not
 only reserved slots. The agent owns delivery of these services.
 

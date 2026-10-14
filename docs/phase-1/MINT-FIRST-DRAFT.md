@@ -22,6 +22,11 @@ The agent owns delivery. Prefer completing and validating the services before
 the bitstream build; alternatively demonstrate a reloadable-LUMP path.
 All services must work before Phase 1 is complete.
 
+Two Phase 1 Namespaces sharing one CM FPGA's memory to test CM networking are
+**Phase 2** work, not a Phase 1 Mint acceptance requirement. This does not change
+the approved Phase 1 scope of one IDE managing several CMs or specify the future
+test's memory layout or networking mechanism.
+
 The user requests a first draft with enough space to grow. The allocation policy
 below is proposed to satisfy that requirement; no exact byte allocation has
 been approved or measured.
