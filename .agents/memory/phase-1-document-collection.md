@@ -186,3 +186,15 @@ before the bitstream (preferred), or the LUMP must be reloadable.
 bitstream build. The alternative requires demonstrated reloadability without
 rebuilding the bitstream; it does not excuse unfinished services at release.
 Do not assume arbitrary live replacement is safe or already supported.
+
+Resolve Mint's full Phase 1 scope in the current guided document Q&A, including
+related verification/authority contracts, rather than deferring design choices
+to implementation.
+
+**Why:** The user explicitly added that the full scope of Mint “must be resolved
+by this present Q&A.”
+
+**How to apply:** Bring Mint decisions forward and record explicit resolutions
+for scope, ownership, proof/ABI, validation, writes/publication, failures,
+loading/reloading and acceptance. Do not treat a reserved slot or operational
+requirement as approval of an unspecified implementation.
