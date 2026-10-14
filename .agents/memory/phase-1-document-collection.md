@@ -301,6 +301,17 @@ revoked: successful use does not consume it, and every operation still checks
 current credential validity and authorization. This is not one-time-use replay
 protection.
 
+PassKey revocation invalidates only the credential's GT/proof pair, not object
+GTs previously issued under its authority. Those GTs retain their own validity
+and separately authorized revocation rules.
+
+**Why:** The user explicitly chose PassKey-only revocation rather than
+cascading invalidation of previously issued object GTs.
+
+**How to apply:** Reject revoked credentials without inventing descendant
+revocation; retain independent object checks. Revocation mechanics and
+in-flight timing are not settled by this scope choice.
+
 Keep the requested CLOOMC review drafts deliberately unbuildable at unresolved
 contract boundaries rather than supplying accepting placeholder methods.
 

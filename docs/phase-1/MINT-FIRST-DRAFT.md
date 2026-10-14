@@ -129,6 +129,11 @@ Validate current credential state and operation authorization on every use.
 Revoked or invalid credentials hard-fault. This is not one-time-use replay
 protection; concrete revocation mechanics remain unresolved.
 
+**Revocation scope — approved:** Revoke only the PassKey GT/proof pair, not
+object GTs previously issued under its authority. Those object GTs remain
+subject to their own validity and separately authorized revocation rules.
+Do not infer an automatic cascading revocation mechanism.
+
 **Validity before equality:** NULL/NULL must never pass pkverify. EXACT alone
 is bit comparison, not PassKey validation. Validate both supplied and trusted
 GTs as non-NULL, valid and actively issued/bound credentials; require initialized

@@ -386,6 +386,12 @@ revoked or otherwise invalid credentials hard-fault. This does not provide
 one-time-use replay protection or select proof storage, transfer, ABI or
 concrete revocation mechanics.
 
+**PassKey revocation scope — approved:** Revocation invalidates the PassKey
+GT/proof pair, not object GTs previously issued under its authority. No automatic
+cascading revocation is required or implied. Previously issued object GTs
+remain subject to their own validity and separately authorized revocation
+rules; this does not make them permanently valid.
+
 Require simulator, RTL and exact-release-build physical FPGA evidence for
 TPERM NULL/EXACT, HARDFAULT/IDE attribution and Mint's exclusive update/publication,
 **with Genesis override authority**. Identify exercised overrides separately

@@ -45,6 +45,10 @@ not executable implementations.
   reissuance. Every operation still requires current credential validation
   and operation authorization; reuse is not one-time-use replay protection.
   Revoked or otherwise invalid credentials hard-fault.
+- **Revocation scope — approved:** Revoke the PassKey GT/proof pair only.
+  Do not automatically invalidate object GTs previously issued under its
+  authority. Those GTs retain their own validity checks and separately
+  authorized revocation rules; no cascading revocation is implied.
 - Proof generation, protected storage/transfer, ABI, concrete revocation
   mechanics, list representation and bootstrap issuance remain software TBD.
 - Track used/free blocks per LUMP size class, separately from slots/generations.
