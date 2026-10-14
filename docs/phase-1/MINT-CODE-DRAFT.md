@@ -239,8 +239,10 @@ with presence; no special all-zero-proof rule has been selected.
 **Agreed TPERM design direction:** A dedicated `TPERM CRn, NULL` tests the
 architectural NULL type without faulting or changing the capability (Z=1 for
 NULL, Z=0 otherwise). The paired EXACT change hard-faults if either operand is
-NULL before comparing bits. These semantics are not implemented yet; encoding
-and remaining flag/conditional-execution details still need specification.
+NULL before comparing bits. **Approved NULL-test flags:** Z=is-NULL,
+N=not-NULL, C=0, V=0 (NULL: NZCV=0100; non-NULL: NZCV=1000).
+These semantics are not implemented yet; encoding and conditional-execution
+details still need specification.
 Neither test replaces trusted issuance, validity or proof checks.
 
 Required acceptance cases include NULL/NULL (including nonzero NULL encodings),

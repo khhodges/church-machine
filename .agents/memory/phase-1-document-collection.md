@@ -314,5 +314,6 @@ proposing that EXACT hard-fault on either NULL operand.
 
 **How to apply:** TPERM NULL tests architectural NULL type (including nonzero
 NULL encodings), sets Z=1 for NULL and Z=0 otherwise, without faulting or changing
-the GT. Pair with NULL-before-equality hard faults for EXACT. Encoding and other
-flag/conditional-execution details remain open; no implementation is implied.
+the GT. The user approved the full NULL-test flags: Z=is-NULL, N=not-NULL,
+C=0, V=0. Pair with NULL-before-equality hard faults for EXACT. Encoding and
+conditional-execution details remain open; no implementation is implied.
