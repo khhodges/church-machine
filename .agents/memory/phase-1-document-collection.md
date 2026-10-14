@@ -109,9 +109,16 @@ exemptions must not be inferred. CR13 remains untouched.
 
 Phase 1 gt_seq is 9 bits, values 0–511, for GTs and corresponding Namespace
 descriptors.
+Generation management is exclusively software-controlled. Hardware's generation
+role is equality checking against the Namespace entry, faulting on mismatch;
+there is no hardware increment, exhaustion enforcement or wrap-rate guard.
 
 **Why:** The user explicitly selected the 9-bit format over stale 7-bit work-plan
 requirements.
+The user explicitly corrected the generation discussion: hardware is not
+involved beyond checking equality.
 
 **How to apply:** Align active descriptions with this width. Width approval alone
 does not approve modulo wrap or generation reuse; never infer that policy.
+Keep any reuse/exhaustion policy in software. The suggested no-wrap rule was
+not approved; do not turn it into a hardware or software requirement.
