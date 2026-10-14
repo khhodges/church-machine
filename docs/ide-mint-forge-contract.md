@@ -17,6 +17,10 @@ not executable implementations.
   (NS[15], E). Slot assignment does not itself issue capabilities. The agent
   owns delivery. Prefer finish-before-bitstream; otherwise demonstrate a
   validated reloadable-LUMP path. Services must work before release.
+- Automatic IDE-assisted lazy loading is deferred to Phase 2. Phase 1 uses
+  explicit IDE-controlled loading before execution. This does not remove the
+  validated service-reload delivery option or authorize automatic
+  execution-triggered installation/continuation as a Phase 1 requirement.
 - Mint supports create and authorized replacement, **never replacement of a
   RESIDENT LUMP**, including Mint/pkverify if resident. Any resident update path
   requires its own contract. Growth space does not waive this exclusion.

@@ -426,3 +426,15 @@ explicitly added “with Genesis override.”
 **How to apply:** Keep exercised overrides distinguishable from passed tests;
 report missing/failed/unobservable evidence honestly. Authority to override
 is not an exercised blanket waiver or authorization to build/upload/flash.
+
+Automatic IDE-assisted lazy loading is deferred to Phase 2. Phase 1 uses
+explicit IDE-controlled loading before execution. Working Mint/pkverify/nstab
+and the alternative validated service-reload delivery path remain required
+as previously scoped; the deferral does not permit resident replacement.
+
+**Why:** The user selected deferral rather than requiring execution-triggered
+loading and continuation in Phase 1.
+
+**How to apply:** Keep automatic lazy-load lifecycle acceptance out of Phase 1,
+while retaining explicit-load admission checks and service-delivery evidence.
+This scope decision alone does not authorize removing existing runtime code.

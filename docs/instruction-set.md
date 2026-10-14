@@ -368,6 +368,12 @@ deferred. Two Namespaces on one FPGA for networking tests are Phase 2.
 
 ### Services and evidence
 
+**Loading scope — approved:** Defer automatic IDE-assisted lazy loading to
+Phase 2. Phase 1 uses explicit IDE-controlled loading before execution, not
+an execution-triggered request/install/continue path for nonresident LUMPs.
+This does not remove the required services or the separately validated
+service-reload delivery option below, and does not waive admission checks.
+
 Working Mint, pkverify and controlled nstab are required, preferably completed
 before bitstream build; alternatively a validated reloadable-LUMP path, never
 unfinished services at release. The [Mint contract](ide-mint-forge-contract.md)

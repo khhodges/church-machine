@@ -12,8 +12,15 @@ retirements. One IDE managing several CMs and working Mint/pkverify/nstab are
 required. No GC in Phase 1; direct CM-to-CM and multiple IDEs are deferred.
 Two Namespaces sharing one FPGA for networking tests are Phase 2.
 
+**Loading scope — approved:** Automatic IDE-assisted lazy loading is deferred
+to Phase 2. Phase 1 uses explicit IDE-controlled loading before execution.
+An execution-triggered request/install/continue path for a nonresident LUMP
+is not a Phase 1 requirement. Working Mint/pkverify/nstab and the approved
+alternative of a validated service-reload path remain in scope; neither
+reloadability nor this deferral grants a validation bypass.
+
 The feature matrix below remains an inventory, not approval to expand Phase 1
-into GC, Ethernet/HDMI, unspecified lazy loading or other unselected services.
+into GC, Ethernet/HDMI, deferred automatic lazy loading or other unselected services.
 T is networked identity; without networking T===GT, with optional IDE virtualGTs
 for non-memory objects. The older frozen-bootstrap/hash split is superseded for
 this target; representation/local binding are TBD. Half the FPGA memory is the
