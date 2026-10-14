@@ -35,6 +35,16 @@ review, not an unrelated feature.
 inclusion; do not infer authorization to add a fourth resident LUMP or replace
 the existing Mint merely from this request.
 
+Namespace image design/adoption is TBD within the Phase 1 bitstream work.
+Do not resume the earlier standalone multi-Namespace adoption plan.
+
+**Why:** The user withdrew that plan after changes including Mint, explicitly
+stating that this is all TBD as part of Phase 1 bitstream.
+
+**How to apply:** Re-establish the Phase 1 image scope and inputs before preparing
+or adopting a new executable Namespace. Earlier private candidate reports do
+not establish the current resident policy or authorize activation.
+
 Draft the ide.Mint contract before completing its instruction bodies; keep the
 saved LUMP untouched while authentication, operation authorization, commit
 atomicity and exit guarantees are unresolved.
