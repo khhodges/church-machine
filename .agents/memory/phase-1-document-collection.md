@@ -175,3 +175,14 @@ only and not the full networked-IDE/CM scope.
 **How to apply:** Treat networked T support for that topology as a release
 requirement, not merely future documentation. Do not infer a transport or
 expand the requirement to direct CM-to-CM operations.
+
+Phase 1 requires working ide.Mint, pkverify and controlled nstab RW use, not
+only reserved slots. The agent owns delivery of these services.
+
+**Why:** The user selected working services and directed that they be finished
+before the bitstream (preferred), or the LUMP must be reloadable.
+
+**How to apply:** Prefer completing and validating service software before the
+bitstream build. The alternative requires demonstrated reloadability without
+rebuilding the bitstream; it does not excuse unfinished services at release.
+Do not assume arbitrary live replacement is safe or already supported.
