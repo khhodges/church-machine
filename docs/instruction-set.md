@@ -131,12 +131,29 @@ replaying it grants reset authority.
 
 This is an explicit reset exception to ordinary CHANGE's required-zero low
 bits, not indexed CHANGE or a general capability-check bypass. The marker and
-its restricted purpose are selected; reset-ROM fetch authority, grant handling,
-precise admission/consumption mechanism and final-CALL sequencing remain open.
+its restricted purpose are selected. Reset-ROM fetch authority is bounded as
+specified below; grant handling, precise admission/consumption mechanism and
+final-CALL sequencing remain open.
 No ROM rebuild, binary migration or hardware operation is authorized.
 Downstream tests must distinguish legitimate reset admission, replay, ordinary
 code containing the same word, software M manipulation, invalid slot-2 state
 and wrong entry context, using simulator, RTL and exact-build FPGA evidence.
+
+#### Reset-ROM instruction-fetch authority — approved
+
+Hardware permits instruction fetch only from the designated **immutable reset
+ROM during bootstrap**, independently of ordinary Thread fetch authority.
+Application code and programmer-set M bits cannot enable this authority.
+It grants no additional data-memory or Namespace-table permissions and is not
+a general validation bypass. End this fetch authority at the defined boot
+handoff; ordinary execution thereafter uses normal capability checks.
+The exact handoff point and final ROM CALL remain separate open decisions.
+This requirement does not select an implementation latch, reset grant ABI or
+new capability encoding.
+
+Downstream simulator, RTL and exact-build FPGA evidence must show bounded ROM
+fetch, rejection outside the permitted bootstrap context, no software/M-based
+re-enablement, no extra data/table access and normal fetch checks after handoff.
 
 An executed `CHANGE CR13` or `SWITCH` targeting CR13 hard-faults through
 existing **INVALID_OP**, before any instruction effects (including Thread
@@ -282,7 +299,7 @@ These remain requests for confirmation, not established supersessions.
 | Ordinary CHANGE | The one permissionless Thread GT already held in CRn is authoritative. No implicit C-List lookup, extra operand, or general operand-M requirement is introduced. |
 | Indexed CHANGE | Remains a proposal, not an enabled form under the one-GT correction. A reported INDEX deferral needs its decision record and exact scope; it must not be inferred to cancel the selected compact indexed LOAD/SAVE rules. |
 | Direct CHANGE encoding | Approved: opcode 4, ordinary condition, bits 22:19 zero, source CRn in 18:15, bits 14:0 zero; destination CR12 implicit. AL CHANGE CR12 = `0x27060000`. No IDX field or migration policy is approved. |
-| Reset boot | Approved marker `0x27000001`: trusted reset ROM only, one-shot per reset, incoming-only activation of NS[2] into CR12; not enabled by programmer M. Reset-ROM fetch authority, grant handling and final-CALL sequencing remain open. Canonical frame preparation alone does not remove CALL. |
+| Reset boot | Approved marker `0x27000001`: trusted reset ROM only, one-shot per reset, incoming-only activation of NS[2] into CR12; not enabled by programmer M. Bounded hardware reset-ROM fetch authority is approved. Exact handoff point, grant handling and final-CALL sequencing remain open. Canonical frame preparation alone does not remove CALL. |
 | CR13 | Reserved NULL and never touched in Phase 1. Executed CHANGE CR13 or SWITCH targeting CR13 faults INVALID_OP before instruction effects; condition-false instructions skip the CR13 check. Earlier IRQ-swap proposals are superseded. |
 | Other amendment items | Keep their individual proposed/baseline/user-decided status. No blanket approval is implied for transition fault numbers, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
 
@@ -299,7 +316,7 @@ No collision or current execution defect is claimed by this inventory.
 | `0x27660000` | Earlier repeated-register direct `CHANGE CR12` word; legacy fields repeat CR12 and immediate is zero. | Noncanonical under the approved ordinary CHANGE layout; do not reinterpret as indexed CHANGE. Existing binaries remain unchanged pending an authorized release rebuild. |
 | `0x27060000` | Approved AL direct `CHANGE CR12`. | CR12 destination implicit; source in bits 18:15; unused fields zero. Implementation and exact-build conformance remain unverified by this selection. |
 | `0x27678001` | Source-derived legacy reset-ROM CHANGE, encoded with destination CR12, source CR15, immediate 1. | Existing ROM evidence, not either proposed direct word or the proposed boot marker. Verify the exact release image and decoder before changing its meaning. |
-| `0x27000001` | Approved one-shot reset-ROM marker, incoming-only activation from NS[2] into CR12. | INVALID_OP outside authorized reset context. Fetch authority, admission/consumption mechanism, grants and final-CALL sequencing still require definition before implementation. |
+| `0x27000001` | Approved one-shot reset-ROM marker, incoming-only activation from NS[2] into CR12. | INVALID_OP outside authorized reset context. Bounded ROM fetch authority approved; admission/consumption mechanism, exact handoff point, grants and final-CALL sequencing still need definition. |
 | `0x276E8000` | Repeated-register `CHANGE CR13` word also discussed as a hidden-return trigger in a separate proposal. | Not approved as an IRQ-return trigger by a successful round trip. Any retained ordinary meaning and any proposed special meaning must be distinguished explicitly. |
 | `0x276E8001` | Earlier IRQ-return trigger candidate, withdrawn in the review series; later candidate indexed space can overlap it. | No current IRQ-return authorization. Approve an explicit disposition and test against accidental reauthorization. |
 | `0x27000002` | Earlier `IRQRETURN` candidate in the split-magnitude review, subsequently withdrawn within the review series. | No executable IRQRETURN allocation is approved here; include this exact word in negative/disposition checks. |
@@ -344,7 +361,7 @@ encoding, saved-image migration, ROM build, or hardware operation is certified.
 ### Open authority and platform decisions
 
 The following remain visible approval blockers rather than implied defaults:
-reset-ROM fetch authority; boot entry/grant/final-CALL binding (slot 2 is settled);
+reset-ROM fetch handoff point; boot entry/grant/final-CALL binding (slot 2 is settled);
 watchdog memory-backed capture authority; protected configuration interface;
 target timing-source implementation; and the
 proposed `THREAD_CONTEXT` (`0x1D`), `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG`

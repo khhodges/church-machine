@@ -11,8 +11,11 @@ Church checks.
 The user subsequently approved exact reset marker 0x27000001: one-shot per
 reset at the designated trusted reset-ROM instruction, incoming-only activation
 of Namespace slot 2 into CR12. Outside authorized reset context it is INVALID_OP;
-programmer-set M does not grant admission. Fetch authority, grant handling,
-precise admission/consumption and final-CALL sequencing still need resolution.
+programmer-set M does not grant admission. Bounded hardware fetch authority
+for immutable reset ROM during bootstrap is now explicitly approved: no
+software enablement or additional data/table permissions; normal fetch checks
+apply after handoff. Exact handoff point, grant handling, precise marker
+admission/consumption and final-CALL sequencing still need resolution.
 
 **Why:** The user selected a distinct reset exception, not indexed CHANGE or
 a general software privilege. Do not infer final-CALL removal from this choice.

@@ -7,7 +7,9 @@
 > UART 8, Mint 9, nstab 14 and pkverify 15; default 256 slots / 4 KiB,
 > CR15 limit 1023, within half the FPGA memory. Reset marker **0x27000001** is
 > approved for one-shot incoming-only activation of slot 2 into CR12 at the
-> designated trusted reset-ROM instruction. Fetch authority, grant handling and
+> designated trusted reset-ROM instruction. Hardware-controlled fetch authority
+> is bounded to immutable reset ROM during bootstrap, with no extra data/table
+> permissions or software enablement. Exact handoff point, grant handling and
 > final-CALL sequencing remain open. No image migration or ROM rebuild follows.
 
 **v1.1 — 2026-07-23**
