@@ -56,3 +56,15 @@ requirement to install an interrupt Thread after Namespace handoff.
 **How to apply:** Remove that installation requirement when reconciling current
 documents; keep watchdog policy a separate decision and preserve historical
 proposals unchanged.
+
+The user approved the Master's ascending layout as the sole new Phase 1
+Namespace layout and requested three trailing additions in this order:
+`ide.Mint E`, `nstab RW` (hand-crafted Namespace-table RW capability, “the
+power”), and `pkverify E` (a new, yet-to-be-defined LUMP).
+
+**Why:** These are explicit user requirements accompanying layout approval,
+not inferred runtime provisioning or a completed verifier design.
+
+**How to apply:** Preserve the order and exact requested rights. Establish
+which table and capability holder the user means before assigning rows or
+granting authority; do not invent pkverify behavior.
