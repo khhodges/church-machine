@@ -11,6 +11,12 @@ the associated execution state. CR13 stays reserved.
 Ordinary CHANGE now has an approved direct encoding in the master ISA.
 SWITCH's exact instruction-field allocation remains a separate decision.
 
+**Source selection explicitly reaffirmed:** Keep the authorized C-List row
+lookup through CR0–CR11 with L permission, not a direct Namespace GT source.
+Retain ordinary source/row/Namespace validation and current CR15.M authorization.
+This approval preserves the lookup contract, not the old general destination
+selection or an independently selected machine encoding.
+
 For Phase 1, CHANGE is THREADSAVE → THREADLOAD; SWITCH inserts LOAD
 NAMESPACE(CR15) between those halves. CR13 is reserved NULL and never touched.
 The earlier blanket CR12–CR14 isolated-LOAD qualification is not reaffirmed.

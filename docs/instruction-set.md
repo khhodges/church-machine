@@ -62,6 +62,14 @@ updates the associated execution context, not just these GT registers.
 The CR13 reservation continues to apply. Ordinary CHANGE now uses the approved
 direct layout below; SWITCH/reset field allocations remain separate decisions.
 
+**SWITCH source — approved:** Retain the authorized C-List row lookup.
+CRs in CR0–CR11 supplies an L-capable C-List capability; the selected row
+supplies the incoming Namespace GT after ordinary bounds, generation,
+integrity and type validation. SWITCH does not directly consume a Namespace GT
+already held in CRs. Current CR15.M authorization remains required; source M
+does not authorize the operation. Fixed destinations do not waive these checks.
+The exact SWITCH encoding remains a separate decision.
+
 #### Ordinary CHANGE encoding — approved
 
 | Bits | Meaning |

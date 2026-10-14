@@ -12,6 +12,12 @@ Phase 1 has fixed destinations: CHANGE CRn selects the incoming Thread from CRn
 and activates CR12, leaving CR15 unchanged; SWITCH loads CR15 then activates
 CR12 from the incoming Namespace's slot 2. Neither is a general isolated LOAD.
 
+SWITCH retains authorized C-List row lookup through an L-capable source;
+it does not take a Namespace GT directly from CRn. CR15.M authorization remains.
+
+**Why:** After fixing destinations, the user explicitly chose to retain the
+existing source-authorization contract rather than introduce a direct-GT form.
+
 **Why:** The user explicitly chose fixed destinations with a selectable CHANGE
 source to simplify Phase 1 without losing Thread selection.
 
