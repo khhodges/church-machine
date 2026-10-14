@@ -37,6 +37,12 @@ mismatches write nothing.
 
 ## Device rows
 
+**New Phase 1 target:** UART is **NS[8]**, while NS[2] is the reset/handoff
+Thread. See [master geometry](instruction-set.md#active-namespace-geometry).
+The endpoint behavior and NS[2] UART description below are **legacy-profile
+implementation evidence**, not the new placement rule. Do not change saved rows
+or claim the endpoint migrated merely because the specification was reconciled.
+
 `GET /api/namespace/device-migration` is a read-only diagnostic. The
 Namespace plan must contain `UART_DEV` at `NS[2]` with location `0x40000014`
 and inclusive register limit `0x00002`. `CapabilityTest` is an executable

@@ -1,5 +1,12 @@
 # Church Machine Boot Permission Rules
 
+> **New Phase 1 target:** Follow the
+> [master contract](instruction-set.md#approved-phase-1-contract): metadata 0,
+> Namespace self 1, reset/handoff Thread 2; CR13 NULL and never touched.
+> References below to existing ROM, slot placement or register behavior are
+> implementation-profile evidence where inconsistent, not migration approval.
+> Reset opcode/grants/final CALL remain TBD; do not remove CALL by inference.
+
 > **Status:** Current architecture rule summary, backed by implementation and
 > executable tests for specific paths; not a formal proof of isolation. Wukong A7
 > is the current hardware target. The similarly named file under `docs/archive/`

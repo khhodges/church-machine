@@ -3,6 +3,14 @@
 **Draft for review — 24 July 2026**
 **CONFIDENTIAL**
 
+> **Phase 1 target boundary:** The
+> [approved Master ISA](instruction-set.md#approved-phase-1-contract) takes
+> precedence over this older encoding draft: 9-bit software-managed generation,
+> no Phase 1 GC or hardware version changes, F/G masked by 0x3FFFFFFF in the
+> unchanged integrity formula, and networked T/no-network T===GT with optional
+> IDE virtualGTs. Older layout/hash/bootstrap restrictions remain profile
+> evidence, not the new contract. New representation/binding is still TBD.
+
 > **EVIDENCE BOUNDARY:** This draft mixes normative design and implementation
 > audit notes. “Unforgeability” is not a cryptographic guarantee: shipped
 > `integrity32` is public, linear, and unkeyed. Current source and executable

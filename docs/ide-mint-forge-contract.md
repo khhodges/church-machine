@@ -1,7 +1,68 @@
 # ide.Mint — Forge_GT_At_Slot contract draft
 
 Date: 2026-10-11  
-Status: **Design draft; not approved for implementation or operational use.**
+Status: **Approved Phase 1 requirements below; unresolved software mechanisms
+remain TBD. Not an operational service or implementation approval.**
+
+## Current Phase 1 contract — reconciled 2026-10-14
+
+This section supersedes conflicting prescriptions in the earlier draft retained
+below. Authority: [Master ISA](instruction-set.md#approved-phase-1-contract) and
+[Genesis resolution log](phase-1/REVIEW-2026-10-14.md). The
+[service draft](phase-1/MINT-FIRST-DRAFT.md) and
+[CLOOMC review sources](phase-1/source-drafts/README.md) expose remaining TBDs,
+not executable implementations.
+
+- Provide working ide.Mint (NS[9], E), nstab (NS[14], RW) and pkverify
+  (NS[15], E). Slot assignment does not itself issue capabilities. The agent
+  owns delivery. Prefer finish-before-bitstream; otherwise demonstrate a
+  validated reloadable-LUMP path. Services must work before release.
+- Mint supports create and authorized replacement, **never replacement of a
+  RESIDENT LUMP**, including Mint/pkverify if resident. Any resident update path
+  requires its own contract. Growth space does not waive this exclusion.
+- **Only a same-scope LAMBDA references NSRW-GT**, one Namespace slot at a time,
+  including reads and commit rechecks. No separate LAMBDA service LUMP or
+  automatic delegation to callers/pkverify.
+- Finish verification/preparation before the first table write. Exclude other
+  writers and prevent readers using partial entries. No CALL, CHANGE, SWITCH
+  or yield during writes; publish the resulting GT only after confirmed writes.
+  Exact exclusion, confirmation and interrupted-write containment are TBD,
+  not proved by four DWRITEs. No watchdog/reset exemption or promised rollback.
+- All faults hard-fault, not recoverable rejection returns. Use the approved
+  HARDFAULT/fault-map direction in the master; exact lowering remains unverified.
+- Mint forges the PassKey GT **and separate 128-bit proof at forging time**.
+  Genesis defines/approves the permitted sharing structure and approved-GT list.
+  Mint enforces it rather than choosing recipients. pkverify requires both GT
+  and proof. Validate non-NULL, valid, actively issued/bound reference state,
+  independent of caller-controlled expected values; no missing-state zero
+  defaults. EXACT alone does not authenticate.
+- Proof generation, protected storage/transfer, ABI, revocation/replay, list
+  representation and bootstrap issuance remain software TBD.
+- Track used/free blocks per LUMP size class, separately from slots/generations.
+  **No GC in Phase 1.** G-setting location/control is Phase 2 TBD.
+- Software versions are 9 bits. A genuinely never-used slot starts at 0.
+  Release increments to 1–511 inclusive before freeing; at 511, hard-fault
+  without freeing, never wrap. Retain version with slot and reuse it without
+  another increment. **Direct replacement's slot/version policy is software
+  TBD**; do not infer same-slot/+1 approval. Release authority, bookkeeping and
+  in-use safeguards still need definition.
+- Use ascending 256-slot starting geometry and **half the FPGA memory**.
+  Mint/pkverify planning guesses are 2/1 KiB, not measured reservations; 100%
+  headroom is unapproved. Budget pool/proof storage and complete payloads.
+- T is networked object identity; without networking T===GT. IDE virtualGTs
+  may identify non-memory objects beyond table capacity. Representation/binding
+  remains TBD; do not substitute the old frozen/content-hash split.
+- Require simulator, RTL and exact-build physical FPGA evidence for TPERM
+  NULL/EXACT, HARDFAULT attribution and exclusive update/publication, **with
+  Genesis override**. An override is not a passed test or implicit hardware
+  authorization.
+
+## Earlier contract proposal — superseded where inconsistent above
+
+The following dated draft preserves design rationale and source observations.
+Its create-only preference, bootstrap T restriction, ordinary rejection returns,
+unqualified resident scope and unresolved create/replace language are not current
+Phase 1 requirements. Unsettled ABI/atomicity proposals are not adopted by retention.
 
 This document specifies requirements and records unresolved decisions. It does
 not change the saved LUMP, Namespace, simulator, hardware or release selection.

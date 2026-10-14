@@ -5,6 +5,27 @@
 
 ## Overview
 
+**Phase 1 normative reconciliation — 2026-10-14:** The
+[Master ISA](instruction-set.md#approved-phase-1-contract) governs the new
+Namespace profile: ascending four-word entries, slot 0 metadata, 1 self,
+2 reset/handoff Thread, UART 8, Mint 9, nstab 14, pkverify 15; default 256
+slots / 4 KiB / CR15 limit 1023, within half the FPGA memory.
+Separate physical headers, tail tables and self-at-slot-0 descriptions below
+are legacy-profile contracts, not new Phase 1 geometry.
+
+T is networked object identity; without a network T===GT, with optional IDE
+virtualGTs for non-memory objects beyond table capacity. This supersedes this
+document's frozen-bootstrap/content-hash distinction **for the new Phase 1
+identity contract**; encoding/binding remain TBD. Preserve saved artifact/hash
+evidence and historical binaries, not a silent format conversion.
+
+Use 9-bit software-managed generations and the master's initial/release/reuse
+rules. Hardware only equality-checks; direct replacement policy is software TBD.
+No GC in Phase 1. F and G are both excluded from the unchanged integrity formula
+using mask 0x3FFFFFFF. For new Mint behavior, including the RESIDENT replacement
+exclusion and Genesis proof policy, see [the Mint contract](ide-mint-forge-contract.md).
+These requirements do not certify implementation or authorize migration.
+
 A **lump** is the fundamental deployable unit of the Church Machine. It is a
 contiguous, capability-secured memory region containing an executable code
 section and an optional capability list (c-list). Every function abstraction

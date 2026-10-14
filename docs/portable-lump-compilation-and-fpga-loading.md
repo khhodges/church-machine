@@ -3,6 +3,14 @@
 **Status:** Implemented contract (`church.portable-lump-binding/v1`, August 30, 2026)
 **Normative rule:** **Compile names; verify tokens; load bindings.**
 
+> **Phase 1 boundary:** This remains evidence of the existing portable format.
+> Its hash/identity representation is not silently adopted for the new
+> [Phase 1 T contract](instruction-set.md#approved-phase-1-contract):
+> networked object identity, no-network T===GT, and optional IDE virtualGTs.
+> New encoding/local binding is TBD. Preserve existing artifacts; do not
+> migrate them or relabel this implemented pipeline as proof of the new model.
+> Phase 1 requires one IDE/several CMs, not direct CM-to-CM or multiple IDEs.
+
 The active compiler accepts pinned portable dependency descriptors, Build/Save
 keeps their C-list rows unresolved, and destination installation performs
 exact-name, `T`, full-content-hash, identity, authorization, rights, type,

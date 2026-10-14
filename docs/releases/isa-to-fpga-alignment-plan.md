@@ -3,6 +3,24 @@
 Finalized execution plan: 2026-10-11.
 Working candidate name: **B.1.1+**. This label is not a build ID or certification.
 
+## Current approved Phase 1 scope — 2026-10-14
+
+Use the [reconciled Master ISA](../instruction-set.md#approved-phase-1-contract)
+and [Mint contract](../ide-mint-forge-contract.md). Older broad feature lists
+below are inventory, not blanket Phase 1 requirements. No GC; direct CM-to-CM
+and multiple IDEs deferred; two Namespaces/one FPGA networking tests are Phase 2.
+One IDE/several CMs and working Mint/pkverify/controlled nstab are required.
+Use the ascending 256-slot default and half-FPGA-memory budget; CR13 untouched,
+combined SWITCH, elapsed one-second watchdog, and the approved TPERM changes.
+No new T encoding, reset word or HARDFAULT machine word is silently selected.
+
+Require simulator, RTL and exact-release-build physical FPGA evidence for
+TPERM NULL/EXACT (NULL/NULL and skips included), HARDFAULT/IDE attribution and
+exclusive Mint publication, **with Genesis override**. Record overrides as
+overrides, not passed tests; no override is exercised by this plan.
+Record all other pending evidence honestly. This document does not authorize
+source implementation, migration, building, uploading or flashing now.
+
 ## Goal and authority
 
 One explicitly approved architectural contract, implemented consistently by the

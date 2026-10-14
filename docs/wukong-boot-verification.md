@@ -1,5 +1,12 @@
 # Wukong Boot Verification Procedure
 
+> **Phase 1 qualification boundary:** This older boot checklist does not prove
+> the [new approved contract](instruction-set.md#approved-phase-1-contract).
+> Retain its target/build context. New TPERM NULL/EXACT, HARDFAULT attribution
+> and exclusive Mint publication need simulator, RTL and exact-release-build
+> physical FPGA evidence, with Genesis override explicitly distinguished from
+> a passed test. No flash or build is authorized by this documentation update.
+
 This checklist confirms the Wukong XC7A100T board boots correctly after
 re-flashing with the fixed bitstream.  Run it at the workbench after every
 new synthesis — it covers all three acceptance criteria.

@@ -5,6 +5,17 @@
 
 ## Namespace Table Structure
 
+**Phase 1 reconciliation:** The [master](instruction-set.md#approved-phase-1-contract)
+controls the new profile; older layouts and security-path descriptions below
+remain baseline evidence where inconsistent. Generations are **9 bits**,
+not the older 7-bit fields below; software manages them, hardware equality-checks.
+No hardware wrap timer, GC, G reset on access, or automatic stale-to-NULL
+conversion is approved in Phase 1. integrity32 excludes both F/G with
+`W1 & 0x3FFFFFFF`, retaining the existing rotation/XOR formula.
+CR13 remains NULL and untouched; the earlier isolated-register/IRQ wording
+does not authorize touching it. F/G inspection uses authorized reads/BFEXT;
+setting B=true, if needed, is a privileged function, not a new instruction.
+
 The namespace is the master directory of all resources in the system. Every Golden Token references an entry in the namespace table. Each entry describes a resource with four 32-bit words:
 
 | Word   | Content |

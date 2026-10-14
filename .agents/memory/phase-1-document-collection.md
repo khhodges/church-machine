@@ -6,6 +6,16 @@ description: User-requested ISA-first organization and single-source preservatio
 Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
+Apply only explicit approvals when reconciling active specifications; preserve
+original audit snapshots and historical evidence, and keep software TBDs visible.
+
+**Why:** The user specifically selected approved-decisions-only reconciliation,
+not inferred design completion, implementation or hardware changes.
+
+**How to apply:** Correct active original files through the single-source
+collection; use explicit profile/supersession boundaries for retained old
+descriptions. Do not convert a TBD or an implementation observation into approval.
+
 **Why:** The user explicitly requested one place for the related documents after
 the Master ISA reconciliation. Scattered review editions had made their status
 and relationships difficult to follow.

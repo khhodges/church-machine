@@ -3,6 +3,27 @@
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 
+## Reconciled Phase 1 scope
+
+The [approved master contract](instruction-set.md#approved-phase-1-contract)
+supersedes conflicting tasks below. The older checklist is retained as a
+planning baseline, not blanket implementation authorization.
+
+- Generation width is **9 bits (0–511)**. Software manages versions; hardware
+  only equality-checks. Retire the 7-bit/modulo-128 and hardware wrap-timer tasks.
+- **No GC in Phase 1.** The P1-GC tasks below are removed from Phase 1 release
+  requirements; Phase 2 GC-enable location/control is TBD, not approved here.
+- Software pool release increments to 1–511 without wrap, retains the slot
+  version for reuse, and faults before freeing at exhaustion. First use is 0.
+  Direct replacement version policy remains software TBD.
+- The execution watchdog is one second, unrelated to wrap frequency. Only
+  successful CHANGE/SWITCH renews it; IDE Debug/Trace are exempt.
+- Validate TPERM NULL/EXACT, HARDFAULT attribution and exclusive Mint publication
+  with simulator, RTL and exact-build physical evidence, with Genesis override.
+  Identify overrides separately from passed tests.
+
+Do not implement conflicting old task bullets just because they remain listed.
+
 > **Scope**: Granular, independent security hardening tasks for Phase 1. Each item is **self-contained**, **non-blocking on silicon**, and can be completed in order or in parallel. None require hardware changes.
 
 ---

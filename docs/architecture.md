@@ -5,6 +5,24 @@
 
 ## Overview
 
+**Phase 1 target reconciliation — 2026-10-14:** The
+[approved master contract](instruction-set.md#approved-phase-1-contract)
+supersedes older profile prescriptions in this overview. Use ascending 256-slot
+starting geometry, slot 2 reset/handoff, UART 8, Mint 9, nstab 14, pkverify 15,
+and half the FPGA memory. CR13 stays NULL and untouched. CHANGE saves/loads
+a Thread; SWITCH inserts the Namespace load between the same halves.
+
+The execution watchdog is one elapsed second except IDE Debug/Trace; only a
+successful CHANGE/SWITCH renews it, **not instruction retirement or CALL/RETURN**.
+Arm at execution start after reset; leaving exempt modes starts a fresh second;
+expiry wins at equality. The later retirement-renewal watchdog description is
+superseded for Phase 1, not a second active watchdog policy.
+
+No GC in Phase 1. Hardware never increments generations. One IDE managing
+several CMs is required; direct CM-to-CM and multiple IDEs are deferred. Older
+bootstrap/content-token and layout descriptions are profile evidence where
+they conflict with the master, not authority to rebuild/migrate images.
+
 The Church Machine is a capability-oriented processor with instruction-level
 validation gates. It has no conventional operating system, privilege ring, or
 superuser model. Implemented capability access paths use gates such as mLoad and
@@ -26,6 +44,10 @@ not implied by the presence of an upload timeout or a working boot sequence.
 
 
 ### Normative contracts and target profiles
+
+The table below records existing implementation profiles, not the new approved
+Phase 1 ascending profile. Machine-readable contracts still need corresponding
+implementation changes; their current bytes do not override the reconciled ISA.
 
 The machine-readable authority for core layouts and target differences is
 [`shared/architecture_contracts.json`](../shared/architecture_contracts.json).
@@ -296,6 +318,12 @@ These rules are checkable by the IDE, simulator, or hardware boundary:
    transport or a matching member token.
 
 ## RUN-TO-SUSPENSION AND WATCHDOG
+
+**Legacy design discussion:** This section's IRQ mechanism and
+retirement/progress-based renewal are superseded for Phase 1 by the
+[master execution policy](instruction-set.md#execution-and-watchdog).
+No CR13 operations or instruction-retirement renewal remain active requirements.
+Retained details below are not approval to implement that older policy.
 
 ### Scheduler handoff model
 

@@ -2,6 +2,26 @@
 
 Date: 2026-10-11
 
+## Current Phase 1 scope — reconciled 2026-10-14
+
+The [Master ISA](instruction-set.md#approved-phase-1-contract) supersedes
+conflicting earlier mechanisms below. The handoff is one SWITCH:
+THREADSAVE → LOAD NAMESPACE(CR15) → THREADLOAD, using incoming slot 2/version 0.
+No following CHANGE or CR13 operation; no shared context solely to bridge two
+retirements. One IDE managing several CMs and working Mint/pkverify/nstab are
+required. No GC in Phase 1; direct CM-to-CM and multiple IDEs are deferred.
+Two Namespaces sharing one FPGA for networking tests are Phase 2.
+
+The feature matrix below remains an inventory, not approval to expand Phase 1
+into GC, Ethernet/HDMI, unspecified lazy loading or other unselected services.
+T is networked identity; without networking T===GT, with optional IDE virtualGTs
+for non-memory objects. The older frozen-bootstrap/hash split is superseded for
+this target; representation/local binding are TBD. Half the FPGA memory is the
+Phase 1 budget. M4's full end-to-end lifecycle acceptance remains unresolved.
+See [the Mint contract](ide-mint-forge-contract.md) for service boundaries and
+Genesis's evidence-override authority; no implementation or hardware action is
+implied by reconciliation.
+
 **Status:** user-approved direction; detailed mechanism and ABI are a design
 draft. This document does not claim implementation, allocate GTs or slots,
 replace saved LUMPs, enable Mint/Outform, or authorize a build or flash.

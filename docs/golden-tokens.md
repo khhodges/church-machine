@@ -5,6 +5,13 @@
 
 ## What Are Golden Tokens?
 
+**Phase 1 normative reconciliation:** Use the
+[Master ISA Phase 1 contract](instruction-set.md#approved-phase-1-contract).
+T is networked object identity; without a network T===GT, with the approved
+IDE virtualGT extension for non-memory objects. The older content-hash/cache
+definition below is a legacy representation, not the new T contract; encoding
+and local binding remain TBD. No saved token or binary is rewritten here.
+
 Golden Tokens (GTs) are the fundamental unit of access control in the Church
 Machine architecture. Implemented capability paths require a GT with the
 necessary fields and permissions. GTs are not described here as cryptographically
@@ -125,8 +132,10 @@ Church Machine includes a 9-bit `gt_seq` field in bits [24:16] of the Golden Tok
 
 - Each NS SLOT stores a corresponding `gt_seq` value in SLOT Word 1 bits [29:21].
 - When a GT is used (LOAD or CALL), ChurchNSGate compares `gt_word0.gt_seq` against the NS SLOT's `gt_seq`. A mismatch means the GT has been revoked — access FAULTs immediately.
-- During garbage collection, reclaimed entries have their `gt_seq` incremented. All outstanding GTs referencing that entry become stale instantly.
-- 9 bits gives 512 revocation generations before wraparound.
+- No GC in Phase 1. Software alone manages versions; hardware only compares.
+- A never-used Mint slot starts at 0; authorized release increments to 1–511
+  without wrap, retaining the version for reallocation without a second increment.
+  Release at 511 hard-faults before freeing. Direct replacement policy is TBD.
 
 ---
 

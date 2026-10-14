@@ -3,6 +3,16 @@
 **GoldenDetails.md — v2.0 — 2026-06-25**
 **CONFIDENTIAL**
 
+> **Phase 1 authority boundary:** This is a hardware-format/profile reference,
+> not authority over the [Master ISA](instruction-set.md#approved-phase-1-contract).
+> The new layout is ascending with 256 starting slots, slot 0 metadata, 1 self,
+> 2 reset/handoff; legacy profile layouts below remain implementation evidence.
+> T now denotes networked identity, with no-network T===GT and IDE virtualGTs;
+> older cache/hash definitions do not define the new representation (TBD).
+> No GC in Phase 1. Hardware G inversion is conditional on a Phase 2 GC setting
+> whose location/control is TBD; hardware never increments generation.
+> integrity32 remains ROL32(W0,7) XOR ROL32(W1 & 0x3FFFFFFF,13) XOR 0xDEADBEEF.
+
 Authoritative implementation source: `hardware/layouts.py`
 This document is the single canonical description of every wire-level format used
 by the Church Machine and the IDE. Where any other document conflicts with this

@@ -1,5 +1,13 @@
 # Boot ROM Layout
 
+> **Legacy implementation profile, not the new Phase 1 layout.** The separate
+> 16-word Header V2, tail table, NS[0] self-entry and NS[1] Thread below describe
+> existing images/ROM evidence. The [approved master](instruction-set.md#active-namespace-geometry)
+> instead uses ascending slots 0 metadata, 1 self, 2 reset/handoff Thread,
+> UART 8, Mint 9, nstab 14 and pkverify 15; default 256 slots / 4 KiB,
+> CR15 limit 1023, within half the FPGA memory. Reset opcode/grants/final CALL
+> remain TBD. No image migration or ROM rebuild follows from this correction.
+
 **v1.1 — 2026-07-23**
 **CONFIDENTIAL**
 

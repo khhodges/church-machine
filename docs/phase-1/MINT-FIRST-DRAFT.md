@@ -6,7 +6,9 @@ is created by this document. The resolution log in
 [the Phase 1 review](REVIEW-2026-10-14.md) records the user's decisions.
 
 This is a new review output, not an additional member of the original 45-file
-audit snapshot. Older source contracts remain evidence pending reconciliation.
+audit snapshot. Approved requirements have been reconciled into the
+[active Mint contract](../ide-mint-forge-contract.md) and Master ISA. Older
+proposal sections remain explicitly superseded evidence; software TBDs remain.
 
 ## 1. Approved service scope
 

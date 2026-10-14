@@ -4,6 +4,18 @@
 
 Latest collection review: [conflicts and missing information — 2026-10-14](REVIEW-2026-10-14.md).
 
+Approved decisions have now been reconciled into the
+[Master ISA Phase 1 contract](../instruction-set.md#approved-phase-1-contract),
+[Mint contract](../ide-mint-forge-contract.md) and affected supporting sources.
+See [the reconciliation record](REVIEW-2026-10-14.md#approved-decision-source-reconciliation).
+Unresolved software choices remain TBD. This is not implementation, release
+acceptance, a Genesis override, or authorization to build/flash.
+
+Review outputs outside the original 45-source snapshot:
+- [Mint service draft](MINT-FIRST-DRAFT.md).
+- [Code draft and sizing estimates](MINT-CODE-DRAFT.md).
+- [Blocked CLOOMC source drafts](source-drafts/README.md).
+
 This folder brings the Phase 1 architecture, contracts, implementation plans,
 review evidence and security work into one place. The files in its numbered
 sections are **relative symbolic links to the existing originals**, not copies.
@@ -93,7 +105,9 @@ selects which requirements apply.
 - [Historical ISA encoding reference](../isa_encoding.md).
 
 These are supporting evidence, not additional competing “master” documents.
-No document's bytes or status were changed to add it to this collection.
+No document's bytes or status were changed merely to add it to this collection.
+The subsequent approved-decision reconciliation edits active originals; the
+historical editions and original review snapshot remain unchanged.
 
 ## Maintaining this folder
 

@@ -3,6 +3,22 @@
 Date: 2026-10-11  
 Status: **proposal for Design Team review, not an approved ABI or implementation.**
 
+## Phase 1 reconciliation — controlling replacement for the older mapping
+
+Use the [Master ISA](instruction-set.md#approved-phase-1-contract):
+one SWITCH performs THREADSAVE → LOAD NAMESPACE(CR15) → THREADLOAD, entering
+destination slot 2 with the specified permissionless Inform GT/version 0.
+No following CHANGE, inter-instruction bridge or IRQ/CR13 operation is approved.
+The shared-context two-instruction mapping, intermediate checkpoints and related
+proof obligations in sections 4–7 below are **superseded proposal evidence**,
+not a recipe to implement. General validation/exclusion obligations remain;
+faults hard-fault without new rollback/retry mechanisms.
+
+Reset also uses slot 2; reset encoding/grants/final CALL remain separately TBD.
+Phase 1 requires one IDE/several CMs and working Mint/pkverify/nstab; no GC.
+Direct CM-to-CM/multiple IDEs are deferred; the two-Namespaces/one-FPGA test is
+Phase 2. Do not use this older proposal to require those features in Phase 1.
+
 ## Binding clarification: handoff errors are hard faults
 
 User clarification, 2026-10-11: any error encountered during handoff, including

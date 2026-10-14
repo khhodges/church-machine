@@ -2,8 +2,10 @@
 
 ## Contract
 
-`SWITCH CRd, CRs, #row` retains its existing encoding. CR12–CR14 destinations
-perform isolated-register LOAD. A CR15 destination performs the complete
+For Phase 1, CHANGE is THREADSAVE → THREADLOAD; SWITCH inserts LOAD
+NAMESPACE(CR15) between those halves. CR13 is reserved NULL and never touched.
+The earlier blanket CR12–CR14 isolated-LOAD qualification is not reaffirmed.
+The existing CR15 form performs the complete
 Namespace-and-Thread handoff defined in the master ISA. It is not a register
 swap, a PassKey install, or an authority carried by the source.
 
@@ -13,14 +15,14 @@ RTL, saved programs, or boot images already implement the CR15 correction.
 At instruction acceptance the machine latches the complete destination index
 and that destination register's M bit. Execution succeeds only when:
 
-1. CRd is exactly CR12, CR13, CR14, or CR15.
+1. This approved handoff uses CRd=CR15; CR13 is not an available destination.
 2. The latched CRd.M value is set.
 3. CRs is exactly CR0–CR11 and holds a valid ordinary c-list capability with L permission.
 4. `CRs[row]` passes the normal LOAD bounds, version, integrity, and type checks.
 5. Reserved encoding bits are zero.
 
-The four-bit destination field preserves all four isolated registers without
-aliasing or truncation. Source M is never consulted.
+Retain the destination field without aliasing/truncation. Other destinations
+are not approved by this Phase 1 handoff contract. Source M is never consulted.
 
 ## M-bit device and custody
 
@@ -38,17 +40,14 @@ required right fails closed without changing M.
 
 ## Operation lifecycle
 
-Successful combined `SWITCH CR15` clears CR13 completely, including M. The
-destination Thread manager explicitly installs its own IRQ Thread. The outgoing
-IRQ capability is not carried into the destination, and a non-NULL CR13 is not
-an additional rejection precondition. This is not automatic fault recovery.
+Successful combined `SWITCH CR15` never loads, restores or clears CR13.
+No IRQ Thread is installed in Phase 1. Ordinary CHANGE leaves CR15 unchanged.
 
 1. Namespace presents the M-bit I/O capability and writes the complete M word.
 2. The instruction decoder accepts `SWITCH`, latching CRd and CRd.M.
 3. The destination and encoding are validated.
 4. The ordinary LOAD pipeline validates `CRs[row]`. No source-M bypass exists.
-5. For CR12–CR14, the loaded capability replaces CRd and CRd.M clears.
-   For CR15, the validated value must identify a Namespace: save the outgoing
+5. For CR15, the validated value must identify a Namespace: save the outgoing
    Thread under the old Namespace, load CR15 at the microcode midpoint, and
    activate the destination's slot-2 Thread using a hardwired permissionless
    Inform GT with version 0. Successful handoff consumes CR15.M.
@@ -59,8 +58,7 @@ The latch prevents a concurrent or later M-device transition from changing the
 authorization decision for an already accepted instruction.
 
 There is no ordinary instruction boundary inside the CR15 handoff, no extra
-Thread operand, and no required following CHANGE. Other SWITCH destinations
-do not gain these Thread-transition side effects. Fixed entry selection must
+Thread operand, and no required following CHANGE. Fixed entry selection must
 still validate the actual descriptor, version, Thread, frame, and C-List.
 
 ## Fault behavior
@@ -68,8 +66,8 @@ still validate the actual descriptor, version, Thread, frame, and C-List.
 An M-clear destination faults with `PERM_L`. A CR0–CR11 destination, CR12–CR15
 source, or malformed encoding faults with `INVALID_OP`. A NULL or non-L source,
 out-of-bounds row, stale token, or integrity failure faults before
-source admission completes. For CR12–CR14, no failure may mutate any capability
-register, M bit, Namespace entry, memory word, or source capability.
+source admission completes. Reserved CR13 operation disposition needs explicit
+encoding/fault definition; it is not an enabled isolated-load path.
 
 For CR15, outgoing-save writes are not transactionally rolled back if a later
 phase fails. Default to hard fault, not retry, alternate target, silent repair,

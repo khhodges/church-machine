@@ -3,9 +3,9 @@
 **CHANGE correction:** Programmatic CHANGE takes one GT already in the operand
 register, not an indexed operand. All CHANGE indexing modes and byte examples
 below are superseded by the [master one-GT rule](instruction-set.md#change-one-gt-thread-activation).
-Boot uses only the incoming half into CR12; IRQ entry is a hardware CR12/CR13
-swap with a matching hidden swap back on return. Neither operation is CHANGE;
-the return trigger/encoding remains unspecified. This document does not
+Boot uses only the incoming half into CR12, with reset entry slot 2.
+For Phase 1, CR13 is NULL and never touched; the earlier IRQ swap proposal
+is superseded. No IRQ entry/return mechanism is introduced. This document does not
 authorize the old indexed CHANGE form.
 
 Status: **prior multiword encoding proposal, not authority for the corrected

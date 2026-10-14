@@ -3,6 +3,7 @@
 ## Navigation
 
 - [Document authority](#document-authority)
+- [Approved Phase 1 contract](#approved-phase-1-contract)
 - [October 2026 amendment reconciliation](#october-2026-amendment-reconciliation)
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
@@ -29,7 +30,126 @@ Existing encoding tables and repeated instruction descriptions elsewhere in
 this document remain baseline records pending reconciliation; they do not
 override these corrections or establish a new encoding layout.
 
+## Approved Phase 1 contract
+
+**Reconciled from explicit Genesis decisions, 2026-10-14.** The
+[resolution log](phase-1/REVIEW-2026-10-14.md#resolution-log--guided-review)
+is the decision evidence. These are target requirements, not claims that the
+compiler, simulator, RTL, saved images or physical board already conform.
+Only approved decisions are incorporated; software TBDs are not implementation
+defaults. No build, migration, upload or flash is authorized by this edit.
+
+### Execution and watchdog
+
+```text
+CHANGE: THREADSAVE → THREADLOAD
+SWITCH: THREADSAVE → LOAD NAMESPACE(CR15) → THREADLOAD
+```
+
+These are internal phases, not separately issued instructions. Ordinary CHANGE
+remains and leaves CR15 unchanged. SWITCH saves under the outgoing Namespace
+and loads the Thread under the incoming Namespace; no following CHANGE is
+required. CR13 is reserved NULL and **never touched** in Phase 1: no IRQ role,
+load, restore or explicit clearing, including on SWITCH.
+
+The watchdog is **one second of elapsed time to hard fault**, except in IDE
+Debug or IDE Trace mode. Every successful CHANGE/SWITCH renews a full second,
+including self/helper transfers. Retirement, CALL and RETURN do not renew it;
+failed or condition-skipped transfers do not renew it. This bounds time between
+transfers, not useful progress or return to a scheduler.
+
+Arm on execution start after reset, including boot unless exempt. On leaving
+both exempt modes, start a fresh second. Expiry wins at equality: a transfer
+must complete strictly before its deadline. Stalls do not extend the interval.
+No automatic IRQ, CR13 action, maintenance exemption or hardware timer ABI is
+introduced by this policy; exact target timing/capture needs implementation evidence.
+
+### TPERM NULL and EXACT
+
+| Form | Phase 1 behavior |
+|---|---|
+| `TPERM CRn, NULL` | Preset 15 (`0x0F`), unchanged TPERM opcode. Test architectural NULL type, not literal zero. NULL: NZCV=0100; non-NULL: NZCV=1000. Never modifies the GT or faults merely for its type. |
+| B-modified NULL encoding 31 (`0x1F`) | Reserved: assembler rejects; executed raw form hard-faults. The operand GT's B bit is ignored by the NULL-type test, not the instruction modifier. |
+| `TPERM CRd, EXACT, CRs` | If either or both operands are NULL, hard-fault **before changing flags or operands**, attributed to EXACT itself. For two non-NULL operands, retain bit equality and the existing Z=match, N=not-match, C=0, V=0 convention. Equality is not credential validity. |
+| Condition-skipped TPERM | No operand checks, no TPERM fault, no flag/capability changes, including the reserved B-modified NULL form. Independent fetch faults and watchdog expiry remain possible. |
+
+NULL includes nonzero encodings of the architectural NULL type. Preserve the
+originating EXACT fault location through subsequent fault handling. Validate
+PassKey issuance, type, generation, binding and proof separately; equal malformed
+or stale GTs must not authorize an operation. No read-only TESTB is approved.
+
+F/G are Namespace Word-1 bits 31/30, inspected through authorized reads and
+BFEXT, not new TPERM presets. Within Mint, only the same-scope single-slot
+LAMBDA references NSRW-GT. Setting GT B=true, if required, is a privileged
+function, not a new set-B instruction; its authority/ABI remain TBD.
+
+### Standard software hard fault
+
+`HARDFAULT reason` is an approved compiler pseudo-instruction direction:
+emit **one designated non-executable word** using existing INVALID_OP.
+The exact word is **TBD pending verification**, not a new executable opcode.
+It must remain non-executable in future ISA revisions; HALT is not a substitute.
+
+The compiler records an exact-artifact map:
+`instruction offset → reason, method, source line, explanation`.
+The IDE uses captured origin and loaded artifact identity, or shows the raw
+location if no matching map exists. INVALID_OP alone does not identify an
+intentional site. Start with static diagnostics only: no proof/private-authority
+data, register dumps, runtime message construction, reporting CALL, network
+dependency or diagnostic scratch registers. Tiny LUMPs need not carry strings.
+Verify state preservation and pre-recovery location capture before use.
+
+### Namespace identity and software lifecycle
+
+See [active geometry](#active-namespace-geometry) for the approved ascending
+256-slot starting table, slot map and half-FPGA-memory budget.
+GT and entry generations are **9 bits, 0–511**. Hardware checks equality and
+faults on mismatch; software alone manages versions. Never add a hardware
+increment, wrap/exhaustion policy or wrap-rate timer.
+
+For genuinely never-used Mint slots, initial version is 0. Before authorized
+pool release, software increments to 1–511 inclusive; no wrap. At current 511,
+release hard-faults before freeing. Retain that version with the Namespace slot,
+not the memory block; reallocation uses it without a second increment.
+Empty does not mean never-used. **Direct replacement's slot/version policy is
+software TBD**, not inferred from release. Track used/free blocks per LUMP
+size separately from slot/version availability; ownership, bookkeeping and
+remaining safe-release mechanics are TBD.
+
+**No GC in Phase 1.** Hardware G-bit inversion requires a system GC setting;
+its location/control is Phase 2 TBD. No garbage-to-NULL automation is approved.
+
+Retain the existing integrity formula, excluding both F/G and no other fields:
+`ROL32(W0,7) XOR ROL32(W1 & 0x3FFFFFFF,13) XOR 0xDEADBEEF`.
+Masking for calculation grants no write authority.
+
+T identifies networked objects: a networked Golden Token. Without a network,
+**T === GT**; do not narrow this to frozen bootstrap or automatically define T
+as a content hash. The IDE may use T values greater than slot count as
+**virtualGT** IDs for non-memory objects when resident+lazy+new objects exceed
+table capacity. This is not a hardware slot or access grant. Representation,
+network/local binding and virtual/resident transitions remain TBD.
+One IDE managing several CMs is Phase 1; direct CM-to-CM and multiple IDEs are
+deferred. Two Namespaces on one FPGA for networking tests are Phase 2.
+
+### Services and evidence
+
+Working Mint, pkverify and controlled nstab are required, preferably completed
+before bitstream build; alternatively a validated reloadable-LUMP path, never
+unfinished services at release. The [Mint contract](ide-mint-forge-contract.md)
+governs the approved scope, single-slot LAMBDA, proof and publication boundaries.
+
+Require simulator, RTL and exact-release-build physical FPGA evidence for
+TPERM NULL/EXACT, HARDFAULT/IDE attribution and Mint's exclusive update/publication,
+**with Genesis override authority**. Identify exercised overrides separately
+from passed tests; preserve failed, missing and unobservable evidence honestly.
+No override is exercised by this specification.
+
 ## October 2026 amendment reconciliation
+
+The subsequent [approved Phase 1 contract](#approved-phase-1-contract) below
+supersedes the earlier pending status wherever an explicit decision now exists.
+Historical proposals remain evidence, not additional approvals.
 
 **Documentation correction — 2026-10-14.** This section reconciles the
 [October 13 completeness review](../attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791978480955.txt)
@@ -62,15 +182,12 @@ These remain requests for confirmation, not established supersessions.
 | Ordinary CHANGE | The one permissionless Thread GT already held in CRn is authoritative. No implicit C-List lookup, extra operand, or general operand-M requirement is introduced. |
 | Indexed CHANGE | Remains a proposal, not an enabled form under the one-GT correction. A reported INDEX deferral needs its decision record and exact scope; it must not be inferred to cancel the selected compact indexed LOAD/SAVE rules. |
 | Direct CHANGE encoding | Semantic approval does not approve `0x27060000`, its proposed IDX field, or a binary migration policy. Confirm this allocation separately from any INDEX decision. |
-| Reset boot | Incoming-half-only Thread activation remains the semantic baseline. Neither candidate marker `0x27000001` nor the reported CR12-only M grant / canonical-frame entry / ROM CALL removal combination is approved here. Confirm entry, grant consumption, reset-ROM fetch authority, initial slot and final CALL together. Canonical frame preparation alone does not remove CALL. |
-| CR13 | Reservation with no automatic IRQ/WatchdogFault role is supported review direction, not approval of a new entry/return mechanism. The earlier IRQ-swap correction below is a conflicting prior record, not a settled release contract. Full NULL-clearing on every ordinary CHANGE requires confirmation; do not infer it from the specific `SWITCH CR15` handoff rule. Ordinary `CHANGE CR13` is not made privileged or forbidden by that reservation direction. |
+| Reset boot | Incoming-half-only activation remains the baseline; initial entry is NS[2]. Candidate marker `0x27000001`, CR12-only M grant, reset-ROM fetch authority and final-CALL removal remain unapproved. Canonical frame preparation alone does not remove CALL. |
+| CR13 | Reserved NULL and never touched in Phase 1: no IRQ role, CHANGE/SWITCH activation, load, restore or explicit clearing. Earlier IRQ-swap proposals are superseded for Phase 1. Reserved-operation encoding/fault disposition remains TBD. |
 | Other amendment items | Keep their individual proposed/baseline/user-decided status. No blanket approval is implied for transition fault numbers, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
 
-Namespace handoff and reset entry are distinct contracts. The currently stated
-`SWITCH CR15` handoff uses its own incoming slot and explicitly clears CR13;
-it neither selects the reset-boot slot nor establishes clearing on every CHANGE.
-The reviewed proposals disagree about initial slot NS[1] versus NS[2]; do not
-resolve that disagreement by copying the handoff slot into reset boot.
+Namespace handoff and reset entry remain distinct contracts, but both now
+explicitly use slot 2. Neither operation touches CR13, including clearing it.
 
 ### CHANGE binary disposition — approval still required
 
@@ -127,9 +244,9 @@ encoding, saved-image migration, ROM build, or hardware operation is certified.
 ### Open authority and platform decisions
 
 The following remain visible approval blockers rather than implied defaults:
-reset-ROM fetch authority; boot entry/grant/slot/final-CALL binding;
+reset-ROM fetch authority; boot entry/grant/final-CALL binding (slot 2 is settled);
 watchdog memory-backed capture authority; protected configuration interface;
-timebase, refresh and numeric budgets; exact CR13 clearing semantics; and the
+target timing-source implementation; reserved-CR13 operation fault disposition; and the
 proposed `THREAD_CONTEXT` (`0x1D`), `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG`
 (`0x1F`) fault allocations.
 
@@ -229,15 +346,14 @@ Boot uses the **back half** of the Thread transition: the incoming Thread is
 loaded into CR12. There is no outgoing programmatic Thread context to suspend.
 This special initialization path does not add operands to programmatic CHANGE.
 
-### Earlier IRQ hardware exception — unresolved against later review direction
+### Earlier IRQ hardware exception — superseded for Phase 1
 
-**Status clarification — 2026-10-14:** The following paragraphs retain the
+**Historical status — 2026-10-14:** The following paragraphs retain the
 earlier semantic correction and its distinction between CHANGE and IRQ return.
-Later review direction reserves CR13 without an automatic IRQ/WatchdogFault
-role. The resulting conflict has no confirmed entry/return allocation or
-complete replacement contract. Do not treat these prior paragraphs as approval
+The approved Phase 1 contract reserves CR13 NULL and never touched.
+The older IRQ exchange below is not Phase 1 behavior. Do not treat it as approval
 to implement IRQ swapping, add an IRQRETURN opcode, or repurpose ordinary
-`CHANGE CR13`. Resolve the contract explicitly before release; see the
+`CHANGE CR13`. See the
 [reconciliation status](#october-2026-amendment-reconciliation).
 
 IRQ entry is **not a CHANGE instruction**. Hardware can swap CR12 and CR13
@@ -388,6 +504,10 @@ target. It replaces the older separate sixteen-word physical Namespace header:
 | 0..3 | Slot 0 metadata: W0 Namespace header, W1 memory base, W2 following-member count, W3 reserved |
 | 4..7 | Slot 1: Namespace self-entry |
 | 8..11 | Slot 2: designated Boot/entry Thread descriptor |
+| 32..35 | Slot 8: UART |
+| 36..39 | Slot 9: ide.Mint (requested E capability) |
+| 56..59 | Slot 14: nstab (requested RW capability) |
+| 60..63 | Slot 15: pkverify (requested E capability) |
 | `4*i`..`4*i+3` | Subsequent slot `i` |
 
 The header's table count N includes metadata slot 0. Member count is not table
@@ -395,6 +515,14 @@ capacity. CR15 describes the **NST only**, with its location at the table base
 and a word-offset limit of **`4*N - 1`**. The full memory allocation extent is
 derived from metadata, not from CR15's table-only limit. No separate physical
 header precedes the NST; resident bodies must not overlap its slots.
+
+Slot 2 serves both reset boot and Namespace handoff. The starting/default
+capacity is **256 total slots (0–255)**, configurable rather than an ISA maximum:
+1,024 words / 4 KiB of table and CR15 word-offset limit **1023**.
+Preserve slot identities and recalculate body placement; do not blindly shift
+all addresses. Phase 1 is budgeted to **half the FPGA memory**; exact target
+bytes and placement require evidence. Two Phase 1 Namespaces sharing one FPGA
+memory for CM networking tests are Phase 2, not Phase 1 acceptance.
 
 Runtime lookup derives slot addresses and bounds from the active CR15 and
 that Namespace's metadata, never the IDE's inspected Namespace, saved
@@ -408,23 +536,22 @@ Namespace images, catalogs, resident LUMPs, or deployment approvals.
 
 ## SWITCH: isolated-register LOAD and Namespace handoff
 
-**Approved semantic correction.** The existing encoding is retained.
-Destinations CR12–CR14 retain isolated-register LOAD behavior; CR15 performs
-the complete Namespace-and-Thread handoff below. This specification does not
+**Approved Phase 1 semantics:** CHANGE is THREADSAVE → THREADLOAD. SWITCH is
+the same halves with LOAD NAMESPACE(CR15) inserted between them. Ordinary CHANGE
+leaves CR15 unchanged; CR13 is NULL and never touched. The earlier blanket
+CR12–CR14 isolated-LOAD qualification is not reaffirmed by this approval.
+The CR15 handoff below retains ordinary admission checks; this does not
 claim simulator or RTL conformance, rewrite saved programs, regenerate boot
 images, or approve hardware. See also [SWITCH lifecycle](switch-lifecycle.md).
 
-`SWITCH CRd, CRs, #row` is the special LOAD form for isolated registers.
-CRd must be CR12–CR15, and its M bit is latched at instruction acceptance.
+For the CR15 form `SWITCH CR15, CRs, #row`, CR15.M is latched at instruction acceptance.
 CRs must be CR0–CR11 and hold a valid ordinary c-list capability with L
 permission. Source M is not consulted. The selected `CRs[row]` passes normal
 LOAD bounds, version, integrity, and type checks; reserved encoding bits
 must be zero.
 
-For CR12–CR14, on success the selected capability replaces CRd and destination M clears.
-Namespace must reauthorize that exact destination through the corresponding
-bit in the single-word M-bit I/O object before another SWITCH to it.
-M is register state, not a GT permission.
+M is register state, not a GT permission. This reconciliation does not approve
+other SWITCH destinations; CR13 operations are excluded from Phase 1.
 
 ### Namespace destination: CR15
 
@@ -442,11 +569,8 @@ The single instruction:
 
 There is no programmer-visible instruction boundary between these phases and
 no additional Thread operand or following CHANGE instruction is required.
-Successful handoff consumes CR15.M. Successful Namespace handoff also clears
-CR13 completely, including its M bit. No outgoing interrupt-Thread capability
-is carried into the destination Namespace. The destination's Thread manager
-must explicitly install its own interrupt Thread. This clearing is part of
-the successful instruction, not a fault-recovery action.
+Successful handoff consumes CR15.M. CR13 remains NULL and is never loaded,
+restored or explicitly cleared. No interrupt Thread is installed in Phase 1.
 
 Fixed entry selection does not waive
 Thread type, GT version, saved-frame, or C-List checks. Never construct an
