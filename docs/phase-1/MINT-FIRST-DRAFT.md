@@ -81,7 +81,7 @@ external-writer exclusion or interruption behavior.
 
 - Mint performs authorized creation/replacement and Namespace publication.
 - pkverify verifies the agreed proof/credential contract; token equality alone
-  must not be silently substituted for any required proof.
+  must not be silently substituted for the required separate 128-bit proof.
 - nstab supplies the actual table-write capability, referenced only by the
   same-scope LAMBDA above. Provisioning must still be defined; a caller's E access
   to Mint does not confer NSRW-GT.
@@ -90,6 +90,12 @@ external-writer exclusion or interruption behavior.
 
 These roles do not assign scratch CRs, DRs, proof storage or cryptographic
 primitives. Existing draft ABI assignments are not adopted merely by reference.
+
+**Proof requirement — approved:** pkverify requires both the passkey-GT and a
+separate **128-bit proof**. **Mint creates the proof when it forges the PassKey.**
+Missing or invalid proof hard-faults. Generation mechanism, protected storage,
+transfer and verification ABI remain unresolved; this does not authorize
+exposing proof material in public results, traces or diagnostics.
 
 **Approved fault rule:** Any fault in Mint, its same-scope LAMBDA or pkverify
 is a **hard fault**, including failed authorization, verification, validation

@@ -128,6 +128,12 @@ The actual list, representation and enforcement mechanics remain TBD.
 Do not invent approved entries or infer that possessing Mint's E capability
 alone permits receiving or further sharing the passkey-GT.
 
+**Proof requirement — approved:** pkverify requires the passkey-GT **and a
+separate 128-bit proof**. Mint creates that proof **when it forges the PassKey**.
+Missing or invalid credentials/proof hard-fault; matching GT bits alone cannot
+succeed. Proof generation mechanism, protected storage, transfer and verification
+ABI remain unresolved.
+
 The following symbolic outline records Mint's additional responsibility.
 It does not select a public method name, register ABI, first-issuance authority
 or token/proof format. All failed checks hard-fault.
@@ -137,13 +143,16 @@ or token/proof format. All failed checks hard-fault.
 Mint_create_and_share_passkey(request):
     policy = UNRESOLVED_GET_GENESIS_APPROVED_GT_LIST()
     UNRESOLVED_REQUIRE_ISSUANCE_AND_SHARING_PERMITTED(request, policy)
-    passkey_gt = UNRESOLVED_CREATE_PASSKEY_GT(request, policy)
+    # Forge the PassKey and create its separate 128-bit proof at that time.
+    passkey_gt, proof128 = UNRESOLVED_FORGE_PASSKEY_WITH_128_BIT_PROOF(request, policy)
+    UNRESOLVED_PROTECT_CREATED_PROOF(passkey_gt, proof128)
     UNRESOLVED_SHARE_ONLY_AS_DESIGN_PERMITS(passkey_gt, request, policy)
+    # Proof transfer is TBD; this does not expose proof128 in the public result.
     return UNRESOLVED_SUCCESS_WITHOUT_PRIVATE_STATE()
 ```
 
 Any Namespace access requiring NSRW-GT remains confined to Mint's same-scope,
-single-slot LAMBDA. This decision does not settle pkverify's proof contract,
+single-slot LAMBDA. This decision does not settle the proof-generation mechanism,
 credential storage, revocation, replay, onward sharing or bootstrap issuance.
 It does not equate the passkey-GT with NSRW-GT or grant the recipient table RW.
 
@@ -151,11 +160,13 @@ It does not equate the passkey-GT with NSRW-GT or grant the recipient table RW.
 pkverify(credential, frozen_request):
     result = NOT_VERIFIED
 
-    # Mint creates/shares the passkey-GT under the design-approved GT list.
+    # Mint creates the separate 128-bit proof when forging the PassKey.
+    # Passkey-GT sharing follows the Genesis-approved GT list.
     # Issuance mechanics, private storage and proof transport remain undecided.
     trusted = UNRESOLVED_GET_PRIVATE_VERIFICATION_STATE(credential)
     UNRESOLVED_CHECK_CREDENTIAL_BINDING_AND_REVOCATION(trusted, credential)
-    UNRESOLVED_VERIFY_REQUIRED_PROOF(trusted, credential, frozen_request)
+    UNRESOLVED_REQUIRE_PASSKEY_GT_AND_128_BIT_PROOF(credential)
+    UNRESOLVED_VERIFY_PASSKEY_GT_AND_128_BIT_PROOF(trusted, credential, frozen_request)
     UNRESOLVED_ENFORCE_AGREED_REPLAY_RULES(trusted, credential, frozen_request)
 
     # Equality of GT bits alone is not a substitute for required proof.

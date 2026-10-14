@@ -275,3 +275,13 @@ as explicitly clarified by the user. Mint enforces that policy rather than
 choosing approved recipients. Do not invent list entries or
 issuance/bootstrap/onward-sharing rules. Do not equate
 passkey possession with NSRW-GT access or silently settle pkverify's proof ABI.
+
+pkverify requires a passkey-GT plus a separate 128-bit proof; Mint creates the
+proof when it forges the PassKey.
+
+**Why:** The user explicitly retained the two-part requirement and specified
+Mint as the proof creator at forging time.
+
+**How to apply:** Require both, hard-fault on missing/invalid proof, and never
+substitute GT equality alone. Generation mechanism, protected storage, transfer,
+verification ABI, revocation and replay rules still require explicit decisions.
