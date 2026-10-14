@@ -70,6 +70,14 @@ the pool. Authority, eligible targets, in-use safeguards, reclamation and
 interruption semantics remain unresolved. This is not permission to destroy
 arbitrary active or protected objects.
 
+**Outstanding GTs — approved:** Authorized Destroy may invalidate existing
+GTs rather than prove no copies remain. Later stale-GT accesses must fault.
+Use the approved software release rules: increment before freeing, no wrap,
+hard-fault without freeing at version 511, and retain the slot version on
+reuse. No reference enumeration/cleanup is required by this decision.
+Active/protected-target safeguards and safe reclamation mechanics remain
+separate requirements.
+
 These operations need a defined destination CM/Namespace, object, allocation,
 requested authority and expected destination state. These are conceptual inputs,
 not approved register assignments or a new wire protocol. Determine whether

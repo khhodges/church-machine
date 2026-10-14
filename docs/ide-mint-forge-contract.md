@@ -39,6 +39,13 @@ not executable implementations.
   authorization, per-type eligibility, in-use safeguards, memory reclamation,
   interruption behavior and ABI remain to be defined; this is not blanket
   permission to destroy protected or active objects.
+- **Outstanding GTs on Destroy — approved:** An authorized Destroy may
+  invalidate outstanding GTs under the approved software slot-version release
+  rules, without finding/removing every copy or proving none remain.
+  Subsequent stale-GT accesses must fault. Increment before freeing, never
+  wrap, and hard-fault without freeing at version 511; retain the slot version
+  for reuse. This does not waive active/protected-target eligibility checks
+  or resolve safe reclamation and interrupted-write mechanics.
 - **PassKey required in each case — approved:** Each supported Mint request
   requires a valid, appropriately authorized PassKey GT and its separate
   128-bit proof. This includes Create, authorized Replace and explicit Destroy

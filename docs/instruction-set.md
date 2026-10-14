@@ -396,6 +396,13 @@ authority, per-type eligibility, in-use safeguards, reclamation, interruption
 behavior and ABI still need definition; no unrestricted destruction of protected
 or active objects is approved.
 
+**Destroy with outstanding GTs — approved:** Authorized Destroy may invalidate
+outstanding GTs without locating every copy or proving no references remain.
+Subsequent stale-GT accesses must fault. Apply the approved software
+increment-before-free/no-wrap/retained-slot-version rules, including hard fault
+without freeing at version 511. This does not authorize destroying active or
+protected objects or settle safe reclamation and interruption mechanisms.
+
 **PassKey required in each Mint case — approved:** Require the valid PassKey
 GT plus its separate 128-bit proof for each supported Create, authorized
 Replace and explicit Destroy request, covering application Abstractions,

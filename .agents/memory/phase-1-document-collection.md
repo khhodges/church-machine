@@ -492,3 +492,15 @@ after adding LS C-list objects, RW data and Destroy to the required scope.
 operation/target; hard-fault failures before protected changes. Do not infer
 distinct credentials per type, a bootstrap bypass or new proof checks for
 ordinary ISA LS/RW accesses.
+
+Authorized Destroy may invalidate outstanding GTs without locating their
+copies or proving no references remain. Subsequent stale accesses must fault,
+including after slot reuse.
+
+**Why:** The user selected invalidation rather than a no-outstanding-GTs
+precondition for Destroy.
+
+**How to apply:** Preserve software increment-before-free, no wrap, rejection
+without freeing at version 511, and retained slot versions. Do not infer
+permission to destroy active/protected objects or skip safe reclamation
+and interruption safeguards.
