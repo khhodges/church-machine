@@ -22,6 +22,12 @@ The agent owns delivery. Prefer completing and validating the services before
 the bitstream build; alternatively demonstrate a reloadable-LUMP path.
 All services must work before Phase 1 is complete.
 
+**No GC in Phase 1.** The PP250 garbage-to-NULL suggestion is withdrawn.
+Phase 2 hardware G-bit inversion requires the system GC-enable setting to be
+set; the setting's location and how it is set remain Phase 2 open issues.
+No automatic garbage/stale-GT conversion to NULL or GC mechanism is inferred
+for Mint. This does not change the agreed NULL-test or EXACT fault semantics.
+
 Two Phase 1 Namespaces sharing one CM FPGA's memory to test CM networking are
 **Phase 2** work, not a Phase 1 Mint acceptance requirement. This does not change
 the approved Phase 1 scope of one IDE managing several CMs or specify the future

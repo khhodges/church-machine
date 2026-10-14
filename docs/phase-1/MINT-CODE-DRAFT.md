@@ -15,6 +15,12 @@ no implementation and must block compilation/admission until resolved in the Q&A
 The proposed helper names and ordering are review proposals, not approved ABI.
 Nothing here installs a LUMP, grants nstab authority or changes saved memory.
 
+**Scope correction:** No GC in Phase 1. The user withdrew the PP250
+garbage-to-NULL comment. Hardware G-bit inversion is conditional on a system
+GC-enable setting; its location and control are Phase 2 open issues. Do not
+add GC or automatic stale/garbage-GT nulling to these drafts. The agreed
+TPERM NULL/EXACT behavior remains separate.
+
 ## 1. ide.Mint
 
 The shared entry below represents both approved operations. Whether the public

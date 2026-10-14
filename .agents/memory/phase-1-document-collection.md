@@ -317,3 +317,13 @@ NULL encodings), sets Z=1 for NULL and Z=0 otherwise, without faulting or changi
 the GT. The user approved the full NULL-test flags: Z=is-NULL, N=not-NULL,
 C=0, V=0. Pair with NULL-before-equality hard faults for EXACT. Encoding and
 conditional-execution details remain open; no implementation is implied.
+
+No GC in Phase 1. The PP250 garbage-to-NULL suggestion is withdrawn.
+
+**Why:** After further research the user explicitly withdrew the comparison
+and excluded GC from Phase 1.
+
+**How to apply:** Do not infer automatic stale/garbage-GT nulling or a Phase 1
+GC path. In Phase 2, hardware may invert G only with the system GC setting
+enabled; the setting's location and how it is set remain open. Preserve the
+separate agreed TPERM NULL/EXACT rules. This does not settle lazy loading.
