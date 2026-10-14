@@ -45,3 +45,14 @@ the repeated “slot 1” in the initial comment was clarified by the user.
 **How to apply:** Use this approved assignment when reconciling the Phase 1
 documents. It does not authorize migrating existing images or settle other
 reset instruction/authority questions.
+
+CR13 is reserved in Phase 1 with no automatic interrupt or watchdog-Thread
+role. Successful SWITCH CR15 still clears CR13 including M; ordinary CHANGE
+gets no new clearing rule.
+
+**Why:** The user approved reserving CR13 rather than retaining the conflicting
+requirement to install an interrupt Thread after Namespace handoff.
+
+**How to apply:** Remove that installation requirement when reconciling current
+documents; keep watchdog policy a separate decision and preserve historical
+proposals unchanged.
