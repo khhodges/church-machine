@@ -122,3 +122,12 @@ involved beyond checking equality.
 does not approve modulo wrap or generation reuse; never infer that policy.
 Keep any reuse/exhaustion policy in software. The suggested no-wrap rule was
 not approved; do not turn it into a hardware or software requirement.
+
+Keep the existing integrity32 formula, ignoring both F and G in its input.
+No further formula revision is authorized.
+
+**Why:** After clarification, the user explicitly directed: “Do not revise the
+formula beyond ignoring both F and G.”
+
+**How to apply:** Reconcile prose that mentions only G with the two-flag mask.
+Do not treat calculation masking as a stored-flag write or an authority grant.
