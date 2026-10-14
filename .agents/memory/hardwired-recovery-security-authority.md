@@ -14,11 +14,14 @@ of Namespace slot 2 into CR12. Outside authorized reset context it is INVALID_OP
 programmer-set M does not grant admission. Bounded hardware fetch authority
 for immutable reset ROM during bootstrap is now explicitly approved: no
 software enablement or additional data/table permissions; normal fetch checks
-apply after handoff. Exact handoff point, grant handling, precise marker
-admission/consumption and final-CALL sequencing still need resolution.
+apply after handoff. The user explicitly retained the final reset-ROM CALL CR0:
+normal CALL validation applies and successful transfer ends ROM fetch authority.
+No additional ROM CALL is implied for ordinary CHANGE or SWITCH. Grant handling
+and precise marker admission/consumption still need resolution.
 
 **Why:** The user selected a distinct reset exception, not indexed CHANGE or
-a general software privilege. Do not infer final-CALL removal from this choice.
+a general software privilege, and subsequently chose to retain the checked CALL
+into the prepared first abstraction rather than infer direct Thread entry.
 
 After bootstrap passes validation, the system must complete at least one
 successful CHANGE for save-first fault recovery to work. Before that, the

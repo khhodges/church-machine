@@ -9,8 +9,10 @@
 > approved for one-shot incoming-only activation of slot 2 into CR12 at the
 > designated trusted reset-ROM instruction. Hardware-controlled fetch authority
 > is bounded to immutable reset ROM during bootstrap, with no extra data/table
-> permissions or software enablement. Exact handoff point, grant handling and
-> final-CALL sequencing remain open. No image migration or ROM rebuild follows.
+> permissions or software enablement. Retain final ROM **CALL CR0** with normal
+> CALL validation; successful transfer ends reset-ROM fetch authority.
+> Grant handling and precise marker admission/consumption remain open.
+> No image migration or ROM rebuild follows.
 
 **v1.1 — 2026-07-23**
 **CONFIDENTIAL**

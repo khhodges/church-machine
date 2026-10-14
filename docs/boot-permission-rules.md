@@ -10,8 +10,10 @@
 > into CR12. Outside authorized reset context it faults INVALID_OP; programmer
 > M bits do not grant admission. Bounded hardware instruction-fetch authority
 > for immutable reset ROM during bootstrap is approved; it grants no extra
-> data/table permissions and cannot be software-enabled. Exact handoff point,
-> grant handling and final CALL remain open; do not remove CALL by inference.
+> data/table permissions and cannot be software-enabled. Retain final ROM
+> **CALL CR0**, with normal CALL validation; successful transfer ends reset-ROM
+> fetch authority. Grant handling and precise marker admission/consumption
+> remain open. No additional ROM CALL is introduced for CHANGE or SWITCH.
 
 > **Status:** Current architecture rule summary, backed by implementation and
 > executable tests for specific paths; not a formal proof of isolation. Wukong A7
