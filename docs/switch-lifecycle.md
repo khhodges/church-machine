@@ -74,6 +74,9 @@ activation. CR15 may already have changed when the second check fails.
 Hard-fault without rollback; the target Thread must not activate or run.
 Both matches are required for completed handoff, but the guard does not
 require an additional both-before-CR15 preflight pass.
+Either guard mismatch uses the existing `VERSION` fault, with diagnostics
+identifying slot 1 (Namespace) or slot 2 (Thread). No separate guard fault
+category is introduced.
 
 Successful combined `SWITCH CR15` never loads, restores or clears CR13.
 No IRQ Thread is installed in Phase 1. Ordinary CHANGE leaves CR15 unchanged.

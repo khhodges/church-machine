@@ -34,6 +34,8 @@ for this pair or copy a live descriptor version to satisfy a check. Check slot 1
 during Namespace admission, then slot 2 during Thread admission before activation.
 A second-stage failure may leave CR15 changed: hard-fault without rollback and
 do not activate the target Thread. Other slot policies remain unchanged.
+Report either guard mismatch as `VERSION`, identifying the failing slot
+(1 for Namespace, 2 for Thread); no separate boot-guard fault category is added.
 Generate the pair once on approval of a new boot configuration and retain it
 with that configuration. Unchanged rebuilds, exports, uploads, resets and
 unrelated application LUMP changes reuse it. Only explicit approval of a changed

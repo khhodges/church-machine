@@ -27,6 +27,11 @@ Namespace/version policies remain unchanged. Check slot 1 at Namespace admission
 and slot 2 at Thread admission before activation. CR15 may already have changed
 on second-stage failure; hard-fault without rollback or target activation.
 No extra both-before-CR15 preflight is required. Provisioning remains open.
+Both boot-guard mismatch cases use the existing VERSION fault; diagnostics
+identify slot 1 (Namespace) or slot 2 (Thread), without a new fault category.
+
+**Why:** The user explicitly approved reusing VERSION with failing-slot
+identification rather than introducing a separate boot-guard category.
 
 **Why:** The user explicitly selected accidental wrong-image loading as the
 threat to address, rather than deliberate unauthorized substitution, and chose
