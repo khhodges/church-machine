@@ -5,7 +5,11 @@
 > Namespace self 1, reset/handoff Thread 2; CR13 NULL and never touched.
 > References below to existing ROM, slot placement or register behavior are
 > implementation-profile evidence where inconsistent, not migration approval.
-> Reset opcode/grants/final CALL remain TBD; do not remove CALL by inference.
+> The reset-only marker is now approved as **0x27000001**, one-shot at the
+> designated trusted reset-ROM instruction, incoming-only activation of slot 2
+> into CR12. Outside authorized reset context it faults INVALID_OP; programmer
+> M bits do not grant admission. Fetch authority, grant handling and final CALL
+> remain open; do not remove CALL by inference.
 
 > **Status:** Current architecture rule summary, backed by implementation and
 > executable tests for specific paths; not a formal proof of isolation. Wukong A7

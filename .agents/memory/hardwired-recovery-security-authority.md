@@ -8,6 +8,15 @@ Thread and initial CR15 authority are hardwired. Trust the IDE builder and
 the seals without introducing a new W3 cold-boot seal or waiving applicable
 Church checks.
 
+The user subsequently approved exact reset marker 0x27000001: one-shot per
+reset at the designated trusted reset-ROM instruction, incoming-only activation
+of Namespace slot 2 into CR12. Outside authorized reset context it is INVALID_OP;
+programmer-set M does not grant admission. Fetch authority, grant handling,
+precise admission/consumption and final-CALL sequencing still need resolution.
+
+**Why:** The user selected a distinct reset exception, not indexed CHANGE or
+a general software privilege. Do not infer final-CALL removal from this choice.
+
 After bootstrap passes validation, the system must complete at least one
 successful CHANGE for save-first fault recovery to work. Before that, the
 stuck-in-a-loop condition remains. Do not invent a readiness register or latch

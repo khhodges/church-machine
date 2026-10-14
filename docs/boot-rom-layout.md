@@ -5,8 +5,10 @@
 > existing images/ROM evidence. The [approved master](instruction-set.md#active-namespace-geometry)
 > instead uses ascending slots 0 metadata, 1 self, 2 reset/handoff Thread,
 > UART 8, Mint 9, nstab 14 and pkverify 15; default 256 slots / 4 KiB,
-> CR15 limit 1023, within half the FPGA memory. Reset opcode/grants/final CALL
-> remain TBD. No image migration or ROM rebuild follows from this correction.
+> CR15 limit 1023, within half the FPGA memory. Reset marker **0x27000001** is
+> approved for one-shot incoming-only activation of slot 2 into CR12 at the
+> designated trusted reset-ROM instruction. Fetch authority, grant handling and
+> final-CALL sequencing remain open. No image migration or ROM rebuild follows.
 
 **v1.1 — 2026-07-23**
 **CONFIDENTIAL**
