@@ -569,14 +569,14 @@ def isolated_bootstrap_repository(tmp_path, monkeypatch):
 
 def _artifact_save_payload(client):
     """Compile/finalize an artifact without borrowing a resident's authority."""
-    source = "; @abstraction BootstrapPublicationFixture\nIADD DR1, DR0, #42\nRETURN\n"
+    source = "; @abstraction test.BootstrapPublicationFixture\nIADD DR1, DR0, #42\nRETURN\n"
     response = client.post("/api/compile", json={
         "source": source, "language": "assembly"})
     assert response.status_code == 200 and response.json["ok"], response.json
     compiled = response.json
     metadata = {
-        "abstraction": "BootstrapPublicationFixture",
-        "dot_name": "BootstrapPublicationFixture", "issue_n": 1,
+        "abstraction": "test.BootstrapPublicationFixture",
+        "dot_name": "test.BootstrapPublicationFixture", "issue_n": 1,
         "source": source, "language": "assembly",
         "trust_origin": compiled["trust_origin"],
         "compiler_identity": compiled["compiler_identity"],
@@ -642,7 +642,7 @@ def test_published_artifact_requires_separate_reviewed_namespace_adoption(
         slot = next(n for n in range(14, 64)
                     if n not in {row["slot"] for row in rows})
         proposed = rows + [dict(
-            slot=slot, name="BootstrapPublicationFixture",
+            slot=slot, name="test.BootstrapPublicationFixture",
             filename=saved["filename"], token=saved["token"],
             binary_hash=hashlib.sha256(
                 (isolated_bootstrap_repository / saved["filename"]).read_bytes()).hexdigest(),

@@ -131,11 +131,15 @@ do not label every INVALID_OP as an intentional software fault. No new
 executable opcode, scratch register or reporting CALL is introduced. The
 designated word must remain non-executable in future ISA revisions.
 
-The exact word, preservation of flags/registers and capture of an identifiable
-fault location before recovery changes state must still be verified against
-the ISA and target. Approval selects the approach, not a numeric encoding.
+Genesis selected `0xF7000000` following isolated verification. Full target
+integration and pre-recovery capture/transport remain verification gates.
 `HALT` is not a substitute. Map serialization, capture/transport details and
 implementation remain open. No rollback or continuation is implied.
+
+The [isolated candidate investigation](HARDFAULT-CANDIDATE-VERIFICATION.md)
+records **`0xF7000000`**, with simulator/RTL state and location evidence and
+explicit IDE/target-integration gaps. Selection does not enable compiler
+emission or claim physical acceptance.
 
 ```text
 Mint(request, credential):

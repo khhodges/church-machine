@@ -64,3 +64,30 @@ while using the exact-artifact map for software reasons.
 and original fault-location capture before use. Keep the word non-executable
 in future ISA revisions. Do not interpret every INVALID_OP as intentional;
 only an exact matching fault-map site establishes that distinction.
+
+Candidate verification is not numeric-encoding approval or target acceptance.
+
+**Why:** Isolated execution can prove the fault edge while relying on an
+integration-provided fetch gate; preserved state before reset does not imply
+preservation after reset. A passing candidate test must not silently enable
+compiler lowering.
+
+**How to apply:** Keep selection, exact-artifact map binding, integrated
+capture/transport, and physical acceptance as distinct gates. Consult the
+HARDFAULT candidate investigation in the Phase 1 docs before enabling emission.
+
+Genesis selected the verified `0xF7000000` WORD encoding for HARDFAULT.
+
+**Why:** Genesis approved the returned candidate and its documented limits;
+selection is not permission to treat unverified target behavior as PASS.
+
+**How to apply:** Preserve permanent non-executability. Keep compiler emission
+disabled until exact-artifact maps and integration capture gates are satisfied.
+
+Release approval may be deferred while closing the HARDFAULT investigation.
+
+**Why:** The user explicitly approved moving forward without release approval.
+This separates selecting the encoding from authorizing its use.
+
+**How to apply:** Preserve outstanding release checks and target acceptance as
+open gates, never as PASS; investigation completion must not enable emission.

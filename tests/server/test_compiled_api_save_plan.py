@@ -9,7 +9,7 @@ from test_idx1_save_endpoint import client, isolated_lumps
 @pytest.mark.parametrize("profile", ["api", "compact", "full"])
 @pytest.mark.parametrize("tamper", [False, True])
 def test_server_compiled_run_api_reaches_save_plan(client, isolated_lumps, profile, tamper):
-    source = "abstraction ApiRunFixture {\nmethod Run() {\nreturn(1);\n}\n}\n"
+    source = "abstraction test.ApiRunFixture {\nmethod Run() {\nreturn(1);\n}\n}\n"
     response = client.post("/api/compile", json={
         "source": source, "language": "javascript", "tier": 2,
     })
@@ -28,7 +28,7 @@ const input = JSON.parse(fs.readFileSync(0,'utf8'));
         _lumpManifests:{6:{_methods:[{name:'WrongBootMethod'}]}}});
     vm.runInContext(text.slice(text.indexOf('function _formatLumpApiDefinition('),
         text.indexOf('// Format the C-list from the immutable embedded API')), context);
-    const api = context._formatLumpApiDefinition('ApiRunFixture',
+    const api = context._formatLumpApiDefinition('test.ApiRunFixture',
         inspected.apiDefinition.capabilities, {apiDefinition:inspected.canonicalApiDefinition});
     if (JSON.stringify(api.methods) !== JSON.stringify(inspected.canonicalApiDefinition.methods))
         throw Error('Browser changed the canonical compiler interface');
@@ -48,7 +48,7 @@ const input = JSON.parse(fs.readFileSync(0,'utf8'));
     result = client.post("/api/lumps/save-plan", json={
         "binary": candidate["words"],
         "metadata": {
-            "abstraction": "ApiRunFixture", "language": compiled["language"],
+            "abstraction": "test.ApiRunFixture", "language": compiled["language"],
             "content_type": "code", "artifact_only": True,
             "capabilities": compiled["capabilities"],
             "original_source": source,
@@ -70,7 +70,7 @@ const input = JSON.parse(fs.readFileSync(0,'utf8'));
         saved, _ = save(client, {
             "binary": candidate["words"],
             "metadata": {
-                "abstraction": "ApiRunFixture", "language": compiled["language"],
+                "abstraction": "test.ApiRunFixture", "language": compiled["language"],
                 "content_type": "code", "artifact_only": True,
                 "save_variants": True, "source_required": True,
                 "capabilities": compiled["capabilities"],

@@ -152,7 +152,7 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(
         app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
-    source = "; @abstraction CompilerRouteFixture\nIADD DR1, DR0, #42\nRETURN\n"
+    source = "; @abstraction test.CompilerRouteFixture\nIADD DR1, DR0, #42\nRETURN\n"
 
     with app_module.app.test_client() as client:
         compiled_response = client.post("/api/compile", json={
@@ -177,8 +177,8 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
         assert rejected_response.status_code == 403
 
         metadata = {
-            "abstraction": "CompilerRouteFixture",
-            "dot_name": "CompilerRouteFixture",
+            "abstraction": "test.CompilerRouteFixture",
+            "dot_name": "test.CompilerRouteFixture",
             "issue_n": 1,
             "source": source,
             "language": "assembly",
@@ -213,5 +213,5 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
 
     artifact = tmp_path / saved["filename"]
     delivered = _require_approved_executable_lump(
-        str(artifact), str(tmp_path), "CompilerRouteFixture")
+        str(artifact), str(tmp_path), "test.CompilerRouteFixture")
     assert delivered == finalized["final_binary"]

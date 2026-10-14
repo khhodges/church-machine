@@ -87,8 +87,11 @@ function, not a new set-B instruction; its authority/ABI remain TBD.
 
 `HARDFAULT reason` is an approved compiler pseudo-instruction direction:
 emit **one designated non-executable word** using existing INVALID_OP.
-The exact word is **TBD pending verification**, not a new executable opcode.
+Genesis selected **`0xF7000000`** following isolated verification, not a new executable opcode.
 It must remain non-executable in future ISA revisions; HALT is not a substitute.
+
+See [verification evidence and remaining gates](phase-1/HARDFAULT-CANDIDATE-VERIFICATION.md).
+Compiler emission remains disabled; physical behavior is not verified.
 
 The compiler records an exact-artifact map:
 `instruction offset → reason, method, source line, explanation`.
