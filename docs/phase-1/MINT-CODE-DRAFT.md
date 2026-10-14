@@ -130,7 +130,73 @@ Independent examples:
 | 0x00000000 | 0xC0000000 | 0xDEADBEEF |
 | 0x00000001 | 0x00000001 | 0xDEAD9E6F |
 
-## 4. From this draft to measurable code
+## 4. Tiny LUMP size estimates — agreed planning basis
+
+The user agreed to record the following rough estimates. They are **not compiled
+measurements, approved memory reservations or approval of the proposed 100%
+growth allowance**. One word is four bytes; KiB means 1,024 bytes.
+
+Assumptions: Tiny carries no embedded source and only minimal required metadata.
+pkverify performs a small credential/proof check, not a full software public-key
+signature algorithm. This is a sizing assumption, not selection of its unresolved
+verification contract. Method/helper names remain provisional, not approved ABI.
+
+### ide.Mint
+
+Create and Replace share validation and publication code. Shared routines are
+counted once, not once per entry point.
+
+| Method / shared routine | Estimated words | Bytes |
+|---|---:|---:|
+| Create — empty-slot checks and request setup | 24 | 96 |
+| Replace — authorization path, expected-state and RESIDENT exclusion | 40 | 160 |
+| Shared authorization and verifier call | 64 | 256 |
+| Object, identity, type and permission validation | 56 | 224 |
+| Allocation, bounds and overlap checks | 32 | 128 |
+| Entry construction and integrity calculation | 16 | 64 |
+| Commit, exclusion and destination recheck | 48 | 192 |
+| Result, rejection and cleanup paths | 24 | 96 |
+| **Code subtotal** | **304** | **1,216** |
+| Header, dispatch, C-List, minimal metadata and local data allowance | 80 | 320 |
+| **Estimated payload** | **384** | **1,536** |
+| **Estimated power-of-two LUMP allocation** | **512** | **2,048 — 2 KiB** |
+
+### pkverify
+
+| Method / shared routine | Estimated words | Bytes |
+|---|---:|---:|
+| Verify entry and credential lookup | 24 | 96 |
+| Proof comparison and object/request binding | 48 | 192 |
+| Credential validity/revocation checks | 32 | 128 |
+| Result and private-scratch cleanup | 24 | 96 |
+| **Code subtotal** | **128** | **512** |
+| Header, dispatch, C-List, minimal metadata and local data allowance | 64 | 256 |
+| **Estimated payload** | **192** | **768** |
+| **Estimated power-of-two LUMP allocation** | **256** | **1,024 — 1 KiB** |
+
+### Combined budget
+
+| Item | Words | Bytes |
+|---|---:|---:|
+| Mint + pkverify estimated payload | 576 | 2,304 |
+| **Estimated allocated Tiny LUMPs** | **768** | **3,072 — 3 KiB** |
+| Existing 256-slot Namespace table | 1,024 | 4,096 — 4 KiB |
+| **Services plus table** | **1,792** | **7,168 — 7 KiB** |
+
+nstab RW accesses the existing table: it needs neither a third executable LUMP
+nor another table copy. Power-of-two rounding above is not an additional
+deliberate growth reservation.
+
+Use **3 KiB as the working service estimate**, with a rough **3–6 KiB combined
+service-LUMP range** while mechanisms are settled. This is not a guaranteed upper
+bound. Private credential storage, request buffers, Thread stacks and any separate
+networking service are additional. Full software cryptography or substantial
+replay/recovery machinery could exceed the range.
+
+All of these costs, together with the other Phase 1 objects, must fit within
+half the FPGA memory. No board-fit claim follows from these estimates.
+
+## 5. From this draft to measurable code
 
 Resolve the `UNRESOLVED_*` contracts one at a time, then translate into CLOOMC
 with an explicit C-List and preserved/clobbered register ABI. In particular,

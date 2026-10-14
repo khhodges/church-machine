@@ -242,3 +242,13 @@ not approval of that allowance.
 **How to apply:** Use the draft to expose remaining decisions and obtain actual
 sizing once compilable. Keep unresolved contracts explicit; drafting permission
 does not supersede the requirement to settle Mint's full scope in the Q&A.
+
+The user accepted the Tiny service sizing guesses as a planning basis, not
+measured sizes or reservations: 2 KiB Mint plus 1 KiB pkverify.
+
+**Why:** The user agreed to adding the estimates to the code draft after they
+were explicitly presented as conditional guesses with growth still undecided.
+
+**How to apply:** Preserve that distinction. The small-verifier assumption is
+not approval of a verification mechanism; compilation and the settled contract
+must determine actual size before allocation.
