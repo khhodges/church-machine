@@ -190,8 +190,9 @@ configuration identity/canonicalization still needs definition.
 guard18 = (slot1_version << 9) | slot2_version
 ```
 
-The IDE assigns one random 18-bit configuration value with independently
-chosen nine-bit halves: upper half in slot 1's existing version field, lower
+The IDE independently chooses each boot version uniformly from **0–510**,
+excluding reserved value 511, and packs the pair into 18 bits:
+upper half in slot 1's existing version field, lower
 half in slot 2's. Embed the expected pair in the bitstream. This replaces the
 earlier proposal to store identical full guard copies in separate boot metadata;
 no additional Namespace-entry guard fields are needed. Do not repeat the same
@@ -231,8 +232,10 @@ version requires a matching approved boot configuration and bitstream.
 Ordinary allocatable-slot initial/release/reuse rules are unchanged. Other
 Namespace handoffs retain their approved fixed version-0 rule.
 
-For independently generated unrelated pairs the accidental match probability
-is 1/262,144; if only one independently generated half differs, it is 1/512.
+There are **511 × 511 = 261,121** permitted pairs. For independently generated
+unrelated pairs the accidental match probability is **1/261,121**; when only
+one half is independently regenerated and the other is fixed, it is **1/511**.
+Packing remains 18 bits, but not every 18-bit pattern is a valid guard.
 This is not authentication or a content check. Retain all ordinary capability,
 integrity, version, type and frame checks. GT width, integrity32 and T meanings
 are unchanged.
@@ -349,8 +352,8 @@ slot rather than preventing destruction. Never reallocate a retired slot or
 reset its version. Retain usable release versions 1–510 with the Namespace
 slot, not the memory block; reallocation uses them without a second increment.
 Backing-memory reclamation remains subject to safe-release checks and is
-distinct from retiring the slot. The random boot-pair version exception still
-needs reconciliation with this reservation; no boot guard is changed here.
+distinct from retiring the slot. Boot-pair generation also excludes 511:
+choose each half from 0–510. This does not change existing boot artifacts here.
 Empty does not mean never-used. **Direct replacement's slot/version policy is
 software TBD**, not inferred from release. Track used/free blocks per LUMP
 size separately from slot/version availability; ownership, bookkeeping and

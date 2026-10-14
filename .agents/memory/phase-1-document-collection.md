@@ -394,7 +394,8 @@ Ordinary issued versions are 0–510; 511 means permanently retired.
 **How to apply:** Allow authorized Destroy at 510 to advance to 511. Never
 issue ordinary GTs at 511, reuse retired slots, reset or wrap their versions.
 Hardware never increments. Memory reclamation and target eligibility remain
-separate; the random boot-pair version exception needs explicit reconciliation.
+separate. The user reconciled boot-pair generation by excluding 511 from both
+independently chosen halves: each uses 0–510, yielding 261,121 packed pairs.
 
 Reallocation uses the Namespace slot's retained release version, without a
 second increment.

@@ -27,7 +27,9 @@ changes and normal runtime Namespace updates do not require a new value;
 a changed boot configuration requires matching bitstream and boot metadata.
 Use the approved special-case **18-bit concatenation of the existing versions**:
 `(slot1_version << 9) | slot2_version`. The IDE assigns the two independent
-nine-bit halves and embeds their expected pair in the bitstream. No separate
+nine-bit halves independently from 0–510, excluding 511, and embeds their
+expected pair in the bitstream. The 18-bit packing contains 261,121 permitted
+pairs, not all 262,144 bit patterns. No separate
 guard metadata copies are needed. GTs for the guarded boot objects use their
 assigned versions, including the hardwired entry GT; do not assume version zero
 for this pair or copy a live descriptor version to satisfy a check. Check slot 1

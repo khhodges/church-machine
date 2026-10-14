@@ -12,7 +12,10 @@ The proposed IDE-generated bitstream guards for slots 1 and 2 are for
 accidental boot-image mismatch detection, not secret authentication.
 Representation is the approved boot-only exception: concatenate the existing
 slot-1 and slot-2 nine-bit versions into an 18-bit guard, with independent
-random halves assigned by the IDE and expected values embedded in the bitstream.
+random halves assigned by the IDE from 0–510 only, excluding retired value 511,
+and expected values embedded in the bitstream. This yields 261,121 permitted
+pairs in 18-bit packing; uniform whole-pair match probability is 1/261,121,
+or 1/511 when only one half is independently regenerated.
 The guard identifies the approved slot-1/slot-2 boot configuration, not every
 image revision. Unrelated application edits and normal runtime Namespace
 updates must not force a new value; changed boot configuration does.

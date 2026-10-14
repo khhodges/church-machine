@@ -93,8 +93,9 @@ not executable implementations.
   Release increments before freeing; 510→511 destroys and retires the slot.
   Never wrap, reset or reallocate a retired slot. Retain usable versions with
   the slot and reuse without another increment. Memory reclamation remains
-  separate from slot retirement. The boot-pair version exception needs explicit
-  reconciliation. **Direct replacement's slot/version policy is software
+  separate from slot retirement. Boot-pair generation also excludes 511,
+  choosing each half independently from 0–510.
+  **Direct replacement's slot/version policy is software
   TBD**; do not infer same-slot/+1 approval. Release authority, bookkeeping and
   in-use safeguards still need definition.
 - Use ascending 256-slot starting geometry and **half the FPGA memory**.

@@ -41,8 +41,8 @@ in-use safeguards, update ordering and interruption handling still need definiti
 release version without another increment. Preserve this value across slot
 clearing; it belongs to the slot, not the memory block. Example: 7 → release to
 8 → reallocate using 8. A retained 511 is permanently retired, not allocatable.
-Retention representation remains open. Boot-pair random versions need separate
-reconciliation with the retirement reservation.
+Retention representation remains open. Boot-pair random versions also exclude
+511: choose each independently from 0–510.
 
 **Approved initial version:** The first allocation into a genuinely never-used
 Mint slot uses **0**. Existing/freed slots retain their history, even when empty.

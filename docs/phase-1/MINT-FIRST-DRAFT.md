@@ -218,8 +218,8 @@ to release a protected/in-use object.
 slot and use it for the next GT allocated into that slot; do not increment again
 or reset it when clearing the slot. Versions follow slots, not free memory
 blocks. Only retained versions 1–510 may be reallocated; 511 is permanently
-retired. Storage representation remains to be defined. The separate random
-boot-pair version exception needs reconciliation with this reservation.
+retired. Storage representation remains to be defined. The random boot-pair
+versions also exclude 511, each chosen independently from 0–510.
 
 **Approved initial version:** Use version **0** for the first allocation into
 a genuinely never-used Mint slot. Existing or previously freed slots retain
