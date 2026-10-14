@@ -1,0 +1,1168 @@
+{
+  "candidate": "exact-selected-artifacts",
+  "image_mode": "saved-prepared",
+  "image_sha256": "0ff1b24d76b7010c13b8b50737f4513a771b586be73b8d0fa80a748087070a5b",
+  "preserved_preparation": false,
+  "preparedEntries": [
+    {
+      "slot": 1,
+      "base": 16,
+      "cr0": 1241513994,
+      "indicator": 4337,
+      "enter": 1241513994,
+      "frame": 268431603
+    },
+    {
+      "slot": 11,
+      "base": 4368,
+      "cr0": 1241513994,
+      "indicator": 4335,
+      "enter": 1241513994,
+      "frame": 4337
+    },
+    {
+      "slot": 12,
+      "base": 4624,
+      "cr0": 1241513994,
+      "indicator": 4335,
+      "enter": 1241513994,
+      "frame": 4337
+    }
+  ],
+  "input_hashes": {
+    "server/lumps/SelfTest.1.8b19abd7.lump": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+    "server/lumps/CapabilityTest.1.68be391a.lump": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77",
+    "server/lumps/WukongCallHome.1.b29b38e3.lump": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
+    "server/boot-config.json": "626c2c001d24eea51ef9b8790670dadb9b6eadf305b3e0de86bfad411f4e7426",
+    "server/lumps/boot-image.bin": "0ff1b24d76b7010c13b8b50737f4513a771b586be73b8d0fa80a748087070a5b",
+    "server/lumps/boot-image.provenance.json": "1b9ad8ee2235baac889e587c6dde2fb93005f5f1ce3a6f2716f1010aec1cbb2d",
+    "server/lumps/approvals.json": "dcabe2381b2682b718f6731a2facdd5bc39c663667cab1b339d36e0c4fb066c8",
+    "server/lumps/manifest.json": "9a610448291c737e9ee190b6315057be4be3126cfa5a3c2d3cc33f83deee720f",
+    "server/lumps/ns-state.json": "c1f404f5a97b49ba2c54f3154b5f4eee3d6731011b7e2e25eb2605dbcc5346cd"
+  },
+  "admission_tested": false,
+  "selected": [
+    {
+      "name": "SelfTest",
+      "filename": "/home/runner/workspace/server/lumps/SelfTest.1.8b19abd7.lump",
+      "hash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de"
+    },
+    {
+      "name": "CapabilityTest",
+      "filename": "/home/runner/workspace/server/lumps/CapabilityTest.1.68be391a.lump",
+      "hash": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77"
+    },
+    {
+      "name": "WukongCallHome",
+      "filename": "/home/runner/workspace/server/lumps/WukongCallHome.1.b29b38e3.lump",
+      "hash": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af"
+    }
+  ],
+  "changes": [
+    {
+      "step": 19,
+      "thread": 1,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 0,
+        "sto": 241
+      }
+    },
+    {
+      "step": 40,
+      "thread": 11,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 21,
+        "sto": 241
+      }
+    },
+    {
+      "step": 466,
+      "thread": 11,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 21,
+        "sto": 241
+      }
+    },
+    {
+      "step": 892,
+      "thread": 11,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 21,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1318,
+      "thread": 11,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 21,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1744,
+      "thread": 11,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 21,
+        "sto": 241
+      }
+    }
+  ],
+  "calls": [
+    {
+      "step": 53,
+      "thread": 11,
+      "slot": 10,
+      "pc": 33,
+      "sto": 241,
+      "dr1": 42,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 6,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 385,
+      "thread": 11,
+      "slot": 10,
+      "pc": 34,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 479,
+      "thread": 11,
+      "slot": 10,
+      "pc": 33,
+      "sto": 241,
+      "dr1": 42,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 6,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 811,
+      "thread": 11,
+      "slot": 10,
+      "pc": 34,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 905,
+      "thread": 11,
+      "slot": 10,
+      "pc": 33,
+      "sto": 241,
+      "dr1": 42,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 6,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 1237,
+      "thread": 11,
+      "slot": 10,
+      "pc": 34,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 1331,
+      "thread": 11,
+      "slot": 10,
+      "pc": 33,
+      "sto": 241,
+      "dr1": 42,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 6,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 1663,
+      "thread": 11,
+      "slot": 10,
+      "pc": 34,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 1757,
+      "thread": 11,
+      "slot": 10,
+      "pc": 33,
+      "sto": 241,
+      "dr1": 42,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 6,
+        "pc": 1,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2089,
+      "thread": 11,
+      "slot": 10,
+      "pc": 34,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "CALL",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 1,
+        "sto": 239
+      }
+    }
+  ],
+  "returns": [
+    {
+      "step": 384,
+      "thread": 11,
+      "slot": 6,
+      "pc": 499,
+      "sto": 239,
+      "dr1": 0,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 34,
+        "sto": 241
+      }
+    },
+    {
+      "step": 445,
+      "thread": 11,
+      "slot": 7,
+      "pc": 60,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 35,
+        "sto": 241
+      }
+    },
+    {
+      "step": 810,
+      "thread": 11,
+      "slot": 6,
+      "pc": 499,
+      "sto": 239,
+      "dr1": 0,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 34,
+        "sto": 241
+      }
+    },
+    {
+      "step": 871,
+      "thread": 11,
+      "slot": 7,
+      "pc": 60,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 35,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1236,
+      "thread": 11,
+      "slot": 6,
+      "pc": 499,
+      "sto": 239,
+      "dr1": 0,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 34,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1297,
+      "thread": 11,
+      "slot": 7,
+      "pc": 60,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 35,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1662,
+      "thread": 11,
+      "slot": 6,
+      "pc": 499,
+      "sto": 239,
+      "dr1": 0,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 34,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1723,
+      "thread": 11,
+      "slot": 7,
+      "pc": 60,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 35,
+        "sto": 241
+      }
+    },
+    {
+      "step": 2088,
+      "thread": 11,
+      "slot": 6,
+      "pc": 499,
+      "sto": 239,
+      "dr1": 0,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 34,
+        "sto": 241
+      }
+    },
+    {
+      "step": 2149,
+      "thread": 11,
+      "slot": 7,
+      "pc": 60,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 35,
+        "sto": 241
+      }
+    }
+  ],
+  "faults": [],
+  "trace_start": [
+    {
+      "step": 0,
+      "thread": 1,
+      "slot": 10,
+      "pc": 1,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 2,
+        "sto": 241
+      }
+    },
+    {
+      "step": 1,
+      "thread": 1,
+      "slot": 10,
+      "pc": 2,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 3,
+        "sto": 241
+      }
+    },
+    {
+      "step": 2,
+      "thread": 1,
+      "slot": 10,
+      "pc": 3,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 4,
+        "sto": 241
+      }
+    },
+    {
+      "step": 3,
+      "thread": 1,
+      "slot": 10,
+      "pc": 4,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 5,
+        "sto": 241
+      }
+    },
+    {
+      "step": 4,
+      "thread": 1,
+      "slot": 10,
+      "pc": 5,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 6,
+        "sto": 241
+      }
+    },
+    {
+      "step": 5,
+      "thread": 1,
+      "slot": 10,
+      "pc": 6,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 7,
+        "sto": 241
+      }
+    },
+    {
+      "step": 6,
+      "thread": 1,
+      "slot": 10,
+      "pc": 7,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 8,
+        "sto": 241
+      }
+    },
+    {
+      "step": 7,
+      "thread": 1,
+      "slot": 10,
+      "pc": 8,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 9,
+        "sto": 241
+      }
+    },
+    {
+      "step": 8,
+      "thread": 1,
+      "slot": 10,
+      "pc": 9,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 10,
+        "sto": 241
+      }
+    },
+    {
+      "step": 9,
+      "thread": 1,
+      "slot": 10,
+      "pc": 10,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 11,
+        "sto": 241
+      }
+    },
+    {
+      "step": 10,
+      "thread": 1,
+      "slot": 10,
+      "pc": 11,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 12,
+        "sto": 241
+      }
+    },
+    {
+      "step": 11,
+      "thread": 1,
+      "slot": 10,
+      "pc": 12,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 13,
+        "sto": 241
+      }
+    },
+    {
+      "step": 12,
+      "thread": 1,
+      "slot": 10,
+      "pc": 13,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 14,
+        "sto": 241
+      }
+    },
+    {
+      "step": 13,
+      "thread": 1,
+      "slot": 10,
+      "pc": 14,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 15,
+        "sto": 241
+      }
+    },
+    {
+      "step": 14,
+      "thread": 1,
+      "slot": 10,
+      "pc": 15,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 16,
+        "sto": 241
+      }
+    },
+    {
+      "step": 15,
+      "thread": 1,
+      "slot": 10,
+      "pc": 16,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "ISUB",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 17,
+        "sto": 241
+      }
+    },
+    {
+      "step": 16,
+      "thread": 1,
+      "slot": 10,
+      "pc": 17,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "IADD",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 18,
+        "sto": 241
+      }
+    },
+    {
+      "step": 17,
+      "thread": 1,
+      "slot": 10,
+      "pc": 18,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "DWRITE",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 19,
+        "sto": 241
+      }
+    },
+    {
+      "step": 18,
+      "thread": 1,
+      "slot": 10,
+      "pc": 19,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "SWITCH",
+      "post": {
+        "thread": 1,
+        "slot": 10,
+        "pc": 20,
+        "sto": 241
+      }
+    },
+    {
+      "step": 19,
+      "thread": 1,
+      "slot": 10,
+      "pc": 20,
+      "sto": 241,
+      "dr1": 8192,
+      "instruction": "CHANGE",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 0,
+        "sto": 241
+      }
+    },
+    {
+      "step": 20,
+      "thread": 11,
+      "slot": 10,
+      "pc": 0,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 1,
+        "sto": 241
+      }
+    },
+    {
+      "step": 21,
+      "thread": 11,
+      "slot": 10,
+      "pc": 1,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 2,
+        "sto": 241
+      }
+    },
+    {
+      "step": 22,
+      "thread": 11,
+      "slot": 10,
+      "pc": 2,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 3,
+        "sto": 241
+      }
+    },
+    {
+      "step": 23,
+      "thread": 11,
+      "slot": 10,
+      "pc": 3,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 4,
+        "sto": 241
+      }
+    },
+    {
+      "step": 24,
+      "thread": 11,
+      "slot": 10,
+      "pc": 4,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 5,
+        "sto": 241
+      }
+    },
+    {
+      "step": 25,
+      "thread": 11,
+      "slot": 10,
+      "pc": 5,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 6,
+        "sto": 241
+      }
+    },
+    {
+      "step": 26,
+      "thread": 11,
+      "slot": 10,
+      "pc": 6,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "LOAD",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 7,
+        "sto": 241
+      }
+    },
+    {
+      "step": 27,
+      "thread": 11,
+      "slot": 10,
+      "pc": 7,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 8,
+        "sto": 241
+      }
+    },
+    {
+      "step": 28,
+      "thread": 11,
+      "slot": 10,
+      "pc": 8,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 9,
+        "sto": 241
+      }
+    },
+    {
+      "step": 29,
+      "thread": 11,
+      "slot": 10,
+      "pc": 9,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 10,
+        "sto": 241
+      }
+    },
+    {
+      "step": 30,
+      "thread": 11,
+      "slot": 10,
+      "pc": 10,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 11,
+        "sto": 241
+      }
+    },
+    {
+      "step": 31,
+      "thread": 11,
+      "slot": 10,
+      "pc": 11,
+      "sto": 241,
+      "dr1": 0,
+      "instruction": "TPERM",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 12,
+        "sto": 241
+      }
+    }
+  ],
+  "trace_tail": [
+    {
+      "step": 2135,
+      "thread": 11,
+      "slot": 7,
+      "pc": 46,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "DWRITE",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 47,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2136,
+      "thread": 11,
+      "slot": 7,
+      "pc": 47,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "DREAD",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 48,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2137,
+      "thread": 11,
+      "slot": 7,
+      "pc": 48,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "ISUB",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 49,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2138,
+      "thread": 11,
+      "slot": 7,
+      "pc": 49,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "BRANCH",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 50,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2139,
+      "thread": 11,
+      "slot": 7,
+      "pc": 50,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "IADD",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 51,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2140,
+      "thread": 11,
+      "slot": 7,
+      "pc": 51,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "DWRITE",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 52,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2141,
+      "thread": 11,
+      "slot": 7,
+      "pc": 52,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "DREAD",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 53,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2142,
+      "thread": 11,
+      "slot": 7,
+      "pc": 53,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "ISUB",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 54,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2143,
+      "thread": 11,
+      "slot": 7,
+      "pc": 54,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "BRANCH",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 55,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2144,
+      "thread": 11,
+      "slot": 7,
+      "pc": 55,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "IADD",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 56,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2145,
+      "thread": 11,
+      "slot": 7,
+      "pc": 56,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "DWRITE",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 57,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2146,
+      "thread": 11,
+      "slot": 7,
+      "pc": 57,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "DREAD",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 58,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2147,
+      "thread": 11,
+      "slot": 7,
+      "pc": 58,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "ISUB",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 59,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2148,
+      "thread": 11,
+      "slot": 7,
+      "pc": 59,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "BRANCH",
+      "post": {
+        "thread": 11,
+        "slot": 7,
+        "pc": 60,
+        "sto": 239
+      }
+    },
+    {
+      "step": 2149,
+      "thread": 11,
+      "slot": 7,
+      "pc": 60,
+      "sto": 239,
+      "dr1": 1,
+      "instruction": "RETURN",
+      "post": {
+        "thread": 11,
+        "slot": 10,
+        "pc": 35,
+        "sto": 241
+      }
+    }
+  ],
+  "status": "passed"
+}

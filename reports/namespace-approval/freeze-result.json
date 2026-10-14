@@ -1,0 +1,7 @@
+{
+  "status": 409,
+  "response": {
+    "error": "Generated Verilog provenance does not bind the exact frozen Namespace image and source commit; regenerate and review provenance before approval.",
+    "ok": false
+  }
+}

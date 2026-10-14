@@ -8,6 +8,7 @@ submitting it again through the real save endpoint must be idempotent.
 
 import base64
 import hashlib
+import inspect
 import json
 import os
 import shutil
@@ -109,6 +110,11 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
     }
     for name, value in paths.items():
         monkeypatch.setattr(app_module, name, value)
+    hook = next(h for h in app_module.app.before_request_funcs[None]
+                if h.__name__ == "review")
+    store = inspect.getclosurevars(hook).nonlocals["store"]
+    private_store = type(store)(tmp_path / "reviews.sqlite")
+    monkeypatch.setattr(store, "path", private_store.path)
 
     state_path = private_lumps / "ns-state.json"
     fixture_state = json.loads(state_path.read_text(encoding="utf-8"))
@@ -255,3 +261,9 @@ def test_two_unchanged_namespace_saves_preserve_identity_and_projected_layout(
             app_module._capture_committed_namespace_snapshot()
         assert state_path.read_bytes() == before_rejection
         assert (private_lumps / "boot-image.bin").read_bytes() == prepared_bytes
+
+    # Raw-only publication must invalidate even an otherwise valid binding.
+    state_path.write_text(json.dumps(prepared_state))
+    app_module._write_boot_image_bytes(prepared_bytes)
+    with pytest.raises(ValueError, match="not bound to a raw table revision"):
+        app_module._freeze_namespace_revision("must-reject-raw-only")

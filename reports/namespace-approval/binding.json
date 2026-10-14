@@ -1,0 +1,18 @@
+{
+  "image_sha256": "0ff1b24d76b7010c13b8b50737f4513a771b586be73b8d0fa80a748087070a5b",
+  "namespace_fingerprint": "83b6eb8a6e2cf4323538f21db08d8f2dde32c2b2c2693a742265d0f51e55e2f7",
+  "raw_fingerprint": "9544f696da646c61d5c9840c9d4aba7f68dbd866563075069f6e38b7494fa117",
+  "protected_inputs": {
+    "/home/runner/workspace/server/boot-config.json": "626c2c001d24eea51ef9b8790670dadb9b6eadf305b3e0de86bfad411f4e7426",
+    "/home/runner/workspace/server/lumps/manifest.json": "9a610448291c737e9ee190b6315057be4be3126cfa5a3c2d3cc33f83deee720f",
+    "/home/runner/workspace/server/lumps/SelfTest.1.8b19abd7.lump": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+    "/home/runner/workspace/server/lumps/WukongCallHome.1.b29b38e3.lump": "912eb704c1eedb125de02f00403c425f5fe0d10c7768038be5c06bf6961612af",
+    "/home/runner/workspace/server/lumps/CapabilityTest.1.68be391a.lump": "210e01b002004bc1bdbc7a01d2caa0337aae12eb54b1c13d1fcd7c914fe74a77"
+  },
+  "unchanged_image": true,
+  "unchanged_selections": true,
+  "empty_slots": [
+    8,
+    9
+  ]
+}

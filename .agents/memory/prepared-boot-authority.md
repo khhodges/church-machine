@@ -79,6 +79,16 @@ stays null rather than becoming Namespace slot zero.
 Commit provenance only after all authoritative config/Namespace inputs have
 reached their final transaction state.
 
+Paired preparation publication must bind decoded metadata to the newly staged
+raw image and retain that binding when finalizing provenance. Raw-only writers
+must still invalidate decoded bindings.
+
+**Why:** Preparation previously used the raw-only invalidation path after
+writing metadata, leaving runnable images ineligible for approval capture.
+
+**How to apply:** Test preparation followed by immutable approval capture as
+one transaction, including rejection after a subsequent raw-only publication.
+
 **Why:** A successful multi-file image save can immediately invalidate itself
 when provenance or freshness timestamps describe the pre-save Namespace.
 
