@@ -97,6 +97,10 @@ start a fresh second rather than restoring a partially spent interval.
 Hard Fault unless in IDE debug or IDE Trace mode.” They then explicitly selected
 every successful CHANGE/SWITCH as the renewal event.
 They also explicitly selected a fresh second on return from Debug/Trace.
+They approved arming when execution starts after reset (including boot, except
+in the exempt IDE modes), elapsed-time rather than instruction-count timing,
+and expiry winning at exactly one second. A transfer must complete strictly
+before the deadline to renew it.
 
 **How to apply:** Preserve the duration, exceptions and transfer-based renewal.
 Do not introduce scheduler-only renewal, or claim this guarantees useful progress
