@@ -8,6 +8,14 @@ Thread and initial CR15 authority are hardwired. Trust the IDE builder and
 the seals without introducing a new W3 cold-boot seal or waiving applicable
 Church checks.
 
+Reloading CR15 requires activation of the incoming Namespace's slot-2 Thread
+under the same authority, with no second Thread-activation grant. SWITCH's
+CR15.M covers both; reset retains authorized bootstrap and its marker sequence.
+Thread validation remains mandatory. This does not settle reset GT version.
+
+**Why:** The user explicitly tied required slot-2 activation to the authority
+that reloads CR15, rather than an independently authorized operation.
+
 The user subsequently approved exact reset marker 0x27000001: one-shot per
 reset at the designated trusted reset-ROM instruction, incoming-only activation
 of Namespace slot 2 into CR12. Outside authorized reset context it is INVALID_OP;

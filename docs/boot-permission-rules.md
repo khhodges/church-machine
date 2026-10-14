@@ -18,6 +18,12 @@
 > ordinary M-bit rules and Thread validation remain unchanged.
 > No additional ROM CALL is introduced for CHANGE or SWITCH.
 
+For Phase 1, authority to establish/reload CR15 also authorizes the required
+slot-2 Thread activation into CR12. Reset uses its authorized bootstrap context
+and approved one-shot marker; no separate Thread-activation grant is requested.
+This does not waive Thread validation, alter the reset instruction sequence,
+or independently select the reset entry GT's version.
+
 > **Status:** Current architecture rule summary, backed by implementation and
 > executable tests for specific paths; not a formal proof of isolation. Wukong A7
 > is the current hardware target. The similarly named file under `docs/archive/`

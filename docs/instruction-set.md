@@ -64,6 +64,18 @@ direct layout below; SWITCH's destination field is also settled below.
 The SWITCH row encoding and reset-only marker are now selected below;
 the remaining reset authority and entry-sequencing decisions stay separate.
 
+**Shared Namespace/entry-Thread authority — approved:** If CR15 is reloaded,
+the incoming Namespace's slot-2 Thread must also be activated into CR12 by
+the **same authority**. There is no independently requested Thread-activation
+grant or extra CR12.M requirement. For SWITCH, CR15.M authorizes the combined
+Namespace/Thread handoff; during reset, authorized bootstrap context covers
+Namespace establishment and the reset marker's incoming Thread activation.
+The approved reset instruction sequence and one-shot admission remain intact;
+this rule does not silently collapse reset into one instruction.
+Thread type, version, capability and frame validation still apply; any failure
+hard-faults rather than accepting a Namespace-only handoff. No rollback is
+promised. This authority decision does not select the reset entry GT's version.
+
 **SWITCH source — approved:** Retain the authorized C-List row lookup.
 CRs in CR0–CR11 supplies an L-capable C-List capability; the selected row
 supplies the incoming Namespace GT after ordinary bounds, generation,

@@ -2,6 +2,13 @@
 
 ## Contract
 
+**Same authority for both halves:** Reloading CR15 requires activation of the
+incoming Namespace's slot-2 Thread into CR12 under that same authority.
+CR15.M authorizes the combined SWITCH handoff, not just the Namespace load;
+no separate CR12.M or second Thread-activation authorization is required.
+All incoming Thread checks remain mandatory and failure hard-faults, without
+promised rollback. A Namespace-only transition is not a completed handoff.
+
 **Phase 1 fixed destinations — approved:** SWITCH loads the destination
 Namespace into CR15 and then activates its slot-2 Thread into CR12. Ordinary
 `CHANGE CRn` instead selects its incoming Thread GT from CRn and activates
