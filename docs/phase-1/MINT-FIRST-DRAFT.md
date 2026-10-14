@@ -109,6 +109,14 @@ proofs and private authority; diagnostic delivery must not gate faulting.
 The record fields, ABI, transport and implementation mechanism remain unresolved,
 not new ISA or hardware requirements inferred from this design discussion.
 
+**Agreed starting design:** compiler pseudo-instruction `HARDFAULT reason`,
+with an exact-artifact IDE fault map from instruction offset to reason, method,
+source line and explanation. Start with static diagnostics only, no runtime
+reporting CALL or diagnostic scratch registers. Tiny LUMPs need not carry
+explanatory strings. If no matching map exists, show the raw fault location.
+The actual non-returning machine-code sequence and reliable capture of its
+fault location still require verification; no new opcode or HALT substitution.
+
 ## 4. Growth headroom — proposal pending
 
 **User direction:** Draft the code first. The 100% growth-headroom proposal

@@ -43,6 +43,9 @@ fault:
     ; Must use the standard non-returning hard-fault path with structured
     ; IDE diagnostics. Record format/ABI TBD; no proof/private authority data.
     ; Failure to deliver diagnostics must not prevent the hard fault.
+    ; Agreed future syntax: HARDFAULT <reason>, mapped by exact artifact/offset.
+    ; Preserve distinct failure reasons at their sites when lowering is defined.
+    ; Current compiler support is absent; retain the blocker below.
     ; Do not replace with HALT, RETURN, retry or rollback.
     BRANCH TODO_NONRETURNING_HARD_FAULT
 }

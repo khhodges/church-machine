@@ -41,3 +41,15 @@ pkverify's draft fault paths.
 ad hoc method-specific mechanisms. Keep proof material and private authority out
 of diagnostics; reporting failure must not prevent faulting. Exact fields,
 ABI and transport are not yet approved; do not infer a new opcode or recovery.
+
+The user approved `HARDFAULT reason` as the starting compiler design: a
+pseudo-instruction with an exact-artifact static IDE fault map.
+
+**Why:** This permits consistent compiler-generated diagnostics without runtime
+message construction, reporting calls, extra diagnostic registers or secrets.
+
+**How to apply:** Map instruction offsets to reason/method/source/explanation.
+Use the exact loaded artifact identity; missing maps show raw locations, not
+guessed labels. Keep strings outside Tiny LUMPs if appropriate. Static data
+only initially. Verify a non-returning lowering and pre-recovery fault-location
+capture before implementation; neither HALT nor a new opcode is approved.

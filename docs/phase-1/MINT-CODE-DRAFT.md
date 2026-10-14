@@ -59,12 +59,34 @@ diagnostic data for the IDE, rather than unrelated ad hoc fault paths per method
 Reporting must not expose proof material or private authority, and failure to
 deliver diagnostics must not prevent the hard fault.
 
-Proposed diagnostic content for subsequent agreement: stable reason code,
-originating LUMP/method and instruction location, operation/stage, and permitted
-nonsecret context. These are candidate fields, not an approved record format.
-Record layout, calling convention, transport, capture ordering and exact
-software/hardware support remain to be defined. No new opcode or fault encoding
-is approved by this requirement, and no rollback or continuation is implied.
+**Agreed starting design:** `HARDFAULT reason` is a compiler pseudo-instruction,
+not a new hardware opcode. At each site the compiler emits a non-returning
+hard-fault sequence and an IDE-readable fault-map entry, tied to the **exact
+compiled artifact**:
+
+```text
+instruction offset → reason, method, source line, explanation
+```
+
+For example, intended source syntax (not yet supported by the compiler):
+
+```text
+bad_passkey:
+    HARDFAULT PASSKEY_MISMATCH
+```
+
+The IDE resolves the captured fault location against the loaded artifact's
+matching map. Without the exact map, show the raw fault location rather than
+guessing. Start with **static diagnostics only**; dynamic values and register
+dumps are not part of this agreement. Keep explanatory strings in the IDE map,
+not necessarily in Tiny LUMPs. There is no runtime message construction,
+reporting CALL, network dependency or diagnostic scratch-register requirement
+in this basic design. Compiler-generated checks may use the same construct.
+
+The exact lowering sequence and preservation of an identifiable fault location
+before recovery changes state must be verified against the ISA and target.
+`HALT` is not a substitute. Map serialization, capture/transport details and
+implementation remain open. No rollback or continuation is implied.
 
 ```text
 Mint(request, credential):

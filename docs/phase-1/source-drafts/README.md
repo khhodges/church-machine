@@ -30,6 +30,10 @@ mechanism, with real hard-fault paths on failed checks.
   Use a standard non-returning path with structured IDE diagnostics; fields,
   ABI and transport remain TBD. No secrets in the record, and no dependency on
   IDE availability for the hard fault itself.
+  The agreed starting design is `HARDFAULT reason` plus an exact-artifact
+  static fault map for the IDE. This pseudo-instruction is not implemented yet;
+  retain the source blockers until its non-returning lowering and captured
+  fault location are verified. No HALT substitution or guessed artifact map.
 
 The current assembler accepts `LAMBDA CRn`; the current ISA document places
 its detailed description in the history document. These drafts follow the
