@@ -327,3 +327,13 @@ and excluded GC from Phase 1.
 GC path. In Phase 2, hardware may invert G only with the system GC setting
 enabled; the setting's location and how it is set remain open. Preserve the
 separate agreed TPERM NULL/EXACT rules. This does not settle lazy loading.
+
+Phase 1 requires used/free allocation tracking per LUMP size class.
+
+**Why:** The user identified the need for size-specific pools after distinguishing
+slot/version combinations from actual memory available for Mint creation.
+
+**How to apply:** Keep memory-block availability separate from Namespace slots
+and generations. This is explicit management, not GC; pool ownership, release,
+reuse and sizing remain open. Do not infer splitting/coalescing, generation
+wrap or RESIDENT reclamation. Budget pool bookkeeping within Phase 1 memory.

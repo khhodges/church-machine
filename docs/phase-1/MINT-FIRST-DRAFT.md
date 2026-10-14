@@ -132,6 +132,13 @@ fault location still require verification; no new opcode or HALT substitution.
 
 ## 4. Growth headroom — proposal pending
 
+**Allocation requirement:** Track used and free memory blocks per LUMP size
+class in Phase 1, independently of Namespace-slot availability and generations.
+This is explicit allocation management, not GC. Define pool ownership, initial
+sizes, authorized release, safe reuse and exhaustion behavior in the remaining
+contract; no splitting/coalescing or RESIDENT reclamation is implicitly approved.
+Pool memory and bookkeeping must fit the approved half-FPGA-memory budget.
+
 **User direction:** Draft the code first. The 100% growth-headroom proposal
 below was not approved. The [code draft](MINT-CODE-DRAFT.md) exposes the proposed
 control flow and unresolved mechanisms; it is not an executable or size estimate.

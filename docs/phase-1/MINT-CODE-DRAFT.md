@@ -21,6 +21,13 @@ GC-enable setting; its location and control are Phase 2 open issues. Do not
 add GC or automatic stale/garbage-GT nulling to these drafts. The agreed
 TPERM NULL/EXACT behavior remains separate.
 
+**Allocation requirement:** Phase 1 uses used/free memory-block tracking per
+LUMP size class. Namespace-slot availability and generation tracking are
+separate. Pool representation/ownership, initial sizing and authorized safe
+release/reuse remain unresolved; this does not introduce GC or permit RESIDENT
+reclamation. Include pool bookkeeping in the half-memory budget; the earlier
+Tiny service estimates do not separately cost it.
+
 ## 1. ide.Mint
 
 The shared entry below represents both approved operations. Whether the public
