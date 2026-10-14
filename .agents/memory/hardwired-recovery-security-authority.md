@@ -22,12 +22,14 @@ resets reuse it; bitstream builds alone never regenerate it. Storage schema
 and detailed configuration identity/provisioning mechanics remain undecided.
 For a CR0-only startup-selection change, an IDE setting chooses retaining
 the guard or requiring a new guard and matching bitstream through explicit
-changed-configuration approval. Default and setting scope remain undecided.
+changed-configuration approval. The approved default is retain the existing
+guard; new-guard mode remains explicit. Setting scope/persistence remain undecided.
 Both modes retain normal CALL validation and guard checks; neither grants
 hardware permission to change versions.
 
 **Why:** The user said “Make it an IDE setting option” rather than selecting
-a universal guard policy for startup-program changes.
+a universal guard policy for startup-program changes, then selected retaining
+the existing guard as the default.
 
 This replaces identical full-value metadata copies. Referencing GTs use the
 assigned versions; reset/handoff into this boot pair uses the embedded expected
