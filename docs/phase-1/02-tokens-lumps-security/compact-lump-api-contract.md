@@ -1,0 +1,1 @@
+../../compact-lump-api-contract.md

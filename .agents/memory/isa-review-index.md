@@ -12,3 +12,4 @@ description: User decisions on scope, compatibility, encoding validation and fau
 - [Bitfield widths](bitfield-width-decision.md): widths 1–31; zero is invalid, not a width-32 alias.
 - [Indexed operand intent](register-indexed-load-intent.md): runtime DR value plus immediate applies uniformly to indexed instructions.
 - [CHANGE access](change-programmer-access.md): CHANGE is not protected; do not block CR13–CR15 while exempting CR12.
+- [Phase 1 documents](phase-1-document-collection.md): keep an ISA-first shared collection without competing copies or implied approvals.

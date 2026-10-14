@@ -1,0 +1,1 @@
+../../namespace-plan-contract.md
