@@ -68,6 +68,13 @@ required right fails closed without changing M.
 
 ## Operation lifecycle
 
+For the guarded boot pair, check the bitstream-expected slot-1 version during
+Namespace admission and slot-2 version during Thread admission before
+activation. CR15 may already have changed when the second check fails.
+Hard-fault without rollback; the target Thread must not activate or run.
+Both matches are required for completed handoff, but the guard does not
+require an additional both-before-CR15 preflight pass.
+
 Successful combined `SWITCH CR15` never loads, restores or clears CR13.
 No IRQ Thread is installed in Phase 1. Ordinary CHANGE leaves CR15 unchanged.
 

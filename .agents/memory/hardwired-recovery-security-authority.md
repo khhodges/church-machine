@@ -19,7 +19,10 @@ updates must not force a new value; changed boot configuration does.
 This replaces identical full-value metadata copies. Referencing GTs use the
 assigned versions; reset/handoff into this boot pair uses the embedded expected
 slot-2 version, not mandatory zero or a version copied from live state. Other
-Namespace/version policies remain unchanged. Check timing/provisioning remain open.
+Namespace/version policies remain unchanged. Check slot 1 at Namespace admission
+and slot 2 at Thread admission before activation. CR15 may already have changed
+on second-stage failure; hard-fault without rollback or target activation.
+No extra both-before-CR15 preflight is required. Provisioning remains open.
 
 **Why:** The user explicitly selected accidental wrong-image loading as the
 threat to address, rather than deliberate unauthorized substitution, and chose

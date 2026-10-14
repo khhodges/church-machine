@@ -30,8 +30,11 @@ Use the approved special-case **18-bit concatenation of the existing versions**:
 nine-bit halves and embeds their expected pair in the bitstream. No separate
 guard metadata copies are needed. GTs for the guarded boot objects use their
 assigned versions, including the hardwired entry GT; do not assume version zero
-for this pair or copy a live descriptor version to satisfy a check. Other slot
-policies remain unchanged. Exact check timing and provisioning remain TBD.
+for this pair or copy a live descriptor version to satisfy a check. Check slot 1
+during Namespace admission, then slot 2 during Thread admission before activation.
+A second-stage failure may leave CR15 changed: hard-fault without rollback and
+do not activate the target Thread. Other slot policies remain unchanged.
+Configuration identity and generation/provisioning remain TBD.
 **CONFIDENTIAL**
 
 The Boot ROM and RAM are defined by the FPGA bitstream used to flash the FPGA. It is defined by the IDE under program control, size is defined in words (4 bytes each). The ROM is read-only instruction memory, carried from the IDE to the FPGA in `hardware/boot_rom.py` and instantiated as the `BootRom` class with the following three CLOOMC boot instructions: LOAD CR15, CHANGE that suspends the current thread and starts Boot.Thread, and CALL CR0, the programmer-selected lightning bolt slot in the IDE-defined namespace as Lazy Load.
