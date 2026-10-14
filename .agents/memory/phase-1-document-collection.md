@@ -34,3 +34,14 @@ than a batch of inferred architectural approvals.
 obtain the user's decision, and update its resolution before moving on.
 Keep proposed decisions distinct from approved ones and from implementation
 or hardware authorization.
+
+The user confirmed the new Phase 1 Namespace slot assignment: metadata at 0,
+Namespace self-entry at 1, and entry Thread at 2 for both reset boot and
+Namespace handoff.
+
+**Why:** This explicitly settles the review's reset-versus-handoff ambiguity;
+the repeated “slot 1” in the initial comment was clarified by the user.
+
+**How to apply:** Use this approved assignment when reconciling the Phase 1
+documents. It does not authorize migrating existing images or settle other
+reset instruction/authority questions.
