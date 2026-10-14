@@ -262,3 +262,13 @@ explicit code-access and single-slot boundary.
 **How to apply:** Keep NSRW-GT references inside that LAMBDA, not surrounding
 Mint code or pkverify. Do not turn it into a separate LUMP, infer capability
 provisioning or treat single-slot access as proof of atomicity or fault safety.
+
+Mint creates a passkey-GT and shares it as permitted by the design structure,
+TBD as a list of approved GTs.
+
+**Why:** The user supplied this authority model instead of selecting the proposed
+IDE-only versus explicitly authorized CM-caller alternatives.
+
+**How to apply:** Preserve Mint's creation/sharing responsibility. Do not invent
+the list, its owner or issuance/bootstrap/onward-sharing rules. Do not equate
+passkey possession with NSRW-GT access or silently settle pkverify's proof ABI.

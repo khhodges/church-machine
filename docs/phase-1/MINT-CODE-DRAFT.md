@@ -116,13 +116,40 @@ cannot override it with stronger authorization or available growth space.
 The commit boundary must preserve that rule against destination changes after
 the initial read. This draft supplies no automatic retry or rollback strategy.
 
-## 2. pkverify
+## 2. Passkey-GT creation/sharing and pkverify
+
+**Approved:** Mint creates a **passkey-GT** and shares it as permitted by the
+design structure, to be defined as a **list of approved GTs**. This is the
+selected authority direction, not an IDE-only or unrestricted-CM caller rule.
+The list's membership, ownership, representation and enforcement remain TBD.
+Do not invent approved entries or infer that possessing Mint's E capability
+alone permits receiving or further sharing the passkey-GT.
+
+The following symbolic outline records Mint's additional responsibility.
+It does not select a public method name, register ABI, first-issuance authority
+or token/proof format. All failed checks hard-fault.
+
+```text
+# Mint responsibility; exact callable interface TBD.
+Mint_create_and_share_passkey(request):
+    policy = UNRESOLVED_GET_DESIGN_APPROVED_GT_LIST()
+    UNRESOLVED_REQUIRE_ISSUANCE_AND_SHARING_PERMITTED(request, policy)
+    passkey_gt = UNRESOLVED_CREATE_PASSKEY_GT(request, policy)
+    UNRESOLVED_SHARE_ONLY_AS_DESIGN_PERMITS(passkey_gt, request, policy)
+    return UNRESOLVED_SUCCESS_WITHOUT_PRIVATE_STATE()
+```
+
+Any Namespace access requiring NSRW-GT remains confined to Mint's same-scope,
+single-slot LAMBDA. This decision does not settle pkverify's proof contract,
+credential storage, revocation, replay, onward sharing or bootstrap issuance.
+It does not equate the passkey-GT with NSRW-GT or grant the recipient table RW.
 
 ```text
 pkverify(credential, frozen_request):
     result = NOT_VERIFIED
 
-    # Credential issuance, private storage and proof transport remain undecided.
+    # Mint creates/shares the passkey-GT under the design-approved GT list.
+    # Issuance mechanics, private storage and proof transport remain undecided.
     trusted = UNRESOLVED_GET_PRIVATE_VERIFICATION_STATE(credential)
     UNRESOLVED_CHECK_CREDENTIAL_BINDING_AND_REVOCATION(trusted, credential)
     UNRESOLVED_VERIFY_REQUIRED_PROOF(trusted, credential, frozen_request)
@@ -227,6 +254,10 @@ replay/recovery machinery could exceed the range.
 
 All of these costs, together with the other Phase 1 objects, must fit within
 half the FPGA memory. No board-fit claim follows from these estimates.
+
+The subsequent passkey-GT creation/sharing decision has not been separately
+costed in this table. Retain the agreed figures as the earlier planning baseline,
+not proof that the additional issuance/list-enforcement code fits those sizes.
 
 ## 5. From this draft to measurable code
 

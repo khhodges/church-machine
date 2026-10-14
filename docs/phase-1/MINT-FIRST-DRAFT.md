@@ -60,7 +60,14 @@ reloadability cannot be justified through Mint replacement in that case.
 Hardware only checks generation equality; software owns generation management.
 No wrap/reuse policy is inferred.
 
-## 3. Service separation — LAMBDA boundary approved; other details pending
+## 3. Service separation — LAMBDA and passkey direction approved; details pending
+
+**Passkey-GT direction — approved:** Mint creates the passkey-GT and shares it
+as Mint is permitted by the design structure, TBD as a **list of approved GTs**.
+List membership, ownership, representation, enforcement and issuance/sharing
+mechanics remain unresolved. Do not infer IDE-only access, unrestricted CM
+access, onward-sharing permission or NSRW-GT delegation. The pkverify proof
+contract remains open; GT equality alone is not implicitly approved as proof.
 
 **Approved:** Mint uses a **same-scope LAMBDA** as the only code referencing
 `NSRW-GT`, accessing **one Namespace slot at a time**. Surrounding Mint code and
