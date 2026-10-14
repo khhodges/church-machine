@@ -1982,6 +1982,7 @@ function _renderSavedLumpWordUsage(panel, savedWords) {
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection, savedWords) {
     window._faultNavigationBinary = savedWords
         ? { token: lookupToken, words: Array.from(savedWords),
+            hardfaultMap: lump && lump.hardfault_map,
             binaryHash: lump && lump.binary_hash, filename: lump && lump.filename } : null;
     window._savedLumpEditorMode = true;
     window._compiledCandidateEditorMode = false;
@@ -2026,6 +2027,9 @@ function _setDisassemblyPresentationStatus(message) {
 // disassembly: method dispatch words and comments make that mapping lossy.
 function _revealFaultInstruction(token, offset, rawWord, evidence) {
     const binary = window._faultNavigationBinary;
+    // Each invocation invalidates pending async attribution, including failures.
+    const reasonRequest = {};
+    window._faultReasonRequest = reasonRequest;
     const output = document.getElementById('savedLumpDisassembly');
     if (output && typeof output.querySelectorAll === 'function') {
         output.querySelectorAll('.fault-code-line-highlight').forEach(row => {
@@ -2111,6 +2115,27 @@ function _revealFaultInstruction(token, offset, rawWord, evidence) {
     target.scrollIntoView({ block: 'center' });
     _setDisassemblyPresentationStatus(comparison + addressing + 'Fault instruction at LUMP +' + offset +
         ' highlighted. Source is unchanged; comments are authored text, not verified C-list or Namespace mappings.');
+    // Disassembly equality is NOT map authentication. Keep raw diagnostics and
+    // add only allowlisted static text after independent signature/hash checks.
+    if (typeof ChurchHardfaultMap !== 'undefined') {
+        const baseStatus = comparison + addressing + 'Fault instruction at LUMP +' + offset +
+            ' highlighted. Source is unchanged. ';
+        ChurchHardfaultMap.verify({
+            envelope: binary.hardfaultMap,
+            artifactWords: binary.words,
+            capturedCodeWords: evidence && evidence.codeWords,
+            capturedIdentity: identity,
+            occurrence: evidence && evidence.occurrence,
+            capturedOffset: evidence && evidence.capturedOffset,
+            faultType: evidence && evidence.faultType, offset, rawWord
+        }).then(site => {
+            if (!site || window._faultNavigationBinary !== binary ||
+                window._faultReasonRequest !== reasonRequest) return;
+            _setDisassemblyPresentationStatus(baseStatus + 'Intentional HARDFAULT: ' +
+                site.reason + ' — ' + site.method + ', source line ' + site.sourceLine +
+                ', LUMP +' + site.offset + '. ' + site.explanation);
+        });
+    }
 
     // Only a complete byte-for-byte source mapping can select editable text.
     // A stale draft or an unsupported high-level language remains untouched.
@@ -8871,6 +8896,7 @@ async function openLumpInEditor(token, options) {
         // Unsaved compiled LUMPs also have exact code words for navigation.
         window._faultNavigationBinary = serverWords
             ? { token: token, words: Array.from(serverWords),
+                hardfaultMap: !_inMemoryLump && _exactResponseLump && _exactResponseLump.hardfault_map,
                 binaryHash: !_inMemoryLump && _exactResponseLump && _exactResponseLump.binary_hash,
                 filename: _exactResponseLump && _exactResponseLump.filename } : null;
         window._editorOpenedBootInspectionToken =

@@ -179,8 +179,11 @@ establish the exact loaded artifact. This investigation has **not proved**
 hardware-to-IDE exact-artifact attribution. Simulated serial delivery is now
 covered by the supplement below; physical serial delivery is not.
 
-There is currently **no HARDFAULT reason-map emitter, serialization contract,
-authenticated map lookup, or intentional-site classifier**. Existing
+At the time of this investigation there was **no HARDFAULT reason-map emitter,
+serialization contract, authenticated map lookup, or intentional-site classifier**.
+The subsequent [static-map binding proposal](HARDFAULT-STATIC-MAPS.md) implements
+a verifier and presentation path with no trusted production keys; emission and
+map enablement remain disabled pending approval. Existing
 disassembly attribution is useful infrastructure, not the approved feature
 already implemented. Without exact identity and a matching site map, retain
 raw INVALID_OP/location/word diagnostics; do not invent a reason. Static

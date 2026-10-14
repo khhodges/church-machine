@@ -7,6 +7,22 @@ KISS is a confirmed standing CM design rule, not a pending review proposal.
 The user directs that faults default to a hard fault rather than initiating
 new recovery strategies.
 
+Intentional HARDFAULT has a selected word, but selection must not be treated as
+approval of map binding, compiler emission, or target release. The detached
+signed-map format is a proposal, not a user-approved trust policy.
+
+On 2026-10-14 the user superseded the standalone exact-artifact HARDFAULT map
+work as part of the Phase 1 bitstream. Carry its unresolved approval and release
+gates into that work; do not restart standalone release validation for it.
+
+**Why:** Encoding selection followed isolated candidate evidence while release
+approval was explicitly deferred. Map authentication and hardware acceptance
+are separate decisions.
+
+**How to apply:** Obtain explicit binding/key-provisioning approval before
+enabling reason attribution or lowering; never promote test signing keys into
+production trust or infer intentional faults from identical WORD bytes.
+
 **Why:** The user's engineering rationale is that sound software construction
 exposes faults on first occurrence, they are fixed promptly, and removing
 their causes improves MTBF. Recovery machinery is not the design priority.

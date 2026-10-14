@@ -4859,6 +4859,10 @@ function showFaultModal(f) {
     _faultModalEditLineNum  = _editLineNum;
     _faultModalRawWord = word;
     _faultModalEvidence = JSON.parse(JSON.stringify({
+        faultType: f.type,
+        // Simulator PC excludes the header. Hardware NIA is byte-addressed and
+        // cannot use this path without independently authenticated provenance.
+        capturedOffset: f.executionOccurrence && Number.isInteger(f.pc) ? f.pc + 1 : null,
         artifact: f.executionArtifact || null,
         occurrence: f.executionOccurrence || null,
         codeWords: f.faultCodeWords || null,

@@ -1867,6 +1867,14 @@ class ChurchAssembler {
         if (parts.length === 0) return null;
 
         let mnemonic = parts[0].toUpperCase();
+        // Selected word is not permission to emit intentional sites. All
+        // compiler backends using this assembler retain the approval gate.
+        if (mnemonic === 'HARDFAULT') {
+            this.errors.push({ line: lineNum,
+                ...this._tokenCols(this._currentLineText, parts[0]),
+                message: 'HARDFAULT emission is disabled pending approval of exact-artifact map binding and target integration.' });
+            return null;
+        }
         let opcode = null;
         let cond = 14;
 
