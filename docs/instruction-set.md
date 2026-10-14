@@ -401,9 +401,14 @@ replace RESIDENT LUMPs or an active Thread.
 **Explicit Destroy — required:** Include an explicit authorized object-destruction
 operation in Phase 1. This is neither GC nor simply revoking a PassKey pair.
 Preserve the approved software slot-version and pool-release rules. Destroy's
-authority, per-type eligibility, in-use safeguards, reclamation, interruption
-behavior and ABI still need definition; no unrestricted destruction of protected
-or active objects is approved.
+detailed authority, remaining per-type eligibility, active-use detection,
+reclamation, interruption behavior and ABI still need definition.
+
+**Destroy exclusions — approved:** Refuse RESIDENT objects, the active Thread,
+and objects supplying currently executing code or the active C-list. Even a
+valid operation-authorized PassKey cannot override these exclusions. Hard-fault
+before changing the target slot version or modifying/reclaiming target memory.
+This defines the safety requirement, not how active use is detected.
 
 **Destroy with outstanding GTs — approved:** Authorized Destroy may invalidate
 outstanding GTs without locating every copy or proving no references remain.

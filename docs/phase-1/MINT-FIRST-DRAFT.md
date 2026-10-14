@@ -66,9 +66,14 @@ RESIDENT exclusion is mandatory.
 **Destroy — required:** Explicitly destroy an authorized object; do not
 substitute automatic GC or PassKey-only revocation. Preserve the approved
 increment-before-free/no-wrap/retained-slot-version rules when releasing to
-the pool. Authority, eligible targets, in-use safeguards, reclamation and
-interruption semantics remain unresolved. This is not permission to destroy
-arbitrary active or protected objects.
+the pool. Detailed authority, remaining target eligibility, active-use detection,
+reclamation and interruption semantics remain unresolved.
+
+**Destroy exclusions — approved:** Reject RESIDENT objects, the active Thread,
+and objects supplying currently executing code or the active C-list. Hard-fault
+before target-version changes or target-memory modification/reclamation,
+even for a caller with a valid operation-authorized PassKey. The detection
+mechanism is not selected by this requirement.
 
 **Outstanding GTs — approved:** Authorized Destroy may invalidate existing
 GTs rather than prove no copies remain. Later stale-GT accesses must fault.

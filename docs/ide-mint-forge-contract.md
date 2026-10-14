@@ -36,9 +36,13 @@ not executable implementations.
   object destruction, not automatic garbage collection or merely PassKey
   revocation. For pool release, preserve the approved software-managed
   increment-before-free, no-wrap and retained-slot-version rules. Destroy
-  authorization, per-type eligibility, in-use safeguards, memory reclamation,
-  interruption behavior and ABI remain to be defined; this is not blanket
-  permission to destroy protected or active objects.
+  detailed authorization, remaining per-type eligibility, active-use detection,
+  memory reclamation, interruption behavior and ABI remain to be defined.
+- **Destroy exclusions — approved:** Reject RESIDENT objects, the active
+  Thread, and objects supplying the currently executing code or active C-list.
+  Hard-fault before changing the target slot version or modifying/reclaiming
+  target memory, even with a valid operation-authorized PassKey. This is an
+  eligibility requirement, not a selected active-use detection mechanism.
 - **Outstanding GTs on Destroy — approved:** An authorized Destroy may
   invalidate outstanding GTs under the approved software slot-version release
   rules, without finding/removing every copy or proving none remain.

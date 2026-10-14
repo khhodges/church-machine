@@ -506,3 +506,15 @@ precondition for Destroy.
 retirement at 511, and retained usable slot versions. Do not infer
 permission to destroy active/protected objects or skip safe reclamation
 and interruption safeguards.
+
+Destroy must refuse RESIDENT objects, the active Thread, and objects supplying
+currently executing code or the active C-list, even with valid authorized
+PassKey credentials. Hard-fault before target-version changes or target-memory
+modification/reclamation.
+
+**Why:** The user explicitly approved these safety exclusions separately from
+allowing invalidation of outstanding unused GT copies.
+
+**How to apply:** Enforce target eligibility independently of credential
+validity. Do not turn this into a ban on all outstanding GTs or assume that
+the active-use detection mechanism has already been specified.
