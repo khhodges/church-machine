@@ -49,6 +49,10 @@ not executable implementations.
   Do not automatically invalidate object GTs previously issued under its
   authority. Those GTs retain their own validity checks and separately
   authorized revocation rules; no cascading revocation is implied.
+- **Revocation authority — approved:** Only an explicitly Genesis-authorized
+  revoker may revoke a PassKey GT/proof pair. Possession of the pair alone
+  does not grant revocation authority. Unauthorized revocation attempts
+  hard-fault under the existing authorization rule.
 - Proof generation, protected storage/transfer, ABI, concrete revocation
   mechanics, list representation and bootstrap issuance remain software TBD.
 - Track used/free blocks per LUMP size class, separately from slots/generations.

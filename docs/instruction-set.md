@@ -392,6 +392,12 @@ cascading revocation is required or implied. Previously issued object GTs
 remain subject to their own validity and separately authorized revocation
 rules; this does not make them permanently valid.
 
+**PassKey revocation authority — approved:** Only an explicitly
+Genesis-authorized revoker may revoke the pair. A holder does not gain
+revocation authority merely by possessing it. Unauthorized revocation attempts
+hard-fault. The concrete authorization representation, ABI and revocation
+mechanics remain unresolved.
+
 Require simulator, RTL and exact-release-build physical FPGA evidence for
 TPERM NULL/EXACT, HARDFAULT/IDE attribution and Mint's exclusive update/publication,
 **with Genesis override authority**. Identify exercised overrides separately

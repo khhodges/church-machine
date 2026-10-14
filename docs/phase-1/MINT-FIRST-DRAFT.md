@@ -134,6 +134,11 @@ object GTs previously issued under its authority. Those object GTs remain
 subject to their own validity and separately authorized revocation rules.
 Do not infer an automatic cascading revocation mechanism.
 
+**Revocation authority — approved:** Require explicit Genesis authorization
+to revoke the pair. Mere possession is not revocation authority, even for
+the holder's own pair. Unauthorized attempts hard-fault. This does not
+assign a revoker identity, register, storage format or method ABI.
+
 **Validity before equality:** NULL/NULL must never pass pkverify. EXACT alone
 is bit comparison, not PassKey validation. Validate both supplied and trusted
 GTs as non-NULL, valid and actively issued/bound credentials; require initialized

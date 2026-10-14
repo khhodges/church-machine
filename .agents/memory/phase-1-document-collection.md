@@ -312,6 +312,16 @@ cascading invalidation of previously issued object GTs.
 revocation; retain independent object checks. Revocation mechanics and
 in-flight timing are not settled by this scope choice.
 
+Only an explicitly Genesis-authorized revoker may revoke a PassKey pair;
+possession alone grants no revocation authority.
+
+**Why:** The user rejected automatic holder self-revocation in favor of
+explicit Genesis authorization.
+
+**How to apply:** Distinguish use authority from revocation authority and
+hard-fault unauthorized revocation attempts. Do not invent revoker identities
+or a storage/ABI mechanism from this policy choice.
+
 Keep the requested CLOOMC review drafts deliberately unbuildable at unresolved
 contract boundaries rather than supplying accepting placeholder methods.
 
