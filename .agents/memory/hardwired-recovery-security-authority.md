@@ -16,8 +16,9 @@ for immutable reset ROM during bootstrap is now explicitly approved: no
 software enablement or additional data/table permissions; normal fetch checks
 apply after handoff. The user explicitly retained the final reset-ROM CALL CR0:
 normal CALL validation applies and successful transfer ends ROM fetch authority.
-No additional ROM CALL is implied for ordinary CHANGE or SWITCH. Grant handling
-and precise marker admission/consumption still need resolution.
+No additional ROM CALL is implied for ordinary CHANGE or SWITCH. Consume marker
+authorization on valid acceptance before activation; faults never restore it,
+only fresh reset re-arms it. Grant handling remains unresolved.
 
 **Why:** The user selected a distinct reset exception, not indexed CHANGE or
 a general software privilege, and subsequently chose to retain the checked CALL
