@@ -31,3 +31,13 @@ The user reaffirmed this rule during the Phase 1 Mint Q&A: “Any fault is a har
 fault.” Apply it to Mint, its same-scope NSRW-GT LAMBDA and pkverify, including
 failed authorization/verification/validation checks, rather than drafting
 recoverable rejection returns. Hard faults do not imply rollback of prior writes.
+
+Standard software hard faults need structured diagnostic data for the IDE.
+
+**Why:** The user identified this common requirement while reviewing Mint and
+pkverify's draft fault paths.
+
+**How to apply:** Define a shared non-returning fault/reporting contract, not
+ad hoc method-specific mechanisms. Keep proof material and private authority out
+of diagnostics; reporting failure must not prevent faulting. Exact fields,
+ABI and transport are not yet approved; do not infer a new opcode or recovery.

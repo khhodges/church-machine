@@ -103,6 +103,12 @@ and destination/commit checks. No recoverable rejection return, retry, rollback
 or automatic continuation is introduced. A hard fault does not undo writes
 already made; write visibility and interruption boundaries still need definition.
 
+**Standard reporting requirement:** Software hard faults need a common
+non-returning path carrying structured diagnostic data for the IDE. Protect
+proofs and private authority; diagnostic delivery must not gate faulting.
+The record fields, ABI, transport and implementation mechanism remain unresolved,
+not new ISA or hardware requirements inferred from this design discussion.
+
 ## 4. Growth headroom — proposal pending
 
 **User direction:** Draft the code first. The 100% growth-headroom proposal

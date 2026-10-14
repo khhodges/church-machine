@@ -53,6 +53,19 @@ fault-code assignment. Every unresolved check must obey this rule when defined.
 No retry, rollback, repair or continuation is introduced. A hard fault does not
 undo earlier writes or prove atomicity; write visibility still needs definition.
 
+**Standard software hard-fault reporting — requirement:** Provide a common,
+non-returning hard-fault path with structured, programmatically interpretable
+diagnostic data for the IDE, rather than unrelated ad hoc fault paths per method.
+Reporting must not expose proof material or private authority, and failure to
+deliver diagnostics must not prevent the hard fault.
+
+Proposed diagnostic content for subsequent agreement: stable reason code,
+originating LUMP/method and instruction location, operation/stage, and permitted
+nonsecret context. These are candidate fields, not an approved record format.
+Record layout, calling convention, transport, capture ordering and exact
+software/hardware support remain to be defined. No new opcode or fault encoding
+is approved by this requirement, and no rollback or continuation is implied.
+
 ```text
 Mint(request, credential):
     result = NON_SUCCESS_WITHOUT_CAPABILITY

@@ -27,6 +27,9 @@ mechanism, with real hard-fault paths on failed checks.
 - Trusted-state/proof transfer and early-out comparison timing. The four-word
   equality example is not a complete secure verifier or a constant-time claim.
 - Hard-fault entry: no new fault instruction or encoding is invented.
+  Use a standard non-returning path with structured IDE diagnostics; fields,
+  ABI and transport remain TBD. No secrets in the record, and no dependency on
+  IDE availability for the hard fault itself.
 
 The current assembler accepts `LAMBDA CRn`; the current ISA document places
 its detailed description in the history document. These drafts follow the

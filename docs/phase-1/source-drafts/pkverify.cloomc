@@ -40,7 +40,9 @@ verified:
     BRANCH TODO_SUCCESS_CLEANUP_AND_RESULT_ABI
     RETURN
 fault:
-    ; Must become the approved non-returning hard-fault path.
+    ; Must use the standard non-returning hard-fault path with structured
+    ; IDE diagnostics. Record format/ABI TBD; no proof/private authority data.
+    ; Failure to deliver diagnostics must not prevent the hard fault.
     ; Do not replace with HALT, RETURN, retry or rollback.
     BRANCH TODO_NONRETURNING_HARD_FAULT
 }
