@@ -153,3 +153,14 @@ not constrained by physical Namespace capacity.
 **How to apply:** Preserve this optional virtualGT ID space without requiring
 live slots for every IDE-known object. Do not infer a packed encoding, hardware
 access authority, or virtual-to-resident binding algorithm from this statement.
+
+Phase 1 starts with **256 total Namespace slots**, numbered 0–255 including
+metadata slot 0. Capacity remains configurable; existing slot assignments stay.
+
+**Why:** The user approved increasing the starting capacity from 64 rather than
+letting a small physical table constrain the IDE's object catalog.
+
+**How to apply:** Budget 4 KiB for the table and CR15 word-offset limit 1023.
+Recalculate resident placement without renumbering slots. Approval selects the
+target, not migration or hardware conformance; validate the matching image and
+bitstream before hardware use.
