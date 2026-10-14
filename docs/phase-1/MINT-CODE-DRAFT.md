@@ -36,6 +36,12 @@ Check the untruncated increment; masking 512 to zero is forbidden. Namespace
 updates remain inside the same-scope single-slot LAMBDA. Release authority,
 in-use safeguards, update ordering and interruption handling still need definition.
 
+**Approved reallocation rule:** Mint uses the freed Namespace slot's retained
+release version without another increment. Preserve this value across slot
+clearing; it belongs to the slot, not the memory block. Example: 7 → release to
+8 → reallocate using 8. A retained 511 can be allocated; another release cannot
+increment it. Initial version selection and retention representation remain open.
+
 ## 1. ide.Mint
 
 The shared entry below represents both approved operations. Whether the public
@@ -149,7 +155,8 @@ Mint(request, credential):
 
     # Software selects generation; hardware only checks equality.
     # Pool release increments to 1..511 without wrap; initial assignment and
-    # allocation/replacement bookkeeping must respect that separate rule.
+    # reallocation uses the slot's retained release version, with no increment.
+    # Initial assignment and direct-replacement sequencing remain to be defined.
     generation = UNRESOLVED_SELECT_SOFTWARE_GENERATION(current, frozen)
     UNRESOLVED_REQUIRE_GENERATION_IN_RANGE(generation, 0, 511)
     candidate = UNRESOLVED_PREPARE_OBJECT_AND_FOUR_WORD_ENTRY(

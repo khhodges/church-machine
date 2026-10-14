@@ -349,3 +349,12 @@ version increment as part of returning a used block to its free pool.
 hard fault before freeing the block. Never truncate/wrap the arithmetic or
 have hardware increment it. This settles release-version progression only,
 not initial versions, release authority or all in-use/interruption safeguards.
+
+Reallocation uses the Namespace slot's retained release version, without a
+second increment.
+
+**Why:** The user explicitly approved retaining and reusing the release version.
+
+**How to apply:** Keep the version with the slot, not the memory block, and never
+reset it when clearing a free slot. Retained 511 may be allocated but cannot
+support another release increment. Initial version selection remains open.

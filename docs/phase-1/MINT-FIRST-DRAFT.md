@@ -140,6 +140,13 @@ the attempted release hard-faults without freeing the block. No wrap to zero
 and no hardware increment. This defines the release increment, not initial
 version selection or permission to release a protected/in-use object.
 
+**Approved reallocation rule:** Retain the release version with the Namespace
+slot and use it for the next GT allocated into that slot; do not increment again
+or reset it when clearing the slot. Versions follow slots, not free memory
+blocks. A retained 511 may be allocated, but cannot subsequently be incremented
+for another release. Initial version selection and storage representation remain
+to be defined.
+
 **Allocation requirement:** Track used and free memory blocks per LUMP size
 class in Phase 1, independently of Namespace-slot availability and generations.
 This is explicit allocation management, not GC. Define pool ownership, initial
