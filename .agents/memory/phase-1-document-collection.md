@@ -74,12 +74,13 @@ not inferred runtime provisioning or a completed verifier design.
 Capability holders/issuance and pkverify behavior still require their own
 contracts; do not treat Namespace placement as blanket authority issuance.
 
-The user approved the single combined SWITCH CR15 handoff and explicitly
-retained ordinary CHANGE without a Namespace change.
+CHANGE is THREADSAVE → THREADLOAD. SWITCH is the same sequence with
+LOAD NAMESPACE (CR15) inserted between those halves. Ordinary CHANGE leaves
+CR15 unchanged; neither sequence touches CR13.
 
-**Why:** Their clarification was “Switch is a special case of CHANGE but Change
-without CR15 remains.” The combined handoff must not eliminate ordinary CHANGE.
+**Why:** The user repeated and clarified this relationship after the assistant
+distracted from it by retaining separate SWITCH protected-load qualifications.
 
-**How to apply:** Supersede the two-instruction SWITCH-then-CHANGE recipe;
-preserve ordinary CHANGE. CR13 is excluded under the user's later reserved-NULL
-clarification; do not otherwise reinterpret SWITCH CR12/CR14 behavior.
+**How to apply:** Use the exact two-halves/inserted-Namespace-load formulation
+in reconciliation. These are internal phases, not separate instructions.
+Do not treat the assistant's withdrawn CR12/CR14 qualification as user approval.
