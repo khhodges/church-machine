@@ -274,8 +274,11 @@ N=not-NULL, C=0, V=0 (NULL: NZCV=0100; non-NULL: NZCV=1000).
 no operand checks, raises no TPERM fault, and preserves flags and capabilities.
 This applies to both NULL and EXACT; a skipped EXACT cannot fault on NULL.
 Independent fetch faults and watchdog expiry are not suppressed.
-These design changes are not implemented here; encoding and fault attribution
-still need specification and implementation evidence.
+**Approved EXACT fault rule:** An executed EXACT with either operand NULL
+hard-faults before changing flags or operands. The captured fault location
+identifies EXACT itself, even if subsequent architectural fault handling runs.
+These design changes are not implemented here; encoding and implementation
+evidence, including pre-fault state and location capture, remain outstanding.
 Neither test replaces trusted issuance, validity or proof checks.
 
 Required acceptance cases include NULL/NULL (including nonzero NULL encodings),

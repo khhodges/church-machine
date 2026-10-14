@@ -320,6 +320,8 @@ C=0, V=0. Pair with NULL-before-equality hard faults for EXACT.
 The user approved complete condition skip: false-condition TPERM performs no
 operand checks, raises no TPERM fault, and preserves flags/capabilities,
 including NULL/EXACT. Independent fetch/watchdog faults remain separate.
+The user approved EXACT-on-NULL faulting before flags/operands change, with
+the captured location attributed to EXACT itself rather than later recovery.
 Encoding remains open; no implementation is implied.
 
 No GC in Phase 1. The PP250 garbage-to-NULL suggestion is withdrawn.
