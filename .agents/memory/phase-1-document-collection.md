@@ -106,3 +106,12 @@ before the deadline to renew it.
 Do not introduce scheduler-only renewal, or claim this guarantees useful progress
 or return to a scheduler. Preserve fresh-second mode exit; broader maintenance
 exemptions must not be inferred. CR13 remains untouched.
+
+Phase 1 gt_seq is 9 bits, values 0–511, for GTs and corresponding Namespace
+descriptors.
+
+**Why:** The user explicitly selected the 9-bit format over stale 7-bit work-plan
+requirements.
+
+**How to apply:** Align active descriptions with this width. Width approval alone
+does not approve modulo wrap or generation reuse; never infer that policy.
