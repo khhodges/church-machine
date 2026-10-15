@@ -4,6 +4,7 @@
 
 ## Current decision and implementation entry points
 
+- [Current folder consistency audit and simplifying proposals](CONSISTENCY-AUDIT.md).
 - [Master ISA: approved contract and delegated hardware choices](01-isa/instruction-set.md#approved-phase-1-contract).
 - [Decision ledger and source-level implementation gaps](REVIEW-2026-10-14.md#resolution-log--guided-review).
 - [Approved single-word CALL encoding](CALL-SINGLE-WORD-DRAFT.md) — retained filename, not draft status.
