@@ -662,6 +662,17 @@ THREAD_PERMISSIONS (0x1E) as a hard fault.
 **Why:** The user explicitly approved this mapping after approving the numeric
 fault-code allocation; rejection itself was already required.
 
-**How to apply:** Preserve specific NULL/VERSION/BOUNDS and other fault mappings.
-Do not infer priority for multiple simultaneous validation failures or weaken
-the permissionless-Thread requirement. Implementation evidence remains separate.
+**How to apply:** Treat this as a separate operand check from Thread-context
+validation, which the user subsequently mapped uniformly to THREAD_CONTEXT
+(0x1D). Do not infer priority for simultaneous failures or weaken validation.
+Implementation evidence remains separate.
+
+All Thread-context validation failures report THREAD_CONTEXT (0x1D), not only
+structural failures without a more-specific code.
+
+**Why:** The user selected the broad context mapping, then explicitly retained
+THREAD_PERMISSIONS (0x1E) for the separate supplied-Thread-GT permission check.
+
+**How to apply:** Preserve every underlying check but report 0x1D within context
+validation. Do not remap ordinary instruction faults outside that validation,
+change validation order, or infer a priority for distinct simultaneous failures.

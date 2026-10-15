@@ -375,8 +375,17 @@ physical conformance remain to be verified; no runtime change is made here.
 **Thread permission-check mapping — approved:** Failure of the supplied Thread
 GT's mandatory no-permissions check reports `THREAD_PERMISSIONS` (`0x1E`) as a
 hard fault. This maps the existing check; it does not relax it or replace
-specific NULL, VERSION, BOUNDS or other fault mappings. Priority when multiple
-checks fail is not selected by this mapping.
+the context-validation mapping below. Priority when multiple checks fail is
+not selected by this mapping.
+
+**Thread context-validation mapping — approved:** All Thread-context validation
+failures report `THREAD_CONTEXT` (`0x1D`), not only structural failures lacking
+a more-specific code. Within context validation, this reporting rule replaces
+more-specific failure codes; the underlying checks remain mandatory.
+The supplied Thread GT's no-permissions check is a separate operand check and
+continues to report `THREAD_PERMISSIONS` (`0x1E`). This does not remap ordinary
+instruction faults outside Thread-context validation, change validation order
+or select priority when distinct checks fail together.
 
 ### TPERM NULL and EXACT
 
@@ -757,10 +766,12 @@ incoming stack frame and a valid C-List usable by the restored context.
 **Any error is a hard fault.** Do not ignore errors, strip permissions to make
 the GT acceptable, substitute another frame/C-List, or continue with a partial
 transition. Microcode privileges enable access for the transition; they do not
-waive these checks. The detailed C-List validation algorithm and remaining
-check-to-fault mappings are not specified by this semantic correction.
-The no-permissions mapping does not replace specific NULL, VERSION or BOUNDS
-faults or select precedence when multiple checks fail.
+waive these checks. All Thread-context validation failures report
+`THREAD_CONTEXT` (`0x1D`), including failures that otherwise have a more-specific
+code within that validation. The supplied Thread GT no-permissions check
+remains separate and reports `THREAD_PERMISSIONS` (`0x1E`). The detailed C-List
+validation algorithm remains unspecified here; this fault mapping does not
+change validation order or select precedence when multiple checks fail.
 
 This is distinct from validation of the executable Enter GT in a saved
 continuation frame. Do not transfer that frame's E-permission requirement to
