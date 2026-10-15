@@ -16,6 +16,7 @@ from contextlib import contextmanager
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from amaranth import Elaboratable, Module, Signal, Value
+from amaranth.hdl._ast import Slice
 from amaranth.back import rtlil, verilog
 from amaranth.sim import Simulator as ModelSimulator
 from scripts.rtl_process_supervision import bounded_tool
@@ -86,6 +87,15 @@ class Recorder:
 
             def set(self, signal, value):
                 expression = Value.cast(signal)
+                if isinstance(expression, Slice) and isinstance(expression.value, Signal):
+                    # Fixtures can drive individual fields of an input record.
+                    # Preserve the other bits, then record the complete input bus.
+                    base = expression.value
+                    mask = (1 << len(expression)) - 1
+                    merged = ((self.ctx.get(base) & ~(mask << expression.start))
+                              | ((int(value) & mask) << expression.start))
+                    self.set(base, merged)
+                    return
                 if not isinstance(expression, Signal):
                     raise TypeError("Replay input must be a complete signal")
                 key = id(expression)
@@ -117,8 +127,9 @@ class Recorder:
     def run(self):
         self.model.run()  # The original independent assertions must pass first.
         ports = self.writes + [port for _, port in self.reads]
-        domain = self.model._design.fragment.domains["sync"]
-        ports += [domain.clk, domain.rst]
+        domain = self.model._design.fragment.domains.get("sync")
+        if domain is not None:
+            ports += [domain.clk, domain.rst]
         # Reuse the recorded elaboration: core debug taps refer to its internal
         # signals, not to the new signals a second elaborate() would create.
         design = ReplayDesign(self.model._design.fragment, self.reads, self.writes)
@@ -129,7 +140,7 @@ class Recorder:
         rtl = (None if self.release_converter else
                verilog._convert_rtlil_text(il, write_verilog_opts=self.write_verilog_opts))
         declarations = ["reg clk=0;", "reg rst=0;"]
-        bindings = [".clk(clk)", ".rst(rst)"]
+        bindings = [".clk(clk)", ".rst(rst)"] if domain is not None else []
         for i, signal in enumerate(self.writes):
             declarations.append(f"reg [{len(signal)-1}:0] in_{i}={len(signal)}'h{signal.init:x};")
             bindings.append(f".{signal.name}(in_{i})")

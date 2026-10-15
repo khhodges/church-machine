@@ -68,6 +68,7 @@ def test_data_offset_and_accepted_index_capture(write, imm, index, offset):
     (0xAF104005, 0xBF000003, 12, None),   # DR0+3 words
     (0xAF104000, 0xBF140064, None, 8),    # target below zero
     (0xB7104001, 0xBF100001, None, 8),    # target above 32 bits
+    (0xAF104000, 0xBF03FFFF, None, 8),    # 32-bit target outside active code fence
     (0xAF104000, 0x17042001, None, 8),    # CALL row DR0-1
     (0xAF104000, 0x17090801, None, 8),    # CALL direct method DR0-1
     (0xB7104001, 0x17140001, None, 8),    # CALL row DR2+1 overflow

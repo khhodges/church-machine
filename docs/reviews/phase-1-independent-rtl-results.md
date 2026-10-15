@@ -1,5 +1,17 @@
 # Independent Phase 1 RTL fixtures — initial results
 
+## Generated-Verilog comparison (2026-10-15)
+
+The reproducible comparison is
+`python3 scripts/replay_phase1_instruction_rtl.py --report generated-artifacts/phase1-instruction-rtl.json --jobs 4`.
+Use a fresh report path; the runner refuses to overwrite evidence.
+See [generated-Verilog evidence](phase-1-generated-verilog-results.md) for
+the recorded outcome, exact provenance and coverage boundaries.
+
+This comparison reuses the independent fixtures below rather than introducing
+a second instruction oracle. It adds one literal BRANCH case to distinguish
+active code-fence rejection from 32-bit arithmetic overflow.
+
 ## Instruction RTL update
 
 The three confirmed failures are corrected: indexed CALL recognition and
@@ -27,8 +39,9 @@ read/arithmetic paths rather than a new staged frontend. This engineering
 refinement is recorded in the Master; resources/timing remain unmeasured.
 
 This is not complete ISA qualification: full runtime method dispatch, all
-frame/continuation cases, combined CHANGE/SWITCH transition completion, exact
-generated/mapped RTL and physical evidence remain outstanding. No vendor build,
+frame/continuation cases, combined CHANGE/SWITCH transition completion,
+whole-board generated/mapped RTL and physical evidence remain outstanding.
+The focused generated-Verilog comparison is recorded separately above. No vendor build,
 upload, flashing or live image changes occurred.
 
 ## Pre-update fixture findings (superseded by the RTL results above)
@@ -71,7 +84,10 @@ retirements after boot, a nonzero destination sentinel and deferred fault reset.
 They assert data writes, capability preservation, memory-write absence and
 retirement identity. No compiler or decoder generates the expected values.
 
-## Coverage limits and remaining work
+## Historical pre-update coverage limits
+
+The following table describes the initial fixture slice, not the later operand
+fixtures or generated-Verilog comparison linked above.
 
 | Group | Status of this new suite |
 |---|---|
@@ -85,7 +101,7 @@ retirement identity. No compiler or decoder generates the expected values.
 | H08 | Not implemented here. Full context-fault injection requires explicit private-frame fixtures; fault-code assignment tests alone do not cover triggers. |
 | H09 | Executed and skipped reserved-CR13 cases only; positive/negative CHANGE/SWITCH activation and authority fixtures remain. |
 
-Generated/mapped RTL replay and physical evidence are **not covered**.
+Generated/mapped RTL replay and physical evidence were **not covered by that initial run**.
 Existing suites must be reconciled against current Phase 1 expectations before
 their results count toward coverage. The broader instruction-test task remains
 in progress; this report does not close it or qualify a release.

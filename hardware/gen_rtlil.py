@@ -323,25 +323,12 @@ def _rtlil_to_verilog(il_path, v_path, module_name=None):
         return None
 
 
-def generate_rtlil_wukong(output_dir="build"):
-    """Generate RTLIL + Verilog for QMTECH Wukong Artix-7 XC7A100T.
-
-    The Verilog output is generic (no Xilinx vendor cells) and is fed into
-    Vivado for Artix-7 synthesis, place-and-route, and bitstream generation.
-    """
-    from .wukong_top import ChurchWukongXC7A100T
-    os.makedirs(output_dir, exist_ok=True)
-
-    top = ChurchWukongXC7A100T(clk_freq=50_000_000, baud=57_600, sim_mode=False)
-
-    ports = (
-        [top.clk, top.rst_n]
-        + list(top.led)
-        + [top.uart_tx_pin, top.uart_rx_pin]
-    )
-
+def install_elaboration_caches():
+    """Install the release generator's traversal caches once per process."""
     import gc
-    import time
+    gc.disable()
+    if getattr(install_elaboration_caches, "_installed", False):
+        return
 
     # ── Shape-memoisation patch ───────────────────────────────────────────────
     # Amaranth 0.5.x has no caching on Operator.shape() or Switch.shape().
@@ -449,6 +436,22 @@ def generate_rtlil_wukong(output_dir="build"):
         _orig_cusv(self, fragment, value)
     _amaranth_ir.Design._collect_used_signals_value = _memoised_cusv
     # ─────────────────────────────────────────────────────────────────────────
+    install_elaboration_caches._installed = True
+
+
+def generate_rtlil_wukong(output_dir="build"):
+    """Generate generic release RTL for Wukong; vendor implementation is separate."""
+    from .wukong_top import ChurchWukongXC7A100T
+    import gc
+    import time
+    os.makedirs(output_dir, exist_ok=True)
+    install_elaboration_caches()
+    top = ChurchWukongXC7A100T(clk_freq=50_000_000, baud=57_600, sim_mode=False)
+    ports = (
+        [top.clk, top.rst_n]
+        + list(top.led)
+        + [top.uart_tx_pin, top.uart_rx_pin]
+    )
 
     print(f"  [gen_rtlil] Starting convert() at {time.strftime('%H:%M:%S')} — shape cache + gc disabled")
     sys.stdout.flush()

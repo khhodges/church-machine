@@ -144,8 +144,6 @@
 - [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
 - [Thread LUMP placement](thread-lump-placement.md) — Threads are LUMPs, not special-address reservations; saved descriptors control generic placement.
-- [Generated RTL replay](generated-rtl-replay.md) — constant-only Verilog blocks can leave unknown GT bits; distinguish dialect evidence and preserve the recorded elaboration.
-- [Amaranth elaboration performance](amaranth-shape-memoization.md) — full Wukong replay must reuse release-generator AST memoization; bare traversal can stall or crash.
 - [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
