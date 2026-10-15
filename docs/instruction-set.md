@@ -314,6 +314,14 @@ The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
 delivery gate or passed hardware-conformance claim is introduced here.
 
+**Watchdog context-capture authority — approved:** Use the existing validated
+Thread-save path to save the faulting Thread's context. Retain its validation
+checks; do not give the watchdog a separate unrestricted RAM-write bypass.
+If outgoing context cannot be saved, it remains a failed save, not permission
+to bypass validation or claim capture succeeded. This selects capture authority,
+not a new recovery handler or CR13 role; preserve the existing save-first
+recovery direction. Exact implementation and hardware evidence remain required.
+
 ### Phase 1 hardware fault-code assignments — approved
 
 | Fault code | Name |
@@ -630,11 +638,14 @@ The following remain visible approval blockers rather than implied defaults:
 remaining detailed boot-entry binding (slot 2, consume-on-acceptance marker,
 no additional CR12.M grant, retained final CALL CR0 and ROM-fetch handoff point
 are settled);
-watchdog memory-backed capture authority; protected configuration interface;
+protected configuration interface;
 target timing-source implementation. The `THREAD_CONTEXT` (`0x1D`),
 `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG` (`0x1F`) fault-code assignments
 are approved, not open allocation decisions; additional trigger details and
 implementation evidence remain separate.
+Watchdog memory-backed capture authority is also settled: use the validated
+Thread-save path, without an unrestricted RAM-write bypass. Its implementation
+and verification remain outstanding, not a new authority decision.
 
 Indexed CALL's exact binary-field transcription must be reconciled separately:
 do not copy CHANGE's candidate layout. This is a missing encoding record, not

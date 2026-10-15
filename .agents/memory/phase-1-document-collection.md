@@ -612,3 +612,13 @@ THREAD_PERMISSIONS=0x1E and WATCHDOG=0x1F, within the existing five-bit field.
 instruction opcodes/TPERM operands. Additional trigger conditions and precedence
 were not selected by this approval; implementation and exact-build evidence
 remain separate from the documentation decision.
+
+Watchdog context capture uses the existing validated Thread-save path, never
+a separate unrestricted RAM-write bypass. An unsuccessful save remains failed.
+
+**Why:** The user explicitly approved retaining Thread-save validation for
+watchdog capture.
+
+**How to apply:** Do not reopen capture authority or permit validation bypass
+to obtain diagnostics. Preserve existing save-first recovery and CR13 rules;
+implementation and hardware evidence remain outstanding.
