@@ -518,3 +518,14 @@ allowing invalidation of outstanding unused GT copies.
 **How to apply:** Enforce target eligibility independently of credential
 validity. Do not turn this into a ban on all outstanding GTs or assume that
 the active-use detection mechanism has already been specified.
+
+Reclaimed object memory must be zeroed across the entire block before another
+object can use it, including unused capacity.
+
+**Why:** The user explicitly approved full-block zeroing before reuse to prevent
+old data or C-list contents from passing to the next object.
+
+**How to apply:** Keep clearing during Destroy versus allocation, the mechanism
+and interruption handling as software TBD. Incomplete clearing must not permit
+reuse. Preserve Destroy exclusions and slot-version rules; documentation
+approval is not implementation or hardware authorization.

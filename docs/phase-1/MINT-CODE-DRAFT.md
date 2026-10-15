@@ -28,6 +28,13 @@ release/reuse remain unresolved; this does not introduce GC or permit RESIDENT
 reclamation. Include pool bookkeeping in the half-memory budget; the earlier
 Tiny service estimates do not separately cost it.
 
+**Approved reclamation requirement:** Zero the entire reclaimed block, including
+unused capacity, before another object can use it. Clearing during Destroy
+versus allocation, the mechanism and interruption handling remain software TBD.
+Incomplete clearing must not permit reuse. This does not waive Destroy
+exclusions or alter slot-version rules; no executable clearing helper is
+introduced by this draft.
+
 **Approved pool-release version rule:** Software increments the corresponding
 Namespace-entry version before returning its block to the free pool.
 `next_version = current_version + 1` must be in **1–511 inclusive**, with no

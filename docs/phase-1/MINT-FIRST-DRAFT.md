@@ -75,6 +75,12 @@ before target-version changes or target-memory modification/reclamation,
 even for a caller with a valid operation-authorized PassKey. The detection
 mechanism is not selected by this requirement.
 
+**Reclaimed memory — approved:** The entire reclaimed memory block, including
+unused capacity, must be zeroed before another object can use it. Whether
+Destroy or allocation clears it, the mechanism and interruption handling remain
+software TBD. Incomplete clearing must not permit reuse. This does not waive
+Destroy exclusions or change slot-version rules.
+
 **Outstanding GTs — approved:** Authorized Destroy may invalidate existing
 GTs rather than prove no copies remain. Later stale-GT accesses must fault.
 Use the approved software release rules: increment before freeing, no wrap,

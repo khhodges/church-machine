@@ -410,6 +410,12 @@ valid operation-authorized PassKey cannot override these exclusions. Hard-fault
 before changing the target slot version or modifying/reclaiming target memory.
 This defines the safety requirement, not how active use is detected.
 
+**Reclaimed memory — approved:** Zero the entire reclaimed memory block before
+another object can use it, including unused capacity, not only the former payload.
+Whether Destroy or allocation performs the clearing, its mechanism and
+interruption handling remain software TBD. Incomplete clearing must not permit
+reuse. This does not waive Destroy exclusions or change slot-version rules.
+
 **Destroy with outstanding GTs — approved:** Authorized Destroy may invalidate
 outstanding GTs without locating every copy or proving no references remain.
 Subsequent stale-GT accesses must fault. Apply the approved software

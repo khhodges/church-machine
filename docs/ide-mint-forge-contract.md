@@ -43,6 +43,11 @@ not executable implementations.
   Hard-fault before changing the target slot version or modifying/reclaiming
   target memory, even with a valid operation-authorized PassKey. This is an
   eligibility requirement, not a selected active-use detection mechanism.
+- **Reclaimed memory — approved:** Zero the entire reclaimed block, including
+  unused capacity, before another object can use it. Whether Destroy or
+  allocation performs clearing, its mechanism and interruption handling remain
+  software TBD; incomplete clearing must not permit reuse. Preserve Destroy
+  exclusions and slot-version rules.
 - **Outstanding GTs on Destroy — approved:** An authorized Destroy may
   invalidate outstanding GTs under the approved software slot-version release
   rules, without finding/removing every copy or proving none remain.
