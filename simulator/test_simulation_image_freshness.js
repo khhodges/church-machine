@@ -2,55 +2,38 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
-const banner = {textContent: '', style: {}};
-const configuration = {imageHash: 'exact-image'};
-let report = {status: 'stale', basis: 'verified-image', imageHash: 'exact-image',
-    warnings: [{abstraction: 'WukongCallHome', selected: {filename: 'old.lump'},
-        latest: {filename: 'new.lump'}}]};
-let consent = false, prompts = 0, delay;
-const ctx = {sim: {simulationConfiguration: configuration},
-    document: {getElementById: id => id === 'simulationImageFreshnessWarning' ? banner : null},
-    window: {_nsState: {abstractions: [{filename: 'new.lump'}]},
-        confirm: text => { prompts++; assert.match(text, /existing image/); return consent; }},
-    fetch: async (url, options) => {
-        assert.match(url, /imageHash=exact-image/);
-        assert.equal(options.cache, 'no-store');
-        if (delay) await delay;
-        return {ok: true, json: async () => report};
-    }};
+const indicator = {textContent: '', style: {}};
+const ctx = {
+    sim: {simulationConfiguration: {imageHash: 'abcdef0123456789'}},
+    document: {getElementById: id => id === 'simulationImageIdentity' ? indicator : null},
+    window: {
+        confirm: () => { throw Error('Freshness must not prompt'); },
+    },
+    fetch: () => { throw Error('Execution must not request freshness'); },
+};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(__dirname + '/app-simulation-preparation.js', 'utf8'), ctx);
 (async () => {
     const check = ctx.window.SimulationPreparation.checkExecutionFreshness;
-    const before = JSON.stringify([ctx.sim, ctx.window._nsState]);
-    assert.equal(await check(), false, 'cancel prevents execution');
-    assert.match(banner.textContent, /WukongCallHome: loaded image old.lump.*latest saved new.lump/);
-    assert.equal(banner.style.display, 'flex');
-    consent = true;
+    const before = JSON.stringify(ctx.sim);
     assert.equal(await check(), true);
-    const accepted = prompts;
+    assert.match(indicator.textContent, /abcdef012345/);
+    assert.match(indicator.textContent, /latest-version check disabled/);
+    assert.match(indicator.title, /abcdef0123456789/);
+    assert.equal(JSON.stringify(ctx.sim), before, 'display must not mutate execution');
+    assert.equal(await check(), true, 'repeat execution needs no consent');
+    ctx.sim.simulationConfiguration = {imageHash: '9876543210abcdef'};
     assert.equal(await check(), true);
-    assert.equal(prompts, accepted, 'same warning remains visible without repeated prompts');
-    assert.equal(JSON.stringify([ctx.sim, ctx.window._nsState]), before);
-    report = {status: 'unknown', reason: 'image replaced on server'};
-    consent = false;
-    assert.equal(await check(), false);
-    assert.match(banner.textContent, /UNVERIFIED/);
-    report = {status: 'current', basis: 'verified-image', imageHash: 'exact-image', warnings: []};
-    assert.equal(await check(), true);
-    assert.equal(banner.style.display, 'none');
-    let release;
-    delay = new Promise(resolve => { release = resolve; });
-    const pending = check();
-    assert.equal(await check(), false, 'parallel Run cannot bypass pending check');
-    ctx.sim.simulationConfiguration = {imageHash: 'other-image'};
-    release();
-    assert.equal(await pending, false, 'activation while checking cancels old request');
+    assert.match(indicator.textContent, /9876543210ab/, 'activation updates displayed identity');
+    ctx.sim.simulationConfiguration = null;
+    assert.equal(await check(), true, 'missing freshness evidence is not an execution gate');
+    assert.match(indicator.textContent, /identity unavailable/);
+    assert.doesNotMatch(indicator.title, /abcdef/, 'old identity must not linger');
+    const source = fs.readFileSync(__dirname + '/app-simulation-preparation.js', 'utf8');
+    assert.match(source, /actualHash !== selected.imageHash/, 'approved image integrity check retained');
     const run = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
-    for (const name of ['runSimGo', 'stepSim', 'walkToggle']) {
-        const start = run.indexOf('async function ' + name + '(');
-        assert(start >= 0);
-        assert.match(run.slice(start, start + 2400), /await window.SimulationPreparation.checkExecutionFreshness/);
-    }
-    console.log('PASS loaded-image warning, consent, persistence, unknown identity, race and execution gates');
+    assert.match(run, /_requireCommittedImageForExecution\('Step'\)/);
+    assert.equal((run.match(/await window.SimulationPreparation.checkExecutionFreshness/g) || []).length, 3,
+        'Run, Step and Walk continue to refresh identity');
+    console.log('Simulator identity without freshness gates: PASS');
 })().catch(error => { console.error(error); process.exitCode = 1; });

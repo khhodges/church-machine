@@ -3,6 +3,14 @@ name: Executed-artifact freshness warning
 description: User-facing rule for distinguishing a valid committed boot image from the latest successful compilations.
 ---
 
+## Simulator exception approved 2026-10-15
+
+Simulator Run, Step and Walk must not require latest-version freshness checks or confirmation prompts. Show a compact loaded-image identity instead; do not imply it is the latest saved revision.
+
+**Why:** The user explicitly approved running older images without freshness interruptions after a provenance-format mismatch produced an unverified warning.
+
+**How to apply:** This supersedes the simulator warning requirement below. Retain image integrity/admission checks, ISA protection, and hardware release gates. The older rules below still guide freshness reporting where requested outside simulator execution.
+
 A valid, provenance-approved boot image may intentionally contain older LUMPs. The IDE must prominently and persistently identify every committed Namespace artifact that differs from the latest successful compilation for that abstraction.
 
 **Why:** Restoring an older approved resident image made the IDE boot, but the user was blindsided because “boot works” was reported without an equally prominent warning that newer successfully compiled code was not executing.

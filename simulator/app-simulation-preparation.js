@@ -9,51 +9,20 @@
     let historySelection = '';
     let message = 'Press Run to validate and run the saved image. Private configuration review is optional.';
     let savedImageLoad = null;
-    let freshnessCheck = false;
-    let acceptedFreshness = null;
-    async function checkExecutionFreshness() {
-        if (freshnessCheck) return false;
-        freshnessCheck = true;
-        const machine = sim;
-        const configuration = machine.simulationConfiguration;
+    function updateImageIndicator() {
+        const indicator = document.getElementById('simulationImageIdentity');
+        if (!indicator) return;
+        const configuration = typeof sim !== 'undefined' && sim.simulationConfiguration;
         const hash = configuration && configuration.imageHash;
-        let report;
-        try {
-            const response = await fetch('/api/simulation/image-freshness?imageHash=' +
-                encodeURIComponent(hash || ''), {cache: 'no-store'});
-            if (!response.ok) throw new Error('Freshness request failed');
-            report = await response.json();
-        } catch (_) {
-            report = {status: 'unknown', reason: 'Could not check the loaded image against saved revisions.'};
-        } finally {
-            freshnessCheck = false;
-        }
-        if (sim !== machine || machine.simulationConfiguration !== configuration) return false;
-        const banner = document.getElementById('simulationImageFreshnessWarning');
-        const warnings = Array.isArray(report.warnings) ? report.warnings : [];
-        const current = report.status === 'current' && report.basis === 'verified-image' &&
-            report.imageHash === hash && !warnings.length && !(report.failedSaves || []).length;
-        const detail = warnings.map(item => {
-            const selected = item.selected || {}, latest = item.latest || {};
-            return item.abstraction + ': loaded image ' + (selected.filename || 'unknown') +
-                ' → latest saved ' + (latest.filename || 'unknown');
-        }).join('\n');
-        const text = current ? '' : detail
-            ? 'LOADED IMAGE IS NOT THE LATEST SAVED CODE.\n' + detail +
-                '\nRunning keeps the existing image. To use newer code, explicitly prepare and activate it.'
-            : 'LOADED IMAGE FRESHNESS IS UNVERIFIED.\n' +
-                (report.reason || 'Latest admissible artifact identity could not be established.') +
-                '\nDo not treat this simulation as a test of the latest saved code.';
-        if (banner) {
-            banner.textContent = text;
-            banner.style.display = current ? 'none' : 'flex';
-        }
-        // Inform before execution, including repeat Run on an already loaded image.
-        const signature = JSON.stringify([hash, report]);
-        if (current) { acceptedFreshness = null; return true; }
-        if (acceptedFreshness === signature) return true;
-        if (!window.confirm(text + '\n\nExecute the existing image anyway?')) return false;
-        acceptedFreshness = signature;
+        indicator.textContent = 'Simulator image: ' + (hash ? String(hash).slice(0, 12) : 'identity unavailable') +
+            ' · latest-version check disabled';
+        indicator.title = hash ? 'Loaded image SHA-256: ' + hash : 'No loaded image hash is available.';
+        indicator.style.display = 'block';
+    }
+    // Retain the execution hook, but freshness is no longer an execution gate.
+    // Image admission, byte validation and target authorization remain separate.
+    async function checkExecutionFreshness() {
+        updateImageIndicator();
         return true;
     }
     const freeze = value => {
@@ -128,6 +97,7 @@
             '<small>Simulation only—not hardware certification. Review and approval do not activate or execute. Activation does not start Run.</small>';
     }
     function render() {
+        updateImageIndicator();
         for (const id of ['simulationPreparationPanel']) {
             const panel = document.getElementById(id);
             if (panel) panel.innerHTML = markup();
