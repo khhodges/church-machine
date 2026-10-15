@@ -104,6 +104,8 @@ When normal execution resumes with neither IDE Debug nor IDE Trace active,
 start a fresh second rather than restoring a partially spent interval.
 Hardware reset preserves the existing Debug/Trace exemption; it does not clear
 an active exemption or create one when none was active.
+For Phase 1 bootstrap, power-on/FPGA configuration initializes the exemption
+enabled; Genesis = IDE in this scope.
 
 **Why:** The user selected bounded turns and explicitly fixed “ONE second to
 Hard Fault unless in IDE debug or IDE Trace mode.” They then explicitly selected
@@ -115,13 +117,17 @@ and expiry winning at exactly one second. A transfer must complete strictly
 before the deadline to renew it.
 The user subsequently selected preserving the exemption across hardware reset,
 not the offered clear-on-reset recommendation.
+The user then explicitly selected enabled initialization as a Phase 1 bootstrap
+decision where Genesis = IDE, rather than the offered normal-protection default.
 
 **How to apply:** Preserve the duration, exceptions and transfer-based renewal.
 Do not introduce scheduler-only renewal, or claim this guarantees useful progress
 or return to a scheduler. Preserve fresh-second mode exit; broader maintenance
 exemptions must not be inferred. CR13 remains untouched.
-Reset retention does not select a power-on value or promise persistence through
-power loss or FPGA reconfiguration. The MMIO abstraction remains in control.
+Distinguish reset retention from enabled Phase 1 initialization: reset preserves
+even a subsequently disabled state; power-on/configuration initializes enabled,
+not the previous pre-power-loss state. Do not extend this bootstrap default to
+later phases. The MMIO abstraction remains in control.
 
 The watchdog register must exist as a Genesis-provisioned MMIO GT; the MMIO
 abstraction is in charge, not an IDE-only hardware control.

@@ -307,8 +307,18 @@ existing Debug/Trace exemption rather than clearing it. An active exemption
 therefore remains active across reset; reset does not create an exemption
 when none was active. The MMIO abstraction remains in control. Leaving both
 exempt modes starts a fresh one-second interval under the existing rule.
-This is reset retention, not a selected power-on initialization value or a
-promise of persistence across power loss or FPGA reconfiguration.
+This is reset retention, distinct from the Phase 1 initialization rule below;
+it does not promise persistence of the previous state across power loss or
+FPGA reconfiguration.
+
+**Phase 1 bootstrap watchdog initialization — approved:** After power-on or
+FPGA configuration, start with the Debug/Trace watchdog exemption **enabled**.
+This is a Phase 1 bootstrap decision where **Genesis = IDE**, not a universal
+default for later phases. The MMIO abstraction remains in charge; this does
+not impose an IDE-only hardware-control path. Hardware reset preserves the
+current exemption state. When both exempt modes are left, start a fresh
+one-second interval under the existing rule. Initial enabled state is not
+retention of whatever state existed before power loss or reconfiguration.
 
 **Watchdog MMIO authority — approved:** The watchdog register must exist as a
 Genesis-provisioned MMIO GT; the MMIO abstraction is in charge. Do not replace
