@@ -1,0 +1,33 @@
+/*
+ * Shared native <select> standard for the Church Machine IDE.
+ * Mirrors the Target (Simulator) selector (.programming-target select).
+ * !important is intentional: it lets this presentation-only rule win over
+ * legacy inline style="" decoration on static and dynamically rendered
+ * selects. Width/layout (width, max-width, flex, margin) is NOT touched,
+ * so each select keeps its own sizing. Native arrow is preserved.
+ */
+body select {
+    color: #e7e7f2 !important;
+    background-color: #1a1a2a !important;
+    background-image: none;
+    border: 1px solid #4a4a68 !important;
+    border-radius: 3px !important;
+    font-size: .7rem !important;
+    padding: 2px !important;
+    font-family: inherit;
+    line-height: normal;
+    box-shadow: none;
+}
+body select option,
+body select optgroup {
+    color: #e7e7f2;
+    background-color: #1a1a2a;
+}
+body select:focus-visible {
+    outline: 2px solid #daa520 !important;
+    outline-offset: 1px;
+}
+body select:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
