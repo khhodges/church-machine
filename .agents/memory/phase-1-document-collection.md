@@ -712,3 +712,13 @@ replaces the old 14-bit immediate-only range.
 **How to apply:** Do not preserve the old immediate-mode meaning of bit 14 or
 silently reinterpret old binaries. Keep checked arithmetic and access validation;
 encoding approval is not implementation, migration or hardware-test approval.
+
+Phase 1 BRANCH is single-word with a DR index and separate sign plus 18-bit
+magnitude, relative to the address of the BRANCH itself.
+
+**Why:** The user approved reclaiming both unused register fields to support
+runtime indexing and a larger relative offset in one word.
+
+**How to apply:** A negative displacement is valid; reject invalid target
+addresses, not backward branches. Do not wrap arithmetic, retain the old
+signed-15-bit encoding as current, or silently reinterpret saved binaries.

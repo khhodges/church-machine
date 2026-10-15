@@ -12,6 +12,10 @@ bit 14 sign, bits 13:4 magnitude, bits 3:0 DR selector. The historical
 DREAD/DWRITE bit-14 immediate-mode interpretation is superseded; see the
 [approved common layout](instruction-set.md#dreaddwrite-common-indexed-operand--approved-for-phase-1).
 This is an encoding decision, not implementation or conformance evidence.
+Phase 1 BRANCH now uses index DR [22:19], subtract flag bit 18 and unsigned
+18-bit magnitude [17:0], relative to this BRANCH's address. The historical
+signed-15-bit diagrams below are superseded by the
+[approved single-word layout](instruction-set.md#single-word-indexed-branch--approved-for-phase-1).
 
 **Authority:** [Church Machine Instruction Set](instruction-set.md) is the master
 ISA document. This supporting encoding record must defer to it.

@@ -988,6 +988,37 @@ This documentation correction does not itself rewrite saved programs,
 Namespace contents or boot images. Existing binaries are not compatibility
 requirements for the new ISA.
 
+### Single-word indexed BRANCH — approved for Phase 1
+
+| Bits | Width | Meaning |
+|---|---:|---|
+| 31:27 | 5 | BRANCH opcode 23 |
+| 26:23 | 4 | Condition |
+| 22:19 | 4 | Index DR0–DR15 |
+| 18 | 1 | Subtract flag: 0 adds, 1 subtracts |
+| 17:0 | 18 | Unsigned immediate magnitude, 0–262143 |
+
+```text
+displacement_words = unsigned32(DR[index]) + (S ? -magnitude : magnitude)
+target_byte_address = address_of_this_BRANCH + 4 * displacement_words
+```
+
+DR0 supplies zero for immediate-only relative branches. The sign is separate
+from the magnitude, not a two's-complement field. All 32 bits are used; no
+prefix or extension word is permitted. The reference address is this BRANCH,
+not the following instruction.
+
+Perform displacement and target-address arithmetic without wrapping or
+truncation. A negative displacement is valid for a backward branch; it is not
+by itself an invalid negative memory index. The resulting target must satisfy
+the existing authorized executable-range and instruction-target checks before
+control transfers. Preserve the ordinary condition semantics.
+
+This replaces the former zero register fields and signed 15-bit displacement.
+Existing binaries must not be silently reinterpreted; no automatic rewriting,
+migration or compatibility mode is authorized. Encoding approval is not
+assembler, simulator, RTL or exact-build physical conformance.
+
 ## Retired opcodes and direct/indirect reference forms
 
 **Current ISA guidance — 2026-10-10.** ELOADCALL (8) and XLOADLAMBDA
