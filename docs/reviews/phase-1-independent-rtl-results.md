@@ -3,17 +3,18 @@
 Command:
 `python3 -m pytest hardware/test_phase1_independent_execution.py -q`
 
-Observed across the 30-case run and four subsequently added cases:
-**29 pytest cases passed, 5 failed** (34 total). The four additions were tested
-separately without changing the earlier fixtures. No xfail conversion.
+Current suite: **40 cases; 37 passing and 3 known failures**.
+The latest targeted run passed all ten unsigned-immediate cases; the other
+30 cases retain their unchanged prior results (27 passes, 3 failures).
+No xfail conversion. This is cumulative evidence, not a claim that all 40
+cases were rerun after the immediate clarification.
 These are Amaranth simulations, not generated/mapped RTL or board evidence.
 
 | Coverage | Observation |
 |---|---|
 | H02 decoder conditions | All 15 defined conditions × 16 NZCV states, with valid asserted/deasserted, pass. NV remains unspecified. This does not prove condition-skipped core side effects. |
-| H01 IADD immediate +1/+8191 | Pass, including exact data/flags, NIA advancement, unchanged CRs, no memory writes and no duplicate retirement. |
-| H01 IADD immediate −1 | Literal word `0xAF087FFF`: expected `0xFFFFFFFF`, observed `0x00003FFF`. |
-| H01 IADD immediate −8192 | Literal word `0xAF086000`: expected `0xFFFFE000`, observed `0x00002000`. |
+| H01 IADD unsigned immediates | 0, 1, 8191, 8192 and 16383 pass, including exact data/flags, NIA advancement, unchanged CRs, no memory writes and no duplicate retirement. `0xAF087FFF` means +16383; `0xAF086000` means +8192. |
+| H01 ISUB unsigned immediates | Subtract 0, 1, 8191, 8192 and 16383 from zero. Exact results and NZCV pass, including no-borrow C=1 for 0−0 and negative results for positive subtrahends. |
 | H01 DR0/aliasing | Destination DR0 stays zero; DR1←DR1+1 uses the pre-write value. Pass. |
 | H01 MCMP | Three independent greater/equal/less cases pass full NZCV and no-data-write assertions. |
 | H02 core skips | NE with Z=1 skips IADD, SAVE through NULL, CHANGE CR13 and an invalid-range BRANCH, preserving DR/CR/flags and preventing memory writes. Four cases pass. |
@@ -25,15 +26,12 @@ These are Amaranth simulations, not generated/mapped RTL or board evidence.
 | H05 RETURN encoding | All 4,096 keep masks decode unchanged. No execution/frame-validation claim. |
 | H09 executed CHANGE CR13 | `0x276E8000`: expected immediate reserved-operand INVALID_OP `0x0B`; observed fault `0x07` at cycle3. Pre-fault CR/DR/flags and no-memory-write assertions pass. |
 
-The current Phase 1 Master specifies signed immediate payloads; the hardware
-and existing shift-test setup use unsigned payloads. This is a conformance
-conflict, not evidence that the expectation should be weakened. Resolve the
-contract/implementation difference explicitly before asserting qualification.
-The signed wording was restored from the archived encoding reference, not
-from a separately recorded explicit sign-selection approval. Changing the
-interpretation changes existing instruction words; user confirmation is needed
-before treating these two failures as approved RTL-change requirements.
-Production RTL and the Master were not altered by this test slice.
+**Resolved on 2026-10-15:** The user explicitly selected unsigned IADD/ISUB
+immediates, 0–16383, preserving existing hardware behavior. The Master and
+independent expectations now use zero extension. The two former signed-
+interpretation failures were specification-restoration errors, not approved
+RTL defects; their old observations are superseded by this explicit decision.
+Indexed sign/magnitude formats are unaffected. No production RTL was changed.
 
 Fixtures use independent literal words/expected results, three checked real
 retirements after boot, a nonzero destination sentinel and deferred fault reset.
@@ -44,7 +42,7 @@ retirement identity. No compiler or decoder generates the expected values.
 
 | Group | Status of this new suite |
 |---|---|
-| H01 | Partial; positive, negative-immediate, DR0, aliasing and three MCMP vectors. Arithmetic overflow, all ordinary opcodes and all register positions remain. |
+| H01 | Partial; ten unsigned-immediate ADD/SUB cases, DR0, aliasing and three MCMP vectors. Arithmetic overflow, all ordinary opcodes and all register positions remain. |
 | H02 | Complete defined decoder truth table; four core skip vectors only. Full cross-product instruction-effect coverage remains. NV is blocked on its oracle. |
 | H03 | Five LOAD arithmetic/access-boundary cases plus failing CALL recognition. SAVE/DREAD/DWRITE/BRANCH and complete CALL execution remain. |
 | H04 | Failing runtime-position BFEXT vector; BFINS and boundary/fault cross-product remain. |

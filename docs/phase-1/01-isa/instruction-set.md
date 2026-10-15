@@ -70,7 +70,7 @@ replace the older memory/BRANCH/bitfield operand encodings.
 | Opcode | Operation | Encoding and result |
 |---|---|---|
 | 20 MCMP | Compare DR[A]−DR[B], no data write | Operand field zero. NZCV records subtraction: N=result bit 31, Z=result zero, C=no unsigned borrow, V=signed overflow. |
-| 21 IADD | DR[A]←DR[B]+third operand | Operand bit 14=0: third operand is DR[3:0], bits 13:4 zero. Bit 14=1: sign-extend bits 13:0 (−8192…8191). |
+| 21 IADD | DR[A]←DR[B]+third operand | Operand bit 14=0: third operand is DR[3:0], bits 13:4 zero. Bit 14=1: zero-extend bits 13:0 (0…16383). |
 | 22 ISUB | DR[A]←DR[B]−third operand | Same two operand forms as IADD. |
 | 24 SHL | DR[A]←DR[B] shifted left | Amount bits 4:0, 0…31; logical zero fill. |
 | 25 SHR | DR[A]←DR[B] shifted right | Amount bits 4:0; bit 5=0 logical, bit 5=1 arithmetic sign extension. |
@@ -79,6 +79,10 @@ Arithmetic results are 32-bit. IADD/ISUB set NZCV; addition C is carry out,
 subtraction C is no borrow, V is signed overflow. Capture inputs before writes,
 including aliased operands and DR0 destinations. Do not substitute the checked,
 non-wrapping address arithmetic for ordinary integer-result arithmetic.
+
+IADD/ISUB immediates are **unsigned**, as explicitly selected for Phase 1.
+ISUB can produce a negative result; that does not make its immediate signed.
+This does not change the separately approved signed-offset/index formats.
 
 ### Capability operations and calls
 

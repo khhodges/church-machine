@@ -87,12 +87,18 @@ async def execute_data(ctx, dut, word):
 
 
 @pytest.mark.parametrize("word,expected,nzcv", [
+    (0xAF084000, 0, (0, 1, 0, 0)),        # IADD DR1,DR0,#0
     (0xAF084001, 1, (0, 0, 0, 0)),        # IADD DR1,DR0,#1
-    (0xAF087FFF, 0xFFFFFFFF, (1, 0, 0, 0)),  # signed immediate -1
-    (0xAF086000, 0xFFFFE000, (1, 0, 0, 0)),  # signed immediate -8192
-    (0xAF085FFF, 8191, (0, 0, 0, 0)),     # largest positive signed14
+    (0xAF087FFF, 16383, (0, 0, 0, 0)),    # maximum unsigned14 immediate
+    (0xAF086000, 8192, (0, 0, 0, 0)),     # bit13 is magnitude, not sign
+    (0xAF085FFF, 8191, (0, 0, 0, 0)),     # value immediately below bit13
+    (0xB7084000, 0, (0, 1, 1, 0)),       # ISUB DR1,DR0,#0: no borrow
+    (0xB7084001, 0xFFFFFFFF, (1, 0, 0, 0)),
+    (0xB7085FFF, 0xFFFFE001, (1, 0, 0, 0)),  # 0 - 8191
+    (0xB7086000, 0xFFFFE000, (1, 0, 0, 0)),  # 0 - 8192
+    (0xB7087FFF, 0xFFFFC001, (1, 0, 0, 0)),  # 0 - 16383
 ])
-def test_iadd_independent_literal_words(word, expected, nzcv):
+def test_arithmetic_unsigned_immediate_literal_words(word, expected, nzcv):
     dut = ChurchCore()
 
     async def bench(ctx):

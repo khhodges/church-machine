@@ -9,6 +9,16 @@ shared collection, starting with the ISA.
 Keep the active Phase 1 reading path short: Master ISA plus hardware acceptance;
 keep expanded rationale, old plans and proposals outside the active folder.
 
+IADD/ISUB arithmetic immediates remain unsigned, 0–16383.
+
+**Why:** The user explicitly chose preserving existing unsigned hardware behavior
+after a signed interpretation was mistakenly restored from an older encoding
+reference. That old wording was not approval to change instruction meaning.
+
+**How to apply:** Keep literal instruction-word tests at 8191/8192/16383 and
+distinguish an unsigned ISUB operand from its possibly negative result. Do not
+transfer this choice to the separate indexed sign/magnitude encodings.
+
 **Why:** The user explicitly requested less text, KISS and quicker understanding
 when approving the consistency audit's simplifications.
 
