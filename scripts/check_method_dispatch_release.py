@@ -70,7 +70,12 @@ def validate_report(report):
         raise RuntimeError("Incomplete release evidence: all 13 fixtures plus SelfTest required")
 
 def validate(report, cases, candidate_hash, before, after):
-    if len(cases) < 13 or before != after or report != {
+    if before != after:
+        changed = sorted(k for k in before.keys() | after.keys()
+                         if before.get(k) != after.get(k))
+        raise ValueError("Stale release evidence: inputs changed during replay: "
+                         + ", ".join(changed))
+    if len(cases) < 13 or report != {
             "schema": 1, "converter": "release-verilog",
             "cases": [list(c) for c in cases], "candidate_sha256": candidate_hash}:
         raise ValueError("Incomplete or stale release evidence")

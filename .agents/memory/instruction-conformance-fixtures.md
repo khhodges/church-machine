@@ -24,6 +24,19 @@ differences; a green regression wrapper must not be mistaken for qualification.
 separately. Do not apply architectural descriptor-limit semantics directly to
 an internal unit's count interface without establishing the caller contract.
 
+Long independent arithmetic sweeps must stay within the separately latched
+fetch fence after the reset window, not just retire three setup instructions.
+
+**Why:** The reset ROM's small fetch bound can terminate an otherwise valid
+sweep and falsely implicate the instruction being tested. Also, a faulting
+instruction may assert retirement to report its fault; that is not successful
+architectural completion.
+
+**How to apply:** Establish the fetch-fence contract separately from the
+visible code descriptor. Keep setup execution inside the authorized range
+without reopening reset privileges, and distinguish fault reporting from
+successful retirement when attributing the first fault.
+
 For large-core CXXRTL tests, preserve hierarchy and enough debug metadata to
 retain aliased observation ports.
 

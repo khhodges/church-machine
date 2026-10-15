@@ -98,7 +98,7 @@ def test_tool_nonzero_and_outer_cancellation(tmp_path, monkeypatch):
             try:
                 if Path(f"/proc/{pid}/stat").read_text().split()[2] == "Z":
                     break
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
                 break
             time.sleep(.02)
         else:
@@ -109,6 +109,17 @@ def evidence():
     cases = [[n, 2, 2, None] for n in range(13)]
     return cases, {"schema": 1, "converter": "release-verilog",
                    "cases": cases, "candidate_sha256": "abc"}
+
+
+def test_release_drift_identifies_changed_added_and_removed_inputs():
+    cases, report = evidence()
+    before = {"unchanged.py": "a", "changed.py": "old", "removed.lump": "b"}
+    after = {"unchanged.py": "a", "changed.py": "new", "added.json": "c"}
+    with pytest.raises(ValueError) as error:
+        gate.validate(report, cases, "abc", before, after)
+    message = str(error.value)
+    assert "added.json, changed.py, removed.lump" in message
+    assert "unchanged.py" not in message
 
 
 def test_complete_evidence():
