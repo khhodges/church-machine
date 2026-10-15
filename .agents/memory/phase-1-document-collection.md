@@ -676,3 +676,13 @@ THREAD_PERMISSIONS (0x1E) for the separate supplied-Thread-GT permission check.
 **How to apply:** Preserve every underlying check but report 0x1D within context
 validation. Do not remap ordinary instruction faults outside that validation,
 change validation order, or infer a priority for distinct simultaneous failures.
+
+Incoming Thread activation requires no full C-List pre-scan. Runtime mLoad
+checks apply; CHANGE checks each GT on its CRn load through mLoad.
+
+**Why:** The user selected structure/resume-authority validation with other
+entries checked on use and explicitly specified mLoad for CHANGE CRn loads.
+
+**How to apply:** Do not restore unchecked CR-held GTs or scan every unused
+C-List row. Preserve structural/resume checks and applicable mLoad NULL/Abstract
+semantics. Simulator pre-scan behavior is not a hardware requirement.

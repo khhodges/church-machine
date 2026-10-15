@@ -769,9 +769,17 @@ transition. Microcode privileges enable access for the transition; they do not
 waive these checks. All Thread-context validation failures report
 `THREAD_CONTEXT` (`0x1D`), including failures that otherwise have a more-specific
 code within that validation. The supplied Thread GT no-permissions check
-remains separate and reports `THREAD_PERMISSIONS` (`0x1E`). The detailed C-List
-validation algorithm remains unspecified here; this fault mapping does not
-change validation order or select precedence when multiple checks fail.
+remains separate and reports `THREAD_PERMISSIONS` (`0x1E`). This fault mapping
+does not change validation order or select precedence when multiple checks fail.
+
+**Runtime C-List/CR restoration checks — approved:** No full scan of the incoming
+C-List is required before Thread activation. Validate its structure and the
+authority needed to resume execution; mLoad performs the runtime capability
+checks. CHANGE must use mLoad to check each GT as it is loaded into CRn.
+Other C-List entries are checked when loaded/used, not by an eager scan of
+every occupied row. This is not permission to restore unchecked CR-held GTs or
+skip applicable mLoad checks. Preserve existing NULL/Abstract semantics and
+the approved Thread-context versus operand-permission fault mapping.
 
 This is distinct from validation of the executable Enter GT in a saved
 continuation frame. Do not transfer that frame's E-permission requirement to
@@ -795,6 +803,8 @@ words are rejected. This is not approval of a new hardware encoding, migration
 of saved binaries, or implementation of the proposed IRQ-return trigger.
 The simulator checks the incoming frame, C-List geometry, matching executable
 SELF and resolvable Inform entries before publishing restored context.
+This simulator implementation description is not a requirement for a complete
+hardware C-List pre-scan; the approved runtime mLoad rule above governs Phase 1.
 Unoccupied rows and unresolved Abstract locks retain their existing meanings.
 An already active Thread is not accepted as a dormant incoming context.
 The isolated regression is `node simulator/test_change_one_gt.js`.
