@@ -143,10 +143,14 @@ The user subsequently approved the control layout, asked about four timeout
 variations, then approved 0.25/0.5/1/2 seconds with initial selection 1 second.
 The user explicitly selected next-start/renewal application of timeout changes,
 preserving the current deadline for both shorter and longer selections.
+They also explicitly approved retaining the selected timeout across hardware
+reset, while power-on/FPGA configuration still initializes it to 1 second.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
-sentence. Address and GT distribution remain open. Selector-code mapping and
-selector reset retention remain unresolved. A changed timeout takes effect at
+sentence. Address, GT distribution and selector-code mapping remain open.
+Hardware reset preserves selection, not elapsed countdown time; execution
+starts a fresh retained-duration interval unless exempt.
+A changed timeout takes effect at
 the next approved timer start/renewal; the current duration/deadline is unchanged.
 Selector writes alone never restart or extend the active interval.
 Preserve the approved timing/renewal rules. Mint's MMIO-creation exclusion does

@@ -339,9 +339,16 @@ initializes bit 0 to 1 for Phase 1 bootstrap; hardware reset preserves it.
 Clearing the exemption starts a fresh selected interval. This selects the
 control-word layout, not a register address, Namespace slot or software API.
 This supersedes the earlier fixed-one-second rule and reservation of bits 2:1.
-The mapping of selector codes to durations and reset retention of the new
-selector remain unspecified; exemption retention is already approved.
+The mapping of selector codes to durations remains unspecified.
 Exact timing/resource implementation and conformance need evidence.
+
+**Timeout selector across reset — approved:** Hardware reset preserves the
+selected timeout, just as it preserves exemption. It does not preserve elapsed
+countdown time: execution start after reset begins a fresh interval using the
+retained selection unless exempt. Retain the selected value, not an older
+duration latched for the pre-reset interval. Power-on or FPGA reconfiguration
+instead initializes the selection to 1 second and exemption to enabled under
+the approved Phase 1 bootstrap rule.
 
 **Timeout selection during an active interval — approved:** A selector change
 takes effect at the next approved timer start or renewal. The active interval
