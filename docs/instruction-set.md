@@ -372,6 +372,12 @@ not additional trigger conditions, precedence rules or implementation details.
 Retain already approved fault behavior. Simulator, RTL, telemetry and exact-build
 physical conformance remain to be verified; no runtime change is made here.
 
+**Thread permission-check mapping — approved:** Failure of the supplied Thread
+GT's mandatory no-permissions check reports `THREAD_PERMISSIONS` (`0x1E`) as a
+hard fault. This maps the existing check; it does not relax it or replace
+specific NULL, VERSION, BOUNDS or other fault mappings. Priority when multiple
+checks fail is not selected by this mapping.
+
 ### TPERM NULL and EXACT
 
 | Form | Phase 1 behavior |
@@ -745,13 +751,16 @@ microcode privileges to subsequent programmer instructions.
 
 **Mandatory acceptance checks:** Microcode must check that the supplied Thread
 GT has **no permissions set**, not merely accept zero permissions as optional.
-A GT with any permission set fails this requirement. It must also validate the
+A GT with any permission set fails this requirement; report
+`THREAD_PERMISSIONS` (`0x1E`) for this check's failure. It must also validate the
 incoming stack frame and a valid C-List usable by the restored context.
 **Any error is a hard fault.** Do not ignore errors, strip permissions to make
 the GT acceptable, substitute another frame/C-List, or continue with a partial
 transition. Microcode privileges enable access for the transition; they do not
-waive these checks. The detailed C-List validation algorithm and fault-code
-assignments are not specified by this semantic correction.
+waive these checks. The detailed C-List validation algorithm and remaining
+check-to-fault mappings are not specified by this semantic correction.
+The no-permissions mapping does not replace specific NULL, VERSION or BOUNDS
+faults or select precedence when multiple checks fail.
 
 This is distinct from validation of the executable Enter GT in a saved
 continuation frame. Do not transfer that frame's E-permission requirement to

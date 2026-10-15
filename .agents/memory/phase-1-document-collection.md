@@ -655,3 +655,13 @@ write containment.
 **How to apply:** Do not confuse reporting priority with continued execution,
 deadline-equal transfer renewal, a general fault-priority order, or permission
 to replace an earlier latched fault. Hardware conformance still needs evidence.
+
+Failure of the supplied Thread GT's mandatory no-permissions check reports
+THREAD_PERMISSIONS (0x1E) as a hard fault.
+
+**Why:** The user explicitly approved this mapping after approving the numeric
+fault-code allocation; rejection itself was already required.
+
+**How to apply:** Preserve specific NULL/VERSION/BOUNDS and other fault mappings.
+Do not infer priority for multiple simultaneous validation failures or weaken
+the permissionless-Thread requirement. Implementation evidence remains separate.
