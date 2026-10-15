@@ -122,7 +122,8 @@
         host.innerHTML=html;
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
-        saveButton.textContent='Save Namespace Design';
+        saveButton.textContent='Bind Namespace Design';
+        saveButton.title='Currently saves the design only. Runtime GT binding and binding windows are not implemented yet.';
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
         host.querySelector('#nsSaveLayoutNote').textContent=state.error ||
