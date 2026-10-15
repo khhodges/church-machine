@@ -339,7 +339,19 @@ initializes bit 0 to 1 for Phase 1 bootstrap; hardware reset preserves it.
 Clearing the exemption starts a fresh selected interval. This selects the
 control-word layout, not a register address, Namespace slot or software API.
 This supersedes the earlier fixed-one-second rule and reservation of bits 2:1.
-The mapping of selector codes to durations remains unspecified.
+**Timeout selector encoding — approved for Phase 1:**
+
+| Bits 2:1 | Timeout |
+|---|---|
+| `00` | 0.25 seconds |
+| `01` | 0.5 seconds |
+| `10` | 1 second |
+| `11` | 2 seconds |
+
+With bit 0 set for exemption and reserved bits zero, power-on/FPGA
+configuration initializes the control word to **`0x00000005`**.
+This is the initialization value, not a hardware-reset overwrite: reset
+retains the current selector and exemption under the rule below.
 Exact timing/resource implementation and conformance need evidence.
 
 **Timeout selector across reset — approved:** Hardware reset preserves the

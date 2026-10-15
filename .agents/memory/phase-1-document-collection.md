@@ -145,9 +145,12 @@ The user explicitly selected next-start/renewal application of timeout changes,
 preserving the current deadline for both shorter and longer selections.
 They also explicitly approved retaining the selected timeout across hardware
 reset, while power-on/FPGA configuration still initializes it to 1 second.
+They approved ascending selector codes 00/01/10/11 for 0.25/0.5/1/2 seconds,
+making the initial exempt control word 0x00000005.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
-sentence. Address, GT distribution and selector-code mapping remain open.
+sentence. Address and GT distribution remain open; selector-code mapping is
+settled. Do not apply the power-on control value during ordinary hardware reset.
 Hardware reset preserves selection, not elapsed countdown time; execution
 starts a fresh retained-duration interval unless exempt.
 A changed timeout takes effect at
