@@ -24,6 +24,12 @@ not executable implementations.
 - Mint supports create and authorized replacement, **never replacement of a
   RESIDENT LUMP**, including Mint/pkverify if resident. Any resident update path
   requires its own contract. Growth space does not waive this exclusion.
+- **Replace active-use exclusions — approved:** Reject the active Thread and
+  objects supplying currently executing code or the active C-list, even with
+  valid operation-authorized credentials. Hard-fault before changing the target
+  Namespace entry (including its version) or target memory. Retain the RESIDENT
+  exclusion. Active-use detection and direct replacement's slot/version policy
+  remain software TBD.
 - **Object scope — approved:** Support application Abstractions, Threads,
   **LS C-list objects and RW data objects** within an existing Namespace in
   Phase 1. LS and RW describe the respective object permissions, not a combined
@@ -31,7 +37,7 @@ not executable implementations.
   Defer creating Namespace LUMPs through Mint to Phase 2.
   PassKey forging remains required. This type scope
   does not waive replacement restrictions or authorize replacing an active
-  Thread; replacement eligibility and safeguards remain separate requirements.
+   Thread; replacement eligibility and safeguards remain separate requirements.
 - **Explicit Destroy — required:** Phase 1 must provide explicit authorized
   object destruction, not automatic garbage collection or merely PassKey
   revocation. For pool release, preserve the approved software-managed

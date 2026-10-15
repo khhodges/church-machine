@@ -529,3 +529,14 @@ old data or C-list contents from passing to the next object.
 and interruption handling as software TBD. Incomplete clearing must not permit
 reuse. Preserve Destroy exclusions and slot-version rules; documentation
 approval is not implementation or hardware authorization.
+
+Replace must reject the active Thread and objects supplying currently executing
+code or the active C-list, even with valid operation-authorized credentials.
+Hard-fault before changing the target Namespace entry or target memory.
+
+**Why:** The user explicitly extended active-use exclusions to Replace, in
+addition to the existing RESIDENT replacement prohibition.
+
+**How to apply:** Keep active-use detection and direct replacement's slot/version
+policy as software TBD. Do not import Destroy's version/invalidation semantics
+into Replace or treat this documentation approval as implementation evidence.

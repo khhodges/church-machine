@@ -63,6 +63,13 @@ RESIDENT LUMP even for an otherwise authorized caller. Create-only restrictions
 in the older draft no longer describe the selected Phase 1 scope, but the
 RESIDENT exclusion is mandatory.
 
+**Replace active-use exclusions — approved:** Reject replacement of the active
+Thread and objects supplying currently executing code or the active C-list,
+even with valid operation-authorized credentials. Hard-fault before changing
+the target Namespace entry (including its version) or target memory. Active-use
+detection and direct replacement's slot/version policy remain software TBD.
+The RESIDENT exclusion remains mandatory.
+
 **Destroy — required:** Explicitly destroy an authorized object; do not
 substitute automatic GC or PassKey-only revocation. Preserve the approved
 increment-before-free/no-wrap/retained-slot-version rules when releasing to

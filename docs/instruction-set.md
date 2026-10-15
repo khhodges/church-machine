@@ -398,6 +398,13 @@ PassKey forging remains required. Existing
 replacement restrictions remain unchanged; this is not authorization to
 replace RESIDENT LUMPs or an active Thread.
 
+**Replace active-use exclusions — approved:** Reject replacement of the active
+Thread and objects supplying currently executing code or the active C-list,
+even with valid operation-authorized credentials. Hard-fault before changing
+the target Namespace entry (including its version) or target memory. The
+RESIDENT exclusion remains mandatory. Active-use detection and direct
+replacement's slot/version policy remain software TBD.
+
 **Explicit Destroy — required:** Include an explicit authorized object-destruction
 operation in Phase 1. This is neither GC nor simply revoking a PassKey pair.
 Preserve the approved software slot-version and pool-release rules. Destroy's

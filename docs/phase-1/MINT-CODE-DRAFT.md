@@ -63,6 +63,13 @@ interface has one method or separate Create/Replace methods remains undecided.
 `request`, `credential`, `result` and locals are symbolic values, not CR/DR
 assignments. A result must not expose verifier private state or nstab.
 
+**Approved Replace exclusions:** In addition to RESIDENT objects, reject the
+active Thread and objects supplying currently executing code or the active
+C-list, even with valid operation-authorized credentials. Hard-fault before
+changing the target Namespace entry (including its version) or target memory.
+Active-use detection and direct replacement's slot/version policy remain
+software TBD; this requirement does not supply an executable detection helper.
+
 **Approved authority boundary:** Mint uses a **LAMBDA in the same scope**.
 Only that LAMBDA's code references `NSRW-GT`, on a **single Namespace slot at a
 time**. The surrounding Mint code and pkverify do not reference it. This is not
