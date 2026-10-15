@@ -633,3 +633,13 @@ delaying fault latching or granting extra program execution time.
 **How to apply:** Do not complete unaccepted writes from a multi-write operation
 or promise rollback. Establish the acceptance/completion boundary and exact bound
 with hardware evidence; reset or elapsed time alone does not prove completion.
+
+When an instruction fault and watchdog expiry occur on the same clock edge,
+report the instruction fault, while retaining immediate stopping and watchdog
+write containment.
+
+**Why:** The user explicitly chose instruction-fault reporting in this tie.
+
+**How to apply:** Do not confuse reporting priority with continued execution,
+deadline-equal transfer renewal, a general fault-priority order, or permission
+to replace an earlier latched fault. Hardware conformance still needs evidence.

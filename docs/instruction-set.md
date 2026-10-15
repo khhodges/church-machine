@@ -331,6 +331,15 @@ Recovery's validated Thread-save writes are a separate operation and retain
 their checks. The acceptance/completion boundary and exact bound require
 hardware evidence; do not assume completion merely from elapsed time or reset.
 
+**Same-cycle fault priority — approved:** If an instruction fault and watchdog
+expiry occur on the same clock edge, report the instruction fault code rather
+than WATCHDOG. Execution still stops immediately; watchdog deadline containment,
+the prohibition on new program writes and bounded completion of accepted writes
+remain mandatory. This reporting priority does not allow execution to continue
+or let a deadline-equal CHANGE/SWITCH renew the interval. It selects only this
+same-cycle tie, not a general priority order or permission to replace an earlier
+latched fault.
+
 ### Phase 1 hardware fault-code assignments — approved
 
 | Fault code | Name |
