@@ -1144,13 +1144,15 @@ an unauthorized read, write or control transfer.
 
 ### Indexed arithmetic implementation direction
 
-**Selected under delegated simplest-FPGA-design discretion:** Share one widened
-index add/subtract datapath per core across the approved indexed forms.
-Sequence calculations internally where needed rather than duplicating arithmetic
-for simultaneous operands. Capture all required operand values before an
-instruction changes registers, including overlapping source/destination/index
-registers. Indexed CALL computes its row and method separately from those
-captured inputs; subsequent internal steps must not reread changed registers.
+**Engineering choice under delegated FPGA-design discretion:** Compute checked
+operands at the existing instruction-acceptance boundary. CALL resolves row and
+method together and latches them before changing context; data operations latch
+their index at acceptance. This uses additional read multiplexers/arithmetic
+rather than adding a new stalled-instruction ownership/replay phase.
+It replaces the earlier preference for one sequenced shared adder, not any ISA
+rule. Resource and timing measurements remain required before build acceptance.
+Capture operands before destination writes, including overlapping registers;
+later internal steps must not reread changed inputs.
 
 Retain sufficient intermediate width through offset calculation, word-to-byte
 scaling and address addition to detect overflow/underflow before narrowing.
@@ -1160,7 +1162,7 @@ type/permission/bounds checks and flag effects. A negative BRANCH displacement
 is allowed when its final target is valid; a negative memory index is not.
 Index arithmetic must not independently commit arithmetic flags.
 
-This is shared implementation machinery, not a unified operand encoding or
+This is implementation machinery, not a unified operand encoding or
 validation policy. All approved one-word formats and observable instruction
 semantics remain unchanged. Additional internal cycles do not authorize
 extension words, interruptible partial retirement, or watchdog suspension.

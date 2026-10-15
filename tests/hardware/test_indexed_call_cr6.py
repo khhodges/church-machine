@@ -13,8 +13,8 @@ def _cap(gt, location=0, limit=0):
 def test_wukong_callhome_row6_decodes_as_indexed_call():
     dut = ChurchDecoder()
     # CALL CR6[WukongCallHome.hw], Main:
-    # opcode=2, cr_dst=0, cr_src=6, method selector=1, c-list row=6.
-    instruction = (2 << 27) | (6 << 15) | (1 << 5) | 6
+    # Phase 1 indexed bit18, DR0 for both indices, method +1, row +6.
+    instruction = 0x17040026
     observed = {}
 
     async def bench(ctx):
@@ -35,9 +35,8 @@ def test_wukong_callhome_row6_decodes_as_indexed_call():
 
 def test_cr6_register_bound_call_is_not_misdecoded_as_indexed():
     dut = ChurchDecoder()
-    # A nonzero cr_dst retains the ordinary register-bound CALL meaning even
-    # when the generic cr_src field happens to contain CR6.
-    instruction = (2 << 27) | (6 << 19) | (6 << 15) | 3
+    # Direct-immediate CALL CR6, method3 requires bits18:15 zero.
+    instruction = 0x17300003
     observed = {}
 
     async def bench(ctx):

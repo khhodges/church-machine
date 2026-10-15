@@ -4,6 +4,7 @@
 
 1. **[Master ISA](01-isa/instruction-set.md)** — hardware rules and encodings.
 2. **[Hardware acceptance](04-release/isa-to-fpga-alignment-plan.md)** — how to prove them.
+3. **[RTL source snapshot](02-rtl/README.md)** — reference copy of the current implementation and focused tests; not a qualified bitstream.
 
 ## Authority
 

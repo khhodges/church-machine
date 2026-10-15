@@ -1,0 +1,2824 @@
+#!/usr/bin/env python3
+"""hardware/wukong_bridge.py — UART bridge: Wukong board ↔ Church Machine IDE.
+
+Usage
+-----
+    python3 hardware/wukong_bridge.py --ide=https://<your-replit-url>
+    python3 hardware/wukong_bridge.py --port=/dev/ttyUSB0 --ide=http://localhost:5000 --insecure
+    py hardware/wukong_bridge.py --port=COM3 --ide=https://<your-replit-url>
+
+What it does
+------------
+Reads bytes from the UART (57600 8N1):
+  • ASCII bytes (bit-7 clear) are printed to stdout as CM program output.
+  • 0xAA-prefixed 12-byte trace packets are parsed and POSTed to
+    /hardware/wukong/trace as JSON.
+
+Polls GET /hardware/wukong/command every 50 ms and writes any pending command
+byte to the serial port.  Commands from the IDE:
+
+  {cmd: "s"}                    → write b's'  (step: execute one instruction)
+  {cmd: "r"}                    → write b'r'  (run free)
+  {cmd: "h"}                    → write b'h'  (halt immediately)
+  {cmd: "b", nia: N}            → write b'b' + big-endian 4-byte NIA  (set/clear breakpoint)
+    {cmd: "u", data: "<base64>", reboot: true}
+                                → decode board-native image, write 0x75+len(4 BE)+bytes
+                                   to UART, reboot through the boot ladder, then POST result
+                                   to /hardware/wukong/upload-ack
+
+Trace packet format (12 bytes, big-endian) — one packet per state-change event:
+  [0]     0xAA      magic
+  [1..4]  NIA       retiring instruction NIA (uint32 big-endian)
+  [5]     ev_type   TRACE_EV_* constant (which CR changed, or stack push/pop)
+  [6..9]  payload   GT word0 (uint32 big-endian); 0 for push/pop events
+  [10]    flags     bits[3:0] = NZCV; bits[7:4] = 0
+  [11]    fault     bits[4:0]=fault_code; bit[6]=fault_valid; bit[7]=bp_hit
+
+Multi-event instructions emit multiple consecutive packets with the same NIA:
+  LOAD    → 2 packets (LOAD.shadow, LOAD.new)
+  CHANGE  → 3 packets (CHANGE.push, CHANGE.CR12, CHANGE.CR5)
+  CALL    → 3 packets (CALL.CR6, CALL.CR14, CALL.push)
+  RETURN  → 3 packets (RETURN.pop, RETURN.CR6, RETURN.CR14)
+  others  → 1 packet  (RESULT)
+"""
+
+import argparse
+import base64
+import os
+import queue
+import struct
+import sys
+import threading
+import time
+import uuid
+import zlib
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+try:
+    from shared.architecture_contracts import (
+        PROFILES as ARCH_PROFILES,
+        TRACE_UNITS as ARCH_TRACE_UNITS,
+    )
+except ImportError:
+    # Standalone projection for /dl/wukong-bridge, which intentionally serves
+    # this script as one file. tests/test_architecture_contracts.py checks every
+    # projected value against shared/architecture_contracts.json.
+    ARCH_PROFILES = {
+        "wukong-uart-upload-v2": {
+            "totalWords": 16384,
+            "traceUnit": "wukong-event-uart-v2",
+        },
+    }
+    ARCH_TRACE_UNITS = {
+        "wukong-event-uart-v2": {
+            "magic": 170,
+            "packetBytes": 12,
+            "eventIds": {
+                "RESULT": 0, "LOAD_SHADOW": 1, "LOAD_NEW": 2,
+                "CHANGE_PUSH": 3, "CHANGE_CR12": 4, "CHANGE_CR5": 5,
+                "CALL_CR6": 6, "CALL_CR14": 7, "CALL_PUSH": 8,
+                "RETURN_POP": 9, "RETURN_CR6": 10, "RETURN_CR14": 11,
+            },
+        },
+    }
+
+try:
+    from .wukong_prefetch import (
+        PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
+        PREFETCH_STATUS_NOT_FOUND, PREFETCH_STATUS_MALFORMED,
+        PREFETCH_STATUS_CRC, PREFETCH_STATUS_TRANSPORT, PREFETCH_MAX_LUMP_WORDS,
+        build_response, parse_request, crc32,
+    )
+except ImportError:  # direct invocation: python hardware/wukong_bridge.py
+    try:
+        from wukong_prefetch import (
+            PREFETCH_REQUEST_MAGIC, PREFETCH_INCIDENT_MAGIC, PREFETCH_REQUEST_LEN,
+            PREFETCH_STATUS_NOT_FOUND, PREFETCH_STATUS_MALFORMED,
+            PREFETCH_STATUS_CRC, PREFETCH_STATUS_TRANSPORT, PREFETCH_MAX_LUMP_WORDS,
+            build_response, parse_request, crc32,
+        )
+    except ImportError:
+        # The /dl/wukong-bridge endpoint intentionally serves one file. Keep
+        # the small wire-format helper embedded here as a final fallback so a
+        # downloaded bridge does not require wukong_prefetch.py beside it.
+        PREFETCH_REQUEST_MAGIC = 0xD7
+        PREFETCH_RESPONSE_MAGIC = 0xD8
+        PREFETCH_INCIDENT_MAGIC = 0xD9
+        PREFETCH_VERSION = 1
+        PREFETCH_REQUEST_LEN = 16
+        PREFETCH_MAX_LUMP_WORDS = 16384
+        PREFETCH_STATUS_NOT_FOUND = 1
+        PREFETCH_STATUS_MALFORMED = 2
+        PREFETCH_STATUS_CRC = 3
+        PREFETCH_STATUS_TRANSPORT = 5
+
+        def crc32(raw):
+            return zlib.crc32(raw) & 0xFFFFFFFF
+
+        def parse_request(frame):
+            if len(frame) != PREFETCH_REQUEST_LEN:
+                return None
+            magic, version, sequence, slot, token, max_words, reserved = \
+                struct.unpack(">BBBBIHH", frame[:12])
+            expected_hash32 = struct.unpack(">I", frame[12:16])[0]
+            if (magic != PREFETCH_REQUEST_MAGIC or version != PREFETCH_VERSION
+                    or reserved or max_words < 1
+                    or max_words > PREFETCH_MAX_LUMP_WORDS):
+                return None
+            return {
+                "sequence": sequence,
+                "slot": slot,
+                "token": token,
+                "max_words": max_words,
+                "expected_hash32": expected_hash32,
+            }
+
+        def build_response(slot, token, words, status=0):
+            raw = struct.pack(">%dI" % len(words), *(
+                w & 0xFFFFFFFF for w in words
+            ))
+            return struct.pack(
+                ">BBBBIII", PREFETCH_RESPONSE_MAGIC, PREFETCH_VERSION,
+                status & 0xFF, slot & 0xFF, token & 0xFFFFFFFF,
+                len(words), crc32(raw)
+            ) + raw
+
+try:
+    import serial
+except ImportError:
+    serial = None  # unit tests import this module without pyserial; main() checks
+
+try:
+    import requests
+except ImportError:
+    requests = None  # IDE notifications silently skipped; bridge main() will exit if None
+
+try:
+    from wukong_trace_symbols import trace_metadata as _trace_metadata
+except ImportError:
+    # The bridge is also distributed as a standalone single-file download.
+    _trace_metadata = None
+
+
+_TRACE_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
+_TRACE_CONTRACT = ARCH_TRACE_UNITS[_TRACE_PROFILE["traceUnit"]]
+WUKONG_DMEM_WORDS = _TRACE_PROFILE["totalWords"]
+TRACE_MAGIC    = _TRACE_CONTRACT["magic"]
+TRACE_LEN      = _TRACE_CONTRACT["packetBytes"]
+
+# Complete architectural stop-state snapshot.  This is deliberately a
+# different magic byte from TRACE_MAGIC so old bridges/IDEs can continue to
+# consume the compact event stream.
+SNAPSHOT_MAGIC   = 0xAC
+SNAPSHOT_VERSION = 1
+SNAPSHOT_HEADER_LEN = 6       # magic, version, payload length, sequence
+SNAPSHOT_CRC_LEN = 2
+SNAPSHOT_PAYLOAD_LEN = 284
+
+# Board execution-state evidence:
+#   AD 01 01 01 NN CC
+# magic, version, state=halted, reason, request nonce, XOR checksum.
+HALT_STATE_MAGIC = 0xAD
+HALT_STATE_VERSION = 1
+HALT_STATE_HALTED = 1
+HALT_STATE_REASON_EXPLICIT = 1
+HALT_STATE_LEN = 6
+
+# ── Boot trace packet gate ────────────────────────────────────────────────────
+# On a cold board start the CM emits a fixed number of trace packets
+# immediately after the sentinel (boot-thread CHANGE sequence + boot CALL
+# sequence).  The breakdown is:
+#   CHANGE.push + CHANGE.CR12 + CHANGE.CR5  →  3 packets  (thread context init)
+#   CALL.CR6   + CALL.CR14   + CALL.push   →  3 packets  (boot CALL)
+#   RESULT                                 →  1 packet   (SelfTest entry)
+#   RESULT                                 →  1 packet   (first SelfTest step)
+#                                             ─────────
+#                                              8 packets total
+#
+# Race window: the bridge sends 'r' then 'q' after the sentinel.  If 'q'
+# arrives at the hardware before the boot CALL packet has been processed,
+# the resulting snapshot captures misleading mid-boot register state
+# (e.g. CR6/CR14 not yet updated).  The fix: arm a deferred-'q' gate on
+# every sentinel; send 'q' only after BOOT_TRACE_PACKET_COUNT packets
+# have been received, or BOOT_Q_TIMEOUT seconds have elapsed (whichever
+# comes first).
+BOOT_TRACE_PACKET_COUNT = 8    # trace packets expected before 'q' is safe
+BOOT_Q_TIMEOUT          = 2.0  # seconds; timeout fallback for slow boards
+
+# ── Event type constants ──────────────────────────────────────────────────────
+# Must match _TRACE_EV_* in wukong_top.py and docs/debug-packet-protocol.md.
+TRACE_EV_RESULT      = _TRACE_CONTRACT["eventIds"]["RESULT"]
+TRACE_EV_LOAD_SHADOW = _TRACE_CONTRACT["eventIds"]["LOAD_SHADOW"]
+TRACE_EV_LOAD_NEW    = _TRACE_CONTRACT["eventIds"]["LOAD_NEW"]
+TRACE_EV_CHANGE_PUSH = _TRACE_CONTRACT["eventIds"]["CHANGE_PUSH"]
+TRACE_EV_CHANGE_CR12 = _TRACE_CONTRACT["eventIds"]["CHANGE_CR12"]
+TRACE_EV_CHANGE_CR5  = _TRACE_CONTRACT["eventIds"]["CHANGE_CR5"]
+TRACE_EV_CALL_CR6    = _TRACE_CONTRACT["eventIds"]["CALL_CR6"]
+TRACE_EV_CALL_CR14   = _TRACE_CONTRACT["eventIds"]["CALL_CR14"]
+TRACE_EV_CALL_PUSH   = _TRACE_CONTRACT["eventIds"]["CALL_PUSH"]
+TRACE_EV_RETURN_POP  = _TRACE_CONTRACT["eventIds"]["RETURN_POP"]
+TRACE_EV_RETURN_CR6  = _TRACE_CONTRACT["eventIds"]["RETURN_CR6"]
+TRACE_EV_RETURN_CR14 = _TRACE_CONTRACT["eventIds"]["RETURN_CR14"]
+
+_EV_NAMES = {
+    TRACE_EV_RESULT:      'RESULT',
+    TRACE_EV_LOAD_SHADOW: 'LOAD.shadow',
+    TRACE_EV_LOAD_NEW:    'LOAD.new',
+    TRACE_EV_CHANGE_PUSH: 'CHANGE.push',
+    TRACE_EV_CHANGE_CR12: 'CHANGE.CR12',
+    TRACE_EV_CHANGE_CR5:  'CHANGE.CR5',
+    TRACE_EV_CALL_CR6:    'CALL.CR6',
+    TRACE_EV_CALL_CR14:   'CALL.CR14',
+    TRACE_EV_CALL_PUSH:   'CALL.push',
+    TRACE_EV_RETURN_POP:  'RETURN.pop',
+    TRACE_EV_RETURN_CR6:  'RETURN.CR6',
+    TRACE_EV_RETURN_CR14: 'RETURN.CR14',
+}
+
+# ── Boot sentinel constants ───────────────────────────────────────────────────
+# Old (stale) bitstreams emit a 2-byte sentinel:  0xBB  N_INIT&0xFF
+# New bitstreams emit a 3-byte sentinel:           0xBC  N_INIT&0xFF  TU_VERSION
+#
+# TU_VERSION encodes TraceUnit FSM capability:
+#   0x02 = ELOADCALL and XLOADLAMBDA emit 3-packet CALL sequence
+#          (CALL_CR6 + CALL_CR14 + CALL_PUSH) — current standard.
+#
+# If the bridge sees 0xBB it knows the TraceUnit is old: ELOADCALL and
+# XLOADLAMBDA will emit a single RESULT packet instead of the 3-packet CALL
+# sequence, so CR6/CR14 state shown in the IDE will be silently wrong.
+BOOT_SENTINEL_V1  = 0xBB   # old/stale 2-byte sentinel magic
+BOOT_SENTINEL_V2  = 0xBC   # current 3-byte sentinel magic
+SENTINEL_V1_LEN   = 2      # 0xBB  N_INIT&0xFF
+SENTINEL_V2_LEN   = 4      # 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
+# The bridge is distributed as a standalone file, so it cannot import the
+# FPGA source's WUKONG_BUILD_VERSION when it runs on Windows. This is the
+# downloadable host-bridge version, intentionally tracked separately from
+# the FPGA build version.
+BRIDGE_VERSION    = 19
+
+# Minimum TU_VERSION required to guarantee correct ELOADCALL/XLOADLAMBDA trace.
+TU_VERSION_CALL_3PKT = 0x02  # must match _TU_VERSION_CALL_3PKT in wukong_top.py
+# Build 18 introduced the M6 edge-debounced physical Thread scheduler.  The
+# server uses this advertised sentinel identity as a fail-closed upload gate.
+THREAD_SCHEDULER_MIN_BUILD = 18
+
+
+def parse_boot_sentinel(buf, i=0):
+    """Parse a boot sentinel starting at position *i* of *buf*.
+
+    Shared helper used by both the bridge's ``main()`` loop and the smoke
+    test's ``check_sentinel()``.  Centralising the parsing here means a
+    single change keeps both paths in sync.
+
+    Parameters
+    ----------
+    buf : bytes | bytearray
+        Receive buffer (may contain arbitrary bytes before and after the
+        sentinel).
+    i : int
+        Index of the candidate sentinel byte within *buf*.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not a sentinel magic byte (0xBB or 0xBC); the caller
+        should advance ``i`` and try the next byte.
+    False
+        ``buf[i]`` *is* a sentinel magic byte, but the buffer does not yet
+        contain the full sentinel (not enough bytes).  The caller should
+        wait for more data without advancing ``i``.
+    dict
+        Fully-parsed sentinel.  Keys:
+
+        ``magic``       — sentinel magic byte (``BOOT_SENTINEL_V1`` or
+                          ``BOOT_SENTINEL_V2``)
+        ``n_init_byte`` — raw N_INIT byte sent by the board
+        ``tu_version``  — ``TU_VERSION`` byte for V2 sentinels; ``None``
+                          for V1 (stale) sentinels
+        ``length``      — number of bytes consumed (``SENTINEL_V1_LEN`` or
+                          ``SENTINEL_V2_LEN``)
+        ``stale``       — ``True`` when the sentinel indicates a stale
+                          TraceUnit FSM (V1 magic, or V2 with
+                          ``tu_version < TU_VERSION_CALL_3PKT``)
+    """
+    if i >= len(buf):
+        return None
+    b = buf[i]
+    if b == BOOT_SENTINEL_V1:
+        # Old 2-byte sentinel: 0xBB  N_INIT&0xFF
+        if len(buf) - i < SENTINEL_V1_LEN:
+            return False
+        return {
+            'magic':        b,
+            'n_init_byte':  buf[i + 1],
+            'tu_version':   None,
+            'length':       SENTINEL_V1_LEN,
+            'stale':        True,
+        }
+    elif b == BOOT_SENTINEL_V2:
+        # Current 4-byte sentinel: 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
+        if len(buf) - i < SENTINEL_V2_LEN:
+            return False
+        tu_version    = buf[i + 2]
+        build_version = buf[i + 3]
+        return {
+            'magic':         b,
+            'n_init_byte':   buf[i + 1],
+            'tu_version':    tu_version,
+            'build_version': build_version,
+            'thread_scheduler': build_version >= THREAD_SCHEDULER_MIN_BUILD,
+            'length':        SENTINEL_V2_LEN,
+            'stale':         tu_version < TU_VERSION_CALL_3PKT,
+        }
+    return None
+
+def try_parse_halt_state_frame(buf, i=0):
+    """Parse and validate one fixed board halt-state evidence frame."""
+    if i >= len(buf) or buf[i] != HALT_STATE_MAGIC:
+        return None
+    if len(buf) - i < HALT_STATE_LEN:
+        return False
+    frame = bytes(buf[i:i + HALT_STATE_LEN])
+    if (frame[1] != HALT_STATE_VERSION or
+            frame[2] != HALT_STATE_HALTED or
+            frame[3] != HALT_STATE_REASON_EXPLICIT or
+            frame[5] != (frame[0] ^ frame[1] ^ frame[2] ^ frame[3] ^
+                         frame[4])):
+        return None
+    return {'state': 'halted', 'reason': 'explicit_halt',
+            'version': frame[1], 'nonce': frame[4]}
+
+
+def halt_state_evidence_matches_pending(decoded, pending_halt):
+    """Return whether decoded halt evidence belongs to the outstanding Halt.
+
+    A syntactically valid frame is not sufficient to confirm a request: the
+    board must echo the nonce assigned to the currently pending command.
+    Keeping this comparison separate makes it difficult for a delayed frame
+    from an older Halt to confirm a newer one.
+    """
+    return bool(
+        decoded and pending_halt and
+        decoded.get('state') == 'halted' and
+        decoded.get('nonce') == pending_halt.get('nonce')
+    )
+
+
+def _compute_expected_n_init():
+    """Return the N_INIT value expected from the current boot_rom.py tables.
+
+    Mirrors wukong_top.py:
+        hw_init_pairs = [(addr, val) for addr, val in enumerate(dmem_init) if val != 0]
+        N_INIT = len(hw_init_pairs)
+
+    Returns None if boot_rom cannot be imported (bridge running stand-alone
+    without the hardware package on the path).
+    """
+    try:
+        _here = os.path.dirname(os.path.abspath(__file__))
+        _root = os.path.dirname(_here)   # project root
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        from hardware.boot_rom import (
+            WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST, WUKONG_SELFTEST_WORDS,
+            WUKONG_SELFTEST_BASE_WORD, WUKONG_WCH_BASE_WORD, WUKONG_WCH_CLIST,
+            WUKONG_WCH_CLIST_WORD, WUKONG_NUC_PROGRAM, WUKONG_THREAD_BASE_WORD,
+            WUKONG_THREAD_HEADER, WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT,
+            WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+            CAPABILITY_TEST_NS_SLOT,
+            WUKONG_CAPABILITY_TEST_BASE_WORD,
+            WUKONG_CAPABILITY_TEST_WORDS,
+            wukong_wch_header,
+        )
+        from hardware.hw_types import (
+            GT_TYPE_INFORM, PERM_MASK_E, PERM_MASK_S, make_gt,
+        )
+    except (ImportError, OSError, struct.error):
+        return None
+
+    dmem_init = list(WUKONG_DEMO_NAMESPACE)
+    while len(dmem_init) < 256:
+        dmem_init.append(0)
+    dmem_init += list(WUKONG_DEMO_CLIST)
+    while len(dmem_init) < WUKONG_DMEM_WORDS:
+        dmem_init.append(0)
+    for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+        dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_WORDS):
+        dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(
+        [wukong_wch_header(len(WUKONG_NUC_PROGRAM))] + list(WUKONG_NUC_PROGRAM)
+    ):
+        dmem_init[WUKONG_WCH_BASE_WORD + _i] = _v
+    for _i, _v in enumerate(WUKONG_WCH_CLIST):
+        dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
+    dmem_init[WUKONG_THREAD_BASE_WORD] = WUKONG_THREAD_HEADER
+    dmem_init[WUKONG_THREAD_STO_WORD] = WUKONG_THREAD_STO_INIT
+    dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
+    dmem_init[WUKONG_THREAD_CAPS12_WORD] = make_gt(
+        GT_TYPE_INFORM, PERM_MASK_S, 1, 0
+    )
+    return sum(1 for v in dmem_init if v != 0)
+
+
+def _flags_str(flags_byte):
+    """Return a human-readable flag string like 'NZ' from the flags byte."""
+    names = ['N', 'Z', 'C', 'V']  # COND_FLAGS_LAYOUT bits 0..3
+    return ''.join(n for i, n in enumerate(names) if flags_byte & (1 << i)) or '-'
+
+
+_STANDALONE_WUKONG_WORDS = (
+    0x071B0005, 0x07230006, 0xAF080001, 0x8F098000,
+    0xAF280043, 0x8F2A0000, 0x87320001, 0xB73B0001,
+    0xB8007FFE, 0xAF28004D, 0x8F2A0000, 0x87320001,
+    0xB73B0001, 0xB8007FFE, 0xAF28003A, 0x8F2A0000,
+    0x87320001, 0xB73B0001, 0xB8007FFE, 0xAF280057,
+    0x8F2A0000, 0x87320001, 0xB73B0001, 0xB8007FFE,
+    0xAF280055, 0x8F2A0000, 0x87320001, 0xB73B0001,
+    0xB8007FFE, 0xAF28004B, 0x8F2A0000, 0x87320001,
+    0xB73B0001, 0xB8007FFE, 0xAF28004F, 0x8F2A0000,
+    0x87320001, 0xB73B0001, 0xB8007FFE, 0xAF28004E,
+    0x8F2A0000, 0x87320001, 0xB73B0001, 0xB8007FFE,
+    0xAF280047, 0x8F2A0000, 0x87320001, 0xB73B0001,
+    0xB8007FFE, 0xAF28000D, 0x8F2A0000, 0x87320001,
+    0xB73B0001, 0xB8007FFE, 0xAF28000A, 0x8F2A0000,
+    0x87320001, 0xB73B0001, 0xB8007FFE, 0xAF18017C,
+    0xAF103FFF, 0xB7110001, 0xB8807FFF, 0xB7198001,
+    0xB8807FFC, 0x8F018000, 0xAF18017C, 0xAF103FFF,
+    0xB7110001, 0xB8807FFF, 0xB7198001, 0xB8807FFC,
+    0xBF007FBB,
+)
+_STANDALONE_BOOT_WORDS = (0x077F8000, 0x27678001, 0x17000000)
+_STANDALONE_BOOT_DISASSEMBLY = (
+    'LOAD NAMESPACE CR15',
+    'LOAD THREAD+HEAP CR12+, CR5',
+)
+_STANDALONE_CONDS = ('EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
+                     'HI', 'LS', 'GE', 'LT', 'GT', 'LE', '', 'NV')
+_STANDALONE_OPS = {
+    0: 'LOAD', 1: 'SAVE', 2: 'CALL', 3: 'RETURN', 4: 'CHANGE',
+    5: 'SWITCH', 6: 'TPERM', 7: 'LAMBDA', 8: 'ELOADCALL',
+    9: 'XLOADLAMBDA', 16: 'DREAD', 17: 'DWRITE', 18: 'BFEXT',
+    19: 'BFINS', 20: 'MCMP', 21: 'IADD', 22: 'ISUB',
+    23: 'BRANCH', 24: 'SHL', 25: 'SHR',
+}
+
+
+def _standalone_disassemble(word):
+    word &= 0xFFFFFFFF
+    opcode = (word >> 27) & 0x1F
+    cond = (word >> 23) & 0xF
+    dst = (word >> 19) & 0xF
+    src = (word >> 15) & 0xF
+    imm = word & 0x7FFF
+    op = _STANDALONE_OPS.get(opcode)
+    if op is None:
+        return f'??? 0x{word:08x}'
+    op += '' if cond == 14 else _STANDALONE_CONDS[cond]
+    if opcode in (0, 1, 2, 4, 5, 8, 9):
+        return f'{op} CR{dst}, CR{src}[0x{imm:04X}]'
+    if opcode in (16, 17):
+        if imm & 0x4000:
+            return f'{op} DR{dst}, CR{src}, #{imm & 0x3FFF}'
+        return f'{op} DR{dst}, CR{src}, #{(imm >> 4) & 0x3FF}, DR{imm & 0xF}'
+    if opcode in (18, 19):
+        return f'{op} DR{dst}, DR{src}, #{(imm >> 5) & 0x1F}, #{imm & 0x1F}'
+    if opcode == 20:
+        return f'{op} DR{dst}, DR{src}'
+    if opcode in (21, 22):
+        operand = f'#{imm & 0x3FFF}' if imm & 0x4000 else f'DR{imm & 0xF}'
+        return f'{op} DR{dst}, DR{src}, {operand}'
+    if opcode == 23:
+        offset = imm | 0xFFFF8000 if imm & 0x4000 else imm
+        if offset & 0x80000000:
+            offset -= 0x100000000
+        return f'{op} {offset:+d}'
+    return f'{op} DR{dst}, DR{src}, {imm & 0x1F}'
+
+
+def _standalone_boot_disassemble(offset, entry_pet_name='SelfTest'):
+    if offset == 0 or offset == 1:
+        return _STANDALONE_BOOT_DISASSEMBLY[offset]
+    if offset == 2:
+        return f'CALL CR[0] {entry_pet_name}'
+    return None
+
+
+def _trace_location(nia):
+    """Resolve the reference-bitstream pet-name/offset and disassembly."""
+    if _trace_metadata is not None:
+        return _trace_metadata(nia)
+    nia = int(nia) & 0xFFFFFFFF
+    if nia in (0, 4, 8):
+        offset = nia // 4
+        return {
+            'pet_name': 'Boot',
+            'offset': offset,
+            'nia_label': f'Boot.{offset}',
+            'disasm': _standalone_boot_disassemble(offset),
+            'source_map': 'reference-bitstream',
+        }
+    # Factory SelfTest is the resident default; WukongCallHome is the
+    # selectable resident program at 0x1200.
+    if 0x600 <= nia < 0x600 + 512 * 4 and nia % 4 == 0:
+        offset = (nia - 0x600) // 4
+        return {
+            'pet_name': 'SelfTest',
+            'offset': offset,
+            'nia_label': f'SelfTest.{offset}',
+            'disasm': ('LUMP_HEADER' if offset == 0
+                       else 'SelfTest resident instruction'),
+            'source_map': 'reference-bitstream',
+        }
+    if 0x1200 <= nia < 0x1200 + (len(_STANDALONE_WUKONG_WORDS) + 1) * 4 and nia % 4 == 0:
+        offset = (nia - 0x1200) // 4
+        if offset == 0:
+            return {
+                'pet_name': 'WukongCallHome',
+                'offset': 0,
+            'nia_label': 'WukongCallHome.0',
+                'disasm': 'LUMP_HEADER',
+                'source_map': 'reference-bitstream',
+            }
+        return {
+            'pet_name': 'WukongCallHome',
+            'offset': offset,
+            'nia_label': f'WukongCallHome.{offset}',
+            'map_instr_word': _STANDALONE_WUKONG_WORDS[offset - 1],
+            'disasm': _standalone_disassemble(_STANDALONE_WUKONG_WORDS[offset - 1]),
+            'source_map': 'reference-bitstream',
+        }
+    return None
+
+
+# Fault-code table — must match hardware.hw_types.FaultType exactly.
+# (The bridge is distributed as a single standalone file via /dl/wukong-bridge,
+# so it cannot import hw_types at runtime on the Chromebook.)
+_FAULT_NAMES = {
+    0x00: 'NONE',          0x01: 'PERM_R',        0x02: 'PERM_W',
+    0x03: 'PERM_X',        0x04: 'PERM_L',        0x05: 'PERM_S',
+    0x06: 'PERM_E',        0x07: 'NULL_CAP',      0x08: 'BOUNDS',
+    0x09: 'VERSION',       0x0A: 'SEAL',          0x0B: 'INVALID_OP',
+    0x0C: 'TPERM_RSV',     0x0D: 'DOMAIN_PURITY', 0x0E: 'BIND',
+    0x0F: 'F_BIT',         0x10: 'STACK_OVERFLOW', 0x11: 'ABSENT_OUTFORM',
+    0x12: 'STACK_CORRUPT', 0x13: 'STACK_UNDERFLOW', 0x14: 'IRQ_NULL_BASE',
+    0x15: 'OUTFORM_CRC',   0x16: 'OUTFORM_ALLOC', 0x17: 'OUTFORM_MINT',
+    0x18: 'OUTFORM_HDR',   0x19: 'OUTFORM_TIMEOUT', 0x1A: 'OUTFORM_UNAUTH',
+    0x1B: 'IMMUTABLE_SELF_CAP', 0x1C: 'STRUCTURAL_REG',
+}
+MAX_FAULT_CODE = max(_FAULT_NAMES)   # highest defined FaultType
+
+
+def _fault_name(code):
+    return _FAULT_NAMES.get(code, f'FAULT_{code}')
+
+
+# ── GT word decoder ───────────────────────────────────────────────────────────
+# GT bit layout (hw_types.py):
+#   bits[6:0]   = slot_id
+#   bits[26:25] = gt_type  (00=NULL  01=Inform  10=Outform  11=Abstract)
+#   bit[27]     = dom      (0=Turing  1=Church)
+#   bits[30:28] = perm[2:0]
+#     Turing (dom=0): bit0=R  bit1=W  bit2=X
+#     Church (dom=1): bit0=L  bit1=S  bit2=E
+_GT_SLOT_NAMES = {0: 'Thread', 1: 'Boot.NS', 7: 'WukongCallHome'}
+_GT_TYPE_SUFFIX = {2: 'Outform ', 3: 'Abstract '}
+
+# ev_types whose packet payload IS the GT (even 0 = null-GT is informative).
+# Events NOT in this set (RESULT=0x00, CHANGE_PUSH=0x03, CALL_PUSH=0x08,
+# RETURN_POP=0x09) always have hardware-forced payload=0 with no GT meaning.
+_EV_HAS_GT_PAYLOAD = frozenset({
+    0x01, 0x02,        # LOAD_SHADOW, LOAD_NEW
+    0x04, 0x05,        # CHANGE_CR12, CHANGE_CR5
+    0x06, 0x07,        # CALL_CR6, CALL_CR14
+    0x0A, 0x0B,        # RETURN_CR6, RETURN_CR14
+})
+
+# ev_types whose payload carries the new GT value for a *known* CR register.
+# Used to maintain the rolling CR GT cache for hardware fault snapshots.
+# LOAD_NEW (0x02) is excluded because the destination CR is not encoded in the
+# ev_type — it would require instruction decoding to identify the target CR.
+_EV_TO_CR = {
+    TRACE_EV_CHANGE_CR5:  5,
+    TRACE_EV_CALL_CR6:    6,
+    TRACE_EV_CHANGE_CR12: 12,
+    TRACE_EV_CALL_CR14:   14,
+    TRACE_EV_RETURN_CR6:  6,
+    TRACE_EV_RETURN_CR14: 14,
+}
+
+
+def _decode_gt_label(gt_word):
+    """Return a short human-readable annotation for a GT word.
+
+    Returns None only when gt_word is None/undefined.
+    0x00000000 returns 'NULL GT' — it is a valid null-GT value, not absence of
+    a GT payload (call sites must gate on _EV_HAS_GT_PAYLOAD to decide whether
+    to call this at all).
+
+    Examples:
+        0x42000007 -> 'WukongCallHome, Turing X-perm'
+        0x1A000007 -> 'WukongCallHome, Church L-perm'
+        0x02000001 -> 'Boot.NS, Turing no-perm'
+        0x00000000 -> 'NULL GT'
+    """
+    if gt_word is None:
+        return None
+    gt_type = (gt_word >> 25) & 0x3
+    dom     = (gt_word >> 27) & 0x1
+    perm    = (gt_word >> 28) & 0x7
+    slot    = gt_word & 0x7F
+    if gt_type == 0:
+        return 'NULL GT'
+    type_pfx = _GT_TYPE_SUFFIX.get(gt_type, '')
+    slot_str = _GT_SLOT_NAMES.get(slot, f'slot {slot}')
+    dom_str  = 'Church' if dom else 'Turing'
+    if dom:   # Church: L S E
+        parts = (['L'] if perm & 1 else []) + \
+                (['S'] if perm & 2 else []) + \
+                (['E'] if perm & 4 else [])
+    else:     # Turing: R W X
+        parts = (['R'] if perm & 1 else []) + \
+                (['W'] if perm & 2 else []) + \
+                (['X'] if perm & 4 else [])
+    perm_str = ('+'.join(parts) + '-perm') if parts else 'no-perm'
+    return f'{type_pfx}{slot_str}, {dom_str} {perm_str}'
+
+
+def decode_trace_packet(pkt):
+    """Decode a single 12-byte trace packet into a dict.
+
+    Parameters
+    ----------
+    pkt : bytes | bytearray
+        Exactly 12 bytes starting with TRACE_MAGIC (0xAA).
+
+    Returns
+    -------
+    dict with keys:
+        nia         — retiring instruction NIA (int)
+        ev_type     — TRACE_EV_* constant (int)
+        payload_gt  — GT word0 from packet bytes 6-9 (int); 0 for push/pop events
+        flags       — raw flags byte (int); bits[3:0] = NZCV
+        fault_code  — 5-bit fault code (int)
+        fault_valid — bool
+        bp_hit      — bool
+
+    The decode is purely mechanical: it unpacks bytes 1-11 of the packet.
+    All TRACE_EV_* values are forwarded as-is, including CALL sequences:
+        TRACE_EV_CALL_CR6  (0x06) — CR6  ← abstraction GT  (payload_gt = new GT word0)
+        TRACE_EV_CALL_CR14 (0x07) — CR14 ← code/return GT  (payload_gt = new GT word0)
+        TRACE_EV_CALL_PUSH (0x08) — caller frame push        (payload_gt = 0)
+    Three consecutive packets with the same NIA covering CALL_CR6, CALL_CR14,
+    and CALL_PUSH correspond to one ELOADCALL or XLOADLAMBDA retire.
+    """
+    if len(pkt) != TRACE_LEN or pkt[0] != TRACE_MAGIC:
+        raise ValueError(f'decode_trace_packet: expected {TRACE_LEN}-byte packet '
+                         f'starting with 0x{TRACE_MAGIC:02X}, got {bytes(pkt).hex()}')
+    nia        = struct.unpack('>I', pkt[1:5])[0]
+    ev_type    = pkt[5]
+    payload_gt = struct.unpack('>I', pkt[6:10])[0]
+    raw11      = pkt[11]
+    return {
+        'nia':         nia,
+        'ev_type':     ev_type,
+        'payload_gt':  payload_gt,
+        'flags':       pkt[10],
+        'fault_code':  raw11 & 0x1F,
+        'fault_valid': bool(raw11 & 0x40),
+        'bp_hit':      bool(raw11 & 0x80),
+    }
+
+
+def _prefetch_error_response(request, status):
+    """Build a payload-free response that the board can safely retry."""
+    return build_response(request["slot"], request["token"], [], status=status)
+
+
+def build_prefetch_response(request, http_response):
+    """Validate one canonical API LUMP response and frame it for the board."""
+    if getattr(http_response, "status_code", 0) == 404:
+        return _prefetch_error_response(request, PREFETCH_STATUS_NOT_FOUND)
+    if getattr(http_response, "status_code", 0) != 200:
+        return _prefetch_error_response(request, PREFETCH_STATUS_TRANSPORT)
+    payload = bytes(getattr(http_response, "content", b""))
+    if len(payload) < 8 or len(payload) % 4:
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    advertised_crc = struct.unpack(">I", payload[:4])[0]
+    raw = payload[4:]
+    if crc32(raw) != advertised_crc:
+        return _prefetch_error_response(request, PREFETCH_STATUS_CRC)
+    headers = getattr(http_response, "headers", {})
+    hash_header = str(headers.get("X-Lump-Hash", ""))
+    if (not hash_header.startswith("sha256:") or
+            str(headers.get("X-Lump-Trust", "")).lower() != "canonical" or
+            str(headers.get("X-Lump-Cache-Token", "")).lower() !=
+            f"{request['token']:08x}" or
+            not str(headers.get("X-Lump-Identity-Hash", "")).startswith("sha256:")):
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    import hashlib
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != hash_header[7:].lower():
+        return _prefetch_error_response(request, PREFETCH_STATUS_CRC)
+    if request.get("expected_hash32") and int(digest[:8], 16) != request["expected_hash32"]:
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    words = list(struct.unpack(f">{len(raw) // 4}I", raw))
+    header = words[0]
+    allocation = 1 << (((header >> 23) & 0xF) + 6)
+    if (((header >> 27) & 0x1F) != 0x1F or ((header >> 8) & 0x3) != 0x3 or
+            allocation != len(words) or allocation > request["max_words"] or
+            allocation > PREFETCH_MAX_LUMP_WORDS):
+        return _prefetch_error_response(request, PREFETCH_STATUS_MALFORMED)
+    return build_response(request["slot"], request["token"], words)
+
+
+def handle_prefetch_request(frame, ide_base, verify_tls, http_get=None):
+    """Fetch and validate a board-requested LUMP without trusting UART input."""
+    request = parse_request(bytes(frame))
+    if request is None:
+        return None
+    getter = http_get or requests.get
+    try:
+        response = getter(f"{ide_base}/api/lump/{request['token']:08x}",
+                          timeout=5, verify=verify_tls)
+        return build_prefetch_response(request, response)
+    except Exception:
+        return _prefetch_error_response(request, PREFETCH_STATUS_TRANSPORT)
+
+
+def parse_prefetch_incident(frame):
+    """Decode a fixed 8-byte board incident, returning None for noise."""
+    if len(frame) != 8 or frame[0] != PREFETCH_INCIDENT_MAGIC or frame[1] != 1:
+        return None
+    return {"sequence": frame[2], "slot": frame[3],
+            "status": frame[4], "attempts": frame[5]}
+
+
+def _is_turing_only_result(decoded):
+    """Return True for bare Turing RESULT packets that --church-only suppresses.
+
+    A packet is a "bare Turing result" when all three conditions hold:
+      1. ev_type == TRACE_EV_RESULT  (not a CALL/RETURN sub-packet)
+      2. fault_valid is False        (no fault — must always be visible)
+      3. payload_gt == 0             (no GT payload — LOAD/CHANGE carry one)
+
+    ADD, SUB, CMP, BRANCH, and similar arithmetic/control-flow instructions
+    all satisfy this predicate; Church-level CALL, RETURN, LOAD, and CHANGE
+    instructions do not (they either carry a non-zero GT or emit non-RESULT
+    ev_types).
+    """
+    return (decoded['ev_type'] == TRACE_EV_RESULT
+            and not decoded['fault_valid']
+            and not decoded['payload_gt'])
+
+
+def _crc16_ccitt(data, crc=0xFFFF):
+    """CRC-16-CCITT used by the complete architectural snapshot frame."""
+    for byte in data:
+        crc ^= (byte & 0xFF) << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def decode_snapshot_frame(frame):
+    """Decode and integrity-check one complete architectural snapshot frame.
+
+    Wire format:
+      AC version payload_len_hi payload_len_lo seq_hi seq_lo
+      payload[284] crc_hi crc_lo
+
+    Payload is:
+      reason, flags, m_flag, reserved,
+      live nia/sto/thread_base/stored_cr12_gt/packed_pc/stored_mflag,
+      CR0..CR15 × 3 words, DR0..DR15.
+    """
+    if len(frame) < SNAPSHOT_HEADER_LEN + SNAPSHOT_CRC_LEN:
+        raise ValueError('snapshot frame is truncated')
+    if frame[0] != SNAPSHOT_MAGIC:
+        raise ValueError('snapshot frame has bad magic')
+    if frame[1] != SNAPSHOT_VERSION:
+        raise ValueError(f'unsupported snapshot version {frame[1]}')
+    payload_len = struct.unpack('>H', bytes(frame[2:4]))[0]
+    expected_len = SNAPSHOT_HEADER_LEN + payload_len + SNAPSHOT_CRC_LEN
+    if payload_len != SNAPSHOT_PAYLOAD_LEN or len(frame) != expected_len:
+        raise ValueError(f'snapshot length mismatch: payload={payload_len}, frame={len(frame)}')
+    received_crc = struct.unpack('>H', bytes(frame[-2:]))[0]
+    calculated_crc = _crc16_ccitt(bytes(frame[:-2]))
+    if received_crc != calculated_crc:
+        raise ValueError(
+            f'snapshot CRC mismatch: got 0x{received_crc:04X}, '
+            f'expected 0x{calculated_crc:04X}')
+
+    payload = bytes(frame[SNAPSHOT_HEADER_LEN:-2])
+    reason, flags, m_flag, _reserved = payload[:4]
+    words = [
+        struct.unpack('>I', payload[offset:offset + 4])[0]
+        for offset in range(4, 28, 4)
+    ]
+    cr_start = 28
+    cr_words = [
+        list(struct.unpack('>III', payload[cr_start + i * 12:cr_start + (i + 1) * 12]))
+        for i in range(16)
+    ]
+    dr_start = cr_start + 16 * 12
+    dr_words = list(struct.unpack('>16I', payload[dr_start:dr_start + 64]))
+    return {
+        'snapshot': True,
+        'version': frame[1],
+        'payload_len': payload_len,
+        'seq': struct.unpack('>H', bytes(frame[4:6]))[0],
+        'reason': reason,
+        'flags': flags & 0x0F,
+        'm_flag': bool(m_flag & 1),
+        'nia': words[0],
+        'sto': words[1],
+        'thread_base': words[2],
+        'stored_cr12_gt': words[3],
+        'stored_packed_pc': words[4],
+        'stored_mflag': words[5],
+        'cr': cr_words,
+        'dr': dr_words,
+        'crc16': received_crc,
+        'crc_valid': True,
+        'integrity': 'CRC16 verified',
+    }
+
+
+def try_parse_snapshot_frame(buf, i=0):
+    """Return decoded snapshot, False for incomplete, None for invalid."""
+    if i >= len(buf) or buf[i] != SNAPSHOT_MAGIC:
+        return None
+    if len(buf) - i < SNAPSHOT_HEADER_LEN:
+        return False
+    payload_len = struct.unpack('>H', bytes(buf[i + 2:i + 4]))[0]
+    total_len = SNAPSHOT_HEADER_LEN + payload_len + SNAPSHOT_CRC_LEN
+    if payload_len != SNAPSHOT_PAYLOAD_LEN:
+        return None
+    if len(buf) - i < total_len:
+        return False
+    try:
+        return decode_snapshot_frame(bytes(buf[i:i + total_len]))
+    except ValueError:
+        return None
+
+
+def skip_snapshot_matches_pending(decoded, pending):
+    """Match only the exact next hardware snapshot for one delivered k."""
+    return bool(
+        pending and decoded.get('crc_valid') is True and
+        int(decoded.get('reason', -1)) == 3 and
+        int(decoded.get('seq', -1)) ==
+        int(pending.get('expected_skip_snapshot_seq', -2)) and
+        int(decoded.get('nia', -1)) ==
+        ((int(pending.get('fault_nia', -5)) + 4) & 0xFFFFFFFF))
+
+
+# ── Trace frame validation / resync ───────────────────────────────────────────
+# The 0xAA magic byte can also appear inside packet payloads (NIA bytes, GT
+# bytes).  If the parser loses byte alignment — mid-stream attach, a dropped
+# byte on reconnect, or UART noise — it can lock onto a payload 0xAA and emit
+# byte-shifted garbage events (e.g. NIA=0x000000AA with GT = a shifted copy of
+# the real NIA).  validate_trace_frame() applies plausibility checks so such
+# misaligned candidates are rejected and the scanner advances one byte instead.
+
+DMEM_BYTES      = WUKONG_DMEM_WORDS * 4
+_VALID_EV_TYPES = frozenset(_EV_NAMES)
+
+
+def validate_trace_frame(pkt):
+    """Return True when *pkt* (12 bytes starting 0xAA) is a plausible frame.
+
+    Checks (all must hold):
+      • correct length and magic byte
+      • NIA word-aligned and within DMEM range (< 64 KB)
+      • ev_type is one of the known TRACE_EV_* constants
+      • flags byte upper nibble zero (bits[7:4] are always 0 on hardware)
+      • fault byte reserved bit[5] zero, fault_code ≤ MAX_FAULT_CODE,
+        highest hw_types.FaultType — keep _FAULT_NAMES in sync with FaultType)
+    """
+    if len(pkt) != TRACE_LEN or pkt[0] != TRACE_MAGIC:
+        return False
+    nia = struct.unpack('>I', bytes(pkt[1:5]))[0]
+    if nia & 0x3 or nia >= DMEM_BYTES:
+        return False
+    if pkt[5] not in _VALID_EV_TYPES:
+        return False
+    if pkt[10] & 0xF0:
+        return False
+    raw11 = pkt[11]
+    if raw11 & 0x20:                       # reserved bit — always 0 on hardware
+        return False
+    if (raw11 & 0x1F) > MAX_FAULT_CODE:
+        return False
+    return True
+
+
+def try_parse_trace_frame(buf, i=0):
+    """Attempt to parse a validated trace frame at position *i* of *buf*.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not 0xAA, or the candidate frame failed validation.
+        The caller should advance ``i`` by one byte and rescan.
+    False
+        ``buf[i]`` is 0xAA but fewer than 12 bytes are buffered.  The caller
+        should wait for more data without advancing ``i``.
+    dict
+        Decoded frame (see decode_trace_packet) — caller consumes TRACE_LEN.
+    """
+    if i >= len(buf) or buf[i] != TRACE_MAGIC:
+        return None
+    if len(buf) - i < TRACE_LEN:
+        return False
+    pkt = bytes(buf[i:i + TRACE_LEN])
+    if not validate_trace_frame(pkt):
+        return None
+    return decode_trace_packet(pkt)
+
+
+def validate_boot_sentinel(sentinel, expected_n_init=None):
+    """Plausibility check used to *acquire* frame sync from a boot sentinel.
+
+    ``parse_boot_sentinel`` accepts any 0xBB/0xBC byte plus the following
+    byte(s) — that is fine once the stream is aligned, but while the bridge
+    is still hunting for frame sync (mid-run attach, byte slip), a sentinel
+    magic byte inside unaligned trace-packet payload would falsely acquire
+    the lock and re-open the console-garbage spray this gate exists to stop.
+
+    Rules (all must hold for the sentinel to be trusted for lock
+    acquisition; locked-state sentinel handling is unaffected):
+      • when *expected_n_init* is known, the N_INIT byte must match it
+      • V2 sentinels must carry a sane TU_VERSION (0x01..0x0F)
+      • V1 sentinels with no N_INIT reference are rejected — two arbitrary
+        bytes are too weak a signature to trust from an unaligned stream
+    """
+    if expected_n_init is not None:
+        if sentinel['n_init_byte'] != (expected_n_init & 0xFF):
+            return False
+    if sentinel['magic'] == BOOT_SENTINEL_V2:
+        tu = sentinel.get('tu_version')
+        if tu is None or not (0x01 <= tu <= 0x0F):
+            return False
+    elif expected_n_init is None:
+        return False
+    return True
+
+
+class StreamSync:
+    """Attach-time / mid-run frame-sync state for the bridge main loop.
+
+    When the bridge attaches to a board that is already streaming trace
+    packets, the first bytes read land at an arbitrary offset inside a
+    packet.  Misaligned payload bytes are mostly printable ASCII, so without
+    this gate they get echoed to the terminal and forwarded to the IDE
+    console as garbage (``5!%!)!...`` spray).
+
+    The stream is *unlocked* until the first fully-validated trace frame or
+    boot sentinel is decoded.  While unlocked, non-magic bytes are counted
+    and dropped instead of echoed/forwarded.  A failed 0xAA candidate frame
+    (payload byte mistaken for magic — mid-session byte slip) drops the lock
+    again so resync happens quietly.  Serial reopen also drops the lock.
+
+    NOTE: no handshake byte is ever sent to acquire sync — in particular
+    never 'f' (0x66), which performs a full CM reboot on the board.
+    """
+
+    def __init__(self, out=None):
+        self.locked = False
+        self.discarded = 0          # unaligned bytes dropped while unlocked
+        self._ascii_run = []        # consecutive plausible bytes seen unlocked
+        self._out = out if out is not None else print
+
+    def lock(self, source='trace frame'):
+        """Mark the stream aligned (a validated frame/sentinel was decoded)."""
+        self._ascii_run = []
+        if self.locked:
+            return
+        self.locked = True
+        n = self.discarded
+        self.discarded = 0
+        self._out(f'[bridge] frame sync acquired ({source}) — '
+                  f'discarded {n} unaligned byte(s)')
+
+    def unlock(self, reason='byte slip'):
+        """Drop the lock; subsequent non-magic bytes are dropped quietly."""
+        self._ascii_run = []
+        if not self.locked:
+            return
+        self.locked = False
+        self._out(f'[bridge] frame sync lost ({reason}) — '
+                  f'reacquiring quietly')
+
+    def drop_byte(self):
+        """Count one unaligned byte discarded while unlocked.
+
+        Also resets the ASCII re-lock run: this is called for failed 0xAA
+        candidates and invalid sentinels, both strong signs the surrounding
+        bytes are shifted packet payload, not genuine console text.
+        """
+        self.discarded += 1
+        self._ascii_run = []
+
+    def note_unlocked_byte(self, b):
+        """Feed one non-magic byte seen while *unlocked*; maybe re-lock.
+
+        Genuine firmware output can legitimately contain a non-ASCII byte
+        (e.g. UTF-8 box-drawing characters in a banner).  That byte trips
+        the implausible-console-byte slip heuristic and drops the lock; on
+        an idle board no trace frame or boot sentinel may arrive for a long
+        time, so without this path the console would stay muted forever.
+
+        A sustained run of CONSOLE_RELOCK_RUN consecutive plausible ASCII
+        bytes is extremely unlikely in shifted packet payload (NIA high
+        bytes are 0x00, GT words are byte-sparse), so it re-acquires the
+        lock.  Returns the list of buffered run bytes to emit as console
+        output when the lock is re-acquired, else an empty list.
+        """
+        if is_console_plausible(b):
+            self._ascii_run.append(b)
+            if len(self._ascii_run) >= CONSOLE_RELOCK_RUN:
+                run = self._ascii_run
+                self._ascii_run = []
+                self.lock('sustained ASCII run')
+                return run
+        else:
+            # Implausible byte breaks the run; count it plus the (now
+            # discarded) partial run.
+            self.discarded += len(self._ascii_run) + 1
+            self._ascii_run = []
+        return []
+
+
+class FaultRecovery:
+    """Gate one authorized recovery on a complete hardware-fault snapshot.
+
+    Trace packets identify a fault but contain only partial register state. The
+    board emits a complete ``0xAC`` stop snapshot immediately afterwards. Keep
+    it halted until that snapshot is accepted, then send the dedicated ``g``
+    authorization. The RTL accepts it only after a reason-2 snapshot has fully
+    drained. Promotion records durable evidence but intentionally does not
+    reboot: fault disposition is an explicit operator Reboot or Skip Fault.
+    """
+
+    FAULT_SNAPSHOT_REASON = 2
+
+    def __init__(self):
+        self.awaiting_snapshot = False
+        self.reboot_sent = False
+        self.incident_id = None
+        self.bridge_session = None
+        self.trace_payload = None
+        self.authorization_id = None
+        self.local_fault = None
+
+    def prepare_trace(self, trace, bridge_session):
+        """Freeze one immutable fault trace payload before its first POST."""
+        self.clear_pending()
+        payload = dict(trace)
+        if trace.get('fault_valid'):
+            self.awaiting_snapshot = True
+            self.incident_id = uuid.uuid4().hex
+            self.bridge_session = str(bridge_session or '')
+            self.authorization_id = uuid.uuid4().hex
+            payload['incident_id'] = self.incident_id
+            payload['bridge_session'] = self.bridge_session
+            self.trace_payload = payload
+            self.local_fault = {
+                'state': 'local_decoded_awaiting_delivery',
+                'incident_id': self.incident_id,
+                'fault_code': int(trace.get('fault_code', 0)),
+                'fault_name': _fault_name(trace.get('fault_code', 0)),
+                'nia': int(trace.get('nia', 0)),
+                'flags': int(trace.get('flags', 0)),
+                'correlation_status': 'local decoded; awaiting IDE delivery',
+                'promotion_status': 'pending server delivery',
+            }
+        return payload
+
+    def note_trace(self, trace, trace_seq, server_boot_id, bridge_session=None):
+        """Record the server correlation returned for the frozen fault trace."""
+        if self.trace_payload is None and trace.get('fault_valid'):
+            self.prepare_trace(trace, bridge_session or 'legacy-bridge-session')
+        if (self.awaiting_snapshot and isinstance(trace_seq, int) and
+                trace_seq > 0 and isinstance(server_boot_id, str) and server_boot_id):
+            self.trace_seq = trace_seq
+            self.server_boot_id = server_boot_id
+            if self.local_fault:
+                self.local_fault.update({
+                    'state': 'trace_accepted_awaiting_snapshot',
+                    'correlation_status': 'trace accepted; complete snapshot pending',
+                    'promotion_status': 'pending complete snapshot',
+                })
+            return True
+        self.trace_seq = None
+        self.server_boot_id = None
+        if self.local_fault:
+            self.local_fault.update({
+                'state': 'local_decoded_awaiting_delivery',
+                'correlation_status': 'local decoded; awaiting IDE delivery',
+                'promotion_status': 'pending server delivery',
+            })
+        return False
+
+    def clear_pending(self):
+        """Discard a correlation that cannot safely authorize a reboot."""
+        self.awaiting_snapshot = False
+        self.trace_seq = None
+        self.server_boot_id = None
+        self.incident_id = None
+        self.bridge_session = None
+        self.trace_payload = None
+        self.authorization_id = None
+
+    def owns_trace_payload(self, payload):
+        """True only when a delivery result belongs to the active incident."""
+        return bool(
+            self.awaiting_snapshot and self.incident_id and
+            isinstance(payload, dict) and
+            payload.get('incident_id') == self.incident_id)
+
+    def owns_snapshot_payload(self, payload):
+        """True only when a fault snapshot still belongs to this incident."""
+        return self.owns_trace_payload(payload)
+
+    def should_reboot_after_snapshot(self, snapshot, accepted):
+        return bool(
+            accepted and self.awaiting_snapshot and not self.reboot_sent and
+            self.incident_id and self.bridge_session and
+            isinstance(self.trace_seq, int) and self.trace_seq > 0 and
+            isinstance(self.server_boot_id, str) and self.server_boot_id and
+            int(snapshot.get('reason', 0)) == self.FAULT_SNAPSHOT_REASON
+        )
+
+    def mark_reboot_sent(self):
+        self.reboot_sent = True
+        self.clear_pending()
+
+    def note_boot_sentinel(self):
+        """A completed Boot.0 entry allows a later fault to recover once."""
+        self.clear_pending()
+        self.reboot_sent = False
+
+    def snapshot_payload(self, snapshot):
+        """Attach the exact fault event and server generation for correlation."""
+        payload = dict(snapshot)
+        if self.awaiting_snapshot and self.incident_id and self.bridge_session:
+            payload['incident_id'] = self.incident_id
+            payload['bridge_session'] = self.bridge_session
+        if (self.awaiting_snapshot and getattr(self, 'trace_seq', None) and
+                getattr(self, 'server_boot_id', None)):
+            payload['fault_trace_seq'] = self.trace_seq
+            payload['fault_boot_id'] = self.server_boot_id
+        return payload
+
+    def authorization_payload(self):
+        """Return the stable idempotency payload for the already-written ``g``."""
+        return {
+            'incident_id': self.incident_id,
+            'bridge_session': self.bridge_session,
+            'authorization_id': self.authorization_id,
+        }
+
+
+class FaultDeliveryWorker:
+    """Deliver telemetry without making the UART parser wait on HTTPS.
+
+    Every HTTP request is bounded to one attempt. The UART thread decides
+    whether the active fault needs another attempt after consuming its result;
+    this prevents an unreachable older incident from head-of-line blocking a
+    newer fault forever. Jobs are processed in priority order: local fault
+    status, fault trace, fault snapshot, recovery audit, then ordinary
+    telemetry.
+    """
+
+    def __init__(self, ide_base, verify_tls, session_id=None, device_uid=None):
+        self.ide_base = ide_base
+        self.verify_tls = verify_tls
+        self.session_id = session_id
+        self.device_uid = device_uid
+        # Fault evidence has a small reserved lane. Ordinary telemetry is
+        # lossy by design during an outage: the most recent later trace/status
+        # is useful, but no backlog is worth starving a board-fault record.
+        self._fault_jobs = queue.Queue(maxsize=16)
+        self._telemetry_jobs = queue.Queue(maxsize=128)
+        self._fault_results = queue.Queue(maxsize=16)
+        self._telemetry_results = queue.Queue(maxsize=128)
+        self._fault_submit_lock = threading.Lock()
+        self._stopped = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run, name='wukong-telemetry', daemon=True)
+        self._thread.start()
+
+    def close(self):
+        """Stop after any in-flight bounded request; used by bridge shutdown/tests."""
+        self._stopped.set()
+
+    def wait_for_idle(self):
+        """Wait until all submitted deliveries have produced a result.
+
+        The bridge's UART loop must never wait for HTTPS, but callers that own
+        the worker (notably deterministic tests) may need to wait for queued
+        deliveries before inspecting their effects.
+        """
+        self._fault_jobs.join()
+        self._telemetry_jobs.join()
+
+    def submit(self, kind, payload, priority=None):
+        payload = dict(payload)
+        if self.session_id:
+            payload['session_id'] = self.session_id
+            if kind in (
+                    'trace', 'trace_fault', 'snapshot', 'snapshot_fault',
+                    'recovery_authorization', 'skip_fault_completion'):
+                payload['bridge_session'] = self.session_id
+        if self.device_uid:
+            payload['device_uid'] = self.device_uid
+        critical = kind in (
+            'trace_fault', 'snapshot_fault', 'recovery_authorization',
+            'skip_fault_completion')
+        target = self._fault_jobs if critical else self._telemetry_jobs
+        if critical:
+            # The board can have only one recovery-eligible fault at a time.
+            # If an old queued critical retry fills the reserved lane, discard
+            # that oldest queued attempt in favour of the newest active
+            # evidence. An in-flight request still completes and is rejected
+            # by incident ownership if it became stale.
+            with self._fault_submit_lock:
+                try:
+                    target.put_nowait((kind, payload, critical))
+                    return True
+                except queue.Full:
+                    try:
+                        target.get_nowait()
+                        target.task_done()
+                        target.put_nowait((kind, payload, critical))
+                        return True
+                    except queue.Empty:
+                        # The worker won the race; retry the nonblocking put.
+                        try:
+                            target.put_nowait((kind, payload, critical))
+                            return True
+                        except queue.Full:
+                            pass
+                    except queue.Full:
+                        pass
+            print(f'  [{kind}] reserved delivery queue full; retry pending',
+                  flush=True)
+            return False
+        try:
+            target.put_nowait((kind, payload, critical))
+            return True
+        except queue.Full:
+            # Never let a stalled IDE make the UART parser wait. Fault retries
+            # are resubmitted by the parser after a bounded delivery result;
+            # lower-priority telemetry may be dropped under sustained outage.
+            return False
+
+    def poll(self):
+        """Return completed jobs without blocking the UART loop."""
+        results = []
+        for source in (self._fault_results, self._telemetry_results):
+            while True:
+                try:
+                    results.append(source.get_nowait())
+                except queue.Empty:
+                    break
+        return results
+
+    def _run(self):
+        while not self._stopped.is_set():
+            source = self._fault_jobs
+            try:
+                # Wait briefly on the reserved lane rather than blocking on
+                # ordinary telemetry; a fault submitted just after this check
+                # must wake the worker promptly.
+                kind, payload, critical = self._fault_jobs.get(timeout=0.05)
+            except queue.Empty:
+                source = self._telemetry_jobs
+                try:
+                    kind, payload, critical = self._telemetry_jobs.get_nowait()
+                except queue.Empty:
+                    continue
+            try:
+                if kind == 'trace_fault':
+                    reply = _post_wukong_trace(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'snapshot_fault':
+                    reply = _post_wukong_snapshot(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'snapshot':
+                    reply = _post_wukong_snapshot(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'recovery_authorization':
+                    reply = _post_recovery_authorization(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind == 'skip_fault_completion':
+                    reply = _post_skip_fault_completion(
+                        self.ide_base, payload, self.verify_tls,
+                        max_attempts=1)
+                elif kind in ('status', 'console', 'boot_info', 'halt_state'):
+                    endpoint = {
+                        'status': 'bridge-status',
+                        'console': 'console',
+                        'boot_info': 'boot-info',
+                        'halt_state': 'halt-state',
+                    }[kind]
+                    timeout = 0.5 if kind == 'status' else 1
+                    response = requests.post(
+                        f'{self.ide_base}/hardware/wukong/{endpoint}',
+                        json=payload, headers=_bridge_auth_headers(), timeout=timeout,
+                        verify=self.verify_tls)
+                    reply = {} if 200 <= response.status_code < 300 else None
+                else:
+                    try:
+                        response = requests.post(
+                            f'{self.ide_base}/hardware/wukong/trace',
+                            json=payload, headers=_bridge_auth_headers(),
+                            timeout=1, verify=self.verify_tls)
+                        reply = response.json() if response.content else {}
+                        if not (200 <= response.status_code < 300):
+                            reply = None
+                    except Exception as exc:
+                        print(f'  [trace POST error] {exc}', flush=True)
+                        reply = None
+            except Exception as exc:
+                # A malformed response or unexpected worker error must not
+                # terminate telemetry delivery or the serial bridge.
+                print(f'  [{kind} delivery error] {exc}', flush=True)
+                reply = None
+            result = {
+                'kind': kind, 'payload': payload, 'reply': reply}
+            target = self._fault_results if critical else self._telemetry_results
+            try:
+                target.put_nowait(result)
+            except queue.Full:
+                # Telemetry results are informational. A critical result is
+                # retained by retrying this bounded put, never by allocating
+                # an unbounded backlog.
+                if critical:
+                    target.put(result)
+            finally:
+                source.task_done()
+
+def _post_json_retry(url, payload, verify_tls, label, accept_reply,
+                     max_attempts=None, timeout=1, headers=None):
+    """Retry one frozen JSON payload until accepted or explicitly rejected.
+
+    Network failures and HTTP 5xx responses are transient.  HTTP 4xx and a
+    well-formed non-accepting 2xx response are terminal so fault recovery stays
+    fail-closed instead of guessing.
+    """
+    attempt = 0
+    while max_attempts is None or attempt < max_attempts:
+        attempt += 1
+        try:
+            request_args = {
+                'json': payload, 'timeout': timeout, 'verify': verify_tls}
+            request_headers = _bridge_auth_headers()
+            if headers:
+                request_headers.update(headers)
+            request_args['headers'] = request_headers
+            response = requests.post(url, **request_args)
+            try:
+                reply = response.json()
+            except Exception:
+                reply = {}
+            if 200 <= response.status_code < 300:
+                if accept_reply(reply):
+                    return reply
+                print(f'  [{label} rejected] decision='
+                      f'{reply.get("decision", "invalid response")}', flush=True)
+                return None
+            if 400 <= response.status_code < 500:
+                print(f'  [{label} rejected] HTTP {response.status_code} '
+                      f'decision={reply.get("decision", "unknown")}', flush=True)
+                return None
+            print(f'  [{label} transient] HTTP {response.status_code}', flush=True)
+        except Exception as exc:
+            print(f'  [{label} transient] {exc}', flush=True)
+        if max_attempts is None or attempt < max_attempts:
+            time.sleep(min(0.1 * (2 ** min(attempt - 1, 4)), 1.6))
+    return None
+
+
+def _post_wukong_trace(ide_base, payload, verify_tls, max_attempts=None):
+    """Commit one fault trace idempotently and return its stable correlation."""
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/trace', payload, verify_tls, 'trace POST',
+        lambda reply: bool(
+            reply.get('accepted') and int(reply.get('seq', 0)) > 0 and
+            isinstance(reply.get('boot_id'), str) and reply.get('boot_id')),
+        max_attempts=max_attempts)
+
+
+def _post_wukong_snapshot(ide_base, decoded, verify_tls, max_attempts=None):
+    """Commit a snapshot and confirm promotion for this exact incident."""
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/snapshot', decoded, verify_tls,
+        'snapshot POST',
+        lambda reply: bool(
+            reply.get('accepted') and reply.get('promoted') and
+            reply.get('decision') in ('promoted', 'duplicate')),
+        max_attempts=max_attempts)
+
+
+def _post_recovery_authorization(ide_base, payload, verify_tls,
+                                 max_attempts=None):
+    """Publish the already-written ``g`` in arrival order before Boot.0."""
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/recovery-authorization',
+        payload, verify_tls, 'recovery authorization POST',
+        lambda reply: bool(
+            reply.get('accepted') and
+            reply.get('decision') in ('recovery_authorized', 'duplicate')),
+        max_attempts=max_attempts)
+
+
+def _post_skip_fault_completion(ide_base, payload, verify_tls,
+                                max_attempts=None):
+    """Record board-originated post-skip snapshot evidence."""
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    if not token:
+        print('  [skip completion] REPORT_TOKEN absent; completion remains fail-closed',
+              flush=True)
+        return None
+    return _post_json_retry(
+        f'{ide_base}/hardware/wukong/skip-fault-completion', payload,
+        verify_tls, 'skip completion POST',
+        lambda reply: bool(reply.get('accepted') and
+                           reply.get('decision') == 'skip_completed'),
+        max_attempts=max_attempts, headers=_bridge_auth_headers())
+
+
+def _authorize_fault_recovery(ser):
+    """Authorize recovery only after the complete fault snapshot is safe."""
+    try:
+        ser.write(b'g')
+        ser.flush()
+        return True
+    except Exception as exc:
+        print(f'  [fault recovery] authorization send error: {exc}', flush=True)
+        return False
+
+
+def is_console_plausible(b):
+    """Return True when byte *b* is plausible genuine ASCII console output.
+
+    Printable ASCII (0x20..0x7E) plus tab/CR/LF.  Anything else arriving
+    while the stream is *locked* is a strong slip signal: if a packet's
+    0xAA magic byte itself is dropped by a UART overrun, the shifted bytes
+    that follow start with the NIA high bytes (always 0x00 — NIA < 64 KB),
+    so gating on this predicate and dropping the lock on the first
+    implausible byte suppresses the shifted-byte console leak entirely.
+    """
+    return 32 <= b < 127 or b in (0x09, 0x0A, 0x0D)
+
+
+# Consecutive plausible ASCII bytes required to re-acquire the frame lock
+# while unlocked (see StreamSync.note_unlocked_byte).  Shifted trace-packet
+# payload never sustains a run this long (NIA high bytes are always 0x00),
+# but a genuine text banner reaches it within a dozen characters.
+CONSOLE_RELOCK_RUN = 8
+
+
+def try_parse_utf8_sequence(buf, i):
+    """Attempt to parse a valid multi-byte UTF-8 sequence at position *i*.
+
+    Firmware banners legitimately contain multi-byte UTF-8 (box-drawing
+    characters etc.).  While the stream is locked, such bytes should be
+    decoded and forwarded as console output rather than treated as a byte
+    slip.  Truly implausible bytes (0x00, stray continuation bytes, shifted
+    packet payload) are not valid UTF-8 lead sequences and still trigger the
+    slip heuristic.
+
+    Returns
+    -------
+    None
+        ``buf[i]`` is not a valid UTF-8 lead byte, or the bytes that follow
+        do not form a valid UTF-8 sequence.  Caller should treat it as an
+        implausible (slip) byte.
+    False
+        ``buf[i]`` is a valid lead byte but the buffer does not yet hold the
+        full sequence.  Caller should wait for more data without advancing.
+    (length, text)
+        A valid sequence of *length* bytes decoding to *text* (str).
+    """
+    b0 = buf[i]
+    if 0xC2 <= b0 <= 0xDF:
+        n = 2
+    elif 0xE0 <= b0 <= 0xEF:
+        n = 3
+    elif 0xF0 <= b0 <= 0xF4:
+        n = 4
+    else:
+        return None
+    if len(buf) - i < n:
+        return False
+    seq = bytes(buf[i:i + n])
+    try:
+        text = seq.decode('utf-8')
+    except UnicodeDecodeError:
+        return None
+    return (n, text)
+
+
+def _bridge_auth_headers():
+    """Return the configured bridge credential without embedding a secret."""
+    token = os.environ.get('REPORT_TOKEN', '').strip()
+    return {'Authorization': f'Bearer {token}'} if token else {}
+
+
+def _command_target_matches(data, device_uid, session_id):
+    """Return whether a dequeued command still belongs to this bridge instance.
+
+    The server makes this check before consuming a command.  Repeat it here so
+    a stale/proxied response can never be written to a different UART.
+    """
+    target_uid = data.get('target_device_uid')
+    target_session = data.get('target_session_id')
+    if target_uid is None and target_session is None:
+        # Compatibility with pre-target-routing servers. Production commands
+        # include both fields and take the strict branch below.
+        return True
+    return bool(device_uid and session_id and target_uid == device_uid and
+                target_session == session_id)
+
+
+def post_command_ack(ide_base, verify_tls, cmd, ok, error='', cmd_id=None,
+                     session_id=None, device_uid=None, trace_counter=None,
+                     state_counter=None, halt_nonce=None):
+    """Report the serial-write result for a dequeued command to the server.
+
+    Delivery of the ack is best-effort; a failure to POST never interrupts
+    the bridge loop.
+    """
+    try:
+        payload = {'cmd': cmd, 'ok': ok, 'error': error, 'id': cmd_id}
+        if session_id:
+            payload['session_id'] = session_id
+        if device_uid:
+            # command-ack predates target routing; retain its established field
+            # while also making the bridge's physical identity explicit.
+            payload['target_device_uid'] = device_uid
+            payload['device_uid'] = device_uid
+        if trace_counter is not None:
+            payload['trace_counter'] = int(trace_counter)
+        if state_counter is not None:
+            payload['state_counter'] = int(state_counter)
+        if halt_nonce is not None:
+            payload['halt_nonce'] = int(halt_nonce)
+        requests.post(f'{ide_base}/hardware/wukong/command-ack',
+                      json=payload, headers=_bridge_auth_headers(),
+                      timeout=1, verify=verify_tls)
+    except Exception as exc:
+        print(f'  [command-ack POST error] {exc}', flush=True)
+
+
+def execute_board_command(cmd, data, ser, reopen_serial, buf,
+                          ide_base, verify_tls, session_id=None,
+                          device_uid=None, trace_counter=None, state_counter=None,
+                          write_result=None):
+    """Write a dequeued command ('s','r','h','q','b','f','k') to the board's UART.
+
+    Reports success/failure back to the server via POST
+    /hardware/wukong/command-ack so a consumed-but-unwritten command is
+    never lost silently.  Returns the (possibly reopened) Serial object.
+
+    The server-assigned command id (data['id']) is echoed in the ack so the
+    server can attribute the write result to exactly this command, even if
+    another command with the same letter has been queued since.
+    """
+    cmd_id = data.get('id')
+    try:
+        if cmd == 'b':
+            # Server normalizes nia to an int, but be defensive: accept
+            # decimal/hex strings too, and NEVER coerce a parse failure to
+            # 0xFFFFFFFF (that would silently CLEAR breakpoints in RTL).
+            raw_nia = data.get('nia', 0xFFFFFFFF)
+            try:
+                nia_val = raw_nia if isinstance(raw_nia, int) \
+                    else int(str(raw_nia).strip(), 0)
+            except ValueError:
+                try:
+                    nia_val = int(str(raw_nia).strip(), 16)
+                except ValueError:
+                    post_command_ack(ide_base, verify_tls, cmd, False,
+                                     f'unparseable breakpoint nia {raw_nia!r}',
+                    cmd_id=cmd_id, session_id=session_id, device_uid=device_uid)
+                    return ser
+            if not (0 <= nia_val <= 0xFFFFFFFF):
+                post_command_ack(ide_base, verify_tls, cmd, False,
+                                 f'breakpoint nia out of range: {nia_val}',
+                                 cmd_id=cmd_id, session_id=session_id,
+                                 device_uid=device_uid)
+                return ser
+            ser.write(b'b' + struct.pack('>I', nia_val))
+        elif cmd == 'f':
+            # Reopen the serial port first — JTAG programming silently kills
+            # the FTDI connection, so the port may be dead.  Reopening
+            # restores it, then 'f' tells the FPGA to re-fire its boot
+            # sentinel (FAULT_RST, top priority in hardware).
+            ser = reopen_serial()
+            buf.clear()
+            ser.write(b'f')
+        elif cmd == 'h':
+            ser.write(b'h' + bytes([int(data['_halt_nonce']) & 0xFF]))
+        elif cmd in ('s', 'r', 'q', 'k'):
+            ser.write(cmd.encode('ascii'))
+        else:
+            post_command_ack(ide_base, verify_tls, cmd, False,
+                             f'bridge does not understand command {cmd!r}',
+                             cmd_id=cmd_id, session_id=session_id,
+                             device_uid=device_uid)
+            return ser
+        post_command_ack(ide_base, verify_tls, cmd, True, cmd_id=cmd_id,
+                         session_id=session_id, device_uid=device_uid,
+                         trace_counter=trace_counter,
+                         state_counter=state_counter,
+                         halt_nonce=data.get('_halt_nonce') if cmd == 'h' else None)
+        if write_result:
+            write_result(cmd, data, True)
+    except Exception as exc:
+        print(f'  [command] serial write FAILED for {cmd!r}: {exc}',
+              flush=True)
+        post_command_ack(ide_base, verify_tls, cmd, False,
+                         f'serial write failed: {exc}', cmd_id=cmd_id,
+                         session_id=session_id, device_uid=device_uid,
+                         trace_counter=trace_counter,
+                         state_counter=state_counter,
+                         halt_nonce=data.get('_halt_nonce') if cmd == 'h' else None)
+        if write_result:
+            write_result(cmd, data, False)
+    return ser
+
+
+def _available_serial_ports():
+    """Return serial device names visible to pyserial on this host.
+
+    ``/dev/ttyUSB*`` is not available on Windows, where the same USB-UART
+    adapter is exposed as ``COM3``, ``COM4``, etc.  pyserial already provides
+    the portable enumeration API, so the bridge should use it on both
+    platforms instead of assuming a POSIX device path.
+    """
+    try:
+        from serial.tools import list_ports
+        return sorted(
+            {str(info.device) for info in list_ports.comports()
+             if getattr(info, 'device', None)},
+            key=lambda device: device.lower(),
+        )
+    except Exception:
+        # Keep explicit --port operation usable even if enumeration is not
+        # available in a minimal pyserial installation.
+        return []
+
+
+def _find_serial_port(preferred=None):
+    """Return *preferred* when present, otherwise the first visible port.
+
+    The fallback is only used to produce a useful SerialException when no
+    device is connected.  On Windows, COM3 is a conventional error hint; it
+    is not claimed to exist and is never opened in preference to an
+    enumerated port.
+    """
+    candidates = _available_serial_ports()
+    if preferred and preferred in candidates:
+        return preferred
+    if candidates:
+        return candidates[0]
+    if preferred:
+        return preferred
+    return 'COM3' if os.name == 'nt' else '/dev/ttyUSB0'
+
+
+def main():
+    if serial is None:
+        print("ERROR: pyserial not installed.  Run: pip install pyserial", file=sys.stderr)
+        sys.exit(1)
+    if requests is None:
+        print("ERROR: requests not installed.  Run: pip install requests", file=sys.stderr)
+        sys.exit(1)
+
+    parser = argparse.ArgumentParser(description='Wukong UART ↔ IDE bridge')
+    parser.add_argument('--port', default='auto',
+                        help='Serial port (default: auto-detect; COMx on Windows, '
+                             '/dev/ttyUSB* on Linux)')
+    parser.add_argument('--baud', type=int, default=57600, help='Baud rate')
+    parser.add_argument('--ide', default='http://localhost:5000', help='IDE base URL')
+    parser.add_argument(
+        '--device-uid', default=os.environ.get('WUKONG_DEVICE_UID', ''),
+        help='Physical board UID for target-routed commands (or WUKONG_DEVICE_UID)',
+    )
+    parser.add_argument('--insecure', action='store_true',
+                        help='Skip TLS certificate verification')
+    parser.add_argument('--church-only', action='store_true',
+                        help='Suppress bare Turing RESULT packets (no fault, no GT '
+                             'payload).  CALL/RETURN sequences and any faulting '
+                             'instruction always pass through.  Dramatically reduces '
+                             'trace volume for programs like SelfTest that execute '
+                             'many arithmetic steps between Church-level operations.')
+    args = parser.parse_args()
+
+    ide_base    = args.ide.rstrip('/')
+    church_only = args.church_only
+    # This is host configuration because the UART trace protocol deliberately
+    # has no UID field. Never derive identity from a serial path or truncate it.
+    device_uid = str(args.device_uid or '').strip()
+
+    # HTTPS carries the bridge credential: verify the server certificate by
+    # default. Only an explicit --insecure may disable verification.
+    # Requests also supports REQUESTS_CA_BUNDLE for private certificate roots.
+    verify_tls = not args.insecure
+    if not verify_tls:
+        try:
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        except Exception:
+            pass
+
+    # ── Port auto-detection ────────────────────────────────────────────────────
+    port = args.port
+    if port == 'auto':
+        port = _find_serial_port()
+        print(f'Wukong bridge: auto-detected {port} @ {args.baud} baud → {ide_base}')
+    else:
+        # os.path.exists('COM3') is not a reliable Windows serial-port
+        # availability check. Ask pyserial instead, while still honoring an
+        # explicitly supplied port when enumeration is unavailable.
+        if port not in _available_serial_ports():
+            alt = _find_serial_port()
+            if alt != port:
+                print(f'[bridge] {port} not found — trying {alt} instead')
+                port = alt
+        print(f'Wukong bridge: {port} @ {args.baud} baud → {ide_base}')
+    print(f'[bridge] version v{BRIDGE_VERSION} (host software; FPGA version reported separately)')
+    if not verify_tls:
+        print('WARNING: TLS certificate verification disabled by --insecure; '
+              'the IDE server identity is not verified')
+    elif ide_base.startswith('https://'):
+        print('TLS certificate verification enabled')
+    if church_only:
+        print('[trace] church-only filter enabled — bare Turing RESULTs suppressed')
+
+    # Compute the expected N_INIT from the current boot_rom.py tables once at
+    # startup.  Used to validate the N_INIT byte that the board sends after the
+    # sentinel magic byte (0xBB for old/stale bitstreams, 0xBC for current ones).
+    expected_n_init = _compute_expected_n_init()
+    if expected_n_init is None:
+        print('WARNING: boot_rom not importable — N_INIT sentinel byte will not be validated',
+              file=sys.stderr)
+    else:
+        print(f'Boot sentinel: expecting N_INIT={expected_n_init} '
+              f'(0x{expected_n_init & 0xFF:02X}) from board')
+
+    try:
+        ser = serial.Serial(port, args.baud, timeout=0.05)
+    except serial.SerialException as e:
+        print(f'ERROR opening {port}: {e}', file=sys.stderr)
+        sys.exit(1)
+
+    # Attach flush: discard OS-buffered partial stream so we don't start
+    # decoding in the middle of a packet the board sent before we attached.
+    try:
+        ser.reset_input_buffer()
+    except Exception:
+        pass
+    print('[bridge] acquiring frame sync — unaligned bytes will be '
+          'discarded until the first valid trace frame or boot sentinel',
+          flush=True)
+    sync = StreamSync(out=lambda msg: print(msg, flush=True))
+    session_id = uuid.uuid4().hex
+    bridge_state = 'connected'
+    last_read_ts = None
+    last_write_ts = None
+    delivery_worker = FaultDeliveryWorker(
+        ide_base, verify_tls, session_id=session_id, device_uid=device_uid)
+    trace_counter = 0
+    state_counter = 0
+    # Monotonic parse counter retained for diagnostics only. Authorization uses
+    # the exact expected 16-bit sequence already carried by the v1 hardware
+    # snapshot frame.
+    snapshot_counter = 0
+    halt_nonce_counter = 0
+    pending_halt = None
+    pending_skip = [None]  # {command_id, incident_id, fault_nia}, until reason-3 proof
+
+    def _command_write_result(cmd, data, ok):
+        nonlocal pending_halt
+        if cmd == 'h':
+            pending_halt = ({
+                'command_id': data.get('id'),
+                'automatic': False,
+                'requested_ts': time.time(),
+                'state_counter_at_write': state_counter,
+                'nonce': data.get('_halt_nonce'),
+            } if ok else None)
+        elif ok and cmd in ('s', 'r', 'b', 'f', 'u', 'k'):
+            # Any later board-state mutation makes delayed evidence for the
+            # previous timed-out Halt inapplicable.
+            pending_halt = None
+            if cmd == 'k':
+                # A write only proves UART delivery. Wait for the RTL's
+                # post-skip reason-3 snapshot before declaring success.
+                pending_skip[0] = {
+                    'command_id': data.get('id'),
+                    'incident_id': data.get('incident_id'),
+                    'fault_nia': int((fault_recovery.trace_payload or {}).get(
+                        'nia', 0)),
+                    'expected_skip_snapshot_seq': int(
+                        data.get('expected_skip_snapshot_seq', -1)),
+                    'bridge_session': session_id,
+                }
+                fault_recovery.clear_pending()
+
+    def _bridge_status(event='heartbeat', state=None, reason='',
+                       reconnect_attempt=0, fault_delivery=None):
+        """Best-effort health publication; never blocks the UART loop."""
+        payload = {
+            'session_id': session_id, 'serial_port': port,
+            'bridge_version': BRIDGE_VERSION,
+            'event': event, 'state': state or bridge_state, 'reason': reason,
+            'reconnect_attempt': reconnect_attempt,
+            'last_read_ts': last_read_ts, 'last_write_ts': last_write_ts,
+            'church_only': church_only,
+        }
+        if device_uid:
+            payload['device_uid'] = device_uid
+        if fault_delivery:
+            payload['fault_delivery'] = dict(fault_delivery)
+        delivery_worker.submit('status', payload)
+
+    _bridge_status('session_started', 'connected')
+
+    buf          = bytearray()
+    last_poll    = 0.0
+    resync_skips = 0   # bogus-0xAA candidates skipped by frame validation
+    # Rolling cache of the most-recently-seen GT word0 for each CR register,
+    # keyed by CR index.  Updated on every ev_type that unambiguously carries a
+    # known CR's new GT value (CALL_CR6, CALL_CR14, RETURN_CR6, RETURN_CR14,
+    # CHANGE_CR12, CHANGE_CR5).  Included in fault snapshot POSTs so the IDE's
+    # Last Fault panel shows at least the call-path CRs rather than all-zero rows.
+    _cr_gt_cache = {}   # {cr_index: gt_word0}
+    # Fault recovery is deliberately bridge-owned: this process is the sole
+    # serial writer and can prove that the board's complete stop snapshot was
+    # accepted before it asks the RTL to re-enter the boot ladder.
+    fault_recovery = FaultRecovery()
+    # A reason-2 snapshot can arrive before the asynchronous fault trace POST
+    # has returned its server sequence. Hold it until that exact correlation
+    # is available; never post an uncorrelated snapshot.
+    pending_fault_snapshot = [None]  # (incident_id, decoded snapshot)
+
+    def _fault_delivery_status():
+        """Return the local evidence that is safe to expose to the IDE."""
+        return dict(fault_recovery.local_fault or {})
+
+    def _process_delivery_results():
+        """Apply completed HTTP results without ever waiting for the worker."""
+        nonlocal ser
+        for result in delivery_worker.poll():
+            kind = result['kind']
+            reply = result.get('reply')
+            if kind == 'trace_fault':
+                payload = result['payload']
+                # A result from an older delivery attempt is diagnostic only:
+                # it must never lend its server sequence to the active fault.
+                if not fault_recovery.owns_trace_payload(payload):
+                    print('  [fault delivery] stale trace result discarded',
+                          flush=True)
+                    continue
+                trace_seq = int(reply.get('seq', 0)) if reply else None
+                trace_boot_id = reply.get('boot_id') if reply else None
+                accepted = fault_recovery.note_trace(
+                    payload, trace_seq, trace_boot_id, session_id)
+                if accepted:
+                    print('  [fault delivery] trace accepted; '
+                          'complete snapshot still required', flush=True)
+                    _bridge_status(
+                        'fault_trace_accepted', 'fault_hold',
+                        'fault trace accepted; complete snapshot pending',
+                        fault_delivery=_fault_delivery_status())
+                else:
+                    print('  [fault delivery] local fault remains pending '
+                          '— IDE trace delivery has not been confirmed',
+                          flush=True)
+                    _bridge_status(
+                        'fault_trace_pending', 'fault_hold',
+                        'local fault decoded; awaiting IDE trace delivery',
+                        fault_delivery=_fault_delivery_status())
+                    # Retry only the still-active incident. The worker itself
+                    # never sleeps/retries, so UART parsing stays independent.
+                    delivery_worker.submit('trace_fault', payload)
+                if accepted and pending_fault_snapshot[0] is not None:
+                    pending_incident, pending = pending_fault_snapshot[0]
+                    if pending_incident == fault_recovery.incident_id:
+                        pending_fault_snapshot[0] = None
+                        delivery_worker.submit(
+                            'snapshot_fault',
+                            fault_recovery.snapshot_payload(pending))
+            elif kind == 'snapshot_fault':
+                snapshot = result['payload']
+                if not fault_recovery.owns_snapshot_payload(snapshot):
+                    print('  [fault delivery] stale snapshot result discarded',
+                          flush=True)
+                    continue
+                accepted = bool(reply)
+                if accepted:
+                    # Fail closed: promotion is durable evidence only. Do not
+                    # emit `g` automatically; an operator must explicitly
+                    # choose Reboot (`f`) or testing-only Skip (`k`).
+                    print('  [fault recovery] complete fault snapshot stored '
+                          '— board remains held awaiting operator disposition',
+                          flush=True)
+                    _bridge_status(
+                        'fault_snapshot_correlated', 'fault_hold',
+                        'complete fault snapshot promoted; awaiting operator disposition',
+                        fault_delivery=_fault_delivery_status())
+                else:
+                    # A failed network attempt keeps the active, correlated
+                    # incident armed for an exact snapshot retry. A server
+                    # response that did not promote it is terminal and remains
+                    # fail-closed.
+                    if reply:
+                        fault_recovery.clear_pending()
+                        print('  [fault delivery] snapshot was not correlated '
+                              '— recovery remains blocked', flush=True)
+                    else:
+                        print('  [fault delivery] snapshot delivery failed '
+                              '— recovery remains blocked', flush=True)
+                        delivery_worker.submit('snapshot_fault', snapshot)
+            elif kind == 'snapshot':
+                # Explicit/manual snapshots are informational and never
+                # participate in the automatic recovery gate.
+                if reply is None:
+                    print('  [snapshot POST error] delivery deferred',
+                          flush=True)
+            elif kind == 'skip_fault_completion':
+                if reply:
+                    pending_skip[0] = None
+                    print('  [skip fault] board completion snapshot correlated',
+                          flush=True)
+                else:
+                    print('  [skip fault] completion delivery failed; fault remains visible',
+                          flush=True)
+            elif kind == 'recovery_authorization':
+                if reply:
+                    print('  [fault recovery] authorization audit confirmed',
+                          flush=True)
+                else:
+                    print('  [fault recovery] authorization audit pending '
+                          '— board recovery was already fail-closed at snapshot',
+                          flush=True)
+
+    # Deferred 'q' (snapshot) gate — set on each boot sentinel and cleared
+    # once BOOT_TRACE_PACKET_COUNT trace packets have been received or
+    # BOOT_Q_TIMEOUT seconds have elapsed.  Prevents the snapshot from racing
+    # with in-flight boot trace packets on a cold board start (see the
+    # BOOT_TRACE_PACKET_COUNT constant block above for the full race analysis).
+    _boot_q_pending   = False
+    _boot_q_remaining = 0
+    _boot_q_deadline  = 0.0
+    # Raw prefetch responses grant the board exclusive RX ownership. The timer
+    # derives the exact serial drain window and defers all control traffic.
+    prefetch_busy_until = 0.0
+
+    # ── UART ASCII console forwarding ────────────────────────────────────
+    # Printable UART bytes (banner text etc.) are line-buffered and POSTed
+    # to the IDE so the /fpga page's live event log shows ALL board output,
+    # not just decoded trace packets.
+    _console_line  = []     # chars of the line currently being assembled
+    _console_last  = [0.0]  # time of last char appended (for idle flush)
+
+    def _console_flush(base, vtls):
+        if not _console_line:
+            return
+        text = ''.join(_console_line)
+        _console_line.clear()
+        if not text.strip():
+            return
+        delivery_worker.submit(
+            'console', {'text': text, 'ts': time.time()})
+
+    def _reopen_serial():
+        """Close and reopen the serial port; return the new Serial object.
+
+        After a USB reconnect the device may be renumbered (e.g. ttyUSB0→ttyUSB1).
+        We scan /dev/ttyUSB* on each attempt so the renumbered port is found.
+        """
+        nonlocal port, pending_halt
+        if pending_halt is not None:
+            pending_halt = None
+            _bridge_status(
+                'halt_confirmation_unavailable', 'reconnecting',
+                'serial reconnect began before halt evidence arrived')
+        try:
+            ser.close()
+        except Exception:
+            pass
+        for attempt in range(15):
+            _bridge_status('reconnect_attempt', 'reconnecting',
+                           'waiting for serial port', attempt + 1)
+            found = _find_serial_port(port)
+            try:
+                s = serial.Serial(found, args.baud, timeout=0.05)
+                if found != port:
+                    print(f'[bridge] USB renumbered: {port} → {found}', flush=True)
+                    port = found
+                print(f'[bridge] serial port reopened ({port})', flush=True)
+                _bridge_status('reconnected', 'connected',
+                               f'serial port available: {port}')
+                # Attach flush + quiet resync: drop the frame lock and any
+                # partial buffer so we re-acquire alignment without spraying
+                # misaligned payload bytes as console text.
+                try:
+                    s.reset_input_buffer()
+                except Exception:
+                    pass
+                sync.unlock('serial reopen')
+                del buf[:]
+                print('[bridge] acquiring frame sync after reopen', flush=True)
+                return s
+            except serial.SerialException as exc:
+                print(f'[bridge] reopen attempt {attempt+1}/15 failed ({found}): {exc}', flush=True)
+                time.sleep(1)
+        print(f'[bridge] ERROR: could not reopen serial port after 15 attempts', file=sys.stderr)
+        _bridge_status('reconnect_failed', 'serial_error',
+                       'could not reopen serial port after 15 attempts', 15)
+        return ser  # return old object; read loop will keep failing gracefully
+
+    try:
+        while True:
+            try:
+                chunk = ser.read(128)
+                if chunk:
+                    last_read_ts = time.time()
+            except (serial.SerialException, OSError) as exc:
+                print(f'[bridge] serial read error: {exc} — reopening port', flush=True)
+                bridge_state = 'serial_error'
+                _bridge_status('serial_read_error', bridge_state, str(exc))
+                ser = _reopen_serial()
+                buf.clear()
+                continue
+            if chunk:
+                buf.extend(chunk)
+
+            i = 0
+            while i < len(buf):
+                b = buf[i]
+
+                if b == HALT_STATE_MAGIC:
+                    decoded = try_parse_halt_state_frame(buf, i)
+                    if decoded is False:
+                        break
+                    if decoded is None:
+                        sync.unlock('invalid halt-state frame')
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    sync.lock('halt-state frame')
+                    state_counter += 1
+                    if pending_halt is not None:
+                        if not halt_state_evidence_matches_pending(
+                                decoded, pending_halt):
+                            print('  [halt] stale nonce ignored', flush=True)
+                            i += HALT_STATE_LEN
+                            continue
+                        payload = dict(decoded)
+                        payload.update({
+                            'command_id': pending_halt.get('command_id'),
+                            'automatic': bool(pending_halt.get('automatic')),
+                            'requested_ts': pending_halt.get('requested_ts'),
+                            'state_counter_at_write': pending_halt.get(
+                                'state_counter_at_write'),
+                            'board_state_counter': state_counter,
+                            'halt_nonce': decoded.get('nonce'),
+                            'session_id': session_id,
+                            'device_uid': device_uid,
+                            'ts': time.time(),
+                        })
+                        delivery_worker.submit('halt_state', payload)
+                        _bridge_status(
+                            'halt_confirmed', 'halt_confirmed',
+                            'board emitted halted-state evidence')
+                        pending_halt = None
+                    else:
+                        print('  [halt] unsolicited board-state frame ignored',
+                              flush=True)
+                    i += HALT_STATE_LEN
+                    continue
+
+                if b == PREFETCH_REQUEST_MAGIC:
+                    if len(buf) - i < PREFETCH_REQUEST_LEN:
+                        break
+                    request_frame = bytes(buf[i:i + PREFETCH_REQUEST_LEN])
+                    response = handle_prefetch_request(
+                        request_frame, ide_base, verify_tls)
+                    if response is None:
+                        i += 1
+                        continue
+                    try:
+                        ser.write(response)
+                        ser.flush()
+                        last_write_ts = time.time()
+                        prefetch_busy_until = max(
+                            prefetch_busy_until,
+                            last_write_ts + (len(response) * 10 / args.baud) + 0.25)
+                        print(f'[prefetch] request served ({len(response)} bytes)',
+                              flush=True)
+                    except Exception as exc:
+                        print(f'[prefetch] serial write failed: {exc}', flush=True)
+                    i += PREFETCH_REQUEST_LEN
+                    continue
+
+                if b == PREFETCH_INCIDENT_MAGIC:
+                    if len(buf) - i < 8:
+                        break
+                    incident = parse_prefetch_incident(bytes(buf[i:i + 8]))
+                    if incident is not None:
+                        delivery_worker.submit('console', {
+                            'text': ('[PREFETCH INCIDENT] required slot '
+                                     f'{incident["slot"]} stopped after '
+                                     f'{incident["attempts"]} attempt(s), '
+                                     f'status={incident["status"]}'),
+                            'ts': time.time(),
+                        })
+                        _bridge_status('prefetch_incident', 'fault_hold',
+                                       f'slot={incident["slot"]} status={incident["status"]}')
+                        i += 8
+                        continue
+
+                if b == SNAPSHOT_MAGIC:
+                    decoded = try_parse_snapshot_frame(buf, i)
+                    if decoded is False:
+                        break
+                    if decoded is None:
+                        sync.unlock('invalid snapshot frame')
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    sync.lock('snapshot frame')
+                    snapshot_counter += 1
+                    _console_flush(ide_base, verify_tls)
+                    decoded['ts'] = time.time()
+                    # The RTL emits this reason-3 frame only after the
+                    # accepted skip pulse advanced NIA. Bind it to the exact
+                    # UART command and fault incident before any ordinary
+                    # snapshot handling.
+                    skip = pending_skip[0]
+                    if skip_snapshot_matches_pending(decoded, skip):
+                        completion = dict(decoded)
+                        completion.update(skip)
+                        delivery_worker.submit(
+                            'skip_fault_completion', completion)
+                        i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
+                        continue
+                    snapshot_payload = fault_recovery.snapshot_payload(decoded)
+                    if decoded.get('reason') == FaultRecovery.FAULT_SNAPSHOT_REASON:
+                        # The fault trace worker is ahead of this snapshot, but
+                        # its result is applied by the UART thread. Hold the
+                        # complete frame until it supplies seq/boot_id.
+                        if (fault_recovery.awaiting_snapshot and
+                                getattr(fault_recovery, 'trace_seq', None)):
+                            delivery_worker.submit(
+                                'snapshot_fault', snapshot_payload)
+                        elif fault_recovery.awaiting_snapshot:
+                            pending_fault_snapshot[0] = (
+                                fault_recovery.incident_id, decoded)
+                        else:
+                            print('  [fault recovery] uncorrelated snapshot '
+                                  '— recovery remains blocked', flush=True)
+                    else:
+                        delivery_worker.submit('snapshot', snapshot_payload)
+                    i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
+                    continue
+
+                if b == TRACE_MAGIC:
+                    decoded = try_parse_trace_frame(buf, i)
+                    if decoded is False:
+                        # Magic byte seen but frame not fully buffered yet.
+                        break
+                    if decoded is None:
+                        # Candidate frame failed plausibility checks — the 0xAA
+                        # is a payload byte from a misaligned stream (mid-stream
+                        # attach, dropped byte, or noise).  Advance one byte and
+                        # rescan instead of emitting a garbage event.
+                        resync_skips += 1
+                        if resync_skips <= 3 or resync_skips % 100 == 0:
+                            print(f'[bridge] trace resync: skipped bogus 0xAA '
+                                  f'candidate ({resync_skips} total)', flush=True)
+                        # A payload 0xAA mistaken for magic means we may have
+                        # slipped alignment mid-session — drop the lock so the
+                        # following bytes are discarded quietly instead of
+                        # sprayed as console text.
+                        sync.unlock('bogus 0xAA candidate')
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    sync.lock('trace frame')
+                    # Boot trace packet gate: count down toward the deferred
+                    # 'q' snapshot.  Run BEFORE the church-only filter so that
+                    # filtered bare-Turing RESULT packets still contribute to
+                    # the count — the boot sequence may be entirely composed of
+                    # such packets and the gate must fire at the right time
+                    # regardless of filtering mode.
+                    if _boot_q_pending and time.time() >= prefetch_busy_until:
+                        _boot_q_remaining -= 1
+                        if _boot_q_remaining <= 0:
+                            _boot_q_pending = False
+                            try:
+                                ser.write(b'q')
+                                last_write_ts = time.time()
+                                print('  [boot] all boot trace packets received'
+                                      ' — snapshot requested', flush=True)
+                            except Exception as _qe:
+                                print(f'  [boot] snapshot send error: {_qe}',
+                                      flush=True)
+                    # church-only filter: suppress bare Turing RESULT packets
+                    # (no fault, no GT payload).  The frame is still consumed
+                    # (i advances by TRACE_LEN) but nothing is forwarded to the
+                    # IDE and nothing is printed to the terminal.
+                    if church_only and _is_turing_only_result(decoded):
+                        i += TRACE_LEN
+                        continue
+                    # Queue pending ASCII first so console text and trace
+                    # packets retain arrival order without blocking UART reads.
+                    _console_flush(ide_base, verify_tls)
+                    decoded['ts'] = time.time()
+                    trace_counter += 1
+                    decoded['bridge_trace_counter'] = trace_counter
+                    decoded['bridge_session'] = session_id
+                    location = _trace_location(decoded['nia'])
+                    if location:
+                        decoded.update(location)
+                    decoded['gt_label'] = (
+                        _decode_gt_label(decoded.get('payload_gt', 0)) or ''
+                        if decoded.get('ev_type') in _EV_HAS_GT_PAYLOAD else ''
+                    )
+
+                    trace_payload = (
+                        fault_recovery.prepare_trace(decoded, session_id)
+                        if decoded.get('fault_valid') else decoded)
+                    delivery_kind = (
+                        'trace_fault' if decoded.get('fault_valid') else 'trace')
+
+                    ev_type    = decoded['ev_type']
+                    payload_gt = decoded['payload_gt']
+                    nia        = decoded['nia']
+                    flags_byte = decoded['flags']
+                    flag_str   = _flags_str(flags_byte)
+                    ts_str     = time.strftime('%H:%M:%S', time.localtime())
+                    ev_name    = _EV_NAMES.get(ev_type, f'EV_0x{ev_type:02X}')
+                    if ev_type in _EV_HAS_GT_PAYLOAD:
+                        _gt_label = _decode_gt_label(payload_gt)
+                        gt_str    = (f'  GT=0x{payload_gt:08X}' +
+                                     (f' ({_gt_label})' if _gt_label else ''))
+                    else:
+                        gt_str = ''
+
+                    # Update rolling CR GT cache from packets that unambiguously
+                    # carry a known CR's new GT value before a later snapshot
+                    # captures the register update that caused the fault.
+                    _cr_idx = _EV_TO_CR.get(ev_type)
+                    if _cr_idx is not None:
+                        _cr_gt_cache[_cr_idx] = payload_gt
+
+                    if decoded['fault_valid']:
+                        # The server correlates a reason-2 snapshot with the
+                        # latest accepted fault trace.  If that trace did not
+                        # reach it, leave the physical board halted instead of
+                        # rebooting into Boot.0 with a stale fault record.
+                        fault_str = f'  FAULT={_fault_name(decoded["fault_code"])}'
+                    else:
+                        fault_str = ''
+                    bp_str = '  [BP HIT]' if decoded['bp_hit'] else ''
+                    location = _trace_location(nia)
+                    if location:
+                        where = f"{location['nia_label']} (NIA=0x{nia:08X})"
+                        instruction = f"  {location['disasm']}"
+                    else:
+                        where = f"NIA=0x{nia:08X}"
+                        instruction = "  <instruction unavailable>"
+                    print(f'[{ts_str}] HW: {where}{instruction}  {ev_name}{gt_str}'
+                          f'  flags={flag_str}{fault_str}{bp_str}')
+                    if decoded.get('fault_valid'):
+                        _bridge_status(
+                            'fault_decoded', 'fault_hold',
+                            'local fault decoded; awaiting IDE delivery',
+                            fault_delivery=_fault_delivery_status())
+                    delivery_worker.submit(delivery_kind, trace_payload)
+                    i += TRACE_LEN
+
+                elif b in (BOOT_SENTINEL_V1, BOOT_SENTINEL_V2):
+                    # Flush pending ASCII first (arrival-order preservation).
+                    _console_flush(ide_base, verify_tls)
+                    # Delegate to the shared sentinel parser so the bridge and
+                    # the smoke test always interpret the byte stream identically.
+                    sentinel = parse_boot_sentinel(buf, i)
+                    if sentinel is False:
+                        # Magic byte seen but not enough bytes buffered yet.
+                        break
+                    if not sync.locked:
+                        # Unaligned stream: only trust the sentinel to acquire
+                        # the lock when its fields validate — sentinel magic
+                        # bytes also appear inside trace-packet payloads.
+                        if not validate_boot_sentinel(sentinel, expected_n_init):
+                            sync.drop_byte()
+                            i += 1
+                            continue
+                        sync.lock('boot sentinel')
+
+                    board_n_init_byte = sentinel['n_init_byte']
+                    # A new boot sentinel means the previous recovery finished;
+                    # permit exactly one automatic recovery for a later fault.
+                    fault_recovery.note_boot_sentinel()
+                    tu_version        = sentinel['tu_version']   # None for V1
+                    build_version     = sentinel.get('build_version')  # None for V1
+                    tu_str            = (f'  TU_VERSION=0x{tu_version:02X}'
+                                         if tu_version is not None else '')
+                    bv_str            = (f'  BUILD=v{build_version}'
+                                         if build_version is not None else '')
+
+                    if expected_n_init is not None:
+                        expected_byte = expected_n_init & 0xFF
+                        if board_n_init_byte == expected_byte:
+                            print(f'BOOT: board ready — N_INIT={expected_n_init} '
+                                  f'(0x{expected_byte:02X}) matches source  ✓{tu_str}{bv_str}')
+                        else:
+                            print(f'BOOT WARNING: N_INIT mismatch — '
+                                  f'board sent 0x{board_n_init_byte:02X} '
+                                  f'but source expects 0x{expected_byte:02X} '
+                                  f'(N_INIT={expected_n_init}){tu_str}{bv_str}',
+                                  file=sys.stderr)
+                            print('  The bitstream was built with a different '
+                                  'WUKONG_DEMO_NAMESPACE / WUKONG_DEMO_CLIST.',
+                                  file=sys.stderr)
+                            print('  Run: python3 hardware/check_dmem_count.py --check',
+                                  file=sys.stderr)
+                            # Notify the IDE so the mismatch is visible in the
+                            # console event log, not just the bridge's stderr.
+                            delivery_worker.submit('console', {
+                                'text': ('⚠ Board bitstream may be stale — '
+                                         'N_INIT mismatch (board sent '
+                                         f'0x{board_n_init_byte:02X}, expected '
+                                         f'0x{expected_byte:02X}). Reflash the '
+                                         'bitstream.'),
+                                'ts': time.time(),
+                            })
+                    else:
+                        print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
+                              f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')
+
+                    # The current RTL powers up in free-run mode.  Fail safe in
+                    # software by halting immediately after a fresh sentinel;
+                    # both control surfaces then require one deliberate Step
+                    # before they enable Run.
+                    startup_state = 'halt_failed'
+                    try:
+                        halt_nonce_counter = (halt_nonce_counter + 1) & 0xFF
+                        ser.write(b'h' + bytes([halt_nonce_counter]))
+                        last_write_ts = time.time()
+                        pending_halt = {
+                            'command_id': None,
+                            'automatic': True,
+                            'requested_ts': last_write_ts,
+                            'state_counter_at_write': state_counter,
+                            'nonce': halt_nonce_counter,
+                        }
+                        startup_state = 'halt_requested'
+                        print('  [boot] halt requested — awaiting board confirmation',
+                              flush=True)
+                        _bridge_status(
+                            'automatic_halt_after_sentinel',
+                            'halt_requested',
+                            'halt written after boot sentinel; awaiting board evidence')
+                    except Exception as exc:
+                        print(f'  [halt send error] {exc}', flush=True)
+                        _bridge_status(
+                            'automatic_halt_failed', 'serial_error', str(exc))
+
+                    # Do not send 'q' back-to-back with the sentinel.  Drain
+                    # trace bytes already in flight before requesting a
+                    # snapshot, or the snapshot can capture partial boot state.
+                    _boot_q_pending   = True
+                    _boot_q_remaining = BOOT_TRACE_PACKET_COUNT
+                    _boot_q_deadline  = time.time() + BOOT_Q_TIMEOUT
+                    print(f'  [boot] deferring snapshot until boot traffic '
+                          f'settles (timeout={BOOT_Q_TIMEOUT:.1f}s)', flush=True)
+
+                    if sentinel['stale']:
+                        if tu_version is None:
+                            # V1 sentinel — TraceUnit FSM predates 3-packet CALL.
+                            print('BITSTREAM WARNING: old sentinel (0xBB) — '
+                                  'stale TraceUnit FSM detected.',
+                                  file=sys.stderr)
+                        else:
+                            # V2 sentinel but TU_VERSION too low.
+                            print(f'BITSTREAM WARNING: TU_VERSION=0x{tu_version:02X} is below '
+                                  f'required 0x{TU_VERSION_CALL_3PKT:02X}.',
+                                  file=sys.stderr)
+                        print('  ELOADCALL and XLOADLAMBDA emit a single RESULT packet instead of',
+                              file=sys.stderr)
+                        print('  the 3-packet CALL sequence (CALL_CR6 + CALL_CR14 + CALL_PUSH).',
+                              file=sys.stderr)
+                        print('  CR6 and CR14 state shown in the IDE will be wrong after any',
+                              file=sys.stderr)
+                        print('  ELOADCALL or XLOADLAMBDA instruction executes.',
+                              file=sys.stderr)
+                        print('  Rebuild and reflash the bitstream to get the current TraceUnit.',
+                              file=sys.stderr)
+                        # Notify the IDE so it can show a visible warning banner.
+                        post_tu = tu_version if tu_version is not None else 0x01
+                        delivery_worker.submit('boot_info', {
+                            'stale_tu': True, 'tu_version': post_tu,
+                            'build_version': build_version,
+                            'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
+                            'startup_state': startup_state,
+                            'session_id': session_id,
+                            'device_uid': device_uid,
+                        })
+                    else:
+                        # Current bitstream — clear any previous stale warning in the IDE.
+                        delivery_worker.submit('boot_info', {
+                            'stale_tu': False, 'tu_version': tu_version,
+                            'build_version': build_version,
+                            'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
+                            'startup_state': startup_state,
+                            'session_id': session_id,
+                            'device_uid': device_uid,
+                        })
+
+                    i += sentinel['length']
+
+                else:
+                    ch = buf[i]
+                    if not sync.locked:
+                        # Unaligned stream (mid-run attach or byte slip):
+                        # count and drop instead of spraying payload bytes
+                        # as console text.  A sustained run of plausible
+                        # ASCII re-acquires the lock (genuine banner text
+                        # after a UTF-8 byte tripped the slip heuristic);
+                        # the buffered run is then emitted so the banner
+                        # is not clipped.
+                        for rb in sync.note_unlocked_byte(ch):
+                            print(chr(rb) if 32 <= rb < 128 else '.',
+                                  end='', flush=True)
+                            if rb in (0x0A, 0x0D):
+                                _console_flush(ide_base, verify_tls)
+                            elif 32 <= rb < 128:
+                                _console_line.append(chr(rb))
+                                _console_last[0] = time.time()
+                                if len(_console_line) >= 200:
+                                    _console_flush(ide_base, verify_tls)
+                        i += 1
+                        continue
+                    if not is_console_plausible(ch):
+                        # Could be a genuine multi-byte UTF-8 sequence in
+                        # firmware output (box-drawing banner characters).
+                        u = try_parse_utf8_sequence(buf, i)
+                        if u is False:
+                            # Valid lead byte, sequence incomplete — wait for
+                            # more data before deciding.
+                            break
+                        if u is not None:
+                            n_bytes, text = u
+                            print(text, end='', flush=True)
+                            _console_line.append(text)
+                            _console_last[0] = time.time()
+                            if len(_console_line) >= 200:
+                                _console_flush(ide_base, verify_tls)
+                            i += n_bytes
+                            continue
+                        # Locked, but this byte cannot be genuine console
+                        # output (not ASCII, not valid UTF-8).  A dropped 0xAA
+                        # magic byte (UART overrun) leaves the stream shifted
+                        # with the lock still held; the shifted bytes start
+                        # with NIA high bytes (0x00), so treat the first
+                        # implausible byte as a slip: drop the lock and
+                        # discard quietly until resync.
+                        sync.unlock('implausible console byte — probable slip')
+                        sync.drop_byte()
+                        i += 1
+                        continue
+                    print(chr(ch) if 32 <= ch < 128 else '.', end='', flush=True)
+                    # Accumulate printable UART bytes into a line buffer so the
+                    # IDE's /fpga page can show the raw ASCII output too.
+                    if ch in (0x0A, 0x0D):
+                        _console_flush(ide_base, verify_tls)
+                    elif 32 <= ch < 128:
+                        _console_line.append(chr(ch))
+                        _console_last[0] = time.time()
+                        if len(_console_line) >= 200:   # runaway line safety
+                            _console_flush(ide_base, verify_tls)
+                    i += 1
+
+            del buf[:i]
+
+            now = time.time()
+            # Apply only completed HTTP results. Network retries remain in the
+            # daemon worker and can never stop UART decoding.
+            _process_delivery_results()
+            # Deferred snapshot timeout: if the expected boot trace packets
+            # have not all arrived within BOOT_Q_TIMEOUT seconds, send 'q'
+            # anyway so the IDE still gets a register snapshot on boards that
+            # emit fewer packets than expected (e.g. older bitstreams).
+            if _boot_q_pending and now >= _boot_q_deadline and now >= prefetch_busy_until:
+                _boot_q_pending = False
+                try:
+                    ser.write(b'q')
+                    last_write_ts = now
+                    print(f'  [boot] snapshot timeout — requesting snapshot '
+                          f'({_boot_q_remaining} boot packet(s) still pending)',
+                          flush=True)
+                except Exception as _qe:
+                    print(f'  [boot] snapshot send error (timeout): {_qe}',
+                          flush=True)
+
+            # Idle flush: a partial line with no newline (e.g. a banner that
+            # ends without \n) is forwarded after 0.5 s of UART silence.
+            if _console_line and now - _console_last[0] >= 0.5:
+                _console_flush(ide_base, verify_tls)
+            if now - last_poll >= 0.05 and now >= prefetch_busy_until:
+                last_poll = now
+                try:
+                    r = requests.get(
+                        f'{ide_base}/hardware/wukong/command',
+                        headers=dict(_bridge_auth_headers(),
+                                     **{'X-Wukong-Session': session_id,
+                                        'X-Wukong-Device-UID': device_uid}),
+                        timeout=0.1, verify=verify_tls)
+                    if r.status_code == 200:
+                        data = r.json() or {}
+                        cmd = data.get('cmd')
+                        if cmd and not _command_target_matches(
+                                data, device_uid, session_id):
+                            # Never turn an unexpected response into UART
+                            # traffic. The server retains the command on a
+                            # target mismatch; this protects against a stale
+                            # response crossing bridge sessions.
+                            _bridge_status('command_target_mismatch',
+                                           'target_mismatch',
+                                           'dequeued command target differs from bridge identity')
+                            continue
+                        if cmd in ('s', 'r', 'h', 'q', 'b', 'f', 'k'):
+                            if cmd == 'h':
+                                halt_nonce_counter = (
+                                    halt_nonce_counter + 1) & 0xFF
+                                data['_halt_nonce'] = halt_nonce_counter
+                            ser = execute_board_command(
+                                cmd, data, ser, _reopen_serial, buf,
+                                ide_base, verify_tls, session_id, device_uid,
+                                trace_counter=trace_counter,
+                                state_counter=(snapshot_counter
+                                               if cmd == 'k'
+                                               else state_counter),
+                                write_result=_command_write_result)
+                        elif cmd == 'u':
+                            try:
+                                _leftover = _handle_upload(
+                                    data, ser, ide_base, verify_tls, session_id,
+                                    device_uid)
+                                if _leftover:
+                                    # Bytes read during the ACK wait that are
+                                    # NOT the 0x06 ACK byte (e.g. trace packets
+                                    # emitted the moment the board starts
+                                    # executing the new image).  Prepend them
+                                    # back into the main receive buffer so the
+                                    # trace parser sees them on the next loop.
+                                    buf[0:0] = _leftover
+                            except Exception as _upload_exc:
+                                print(f'  [upload] ERROR: unexpected handler '
+                                      f'failure: {_upload_exc}', flush=True)
+                                try:
+                                    requests.post(
+                                        f'{ide_base}/hardware/wukong/upload-ack',
+                                        json=_upload_ack_payload(
+                                            data, False,
+                                            f'handler exception: {_upload_exc}',
+                                            session_id, device_uid),
+                                        headers=_bridge_auth_headers(),
+                                        timeout=2, verify=verify_tls)
+                                except Exception:
+                                    pass
+                except Exception as exc:
+                    bridge_state = 'network_error'
+                    _bridge_status('http_error', bridge_state, str(exc))
+
+    except KeyboardInterrupt:
+        print('\nBridge stopped.')
+    finally:
+        ser.close()
+
+
+def _upload_ack_payload(data, ok, error, session_id, device_uid):
+    """Form the immutable upload acknowledgement from the dequeued command."""
+    correlated = bool(
+        session_id or device_uid or data.get('id') is not None or
+        data.get('artifact_sha256') is not None or
+        data.get('artifact_size') is not None or
+        data.get('artifact_identity') is not None)
+    if not correlated:
+        # Retain compatibility with manually-issued uploads from old IDEs.
+        payload = {'ok': bool(ok)}
+        if not ok:
+            payload['error'] = str(error)
+        return payload
+    return {
+        'ok': bool(ok),
+        'error': '' if ok else str(error),
+        'id': data.get('id'),
+        'target_device_uid': device_uid,
+        'device_uid': device_uid,
+        'session_id': session_id,
+        'artifact_sha256': data.get('artifact_sha256'),
+        'artifact_size': data.get('artifact_size'),
+        'artifact_identity': data.get('artifact_identity'),
+    }
+
+
+def _post_upload_ack(data, ok, error, ide_base, verify_tls, session_id,
+                     device_uid):
+    """Best-effort upload result preserving command/target identity."""
+    try:
+        requests.post(
+            f'{ide_base}/hardware/wukong/upload-ack',
+            json=_upload_ack_payload(data, ok, error, session_id, device_uid),
+            headers=_bridge_auth_headers(),
+            timeout=2, verify=verify_tls)
+    except Exception:
+        pass
+
+
+def _handle_upload(data, ser, ide_base, verify_tls, session_id=None,
+                   device_uid=None):
+    """Decode a base64 boot-image payload and write it to the board over UART.
+
+    Protocol sent to the board (framing that the RTL upload FSM expects):
+        1. Magic byte 0x75 ('u') — upload start
+        2. 4-byte big-endian payload length in bytes
+        3. Raw boot-image bytes
+
+    After writing, posts the result to /hardware/wukong/upload-ack so the
+    IDE can poll for completion before issuing a step/run command.
+
+    Parameters
+    ----------
+    data : dict
+        Command payload from the server (must contain 'data' key with the
+        base64-encoded boot image).
+    ser : serial.Serial
+        Open serial port connected to the Wukong board.
+    ide_base : str
+        Base URL of the IDE server (e.g. 'https://...replit.dev').
+    verify_tls : bool
+        Whether to verify the TLS certificate on IDE requests.
+    """
+    # Bytes read from the serial port during the ACK wait that are NOT the 0x06
+    # ACK byte (e.g. trace packets the board emits as soon as it starts executing
+    # the freshly loaded image).  The caller must prepend these back into the
+    # main receive buffer so the trace parser can process them normally.
+    leftover = bytearray()
+
+    b64_payload = data.get('data', '')
+    if not b64_payload:
+        print('  [upload] ERROR: empty data payload', flush=True)
+        _post_upload_ack(data, False, 'empty payload', ide_base, verify_tls,
+                         session_id, device_uid)
+        return leftover
+
+    try:
+        raw = base64.b64decode(b64_payload, validate=True)
+    except Exception as exc:
+        print(f'  [upload] ERROR: base64 decode failed: {exc}', flush=True)
+        _post_upload_ack(data, False, f'base64 decode: {exc}', ide_base,
+                         verify_tls, session_id, device_uid)
+        return leftover
+    import hashlib
+    source_digest = hashlib.sha256(raw).hexdigest()
+    has_correlation = any(
+        data.get(key) is not None for key in (
+            'id', 'artifact_sha256', 'artifact_size', 'artifact_identity',
+            'target_device_uid', 'target_session_id'))
+    if has_correlation and (
+            source_digest != str(data.get('artifact_sha256', '')).lower() or
+            len(raw) != data.get('artifact_size') or
+            not data.get('artifact_identity')):
+        errmsg = 'upload command artifact identity does not match payload'
+        print(f'  [upload] ERROR: {errmsg}', flush=True)
+        _post_upload_ack(data, False, errmsg, ide_base, verify_tls,
+                         session_id, device_uid)
+        return leftover
+
+    # boot-image.bin stores each 32-bit word little-endian (struct.pack('<...I')).
+    # The RTL upload FSM assembles the first received byte as the MSByte of each
+    # DMEM word (big-endian on the wire).  Byte-swap every complete word so the
+    # board reconstructs the same word values the generator wrote.
+    n_words = len(raw) // 4
+    if n_words > 0:
+        raw = (struct.pack(f'>{n_words}I',
+                           *struct.unpack(f'<{n_words}I', raw[:n_words * 4]))
+               + raw[n_words * 4:])   # trailing partial word (if any) passed as-is
+
+    n_bytes = len(raw)
+
+    # Drain any stale bytes already in the UART RX buffer BEFORE sending the
+    # upload frame.  These are pre-upload trace events queued in the hardware
+    # FIFO (e.g. from a previous run before the 'u' command was issued).
+    # Draining now — before any bytes are sent — guarantees the drain window is
+    # clear of any byte we ourselves write.  After the frame is sent, the board
+    # is already halted (RTL sets step_mode=1 / step_halted=1 on 'u' reception)
+    # so no new trace bytes arrive during the upload or the subsequent ACK wait.
+    # This makes the board's 0x06 ACK (UPLOAD_ACK state) unambiguous: the only
+    # byte that can arrive between the end of the write and the ACK timeout is
+    # the RTL's completion signal.
+    _stale = ser.read(ser.in_waiting) if ser.in_waiting else b''
+    if _stale:
+        print(f'  [upload] drained {len(_stale)} stale RX byte(s) before upload '
+              f'frame', flush=True)
+        leftover.extend(_stale)
+
+    print(f'  [upload] writing {n_bytes} bytes to UART (LE→BE swapped)…', flush=True)
+    try:
+        # Frame: magic(1) + length(4 BE) + byte-swapped payload
+        # The RTL upload FSM (UPLOAD_LEN / UPLOAD_DATA / UPLOAD_ACK states in
+        # wukong_top.py) receives this frame, writes words to DMEM, then sends
+        # a single 0x06 ACK byte back via UART TX.
+        header = b'\x75' + struct.pack('>I', n_bytes)
+        ser.write(header + raw)
+        ser.flush()
+        print(f'  [upload] write complete ({n_bytes} bytes) — waiting for board ACK…',
+              flush=True)
+    except Exception as exc:
+        print(f'  [upload] ERROR: UART write failed: {exc}', flush=True)
+        _post_upload_ack(data, False, f'UART write: {exc}', ide_base,
+                         verify_tls, session_id, device_uid)
+        return leftover
+
+    # Wait for the single unambiguous 0x06 ACK byte.
+    # The CM is halted (RTL guarantees step_mode=1 from 'u' reception), so the
+    # only byte that can arrive after draining + sending the frame is the board's
+    # 0x06 ACK.  Any unexpected bytes are preserved in leftover as a safety net.
+    _ACK_TIMEOUT_S = max(10.0, n_bytes * 0.0002)   # ≥10 s, 0.2 ms/byte headroom
+    ack_deadline = time.time() + _ACK_TIMEOUT_S
+    ack_found = False
+    while time.time() < ack_deadline:
+        avail = ser.in_waiting
+        chunk = ser.read(avail if avail > 0 else 1)
+        for idx, b in enumerate(chunk):
+            if b == 0x06:
+                ack_found = True
+                # Bytes after the ACK in the same read are also preserved.
+                leftover.extend(chunk[idx + 1:])
+                break
+            leftover.append(b)
+        if ack_found:
+            break
+        time.sleep(0.005)
+
+    if ack_found:
+        print('  [upload] board ACK received — upload successful', flush=True)
+        # A complete DMEM replacement must restart from the boot ROM so it
+        # consumes the newly written Namespace descriptor and Thread.caps[0].
+        # The server requests this only for the Wukong-native projection; leave
+        # older/manual upload commands backward compatible.
+        if data.get('reboot'):
+            try:
+                ser.write(b'f')
+                ser.flush()
+                print('  [upload] rebooted board into uploaded boot entry', flush=True)
+            except Exception as exc:
+                errmsg = f'uploaded image but reboot command failed: {exc}'
+                print(f'  [upload] ERROR: {errmsg}', flush=True)
+                _post_upload_ack(data, False, errmsg, ide_base, verify_tls,
+                                 session_id, device_uid)
+                return leftover
+        try:
+            requests.post(
+                f'{ide_base}/hardware/wukong/upload-ack',
+                json=_upload_ack_payload(data, True, '', session_id, device_uid),
+                headers=_bridge_auth_headers(),
+                timeout=2, verify=verify_tls)
+        except Exception as exc:
+            print(f'  [upload] WARNING: could not POST upload-ack: {exc}', flush=True)
+    else:
+        errmsg = f'board ACK timeout after {_ACK_TIMEOUT_S:.0f} s'
+        print(f'  [upload] ERROR: {errmsg}', flush=True)
+        try:
+            _post_upload_ack(data, False, errmsg, ide_base, verify_tls,
+                             session_id, device_uid)
+        except Exception as exc:
+            print(f'  [upload] WARNING: could not POST upload-ack (timeout): {exc}',
+                  flush=True)
+
+    return leftover
+
+
+if __name__ == '__main__':
+    main()

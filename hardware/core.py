@@ -422,13 +422,16 @@ class ChurchCore(Elaboratable):
         cond_exec_enable = Signal()
         compact_index_fault = Signal()
         bf_fault = Signal()
+        call_index_fault = Signal()
+        branch_index_fault = Signal()
         compact_index = Signal(33)
         compact_index_selected = Signal()
         fetch_bounds_fault = Signal()   # combinatorial; gates cond_exec_enable and drives fault
         # fetch_bounds_fault is assigned below (after any_unit_busy is defined).
         # Including ~fetch_bounds_fault here ensures that NO instruction can start in the
         # same cycle that a BOUNDS fault is asserted — decode side effects are suppressed.
-        m.d.comb += cond_exec_enable.eq(self.boot_complete & exec_enable & ~fetch_bounds_fault)
+        m.d.comb += cond_exec_enable.eq(
+            self.boot_complete & exec_enable & ~fetch_bounds_fault & ~u_decoder.fault_valid)
 
         # 1-cycle busy registers for single-cycle Turing ops (prevent double-execution
         # due to the 1-cycle ROM fetch pipeline latency)
@@ -697,7 +700,7 @@ class ChurchCore(Elaboratable):
         bfins_flags_sig = Signal(COND_FLAGS_LAYOUT)
         mcmp_flags_sig  = Signal(COND_FLAGS_LAYOUT)
         branch_taken    = Signal()
-        branch_sx32     = Signal(32)
+        branch_target_checked = Signal(signed(37))
 
         change_dr_wr_en = Signal()
         change_dr_wr_addr = Signal(4)
@@ -1032,7 +1035,7 @@ class ChurchCore(Elaboratable):
             # PC-relative branch: nia += sign_extend(imm) * 4.
             # Gated by ~fetch_bounds_fault: if the *current* nia is already out-of-range
             # the BOUNDS fault is raised instead; nia must not advance further.
-            m.d.sync += nia_reg.eq(nia_reg + Cat(C(0, 2), branch_sx32))
+            m.d.sync += nia_reg.eq(branch_target_checked[:32])
         with m.Elif(
             self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
             & ~call_start_sig
@@ -1047,7 +1050,7 @@ class ChurchCore(Elaboratable):
             & ~(lambda_start_sig if not self.iot_profile else 0)
             & ~(eloadcall_start_sig if not self.iot_profile else 0)
             & ~(xloadlambda_start_sig if not self.iot_profile else 0)
-            & ~fetch_bounds_fault & ~compact_index_fault & ~bf_fault & ~u_outform_fsm.intercept_start
+            & ~fetch_bounds_fault & ~compact_index_fault & ~bf_fault & ~call_index_fault & ~branch_index_fault & ~u_outform_fsm.intercept_start
         ):
             # Advance PC for all instructions (including not-taken branches).
             # CALL and RETURN must NOT advance the PC on their issue cycles.
@@ -1303,26 +1306,48 @@ class ChurchCore(Elaboratable):
         # After ChurchOutformFSM promotes it to Inform, the CALL retries normally.
         m.d.comb += call_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
-            ~any_unit_busy & ~_call_src_is_outform
+            ~any_unit_busy & ~_call_src_is_outform & ~call_index_fault
         )
 
         # Trigger the ChurchOutformFSM when a CALL sees an Outform source GT.
         m.d.comb += [
             u_outform_fsm.intercept_start.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
-                ~any_unit_busy & _call_src_is_outform
+                ~any_unit_busy & _call_src_is_outform & ~call_index_fault
             ),
             u_outform_fsm.src_cr.eq(cr_src),
             u_outform_fsm.src_cr_data.eq(u_regs.cr_rd_data),
         ]
 
+        # Read all indexed inputs before CALL changes context. The CALL FSM
+        # latches both resolved operands at start; no later live DR dependency.
+        call_row = Signal(33)
+        call_method = Signal(33)
+        call_runtime = self.imem_data[16:19] == 1
+        row_value = Cat(u_regs.dr_rd_data3, C(0, 1))
+        method_value = Cat(u_regs.dr_rd_data4, C(0, 1))
+        method_subtract = Mux(u_decoder.call_indexed, self.imem_data[12], self.imem_data[11])
+        method_magnitude = Mux(u_decoder.call_indexed, self.imem_data[5:12], self.imem_data[:11])
         m.d.comb += [
+            u_regs.dr_rd_addr3.eq(Mux(is_bfext_op | is_bfins_op,
+                self.imem_data[10:14], Mux(is_dread_op | is_dwrite_op,
+                self.imem_data[:4], self.imem_data[19:23]))),
+            u_regs.dr_rd_addr4.eq(Mux(u_decoder.call_indexed,
+                                     self.imem_data[14:18], self.imem_data[12:16])),
+            call_row.eq(Mux(self.imem_data[13],
+                            row_value - self.imem_data[:5], row_value + self.imem_data[:5])),
+            call_method.eq(Mux(u_decoder.call_indexed | call_runtime,
+                Mux(method_subtract, method_value - method_magnitude, method_value + method_magnitude),
+                u_decoder.immediate)),
+            call_index_fault.eq(cond_exec_enable & is_church_op &
+                (church_op == ChurchOpcode.CALL) & ~any_unit_busy &
+                ((u_decoder.call_indexed & call_row[32]) | call_method[32])),
             u_call.call_start.eq(call_start_sig),
             u_call.boot_window.eq(boot_microcode_active),
             u_call.cr_src.eq(cr_src),
             u_call.indexed_source.eq(u_decoder.call_indexed),
-            u_call.index.eq(u_decoder.call_clist_row),
-            u_call.call_imm.eq(u_decoder.call_method_index),
+            u_call.index.eq(Mux(u_decoder.call_indexed, call_row[:32], 0)),
+            u_call.call_imm.eq(call_method[:32]),
             u_call.mask.eq(u_decoder.call_mask),
             u_call.cr_rd_data.eq(u_regs.cr_rd_data),
             u_call.cr15_namespace.eq(u_regs.cr15_namespace),
@@ -1462,7 +1487,7 @@ class ChurchCore(Elaboratable):
             u_dread.dmem_rd_data.eq(self.dmem_rd_data),
             u_dread.m_bit_rd_word.eq(u_regs.m_bit_device_state),
             # DR read port for indexed-mode DRx: feed from register port 1
-            u_dread.dr_rd_data.eq(u_regs.dr_rd_data1),
+            u_dread.dr_rd_data.eq(u_regs.dr_rd_data3),
         ]
 
         namespace_exec_gt = View(
@@ -1488,7 +1513,7 @@ class ChurchCore(Elaboratable):
             # Port 1: source data DR[dr_src] — still via register port 2
             u_dwrite.dr_rd_data.eq(u_regs.dr_rd_data2),
             # Port 2 (DRx for indexed mode): read via register port 1
-            u_dwrite.dr_rd_data2.eq(u_regs.dr_rd_data1),
+            u_dwrite.dr_rd_data2.eq(u_regs.dr_rd_data3),
             u_dwrite.namespace_authorized.eq(namespace_exec_authorized),
             u_dwrite.private_m_start.eq(
                 (boot_state_reg == BootState.INIT_CLIST) &
@@ -1669,17 +1694,19 @@ class ChurchCore(Elaboratable):
         m.d.comb += bfext_start_sig.eq(cond_exec_enable & is_bfext_op & ~any_unit_busy & ~bf_invalid)
         m.d.sync += bfext_busy_reg.eq(bfext_start_sig & ~bfext_busy_reg)
 
-        bf_offset = Signal(5)
+        bf_offset = Signal(33)
         bf_width  = Signal(5)
         bf_mask   = Signal(32)
         m.d.comb += [
-            bf_offset.eq(u_decoder.immediate[5:10]),
+            bf_offset.eq(Mux(u_decoder.immediate[14],
+                Cat(u_regs.dr_rd_data3, C(0, 1)) - u_decoder.immediate[5:10],
+                Cat(u_regs.dr_rd_data3, C(0, 1)) + u_decoder.immediate[5:10])),
             bf_width.eq(u_decoder.immediate[0:5]),
-            bf_invalid.eq((bf_width == 0) | ((bf_offset + bf_width) > 32)),
+            bf_invalid.eq((bf_width == 0) | (bf_offset > 31) | ((bf_offset + bf_width) > 32)),
             bf_fault.eq(cond_exec_enable & ~any_unit_busy &
                         (is_bfext_op | is_bfins_op) & bf_invalid),
             bf_mask.eq((1 << bf_width) - 1),
-            bfext_result.eq((u_regs.dr_rd_data1 >> bf_offset) & bf_mask),
+            bfext_result.eq((u_regs.dr_rd_data1 >> bf_offset[:5]) & bf_mask),
         ]
 
         bfext_flags_view = View(COND_FLAGS_LAYOUT, bfext_flags_sig)
@@ -1703,10 +1730,10 @@ class ChurchCore(Elaboratable):
 
         bfins_mask_shifted = Signal(32)
         m.d.comb += [
-            bfins_mask_shifted.eq(bf_mask << bf_offset),
+            bfins_mask_shifted.eq(bf_mask << bf_offset[:5]),
             bfins_result.eq(
                 (u_regs.dr_rd_data2 & ~bfins_mask_shifted) |
-                ((u_regs.dr_rd_data1 & bf_mask) << bf_offset)
+                ((u_regs.dr_rd_data1 & bf_mask) << bf_offset[:5])
             ),
         ]
 
@@ -1741,19 +1768,27 @@ class ChurchCore(Elaboratable):
 
         # ── BRANCH ───────────────────────────────────────────────────────────
         # Conditional PC-relative branch.
-        # branch_target = nia_reg + sign_extend(imm) * 4
-        # (imm is a signed word offset from the current instruction's address)
+        # Phase 1: target = current byte NIA + 4 * (unsigned DR[index] +/- imm18).
+        # Keep a signed wide intermediate through address and code-fence checks.
         # 1-cycle busy after taken branch prevents double-fire from ROM pipeline.
         # (Signals forward-declared above for use in nia chain.)
 
-        m.d.comb += branch_taken.eq(
-            self.boot_complete & exec_enable & is_branch_op & ~any_unit_busy
-        )
+        branch_displacement = Signal(signed(34))
+        branch_index = Cat(u_regs.dr_rd_data3, C(0, 2)).as_signed()
+        branch_magnitude = Cat(self.imem_data[:18], C(0, 16)).as_signed()
+        m.d.comb += [
+            branch_displacement.eq(Mux(self.imem_data[18],
+                branch_index - branch_magnitude, branch_index + branch_magnitude)),
+            branch_target_checked.eq(
+                Cat(nia_reg, C(0, 5)).as_signed() + (branch_displacement << 2)),
+            branch_index_fault.eq(cond_exec_enable & is_branch_op & ~any_unit_busy &
+                ((branch_target_checked < 0) | (branch_target_checked > 0xFFFFFFFF) |
+                 ((code_lo_reg != code_hi_reg) &
+                  ((branch_target_checked < code_lo_reg) |
+                   (branch_target_checked >= code_hi_reg))))),
+            branch_taken.eq(cond_exec_enable & is_branch_op & ~any_unit_busy & ~branch_index_fault),
+        ]
         m.d.sync += branch_busy_reg.eq(branch_taken & ~branch_busy_reg)
-
-        m.d.comb += branch_sx32.eq(
-            Cat(u_decoder.immediate, u_decoder.immediate[14].replicate(17))
-        )
 
         m.d.comb += load_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LOAD) & ~any_unit_busy & ~compact_index_fault
@@ -2704,7 +2739,7 @@ class ChurchCore(Elaboratable):
         )
         with m.If(fetch_bounds_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
-        with m.Elif(compact_index_fault | bf_fault):
+        with m.Elif(compact_index_fault | bf_fault | call_index_fault | branch_index_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
         # Decoder/perm faults are combinational functions of the currently
         # fetched word.  While a multi-cycle unit owns the shared DMEM bus the

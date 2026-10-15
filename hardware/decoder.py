@@ -57,14 +57,14 @@ class ChurchDecoder(Elaboratable):
         self.call_mask = Signal(15)
         self.return_mask = Signal(12)
         self.call_imm = Signal(15)           # CALL method index, imm15 field (0 = fast-path, k>0 = table slot k)
-        self.call_indexed = Signal()          # CALL CR6[row]: cr_dst=0, cr_src=6
+        self.call_indexed = Signal()          # Phase 1 CALL bit18: implicit CR6
         self.call_clist_row = Signal(5)       # indexed CALL c-list row (imm15[4:0])
         self.eloadcall_row = Signal(8)       # ELOADCALL c-list row  (imm15[7:0])
         self.eloadcall_method_index = Signal(7)  # ELOADCALL method index (imm15[14:8])
         self.switch_target = Signal(4)
 
         # CALL: full imm15 = method index (0 = single entry point; n>0 = method table lookup)
-        self.call_method_index = Signal(15)
+        self.call_method_index = Signal(15)   # immediate magnitude only; runtime DR arithmetic is in core
         # ELOADCALL: split imm15 — bits[14:8]=method index (7 bits); bits[7:0]=c-list row (8 bits)
         self.eloadcall_method_index = Signal(7)
         self.eloadcall_clist_row    = Signal(8)
@@ -84,7 +84,8 @@ class ChurchDecoder(Elaboratable):
         m.d.comb += [
             self.church_op.eq(opcode_field),
             self.cr_dst.eq(cr_dst_field),
-            self.cr_src.eq(cr_src_field),
+            self.cr_src.eq(Mux(opcode_field == ChurchOpcode.CALL,
+                Mux(self.instruction[18], CR_CLIST, cr_dst_field), cr_src_field)),
             self.immediate.eq(imm_field),
         ]
 
@@ -96,16 +97,15 @@ class ChurchDecoder(Elaboratable):
             self.call_imm.eq(imm_field),     # CALL method index from imm15 bits[14:0]
             self.call_indexed.eq(
                 (opcode_field == ChurchOpcode.CALL) &
-                (cr_dst_field == 0) & (cr_src_field == CR_CLIST)
+                self.instruction[18]
             ),
             self.call_clist_row.eq(imm_field[:5]),
             self.eloadcall_row.eq(imm_field[:8]),
             self.eloadcall_method_index.eq(imm_field[8:15]),
             self.switch_target.eq(imm_field[:4]),
-            # CALL method index: full imm15 (method index 0 = single entry, n>0 = table lookup)
+            # Immediate field only. The core forms the checked runtime selector.
             self.call_method_index.eq(
-                Mux((cr_dst_field == 0) & (cr_src_field == CR_CLIST),
-                    imm_field[5:12], imm_field)
+                Mux(self.instruction[18], imm_field[5:12], imm_field)
             ),
             # ELOADCALL split imm15: bits[14:8]=method index, bits[7:0]=c-list row
             self.eloadcall_method_index.eq(imm_field[8:15]),
@@ -219,5 +219,16 @@ class ChurchDecoder(Elaboratable):
                 ]
             # Reserved TPERM presets are checked by the condition-gated unit,
             # not here: a false predicate must suppress all TPERM checks.
+            with m.Elif(cond_pass & (
+                ((opcode_field == ChurchOpcode.CHANGE) &
+                 ((cr_dst_field == 13) | (cr_src_field == 13))) |
+                ((opcode_field == ChurchOpcode.CALL) & ~self.instruction[18] &
+                 ((self.instruction[16:18] > 1) |
+                  ((self.instruction[16:18] == 0) & self.instruction[15])))
+            )):
+                m.d.comb += [
+                    self.fault_valid.eq(1),
+                    self.fault.eq(FaultType.INVALID_OP),
+                ]
 
         return m

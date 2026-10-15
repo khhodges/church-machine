@@ -1,5 +1,38 @@
 # Independent Phase 1 RTL fixtures — initial results
 
+## Instruction RTL update
+
+The three confirmed failures are corrected: indexed CALL recognition and
+checked row/method operands, runtime BFEXT/BFINS positions, and executed
+CHANGE CR13 rejection with INVALID_OP before effects.
+DREAD/DWRITE now use the common signed-magnitude offset and capture their
+index at acceptance. BRANCH uses the approved DR-indexed 18-bit magnitude
+with checked byte-address/code-fence bounds. IADD/ISUB stay unsigned.
+
+**88 focused simulations pass:** 40 independent fixtures, 34 new operand
+fixtures, three indexed-CALL regressions, three TPERM regressions and eight
+retired-opcode checks. Evidence is from a combined run plus targeted reruns of
+corrected fixture assertions/additions; no RTL behavior changed after the combined run.
+Fault trace events carry `retire_fault_valid`; they are not successful retirement.
+The corrected tests require exact fault origin/code and unchanged state across
+the fault edge, rather than incorrectly requiring all trace events to disappear.
+
+Old indexed CALL words are explicitly rejected. Existing saved images and
+application compilers were not migrated. Static method-table BRANCH descriptors
+use the new encoding; dynamic/conditional descriptor forms are rejected rather
+than interpreted through the old 15-bit format.
+
+The acceptance-boundary operand implementation uses extra combinational
+read/arithmetic paths rather than a new staged frontend. This engineering
+refinement is recorded in the Master; resources/timing remain unmeasured.
+
+This is not complete ISA qualification: full runtime method dispatch, all
+frame/continuation cases, combined CHANGE/SWITCH transition completion, exact
+generated/mapped RTL and physical evidence remain outstanding. No vendor build,
+upload, flashing or live image changes occurred.
+
+## Pre-update fixture findings (superseded by the RTL results above)
+
 Command:
 `python3 -m pytest hardware/test_phase1_independent_execution.py -q`
 

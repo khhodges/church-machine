@@ -1,0 +1,3241 @@
+from amaranth import *
+from amaranth.lib.memory import Memory as LibMemory
+from amaranth.lib.data import View
+
+from .hw_types import *
+from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT
+from .integrity32 import integrity32_amaranth
+from .boot_rom import NUC_LUMP_BASE, NUC_PROGRAM_CW, DEMO_CLIST_NAMED_SLOTS
+from .registers import ChurchRegisters
+from .decoder import ChurchDecoder
+from .perm_check import ChurchPermCheck
+from .gc_unit import ChurchGCUnit
+from .lambda_unit import ChurchLambda
+from .call import ChurchCall
+from .ret import ChurchReturn
+from .tperm import ChurchTperm
+from .save import ChurchSave
+from .load import ChurchLoad
+from .mload import ChurchMLoad
+from .change import ChurchChange
+from .switch import ChurchSwitch
+from .fused_unit import ChurchELoadCall, ChurchXLoadLambda
+from .irq_dispatch import ChurchIRQDispatch
+from .pet_name_mem import PetNameMemory
+from .dread import ChurchDRead
+from .dwrite import ChurchDWrite
+from .cload import ChurchCLoad
+from .outform import ChurchOutform
+from .outform_iot import ChurchOutformIoT
+from .church_outform import ChurchOutformFSM
+
+
+class ChurchCore(Elaboratable):
+    """Church Machine core — 10 Church opcodes + 2 Turing-domain opcodes.
+
+    Clean 32-bit instruction format matching patent Section 14:
+    opcode[5] | cond[4] | dst[4] | src[4] | imm[15].
+    10 Church opcodes: LOAD, SAVE, CALL, RETURN, CHANGE, SWITCH, TPERM, LAMBDA,
+    ELOADCALL (fused LOAD+TPERM(E)+CALL), XLOADLAMBDA (fused LOAD+TPERM(X)+LAMBDA).
+    2 Turing opcodes:  DREAD (bounded data read), DWRITE (bounded data write).
+    DREAD/DWRITE use CR-cached base+limit; no NS table re-lookup needed.
+    MMIO access: top-level decodes dmem_addr[30]=1,dmem_addr[31]=0 → MMIO.
+    Any other invalid opcode faults immediately.
+
+    All features enabled: GC, CHANGE/SWITCH, fused ops, seal checks.
+    When iot_profile=True: GC, Lambda, Change, Switch, ELoadCall, XLoadLambda
+    are excluded; excluded opcodes emit FAULT_OPCODE.  Outform uses the lean
+    tunnel-hunting ChurchOutformIoT instead of ChurchOutform.
+    """
+
+    def __init__(self, iot_profile=False):
+        self.iot_profile = iot_profile
+        self.imem_addr = Signal(32)
+        self.imem_data = Signal(32)
+        self.imem_valid = Signal()
+
+        self.dmem_addr = Signal(32)
+        self.dmem_rd_en = Signal()
+        self.dmem_rd_data = Signal(32)
+        self.dmem_rd_valid = Signal()
+        self.dmem_wr_data = Signal(32)
+        self.dmem_wr_en = Signal()
+
+        self.ns_addr = Signal(32)
+        self.ns_rd_en = Signal()
+        self.ns_rd_data = Signal(32 * 4)  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
+        self.ns_wr_data = Signal(32 * 4)  # NS_ENTRY_WORDS=4 (stride-4, 16 bytes/slot)
+        self.ns_wr_en = Signal()
+
+        self.clist_addr = Signal(32)
+        self.clist_rd_en = Signal()
+        self.clist_rd_data = Signal(GT_LAYOUT)
+        self.clist_wr_data = Signal(GT_LAYOUT)
+        self.clist_wr_en = Signal()
+
+        self.boot_start = Signal()
+        self.boot_state = Signal(3)
+        self.boot_complete = Signal()
+
+        self.gc_start = Signal()
+        self.gc_busy = Signal()
+        self.gc_garbage_count = Signal(32)
+
+        self.fault = Signal(5)   # widened: FaultType.STACK_OVERFLOW=0x10 needs 5 bits
+        self.fault_valid = Signal()
+        self.halt_valid = Signal()   # pulses when a zero instruction word is fetched post-boot
+
+        # ── Hardware trace / single-step ports ──────────────────────────────
+        # halt_req: input from platform; when asserted in step mode, imem_valid
+        #   is gated off externally (wukong_top manages this via step_halted).
+        #   Held here as a named port so the interface is explicit even though
+        #   the halt logic lives in the top-level.
+        self.halt_req = Signal()      # input: held by top when step-halted
+        # Legacy-safe default: standalone/non-Wukong integrations retain the
+        # historical immediate FAULT_RST behavior. Wukong explicitly asserts
+        # this while it holds a fault long enough to emit a snapshot.
+        self.defer_fault_reset = Signal()
+        # Testing-only, one-shot fault skip. The platform may pulse this only
+        # while the faulting instruction is externally held. It advances NIA
+        # without re-decoding or executing the instruction.
+        self.skip_fault_req = Signal()
+
+        # retire_valid: one-cycle pulse when an instruction commits (NIA changes)
+        #   or when a fault is taken.  Fires on the same cycle as the NIA update.
+        #   retire_nia  = NIA of the just-retired instruction (before advance)
+        #   retire_instr = instruction word at that NIA
+        #   retire_flags = condition flags after the instruction
+        #   retire_fault_code / retire_fault_valid: fault fields (valid together)
+        self.retire_valid      = Signal()
+        self.retire_nia        = Signal(32)
+        self.retire_instr      = Signal(32)
+        self.retire_flags      = Signal(COND_FLAGS_LAYOUT)
+        self.retire_fault_code = Signal(5)
+        self.retire_fault_valid = Signal()
+
+        # ── TraceUnit per-event GT signals ──────────────────────────────────────
+        # Combinatorial, valid at retire_valid time for their respective instruction
+        # classes.  The TraceUnit in wukong_top.py reads these to build event packets.
+        #
+        #   LOAD:   load_shadow_gt = old CR_dst GT (latched at load_start)
+        #           load_new_gt    = new GT being written by the mload bus
+        #   CHANGE: cr12_gt = new CR12 (committed to register file before retire)
+        #           cr5_gt  = new CR5  (committed to register file before retire)
+        #   CALL/ELOADCALL/XLOADLAMBDA:
+        #           cr6_gt  = new CR6  (committed to register file before retire)
+        #           cr14_gt = new CR14 (committed to register file before retire)
+        #   RETURN: cr6_gt  = E-GT from stack frame (u_return.cload_e_gt)
+        #           cr14_gt = current CR14 at retire time (callee's value; the
+        #             TraceUnit overwrites tq_data[2] with retire_trace_return_cr14_gt
+        #             when retire_trace_return_cr14_valid fires — see wukong_top.py)
+        #
+        # retire_trace_return_cr14_valid / retire_trace_return_cr14_gt:
+        #   Pulsed (one cycle) when u_cload commits the restored caller CR14 into
+        #   CR14 after a cross-domain RETURN (u_cload.cr_wr_en & cr_wr_addr==CR14).
+        #   The TraceUnit SEND state updates tq_data[2] on this pulse so the
+        #   RETURN_CR14 packet carries the caller's code capability, not the callee's.
+        self.retire_trace_load_shadow_gt = Signal(32)
+        self.retire_trace_load_new_gt    = Signal(32)
+        self.retire_trace_cr5_gt         = Signal(32)
+        self.retire_trace_cr6_gt         = Signal(32)
+        self.retire_trace_cr12_gt        = Signal(32)
+        self.retire_trace_cr14_gt        = Signal(32)
+        # Cload-commit pulse for RETURN — used by TraceUnit to patch tq_data[2]
+        self.retire_trace_return_cr14_valid = Signal()
+        self.retire_trace_return_cr14_gt    = Signal(32)
+
+        # GT fault telemetry — latched when fault_valid fires; held until FAULT_RST.
+        # Exposed via APB3 registers +0x18..+0x24 for CALLHOME GT diagnostics.
+        # fault_gt / fault_cr14 reserved: sub-unit wiring added in a future pass.
+        self.fault_gt    = Signal(32)  # GT word0 of the cap that faulted (APB3 +0x18)
+        self.fault_instr = Signal(32)  # instruction word at fault NIA     (APB3 +0x1C)
+        self.fault_cr14  = Signal(32)  # CR14 word0 at fault time          (APB3 +0x20)
+        self.fault_stage = Signal(4)   # 0=Fetch 1=Decode 2=Perm 3=Lambda 4=TPERM 5=Call 6=Return 7=DataRW  (APB3 +0x24)
+
+        self.free_run_start = Signal()   # pulse high for 1 cycle to jump to free_run_nia
+        self.free_run_nia   = Signal(32) # target byte address when free_run_start fires
+
+        # External reboot request: pulse high for 1 cycle to force FAULT_RST.
+        # Post-boot faults themselves are held without entering this path so a
+        # complete architectural snapshot can be taken first. clear_all wipes registers,
+        # the boot ladder re-runs (LOAD_NS→INIT_THRD→INIT_CLIST→LOAD_NUC),
+        # and execution restarts at NIA=0.  REBOOT and FAULT both zero the NIA.
+        self.reboot_req     = Signal()
+        # Physical scheduler request.  The Wukong top holds request until
+        # CHANGE completes or faults, so a button press can only start at a
+        # clean instruction boundary. CR12/CR13/CR15 retain their established
+        # system-wide-root roles; CHANGE restores the private code context.
+        self.thread_switch_req = Signal()
+        self.thread_switch_index = Signal(16)
+        self.thread_switch_busy = Signal()
+        self.thread_switch_complete = Signal()
+        self.thread_switch_fault = Signal()
+        self.active_thread_slot = Signal(16, init=1)
+        # Byte address of the active Thread context body. CR12 remains the
+        # system Thread root and is intentionally not overloaded with this.
+        self.active_thread_base = Signal(32)
+        self.active_thread_owned = Signal()
+
+        self.nia = Signal(32)
+        self.flags = Signal(COND_FLAGS_LAYOUT)
+
+        # Read-only architectural snapshot buses.  Wukong uses these to emit
+        # a complete state frame when execution is suspended; trace packets
+        # intentionally remain small and event-oriented.
+        self.debug_cr_words = [
+            [Signal(32, name=f"debug_cr{i}_word{w}") for w in range(3)]
+            for i in range(16)
+        ]
+        self.debug_dr_words = [
+            Signal(32, name=f"debug_dr{i}") for i in range(16)
+        ]
+        self.debug_m_flag = Signal()
+        self.debug_isolated_m_flags = Signal(4)
+
+        self.outform_tx_valid = Signal()
+        self.outform_tx_data  = Signal(8)
+        self.outform_tx_ack   = Signal()   # from tang_nano: UART accepted the byte
+        self.outform_rx_valid = Signal()
+        self.outform_rx_data  = Signal(8)
+        self.outform_result_gt = Signal(32)
+        self.outform_busy     = Signal()   # to tang_nano: route UART to outform
+
+        # Test injection: allows sim tests to fire the outform without CPU.
+        # Set outform_start_in=1 for one cycle to bypass the mLoad path.
+        self.outform_start_in      = Signal()
+        self.outform_slot_id_in    = Signal(16)
+        self.outform_clist_addr_in = Signal(32)
+        self.outform_gt_raw_in     = Signal(32)
+
+        # ── Simulation-only debug ports ──────────────────────────────────────
+        # These ports MUST be tied to 0 at the synthesis integration boundary
+        # (e.g., in wukong_top.py).  They are never driven in production hardware;
+        # Amaranth synthesizes undriven inputs as constant 0, so they add no
+        # logic overhead, but the intent should be explicit.
+        #
+        # dbg_cr_wr_en/addr/data — direct CR write, absolute lowest priority in
+        #   the CR write mux.  Lets test harnesses set arbitrary cap-register
+        #   content without booting through instruction sequences.
+        self.dbg_cr_wr_en   = Signal()
+        self.dbg_cr_wr_addr = Signal(4)
+        self.dbg_cr_wr_data = Signal(CAP_REG_LAYOUT)
+        self.dbg_m_bit_wr_en = Signal()
+        self.dbg_m_bit_word = Signal(16)
+        self.dbg_m_bit_state = Signal(16)
+        self.dbg_return_m_commit = Signal()
+
+        # dbg_outform_done_inject / dbg_outform_result_gt — fake a completed
+        #   Mode 2 outform download in test harnesses without driving the full
+        #   UART/IoT protocol.  Hold inject=1 for the WAIT_OUTFORM + PROMOTE_WRITE
+        #   cycles (2 cycles) so result_gt_in is stable during PROMOTE_WRITE.
+        #   Gate: injected done is ANDed with outform_mode2_active internally.
+        self.dbg_outform_done_inject    = Signal()
+        self.dbg_outform_result_gt      = Signal(32)
+
+        # Hardware IRQ dispatch (Task #1523, non-IoT only).
+        # Driven high for one cycle by the platform timer peripheral when its
+        # compare register fires.  All other trigger conditions (LAZY_LOAD,
+        # LAZY_RESOLVE) are detected internally; this is the only external port.
+        self.timer_alarm = Signal()
+
+        # outform_fsm_busy — combinatorial read of ChurchOutformFSM.busy.
+        #   Useful for integration tests to observe intercept FSM state without
+        #   relying on the download engine's outform_busy (which lags by 1 cycle).
+        self.outform_fsm_busy = Signal()   # Mode 2 intercept FSM busy (test/debug)
+
+        # M-window (CR15 namespace M-flag latch + DR11-DR13 shadow) — Task #432
+        # cr15_m_set: pulse to load DR11-DR14 from CR15 + integrity32 and set M-flag (test)
+        # cr15_m_writeback_trigger: pulse to validate DR11/integrity and write back to CR15
+        # cr15_m_flag: current M-flag state (combinatorial read)
+        # dbg_m_dr11..15: combinatorial reads of DR11-DR15 for test inspection.
+        #   DR15 = cache_token32 (resident Inform W3) — non-authoritative diagnostic
+        #   only; the M-window writeback never consults it (Task #2862).
+        self.cr15_m_set               = Signal()
+        self.cr15_m_writeback_trigger = Signal()
+        self.cr15_m_flag              = Signal()
+        self.dbg_m_dr11               = Signal(32)
+        self.dbg_m_dr12               = Signal(32)
+        self.dbg_m_dr13               = Signal(32)
+        self.dbg_m_dr14               = Signal(32)
+        self.dbg_m_dr15               = Signal(32)
+
+        # dbg_cr12_gt / dbg_cr8_gt — combinatorial reads of CR12 and CR8 GT word0.
+        # Simulation-only observability; tied to 0 at the synthesis boundary.
+        # CR12 must hold an Inform GT (slot_id=1) after boot.
+        # CR8 must remain NULL (0x00000000) after boot — it is never written by the FSM.
+        self.dbg_cr12_gt = Signal(32)   # CR12 thread-stack GT word0 — INFORM(slot=1) after boot
+        self.dbg_cr8_gt  = Signal(32)   # CR8 GT word0 — must remain NULL (0) after boot
+        self.dbg_isolated_m_flags = Signal(4)  # CR12..CR15 accepted M latches
+
+    def elaborate(self, platform):
+        m = Module()
+
+        # clear_all: asserted during BootState.FAULT_RST (driven combinatorially
+        # below, after boot_state_reg is declared).  Declared first so it can be
+        # used as a ResetInserter key for the stateful execution units: every
+        # execution-unit FSM and its latches are wiped on FAULT_RST, so a pass-2
+        # boot after a fault (or an external 'f' reboot) never inherits stale
+        # in-flight state from an interrupted unit.
+        clear_all = Signal()
+        _rst = ResetInserter({"sync": clear_all})
+
+        u_regs = ChurchRegisters()
+        u_decoder = ChurchDecoder(iot_profile=self.iot_profile)
+        u_perm = ChurchPermCheck()
+        u_call = ChurchCall()
+        u_return = ChurchReturn()
+        u_tperm = ChurchTperm()
+        u_save = ChurchSave()
+        u_load = ChurchLoad()
+
+        m.submodules.u_registers = u_regs
+        m.submodules.u_decoder = u_decoder
+        m.submodules.u_perm_check = u_perm
+        m.submodules.u_call = _rst(u_call)
+        m.submodules.u_return = _rst(u_return)
+        m.submodules.u_tperm = _rst(u_tperm)
+        m.submodules.u_save = _rst(u_save)
+        m.submodules.u_load = _rst(u_load)
+        u_shared_mload = ChurchMLoad()
+        m.submodules.u_shared_mload = _rst(u_shared_mload)
+        u_dread = ChurchDRead()
+        u_dwrite = ChurchDWrite()
+        u_cload = ChurchCLoad()
+
+        if self.iot_profile:
+            u_outform = ChurchOutformIoT()
+        else:
+            u_outform = ChurchOutform()
+
+        if not self.iot_profile:
+            u_gc = ChurchGCUnit()
+            u_lambda = ChurchLambda()
+            u_change = ChurchChange()
+            u_switch = ChurchSwitch()
+            u_eloadcall = ChurchELoadCall()
+            u_xloadlambda = ChurchXLoadLambda()
+            u_irq_dispatch = ChurchIRQDispatch()
+            # Pre-mark named boot c-list slots from the authoritative set in
+            # boot_rom.DEMO_CLIST_NAMED_SLOTS.  Freed or anonymous slots (e.g.
+            # idx 4, formerly Startup.Config) are NOT in the set; a NULL GT
+            # there stays a hard NULL_CAP fault.  The DWRITE MMIO path
+            # (IO_PORT_PET_NAME_WR) lets the assembler/firmware annotate
+            # additional named slots at run time.
+            u_pet_name_mem = PetNameMemory(init_named=list(DEMO_CLIST_NAMED_SLOTS))
+            m.submodules.u_gc_unit = _rst(u_gc)
+            m.submodules.u_lambda = _rst(u_lambda)
+            m.submodules.u_change = _rst(u_change)
+            m.submodules.u_switch = _rst(u_switch)
+            m.submodules.u_eloadcall = _rst(u_eloadcall)
+            m.submodules.u_xloadlambda = _rst(u_xloadlambda)
+            m.submodules.u_irq_dispatch = _rst(u_irq_dispatch)
+            # PetNameMemory is intentionally NOT reset-wrapped: its contents are
+            # persistent annotations that must survive FAULT_RST reboots.
+            m.submodules.u_pet_name_mem = u_pet_name_mem
+
+        m.submodules.u_dread = _rst(u_dread)
+        m.submodules.u_dwrite = _rst(u_dwrite)
+        m.submodules.u_cload = _rst(u_cload)
+        m.submodules.u_outform = _rst(u_outform)
+
+        u_outform_fsm = ChurchOutformFSM()
+        m.submodules.u_outform_fsm = _rst(u_outform_fsm)
+
+        nia_reg = Signal(32)
+
+        # Code fence registers — protect against runaway branches escaping the current
+        # CALL context.  Set from the CALL unit on call_complete; cleared to (0, 0) on
+        # reboot or whenever the execution context leaves the guarded code region via
+        # LAMBDA / ELOADCALL / XLOADLAMBDA (where code bounds are unknown).
+        # Fence is inactive when code_lo_reg == code_hi_reg == 0.
+        #
+        # fence_pending_reg is set on cross-domain RETURN and cleared when cload writes
+        # CR14 with the restored caller code cap.  While set, it contributes to
+        # any_unit_busy, preventing instruction fetch/decode during the transitional
+        # window, thereby eliminating the unfenced gap between RETURN and cload.
+        code_lo_reg     = Signal(32, init=0)
+        code_hi_reg     = Signal(32, init=0)
+        fence_pending_reg = Signal(init=0)
+
+        lambda_active_reg = Signal()
+        lambda_pc_reg = Signal(32)
+
+        boot_state_reg = Signal(3, init=BootState.IDLE)
+        namespace_init_armed = Signal()
+
+        m.d.comb += [
+            self.boot_state.eq(boot_state_reg),
+            self.boot_complete.eq(boot_state_reg == BootState.COMPLETE),
+            clear_all.eq(boot_state_reg == BootState.FAULT_RST),
+        ]
+
+        with m.Switch(boot_state_reg):
+            with m.Case(BootState.IDLE):
+                with m.If(self.boot_start):
+                    m.d.sync += boot_state_reg.eq(BootState.FAULT_RST)
+            with m.Case(BootState.FAULT_RST):
+                m.d.sync += [
+                    boot_state_reg.eq(BootState.LOAD_NS),
+                    namespace_init_armed.eq(0),
+                ]
+            with m.Case(BootState.LOAD_NS):
+                m.d.sync += boot_state_reg.eq(BootState.INIT_THRD)
+            with m.Case(BootState.INIT_THRD):
+                m.d.sync += boot_state_reg.eq(BootState.INIT_CLIST)
+            with m.Case(BootState.INIT_CLIST):
+                # Keep protected CR14 on Namespace identity while its Init
+                # body performs the hidden-bank DWRITE. The first cycle
+                # installs identity; subsequent cycles run/wait for DWRITE.
+                with m.If(~namespace_init_armed):
+                    m.d.sync += namespace_init_armed.eq(1)
+                with m.Elif(u_dwrite.done):
+                    m.d.sync += boot_state_reg.eq(BootState.LOAD_NUC)
+            with m.Case(BootState.LOAD_NUC):
+                m.d.sync += boot_state_reg.eq(BootState.COMPLETE)
+            with m.Case(BootState.COMPLETE):
+                m.d.sync += boot_state_reg.eq(BootState.COMPLETE)
+
+        m.d.comb += [
+            u_decoder.instruction.eq(self.imem_data),
+            u_decoder.instr_valid.eq(self.imem_valid & self.boot_complete),
+            u_decoder.flags.eq(u_regs.flags),
+        ]
+
+        is_church_op  = u_decoder.is_church_op
+        is_dread_op   = u_decoder.is_dread_op
+        is_dwrite_op  = u_decoder.is_dwrite_op
+        is_iadd_op    = u_decoder.is_iadd_op
+        is_isub_op    = u_decoder.is_isub_op
+        is_branch_op  = u_decoder.is_branch_op
+        is_shl_op     = u_decoder.is_shl_op
+        is_shr_op     = u_decoder.is_shr_op
+        is_bfext_op   = u_decoder.is_bfext_op
+        is_bfins_op   = u_decoder.is_bfins_op
+        is_mcmp_op    = u_decoder.is_mcmp_op
+        church_op = u_decoder.church_op
+        cr_src = u_decoder.cr_src
+        cr_dst = u_decoder.cr_dst
+        cap_index = u_decoder.cap_index
+        switch_target = u_decoder.switch_target
+        exec_enable = u_decoder.exec_enable
+
+        cond_exec_enable = Signal()
+        compact_index_fault = Signal()
+        bf_fault = Signal()
+        call_index_fault = Signal()
+        branch_index_fault = Signal()
+        compact_index = Signal(33)
+        compact_index_selected = Signal()
+        fetch_bounds_fault = Signal()   # combinatorial; gates cond_exec_enable and drives fault
+        # fetch_bounds_fault is assigned below (after any_unit_busy is defined).
+        # Including ~fetch_bounds_fault here ensures that NO instruction can start in the
+        # same cycle that a BOUNDS fault is asserted — decode side effects are suppressed.
+        m.d.comb += cond_exec_enable.eq(
+            self.boot_complete & exec_enable & ~fetch_bounds_fault & ~u_decoder.fault_valid)
+
+        # 1-cycle busy registers for single-cycle Turing ops (prevent double-execution
+        # due to the 1-cycle ROM fetch pipeline latency)
+        iadd_busy_reg   = Signal()
+        isub_busy_reg   = Signal()
+        branch_busy_reg = Signal()
+        shl_busy_reg    = Signal()
+        shr_busy_reg    = Signal()
+        bfext_busy_reg  = Signal()
+        bfins_busy_reg  = Signal()
+        mcmp_busy_reg   = Signal()
+
+        any_unit_busy = Signal()
+        cross_domain_ret = Signal()
+        cload_pending   = Signal()
+        # Keep decode suppressed for one full IDLE cycle after RETURN changes
+        # NIA. The external synchronous instruction memories and their
+        # registered ROM/DMEM selector otherwise still present the RETURN word
+        # when the return FSM drops busy, causing the same RETURN to execute a
+        # second time and pop the next (empty) frame.
+        return_fetch_settle = Signal()
+
+        # Early declarations for M-window FSM — CR15 M-flag latch + DR11-DR13 shadow
+        mwin_busy              = Signal()
+        mwin_cr_wr_en          = Signal()
+        mwin_cr_wr_data        = Signal(CAP_REG_LAYOUT)
+        mwin_m_set_en          = Signal()
+        mwin_m_clear_en        = Signal()
+        mwin_fault_valid       = Signal()
+
+        # Early declarations for Mint FSM signals used throughout elaborate()
+        mint_busy              = Signal()
+        mint_clist_wr_en       = Signal()
+        mint_clist_addr_d      = Signal(32)  # byte addr of clist slot being written
+        mint_e_gt_d            = Signal(32)  # computed E-GT word written to caller clist
+        mint_slot_id_reg       = Signal(16)  # latched from mLoad when outform fires
+        mint_clist_addr_reg    = Signal(32)  # latched from mLoad when outform fires
+        mint_lump_size_reg     = Signal(15)  # latched lump size (words)
+        mint_dmem_rd_en        = Signal()    # Mint DMEM read request
+        mint_dmem_addr         = Signal(32)  # Mint DMEM read address
+        mint_ns_wr_en          = Signal()    # Mint NS write enable
+        mint_ns_addr           = Signal(32)  # Mint NS write address
+        mint_ns_wr_data        = Signal(32)  # Mint NS write data
+        mint_clist_wr_data_d   = Signal(32)  # clist write data (cc copy or E-GT)
+
+        load_busy_shadow = Signal()  # see load_start_sig below
+        busy_expr = (
+            u_tperm.tperm_busy | u_call.call_busy |
+            u_return.busy | u_save.save_busy | u_load.load_busy | load_busy_shadow |
+            u_dread.busy | u_dwrite.busy |
+            iadd_busy_reg | isub_busy_reg | branch_busy_reg |
+            shl_busy_reg | shr_busy_reg | bfext_busy_reg | bfins_busy_reg | mcmp_busy_reg |
+            u_cload.cload_busy | cload_pending |
+            return_fetch_settle |
+            fence_pending_reg |
+            u_outform.outform_busy |
+            mint_busy |
+            mwin_busy |
+            u_outform_fsm.busy
+        )
+        if not self.iot_profile:
+            busy_expr = busy_expr | (
+                u_lambda.lambda_busy | u_gc.gc_busy |
+                u_change.change_busy | u_switch.switch_busy |
+                u_eloadcall.busy | u_xloadlambda.busy |
+                u_irq_dispatch.busy
+            )
+        m.d.comb += any_unit_busy.eq(busy_expr)
+
+        # Halt detection: zero instruction word fetched after boot, while no unit is busy.
+        # Matches the simulator's halted-on-zero-word behaviour.
+        m.d.comb += self.halt_valid.eq(
+            self.boot_complete & self.imem_valid & (self.imem_data == 0) & ~any_unit_busy
+        )
+
+        lambda_start_sig = Signal()
+        nested_lambda_fault = Signal()
+        if not self.iot_profile:
+            m.d.comb += nested_lambda_fault.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy
+                & lambda_active_reg & (cr_dst != CR_CLIST)
+            )
+            m.d.comb += lambda_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy
+                & ~(lambda_active_reg & (cr_dst != CR_CLIST))
+            )
+
+        tperm_start_sig = Signal()
+        call_start_sig = Signal()
+        ret_start_sig = Signal()
+        switch_start_sig = Signal()
+        load_start_sig = Signal()
+        save_start_sig = Signal()
+        dread_start_sig = Signal()
+        dwrite_start_sig = Signal()
+        change_start_sig = Signal()
+        eloadcall_start_sig = Signal()
+        xloadlambda_start_sig = Signal()
+        scheduler_inflight = Signal()
+        decoded_thread_change_inflight = Signal()
+
+        if not self.iot_profile:
+            cr_rd_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_rd_addr,
+                                     Mux(u_xloadlambda.busy, u_xloadlambda.cr_rd_addr,
+                                         Mux(u_dread.busy, u_dread.cr_rd_addr,
+                                             Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
+                                                 cr_src))))
+            cr_rd_addr_inner = Mux(u_change.change_busy, u_change.cr_rd_addr,
+                                   Mux(u_switch.switch_busy, u_switch.cr_rd_addr,
+                                       cr_rd_addr_default))
+            m.d.comb += u_regs.cr_rd_addr.eq(
+                Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
+                    Mux(lambda_start_sig | u_lambda.lambda_busy, u_lambda.cr_rd_addr,
+                        Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
+                            Mux(u_call.call_busy, u_call.cr_rd_addr,
+                                    Mux(u_save.save_busy, u_save.cr_rd_addr,
+                                        cr_rd_addr_inner)))))
+            )
+        else:
+            cr_rd_addr_default = Mux(u_dread.busy, u_dread.cr_rd_addr,
+                                     Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
+                                         cr_src))
+            m.d.comb += u_regs.cr_rd_addr.eq(
+                Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
+                    Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
+                        Mux(u_call.call_busy, u_call.cr_rd_addr,
+                            Mux(u_save.save_busy, u_save.cr_rd_addr,
+                                cr_rd_addr_default))))
+            )
+
+        # ── Boot microcode M-elevation window (forward-declared for u_perm gating) ──
+        # boot_retire_count and boot_microcode_active are forward-declared here so
+        # u_perm.check_valid (line below) can gate on ~boot_microcode_active.
+        # The sync increment and comb assignment are wired later (after the CHANGE
+        # unit wiring block) together with the u_change.m_elevated connection.
+        boot_retire_count    = Signal(2, name="boot_retire_count")
+        boot_microcode_active = Signal(name="boot_microcode_active")
+
+        perm_gt_sig = Signal(GT_LAYOUT)
+        m.d.comb += perm_gt_sig.eq(View(CAP_REG_LAYOUT, u_regs.cr_rd_data).word0_gt)
+
+        required_perms = Signal(6)
+        with m.Switch(church_op):
+            with m.Case(ChurchOpcode.LOAD):
+                m.d.comb += required_perms.eq(Mux(cr_src == CR_CLIST, 0, PERM_MASK_L))
+            with m.Case(ChurchOpcode.SAVE):
+                m.d.comb += required_perms.eq(0)
+            with m.Case(ChurchOpcode.CALL):
+                # Abstract GTs bypass E-perm: the call FSM dispatches to M_FETCH_NS.
+                # Outform GTs bypass E-perm: the ChurchOutformFSM intercepts first
+                # to lazily install the lump, then promotes to Inform before the CALL.
+                hw_perm_gt_view = View(GT_LAYOUT, perm_gt_sig)
+                with m.If(u_decoder.call_indexed):
+                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                with m.Elif((hw_perm_gt_view.gt_type == GT_TYPE_ABSTRACT) |
+                          (hw_perm_gt_view.gt_type == GT_TYPE_OUTFORM)):
+                    m.d.comb += required_perms.eq(0)
+                with m.Else():
+                    m.d.comb += required_perms.eq(PERM_MASK_E)
+            if not self.iot_profile:
+                with m.Case(ChurchOpcode.SWITCH):
+                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                with m.Case(ChurchOpcode.CHANGE):
+                    # Permission check is done inside ChurchChange (change.py):
+                    # CR12/CR13 require S-perm + location match; CR14/CR15 require L-perm.
+                    # M-elevation during boot bypasses both checks.
+                    m.d.comb += required_perms.eq(0)
+                with m.Case(ChurchOpcode.LAMBDA):
+                    m.d.comb += required_perms.eq(PERM_MASK_X)
+                with m.Case(ChurchOpcode.ELOADCALL):
+                    m.d.comb += required_perms.eq(0)
+                with m.Case(ChurchOpcode.XLOADLAMBDA):
+                    m.d.comb += required_perms.eq(0)
+            with m.Default():
+                m.d.comb += required_perms.eq(0)
+
+        m.d.comb += [
+            u_perm.gt_in.eq(perm_gt_sig),
+            u_perm.required_perms.eq(required_perms),
+            # Suppress perm check during boot microcode (BOOT_PROGRAM[0..2]).
+            # LOAD/CHANGE/CALL use null or partially-initialised caps; each unit
+            # performs its own M-elevated internal checks.
+            u_perm.check_valid.eq(
+                cond_exec_enable & is_church_op & ~any_unit_busy &
+                ~boot_microcode_active &
+                (church_op != ChurchOpcode.CHANGE) &
+                # NULL and EXACT own their type checks in the TPERM unit.
+                # The generic NULL gate would reject the NULL query itself
+                # and attribute EXACT failures to the wrong pipeline stage.
+                ~((church_op == ChurchOpcode.TPERM) &
+                  ((u_decoder.tperm_preset[:4] == TpermPreset.NULL) |
+                   (u_decoder.tperm_preset[:4] == TpermPreset.EXACT))) &
+                # RETURN has no CR source operand. Its frame companion (or
+                # LAMBDA code identity) supplies authority, not decoded CR0,
+                # which a preceding RETURN MASK 0 correctly clears.
+                (church_op != ChurchOpcode.RETURN)
+            ),
+            u_perm.check_domain_purity.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM)
+            ),
+        ]
+
+        all_checks_pass = u_perm.all_checks_pass
+
+        if not self.iot_profile:
+            m.d.comb += [
+                u_gc.gc_start.eq(self.gc_start),
+                u_gc.gc_mark_en.eq(1),
+                u_gc.gc_sweep_en.eq(1),
+                u_gc.ns_start_index.eq(1),
+                u_gc.ns_end_index.eq(0x1000),
+                u_gc.ns_rd_data.eq(self.ns_rd_data),
+            ]
+            m.d.comb += [
+                self.gc_busy.eq(u_gc.gc_busy),
+                self.gc_garbage_count.eq(u_gc.garbage_count),
+            ]
+        else:
+            m.d.comb += [
+                self.gc_busy.eq(0),
+                self.gc_garbage_count.eq(0),
+            ]
+
+        cr_rd_data_gt = Signal(GT_LAYOUT)
+        m.d.comb += cr_rd_data_gt.eq(View(CAP_REG_LAYOUT, u_regs.cr_rd_data).word0_gt)
+
+        m.d.comb += [
+            self.clist_addr.eq(0),
+            self.clist_rd_en.eq(0),
+            self.clist_wr_data.eq(cr_rd_data_gt),
+            self.clist_wr_en.eq(0),
+        ]
+        with m.If(mint_clist_wr_en):
+            m.d.comb += [
+                self.clist_addr.eq(mint_clist_addr_d),
+                self.clist_wr_data.eq(mint_clist_wr_data_d),
+                self.clist_wr_en.eq(1),
+            ]
+
+        m.d.comb += [
+            u_regs.flags_in.eq(0),
+            u_regs.flags_wr_en.eq(0),
+            u_regs.clear_all.eq(clear_all),
+        ]
+
+        # Forward-declare Turing-op signals (logic connected after dwrite section)
+        iadd_start_sig  = Signal()
+        isub_start_sig  = Signal()
+        shl_start_sig   = Signal()
+        shr_start_sig   = Signal()
+        bfext_start_sig = Signal()
+        bfins_start_sig = Signal()
+        mcmp_start_sig  = Signal()
+        iadd_result     = Signal(33)
+        isub_result     = Signal(33)
+        shl_result      = Signal(32)
+        shr_result      = Signal(32)
+        bfext_result    = Signal(32)
+        bfins_result    = Signal(32)
+        mcmp_result     = Signal(33)
+        iadd_flags_sig  = Signal(COND_FLAGS_LAYOUT)
+        isub_flags_sig  = Signal(COND_FLAGS_LAYOUT)
+        shl_flags_sig   = Signal(COND_FLAGS_LAYOUT)
+        shr_flags_sig   = Signal(COND_FLAGS_LAYOUT)
+        bfext_flags_sig = Signal(COND_FLAGS_LAYOUT)
+        bfins_flags_sig = Signal(COND_FLAGS_LAYOUT)
+        mcmp_flags_sig  = Signal(COND_FLAGS_LAYOUT)
+        branch_taken    = Signal()
+        branch_target_checked = Signal(signed(37))
+
+        change_dr_wr_en = Signal()
+        change_dr_wr_addr = Signal(4)
+        change_dr_wr_data = Signal(32)
+        if not self.iot_profile:
+            m.d.comb += [
+                change_dr_wr_en.eq(u_change.dr_wr_en),
+                change_dr_wr_addr.eq(u_change.dr_wr_addr),
+                change_dr_wr_data.eq(u_change.dr_wr_data),
+            ]
+        with m.If(change_dr_wr_en):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(change_dr_wr_addr),
+                u_regs.dr_wr_data.eq(change_dr_wr_data),
+                u_regs.dr_wr_en.eq(1),
+            ]
+        with m.Elif(u_dread.dr_wr_en):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(u_dread.dr_wr_addr),
+                u_regs.dr_wr_data.eq(u_dread.dr_wr_data),
+                u_regs.dr_wr_en.eq(1),
+            ]
+        with m.Elif(iadd_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(iadd_result[:32]),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(iadd_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(isub_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(isub_result[:32]),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(isub_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(shl_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(shl_result),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(shl_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(shr_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(shr_result),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(shr_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(bfext_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(bfext_result),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(bfext_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(bfins_start_sig):
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(cr_dst),
+                u_regs.dr_wr_data.eq(bfins_result),
+                u_regs.dr_wr_en.eq(1),
+                u_regs.flags_in.eq(bfins_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(mcmp_start_sig):
+            # MCMP: flags-only compare, no DR write
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(0),
+                u_regs.dr_wr_data.eq(0),
+                u_regs.dr_wr_en.eq(0),
+                u_regs.flags_in.eq(mcmp_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Elif(u_tperm.tperm_complete):
+            # TPERM complete: update N/Z from tperm_z_result; C and V always 0.
+            # A.10: TPERM flag invariants — N = !Z, C = 0, V = 0.
+            tperm_flags_sig = Signal(COND_FLAGS_LAYOUT)
+            tperm_flags_view = View(COND_FLAGS_LAYOUT, tperm_flags_sig)
+            m.d.comb += [
+                tperm_flags_view.Z.eq(u_tperm.tperm_z_result),
+                tperm_flags_view.N.eq(~u_tperm.tperm_z_result),
+                tperm_flags_view.C.eq(0),
+                tperm_flags_view.V.eq(0),
+                u_regs.flags_in.eq(tperm_flags_sig),
+                u_regs.flags_wr_en.eq(1),
+            ]
+        with m.Else():
+            m.d.comb += [
+                u_regs.dr_wr_addr.eq(0),
+                u_regs.dr_wr_data.eq(0),
+                u_regs.dr_wr_en.eq(0),
+            ]
+
+        # CHANGE/RETURN restore the packed protected-indicator flags.
+        if not self.iot_profile:
+            with m.If(u_change.flags_restore_en):
+                m.d.comb += [
+                    u_regs.flags_in.eq(u_change.flags_restore_data),
+                    u_regs.flags_wr_en.eq(1),
+                ]
+        with m.If(u_return.flags_restore_en):
+            m.d.comb += [
+                u_regs.flags_in.eq(u_return.flags_restore_data),
+                u_regs.flags_wr_en.eq(1),
+            ]
+
+        # IRQ dispatch DR writes — last-write-wins: override the chain above
+        # for the one cycle that u_irq_dispatch fires each write pulse.
+        if not self.iot_profile:
+            with m.If(u_irq_dispatch.dr_wr_en):
+                m.d.comb += [
+                    u_regs.dr_wr_addr.eq(u_irq_dispatch.dr_wr_addr),
+                    u_regs.dr_wr_data.eq(u_irq_dispatch.dr_wr_data),
+                    u_regs.dr_wr_en.eq(1),
+                ]
+            with m.If(u_irq_dispatch.dr1_wr_en):
+                m.d.comb += [
+                    u_regs.dr_wr_addr.eq(1),
+                    u_regs.dr_wr_data.eq(u_irq_dispatch.dr1_wr_data),
+                    u_regs.dr_wr_en.eq(1),
+                ]
+
+        # boot_cap_wr: full 96-bit CR write during boot initialization.
+        # Used to set word1_location and word2_w2 (e.g. CR6/CR15) in one cycle.
+        # Defaults to 0; driven from the boot state switch below.
+        boot_cap_wr_en   = Signal()
+        boot_cap_wr_addr = Signal(4)
+        boot_cap_wr_data = Signal(CAP_REG_LAYOUT)
+
+        if not self.iot_profile:
+            cr_wr_addr_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_addr,
+                                     Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_addr, 0))
+            cr_wr_data_default = Mux(u_eloadcall.busy, u_eloadcall.cr_wr_data,
+                                     Mux(u_xloadlambda.busy, u_xloadlambda.cr_wr_data, 0))
+            cr_wr_en_extra = u_eloadcall.cr_wr_en | u_xloadlambda.cr_wr_en
+            cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr,
+                                   Mux(u_change.change_busy, u_change.cr_wr_addr,
+                                       Mux(u_switch.switch_busy, u_switch.cr_wr_addr,
+                                           cr_wr_addr_default)))
+            cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data,
+                                   Mux(u_change.change_busy, u_change.cr_wr_data,
+                                       Mux(u_switch.switch_busy, u_switch.cr_wr_data,
+                                           cr_wr_data_default)))
+            cr_wr_en_extra = cr_wr_en_extra | u_cload.cr_wr_en | u_change.cr_wr_en | u_switch.cr_wr_en
+        else:
+            cr_wr_addr_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_addr, 0)
+            cr_wr_data_inner = Mux(u_cload.cr_wr_en, u_cload.cr_wr_data, 0)
+            cr_wr_en_extra = u_cload.cr_wr_en
+        # ChurchOutformFSM (Mode 2 CALL intercept) adds a CR promote write.
+        # Wrap cr_wr_addr_inner/cr_wr_data_inner to give it lowest priority
+        # (it only fires during PROMOTE_WRITE, when all other units are idle).
+        cr_wr_addr_inner = Mux(u_outform_fsm.cr_wr_en, u_outform_fsm.cr_wr_addr, cr_wr_addr_inner)
+        cr_wr_data_inner = Mux(u_outform_fsm.cr_wr_en, u_outform_fsm.cr_wr_data, cr_wr_data_inner)
+        cr_wr_en_extra = cr_wr_en_extra | u_outform_fsm.cr_wr_en
+        # Debug CR write port — absolute lowest priority (simulation/test use only).
+        cr_wr_addr_inner = Mux(self.dbg_cr_wr_en, self.dbg_cr_wr_addr, cr_wr_addr_inner)
+        cr_wr_data_inner = Mux(self.dbg_cr_wr_en, self.dbg_cr_wr_data, cr_wr_data_inner)
+        cr_wr_en_extra = cr_wr_en_extra | self.dbg_cr_wr_en
+        m.d.comb += [
+            u_regs.cr_wr_addr.eq(
+                Mux(mwin_cr_wr_en, CR_NAMESPACE,
+                    Mux(boot_cap_wr_en, boot_cap_wr_addr,
+                        Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_addr,
+                            Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_addr,
+                                Mux(u_call.cr_wr_en, u_call.cr_wr_addr,
+                                    Mux(u_return.cr_wr_en, u_return.cr_wr_addr,
+                                        cr_wr_addr_inner))))))
+            ),
+            u_regs.cr_wr_data.eq(
+                Mux(mwin_cr_wr_en, mwin_cr_wr_data,
+                    Mux(boot_cap_wr_en, boot_cap_wr_data,
+                        Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_data,
+                            Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_data,
+                                Mux(u_call.cr_wr_en, u_call.cr_wr_data,
+                                    Mux(u_return.cr_wr_en, u_return.cr_wr_data,
+                                        cr_wr_data_inner))))))
+            ),
+            u_regs.cr_wr_en.eq(
+                mwin_cr_wr_en | boot_cap_wr_en |
+                u_shared_mload.cr_wr_en | u_tperm.cr_wr_en | u_call.cr_wr_en |
+                u_return.cr_wr_en | cr_wr_en_extra
+            ),
+            # M-window set/clear connect to u_regs controls
+            u_regs.m_set_en.eq(mwin_m_set_en),
+            u_regs.m_clear_en.eq(mwin_m_clear_en),
+            u_regs.m_bit_device_wr_en.eq(
+                u_dwrite.m_bit_wr_en | self.dbg_m_bit_wr_en),
+            u_regs.m_bit_device_word.eq(
+                Mux(self.dbg_m_bit_wr_en,
+                    self.dbg_m_bit_word, u_dwrite.m_bit_wr_word)),
+            u_regs.m_switch_consume_en.eq(u_switch.m_consume_en if not self.iot_profile else 0),
+            u_regs.m_switch_consume_target.eq(
+                u_switch.m_consume_target if not self.iot_profile else 0),
+            u_regs.m_save_consume_en.eq(u_save.m_consume_en),
+            u_regs.m_save_consume_target.eq(u_save.m_consume_target),
+            # RETURN commits architecturally only after cLoad has rebuilt CR6.
+            # At that exact write, clear all boundary M state and grant CR6.M.
+            u_regs.m_return_commit_en.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            # Normal RETURN may still fault in cLoad after the frame FSM
+            # completes. Reset descriptors only at its validated CR6 write.
+            u_regs.return_commit_en.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            u_regs.return_mask.eq(u_return.return_mask_latched),
+            self.dbg_return_m_commit.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            # Expose M-flag and shadow DR reads
+            self.cr15_m_flag.eq(u_regs.cr15_m_flag),
+            self.dbg_m_dr11.eq(u_regs.m_dr11),
+            self.dbg_m_dr12.eq(u_regs.m_dr12),
+            self.dbg_m_dr13.eq(u_regs.m_dr13),
+            self.dbg_m_dr14.eq(u_regs.m_dr14),
+            self.dbg_m_dr15.eq(u_regs.m_dr15),
+            # Test-observability: CR12 GT word0 — must be INFORM(slot=1) after boot
+            self.dbg_cr12_gt.eq(View(CAP_REG_LAYOUT, u_regs.cr12_thread).word0_gt),
+            self.dbg_isolated_m_flags.eq(u_regs.isolated_m_flags),
+            self.dbg_m_bit_state.eq(u_regs.m_bit_device_state),
+        ]
+        # Test-observability: CR8 GT word0 via the cr_word_rd port (unused at runtime).
+        # cr_word_rd_addr/sel are driven statically here; no runtime logic uses this port.
+        m.d.comb += [
+            u_regs.cr_word_rd_addr.eq(8),
+            u_regs.cr_word_rd_sel.eq(0),  # sel=0 → word0 (GT)
+            self.dbg_cr8_gt.eq(u_regs.cr_word_rd_data),
+        ]
+
+        # M-window shadow data sources — mgt_set_trigger (from Abstract-GT CALL) takes
+        # priority over cr15_m_set (test/microcode injection port).
+        # For the cr15_m_set path we compute integrity32 here so the WRITEBACK check
+        # succeeds without the test needing to pre-calculate it.
+        cr15_ns_view_mset = View(CAP_REG_LAYOUT, u_regs.cr15_namespace)
+        cr15_m_set_integrity = Signal(32)
+        integrity32_amaranth(
+            m,
+            cr15_ns_view_mset.word1_location,
+            cr15_ns_view_mset.word2_w2,
+            cr15_m_set_integrity,
+        )
+        m.d.comb += [
+            u_regs.m_set_dr11.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_gt_word,
+                    cr15_ns_view_mset.word0_gt.as_value())
+            ),
+            u_regs.m_set_dr12.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_ns_location,
+                    cr15_ns_view_mset.word1_location)
+            ),
+            u_regs.m_set_dr13.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_ns_authority,
+                    cr15_ns_view_mset.word2_w2)
+            ),
+            u_regs.m_set_dr14.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_ns_integrity,
+                    cr15_m_set_integrity)
+            ),
+            # DR15 = resident Inform W3 (cache_token32) — non-authoritative,
+            # diagnostic only.  Task #2862: no longer used to gate/authorise
+            # any writeback.  cr15_m_set path has no W3 available → DR15=0.
+            u_regs.m_set_dr15.eq(
+                Mux(u_call.mgt_set_trigger, u_call.mgt_cache_token32,
+                    0)
+            ),
+        ]
+
+        # Faults retire in place.  The physical top-level immediately gates
+        # fetch and preserves the complete architectural state for its reason-2
+        # snapshot.  Recovery remains an explicit reboot_req; it is no longer
+        # possible for the fault edge itself to destroy the state being
+        # reported.  A testing-only skip advances exactly one instruction while
+        # fetch remains gated, so none of that instruction's decode/execute
+        # side effects can run again.
+        with m.If(u_return.reboot_request | self.reboot_req |
+                  (self.fault_valid & self.boot_complete &
+                   ~self.defer_fault_reset)):
+            m.d.sync += [boot_state_reg.eq(BootState.FAULT_RST), nia_reg.eq(0)]
+        # Wukong's opt-in deferred path must hold the failing NIA. Without an
+        # explicit branch here the ordinary retire/increment chain below would
+        # advance it on the same fault cycle.
+        with m.Elif(self.fault_valid & self.boot_complete):
+            m.d.sync += nia_reg.eq(nia_reg)
+        with m.Elif(clear_all):
+            m.d.sync += nia_reg.eq(0)
+        with m.Elif(self.skip_fault_req & self.boot_complete):
+            m.d.sync += nia_reg.eq(nia_reg + 4)
+        with m.Elif(self.free_run_start):
+            m.d.sync += nia_reg.eq(self.free_run_nia)
+        if not self.iot_profile:
+            with m.Elif(u_change.nia_restore_en):
+                m.d.sync += nia_reg.eq(u_change.nia_restore_val)
+            with m.Elif(u_lambda.nia_set):
+                m.d.sync += nia_reg.eq(u_lambda.nia_value)
+            with m.Elif(u_xloadlambda.nia_set):
+                m.d.sync += nia_reg.eq(u_xloadlambda.nia_value)
+            with m.Elif(u_switch.switch_complete):
+                # SWITCH owns its issuing NIA until its authorization/load FSM
+                # reaches a successful terminal event. Faults leave NIA here
+                # for fault retirement; success advances exactly once.
+                m.d.sync += nia_reg.eq(nia_reg + 4)
+        with m.Elif(u_return.nia_set):
+            m.d.sync += nia_reg.eq(u_return.nia_value)
+        with m.Elif(u_call.nia_set):
+            m.d.sync += nia_reg.eq(u_call.nia_value)
+        if not self.iot_profile:
+            with m.Elif(u_eloadcall.nia_set):
+                m.d.sync += nia_reg.eq(u_eloadcall.nia_value)
+            with m.Elif(u_irq_dispatch.nia_set):
+                m.d.sync += nia_reg.eq(u_irq_dispatch.nia_value)
+        # Non-control-flow multi-cycle instructions advance only at successful
+        # completion.  Their issue cycle is excluded from the generic +4 path.
+        delayed_complete = (
+            u_load.load_complete |
+            u_save.save_complete |
+            u_tperm.tperm_complete |
+            u_dread.done |
+            u_dwrite.done
+        )
+        if not self.iot_profile:
+            delayed_complete = delayed_complete | (
+                u_change.change_complete &
+                ~scheduler_inflight &
+                ~decoded_thread_change_inflight
+            )
+        with m.Elif(self.boot_complete & delayed_complete):
+            m.d.sync += nia_reg.eq(nia_reg + 4)
+        with m.Elif(branch_taken & ~fetch_bounds_fault):
+            # PC-relative branch: nia += sign_extend(imm) * 4.
+            # Gated by ~fetch_bounds_fault: if the *current* nia is already out-of-range
+            # the BOUNDS fault is raised instead; nia must not advance further.
+            m.d.sync += nia_reg.eq(branch_target_checked[:32])
+        with m.Elif(
+            self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
+            & ~call_start_sig
+            & ~ret_start_sig
+            & ~load_start_sig
+            & ~save_start_sig
+            & ~tperm_start_sig
+            & ~dread_start_sig
+            & ~dwrite_start_sig
+            & ~(switch_start_sig if not self.iot_profile else 0)
+            & ~(change_start_sig if not self.iot_profile else 0)
+            & ~(lambda_start_sig if not self.iot_profile else 0)
+            & ~(eloadcall_start_sig if not self.iot_profile else 0)
+            & ~(xloadlambda_start_sig if not self.iot_profile else 0)
+            & ~fetch_bounds_fault & ~compact_index_fault & ~bf_fault & ~call_index_fault & ~branch_index_fault & ~u_outform_fsm.intercept_start
+        ):
+            # Advance PC for all instructions (including not-taken branches).
+            # CALL and RETURN must NOT advance the PC on their issue cycles.
+            # Their NIAs come from the respective nia_set pulses at completion;
+            # an early +4 creates a phantom retire at the sequential address.
+            # ~fetch_bounds_fault ensures nia never advances on a BOUNDS-fault cycle.
+            # ~u_outform_fsm.intercept_start holds the PC at the CALL instruction
+            # when a Mode 2 Outform intercept fires; the CALL is replayed once the
+            # FSM promotes the source CR and releases busy.
+            m.d.sync += nia_reg.eq(nia_reg + 4)
+
+        # Code fence management — separate priority chain from nia update.
+        #
+        # Priority (highest first):
+        #   1. Reboot / global reset: clear fence + cancel any pending transition.
+        #   3. RETURN: set fence_pending to stall fetch until cload restores
+        #      caller context. The callee's fence is KEPT so that the BOUNDS check
+        #      cannot fire during the stall (any_unit_busy already blocks decode, but
+        #      keeping the old fence avoids an inactive-fence window entirely).
+        #   4. cload writes CR14 (or CR6 for in-scope LAMBDA): fence_pending
+        #      clears and the fence is established from the caller code cap.
+        #   6. LAMBDA / ELOADCALL / XLOADLAMBDA: entering unknown code, fence suspended.
+        #   7. CALL completing: establish callee fence from CALL unit outputs.
+        with m.If(u_return.reboot_request | clear_all):
+            # Reboot or global reset — wipe everything immediately.
+            m.d.sync += [
+                code_lo_reg.eq(0),
+                code_hi_reg.eq(0),
+                fence_pending_reg.eq(0),
+            ]
+        with m.Elif(
+            u_return.complete & cross_domain_ret
+        ):
+            # Stall instruction execution until cLoad validates caller context.
+            # Old fence (callee's bounds) is intentionally kept; fetch is blocked by
+            # fence_pending_reg contribution to any_unit_busy, so no false BOUNDS fault.
+            m.d.sync += fence_pending_reg.eq(1)
+        if not self.iot_profile:
+            with m.Elif(u_change.cr_wr_en &
+                        (u_change.cr_wr_addr == CR_CLOOMC)):
+                # A Thread CHANGE restores CR14 directly rather than through
+                # cLoad. Refresh the fetch fence before CHANGE releases busy
+                # and execution resumes at the restored NIA.
+                change_cr14_view = View(
+                    CAP_REG_LAYOUT, u_change.cr_wr_data)
+                change_cr14_w2 = View(
+                    WORD2_LAYOUT, change_cr14_view.word2_w2)
+                m.d.sync += [
+                    code_lo_reg.eq(change_cr14_view.word1_location),
+                    code_hi_reg.eq(
+                        change_cr14_view.word1_location +
+                        ((change_cr14_w2.limit_offset + 1) << 2)
+                    ),
+                ]
+        with m.Elif(u_cload.cr_wr_en &
+                    ((u_cload.cr_wr_addr == CR_CLOOMC) |
+                     (u_return.cload_same_code & (u_cload.cr_wr_addr == CR_CLIST)))):
+            # Normal RETURN restores CR14; in-scope LAMBDA retains CR14
+            # verbatim and reaches this point at its validated CR6 commit.
+            cr14_cload_view = View(CAP_REG_LAYOUT, Mux(
+                u_return.cload_same_code, u_regs.cr14_code, u_cload.cr_wr_data))
+            cr14_cload_w2   = View(WORD2_LAYOUT,   cr14_cload_view.word2_w2)
+            m.d.sync += [
+                fence_pending_reg.eq(0),
+                code_lo_reg.eq(cr14_cload_view.word1_location),
+                code_hi_reg.eq(
+                    cr14_cload_view.word1_location +
+                    ((cr14_cload_w2.limit_offset + 1) << 2)   # limit_offset inclusive (cw-1)
+                ),
+            ]
+        if not self.iot_profile:
+            with m.Elif(u_lambda.nia_set | u_eloadcall.nia_set | u_xloadlambda.nia_set | u_irq_dispatch.nia_set):
+                m.d.sync += [code_lo_reg.eq(0), code_hi_reg.eq(0)]
+        with m.Elif(u_call.call_normal_complete):
+            # Normal CALL completed — establish callee fence from CALL unit byte-address outputs.
+            # Abstract-GT CALL (M_FETCH_DONE) does not update the code fence.
+            m.d.sync += [
+                code_lo_reg.eq(u_call.code_lo_out),
+                code_hi_reg.eq(u_call.code_hi_out),
+            ]
+
+        m.d.comb += [
+            self.imem_addr.eq(nia_reg),
+            self.nia.eq(nia_reg),
+            self.flags.eq(u_regs.flags),
+        ]
+        for i in range(16):
+            for w in range(3):
+                m.d.comb += self.debug_cr_words[i][w].eq(
+                    u_regs.debug_cr_words[i][w])
+            m.d.comb += self.debug_dr_words[i].eq(u_regs.debug_dr_words[i])
+        m.d.comb += self.debug_m_flag.eq(u_regs.cr15_m_flag)
+        m.d.comb += self.debug_isolated_m_flags.eq(u_regs.isolated_m_flags)
+
+        boot_wr_en = [Signal(name=f"boot_cap{i}_wr_en") for i in range(16)]
+        boot_wr_gt = [Signal(GT_LAYOUT, name=f"boot_cap{i}_wr_gt") for i in range(16)]
+
+        with m.Switch(boot_state_reg):
+            with m.Case(BootState.LOAD_NS):
+                # CR15 (namespace cap): full 96-bit write to include word1_location=0
+                # (NS at dmem byte 0) and word2_w2=18 (limit: slots 0..18 accessible).
+                # ISA: NS-load instruction → CR15. Lump 1 (Namespace, NS Slot 0).
+                # ns_gt: slot_id=0, gt_seq=0, GT_TYPE_INFORM, perms=0 (zero-perm)
+                # word0_gt = (GT_TYPE_INFORM<<25) | slot=0 = 0x02000000 ★v2.0
+                # word1 = 0 (NS table at DMEM start)
+                # word2 = 18 (hardwired constant; limit_offset=18 → slots 0-18 accessible)
+                # Cross-reference: simulator.js _bootStep() case 1 (B:01 LOAD_NS)
+                # Slots 16=SlideRule, 17=(empty), 18=Constants
+                m.d.comb += [
+                    boot_cap_wr_en.eq(1),
+                    boot_cap_wr_addr.eq(15),
+                    boot_cap_wr_data.eq(Cat(
+                        C(0x1A000000, 32),  # word0_gt: GT_TYPE_INFORM, Church dom=1, L-perm ★v2.0
+                        # 0x1A000000 = dom=1(Church) | perm=0b001(L) | GT_TYPE_INFORM<<25 | slot=0
+                        # L-perm is required so BOOT_PROGRAM[0]=LOAD CR15,CR15[0] passes
+                        # mload CHECK_L without needing the boot_microcode_active M-elevation window.
+                        C(0,          32),  # word1_location = 0 (NS at dmem start)
+                        C(18,         32),  # word2_w2: limit_offset=18 (slots 0-18)
+                    )),
+                ]
+            with m.Case(BootState.INIT_THRD):
+                # CR12 (thread stack cap): zero-perm Inform GT for NS Slot 1.
+                # ISA: CHANGE instruction primary write → CR12. Lump 2 (Thread, NS Slot 1).
+                # thrd_gt: slot_id=1, gt_seq=0, GT_TYPE_INFORM, dom=0, perm=0 (zero-perm)
+                # word0_gt = (GT_TYPE_INFORM<<25) | slot=1 = 0x02000001 ★v2.0
+                # word1 = thread lump base (from NS entry word0_location)
+                # word2 = NS entry limit_offset (from NS entry word1_limit)
+                # CHANGE hidden write (INSTALL_CR5 in change.py): CR5 ← RW heap token
+                #   CR5.word0 = 0x32000001 (dom=0 Turing, perm=0b011 R+W, GT_TYPE_INFORM, slot=1)
+                #   CR5.word1 = thread lump base; CR5.word2 = NS entry limit_offset (same as CR12)
+                # Cross-reference: simulator.js _bootStep() cases 2+3 (B:02 INIT_THRD + B:03 INIT_HEAP)
+                thrd_gt = Signal(GT_LAYOUT)
+                thrd_gt_view = View(GT_LAYOUT, thrd_gt)
+                m.d.comb += [
+                    thrd_gt_view.slot_id.eq(1),
+                    thrd_gt_view.gt_seq.eq(0),
+                    thrd_gt_view.gt_type.eq(GT_TYPE_INFORM),
+                    thrd_gt_view.dom.eq(0),   # Turing, no perms (M-only, transient)
+                    thrd_gt_view.perm.eq(0),
+                ]
+                m.d.comb += [boot_wr_en[12].eq(1), boot_wr_gt[12].eq(thrd_gt)]
+            with m.Case(BootState.INIT_CLIST):
+                # CR6 (c-list cap): full 96-bit write to include word1_location=0x400
+                # (DEMO_CLIST at dmem byte 0x400 = word 256) and word2_w2=63
+                # (limit: indices 0..63 accessible).
+                # cr6_gt: slot_id=2, GT_TYPE_INFORM, L-only perm (Church dom=1, perm=0b001), gt_seq=0
+                # L-perm (perm[0]=bit28) is required so boot code can LOAD capabilities out
+                # of the c-list via LOAD CR_dst, CR6[n].  mLoad CHECK_L checks perm_bit(src,L)
+                # = dom & perm[0]; perm=0b110 (S+E) has perm[0]=0 → PERM_L fault on NUC[0].
+                # E-perm MUST NOT be set on CR6: CALL checks E-perm on the target GT, so
+                # L+E on CR6 would make "CALL CR6" architecturally valid during the boot window.
+                # CALL always delivers perm=0b001 (L only) to CR6 — see call.py line 345.
+                # v2.0 GT word layout: b_flag[31] | perm[30:28] | dom[27] | gt_type[26:25] | gt_seq[24:16] | slot[15:0]
+                # perm=0b001 (L only): bit30=0(E off), bit29=0, bit28=1(L) → word0_gt = 0x1A000002 ★v2.0
+                m.d.comb += [
+                    boot_cap_wr_en.eq(1),
+                    boot_cap_wr_addr.eq(6),
+                    boot_cap_wr_data.eq(Cat(
+                        C(0x1A000002, 32),  # word0_gt: Church L-only perm (dom=1,perm=0b001), GT_TYPE_INFORM, slot=2 ★v2.0
+                        C(0x400,      32),  # word1_location = 0x400 (DEMO_CLIST base)
+                        C(63,         32),  # word2_w2: limit_offset=63 (64 entries)
+                    )),
+                    # Protected execution identity for Namespace.Init. LOAD_NUC
+                    # replaces this with the normal transient boot fence after
+                    # the private device operation completes.
+                    boot_wr_en[14].eq(1),
+                    boot_wr_gt[14].eq(
+                        make_gt(GT_TYPE_INFORM,
+                                PERM_MASK_R | PERM_MASK_X,
+                                NAMESPACE_EXEC_SLOT, 0)),
+                ]
+            with m.Case(BootState.LOAD_NUC):
+                # CR14 (code cap): TRANSIENT BOOT FENCE — uses Thread slot (1) as a transient
+                # placeholder; no user-visible NS table entry needed. After the
+                # BOOT_PROGRAM CALL, CR14 is reloaded by cload with the Application
+                # LUMP's code capability (Boot.Abstr / SelfTest, slot 6).
+                # This is a microarchitectural detail — not the ISA-visible CALL result.
+                # cr14_gt: slot_id=1, gt_seq=0, GT_TYPE_INFORM, dom=0 (Turing), perm=0b100 (X-only)
+                # word0_gt = (0b100<<28) | (GT_TYPE_INFORM<<25) | slot=1 = 0x42000001 ★v2.0
+                # After CALL/cload executes, CR14 is replaced with the R+X abstraction token:
+                #   word0 = 0x52000000|bootEntrySlot (dom=0, perm=0b101 R+X, GT_TYPE_INFORM)
+                #   word1 = abstraction lump base (from NS entry word0_location)
+                #   word2 = NS entry limit_offset (from NS entry word1_limit)
+                # Cross-reference: simulator.js _bootStep() case 7 (B:07 NUC_CODE)
+                cr14_gt = Signal(GT_LAYOUT)
+                cr14_gt_view = View(GT_LAYOUT, cr14_gt)
+                m.d.comb += [
+                    cr14_gt_view.slot_id.eq(1),
+                    cr14_gt_view.gt_seq.eq(0),
+                    cr14_gt_view.gt_type.eq(GT_TYPE_INFORM),
+                    cr14_gt_view.dom.eq(0),        # Turing domain
+                    cr14_gt_view.perm.eq(0b100),   # X = perm[2] in Turing domain
+                ]
+                m.d.comb += [boot_wr_en[14].eq(1), boot_wr_gt[14].eq(cr14_gt)]
+
+                # Boot fence: BOOT_PROGRAM occupies IMEM byte addresses [0, NUC_LUMP_BASE).
+                # NUC_LUMP_BASE is derived from len(BOOT_PROGRAM) in boot_rom.py —
+                # never a hardcoded magic number. Fence is cleared by LAMBDA mid-boot
+                # and re-established for the NUC_PROGRAM domain by CALL/cload.
+                m.d.sync += [
+                    code_lo_reg.eq(0),
+                    code_hi_reg.eq(NUC_LUMP_BASE),
+                ]
+
+        # ── Boot microcode M-elevation window (connections) ────────────────────────
+        # boot_retire_count / boot_microcode_active were forward-declared above (before
+        # u_perm wiring) so they could gate u_perm.check_valid.  The sync increment
+        # and comb value are connected here, after the full retire machinery is wired.
+        #
+        # BOOT_PROGRAM[0..2] (LOAD→CHANGE→CALL) run immediately after boot_complete.
+        # These three instructions are architecturally M-elevated ("boot microcode"):
+        # they need full L/S/E perm bypass and NS-bounds bypass so that the boot
+        # ROM can load the namespace cap (CR15), switch to Boot.Thread (CR12), and
+        # call the IDE-configured entry abstraction (CR0) without requiring those
+        # caps to be fully permissioned at the hardware level.
+        #
+        # boot_retire_count tracks how many instructions have retired since boot_complete.
+        # boot_microcode_active is True for the first 3 retires (LOAD, CHANGE, CALL).
+        # clear_all (FAULT_RST) must rewind the boot-microcode window: on a
+        # re-boot pass the first 3 instructions run again and need the same
+        # M-elevation, or pass 2 faults VERSION at the very first boot LOAD.
+        with m.If(clear_all):
+            m.d.sync += boot_retire_count.eq(0)
+        with m.Elif(self.boot_complete & self.retire_valid & (boot_retire_count < 3)):
+            m.d.sync += boot_retire_count.eq(boot_retire_count + 1)
+        m.d.comb += boot_microcode_active.eq(
+            self.boot_complete & (boot_retire_count < 3)
+        )
+
+        runtime_wr_en = [Signal(name=f"rt_cap{i}_wr_en") for i in range(16)]
+        runtime_wr_gt = [Signal(GT_LAYOUT, name=f"rt_cap{i}_wr_gt") for i in range(16)]
+
+        # CHANGE owns its entire publication. Never deposit the operand
+        # into CR8 before its permission/context validation has succeeded.
+
+        for i in range(16):
+            m.d.comb += [
+                u_regs.cr_gt_wr_en[i].eq(boot_wr_en[i] | runtime_wr_en[i]),
+                u_regs.cr_gt_wr_data[i].eq(Mux(boot_wr_en[i], boot_wr_gt[i], runtime_wr_gt[i])),
+            ]
+
+        # Detect Outform GT (type=0b10) in the source register at CALL decode time.
+        # When present, the ChurchOutformFSM intercepts before the CALL unit starts
+        # to lazily install the absent lump, then promotes the GT to Inform type.
+        _call_src_gt_view = View(GT_LAYOUT, perm_gt_sig)
+        _call_src_is_outform = Signal(name="call_src_is_outform")
+        m.d.comb += _call_src_is_outform.eq(
+            ~u_decoder.call_indexed &
+            (_call_src_gt_view.gt_type == GT_TYPE_OUTFORM)
+        )
+
+        # Suppress call_start while the source CR holds an Outform GT.
+        # After ChurchOutformFSM promotes it to Inform, the CALL retries normally.
+        m.d.comb += call_start_sig.eq(
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
+            ~any_unit_busy & ~_call_src_is_outform & ~call_index_fault
+        )
+
+        # Trigger the ChurchOutformFSM when a CALL sees an Outform source GT.
+        m.d.comb += [
+            u_outform_fsm.intercept_start.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
+                ~any_unit_busy & _call_src_is_outform & ~call_index_fault
+            ),
+            u_outform_fsm.src_cr.eq(cr_src),
+            u_outform_fsm.src_cr_data.eq(u_regs.cr_rd_data),
+        ]
+
+        # Read all indexed inputs before CALL changes context. The CALL FSM
+        # latches both resolved operands at start; no later live DR dependency.
+        call_row = Signal(33)
+        call_method = Signal(33)
+        call_runtime = self.imem_data[16:19] == 1
+        row_value = Cat(u_regs.dr_rd_data3, C(0, 1))
+        method_value = Cat(u_regs.dr_rd_data4, C(0, 1))
+        method_subtract = Mux(u_decoder.call_indexed, self.imem_data[12], self.imem_data[11])
+        method_magnitude = Mux(u_decoder.call_indexed, self.imem_data[5:12], self.imem_data[:11])
+        m.d.comb += [
+            u_regs.dr_rd_addr3.eq(Mux(is_bfext_op | is_bfins_op,
+                self.imem_data[10:14], Mux(is_dread_op | is_dwrite_op,
+                self.imem_data[:4], self.imem_data[19:23]))),
+            u_regs.dr_rd_addr4.eq(Mux(u_decoder.call_indexed,
+                                     self.imem_data[14:18], self.imem_data[12:16])),
+            call_row.eq(Mux(self.imem_data[13],
+                            row_value - self.imem_data[:5], row_value + self.imem_data[:5])),
+            call_method.eq(Mux(u_decoder.call_indexed | call_runtime,
+                Mux(method_subtract, method_value - method_magnitude, method_value + method_magnitude),
+                u_decoder.immediate)),
+            call_index_fault.eq(cond_exec_enable & is_church_op &
+                (church_op == ChurchOpcode.CALL) & ~any_unit_busy &
+                ((u_decoder.call_indexed & call_row[32]) | call_method[32])),
+            u_call.call_start.eq(call_start_sig),
+            u_call.boot_window.eq(boot_microcode_active),
+            u_call.cr_src.eq(cr_src),
+            u_call.indexed_source.eq(u_decoder.call_indexed),
+            u_call.index.eq(Mux(u_decoder.call_indexed, call_row[:32], 0)),
+            u_call.call_imm.eq(call_method[:32]),
+            u_call.mask.eq(u_decoder.call_mask),
+            u_call.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_call.cr15_namespace.eq(u_regs.cr15_namespace),
+            u_call.cr14_code.eq(u_regs.cr14_code),
+            u_call.mem_rd_data.eq(self.dmem_rd_data),
+            u_call.mem_rd_valid.eq(self.dmem_rd_valid),
+            # Stack push inputs
+            u_call.cr5_heap.eq(u_regs.cr5_heap),
+            u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
+            u_call.cr12_thread.eq(u_regs.cr12_thread),
+            # Stack frames belong to the active Thread body. CR12 remains the
+            # system Thread root and may have location zero on Wukong; CHANGE
+            # resolves the selected Thread body's relocated backing address
+            # into active_thread_base. CALL and RETURN must use that same base.
+            u_call.thread_base.eq(self.active_thread_base),
+            # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
+            u_call.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+            u_call.flags.eq(u_regs.flags),
+            # Parallel register-file mask operations for domain-crossing cleanup
+            u_regs.cr_b_clear_mask.eq(u_call.cr_b_clear_mask),
+            u_regs.cr_null_mask.eq(u_call.cr_null_mask),
+        ]
+
+        m.d.comb += ret_start_sig.eq(
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.RETURN) & ~any_unit_busy
+        )
+        m.d.comb += [
+            u_return.return_start.eq(ret_start_sig),
+            u_return.return_mask.eq(u_decoder.return_mask),
+            u_return.lambda_active.eq(lambda_active_reg),
+            u_return.lambda_pc.eq(lambda_pc_reg),
+            u_return.cr5_heap.eq(u_regs.cr5_heap),
+            u_return.cr14_code.eq(u_regs.cr14_code),
+            u_return.cr12_thread.eq(u_regs.cr12_thread),
+            u_return.thread_base.eq(self.active_thread_base),
+            u_return.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+            u_return.mem_rd_data.eq(self.dmem_rd_data),
+            u_return.mem_rd_valid.eq(self.dmem_rd_valid),
+        ]
+
+        with m.If(ret_start_sig):
+            # Even in-scope LAMBDA RETURN reconstructs CR6 from its accepted
+            # CR14 executable identity and validates it through cLoad.
+            m.d.sync += cross_domain_ret.eq(1)
+
+        with m.If(u_return.nia_set):
+            m.d.sync += return_fetch_settle.eq(1)
+        with m.Elif(return_fetch_settle & ~u_return.busy):
+            m.d.sync += return_fetch_settle.eq(0)
+
+        with m.If(
+            u_return.complete & ~u_return.fault_valid &
+            ~u_return.reboot_request & cross_domain_ret
+        ):
+            m.d.sync += cload_pending.eq(1)
+        with m.Elif(cload_pending):
+            m.d.sync += cload_pending.eq(0)
+
+        m.d.comb += [
+            u_cload.cload_start.eq(cload_pending),
+            u_cload.e_gt.eq(u_return.cload_e_gt),
+            u_cload.same_code.eq(u_return.cload_same_code),
+            u_cload.code_location.eq(u_return.cload_code_location),
+            u_cload.cr15_namespace.eq(u_regs.cr15_namespace),
+            u_cload.mem_rd_data.eq(self.dmem_rd_data),
+            u_cload.mem_rd_valid.eq(self.dmem_rd_valid),
+        ]
+
+        if not self.iot_profile:
+            with m.If(clear_all):
+                m.d.sync += [lambda_active_reg.eq(0), lambda_pc_reg.eq(0)]
+            with m.Elif(u_return.lambda_clear):
+                m.d.sync += lambda_active_reg.eq(0)
+            with m.Elif(u_call.call_normal_complete & ~u_call.call_fault):
+                m.d.sync += lambda_active_reg.eq(0)
+            with m.Elif(u_lambda.lambda_complete & ~u_lambda.lambda_fault):
+                m.d.sync += [lambda_active_reg.eq(1), lambda_pc_reg.eq(u_lambda.saved_nia)]
+
+            m.d.comb += [
+                u_lambda.lambda_start.eq(lambda_start_sig),
+                u_lambda.cr_target.eq(cr_dst),
+                u_lambda.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_lambda.saved_nia.eq(nia_reg + 4),
+            ]
+        else:
+            with m.If(clear_all):
+                m.d.sync += [lambda_active_reg.eq(0), lambda_pc_reg.eq(0)]
+
+        m.d.comb += tperm_start_sig.eq(
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.TPERM) & ~any_unit_busy
+        )
+        m.d.comb += [
+            u_tperm.tperm_start.eq(tperm_start_sig),
+            u_tperm.cr_target.eq(cr_dst),
+            u_tperm.cr_src.eq(cr_src),
+            u_tperm.preset.eq(u_decoder.tperm_preset),
+            u_tperm.cr_rd_data.eq(u_regs.cr_rd_data),
+            # FRAME preset: Z=1 if a real return frame exists (STO < sp_max).
+            # STO is held in protected Thread word +17; a cached register is needed
+            # to drive this without a memory read cycle.  Tied to 0 until the
+            # thread-scheduler exposes a cached sto_reg signal here.
+            # TODO: wire to sto_cached < sp_max when core gains an STO cache.
+            u_tperm.stack_has_frame.eq(0),
+        ]
+
+        m.d.comb += save_start_sig.eq(
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SAVE) & ~any_unit_busy & ~compact_index_fault
+        )
+        m.d.comb += [
+            u_save.save_start.eq(save_start_sig),
+            u_save.cr_src.eq(cr_src),
+            u_save.cr_dst.eq(cr_dst),
+            u_save.index.eq(compact_index[:32]),
+            u_save.source_m.eq(
+                Mux(cr_dst == 12, u_regs.isolated_m_flags[0],
+                    Mux(cr_dst == 13, u_regs.isolated_m_flags[1],
+                        Mux(cr_dst == 14, u_regs.isolated_m_flags[2],
+                            Mux(cr_dst == 15,
+                                u_regs.isolated_m_flags[3], 0))))
+            ),
+            u_save.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_save.cr15_namespace.eq(u_regs.cr15_namespace),
+            u_save.mem_wr_done.eq(1),
+            u_save.mem_rd_data.eq(self.dmem_rd_data),
+            u_save.mem_rd_valid.eq(self.dmem_rd_valid),
+        ]
+
+        m.d.comb += dread_start_sig.eq(
+            cond_exec_enable & is_dread_op & ~any_unit_busy
+        )
+        m.d.comb += [
+            u_dread.start.eq(dread_start_sig),
+            u_dread.cr_src.eq(cr_src),
+            u_dread.dr_dst.eq(cr_dst),
+            u_dread.imm.eq(u_decoder.immediate),
+            u_dread.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_dread.dmem_rd_data.eq(self.dmem_rd_data),
+            u_dread.m_bit_rd_word.eq(u_regs.m_bit_device_state),
+            # DR read port for indexed-mode DRx: feed from register port 1
+            u_dread.dr_rd_data.eq(u_regs.dr_rd_data3),
+        ]
+
+        namespace_exec_gt = View(
+            GT_LAYOUT, View(CAP_REG_LAYOUT, u_regs.cr14_code).word0_gt)
+        namespace_exec_authorized = Signal()
+        m.d.comb += namespace_exec_authorized.eq(
+            (namespace_exec_gt.gt_type == GT_TYPE_INFORM) &
+            (namespace_exec_gt.slot_id == NAMESPACE_EXEC_SLOT) &
+            ~namespace_exec_gt.dom &
+            (namespace_exec_gt.perm == 0b101) &
+            ~namespace_exec_gt.b_flag
+        )
+        m.d.comb += u_dread.namespace_authorized.eq(namespace_exec_authorized)
+        m.d.comb += dwrite_start_sig.eq(
+            cond_exec_enable & is_dwrite_op & ~any_unit_busy
+        )
+        m.d.comb += [
+            u_dwrite.start.eq(dwrite_start_sig),
+            u_dwrite.cr_src.eq(cr_src),
+            u_dwrite.dr_src.eq(cr_dst),
+            u_dwrite.imm.eq(u_decoder.immediate),
+            u_dwrite.cr_rd_data.eq(u_regs.cr_rd_data),
+            # Port 1: source data DR[dr_src] — still via register port 2
+            u_dwrite.dr_rd_data.eq(u_regs.dr_rd_data2),
+            # Port 2 (DRx for indexed mode): read via register port 1
+            u_dwrite.dr_rd_data2.eq(u_regs.dr_rd_data3),
+            u_dwrite.namespace_authorized.eq(namespace_exec_authorized),
+            u_dwrite.private_m_start.eq(
+                (boot_state_reg == BootState.INIT_CLIST) &
+                namespace_init_armed & ~u_dwrite.busy & ~u_dwrite.done),
+            # Namespace.Init writes the complete M-bit object: CR12 on, all
+            # other CR M bits off.
+            u_dwrite.private_m_word.eq(1 << CR_THREAD_STACK),
+        ]
+        # dr_rd_addr2: dwrite source data, BFINS, and register-form IADD/ISUB
+        # use port 2. Arithmetic register operands are encoded in imm[3:0]
+        # when the imm[14] immediate marker is clear.
+        m.d.comb += u_regs.dr_rd_addr2.eq(
+            Mux(u_dwrite.busy, u_dwrite.dr_rd_addr,
+                Mux(bfins_start_sig | mcmp_start_sig, cr_dst,
+                    Mux((iadd_start_sig | isub_start_sig) &
+                        ~u_decoder.immediate[14],
+                        u_decoder.immediate[:4], 0)))
+        )
+        # dr_rd_addr1: dread DRx, dwrite DRx, IADD/ISUB/SHL/SHR/BFEXT/BFINS/MCMP/CHANGE
+        # (dread/dwrite busy is mutually exclusive with the arithmetic ops via any_unit_busy)
+
+        # ── IADD / ISUB ──────────────────────────────────────────────────────
+        # Arithmetic on data registers.
+        # imm[14]=1: DR[dst] = DR[src] +/- zero_extend(imm[13:0])
+        # imm[14]=0: DR[dst] = DR[src] +/- DR[imm[3:0]]
+        # Flags: N = result[31], Z = (result==0), C = carry-out/no-borrow,
+        # V = signed overflow.
+        # 1-cycle busy after execution prevents double-fire due to ROM pipeline latency.
+        # (Signals forward-declared above for use in DR write / nia chains.)
+
+        m.d.comb += [
+            iadd_start_sig.eq(cond_exec_enable & is_iadd_op & ~any_unit_busy),
+            isub_start_sig.eq(cond_exec_enable & is_isub_op & ~any_unit_busy),
+        ]
+
+        # Latch busy for exactly 1 cycle after start (cleared when start is gone)
+        m.d.sync += [
+            iadd_busy_reg.eq(iadd_start_sig & ~iadd_busy_reg),
+            isub_busy_reg.eq(isub_start_sig & ~isub_busy_reg),
+        ]
+
+        # Strip the immediate-mode marker before extending the operand. The
+        # payload is an unsigned 14-bit value, matching the simulator.
+        arith_imm_sx = Signal(32)
+        m.d.comb += arith_imm_sx.eq(
+            Cat(u_decoder.immediate[:14], C(0, 18))
+        )
+
+        arith_rhs = Signal(32)
+        m.d.comb += arith_rhs.eq(
+            Mux(u_decoder.immediate[14], arith_imm_sx, u_regs.dr_rd_data2)
+        )
+
+        # Source DR read port 1 — shared by DREAD/DWRITE (indexed DRx), IADD/ISUB,
+        # SHL/SHR/BFEXT/BFINS/MCMP.  dread/dwrite busy is mutually exclusive with
+        # all arithmetic ops (any_unit_busy prevents their simultaneous dispatch).
+        m.d.comb += [
+            compact_index_selected.eq(
+                is_church_op & ((church_op == ChurchOpcode.LOAD) |
+                                (church_op == ChurchOpcode.SAVE)) & ~any_unit_busy),
+            compact_index.eq(Mux(u_decoder.immediate[14],
+                Cat(u_regs.dr_rd_data1, C(0, 1)) - u_decoder.immediate[4:14],
+                Cat(u_regs.dr_rd_data1, C(0, 1)) + u_decoder.immediate[4:14])),
+            compact_index_fault.eq(cond_exec_enable & compact_index_selected & compact_index[32]),
+        ]
+        m.d.comb += u_regs.dr_rd_addr1.eq(
+            Mux(u_dread.busy, u_dread.dr_rd_addr,
+                Mux(u_dwrite.busy, u_dwrite.dr_rd_addr2,
+                    Mux(compact_index_selected, u_decoder.immediate[:4],
+                    Mux(iadd_start_sig | isub_start_sig |
+                        shl_start_sig | shr_start_sig |
+                        bfext_start_sig | bfins_start_sig | mcmp_start_sig,
+                        cr_src, 0))))
+        )
+
+        # 33-bit results. IADD bit 32 is carry-out. For ISUB the ISA follows
+        # ARM-style condition semantics: C=1 means no borrow, C=0 means borrow.
+        # The widened subtraction's bit 32 is the borrow indicator, so invert it.
+        m.d.comb += [
+            iadd_result.eq(u_regs.dr_rd_data1 + arith_rhs),
+            isub_result.eq(u_regs.dr_rd_data1 - arith_rhs),
+        ]
+
+        iadd_flags_view = View(COND_FLAGS_LAYOUT, iadd_flags_sig)
+        isub_flags_view = View(COND_FLAGS_LAYOUT, isub_flags_sig)
+        m.d.comb += [
+            iadd_flags_view.N.eq(iadd_result[31]),
+            iadd_flags_view.Z.eq(iadd_result[:32] == 0),
+            iadd_flags_view.C.eq(iadd_result[32]),
+            iadd_flags_view.V.eq(
+                ~(u_regs.dr_rd_data1[31] ^ arith_rhs[31]) &
+                (iadd_result[31] ^ u_regs.dr_rd_data1[31])
+            ),
+            isub_flags_view.N.eq(isub_result[31]),
+            isub_flags_view.Z.eq(isub_result[:32] == 0),
+            isub_flags_view.C.eq(~isub_result[32]),
+            isub_flags_view.V.eq(
+                (u_regs.dr_rd_data1[31] ^ arith_rhs[31]) &
+                (isub_result[31] ^ u_regs.dr_rd_data1[31])
+            ),
+        ]
+
+        # ── SHL / SHR ────────────────────────────────────────────────────────
+        # Shift on data registers.
+        # DR[dst] = DR[src] << imm[4:0]              (SHL — shift left)
+        # DR[dst] = DR[src] >> imm[4:0]  LSR          (SHR imm[5]=0 — logical shift right, zero-fill)
+        # DR[dst] = DR[src] >>> imm[4:0] ASR          (SHR imm[5]=1 — arithmetic shift right, sign-extend)
+        # Flags: N = result[31], Z = (result==0), C = last bit shifted out, V = 0.
+        # Shift amount: imm[4:0] (0-31).  SHR mode:   imm[5]=0 LSR, imm[5]=1 ASR.
+
+        m.d.comb += [
+            shl_start_sig.eq(cond_exec_enable & is_shl_op & ~any_unit_busy),
+            shr_start_sig.eq(cond_exec_enable & is_shr_op & ~any_unit_busy),
+        ]
+        m.d.sync += [
+            shl_busy_reg.eq(shl_start_sig & ~shl_busy_reg),
+            shr_busy_reg.eq(shr_start_sig & ~shr_busy_reg),
+        ]
+
+        shift_amt = Signal(5)
+        m.d.comb += shift_amt.eq(u_decoder.immediate[0:5])
+
+        # SHL result (logical left shift — always zero-fills from the right)
+        m.d.comb += shl_result.eq(u_regs.dr_rd_data1 << shift_amt)
+
+        # SHR: choose between LSR (zero-fill) and ASR (sign-extend) based on imm[5]
+        asr_mode = Signal()
+        m.d.comb += asr_mode.eq(u_decoder.immediate[5])
+
+        # Sign-extend source to 64 bits for arithmetic shift right
+        shr_src_sx = Signal(64)
+        m.d.comb += shr_src_sx.eq(Cat(u_regs.dr_rd_data1, u_regs.dr_rd_data1[31].replicate(32)))
+        lsr_result = Signal(32)
+        asr_result = Signal(32)
+        m.d.comb += [
+            lsr_result.eq(u_regs.dr_rd_data1 >> shift_amt),
+            asr_result.eq((shr_src_sx >> shift_amt)[:32]),
+            shr_result.eq(Mux(asr_mode, asr_result, lsr_result)),
+        ]
+
+        # C flag = last bit shifted out, gated on shift_amt > 0
+        # SHR: last bit out = source[shift_amt - 1]  → (source >> (shift_amt-1))[0]
+        # SHL: last bit out = source[32 - shift_amt] → (source >> (32-shift_amt))[0]
+        shr_c_bit = Signal()
+        shl_c_bit = Signal()
+        shr_c_shift = Signal(5)
+        shl_c_shift = Signal(6)
+        m.d.comb += [
+            shr_c_shift.eq((shift_amt - 1)[:5]),
+            shl_c_shift.eq((32 - shift_amt)[:6]),
+            shr_c_bit.eq(Mux(shift_amt == 0, 0,
+                             (u_regs.dr_rd_data1 >> shr_c_shift)[0])),
+            shl_c_bit.eq(Mux(shift_amt == 0, 0,
+                             (u_regs.dr_rd_data1 >> shl_c_shift)[0])),
+        ]
+
+        shl_flags_view = View(COND_FLAGS_LAYOUT, shl_flags_sig)
+        shr_flags_view = View(COND_FLAGS_LAYOUT, shr_flags_sig)
+        m.d.comb += [
+            shl_flags_view.N.eq(shl_result[31]),
+            shl_flags_view.Z.eq(shl_result == 0),
+            shl_flags_view.C.eq(shl_c_bit),
+            shl_flags_view.V.eq(0),
+            shr_flags_view.N.eq(shr_result[31]),
+            shr_flags_view.Z.eq(shr_result == 0),
+            shr_flags_view.C.eq(shr_c_bit),
+            shr_flags_view.V.eq(0),
+        ]
+
+        # ── BFEXT ────────────────────────────────────────────────────────────
+        # Bit-field extract.
+        # DR[dst] = (DR[src] >> offset) & ((1 << width) - 1)
+        # imm[4:0] = width (1-31); imm[9:5] = offset (0-31).
+        # Reject zero width and fields extending beyond bit 31.
+        # Flags: N = result[31], Z = (result==0), C = 0, V = 0.
+
+        bf_invalid = Signal()
+        m.d.comb += bfext_start_sig.eq(cond_exec_enable & is_bfext_op & ~any_unit_busy & ~bf_invalid)
+        m.d.sync += bfext_busy_reg.eq(bfext_start_sig & ~bfext_busy_reg)
+
+        bf_offset = Signal(33)
+        bf_width  = Signal(5)
+        bf_mask   = Signal(32)
+        m.d.comb += [
+            bf_offset.eq(Mux(u_decoder.immediate[14],
+                Cat(u_regs.dr_rd_data3, C(0, 1)) - u_decoder.immediate[5:10],
+                Cat(u_regs.dr_rd_data3, C(0, 1)) + u_decoder.immediate[5:10])),
+            bf_width.eq(u_decoder.immediate[0:5]),
+            bf_invalid.eq((bf_width == 0) | (bf_offset > 31) | ((bf_offset + bf_width) > 32)),
+            bf_fault.eq(cond_exec_enable & ~any_unit_busy &
+                        (is_bfext_op | is_bfins_op) & bf_invalid),
+            bf_mask.eq((1 << bf_width) - 1),
+            bfext_result.eq((u_regs.dr_rd_data1 >> bf_offset[:5]) & bf_mask),
+        ]
+
+        bfext_flags_view = View(COND_FLAGS_LAYOUT, bfext_flags_sig)
+        m.d.comb += [
+            bfext_flags_view.N.eq(bfext_result[31]),
+            bfext_flags_view.Z.eq(bfext_result == 0),
+            bfext_flags_view.C.eq(0),
+            bfext_flags_view.V.eq(0),
+        ]
+
+        # ── BFINS ────────────────────────────────────────────────────────────
+        # Bit-field insert.
+        # DR[dst] = (DR[dst] & ~mask_shifted) | ((DR[src] & mask) << offset)
+        # imm[4:0] = width; imm[9:5] = offset (same as BFEXT).
+        # dr_rd_data1 = DR[cr_src] (value to insert, read on port 1)
+        # dr_rd_data2 = DR[cr_dst] (existing destination, read on port 2)
+        # Flags: N = result[31], Z = (result==0), C = 0, V = 0.
+
+        m.d.comb += bfins_start_sig.eq(cond_exec_enable & is_bfins_op & ~any_unit_busy & ~bf_invalid)
+        m.d.sync += bfins_busy_reg.eq(bfins_start_sig & ~bfins_busy_reg)
+
+        bfins_mask_shifted = Signal(32)
+        m.d.comb += [
+            bfins_mask_shifted.eq(bf_mask << bf_offset[:5]),
+            bfins_result.eq(
+                (u_regs.dr_rd_data2 & ~bfins_mask_shifted) |
+                ((u_regs.dr_rd_data1 & bf_mask) << bf_offset[:5])
+            ),
+        ]
+
+        bfins_flags_view = View(COND_FLAGS_LAYOUT, bfins_flags_sig)
+        m.d.comb += [
+            bfins_flags_view.N.eq(bfins_result[31]),
+            bfins_flags_view.Z.eq(bfins_result == 0),
+            bfins_flags_view.C.eq(0),
+            bfins_flags_view.V.eq(0),
+        ]
+
+        # ── MCMP ─────────────────────────────────────────────────────────────
+        # Compare (flags-only subtract, no register write).
+        # flags = flags_of(DR[dst] - DR[src]); no result is stored.
+        # Equivalent to ISUB but discards the result.
+        # Flags follow ISUB: C means no borrow; V is signed overflow.
+
+        m.d.comb += mcmp_start_sig.eq(cond_exec_enable & is_mcmp_op & ~any_unit_busy)
+        m.d.sync += mcmp_busy_reg.eq(mcmp_start_sig & ~mcmp_busy_reg)
+
+        m.d.comb += mcmp_result.eq(u_regs.dr_rd_data2 - u_regs.dr_rd_data1)
+
+        mcmp_flags_view = View(COND_FLAGS_LAYOUT, mcmp_flags_sig)
+        m.d.comb += [
+            mcmp_flags_view.N.eq(mcmp_result[31]),
+            mcmp_flags_view.Z.eq(mcmp_result[:32] == 0),
+            mcmp_flags_view.C.eq(~mcmp_result[32]),
+            mcmp_flags_view.V.eq(
+                (u_regs.dr_rd_data2[31] ^ u_regs.dr_rd_data1[31]) &
+                (mcmp_result[31] ^ u_regs.dr_rd_data2[31])),
+        ]
+
+        # ── BRANCH ───────────────────────────────────────────────────────────
+        # Conditional PC-relative branch.
+        # Phase 1: target = current byte NIA + 4 * (unsigned DR[index] +/- imm18).
+        # Keep a signed wide intermediate through address and code-fence checks.
+        # 1-cycle busy after taken branch prevents double-fire from ROM pipeline.
+        # (Signals forward-declared above for use in nia chain.)
+
+        branch_displacement = Signal(signed(34))
+        branch_index = Cat(u_regs.dr_rd_data3, C(0, 2)).as_signed()
+        branch_magnitude = Cat(self.imem_data[:18], C(0, 16)).as_signed()
+        m.d.comb += [
+            branch_displacement.eq(Mux(self.imem_data[18],
+                branch_index - branch_magnitude, branch_index + branch_magnitude)),
+            branch_target_checked.eq(
+                Cat(nia_reg, C(0, 5)).as_signed() + (branch_displacement << 2)),
+            branch_index_fault.eq(cond_exec_enable & is_branch_op & ~any_unit_busy &
+                ((branch_target_checked < 0) | (branch_target_checked > 0xFFFFFFFF) |
+                 ((code_lo_reg != code_hi_reg) &
+                  ((branch_target_checked < code_lo_reg) |
+                   (branch_target_checked >= code_hi_reg))))),
+            branch_taken.eq(cond_exec_enable & is_branch_op & ~any_unit_busy & ~branch_index_fault),
+        ]
+        m.d.sync += branch_busy_reg.eq(branch_taken & ~branch_busy_reg)
+
+        m.d.comb += load_start_sig.eq(
+            cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LOAD) & ~any_unit_busy & ~compact_index_fault
+        )
+        # One-cycle busy shadow: u_load.load_busy rises a cycle after
+        # load_start (IDLE→START_SUB is a sync transition), leaving a gap in
+        # which the NEXT instruction can issue and retire while the LOAD is
+        # still pending (observed: back-to-back LOADs — the second was
+        # swallowed and never executed).  busy_expr ORs this in.
+        m.d.sync += load_busy_shadow.eq(load_start_sig)
+        m.d.comb += [
+            u_load.load_start.eq(load_start_sig),
+            u_load.cr_src.eq(cr_src),
+            u_load.cr_dst.eq(cr_dst),
+            u_load.index.eq(compact_index[:32]),
+        ]
+
+        # Multi-cycle instructions own the fetched instruction and its NIA from
+        # issue until a terminal complete/fault pulse.  The shared instruction/
+        # data memory can present unrelated words while an execution unit is
+        # busy, so retain the issuer word for retirement and fault telemetry.
+        delayed_issuer_instr = Signal(32)
+        change_issuer_nia = Signal(32)
+
+        # ── TraceUnit support: trace read port + LOAD shadow latch ─────────────
+        # The trace port always mirrors cr_dst so the old GT is readable.
+        # At load_start_sig time (one cycle before the first mload bus access),
+        # the register file still holds the old CR_dst value; we latch it here
+        # so the TraceUnit can include it in the LOAD_SHADOW event packet.
+        m.d.comb += u_regs.trace_rd_addr.eq(cr_dst)
+
+        _trace_load_shadow_gt = Signal(32, name="trace_load_shadow_gt")
+        with m.If(load_start_sig):
+            m.d.sync += _trace_load_shadow_gt.eq(u_regs.trace_rd_gt)
+
+        if not self.iot_profile:
+            thread_switch_start_sig = Signal()
+            m.d.comb += thread_switch_start_sig.eq(
+                self.thread_switch_req & self.boot_complete & ~any_unit_busy)
+            m.d.comb += change_start_sig.eq(
+                (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy) |
+                thread_switch_start_sig
+            )
+            m.d.comb += [
+                u_change.change_start.eq(change_start_sig),
+                u_change.ordinary.eq(~thread_switch_start_sig & ~boot_microcode_active),
+                u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
+                u_change.cr_dst.eq(Mux(thread_switch_start_sig, 14, cr_dst)),
+                u_change.m_elevated.eq(
+                    (boot_state_reg != BootState.COMPLETE) | boot_microcode_active
+                ),
+                u_change.index.eq(Mux(thread_switch_start_sig, self.thread_switch_index, cap_index)),
+                u_change.change_mask.eq(Mux(thread_switch_start_sig, 0x0FFF, u_decoder.call_mask)),
+                u_change.active_thread_base.eq(self.active_thread_base),
+                u_change.active_thread_owned.eq(self.active_thread_owned),
+                u_change.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_change.cr12_thread.eq(u_regs.cr12_thread),
+                u_change.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_change.mem_rd_data.eq(self.dmem_rd_data),
+                u_change.mem_rd_valid.eq(self.dmem_rd_valid),
+                u_change.mem_wr_done.eq(1),
+                u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
+                u_change.boot_window.eq(boot_microcode_active),
+                u_change.flags_in.eq(u_regs.flags),
+                # ChurchChange encodes the decoded instruction's return NIA by
+                # adding one word. An external M6 request already arrives at an
+                # instruction boundary, so bias its input back one word and
+                # preserve the exact next NIA in the canonical frame.
+                u_change.nia_current.eq(
+                    Mux(thread_switch_start_sig, nia_reg - 4, nia_reg)),
+            ]
+            with m.If(change_start_sig & ~thread_switch_start_sig):
+                m.d.sync += [
+                    change_issuer_nia.eq(nia_reg),
+                    decoded_thread_change_inflight.eq(
+                        ~boot_microcode_active),
+                ]
+            with m.If(clear_all):
+                m.d.sync += decoded_thread_change_inflight.eq(0)
+            with m.Elif(u_change.change_complete | u_change.change_fault):
+                m.d.sync += decoded_thread_change_inflight.eq(0)
+            with m.If(clear_all):
+                m.d.sync += [
+                    scheduler_inflight.eq(0),
+                    self.active_thread_slot.eq(1),
+                    self.active_thread_base.eq(0),
+                    self.active_thread_owned.eq(0),
+                ]
+            with m.Elif(thread_switch_start_sig):
+                m.d.sync += scheduler_inflight.eq(1)
+            with m.Elif(u_change.change_complete | u_change.change_fault):
+                m.d.sync += scheduler_inflight.eq(0)
+                with m.If(u_change.change_complete & scheduler_inflight):
+                    m.d.sync += [
+                        self.active_thread_slot.eq(self.thread_switch_index),
+                        self.active_thread_base.eq(u_change.thread_base_restore_val),
+                        self.active_thread_owned.eq(1),
+                    ]
+            # Capture the initial boot Thread backing address as well.
+            with m.If(u_change.thread_base_restore_en):
+                m.d.sync += [
+                    self.active_thread_base.eq(u_change.thread_base_restore_val),
+                    self.active_thread_owned.eq(1),
+                ]
+            with m.If(u_change.cr_wr_en & (u_change.cr_wr_addr == 12)):
+                m.d.sync += self.active_thread_slot.eq(
+                    View(CAP_REG_LAYOUT, u_change.cr_wr_data).word0_gt.slot_id)
+            m.d.comb += [
+                self.thread_switch_busy.eq(scheduler_inflight | thread_switch_start_sig),
+                self.thread_switch_complete.eq(u_change.change_complete & scheduler_inflight),
+                self.thread_switch_fault.eq(u_change.change_fault & scheduler_inflight),
+            ]
+
+            m.d.comb += switch_start_sig.eq(
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SWITCH) & ~any_unit_busy
+            )
+            m.d.comb += [
+                u_switch.switch_start.eq(switch_start_sig),
+                u_switch.cr_src.eq(cr_src),
+                u_switch.target.eq(cr_dst),
+                u_switch.index.eq(cap_index),
+                # Do not use a subtract-and-bit-select here: malformed CRd
+                # values must not dynamically alias an isolated M latch.
+                u_switch.target_m.eq(
+                    Mux(cr_dst == SWITCH_TGT_CR12, u_regs.isolated_m_flags[0],
+                        Mux(cr_dst == SWITCH_TGT_CR13, u_regs.isolated_m_flags[1],
+                            Mux(cr_dst == SWITCH_TGT_CR14, u_regs.isolated_m_flags[2],
+                                Mux(cr_dst == SWITCH_TGT_CR15,
+                                    u_regs.isolated_m_flags[3], 0))))
+                ),
+                u_switch.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_switch.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_switch.mem_rd_data.eq(self.dmem_rd_data),
+                u_switch.mem_rd_valid.eq(self.dmem_rd_valid),
+            ]
+
+            m.d.comb += eloadcall_start_sig.eq(
+                0  # Retired opcode: decoder faults; never start legacy side effects.
+            )
+            m.d.comb += [
+                u_eloadcall.start.eq(eloadcall_start_sig),
+                u_eloadcall.cr_src.eq(cr_src),
+                u_eloadcall.cr_dst.eq(cr_dst),
+                u_eloadcall.index.eq(u_decoder.eloadcall_clist_row),
+                u_eloadcall.caller_pc.eq(nia_reg[2:17]),
+                u_eloadcall.mask.eq(u_decoder.call_mask),
+                u_eloadcall.call_imm.eq(u_decoder.eloadcall_method_index),  # method-table slot (1-based)
+                u_eloadcall.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_eloadcall.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_eloadcall.mem_rd_data.eq(self.dmem_rd_data),
+                u_eloadcall.mem_rd_valid.eq(self.dmem_rd_valid),
+                # Call-stack frame push: heap cap, thread-lump base, thread header
+                # (LUMP_HEADER_LAYOUT for sp_max/sp_min bounds), and CR12 for null check.
+                u_eloadcall.cr5_heap.eq(u_regs.cr5_heap),
+                u_eloadcall.thread_base.eq(self.active_thread_base),
+                u_eloadcall.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+                u_eloadcall.cr12_thread.eq(u_regs.cr12_thread),
+                u_eloadcall.flags.eq(u_regs.flags),
+            ]
+
+            m.d.comb += xloadlambda_start_sig.eq(
+                0  # Retired opcode: decoder faults; never start legacy side effects.
+            )
+            m.d.comb += [
+                u_xloadlambda.start.eq(xloadlambda_start_sig),
+                u_xloadlambda.cr_src.eq(cr_src),
+                u_xloadlambda.cr_dst.eq(cr_dst),
+                u_xloadlambda.index.eq(cap_index),
+                u_xloadlambda.cr_rd_data.eq(u_regs.cr_rd_data),
+                u_xloadlambda.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_xloadlambda.mem_rd_data.eq(self.dmem_rd_data),
+                u_xloadlambda.mem_rd_valid.eq(self.dmem_rd_valid),
+            ]
+
+            # ── PetNameMemory wiring (Task #1526) ────────────────────────────
+            # Read port: ELoadCall and XLoadLambda are mutually exclusive, so
+            # mux their pet_name_rd_addr; both receive the same rd_data result.
+            m.d.comb += [
+                u_pet_name_mem.rd_addr.eq(
+                    Mux(u_eloadcall.busy,
+                        u_eloadcall.pet_name_rd_addr,
+                        u_xloadlambda.pet_name_rd_addr)
+                ),
+                u_eloadcall.pet_name_rd_data.eq(u_pet_name_mem.rd_data),
+                u_xloadlambda.pet_name_rd_data.eq(u_pet_name_mem.rd_data),
+            ]
+
+            # ── ChurchIRQDispatch wiring (Task #1523) ────────────────────────
+            from .hw_types import IRQ_REASON_TIMER, IRQ_REASON_LAZY_LOAD, IRQ_REASON_LAZY_RESOLVE
+
+            irq_dispatch_start  = Signal()
+            irq_dispatch_reason = Signal(2)
+            irq_dispatch_slot   = Signal(16)
+
+            # ── IRQ arm gate ─────────────────────────────────────────────────
+            # Design rule: IRQ dispatch is DISABLED at boot and stays off until
+            # the first abstraction exits — i.e. after a good CALL, a good
+            # method body, and a good first RETURN.  This prevents dispatch
+            # from firing mid-boot (Scheduler.IRQ does not exist yet →
+            # IRQ_NULL_BASE would kill the boot CALL) and protects IDE
+            # single-stepping from being hijacked by dispatch during bring-up.
+            #
+            # irq_armed_reg:       set on the first clean RETURN after a clean
+            #                      CALL; cleared on FAULT_RST (clear_all).
+            # first_call_done_reg: set on the first clean CALL completion
+            #                      (COMPLETE state, no fault); cleared on
+            #                      FAULT_RST.  A fault at any point before the
+            #                      first RETURN keeps dispatch disabled for the
+            #                      re-boot pass (clear_all wipes both bits).
+            irq_armed_reg       = Signal()
+            first_call_done_reg = Signal()
+            with m.If(clear_all):
+                m.d.sync += [irq_armed_reg.eq(0), first_call_done_reg.eq(0)]
+            with m.Elif(~first_call_done_reg &
+                        u_call.call_normal_complete & ~u_call.call_fault):
+                m.d.sync += first_call_done_reg.eq(1)
+            with m.Elif(first_call_done_reg & ~irq_armed_reg &
+                        u_return.complete & ~u_return.fault_valid &
+                        ~u_return.reboot_request):
+                m.d.sync += irq_armed_reg.eq(1)
+
+            # Priority: TIMER > LAZY_LOAD > LAZY_RESOLVE.
+            # All three are mutually exclusive in practice (one per instruction
+            # boundary), but the priority chain makes it deterministic.
+            m.d.comb += [
+                irq_dispatch_reason.eq(
+                    Mux(self.timer_alarm,        IRQ_REASON_TIMER,
+                    Mux(u_call.lazy_load_irq,    IRQ_REASON_LAZY_LOAD,
+                                                 IRQ_REASON_LAZY_RESOLVE))
+                ),
+                irq_dispatch_slot.eq(
+                    Mux(self.timer_alarm,        0,
+                    Mux(u_call.lazy_load_irq,    u_call.lazy_load_ns_slot,
+                    Mux(u_eloadcall.lazy_resolve_irq, u_eloadcall.lazy_resolve_slot,
+                                                 u_xloadlambda.lazy_resolve_slot)))
+                ),
+                irq_dispatch_start.eq(
+                    (self.timer_alarm | u_call.lazy_load_irq |
+                     u_eloadcall.lazy_resolve_irq | u_xloadlambda.lazy_resolve_irq)
+                    & irq_armed_reg
+                    & ~u_irq_dispatch.busy
+                ),
+                u_irq_dispatch.start.eq(irq_dispatch_start),
+                u_irq_dispatch.irq_reason.eq(irq_dispatch_reason),
+                u_irq_dispatch.irq_slot.eq(irq_dispatch_slot),
+                u_irq_dispatch.cr15_namespace.eq(u_regs.cr15_namespace),
+                u_irq_dispatch.mem_rd_data.eq(self.dmem_rd_data),
+                u_irq_dispatch.mem_rd_valid.eq(self.dmem_rd_valid),
+            ]
+            m.d.comb += [  # re-open bracket to match trailing close below
+                u_xloadlambda.saved_nia.eq(nia_reg + 4),
+            ]
+
+        # ── outform wiring ───────────────────────────────────────────────────
+        # Three sources can trigger the outform download engine:
+        #   1. u_shared_mload.outform_start_out — mLoad intercepted Outform GT in c-list
+        #   2. self.outform_start_in            — test injection (bypasses CPU path)
+        #   3. u_outform_fsm.outform_start_out  — Mode 2: CALL source CR is Outform GT
+        _outform_start = Signal()
+        m.d.comb += _outform_start.eq(
+            u_shared_mload.outform_start_out |
+            self.outform_start_in |
+            u_outform_fsm.outform_start_out
+        )
+
+        # Track whether Mode 2 (ChurchOutformFSM) triggered the current download.
+        # This gates done/fault routing so each consumer only sees its own events.
+        outform_mode2_active = Signal(name="outform_mode2_active")
+        with m.If(u_outform_fsm.outform_start_out):
+            m.d.sync += outform_mode2_active.eq(1)
+        with m.Elif(u_outform.outform_done | u_outform.outform_fault):
+            m.d.sync += outform_mode2_active.eq(0)
+
+        m.d.comb += [
+            u_outform.outform_start.eq(_outform_start),
+            u_outform.gt_raw.eq(
+                Mux(self.outform_start_in, self.outform_gt_raw_in,
+                    Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_gt_raw_out,
+                        u_shared_mload.outform_gt_raw))
+            ),
+            u_outform.slot_id.eq(
+                Mux(self.outform_start_in, self.outform_slot_id_in,
+                    Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_slot_id_out,
+                        u_shared_mload.outform_slot_id))
+            ),
+            u_outform.rx_valid.eq(self.outform_rx_valid),
+            u_outform.rx_data.eq(self.outform_rx_data),
+            self.outform_tx_valid.eq(u_outform.tx_valid),
+            self.outform_tx_data.eq(u_outform.tx_data),
+            self.outform_result_gt.eq(u_outform.result_gt),
+            self.outform_busy.eq(u_outform.outform_busy),
+            self.outform_fsm_busy.eq(u_outform_fsm.busy),
+            u_outform.tx_ack.eq(self.outform_tx_ack),
+            # Route done/fault to mLoad (Mode 1) or to the intercept FSM (Mode 2)
+            u_shared_mload.outform_done_in.eq(u_outform.outform_done & ~outform_mode2_active),
+            u_shared_mload.outform_fault_in.eq(u_outform.outform_fault & ~outform_mode2_active),
+            u_shared_mload.outform_fault_type_in.eq(u_outform.outform_fault_type),
+            u_outform_fsm.outform_done_in.eq(
+                (u_outform.outform_done | self.dbg_outform_done_inject) & outform_mode2_active
+            ),
+            u_outform_fsm.outform_fault_in.eq(u_outform.outform_fault & outform_mode2_active),
+            u_outform_fsm.outform_fault_type_in.eq(u_outform.outform_fault_type),
+            u_outform_fsm.result_gt_in.eq(
+                Mux(self.dbg_outform_done_inject, self.dbg_outform_result_gt, u_outform.result_gt)
+            ),
+        ]
+
+        # Latch Mint context (slot_id + clist_addr) whenever any source fires
+        # outform_start. This applies to both IoT and non-IoT profiles; the Mint
+        # FSM in each profile reads mint_slot_id_reg / mint_clist_addr_reg.
+        with m.If(_outform_start):
+            m.d.sync += [
+                mint_slot_id_reg.eq(
+                    Mux(self.outform_start_in, self.outform_slot_id_in,
+                        Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_slot_id_out,
+                            u_shared_mload.outform_slot_id))
+                ),
+                # For Mode 2 (ChurchOutformFSM), clist_addr is a dummy (0).
+                # The Mint WRITE_CLIST step writes an E-GT to clist[0].  This
+                # is architecturally safe: slot_id=0 is permanently reserved for
+                # the NULL GT type (gt_type=0b00), and no valid capref ever has
+                # slot_id=0.  Writing to clist[0] therefore never clobbers a live
+                # capability.  The promoted GT keeps the Outform GT's original
+                # slot_id (non-zero), so this dummy clist write is fully isolated
+                # from the CR promotion performed by ChurchOutformFSM.
+                mint_clist_addr_reg.eq(
+                    Mux(self.outform_start_in, self.outform_clist_addr_in,
+                        Mux(u_outform_fsm.outform_start_out, u_outform_fsm.outform_clist_addr_out,
+                            u_shared_mload.outform_clist_addr))
+                ),
+            ]
+
+        if self.iot_profile:
+            # ── Watermark allocator ───────────────────────────────────────────
+            # NS(192 words) + clist(64 words) = 256 words; free space starts at 256.
+            WATERMARK_INIT = 256
+            DMEM_WORDS     = 2048
+            watermark_reg   = Signal(32, init=WATERMARK_INIT)
+            alloc_sz_w      = Signal(32)
+            alloc_mask_w    = Signal(32)
+            alloc_aligned_w = Signal(32)
+            alloc_new_wm_w  = Signal(33)
+
+            m.d.comb += alloc_sz_w.eq(C(1, 32) << u_outform.alloc_n)
+            m.d.comb += alloc_mask_w.eq(alloc_sz_w - 1)
+            m.d.comb += alloc_aligned_w.eq(
+                (watermark_reg + alloc_mask_w) & ~alloc_mask_w
+            )
+            m.d.comb += alloc_new_wm_w.eq(
+                Cat(alloc_aligned_w, C(0, 1)) + Cat(alloc_sz_w, C(0, 1))
+            )
+            alloc_fits  = Signal()
+            alloc_n_ok  = Signal()
+            m.d.comb += alloc_fits.eq(alloc_new_wm_w <= DMEM_WORDS)
+            # Enforce alloc_n in [6, 14] (lump sizes 64..16384 words)
+            m.d.comb += alloc_n_ok.eq(
+                (u_outform.alloc_n >= 6) & (u_outform.alloc_n <= 14)
+            )
+
+            m.d.comb += [
+                u_outform.alloc_done.eq(
+                    u_outform.alloc_req & alloc_fits & alloc_n_ok
+                ),
+                u_outform.alloc_fault.eq(
+                    u_outform.alloc_req & (~alloc_fits | ~alloc_n_ok)
+                ),
+                u_outform.alloc_base.eq(alloc_aligned_w << 2),
+            ]
+            with m.If(u_outform.alloc_req & alloc_fits & alloc_n_ok):
+                m.d.sync += watermark_reg.eq(alloc_new_wm_w[:32])
+
+            # ── Mint FSM ──────────────────────────────────────────────────────
+            # Validates the newly downloaded lump, writes the NS entry (3 words),
+            # copies the cc lump-tail GTs into the clist BRAM, then patches the
+            # caller's c-list slot with the fresh E-GT.
+            mint_base_reg      = Signal(32)
+            mint_cw_reg        = Signal(13)
+            mint_cc_reg        = Signal(8)
+            mint_scan_idx_reg  = Signal(14)
+            mint_copy_idx_reg  = Signal(8)   # loop counter for cc-word copy
+            mint_copy_data_reg = Signal(32)  # holds DMEM word between read→write cycles
+            mint_hdr_reg       = Signal(32)
+            # Registered (lump_size − cc_count) — precomputed in MINT_WRITE_NS3 so
+            # the MINT_COPY_CLIST_RD cc_off expression stays binary (2-operand) and
+            # Yosys alumacc cannot merge it into a multi-term $macc cell.
+            mint_cc_base_reg   = Signal(15)
+
+            # NS entry byte address: CR15.base + slot_id << 4 (16-byte stride)
+            cr15_mint_view     = View(CAP_REG_LAYOUT, u_regs.cr15_namespace)
+            mint_ns_entry_base = Signal(32)
+            m.d.comb += mint_ns_entry_base.eq(
+                cr15_mint_view.word1_location + (mint_slot_id_reg << 4)
+            )
+
+            # c-list BRAM base for the new slot (after NS area):
+            #   NS_WORDS = 192 (16 slots × 12 words); c-list starts at byte 768.
+            #   Slot s gets 64 words = 256 bytes.
+            #   Base = (192 + slot_id * 64) * 4 = 768 + (slot_id << 8)
+            #        = (3 + slot_id) << 8   (since 768 = 3 << 8)
+            # Use Cat to shift — avoids a second $add that alumacc could merge into
+            # a 3-term $macc with the downstream address addition.
+            mint_clist_slot_base  = Signal(32)
+            mint_slot_id_p3       = Signal(17)  # slot_id + 3  (at most 65538)
+            m.d.comb += mint_slot_id_p3.eq(mint_slot_id_reg + 3)
+            m.d.comb += mint_clist_slot_base.eq(Cat(Const(0, 8), mint_slot_id_p3))
+
+            # E-GT:  b=0 | perm[2:0]=0b100(bit30) | dom=1(bit27) | typ=Inform(01<<25) | gt_seq=1(<<16) | slot_id ★v2.0
+            # v2.0 GT layout: dom=1 (Church), perm[2]=E → 0x4A000000 | (GT_TYPE_INFORM<<25) | (1<<16) | slot
+            m.d.comb += mint_e_gt_d.eq(
+                (1 << 30) | (1 << GT_DOM_BIT) | (GT_TYPE_INFORM << 25) | (1 << 16) | mint_slot_id_reg
+            )
+            # W2: f_flag=0 | g_bit=0 | gt_seq=1(<<21) | limit_offset = lump_size-1 ★v2.0
+            mint_w2 = Signal(32)
+            m.d.comb += mint_w2.eq((1 << 21) | (mint_lump_size_reg - 1)[:21])
+
+            # integrity32(W0=mint_base_reg, W1=mint_w2) — replaces 90-stage CRC chain
+            mint_integrity = Signal(32)
+            integrity32_amaranth(m, mint_base_reg, mint_w2, mint_integrity)
+
+            mint_done_comb  = Signal()
+            mint_fault_comb = Signal()
+
+            with m.FSM(name="mint") as mint_fsm:
+
+                with m.State("MINT_IDLE"):
+                    with m.If(u_outform.mint_call):
+                        m.d.sync += mint_base_reg.eq(u_outform.mint_base)
+                        m.next = "MINT_READ_HDR"
+
+                with m.State("MINT_READ_HDR"):
+                    m.d.comb += [
+                        mint_dmem_rd_en.eq(1),
+                        mint_dmem_addr.eq(mint_base_reg),
+                    ]
+                    m.next = "MINT_READ_HDR_WAIT"
+
+                with m.State("MINT_READ_HDR_WAIT"):
+                    m.d.sync += mint_hdr_reg.eq(self.dmem_rd_data)
+                    m.next = "MINT_CHECK_HDR"
+
+                with m.State("MINT_CHECK_HDR"):
+                    hdr_v = View(LUMP_HEADER_LAYOUT, mint_hdr_reg)
+                    lsz_c = Signal(15)
+                    m.d.comb += lsz_c.eq(1 << (hdr_v.n_minus_6 + 6))
+                    with m.If(hdr_v.magic != 0x1F):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v.n_minus_6 > 8):
+                        m.next = "MINT_FAULT"
+                    # Explicit cc bounds: cc must leave room for header + at least one code word
+                    with m.Elif(hdr_v.cc > (lsz_c - 2)):
+                        m.next = "MINT_FAULT"
+                    # cw must fit in the remaining space (after header and cc tail)
+                    with m.Elif(hdr_v.cw > (lsz_c - hdr_v.cc - 2)):
+                        m.next = "MINT_FAULT"
+                    with m.Else():
+                        m.d.sync += [
+                            mint_lump_size_reg.eq(lsz_c),
+                            mint_cw_reg.eq(hdr_v.cw),
+                            mint_cc_reg.eq(hdr_v.cc),
+                            mint_scan_idx_reg.eq(hdr_v.cw + 1),
+                        ]
+                        m.next = "MINT_SCAN_FS"
+
+                with m.State("MINT_SCAN_FS"):
+                    scan_end_c = Signal(15)
+                    m.d.comb += scan_end_c.eq(mint_lump_size_reg - mint_cc_reg - 1)
+                    with m.If(mint_scan_idx_reg > scan_end_c):
+                        m.d.sync += mint_copy_idx_reg.eq(0)
+                        m.next = "MINT_WRITE_NS0"
+                    with m.Else():
+                        m.d.comb += [
+                            mint_dmem_rd_en.eq(1),
+                            mint_dmem_addr.eq(
+                                mint_base_reg + (mint_scan_idx_reg << 2)
+                            ),
+                        ]
+                        with m.If(self.dmem_rd_data != 0):
+                            m.next = "MINT_FAULT"
+                        with m.Else():
+                            m.d.sync += mint_scan_idx_reg.eq(mint_scan_idx_reg + 1)
+
+                with m.State("MINT_WRITE_NS0"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base),
+                        mint_ns_wr_data.eq(mint_base_reg),
+                    ]
+                    m.next = "MINT_WRITE_NS1"
+
+                with m.State("MINT_WRITE_NS1"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base + 4),
+                        mint_ns_wr_data.eq(mint_w2),
+                    ]
+                    m.next = "MINT_WRITE_NS2"
+
+                with m.State("MINT_WRITE_NS2"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base + 8),
+                        mint_ns_wr_data.eq(mint_integrity),
+                    ]
+                    m.next = "MINT_WRITE_NS3"
+
+                with m.State("MINT_WRITE_NS3"):
+                    # Frozen single-machine bootstrap: T is the full runtime GT,
+                    # not a portable content hash. Keep W3 identical to the GT
+                    # published below. This is not authentication or permission
+                    # to enable ingress, rebind slots, or cross machines.
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base + 12),
+                        mint_ns_wr_data.eq(mint_e_gt_d),
+                    ]
+                    # Precompute (lump_size − cc) into a register so the
+                    # copy-loop offset expression stays binary (2-operand) and
+                    # alumacc cannot merge it into a multi-term $macc.
+                    m.d.sync += mint_cc_base_reg.eq(mint_lump_size_reg - mint_cc_reg)
+                    m.next = "MINT_COPY_CLIST_RD"
+
+                # ── Copy cc words from lump tail into clist BRAM ──────────────
+                # Read from DMEM at alloc_base + (lump_size - cc + i) * 4,
+                # write to clist bus at (NS_CLIST_WORD_BASE + slot_id*64 + i) * 4.
+                with m.State("MINT_COPY_CLIST_RD"):
+                    with m.If(mint_copy_idx_reg >= mint_cc_reg):
+                        m.next = "MINT_WRITE_CLIST"
+                    with m.Else():
+                        # cc_off = (lump_size - cc) + i.  Use registered base so
+                        # alumacc sees only a binary add (not a 3-term chain).
+                        cc_off = Signal(15)
+                        m.d.comb += cc_off.eq(mint_cc_base_reg + mint_copy_idx_reg)
+                        m.d.comb += [
+                            mint_dmem_rd_en.eq(1),
+                            mint_dmem_addr.eq(
+                                mint_base_reg + (cc_off << 2)
+                            ),
+                        ]
+                        m.next = "MINT_COPY_CLIST_RD_WAIT"
+
+                with m.State("MINT_COPY_CLIST_RD_WAIT"):
+                    m.d.sync += mint_copy_data_reg.eq(self.dmem_rd_data)
+                    m.next = "MINT_COPY_CLIST_WR"
+
+                with m.State("MINT_COPY_CLIST_WR"):
+                    m.d.comb += [
+                        mint_clist_wr_en.eq(1),
+                        mint_clist_addr_d.eq(
+                            mint_clist_slot_base
+                            + (mint_copy_idx_reg << 2)
+                        ),
+                        mint_clist_wr_data_d.eq(mint_copy_data_reg),
+                    ]
+                    m.d.sync += mint_copy_idx_reg.eq(mint_copy_idx_reg + 1)
+                    m.next = "MINT_COPY_CLIST_RD"
+
+                # ── Write E-GT to caller's clist slot ─────────────────────────
+                with m.State("MINT_WRITE_CLIST"):
+                    m.d.comb += [
+                        mint_clist_wr_en.eq(1),
+                        mint_clist_addr_d.eq(mint_clist_addr_reg),
+                        mint_clist_wr_data_d.eq(mint_e_gt_d),
+                    ]
+                    m.next = "MINT_DONE"
+
+                with m.State("MINT_DONE"):
+                    m.d.comb += [
+                        mint_done_comb.eq(1),
+                        u_outform.mint_result_gt.eq(mint_e_gt_d),
+                    ]
+                    m.next = "MINT_IDLE"
+
+                with m.State("MINT_FAULT"):
+                    m.d.comb += mint_fault_comb.eq(1)
+                    m.next = "MINT_IDLE"
+
+            m.d.comb += [
+                mint_busy.eq(~mint_fsm.ongoing("MINT_IDLE")),
+                u_outform.mint_done.eq(mint_done_comb),
+                u_outform.mint_fault.eq(mint_fault_comb),
+            ]
+
+        else:
+            # ── Non-IoT: same watermark allocator and Mint FSM as IoT profile ──
+            # The non-IoT ChurchOutform (outform.py) uses the same alloc/Mint
+            # interface as ChurchOutformIoT; the download mechanism differs but
+            # the allocator and Mint FSM are identical.
+            WATERMARK_INIT = 256
+            DMEM_WORDS     = 2048
+            watermark_reg   = Signal(32, init=WATERMARK_INIT, name="watermark_reg_noniot")
+            alloc_sz_w      = Signal(32, name="alloc_sz_w_noniot")
+            alloc_mask_w    = Signal(32, name="alloc_mask_w_noniot")
+            alloc_aligned_w = Signal(32, name="alloc_aligned_w_noniot")
+            alloc_new_wm_w  = Signal(33, name="alloc_new_wm_w_noniot")
+
+            m.d.comb += alloc_sz_w.eq(C(1, 32) << u_outform.alloc_n)
+            m.d.comb += alloc_mask_w.eq(alloc_sz_w - 1)
+            m.d.comb += alloc_aligned_w.eq(
+                (watermark_reg + alloc_mask_w) & ~alloc_mask_w
+            )
+            m.d.comb += alloc_new_wm_w.eq(
+                Cat(alloc_aligned_w, C(0, 1)) + Cat(alloc_sz_w, C(0, 1))
+            )
+            alloc_fits_ni  = Signal(name="alloc_fits_ni")
+            alloc_n_ok_ni  = Signal(name="alloc_n_ok_ni")
+            m.d.comb += alloc_fits_ni.eq(alloc_new_wm_w <= DMEM_WORDS)
+            m.d.comb += alloc_n_ok_ni.eq(
+                (u_outform.alloc_n >= 6) & (u_outform.alloc_n <= 14)
+            )
+
+            m.d.comb += [
+                u_outform.alloc_done.eq(
+                    u_outform.alloc_req & alloc_fits_ni & alloc_n_ok_ni
+                ),
+                u_outform.alloc_fault.eq(
+                    u_outform.alloc_req & (~alloc_fits_ni | ~alloc_n_ok_ni)
+                ),
+                u_outform.alloc_base.eq(alloc_aligned_w << 2),
+            ]
+            with m.If(u_outform.alloc_req & alloc_fits_ni & alloc_n_ok_ni):
+                m.d.sync += watermark_reg.eq(alloc_new_wm_w[:32])
+
+            # ── Mint FSM (non-IoT) ────────────────────────────────────────────
+            mint_base_reg_ni      = Signal(32, name="mint_base_reg_ni")
+            mint_cw_reg_ni        = Signal(13, name="mint_cw_reg_ni")
+            mint_cc_reg_ni        = Signal(8,  name="mint_cc_reg_ni")
+            mint_scan_idx_reg_ni  = Signal(14, name="mint_scan_idx_reg_ni")
+            mint_copy_idx_reg_ni  = Signal(8,  name="mint_copy_idx_reg_ni")
+            mint_copy_data_reg_ni = Signal(32, name="mint_copy_data_reg_ni")
+            mint_hdr_reg_ni       = Signal(32, name="mint_hdr_reg_ni")
+            # Registered (lump_size − cc_count) for the non-IoT copy loop —
+            # same reason as mint_cc_base_reg above.
+            mint_cc_base_reg_ni   = Signal(15, name="mint_cc_base_reg_ni")
+
+            cr15_mint_view_ni     = View(CAP_REG_LAYOUT, u_regs.cr15_namespace)
+            mint_ns_entry_base_ni = Signal(32, name="mint_ns_entry_base_ni")
+            m.d.comb += mint_ns_entry_base_ni.eq(
+                cr15_mint_view_ni.word1_location + (mint_slot_id_reg << 4)
+            )
+
+            # Same (3 + slot_id) << 8 trick as the IOT version above.
+            mint_clist_slot_base_ni = Signal(32, name="mint_clist_slot_base_ni")
+            mint_slot_id_p3_ni      = Signal(17, name="mint_slot_id_p3_ni")
+            m.d.comb += mint_slot_id_p3_ni.eq(mint_slot_id_reg + 3)
+            m.d.comb += mint_clist_slot_base_ni.eq(Cat(Const(0, 8), mint_slot_id_p3_ni))
+
+            m.d.comb += mint_e_gt_d.eq(
+                (1 << 30) | (1 << GT_DOM_BIT) | (GT_TYPE_INFORM << 25) | (1 << 16) | mint_slot_id_reg
+            )
+            mint_w2_ni = Signal(32, name="mint_w2_ni")
+            m.d.comb += mint_w2_ni.eq((1 << 21) | (mint_lump_size_reg - 1)[:21])
+
+            mint_integrity_ni = Signal(32, name="mint_integrity_ni")
+            integrity32_amaranth(m, mint_base_reg_ni, mint_w2_ni, mint_integrity_ni)
+
+            mint_done_comb_ni  = Signal(name="mint_done_comb_ni")
+            mint_fault_comb_ni = Signal(name="mint_fault_comb_ni")
+
+            with m.FSM(name="mint_noniot") as mint_fsm_ni:
+
+                with m.State("MINT_IDLE"):
+                    with m.If(u_outform.mint_call):
+                        m.d.sync += mint_base_reg_ni.eq(u_outform.mint_base)
+                        m.next = "MINT_READ_HDR"
+
+                with m.State("MINT_READ_HDR"):
+                    m.d.comb += [
+                        mint_dmem_rd_en.eq(1),
+                        mint_dmem_addr.eq(mint_base_reg_ni),
+                    ]
+                    m.next = "MINT_READ_HDR_WAIT"
+
+                with m.State("MINT_READ_HDR_WAIT"):
+                    m.d.sync += mint_hdr_reg_ni.eq(self.dmem_rd_data)
+                    m.next = "MINT_CHECK_HDR"
+
+                with m.State("MINT_CHECK_HDR"):
+                    hdr_v_ni = View(LUMP_HEADER_LAYOUT, mint_hdr_reg_ni)
+                    lsz_c_ni = Signal(15, name="lsz_c_ni")
+                    m.d.comb += lsz_c_ni.eq(1 << (hdr_v_ni.n_minus_6 + 6))
+                    with m.If(hdr_v_ni.magic != 0x1F):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v_ni.n_minus_6 > 8):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v_ni.cc > (lsz_c_ni - 2)):
+                        m.next = "MINT_FAULT"
+                    with m.Elif(hdr_v_ni.cw > (lsz_c_ni - hdr_v_ni.cc - 2)):
+                        m.next = "MINT_FAULT"
+                    with m.Else():
+                        m.d.sync += [
+                            mint_lump_size_reg.eq(lsz_c_ni),
+                            mint_cw_reg_ni.eq(hdr_v_ni.cw),
+                            mint_cc_reg_ni.eq(hdr_v_ni.cc),
+                            mint_scan_idx_reg_ni.eq(hdr_v_ni.cw + 1),
+                        ]
+                        m.next = "MINT_SCAN_FS"
+
+                with m.State("MINT_SCAN_FS"):
+                    scan_end_c_ni = Signal(15, name="scan_end_c_ni")
+                    m.d.comb += scan_end_c_ni.eq(mint_lump_size_reg - mint_cc_reg_ni - 1)
+                    with m.If(mint_scan_idx_reg_ni > scan_end_c_ni):
+                        m.d.sync += mint_copy_idx_reg_ni.eq(0)
+                        m.next = "MINT_WRITE_NS0"
+                    with m.Else():
+                        m.d.comb += [
+                            mint_dmem_rd_en.eq(1),
+                            mint_dmem_addr.eq(
+                                mint_base_reg_ni + (mint_scan_idx_reg_ni << 2)
+                            ),
+                        ]
+                        with m.If(self.dmem_rd_data != 0):
+                            m.next = "MINT_FAULT"
+                        with m.Else():
+                            m.d.sync += mint_scan_idx_reg_ni.eq(mint_scan_idx_reg_ni + 1)
+
+                with m.State("MINT_WRITE_NS0"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni),
+                        mint_ns_wr_data.eq(mint_base_reg_ni),
+                    ]
+                    m.next = "MINT_WRITE_NS1"
+
+                with m.State("MINT_WRITE_NS1"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni + 4),
+                        mint_ns_wr_data.eq(mint_w2_ni),
+                    ]
+                    m.next = "MINT_WRITE_NS2"
+
+                with m.State("MINT_WRITE_NS2"):
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni + 8),
+                        mint_ns_wr_data.eq(mint_integrity_ni),
+                    ]
+                    m.next = "MINT_WRITE_NS3"
+
+                with m.State("MINT_WRITE_NS3"):
+                    # Frozen single-machine bootstrap T === full runtime GT,
+                    # exactly as published below; not authentication. Dynamic
+                    # rebinding and portable identity remain outside this scope.
+                    m.d.comb += [
+                        mint_ns_wr_en.eq(1),
+                        mint_ns_addr.eq(mint_ns_entry_base_ni + 12),
+                        mint_ns_wr_data.eq(mint_e_gt_d),
+                    ]
+                    # Precompute (lump_size − cc) — same alumacc-avoidance
+                    # pattern as the IOT MINT FSM above.
+                    m.d.sync += mint_cc_base_reg_ni.eq(mint_lump_size_reg - mint_cc_reg_ni)
+                    m.next = "MINT_COPY_CLIST_RD"
+
+                with m.State("MINT_COPY_CLIST_RD"):
+                    with m.If(mint_copy_idx_reg_ni >= mint_cc_reg_ni):
+                        m.next = "MINT_WRITE_CLIST"
+                    with m.Else():
+                        cc_off_ni = Signal(15, name="cc_off_ni")
+                        m.d.comb += cc_off_ni.eq(mint_cc_base_reg_ni + mint_copy_idx_reg_ni)
+                        m.d.comb += [
+                            mint_dmem_rd_en.eq(1),
+                            mint_dmem_addr.eq(
+                                mint_base_reg_ni + (cc_off_ni << 2)
+                            ),
+                        ]
+                        m.next = "MINT_COPY_CLIST_RD_WAIT"
+
+                with m.State("MINT_COPY_CLIST_RD_WAIT"):
+                    m.d.sync += mint_copy_data_reg_ni.eq(self.dmem_rd_data)
+                    m.next = "MINT_COPY_CLIST_WR"
+
+                with m.State("MINT_COPY_CLIST_WR"):
+                    m.d.comb += [
+                        mint_clist_wr_en.eq(1),
+                        mint_clist_addr_d.eq(
+                            mint_clist_slot_base_ni
+                            + (mint_copy_idx_reg_ni << 2)
+                        ),
+                        mint_clist_wr_data_d.eq(mint_copy_data_reg_ni),
+                    ]
+                    m.d.sync += mint_copy_idx_reg_ni.eq(mint_copy_idx_reg_ni + 1)
+                    m.next = "MINT_COPY_CLIST_RD"
+
+                with m.State("MINT_WRITE_CLIST"):
+                    m.d.comb += [
+                        mint_clist_wr_en.eq(1),
+                        mint_clist_addr_d.eq(mint_clist_addr_reg),
+                        mint_clist_wr_data_d.eq(mint_e_gt_d),
+                    ]
+                    m.next = "MINT_DONE"
+
+                with m.State("MINT_DONE"):
+                    m.d.comb += [
+                        mint_done_comb_ni.eq(1),
+                        u_outform.mint_result_gt.eq(mint_e_gt_d),
+                    ]
+                    m.next = "MINT_IDLE"
+
+                with m.State("MINT_FAULT"):
+                    m.d.comb += mint_fault_comb_ni.eq(1)
+                    m.next = "MINT_IDLE"
+
+            m.d.comb += [
+                mint_busy.eq(~mint_fsm_ni.ongoing("MINT_IDLE")),
+                u_outform.mint_done.eq(mint_done_comb_ni),
+                u_outform.mint_fault.eq(mint_fault_comb_ni),
+            ]
+
+        # -----------------------------------------------------------------------
+        # M-window FSM — CR15 M-flag latch + DR11-DR13 shadow (Task #432)
+        #
+        # Triggered by: (call_complete | return_complete | cr15_m_writeback_trigger)
+        # AND cr15_m_flag == 1  (never fires when M is not active).
+        # cr15_m_set (test/microcode injection): single-cycle M-set, no FSM state change.
+        #
+        # IDLE  → latch DR11-DR13, validate DR11 gt_type bits[26:25] ★v2.0:
+        #           gt_type != NULL (0b00) → WRITEBACK
+        #           gt_type == NULL        → FAULT
+        # WRITEBACK (1 cycle): pack latched DR11-DR13 → CR15 + clear M → IDLE
+        # FAULT     (1 cycle): INVALID_OP fault + clear M → IDLE
+        # mwin_busy is HIGH in WRITEBACK and FAULT states only.
+        # -----------------------------------------------------------------------
+
+        # Combine all writeback triggers; gate the whole expression on M-flag active.
+        # Only normal CALL completion (not Abstract-GT M_FETCH_DONE) triggers M-writeback.
+        # Abstract-GT CALL sets M via mgt_set_trigger; its writeback fires at the next
+        # normal CALL or RETURN that clears the M-window boundary.
+        mwin_trigger = Signal()
+        m.d.comb += mwin_trigger.eq(
+            (u_call.call_normal_complete | u_return.complete | self.cr15_m_writeback_trigger) &
+            u_regs.cr15_m_flag
+        )
+
+        # Latched snapshot of DR11-DR15 captured in IDLE → {WRITEBACK|FAULT} transition
+        mwin_dr11_lat = Signal(32)
+        mwin_dr12_lat = Signal(32)
+        mwin_dr13_lat = Signal(32)
+        mwin_dr14_lat = Signal(32)
+        mwin_dr15_lat = Signal(32)
+
+        # Combinatorial: decode DR11 gt_type (bits[26:25]) for NULL check ★v2.0.
+        # In hardware, GT_TYPE_NULL = 0b00 at bits[26:25].
+        mwin_dr11_valid = Signal()
+        m.d.comb += mwin_dr11_valid.eq(u_regs.m_dr11[25:27] != GT_TYPE_NULL)
+
+        # Integrity check on the latched shadow — must match integrity32(DR12, DR13).
+        mwin_integrity_computed = Signal(32)
+        integrity32_amaranth(m, mwin_dr12_lat, mwin_dr13_lat, mwin_integrity_computed)
+        mwin_integrity_ok = Signal()
+        m.d.comb += mwin_integrity_ok.eq(mwin_integrity_computed == mwin_dr14_lat)
+
+        # gt_seq revocation check — GT.gt_seq (DR11[24:16]) must match NS_auth.gt_seq (DR13[29:21]) ★v2.0.
+        # Detects stale GTs revoked by GC since the M-window was set.
+        mwin_dr11_gt_seq = Signal(9)
+        mwin_dr13_gt_seq = Signal(9)
+        mwin_gtseq_ok    = Signal()
+        m.d.comb += [
+            mwin_dr11_gt_seq.eq(View(GT_LAYOUT, mwin_dr11_lat).gt_seq),
+            mwin_dr13_gt_seq.eq(View(WORD2_LAYOUT, mwin_dr13_lat).gt_seq),
+            mwin_gtseq_ok.eq(mwin_dr11_gt_seq == mwin_dr13_gt_seq),
+        ]
+
+        # NOTE (Task #2862): the former FNV/DR15 "seal" check has been REMOVED.
+        # DR15 holds the resident Inform W3 (cache_token32) — a non-authoritative,
+        # diagnostic-only value.  It is deliberately NOT recomputed, NOT compared,
+        # and NEVER gates or authorises the M-window writeback.  A random or
+        # tampered W3 can therefore neither authorise nor deny a writeback; the
+        # writeback closes closed on the three authoritative checks below:
+        #   - non-NULL GT       (mwin_dr11_valid)
+        #   - integrity32       (mwin_integrity_ok)
+        #   - 9-bit gt_seq match (mwin_gtseq_ok)
+        # DR15 remains exposed (dbg_m_dr15) purely for diagnostics.
+
+        with m.FSM(name="mwin"):
+            with m.State("IDLE"):
+                m.d.comb += [
+                    mwin_busy.eq(0),
+                    mwin_cr_wr_en.eq(0),
+                    mwin_cr_wr_data.eq(0),
+                    # M-set fires on CALL M-GT dispatch (mgt_set_trigger) or test port
+                    mwin_m_set_en.eq(self.cr15_m_set | u_call.mgt_set_trigger),
+                    mwin_m_clear_en.eq(0),
+                    mwin_fault_valid.eq(0),
+                ]
+                with m.If(mwin_trigger):
+                    m.d.sync += [
+                        mwin_dr11_lat.eq(u_regs.m_dr11),
+                        mwin_dr12_lat.eq(u_regs.m_dr12),
+                        mwin_dr13_lat.eq(u_regs.m_dr13),
+                        mwin_dr14_lat.eq(u_regs.m_dr14),
+                        mwin_dr15_lat.eq(u_regs.m_dr15),
+                    ]
+                    with m.If(mwin_dr11_valid):
+                        m.next = "WRITEBACK"
+                    with m.Else():
+                        m.next = "FAULT"
+
+            with m.State("WRITEBACK"):
+                m.d.comb += mwin_busy.eq(1)
+                # Authoritative validation (Task #2862): all THREE checks must pass;
+                # any failure → INVALID_OP + M-clear (fail closed).  DR15/W3 is NOT
+                # consulted here — it is a non-authoritative cache token only.
+                #   integrity32(DR12,DR13)==DR14   (integrity_ok)
+                #   GT.gt_seq==NS_auth.gt_seq      (gtseq_ok — revocation via gt_seq fields)
+                #   GT.gt_type != NULL             (dr11_valid — checked at IDLE transition)
+                with m.If(mwin_integrity_ok & mwin_gtseq_ok):
+                    mwin_wr_view = View(CAP_REG_LAYOUT, mwin_cr_wr_data)
+                    m.d.comb += [
+                        mwin_wr_view.word0_gt.eq(mwin_dr11_lat),
+                        mwin_wr_view.word1_location.eq(mwin_dr12_lat),
+                        mwin_wr_view.word2_w2.eq(mwin_dr13_lat),
+                        # DR15 (resident Inform W3 / cache_token32) is software-visible
+                        # while M=1 for diagnostics, but it is neither authoritative nor
+                        # written back to CR15 (the 3-word CAP_REG layout has no word3).
+                        mwin_cr_wr_en.eq(1),
+                        mwin_m_set_en.eq(0),
+                        mwin_m_clear_en.eq(1),
+                        mwin_fault_valid.eq(0),
+                    ]
+                with m.Else():
+                    m.d.comb += [
+                        mwin_cr_wr_en.eq(0),
+                        mwin_m_set_en.eq(0),
+                        mwin_m_clear_en.eq(1),
+                        mwin_fault_valid.eq(1),
+                    ]
+                m.next = "IDLE"
+
+            with m.State("FAULT"):
+                m.d.comb += [
+                    mwin_busy.eq(1),
+                    mwin_cr_wr_en.eq(0),
+                    mwin_cr_wr_data.eq(0),
+                    mwin_m_set_en.eq(0),
+                    mwin_m_clear_en.eq(1),
+                    mwin_fault_valid.eq(1),
+                ]
+                m.next = "IDLE"
+
+        # fetch_bounds_fault: active when nia_reg escapes the active code fence.
+        # Also drives cond_exec_enable low (via the declaration above) so that no
+        # instruction can start in the same cycle — decode side effects are suppressed
+        # before the fault is taken.  Fence is inactive when code_lo == code_hi == 0.
+        m.d.comb += fetch_bounds_fault.eq(
+            self.boot_complete & ~any_unit_busy &
+            (code_lo_reg != code_hi_reg) &
+            ((nia_reg < code_lo_reg) | (nia_reg >= code_hi_reg))
+        )
+        with m.If(fetch_bounds_fault):
+            m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
+        with m.Elif(compact_index_fault | bf_fault | call_index_fault | branch_index_fault):
+            m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
+        # Decoder/perm faults are combinational functions of the currently
+        # fetched word.  While a multi-cycle unit owns the shared DMEM bus the
+        # fetch data can be transient garbage (observed on Wukong: mload
+        # traffic decoded as INVALID_OP, spuriously fault-retiring the next
+        # instruction).  Gate them on ~any_unit_busy like retire_norm.
+        with m.Elif(u_decoder.fault_valid & ~any_unit_busy):
+            m.d.comb += [self.fault.eq(u_decoder.fault), self.fault_valid.eq(1)]
+        with m.Elif(u_perm.fault_valid & ~any_unit_busy):
+            m.d.comb += [self.fault.eq(u_perm.fault_type), self.fault_valid.eq(1)]
+        if not self.iot_profile:
+            with m.Elif(u_lambda.lambda_fault):
+                m.d.comb += [self.fault.eq(u_lambda.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(nested_lambda_fault):
+                m.d.comb += [self.fault.eq(FaultType.INVALID_OP), self.fault_valid.eq(1)]
+        with m.Elif(u_tperm.tperm_fault):
+            m.d.comb += [self.fault.eq(u_tperm.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_call.call_fault):
+            m.d.comb += [self.fault.eq(u_call.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_return.fault_valid):
+            m.d.comb += [self.fault.eq(u_return.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_save.save_fault):
+            m.d.comb += [self.fault.eq(u_save.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_load.load_fault):
+            m.d.comb += [self.fault.eq(u_load.fault_type), self.fault_valid.eq(1)]
+        if not self.iot_profile:
+            with m.Elif(u_change.change_fault):
+                m.d.comb += [self.fault.eq(u_change.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(u_switch.switch_fault):
+                m.d.comb += [self.fault.eq(u_switch.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(u_eloadcall.fault):
+                m.d.comb += [self.fault.eq(u_eloadcall.fault_type), self.fault_valid.eq(1)]
+            with m.Elif(u_xloadlambda.fault):
+                m.d.comb += [self.fault.eq(u_xloadlambda.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_dread.fault):
+            m.d.comb += [self.fault.eq(u_dread.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_dwrite.fault):
+            m.d.comb += [self.fault.eq(u_dwrite.fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_cload.cload_fault):
+            m.d.comb += [self.fault.eq(u_cload.cload_fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_outform.outform_fault & ~outform_mode2_active):
+            m.d.comb += [self.fault.eq(u_outform.outform_fault_type), self.fault_valid.eq(1)]
+        with m.Elif(u_outform_fsm.fault):
+            m.d.comb += [self.fault.eq(u_outform_fsm.fault_type), self.fault_valid.eq(1)]
+        if not self.iot_profile:
+            with m.Elif(u_irq_dispatch.null_base_fault):
+                m.d.comb += [self.fault.eq(FaultType.IRQ_NULL_BASE), self.fault_valid.eq(1)]
+        with m.Elif(mwin_fault_valid):
+            m.d.comb += [self.fault.eq(FaultType.INVALID_OP), self.fault_valid.eq(1)]
+        with m.Else():
+            m.d.comb += [self.fault.eq(FaultType.NONE), self.fault_valid.eq(0)]
+
+        # ── fault telemetry stage encoder ─────────────────────────────────────
+        # 4-bit stage index that mirrors the fault priority chain above.
+        # Stage IDs: 0=Fetch/BOUNDS 1=Decode 2=PermCheck 3=Lambda
+        #            4=TPERM 5=Call 6=Return 7=DataRW/Other
+        fault_stage_w = Signal(4)
+        with m.If(fetch_bounds_fault):
+            m.d.comb += fault_stage_w.eq(0)
+        with m.Elif(u_decoder.fault_valid & ~any_unit_busy):
+            m.d.comb += fault_stage_w.eq(1)
+        with m.Elif(u_perm.fault_valid & ~any_unit_busy):
+            m.d.comb += fault_stage_w.eq(2)
+        if not self.iot_profile:
+            with m.Elif(u_lambda.lambda_fault):
+                m.d.comb += fault_stage_w.eq(3)
+            with m.Elif(nested_lambda_fault):
+                m.d.comb += fault_stage_w.eq(3)
+        with m.Elif(u_tperm.tperm_fault):
+            m.d.comb += fault_stage_w.eq(4)
+        with m.Elif(u_call.call_fault):
+            m.d.comb += fault_stage_w.eq(5)
+        with m.Elif(u_return.fault_valid):
+            m.d.comb += fault_stage_w.eq(6)
+        with m.Else():
+            m.d.comb += fault_stage_w.eq(7)
+
+        # ── fault telemetry latch registers ────────────────────────────────────
+        # Latched when fault_valid fires; cleared on FAULT_RST (clear_all).
+        # fault_gt / fault_cr14 reserved (zero) — sub-unit wiring in future pass.
+        delayed_issue = (
+            load_start_sig | save_start_sig | tperm_start_sig |
+            dread_start_sig | dwrite_start_sig |
+            call_start_sig | ret_start_sig
+        )
+        delayed_fault = (
+            u_load.load_fault | u_save.save_fault | u_tperm.tperm_fault |
+            u_dread.fault | u_dwrite.fault |
+            u_call.call_fault | u_return.fault_valid
+        )
+        if not self.iot_profile:
+            delayed_issue = delayed_issue | (
+                change_start_sig | switch_start_sig | lambda_start_sig |
+                eloadcall_start_sig | xloadlambda_start_sig
+            )
+            delayed_fault = delayed_fault | (
+                u_change.change_fault | u_switch.switch_fault |
+                u_lambda.lambda_fault |
+                u_eloadcall.fault | u_xloadlambda.fault
+            )
+
+        with m.If(delayed_issue):
+            m.d.sync += delayed_issuer_instr.eq(self.imem_data)
+
+        fault_instr_latch = Signal(32)
+        fault_stage_latch = Signal(4)
+        with m.If(self.fault_valid):
+            m.d.sync += [
+                fault_instr_latch.eq(
+                    Mux(delayed_fault, delayed_issuer_instr, self.imem_data)),
+                fault_stage_latch.eq(fault_stage_w),
+            ]
+        with m.Elif(clear_all):
+            m.d.sync += [fault_instr_latch.eq(0), fault_stage_latch.eq(0)]
+        m.d.comb += [
+            self.fault_gt.eq(0),
+            self.fault_instr.eq(fault_instr_latch),
+            self.fault_cr14.eq(0),
+            self.fault_stage.eq(fault_stage_latch),
+        ]
+
+        # ── Retire trace signals ──────────────────────────────────────────────
+        # retire_valid pulses once per committed instruction (NIA changes) or
+        # when a fault is taken.  Mirrors the m.d.sync nia_reg update priority
+        # chain above but expressed combinatorially.
+        #
+        # Included conditions (in priority order matching nia update chain):
+        #   fault_valid — fault recorded (NIA is held for snapshot/recovery)
+        #   u_call.nia_set — CALL / ELOADCALL complete (callee NIA set)
+        #   u_return.nia_set — RETURN complete (caller NIA restored)
+        #   branch_taken — BRANCH instruction (NIA += offset)
+        #   normal advance — all single-cycle ops (IADD/ISUB/SHL/SHR/BFEXT/BFINS/
+        #     MCMP/DREAD/DWRITE/TPERM etc.) AND multi-cycle op completion
+        #     (when busy drops and u_decoder.instr_valid is still asserted)
+        # Excluded: clear_all (reboot), free_run_start (jump without retire),
+        #           halt_valid (zero-word fetch stall).
+        #
+        # For non-IoT also includes Lambda/IRQ/XLoadLambda/ELoadCall nia_set.
+        #
+        # halt_req input: consumed externally by wukong_top (via step_halted),
+        # not used internally here — included on ChurchCore for clean API only.
+        _ = self.halt_req  # referenced to prevent "unused port" warnings
+
+        # Multi-cycle instructions retire via their terminal complete, fault, or
+        # nia_set pulses, not retire_norm. Their busy signals rise one cycle
+        # after start, so every issue pulse is excluded explicitly.
+        retire_norm = (
+            u_decoder.instr_valid & ~self.halt_req & ~any_unit_busy &
+            ~call_start_sig &
+            ~ret_start_sig &
+            ~load_start_sig &
+            ~save_start_sig &
+            ~tperm_start_sig &
+            ~dread_start_sig &
+            ~dwrite_start_sig &
+            ~(switch_start_sig if not self.iot_profile else 0) &
+            ~(change_start_sig if not self.iot_profile else 0) &
+            ~(lambda_start_sig if not self.iot_profile else 0) &
+            ~(eloadcall_start_sig if not self.iot_profile else 0) &
+            ~(xloadlambda_start_sig if not self.iot_profile else 0) &
+            ~fetch_bounds_fault & ~u_outform_fsm.intercept_start
+        )
+        retire_conds_base = (
+            self.fault_valid |
+            u_call.nia_set |
+            u_return.nia_set |
+            delayed_complete |
+            (branch_taken & ~fetch_bounds_fault) |
+            retire_norm
+        )
+        change_retire = Const(0)
+        if not self.iot_profile:
+            change_retire = (
+                u_change.change_complete & ~scheduler_inflight)
+            retire_conds = (
+                retire_conds_base |
+                change_retire |
+                u_lambda.nia_set |
+                u_xloadlambda.nia_set |
+                u_eloadcall.nia_set |
+                u_switch.switch_complete |
+                u_irq_dispatch.nia_set
+            )
+        else:
+            retire_conds = retire_conds_base
+
+        m.d.comb += [
+            self.retire_valid.eq(self.boot_complete & retire_conds),
+            self.retire_nia.eq(
+                Mux(change_retire, change_issuer_nia, nia_reg)),
+            self.retire_instr.eq(
+                Mux(delayed_complete | delayed_fault | change_retire,
+                    delayed_issuer_instr, self.imem_data)),
+            self.retire_flags.eq(u_regs.flags),
+            self.retire_fault_code.eq(self.fault),
+            self.retire_fault_valid.eq(self.fault_valid & self.boot_complete),
+        ]
+
+        # ── TraceUnit per-event GT signals ─────────────────────────────────────
+        # All combinatorial, valid at retire_valid time for their instruction class.
+        # For RETURN: retire_trace_cr6_gt carries the E-GT from the stack frame
+        #   (u_return.cload_e_gt), not the current register-file CR6 value.
+        #   retire_trace_cr14_gt carries the current (callee's) CR14 at retire time;
+        #   the TraceUnit SEND state patches tq_data[2] with retire_trace_return_cr14_gt
+        #   when retire_trace_return_cr14_valid fires (cload commits caller CR14).
+        m.d.comb += [
+            self.retire_trace_load_shadow_gt.eq(_trace_load_shadow_gt),
+            self.retire_trace_load_new_gt.eq(
+                View(CAP_REG_LAYOUT, u_shared_mload.cr_wr_data).word0_gt),
+            self.retire_trace_cr5_gt.eq(
+                View(CAP_REG_LAYOUT, u_regs.cr5_heap).word0_gt),
+            self.retire_trace_cr6_gt.eq(
+                Mux(u_return.complete,
+                    u_return.cload_e_gt,
+                    View(CAP_REG_LAYOUT, u_regs.cr6_clist).word0_gt)),
+            self.retire_trace_cr12_gt.eq(
+                View(CAP_REG_LAYOUT, u_regs.cr12_thread).word0_gt),
+            self.retire_trace_cr14_gt.eq(
+                View(CAP_REG_LAYOUT, u_regs.cr14_code).word0_gt),
+            # Cload-commit pulse: fires when cload writes restored caller CR14 into CR14
+            # after a cross-domain RETURN.  Wire to cr_wr_en + cr_wr_addr==CR_CLOOMC.
+            self.retire_trace_return_cr14_valid.eq(
+                u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLOOMC)),
+            self.retire_trace_return_cr14_gt.eq(
+                View(CAP_REG_LAYOUT, u_cload.cr_wr_data).word0_gt),
+        ]
+
+        m.d.comb += [
+            u_shared_mload.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_shared_mload.cr15_namespace.eq(u_regs.cr15_namespace),
+            u_shared_mload.mem_rd_data.eq(self.dmem_rd_data),
+            u_shared_mload.mem_rd_valid.eq(self.dmem_rd_valid),
+        ]
+
+        with m.If(u_call.call_busy):
+            m.d.comb += [
+                u_shared_mload.sub_start.eq(u_call.mload_start),
+                u_shared_mload.sub_cr_src.eq(u_call.mload_cr_src),
+                u_shared_mload.sub_cr_dst.eq(u_call.mload_cr_dst),
+                u_shared_mload.sub_index.eq(u_call.mload_index),
+                u_shared_mload.sub_direct.eq(u_call.mload_direct),
+                u_shared_mload.sub_direct_gt.eq(u_call.mload_direct_gt),
+                u_shared_mload.sub_m_elevated.eq(u_call.mload_m_elevated),
+                u_shared_mload.sub_validate_only.eq(0),
+            ]
+        with m.Elif(u_return.busy):
+            m.d.comb += [
+                u_shared_mload.sub_start.eq(u_return.mload_start),
+                u_shared_mload.sub_cr_src.eq(u_return.mload_cr_src),
+                u_shared_mload.sub_cr_dst.eq(u_return.mload_cr_dst),
+                u_shared_mload.sub_index.eq(u_return.mload_index),
+                u_shared_mload.sub_direct.eq(u_return.mload_direct),
+                u_shared_mload.sub_direct_gt.eq(u_return.mload_direct_gt),
+                u_shared_mload.sub_m_elevated.eq(u_return.mload_m_elevated),
+                u_shared_mload.sub_validate_only.eq(u_return.mload_validate_only),
+            ]
+        with m.Elif(u_load.load_busy):
+            m.d.comb += [
+                u_shared_mload.sub_start.eq(u_load.mload_start),
+                u_shared_mload.sub_cr_src.eq(u_load.mload_cr_src),
+                u_shared_mload.sub_cr_dst.eq(u_load.mload_cr_dst),
+                u_shared_mload.sub_index.eq(u_load.mload_index),
+                u_shared_mload.sub_direct.eq(u_load.mload_direct),
+                u_shared_mload.sub_direct_gt.eq(u_load.mload_direct_gt),
+                u_shared_mload.sub_m_elevated.eq(
+                    u_load.mload_m_elevated
+                    | (boot_state_reg != BootState.COMPLETE)
+                    | boot_microcode_active
+                ),
+                u_shared_mload.sub_validate_only.eq(0),
+            ]
+
+        # Grant-qualified handshake feedback.  The shared mload's busy/done/
+        # fault outputs are broadcast; each master must only see them while it
+        # actually owns the bus (mux priority: call > return > load).  Without
+        # this, a LOAD issued while the boot CALL's mload is still running sees
+        # the CALL's busy as its WAIT_ACK acknowledgment and the CALL's done as
+        # its own completion — the LOAD "retires" instantly without executing
+        # and every subsequent LOAD runs one instruction-slot late.
+        return_grant = Signal()
+        load_grant   = Signal()
+        m.d.comb += [
+            return_grant.eq(~u_call.call_busy & u_return.busy),
+            load_grant.eq(~u_call.call_busy & ~u_return.busy & u_load.load_busy),
+        ]
+        m.d.comb += [
+            u_call.mload_done.eq(u_shared_mload.sub_done & u_call.call_busy),
+            u_call.mload_fault.eq(u_shared_mload.sub_fault & u_call.call_busy),
+            u_call.mload_fault_type.eq(u_shared_mload.sub_fault_type),
+
+            u_return.mload_done.eq(u_shared_mload.sub_done & return_grant),
+            u_return.mload_fault.eq(u_shared_mload.sub_fault & return_grant),
+            u_return.mload_fault_type.eq(u_shared_mload.sub_fault_type),
+
+            u_load.mload_busy.eq(u_shared_mload.sub_busy & load_grant),
+            u_load.mload_done.eq(u_shared_mload.sub_done & load_grant),
+            u_load.mload_fault.eq(u_shared_mload.sub_fault & load_grant),
+            u_load.mload_fault_type.eq(u_shared_mload.sub_fault_type),
+        ]
+
+        m.d.comb += [
+            self.dmem_addr.eq(0),
+            self.dmem_rd_en.eq(0),
+            self.dmem_wr_data.eq(0),
+            self.dmem_wr_en.eq(0),
+        ]
+
+        with m.If(u_shared_mload.mem_rd_en | u_shared_mload.mem_wr_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_shared_mload.mem_addr),
+                self.dmem_rd_en.eq(u_shared_mload.mem_rd_en),
+                self.dmem_wr_data.eq(u_shared_mload.mem_wr_data),
+                self.dmem_wr_en.eq(u_shared_mload.mem_wr_en),
+            ]
+        if not self.iot_profile:
+            with m.Elif(u_change.mem_rd_en):
+                # CHANGE LOAD_THREAD / RESTORE_CALL / scheduler entry/header /
+                # READ_THREAD_HDR: internal mload and direct reads need the
+                # DMEM bus.  Previously absent from this mux — the second
+                # CHANGE boot-ROM run hung because there was no other unit
+                # driving dmem_rd_valid for it to piggyback on.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_change.mem_rd_addr),
+                    self.dmem_rd_en.eq(1),
+                ]
+            with m.Elif(u_change.mem_wr_en):
+                # CHANGE saves CR0–CR11 homes and DR0–DR15 only.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_change.mem_wr_addr),
+                    self.dmem_wr_data.eq(u_change.mem_wr_data),
+                    self.dmem_wr_en.eq(1),
+                ]
+            with m.Elif(u_switch.mem_rd_en):
+                # SWITCH delegates its normal LOAD path to a private mLoad, so
+                # its reads do not pass through u_shared_mload above.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_switch.mem_addr),
+                    self.dmem_rd_en.eq(1),
+                ]
+            with m.Elif(u_eloadcall.mem_rd_en):
+                # ELOADCALL PUSH_ARM / PUSH_READ_STO: read protected STO before
+                # pushing the call-stack frame.  Mutually exclusive with
+                # u_shared_mload (call/return/load) and u_change.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_eloadcall.mem_addr),
+                    self.dmem_rd_en.eq(1),
+                ]
+            with m.Elif(u_eloadcall.mem_wr_en):
+                # ELOADCALL PUSH_EGT / PUSH_FRAME / PUSH_STO: write three
+                # frame-push words.  Also mutually exclusive with all others.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_eloadcall.mem_wr_addr),
+                    self.dmem_wr_data.eq(u_eloadcall.mem_wr_data),
+                    self.dmem_wr_en.eq(1),
+                ]
+            with m.Elif(u_xloadlambda.mem_rd_en | u_xloadlambda.mem_wr_en):
+                # XLOADLAMBDA owns a private mLoad just like ELOADCALL. Route
+                # its c-list/Namespace traffic onto the shared DMEM bus. The
+                # write channel is required for the successful load's G-bit
+                # reset, not just for reaching terminal completion.
+                m.d.comb += [
+                    self.dmem_addr.eq(u_xloadlambda.mem_addr),
+                    self.dmem_rd_en.eq(u_xloadlambda.mem_rd_en),
+                    self.dmem_wr_data.eq(u_xloadlambda.mem_wr_data),
+                    self.dmem_wr_en.eq(u_xloadlambda.mem_wr_en),
+                ]
+        with m.Elif(u_call.mem_rd_en):
+            # CALL FETCH_LUMP / STACK_READ_SP: data memory read
+            m.d.comb += [
+                self.dmem_addr.eq(u_call.mem_rd_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_call.mem_wr_en):
+            # CALL stack push: write E-GT word, LAMBDA frame word, or updated SP
+            m.d.comb += [
+                self.dmem_addr.eq(u_call.mem_wr_addr),
+                self.dmem_wr_data.eq(u_call.mem_wr_data),
+                self.dmem_wr_en.eq(1),
+            ]
+        with m.Elif(u_save.mem_wr_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_save.mem_wr_addr),
+                self.dmem_wr_data.eq(u_save.mem_wr_data),
+                self.dmem_wr_en.eq(1),
+            ]
+        with m.Elif(u_save.mem_rd_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_save.mem_rd_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_dread.dmem_rd_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_dread.dmem_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_dwrite.dmem_wr_en):
+            if not self.iot_profile:
+                from .hw_types import IO_PORT_PET_NAME_WR
+                # Intercept DWRITE writes to IO_PORT_PET_NAME_WR: the written
+                # value's lower 6 bits encode the c-list slot to mark as named.
+                # The write does not propagate to external data memory.
+                with m.If(u_dwrite.dmem_addr == IO_PORT_PET_NAME_WR):
+                    m.d.comb += [
+                        u_pet_name_mem.wr_en.eq(1),
+                        u_pet_name_mem.wr_addr.eq(u_dwrite.dmem_wr_data[:6]),
+                        u_pet_name_mem.wr_data.eq(1),
+                    ]
+                with m.Else():
+                    m.d.comb += [
+                        self.dmem_addr.eq(u_dwrite.dmem_addr),
+                        self.dmem_wr_data.eq(u_dwrite.dmem_wr_data),
+                        self.dmem_wr_en.eq(1),
+                    ]
+            else:
+                m.d.comb += [
+                    self.dmem_addr.eq(u_dwrite.dmem_addr),
+                    self.dmem_wr_data.eq(u_dwrite.dmem_wr_data),
+                    self.dmem_wr_en.eq(1),
+                ]
+        with m.Elif(u_cload.mem_rd_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_cload.mem_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_outform.mem_wr_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_outform.mem_wr_addr),
+                self.dmem_wr_data.eq(u_outform.mem_wr_data),
+                self.dmem_wr_en.eq(1),
+            ]
+        with m.Elif(mint_dmem_rd_en):
+            m.d.comb += [
+                self.dmem_addr.eq(mint_dmem_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_return.mem_rd_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_return.mem_rd_addr),
+                self.dmem_rd_en.eq(1),
+            ]
+        with m.Elif(u_return.mem_wr_en):
+            m.d.comb += [
+                self.dmem_addr.eq(u_return.mem_wr_addr),
+                self.dmem_wr_data.eq(u_return.mem_wr_data),
+                self.dmem_wr_en.eq(1),
+            ]
+        if not self.iot_profile:
+            with m.Elif(u_irq_dispatch.mem_rd_en):
+                m.d.comb += [
+                    self.dmem_addr.eq(u_irq_dispatch.mem_rd_addr),
+                    self.dmem_rd_en.eq(1),
+                ]
+
+        if not self.iot_profile:
+            m.d.comb += [
+                u_gc.valid_key_access.eq(u_shared_mload.gbit_reset_done),
+                u_gc.access_index.eq(0),
+            ]
+
+            # Non-IoT NS mux: Mint writes take priority over GC (Mint fires during
+            # instruction execution; GC has its own busy handshake).
+            with m.If(mint_ns_wr_en):
+                m.d.comb += [
+                    self.ns_addr.eq(mint_ns_addr),
+                    self.ns_rd_en.eq(0),
+                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 96))),  # 32+96=128 bits (NS_ENTRY_WORDS=4)
+                    self.ns_wr_en.eq(1),
+                ]
+            with m.Elif(u_gc.gc_busy):
+                m.d.comb += [
+                    self.ns_addr.eq(u_gc.ns_addr),
+                    self.ns_rd_en.eq(u_gc.ns_rd_en),
+                    self.ns_wr_data.eq(u_gc.ns_wr_data),
+                    self.ns_wr_en.eq(u_gc.ns_wr_en),
+                ]
+            with m.Else():
+                m.d.comb += [
+                    self.ns_addr.eq(0),
+                    self.ns_rd_en.eq(0),
+                    self.ns_wr_data.eq(0),
+                    self.ns_wr_en.eq(0),
+                ]
+        else:
+            with m.If(mint_ns_wr_en):
+                m.d.comb += [
+                    self.ns_addr.eq(mint_ns_addr),
+                    self.ns_rd_en.eq(0),
+                    self.ns_wr_data.eq(Cat(mint_ns_wr_data, Const(0, 96))),  # 32+96=128 bits (NS_ENTRY_WORDS=4)
+                    self.ns_wr_en.eq(1),
+                ]
+            with m.Else():
+                m.d.comb += [
+                    self.ns_addr.eq(0),
+                    self.ns_rd_en.eq(0),
+                    self.ns_wr_data.eq(0),
+                    self.ns_wr_en.eq(0),
+                ]
+
+        return m

@@ -18,8 +18,8 @@ class ChurchCall(Elaboratable):
         self.boot_window = Signal()  # 1 during BOOT_PROGRAM microcode (first 3 retires)
         self.cr_src = Signal(4)
         self.indexed_source = Signal()
-        self.index = Signal(16)
-        self.call_imm = Signal(15)  # method index from CALL imm15; 0 = single entry (NIA=lump_base+4)
+        self.index = Signal(32)
+        self.call_imm = Signal(32)  # checked runtime selector; retain width until bounds checks
         self.mask = Signal(16)   # bits [0:12] → null-GT write mask for CR0–CR11
         self.call_busy = Signal()
         self.call_complete = Signal()        # COMPLETE | M_FETCH_DONE (for exec advance only)
@@ -144,8 +144,8 @@ class ChurchCall(Elaboratable):
         src_reg_latched = Signal(CAP_REG_LAYOUT)
         indexed_clist_latched = Signal(CAP_REG_LAYOUT)
         mask_latched = Signal(16)
-        index_latched = Signal(16)
-        call_imm_latched = Signal(15)   # method index latched from self.call_imm at call_start
+        index_latched = Signal(32)
+        call_imm_latched = Signal(32)   # captured at acceptance, before any context changes
         fault_latched = Signal()
         fault_type_latched = Signal(5)      # 5 bits: covers FaultType 0x0–0x12 (STACK_CORRUPT)
         sub_start_reg = Signal()
@@ -641,7 +641,7 @@ class ChurchCall(Elaboratable):
             with m.State("FETCH_METHOD_ENTRY"):
                 # Read method table entry at memory[lump_base + call_imm * 4].
                 # ns_base_from_cr14 = lump_base (byte address of lump word 0 = header).
-                # call_imm_latched is the 15-bit method index (≥1 when this state is reached).
+                # Keep the full runtime method index until the cw bounds check.
                 # Canonical BRANCH entries are relative to their table word;
                 # legacy bare entries are LUMP-base-relative WORD offsets.
                 m.d.comb += [
@@ -649,10 +649,12 @@ class ChurchCall(Elaboratable):
                     self.mem_rd_en.eq(call_imm_latched <= cw_reg),
                 ]
                 m.d.sync += rd_armed.eq(1)
-                target = Signal(signed(17))
+                target = Signal(signed(34))
                 m.d.comb += target.eq(
                     Cat(call_imm_latched, Const(0, 2)).as_signed()
-                    + self.mem_rd_data[:15].as_signed())
+                    + Mux(self.mem_rd_data[18],
+                          -Cat(self.mem_rd_data[:18], Const(0, 16)).as_signed(),
+                          Cat(self.mem_rd_data[:18], Const(0, 16)).as_signed()))
                 with m.If(call_imm_latched > cw_reg):
                     m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
                     m.next = "FAULT"
@@ -663,9 +665,13 @@ class ChurchCall(Elaboratable):
                         m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_E)]
                         m.next = "FAULT"
                     with m.Elif(self.mem_rd_data[27:32] == 23):
-                        # Canonical BRANCH: signed PC-relative displacement;
-                        # validate before converting to a physical word offset.
-                        with m.If((target < 1) | (target > cw_reg)):
+                        # A dispatch-table BRANCH is a static entry descriptor,
+                        # not an extra executed instruction with live DR inputs.
+                        with m.If((self.mem_rd_data[19:23] != 0) |
+                                  (self.mem_rd_data[23:27] != 14)):
+                            m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
+                            m.next = "FAULT"
+                        with m.Elif((target < 1) | (target > cw_reg)):
                             m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
                             m.next = "FAULT"
                         with m.Else():

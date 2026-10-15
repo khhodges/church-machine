@@ -1,0 +1,1161 @@
+from amaranth import *
+from amaranth.lib.data import View
+
+from .hw_types import *
+from .layouts import (GT_LAYOUT, CAP_REG_LAYOUT, COND_FLAGS_LAYOUT,
+                      LUMP_HEADER_LAYOUT, WORD2_LAYOUT)
+from .mload import ChurchMLoad
+from .boot_change import BootChange
+from .ordinary_change import OrdinaryChange
+from .stack_frame import stack_slot_addr
+from .thread_design import (
+    THREAD_CAP_WORDS,
+    THREAD_DR_OFFSET,
+    THREAD_HEAP_OFFSET,
+    THREAD_STO_OFFSET,
+    THREAD_MIN_N_MINUS_6,
+    THREAD_MAX_N_MINUS_6,
+)
+
+
+class ChurchChange(Elaboratable):
+    def __init__(self):
+        self.change_start = Signal()
+        # Explicit decoded programmatic operation; not a scheduler request.
+        self.ordinary = Signal()
+        self.cr_src = Signal(4)
+        self.index = Signal(16)
+        self.change_mask = Signal(16)
+        self.change_busy = Signal()
+        self.change_complete = Signal()
+        self.change_fault = Signal()
+        self.fault_type = Signal(5)
+
+        self.cr_rd_addr = Signal(4)
+        self.cr_rd_data = Signal(CAP_REG_LAYOUT)
+        self.cr_wr_addr = Signal(4)
+        self.cr_wr_data = Signal(CAP_REG_LAYOUT)
+        self.cr_wr_en = Signal()
+
+        self.cr_dst = Signal(4)       # 12/13 = system-wide; 14/15 = per-thread ctx switch
+        self.m_elevated = Signal()    # 1 during boot — bypasses CR12/CR13 authority check
+
+        self.cr12_thread = Signal(CAP_REG_LAYOUT)
+        self.cr15_namespace = Signal(CAP_REG_LAYOUT)
+
+        self.mem_rd_addr = Signal(32)
+        self.mem_rd_en = Signal()
+        self.mem_rd_data = Signal(32)
+        self.mem_rd_valid = Signal()
+        self.mem_wr_addr = Signal(32)
+        self.mem_wr_data = Signal(32)
+        self.mem_wr_en = Signal()
+        self.mem_wr_done = Signal()
+
+        self.thread_wr_en = Signal()
+        self.thread_wr_idx = Signal(4)
+        self.thread_wr_data = Signal(32)
+
+        self.dr_rd_addr = Signal(4)
+        self.dr_rd_data = Signal(32)
+        # THREAD_HDR: hidden per-thread machine register.
+        # On thread restore CHANGE reads Mem[thread_base+0] (the thread lump header
+        # word) and stores it here. CALL reads stack bounds from this register
+        # directly, eliminating FETCH_THREAD_HDR from the CALL pipeline.
+        self.thread_hdr_out = Signal(32)
+
+        # 1 during BOOT_PROGRAM microcode (same signal the core feeds u_call).
+        # During the boot window LOAD_THREAD resolves the Thread NS slot via
+        # mLoad's direct-GT path instead of fetching a GT from the namespace
+        # c-list: NS slot 0 word1 is the namespace LIMIT word, and a GT's
+        # slot_id occupies the same bits[15:0], so one word cannot serve both.
+        self.boot_window = Signal()
+        # CR12 remains the system Thread root; the physical scheduler carries
+        # the active Thread body's backing address independently.
+        self.active_thread_base = Signal(32)
+        # A selected/default Thread is not necessarily the owner of the live
+        # register bank.  Reset scratch state must never be serialized into it.
+        self.active_thread_owned = Signal()
+        self.thread_base_restore_en = Signal()
+        self.thread_base_restore_val = Signal(32)
+        self.dr_wr_en = Signal()
+        self.dr_wr_addr = Signal(4)
+        self.dr_wr_data = Signal(32)
+        self.nia_restore_en = Signal()
+        self.nia_restore_val = Signal(32)
+        self.flags_in = Signal(COND_FLAGS_LAYOUT)
+        self.nia_current = Signal(32)
+        # NIA is separate core state. CHANGE does not persist the outgoing NIA;
+        # an incoming Thread starts at the CR0-selected abstraction's word 1.
+        # FLAGS/SZ/STO are persisted independently in protected Thread word +17.
+        self.flags_restore_en = Signal()
+        self.flags_restore_data = Signal(COND_FLAGS_LAYOUT)
+
+    def elaborate(self, platform):
+        m = Module()
+        m.submodules.ordinary = ordinary = OrdinaryChange(self)
+        ordinary_selected = Signal()
+        with m.If(self.change_start):
+            m.d.sync += ordinary_selected.eq(self.ordinary)
+        for name in ordinary.INPUTS:
+            m.d.comb += getattr(ordinary, name).eq(getattr(self, name))
+        m.d.comb += ordinary.change_start.eq(self.change_start & self.ordinary)
+
+        RESERVED_MASK = 0b1000_0001_1000_0000
+
+        u_mload = ChurchMLoad()
+        m.submodules.u_mload = u_mload
+        m.submodules.u_boot_change = boot_change = BootChange()
+        m.d.comb += [
+            boot_change.thread.eq(self.cr12_thread),
+            boot_change.namespace.eq(self.cr15_namespace),
+            boot_change.mem_data.eq(self.mem_rd_data),
+            boot_change.mem_valid.eq(self.mem_rd_valid),
+        ]
+
+        cr_index = Signal(4)
+        crn_reg_latched = Signal(CAP_REG_LAYOUT)
+        index_latched    = Signal(16)
+        mask_latched     = Signal(16)
+        cr_src_latched   = Signal(4)   # latched at change_start; self.cr_src is only valid
+        cr_dst_latched   = Signal(4)   # at the decode cycle; NIA advances before FSM runs
+        nia_current_latched = Signal(32)
+        thread_change_lat = Signal()
+        outgoing_thread_base = Signal(32)
+        outgoing_thread_owned = Signal()
+        incoming_thread_base = Signal(32)
+        thread_loaded = Signal()
+        fault_latched    = Signal()
+        fault_type_latched = Signal(5)
+
+        # THREAD_HDR hidden register — loaded from Mem[thread_base+0] on thread restore.
+        # No switch-out save is needed: the lump header is architecturally immutable
+        # (code lumps are write-protected), so CHANGE always re-reads the same value
+        # on the next switch-in.  The register is populated once per restore, consumed
+        # by every CALL until the next thread switch (zero extra reads per CALL).
+        thread_hdr_reg = Signal(32)
+        fetch_thr_hdr_active = Signal()  # high during FETCH_THREAD_HDR state
+        restore_homes_after_hdr = Signal()
+
+        save_index = Signal(5)
+        save_cr_index = Signal(4)
+        restore_cr8_final = Signal()
+
+        mload_start_reg = Signal()
+        mload_done_latched = Signal()
+        mload_fault_latched = Signal()
+
+        effective_mask = Signal(16)
+        # Boot-window (M-elevated) restore mask: CR0 only.
+        # The decoder permanently scrubs call_mask to 0 (imm15 now carries a
+        # method index, not a mask), which silently turned RESTORE_CALL into a
+        # universal no-op — but BOOT_PROGRAM[2] = CALL CR0 depends on CHANGE
+        # restoring CR0 from Thread.caps[0] (DMEM word 244). CR12 is installed
+        # by the boot ladder and has no serialized Thread home.
+        BOOT_RESTORE_MASK = (1 << 0)
+        # Dormant Threads store only the twelve software capability homes.
+        # CR14 is transparently derived from restored CR0 on every activation.
+        SCHEDULER_RESTORE_MASK = (1 << THREAD_CAP_WORDS) - 1
+        m.d.comb += effective_mask.eq(
+            Mux(self.m_elevated,
+                C(BOOT_RESTORE_MASK, 16),
+                Mux(thread_change_lat, C(SCHEDULER_RESTORE_MASK, 16),
+                    mask_latched & ~RESERVED_MASK)))
+
+        skip_current_cr = Signal()
+        m.d.comb += skip_current_cr.eq(
+            (cr_index > 14) |
+            ~effective_mask.bit_select(cr_index, 1) |
+            (thread_change_lat & (cr_index == 8) & ~restore_cr8_final))
+
+        crn_view = View(CAP_REG_LAYOUT, crn_reg_latched)
+        crn_gt = View(GT_LAYOUT, crn_view.word0_gt)
+        crn_has_l_perm = crn_gt.dom & crn_gt.perm[0]   # Church dom=1, perm[0]=L
+        crn_has_s_perm = crn_gt.dom & crn_gt.perm[1]   # Church dom=1, perm[1]=S
+
+        # Authority check for CHANGE CR12/CR13: source cap location must equal
+        # the corresponding CR port address in the Church Hardware Address Range.
+        cr_port_match = Signal()
+        m.d.comb += cr_port_match.eq(
+            Mux(cr_dst_latched == 12,
+                crn_view.word1_location == CR_PORT_CR12,
+                crn_view.word1_location == CR_PORT_CR13)
+        )
+
+        cr12_view = View(CAP_REG_LAYOUT, self.cr12_thread)
+        cr12_gt = View(GT_LAYOUT, cr12_view.word0_gt)
+        cr12_null = Signal()
+        m.d.comb += cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL)
+
+        thread_base = cr12_view.word1_location
+        restore_base = Mux(
+            thread_change_lat | thread_loaded,
+            incoming_thread_base,
+            thread_base)
+
+        fetched_gt_latched = Signal(32)
+
+        mload_src = Signal(4)
+        mload_dst = Signal(4)
+        mload_index = Signal(16)
+        mload_direct = Signal()
+        mload_direct_gt = Signal(32)
+        boot_window_lat = Signal()
+        scheduler_gt_seq = Signal(9)
+        entry_gt_latched = Signal(32)
+        entry_raw_base = Signal(32)
+        entry_header = Signal(32)
+        incoming_indicator = Signal(32)
+        incoming_frame = Signal(32)
+        outgoing_header = Signal(32)
+        outgoing_indicator = Signal(32)
+        outgoing_egt = Signal(32)
+        outgoing_egt_word = Signal(32)
+
+        # Boot-window direct Thread GT: Inform-type, S-perm, slot_id = CHANGE
+        # index operand (BOOT_PROGRAM[1] = CHANGE CR12, CR15[1] → NS slot 1).
+        boot_thread_gt = Signal(32)
+        boot_gt_view = View(GT_LAYOUT, boot_thread_gt)
+        m.d.comb += [
+            boot_gt_view.slot_id.eq(index_latched),
+            # Scheduler direct-mLoad has no c-list GT from which to inherit a
+            # generation. The target descriptor is read first so ns_gate keeps
+            # enforcing the normal generation/revocation check.
+            boot_gt_view.gt_seq.eq(Mux(thread_change_lat, scheduler_gt_seq, 0)),
+            boot_gt_view.gt_type.eq(GT_TYPE_INFORM),
+            boot_gt_view.dom.eq(1),
+            # Scheduler also walks the Thread body's caps through CR8, so its
+            # validated transient Thread capability needs L as well as S.
+            boot_gt_view.perm.eq(
+                Mux(thread_change_lat,
+                    (PERM_MASK_L | PERM_MASK_S) >> 3,
+                    PERM_MASK_S >> 3)),
+        ]
+
+        m.d.comb += [
+            u_mload.sub_start.eq(mload_start_reg),
+            u_mload.sub_cr_src.eq(mload_src),
+            u_mload.sub_cr_dst.eq(mload_dst),
+            u_mload.sub_index.eq(mload_index),
+            u_mload.sub_direct.eq(mload_direct),
+            u_mload.sub_direct_gt.eq(Mux(mload_direct, mload_direct_gt, 0)),
+            u_mload.sub_m_elevated.eq(self.m_elevated),
+            u_mload.sub_validate_only.eq(0),
+            u_mload.cr_rd_data.eq(self.cr_rd_data),
+            # Forward the internal mload's register-read address by default so
+            # its FETCH_SRC reads the real source cap (e.g. CR8 during
+            # RESTORE_CALL).  FSM states that need their own reads override
+            # this with later comb assignments.
+            self.cr_rd_addr.eq(u_mload.cr_rd_addr),
+            u_mload.cr15_namespace.eq(self.cr15_namespace),
+            u_mload.mem_rd_data.eq(self.mem_rd_data),
+            u_mload.mem_rd_valid.eq(self.mem_rd_valid),
+        ]
+
+        mem_wr_addr_reg = Signal(32)
+        mem_wr_data_reg = Signal(32)
+        mem_wr_en_reg = Signal()
+
+        # Direct memory-read path used by scheduler restore/header derivation.
+        direct_rd_active = Signal()
+        direct_rd_addr = Signal(32)
+        preflight_hdr_active = Signal()
+        preflight_base = Signal(32)
+        preflight_rd_armed = Signal()
+        preflight_cap_word = Signal(32)
+        restore_rd_armed = Signal()
+        restore_word = Signal(32)
+        scheduler_ns_active = Signal()
+        scheduler_ns_rd_armed = Signal()
+        scheduler_ns_addr = Signal(32)
+        scheduler_ns_view = View(CAP_REG_LAYOUT, self.cr15_namespace)
+        m.d.comb += scheduler_ns_addr.eq(
+            scheduler_ns_view.word1_location + (index_latched << 4) + 4)
+
+        cr5_install_active = Signal()
+        cr5_cap = Signal(CAP_REG_LAYOUT)
+
+        thr_hdr_view = View(LUMP_HEADER_LAYOUT, thread_hdr_reg)
+        entry_hdr_view = View(LUMP_HEADER_LAYOUT, entry_header)
+        entry_gt_view = View(GT_LAYOUT, entry_gt_latched)
+        entry_cr14 = Signal(CAP_REG_LAYOUT)
+        entry_cr14_view = View(CAP_REG_LAYOUT, entry_cr14)
+        entry_cr14_gt = View(GT_LAYOUT, entry_cr14_view.word0_gt)
+        entry_cr14_w2 = View(WORD2_LAYOUT, entry_cr14_view.word2_w2)
+        entry_cr6 = Signal(CAP_REG_LAYOUT)
+        entry_cr6_view = View(CAP_REG_LAYOUT, entry_cr6)
+        entry_cr6_gt = View(GT_LAYOUT, entry_cr6_view.word0_gt)
+        entry_cr6_w2 = View(WORD2_LAYOUT, entry_cr6_view.word2_w2)
+        cr5_cap_view = View(CAP_REG_LAYOUT, cr5_cap)
+        cr5_new_gt   = View(GT_LAYOUT, cr5_cap_view.word0_gt)
+        thread_lump_size = Signal(15)
+        thread_caps_start = Signal(15)
+        thread_heap_words = Signal(15)
+        incoming_stack_start = Signal(15)
+        incoming_stack_end = Signal(15)
+        outgoing_lump_size = Signal(15)
+        outgoing_caps_start = Signal(15)
+        outgoing_stack_start = Signal(15)
+        outgoing_stack_end = Signal(15)
+        outgoing_cr6_view = View(CAP_REG_LAYOUT, self.cr_rd_data)
+        outgoing_cr6_gt = View(GT_LAYOUT, outgoing_cr6_view.word0_gt)
+        outgoing_egt_view = View(GT_LAYOUT, outgoing_egt_word)
+        m.d.comb += [
+            thread_lump_size.eq(Const(1, 15) << (thr_hdr_view.n_minus_6 + 6)),
+            thread_caps_start.eq(thread_lump_size - THREAD_CAP_WORDS),
+            # Heap spans [THREAD_HEAP_OFFSET, capsStart-cw).
+            thread_heap_words.eq(thread_lump_size - thr_hdr_view.cw -
+                                 (THREAD_HEAP_OFFSET + THREAD_CAP_WORDS)),
+            incoming_stack_end.eq(thread_caps_start - 1),
+            incoming_stack_start.eq(thread_caps_start - thr_hdr_view.cw),
+            outgoing_lump_size.eq(
+                Const(1, 15) << (outgoing_header[23:27] + 6)),
+            outgoing_caps_start.eq(outgoing_lump_size - THREAD_CAP_WORDS),
+            outgoing_stack_end.eq(outgoing_caps_start - 1),
+            outgoing_stack_start.eq(
+                outgoing_caps_start - outgoing_header[10:23]),
+            outgoing_egt_view.slot_id.eq(outgoing_cr6_gt.slot_id),
+            outgoing_egt_view.gt_seq.eq(outgoing_cr6_gt.gt_seq),
+            outgoing_egt_view.gt_type.eq(outgoing_cr6_gt.gt_type),
+            outgoing_egt_view.dom.eq(1),
+            outgoing_egt_view.perm.eq(0b100),
+            outgoing_egt_view.b_flag.eq(outgoing_cr6_gt.b_flag),
+            cr5_new_gt.slot_id.eq(0),
+            cr5_new_gt.gt_seq.eq(0),
+            cr5_new_gt.gt_type.eq(GT_TYPE_INFORM),
+            # Turing domain (dom=0): perm=0b011 (R=perm[0]=1, W=perm[1]=1, X=perm[2]=0)
+            cr5_new_gt.dom.eq(0),
+            cr5_new_gt.perm.eq(0b011),   # R+W in Turing domain
+            cr5_new_gt.b_flag.eq(0),
+            cr5_cap_view.word1_location.eq(
+                restore_base + (THREAD_HEAP_OFFSET << 2)),
+            cr5_cap_view.word2_w2.eq(thread_heap_words - 1),
+            entry_cr14_gt.slot_id.eq(entry_gt_view.slot_id),
+            entry_cr14_gt.gt_seq.eq(entry_gt_view.gt_seq),
+            entry_cr14_gt.gt_type.eq(entry_gt_view.gt_type),
+            entry_cr14_gt.dom.eq(0),
+            entry_cr14_gt.perm.eq(0b101),
+            entry_cr14_gt.b_flag.eq(entry_gt_view.b_flag),
+            entry_cr14_view.word1_location.eq(entry_raw_base + 4),
+            entry_cr14_w2.limit_offset.eq(entry_hdr_view.cw - 1),
+            entry_cr14_w2.gt_seq.eq(entry_gt_view.gt_seq),
+            entry_cr14_w2.g_bit.eq(0),
+            entry_cr14_w2.f_flag.eq(0),
+            entry_cr6_gt.slot_id.eq(entry_gt_view.slot_id),
+            entry_cr6_gt.gt_seq.eq(entry_gt_view.gt_seq),
+            entry_cr6_gt.gt_type.eq(entry_gt_view.gt_type),
+            entry_cr6_gt.dom.eq(1),
+            entry_cr6_gt.perm.eq(0b001),
+            entry_cr6_gt.b_flag.eq(entry_gt_view.b_flag),
+            entry_cr6_view.word1_location.eq(
+                entry_raw_base +
+                ((Const(1, 32) << (entry_hdr_view.n_minus_6 + 6)) -
+                 entry_hdr_view.cc) * 4),
+            entry_cr6_w2.limit_offset.eq(entry_hdr_view.cc - 1),
+            entry_cr6_w2.gt_seq.eq(entry_gt_view.gt_seq),
+            entry_cr6_w2.g_bit.eq(0),
+            entry_cr6_w2.f_flag.eq(0),
+        ]
+
+        m.d.comb += [
+            self.mem_wr_addr.eq(mem_wr_addr_reg),
+            self.mem_wr_data.eq(mem_wr_data_reg),
+            self.mem_wr_en.eq(mem_wr_en_reg),
+            # Priority: preflight > scheduler descriptor > direct restore > thread-header > u_mload
+            self.mem_rd_addr.eq(
+                Mux(preflight_hdr_active, preflight_base,
+                    Mux(scheduler_ns_active, scheduler_ns_addr,
+                        Mux(direct_rd_active, direct_rd_addr,
+                            Mux(fetch_thr_hdr_active, restore_base, u_mload.mem_addr))))
+            ),
+            self.mem_rd_en.eq(preflight_hdr_active | scheduler_ns_active |
+                               direct_rd_active | fetch_thr_hdr_active |
+                               u_mload.mem_rd_en),
+            # CR5 install override: INSTALL_CR5 takes priority over u_mload writes
+            self.cr_wr_addr.eq(Mux(cr5_install_active, 5, u_mload.cr_wr_addr)),
+            self.cr_wr_data.eq(Mux(cr5_install_active, cr5_cap, u_mload.cr_wr_data)),
+            self.cr_wr_en.eq(u_mload.cr_wr_en | cr5_install_active),
+            self.thread_wr_en.eq(u_mload.thread_wr_en),
+            self.thread_wr_idx.eq(u_mload.thread_wr_idx),
+            self.thread_wr_data.eq(u_mload.thread_wr_data),
+            self.thread_hdr_out.eq(thread_hdr_reg),
+            self.thread_base_restore_en.eq(0),
+            self.thread_base_restore_val.eq(incoming_thread_base),
+            self.dr_wr_en.eq(0),
+            self.dr_wr_addr.eq(save_index[:4]),
+            self.dr_wr_data.eq(restore_word),
+            self.nia_restore_en.eq(0),
+            self.nia_restore_val.eq(entry_raw_base + 4),
+            self.flags_restore_en.eq(0),
+            self.flags_restore_data.eq(incoming_frame[28:32]),
+        ]
+
+        # Default: mload_start_reg self-clears every cycle; the FSM states that
+        # need the internal mload (LOAD_THREAD / RESTORE_CALL / CR12_CR13_LOAD)
+        # re-assert it (their m.d.sync assignment overrides this default).
+        # Without this, mload_start_reg stayed 1 after CHANGE completed and the
+        # internal mload restarted forever, hogging the DMEM bus mux (u_change
+        # has priority over u_call) and starving the boot CALL's FETCH_LUMP.
+        m.d.sync += mload_start_reg.eq(0)
+
+        with m.FSM(name="change") as fsm:
+            with m.State("IDLE"):
+                m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
+                m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                m.d.sync += restore_homes_after_hdr.eq(0)
+                with m.If(self.change_start & ~self.ordinary):
+                    m.d.sync += [
+                        index_latched.eq(self.index),
+                        mask_latched.eq(self.change_mask),
+                        cr_src_latched.eq(self.cr_src),
+                        cr_dst_latched.eq(self.cr_dst),
+                        nia_current_latched.eq(self.nia_current),
+                        # Thread context CHANGE is selected by its privileged
+                        # destination (CR14/CR15), never by a UI/scheduler
+                        # side-band semantic flag.
+                        thread_change_lat.eq((self.cr_dst == 14) | (self.cr_dst == 15)),
+                        cr_index.eq(0),
+                        save_index.eq(0),
+                        save_cr_index.eq(0),
+                        restore_cr8_final.eq(0),
+                        boot_window_lat.eq(self.boot_window),
+                        outgoing_thread_base.eq(
+                            Mux((self.cr_dst == 14) | (self.cr_dst == 15), self.active_thread_base,
+                                cr12_view.word1_location)),
+                        outgoing_thread_owned.eq(self.active_thread_owned),
+                        thread_loaded.eq(0),
+                    ]
+                    m.d.comb += self.cr_rd_addr.eq(self.cr_src)
+                    m.next = "READ_CRN"
+
+            with m.State("READ_CRN"):
+                m.d.comb += self.cr_rd_addr.eq(cr_src_latched)
+                m.next = "LATCH_CRN"
+
+            with m.State("LATCH_CRN"):
+                m.d.sync += crn_reg_latched.eq(self.cr_rd_data)
+                m.d.comb += self.cr_rd_addr.eq(cr_src_latched)
+                with m.If((cr_dst_latched == 12) | (cr_dst_latched == 13)):
+                    # CR12/CR13 system-wide: authority check happens in next state
+                    # (crn_reg_latched will be valid there)
+                    m.next = "CHECK_CR12_AUTH"
+                with m.Elif(thread_change_lat):
+                    # Preflight the target descriptor and private Thread body
+                    # before SAVE_DR writes the outgoing context.  Fetch its
+                    # live W2 first so the direct scheduler GT carries the
+                    # descriptor's revocation generation.
+                    m.next = "SCHED_FETCH_AUTH"
+                with m.Elif(~crn_has_l_perm):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
+                    m.next = "FAULT"
+                with m.Elif(cr12_null):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.next = "SAVE_DR"
+
+            with m.State("SCHED_FETCH_AUTH"):
+                # Namespace entries are four words; W1 (authority + sequence)
+                # is byte offset 4. The read port is synchronous, so arm this
+                # request before accepting the following valid cycle.
+                # CR15 is the architectural Namespace root used by the manual
+                # Thread selector. Other source registers must carry L.
+                with m.If((cr_src_latched != 15) & ~crn_has_l_perm):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(FaultType.PERM_L),
+                    ]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.d.comb += scheduler_ns_active.eq(1)
+                    m.d.sync += scheduler_ns_rd_armed.eq(1)
+                    m.next = "SCHED_LATCH_AUTH"
+
+            with m.State("SCHED_LATCH_AUTH"):
+                m.d.comb += scheduler_ns_active.eq(1)
+                with m.If(self.mem_rd_valid & scheduler_ns_rd_armed):
+                    m.d.sync += [
+                        scheduler_ns_rd_armed.eq(0),
+                        scheduler_gt_seq.eq(View(WORD2_LAYOUT, self.mem_rd_data).gt_seq),
+                    ]
+                    m.next = "PREFLIGHT"
+
+            with m.State("CHECK_CR12_AUTH"):
+                # crn_reg_latched is valid here (latched at end of LATCH_CRN).
+                # Boot uses the validated, scratch-free back half. Its incoming
+                # identity is CR12's permissionless GT, not synthesized S authority.
+                # Post-boot (m_elevated=False) requires:
+                #   • source cap carries S-perm
+                #   • source cap location matches the target CR's port address
+                with m.If(boot_window_lat & (cr_dst_latched == 12)):
+                    m.d.comb += boot_change.start.eq(1)
+                    m.next = "BOOT_ACTIVATE"
+                with m.Elif(~crn_has_s_perm):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_S)]
+                    m.next = "FAULT"
+                with m.Elif(~cr_port_match):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_S)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.next = "CR12_CR13_LOAD"
+
+            with m.State("BOOT_ACTIVATE"):
+                m.d.comb += [
+                    self.mem_rd_addr.eq(boot_change.mem_addr),
+                    self.mem_rd_en.eq(boot_change.mem_en),
+                    self.cr_wr_en.eq(boot_change.cr_en),
+                    self.cr_wr_addr.eq(boot_change.cr_addr),
+                    self.cr_wr_data.eq(boot_change.cr_data),
+                ]
+                with m.If(boot_change.fault):
+                    m.d.sync += [
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(boot_change.fault_type),
+                    ]
+                    m.next = "FAULT"
+                with m.Elif(boot_change.done):
+                    m.d.sync += [
+                        thread_hdr_reg.eq(boot_change.header),
+                        incoming_thread_base.eq(boot_change.thread_base),
+                        thread_loaded.eq(1),
+                    ]
+                    m.next = "COMPLETE"
+
+            with m.State("CR12_CR13_LOAD"):
+                # Load the GT from NS[index] (via source cap authority) directly
+                # into CR12 or CR13 — no per-thread context save/restore.
+                m.d.comb += [
+                    mload_src.eq(cr_src_latched),
+                    mload_dst.eq(cr_dst_latched),
+                    mload_index.eq(index_latched),
+                ]
+                # One-shot: drop start as soon as this pass's mload completes,
+                # otherwise the still-high start restarts the mload with stale
+                # latched operands the moment it returns to IDLE.
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault
+                      | mload_done_latched | mload_fault_latched))
+                m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                with m.If(u_mload.sub_done):
+                    m.d.sync += mload_done_latched.eq(1)
+                with m.If(u_mload.sub_fault):
+                    m.d.sync += mload_fault_latched.eq(1)
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_mload.sub_fault_type)]
+                with m.If(mload_fault_latched):
+                    m.next = "FAULT"
+                with m.Elif(mload_done_latched):
+                    m.next = "COMPLETE"
+
+            with m.State("PREFLIGHT"):
+                # Direct mLoad validates the projected Namespace entry,
+                # including its authority, generation, integrity, and bounds,
+                # without changing a CR or clearing its G-bit.
+                m.d.comb += [
+                    mload_src.eq(cr_src_latched),
+                    mload_dst.eq(Mux(thread_change_lat, 8, cr_dst_latched)),
+                    mload_index.eq(index_latched),
+                    mload_direct.eq(1),
+                    mload_direct_gt.eq(boot_thread_gt),
+                    u_mload.sub_validate_only.eq(1),
+                ]
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault |
+                      mload_done_latched | mload_fault_latched))
+                m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                with m.If(u_mload.sub_done):
+                    m.d.sync += [
+                        mload_done_latched.eq(1),
+                        preflight_base.eq(u_mload.resolved_base),
+                        incoming_thread_base.eq(u_mload.resolved_base),
+                    ]
+                with m.If(u_mload.sub_fault):
+                    m.d.sync += [
+                        mload_fault_latched.eq(1),
+                        fault_latched.eq(1),
+                        fault_type_latched.eq(u_mload.sub_fault_type),
+                    ]
+                with m.If(mload_fault_latched):
+                    m.next = "FAULT"
+                with m.Elif(mload_done_latched):
+                    m.next = "PREFLIGHT_HDR"
+
+            with m.State("PREFLIGHT_HDR"):
+                # Private body must use a supported Thread allocation before
+                # outgoing DR/CR state is persisted. cw is stack words and cc
+                # is exactly the twelve persisted CR0--CR11 homes.
+                m.d.comb += preflight_hdr_active.eq(1)
+                # The DMEM read port is shared and synchronous; arm one cycle
+                # before accepting valid so a final Namespace-gate response
+                # cannot be mistaken for the target Thread header.
+                m.d.sync += preflight_rd_armed.eq(1)
+                with m.If(self.mem_rd_valid & preflight_rd_armed):
+                    m.d.sync += preflight_rd_armed.eq(0)
+                    # A Thread is admitted only when its header conforms to
+                    # the normative fixed private ABI.  cw is stack words,
+                    # cc is exactly the twelve persisted CR homes. Stack and
+                    # Heap must meet without overlap before the tail homes.
+                    with m.If((self.mem_rd_data[27:32] == 0x1F) &
+                              (self.mem_rd_data[8:10] == 2) &
+                              (self.mem_rd_data[23:27] >= THREAD_MIN_N_MINUS_6) &
+                              (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
+                               (self.mem_rd_data[10:23] > 0) &
+                               (self.mem_rd_data[0:8] == THREAD_CAP_WORDS) &
+                                 # Heap and stack must leave room for each other.
+                                (self.mem_rd_data[10:23] <
+                                ((Const(1, 15) <<
+                                  (self.mem_rd_data[23:27] + 6)) -
+                                  (THREAD_HEAP_OFFSET + THREAD_CAP_WORDS)))):
+                        m.d.sync += [thread_hdr_reg.eq(self.mem_rd_data),
+                                     cr_index.eq(0), restore_rd_armed.eq(0)]
+                        m.next = "PREFLIGHT_CAP_READ"
+                    with m.Else():
+                        m.d.sync += [
+                            fault_latched.eq(1),
+                            fault_type_latched.eq(FaultType.BOUNDS),
+                        ]
+                        m.next = "FAULT"
+
+            # Read-only admission pass.  This deliberately precedes every
+            # SAVE_* state: mLoad is validate_only, so an incoming stale home
+            # cannot partially serialize the outgoing Thread.
+            with m.State("PREFLIGHT_CAP_READ"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(preflight_base +
+                        ((thread_caps_start + cr_index) << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [preflight_cap_word.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    with m.If((self.mem_rd_data == 0) | (cr_index >= THREAD_CAP_WORDS)):
+                        m.next = "PREFLIGHT_CAP_NEXT"
+                    with m.Else():
+                        m.next = "PREFLIGHT_CAP_VALIDATE"
+
+            with m.State("PREFLIGHT_CAP_VALIDATE"):
+                m.d.comb += [
+                    mload_dst.eq(14),
+                    mload_direct.eq(1),
+                    mload_direct_gt.eq(preflight_cap_word),
+                    u_mload.sub_validate_only.eq(1),
+                ]
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault |
+                      mload_done_latched | mload_fault_latched))
+                m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                with m.If(u_mload.sub_done):
+                    m.d.sync += mload_done_latched.eq(1)
+                with m.If(u_mload.sub_fault):
+                    m.d.sync += [mload_fault_latched.eq(1), fault_latched.eq(1),
+                                 fault_type_latched.eq(u_mload.sub_fault_type)]
+                with m.If(mload_fault_latched):
+                    m.next = "FAULT"
+                with m.Elif(mload_done_latched):
+                    m.next = "PREFLIGHT_CAP_NEXT"
+
+            with m.State("PREFLIGHT_CAP_NEXT"):
+                with m.If(cr_index >= THREAD_CAP_WORDS - 1):
+                    m.d.sync += restore_rd_armed.eq(0)
+                    m.next = "PREFLIGHT_INDICATOR"
+                with m.Else():
+                    m.d.sync += cr_index.eq(cr_index + 1)
+                    m.next = "PREFLIGHT_CAP_READ"
+
+            with m.State("PREFLIGHT_INDICATOR"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(preflight_base +
+                        (THREAD_STO_OFFSET << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [incoming_indicator.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    # Dormant Threads always carry the canonical two-word
+                    # suspension frame.  Reserved indicator bits must be zero.
+                    with m.If((self.mem_rd_data[12] == 1) &
+                              (self.mem_rd_data[13:28] == 0) &
+                              (self.mem_rd_data[:12] >= incoming_stack_start) &
+                              ((self.mem_rd_data[:12] + 2) <= incoming_stack_end)):
+                        m.next = "PREFLIGHT_FRAME"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1),
+                                     fault_type_latched.eq(FaultType.STACK_CORRUPT)]
+                        m.next = "FAULT"
+
+            with m.State("PREFLIGHT_FRAME"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(stack_slot_addr(
+                        preflight_base, incoming_indicator[:12], 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [incoming_frame.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    # Dormant contexts use the same two-word CHURCH frame as
+                    # CALL: the protected STO points below the frame and the
+                    # frame points back exactly two words.  Do not accept a
+                    # merely in-range pointer that could make RESTORE_POP
+                    # consume an unrelated stack word.
+                    with m.If((self.mem_rd_data[:12] == (incoming_indicator[:12] + 2)) &
+                              (self.mem_rd_data[:12] >= incoming_stack_start) &
+                              (self.mem_rd_data[:12] <= incoming_stack_end)):
+                        m.next = "PREFLIGHT_EGT_READ"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1),
+                                     fault_type_latched.eq(FaultType.STACK_CORRUPT)]
+                        m.next = "FAULT"
+
+            with m.State("PREFLIGHT_EGT_READ"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(stack_slot_addr(
+                        preflight_base, incoming_indicator[:12], 1)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [entry_gt_latched.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    m.next = "PREFLIGHT_EGT_VALIDATE"
+
+            with m.State("PREFLIGHT_EGT_VALIDATE"):
+                with m.If(entry_gt_view.gt_type == GT_TYPE_NULL):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.d.comb += [mload_dst.eq(14), mload_direct.eq(1),
+                                 mload_direct_gt.eq(entry_gt_latched),
+                                 u_mload.sub_validate_only.eq(1)]
+                    m.d.sync += mload_start_reg.eq(
+                        ~(u_mload.sub_done | u_mload.sub_fault |
+                          mload_done_latched | mload_fault_latched))
+                    m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                    with m.If(u_mload.sub_done):
+                        m.d.sync += [mload_done_latched.eq(1),
+                                     entry_raw_base.eq(u_mload.resolved_base)]
+                    with m.If(u_mload.sub_fault):
+                        m.d.sync += [mload_fault_latched.eq(1), fault_latched.eq(1),
+                                     fault_type_latched.eq(u_mload.sub_fault_type)]
+                    with m.If(mload_fault_latched):
+                        m.next = "FAULT"
+                    with m.Elif(mload_done_latched):
+                        m.d.sync += restore_rd_armed.eq(0)
+                        m.next = "PREFLIGHT_ENTRY_HEADER"
+
+            with m.State("PREFLIGHT_ENTRY_HEADER"):
+                m.d.comb += [direct_rd_active.eq(1), direct_rd_addr.eq(entry_raw_base)]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [entry_header.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    with m.If((self.mem_rd_data[27:32] == 0x1F) &
+                              (self.mem_rd_data[10:23] != 0) &
+                              (incoming_frame[13:28] <
+                               self.mem_rd_data[10:23])):
+                        with m.If(outgoing_thread_owned):
+                            m.next = "PREFLIGHT_OUT_HEADER"
+                        with m.Else():
+                            # The target is valid, but reset/replacement left
+                            # only scratch registers live. Restore it without
+                            # fabricating a suspension frame for the selected
+                            # default Thread.
+                            m.next = "LOAD_THREAD"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.BOUNDS)]
+                        m.next = "FAULT"
+
+            with m.State("PREFLIGHT_OUT_HEADER"):
+                m.d.comb += [direct_rd_active.eq(1),
+                             direct_rd_addr.eq(outgoing_thread_base)]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [outgoing_header.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    with m.If((self.mem_rd_data[27:32] == 0x1F) &
+                              (self.mem_rd_data[8:10] == 2) &
+                              (self.mem_rd_data[23:27] >= THREAD_MIN_N_MINUS_6) &
+                              (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
+                              (self.mem_rd_data[10:23] > 0) &
+                              (self.mem_rd_data[0:8] == THREAD_CAP_WORDS)):
+                        m.next = "PREFLIGHT_OUT_INDICATOR"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1),
+                                     fault_type_latched.eq(FaultType.BOUNDS)]
+                        m.next = "FAULT"
+
+            with m.State("PREFLIGHT_OUT_INDICATOR"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(outgoing_thread_base +
+                                      (THREAD_STO_OFFSET << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [outgoing_indicator.eq(self.mem_rd_data),
+                                 restore_rd_armed.eq(0)]
+                    with m.If((self.mem_rd_data[13:28] == 0) &
+                              (self.mem_rd_data[:12] <= outgoing_stack_end) &
+                              (self.mem_rd_data[:12] >=
+                               (outgoing_stack_start + 2))):
+                        m.next = "SAVE_CR_READ"
+                    with m.Else():
+                        m.d.sync += [fault_latched.eq(1),
+                                     fault_type_latched.eq(FaultType.STACK_OVERFLOW)]
+                        m.next = "FAULT"
+
+            with m.State("SAVE_CR_READ"):
+                # Scheduler contexts preserve the canonical GT word for every
+                # private CR. On restore mLoad reconstructs location/authority
+                # from the current sealed Namespace descriptor rather than
+                # trusting stale mutable register metadata.
+                m.d.comb += self.cr_rd_addr.eq(save_cr_index)
+                m.next = "SAVE_CR_WRITE"
+
+            with m.State("SAVE_CR_WRITE"):
+                m.d.comb += [
+                    self.cr_rd_addr.eq(save_cr_index),
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(
+                        outgoing_thread_base + ((thread_caps_start + save_cr_index) << 2)),
+                    mem_wr_data_reg.eq(self.cr_rd_data.as_value()[:32]),
+                ]
+                with m.If(self.mem_wr_done):
+                    with m.If(save_cr_index == THREAD_CAP_WORDS - 1):
+                        m.next = "SAVE_EGT_READ"
+                    with m.Else():
+                        m.d.sync += save_cr_index.eq(save_cr_index + 1)
+                        m.next = "SAVE_CR_READ"
+
+            with m.State("SAVE_EGT_READ"):
+                # As with CALL, canonicalize the current CR6 identity into an
+                # E-GT before serializing it.
+                m.d.comb += self.cr_rd_addr.eq(6)
+                m.d.sync += outgoing_egt.eq(outgoing_egt_word)
+                m.next = "SAVE_EGT_WRITE"
+
+            with m.State("SAVE_EGT_WRITE"):
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(stack_slot_addr(
+                        outgoing_thread_base, outgoing_indicator[:12], -1)),
+                    mem_wr_data_reg.eq(outgoing_egt),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "SAVE_FRAME"
+
+            with m.State("SAVE_FRAME"):
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(stack_slot_addr(
+                        outgoing_thread_base, outgoing_indicator[:12], 0)),
+                    mem_wr_data_reg.eq(Cat(
+                        outgoing_indicator[:13],
+                        (nia_current_latched[2:17] + 1)[:15],
+                        self.flags_in.as_value())),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "SAVE_INDICATOR_WRITE"
+
+            with m.State("SAVE_DR"):
+                m.d.comb += self.dr_rd_addr.eq(save_index[:4])
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(outgoing_thread_base + ((THREAD_DR_OFFSET + save_index) << 2)),
+                    mem_wr_data_reg.eq(self.dr_rd_data),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.d.sync += save_index.eq(save_index + 1)
+                    with m.If(save_index >= 15):
+                        m.next = "LOAD_THREAD"
+
+            with m.State("SAVE_INDICATOR_WRITE"):
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(
+                        outgoing_thread_base + (THREAD_STO_OFFSET << 2)),
+                    mem_wr_data_reg.eq(Cat(
+                        (outgoing_indicator[:12] - 2)[:12], Const(1, 1),
+                        Const(0, 15), self.flags_in.as_value())),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "SAVE_DR"
+
+            with m.State("LOAD_THREAD"):
+                m.d.comb += [
+                    mload_src.eq(cr_src_latched),
+                    mload_dst.eq(8),
+                    mload_index.eq(index_latched),
+                    # Boot window: resolve NS slot <index> directly (see
+                    # boot_window comment in __init__) — skips the c-list
+                    # GT fetch that would misread the namespace limit word.
+                    mload_direct.eq(boot_window_lat | thread_change_lat),
+                    mload_direct_gt.eq(boot_thread_gt),
+                ]
+                # One-shot: drop start as soon as this pass's mload completes,
+                # otherwise the still-high start restarts the mload with stale
+                # latched operands the moment it returns to IDLE.
+                m.d.sync += mload_start_reg.eq(
+                    ~(u_mload.sub_done | u_mload.sub_fault
+                      | mload_done_latched | mload_fault_latched))
+                m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                with m.If(u_mload.sub_done):
+                    m.d.sync += [
+                        mload_done_latched.eq(1),
+                        fetched_gt_latched.eq(self.cr_rd_data.as_value()[:32]),
+                        incoming_thread_base.eq(u_mload.resolved_base),
+                        thread_loaded.eq(1),
+                        # Fetch the incoming header before restoring homes:
+                        # capsStart depends on its n_minus_6.
+                        restore_homes_after_hdr.eq(1),
+                    ]
+                with m.If(u_mload.sub_fault):
+                    m.d.sync += mload_fault_latched.eq(1)
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_mload.sub_fault_type)]
+                with m.If(mload_fault_latched):
+                    m.next = "FAULT"
+                with m.Elif(mload_done_latched):
+                    m.next = "FETCH_THREAD_HDR"
+
+            with m.State("RESTORE_CALL"):
+                m.d.comb += [
+                    mload_src.eq(8),
+                    mload_dst.eq(cr_index),
+                    # Thread.caps[n] begins at header-derived capsStart.
+                    # CR8.word1_location = thread_lump_base (set by LOAD_THREAD ns_gate).
+                    mload_index.eq(thread_caps_start + cr_index),
+                ]
+                with m.If(skip_current_cr):
+                    m.d.sync += cr_index.eq(cr_index + 1)
+                    with m.If(cr_index >= 15):
+                        with m.If(thread_change_lat & ~restore_cr8_final):
+                            m.d.sync += [
+                                cr_index.eq(8),
+                                restore_cr8_final.eq(1),
+                            ]
+                            m.next = "RESTORE_CALL"
+                        with m.Elif(thread_change_lat):
+                            m.next = "RESTORE_DR"
+                        with m.Else():
+                            m.next = "FETCH_THREAD_HDR"
+                with m.Else():
+                    m.d.sync += [mload_done_latched.eq(0), mload_fault_latched.eq(0)]
+                    # One-shot: drop start as soon as this pass's mload completes,
+                    # otherwise the still-high start restarts the mload with stale
+                    # latched operands the moment it returns to IDLE.
+                    m.d.sync += mload_start_reg.eq(
+                        ~(u_mload.sub_done | u_mload.sub_fault
+                          | mload_done_latched | mload_fault_latched))
+                    with m.If(u_mload.sub_done):
+                        m.d.sync += mload_done_latched.eq(1)
+                    with m.If(u_mload.sub_fault):
+                        m.d.sync += mload_fault_latched.eq(1)
+                        m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_mload.sub_fault_type)]
+                    with m.If(mload_fault_latched):
+                        m.next = "FAULT"
+                    with m.Elif(mload_done_latched):
+                        m.next = "RESTORE_NEXT"
+
+            with m.State("RESTORE_NEXT"):
+                m.d.sync += cr_index.eq(cr_index + 1)
+                with m.If(thread_change_lat & restore_cr8_final):
+                    m.d.sync += [
+                        save_index.eq(0),
+                        restore_rd_armed.eq(0),
+                    ]
+                    m.next = "RESTORE_DR"
+                with m.Elif(thread_change_lat & (cr_index >= 11)):
+                    m.d.sync += [
+                        cr_index.eq(8),
+                        restore_cr8_final.eq(1),
+                    ]
+                    m.next = "RESTORE_CALL"
+                with m.Elif(cr_index >= 15):
+                    with m.If(thread_change_lat):
+                        m.d.sync += [
+                            save_index.eq(0),
+                            restore_rd_armed.eq(0),
+                        ]
+                        m.next = "RESTORE_DR"
+                    with m.Else():
+                        m.next = "FETCH_THREAD_HDR"
+                with m.Else():
+                    m.next = "RESTORE_CALL"
+
+            with m.State("RESTORE_DR"):
+                m.d.comb += [
+                    direct_rd_active.eq(1),
+                    direct_rd_addr.eq(
+                        restore_base + ((THREAD_DR_OFFSET + save_index) << 2)),
+                ]
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [
+                        restore_word.eq(self.mem_rd_data),
+                        restore_rd_armed.eq(0),
+                    ]
+                    m.next = "RESTORE_DR_WRITE"
+
+            with m.State("RESTORE_DR_WRITE"):
+                m.d.comb += [
+                    self.dr_wr_en.eq(1),
+                    self.dr_wr_addr.eq(save_index[:4]),
+                    self.dr_wr_data.eq(restore_word),
+                ]
+                with m.If(save_index >= 15):
+                    m.next = "RESTORE_POP"
+                with m.Else():
+                    m.d.sync += save_index.eq(save_index + 1)
+                    m.next = "RESTORE_DR"
+
+            with m.State("RESTORE_POP"):
+                # RETURN-equivalent pop of the preflighted suspension frame.
+                m.d.comb += [
+                    mem_wr_en_reg.eq(1),
+                    mem_wr_addr_reg.eq(restore_base +
+                                       (THREAD_STO_OFFSET << 2)),
+                    mem_wr_data_reg.eq(Cat(
+                        incoming_frame[:13], Const(0, 15),
+                        incoming_frame[28:32])),
+                ]
+                with m.If(self.mem_wr_done):
+                    m.next = "RESTORE_INDICATOR_COMMIT"
+
+            with m.State("RESTORE_INDICATOR_COMMIT"):
+                m.d.comb += [
+                    self.flags_restore_en.eq(1),
+                    self.nia_restore_en.eq(1),
+                    self.flags_restore_data.eq(incoming_frame[28:32]),
+                    self.nia_restore_val.eq(incoming_frame[13:28] << 2),
+                ]
+                m.next = "ENTRY_COMMIT"
+
+            with m.State("ENTRY_COMMIT"):
+                # Restore NIA independently from the protected indicator. A
+                # resumed Thread enters its CR0 abstraction at code word 1;
+                # it does not resume an outgoing instruction address.
+                m.d.comb += [
+                    self.cr_wr_addr.eq(14),
+                    self.cr_wr_data.eq(entry_cr14),
+                    self.cr_wr_en.eq(1),
+                ]
+                m.next = "ENTRY_CR6_COMMIT"
+
+            with m.State("ENTRY_CR6_COMMIT"):
+                m.d.comb += [
+                    self.cr_wr_addr.eq(6),
+                    self.cr_wr_data.eq(entry_cr6),
+                    self.cr_wr_en.eq(1),
+                ]
+                m.next = "FETCH_THREAD_HDR"
+
+            with m.State("FETCH_THREAD_HDR"):
+                # After RESTORE_CALL the incoming thread's CRs are all committed
+                # to the register file, so CR12 now holds the new thread capability.
+                # CR12 is M-elevated (perms always 0) — validate null only.
+                #
+                # M-elevated exception: during BOOT_PROGRAM microcode, the CHANGE
+                # mask is 0 (decoder scrubs call_mask to 0), so RESTORE_CALL skips
+                # all ordinary CR homes and CR12 remains null. The boot path does not need
+                # thread-header validation (there is no existing thread stack to
+                # bound-check), so we bypass the null check and use thread_hdr=0.
+                with m.If(thread_change_lat):
+                    m.next = "READ_THREAD_HDR"
+                with m.Elif(cr12_null & ~self.m_elevated):
+                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Elif(cr12_null & self.m_elevated):
+                    # M-elevated + null CR12: skip header read, default hdr=0.
+                    m.d.sync += thread_hdr_reg.eq(0)
+                    m.next = "INSTALL_CR5"
+                with m.Else():
+                    m.next = "READ_THREAD_HDR"
+
+            with m.State("READ_THREAD_HDR"):
+                # thread_base = CR12.word1_location = the incoming thread lump base.
+                # Read Mem[thread_base+0] (the lump header word) and store in
+                # THREAD_HDR — CALL uses it for stack-bound validation on every call
+                # without any additional memory reads.
+                m.d.comb += fetch_thr_hdr_active.eq(1)
+                with m.If(~restore_rd_armed):
+                    m.d.sync += restore_rd_armed.eq(1)
+                with m.Elif(self.mem_rd_valid):
+                    m.d.sync += [
+                        thread_hdr_reg.eq(self.mem_rd_data),
+                        restore_rd_armed.eq(0),
+                    ]
+                    # Validate every restored Thread header, not just the
+                    # scheduler's preflight copy.  Its size comes exclusively
+                    # from n_minus_6; cc is never a heap-size field.
+                    with m.If(
+                        (self.mem_rd_data[27:32] == 0x1F) &
+                        (self.mem_rd_data[8:10] == 2) &
+                        (self.mem_rd_data[23:27] >= THREAD_MIN_N_MINUS_6) &
+                        (self.mem_rd_data[23:27] <= THREAD_MAX_N_MINUS_6) &
+                        (self.mem_rd_data[10:23] > 0) &
+                        (self.mem_rd_data[0:8] == THREAD_CAP_WORDS) &
+                        (self.mem_rd_data[10:23] <
+                         ((Const(1, 15) <<
+                           (self.mem_rd_data[23:27] + 6)) - 30))
+                    ):
+                        with m.If(restore_homes_after_hdr):
+                            m.d.sync += [
+                                restore_homes_after_hdr.eq(0),
+                                cr_index.eq(0),
+                            ]
+                            m.next = "RESTORE_CALL"
+                        with m.Else():
+                            m.next = "INSTALL_CR5"
+                    with m.Else():
+                        m.d.sync += [
+                            fault_latched.eq(1),
+                            fault_type_latched.eq(FaultType.BOUNDS),
+                        ]
+                        m.next = "FAULT"
+
+            with m.State("INSTALL_CR5"):
+                # Synthesise the Zone ④ heap GT from the incoming thread's lump header
+                # and install it into CR5 (the heap cap).
+                # CR5 covers only ordinary heap words. The protected STO word
+                # at +17 is outside this capability.
+                # base = thread_base + 18 words; limit_offset = heapWords - 1.
+                m.d.comb += cr5_install_active.eq(1)
+                m.next = "COMPLETE"
+
+            with m.State("COMPLETE"):
+                with m.If(thread_loaded):
+                    m.d.comb += self.thread_base_restore_en.eq(1)
+                m.next = "IDLE"
+
+            with m.State("FAULT"):
+                m.next = "IDLE"
+
+        m.d.comb += [
+            self.change_busy.eq(~fsm.ongoing("IDLE")),
+            self.change_complete.eq(fsm.ongoing("COMPLETE")),
+            self.change_fault.eq(fault_latched),
+            self.fault_type.eq(fault_type_latched),
+        ]
+
+        with m.If(ordinary_selected):
+            for name in ordinary.OUTPUTS:
+                if name == "thread_hdr_out":
+                    continue
+                m.d.comb += getattr(self, name).eq(getattr(ordinary, name))
+        # Admission headers are speculative. A failed CHANGE must not replace
+        # the running Thread's hidden stack geometry consumed by CALL/RETURN.
+        published_header = Signal(32)
+        with m.If(self.change_complete):
+            m.d.sync += published_header.eq(
+                Mux(ordinary_selected, ordinary.thread_hdr_out, thread_hdr_reg))
+        m.d.comb += self.thread_hdr_out.eq(published_header)
+        return m

@@ -63,6 +63,10 @@ class ChurchRegisters(Elaboratable):
         self.dr_rd_data1 = Signal(32)
         self.dr_rd_addr2 = Signal(4)
         self.dr_rd_data2 = Signal(32)
+        self.dr_rd_addr3 = Signal(4)
+        self.dr_rd_data3 = Signal(32)
+        self.dr_rd_addr4 = Signal(4)
+        self.dr_rd_data4 = Signal(32)
         self.dr_wr_addr = Signal(4)
         self.dr_wr_data = Signal(32)
         self.dr_wr_en = Signal()
@@ -256,6 +260,8 @@ class ChurchRegisters(Elaboratable):
         m.d.comb += [
             self.dr_rd_data1.eq(Mux(self.dr_rd_addr1 == 0, 0, data_regs[self.dr_rd_addr1])),
             self.dr_rd_data2.eq(Mux(self.dr_rd_addr2 == 0, 0, data_regs[self.dr_rd_addr2])),
+            self.dr_rd_data3.eq(Mux(self.dr_rd_addr3 == 0, 0, data_regs[self.dr_rd_addr3])),
+            self.dr_rd_data4.eq(Mux(self.dr_rd_addr4 == 0, 0, data_regs[self.dr_rd_addr4])),
             self.flags.eq(flags_reg),
         ]
 

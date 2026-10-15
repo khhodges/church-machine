@@ -1,0 +1,1966 @@
+"""hardware/wukong_top.py — QMTECH Wukong XC7A100T minimal Church Machine top-level
+## ==================================================================================
+
+Minimal top-level for the QMTECH Wukong Board V3 (Artix-7 XC7A100T-2FGG676C).
+LED blink only — no Ethernet, no UART bridge.
+
+Pin assignments (xc7a100tfgg676-2 / LVCMOS33 — hardware-confirmed on real board):
+  clk    M21  50 MHz oscillator (IO_L14P_T2_SRCC_34, bank 34 — confirmed by counter test)
+  rst_n  M6   Active-low push button  — constrained but not wired to soft reset
+  led[0] G21  User LED D1 (ACTIVE-LOW: FPGA drives LOW → LED ON)
+  led[1] G20  User LED D2 (ACTIVE-LOW: FPGA drives LOW → LED ON)
+
+Note: Do NOT use Instance("BUFG") explicitly — Vivado drops it during opt_design for
+SRCC pins in this design.  Use a direct comb assignment so Vivado auto-infers IBUF→BUFG.
+
+BRAM initialisation note:
+  Vivado does not reliably apply Verilog `initial` blocks to inferred BRAM when the
+  Verilog originates from Yosys (the blocks are treated as simulation-only).  To
+  guarantee correct DMEM state before the CM boots, a hardware init sequencer writes
+  every non-zero DMEM word via the write port in the first ~50 cycles after GSR, then
+  pulses boot_start.  The `init=dmem_init` parameter on LibMemory is kept for
+  simulation accuracy only.
+
+ROM layout (WUKONG_ROM):
+  ROM[0..2]    = BOOT_PROGRAM (3-instruction boot microcode)
+  ROM[3..1023] = 0
+
+Boot microcode M-elevation rule:
+  During boot (boot_state_reg != BootState.COMPLETE), all LOAD instructions are
+  M-elevated in core.py — boot microcode has full privilege.  This means
+  BOOT_PROGRAM[0] = `LOAD CR15, CR15[0]` executes correctly: the L-perm gate is
+  bypassed unconditionally during the boot phase, regardless of cr_src.  The old
+  NUC_PROGRAM workaround (which used cr_src=CR6 to get m_elevated=1) is no longer
+  needed.
+
+What you will see:
+  Booting  (16-cycle POR + ~50 cycle DMEM init):
+    led[0] solid ON  (G21 LOW = active-LOW ON = booting indicator)
+    led[1] 1 Hz heartbeat blink  (clock alive)
+  Running  (boot entry abstraction via BOOT_PROGRAM + CALL):
+    led[0] blinks at ~1 Hz via MMIO reg 0 writes (CM-controlled, active-LOW inverted)
+    led[1] OFF (normal / no fault); blinks ON only if fault_latched is set
+"""
+
+from amaranth import *
+from amaranth.lib.memory import Memory as LibMemory
+
+from .hw_types import *
+from .core import ChurchCore
+from .boot_rom import (BootRom, BOOT_PROGRAM, WUKONG_NUC_PROGRAM, encode_turing,
+                       WUKONG_DEMO_NAMESPACE, WUKONG_DEMO_CLIST,
+                       WUKONG_SELFTEST_WORDS, WUKONG_SELFTEST_BASE_WORD,
+                       CAPABILITY_TEST_NS_SLOT,
+                       WUKONG_CAPABILITY_TEST_BASE_WORD,
+                       WUKONG_CAPABILITY_TEST_WORDS, WUKONG_CAPABILITY_TEST_IMAGE_WORDS,
+                       WUKONG_CALLHOME_BASE_WORD,
+                       WUKONG_WCH_CLIST, WUKONG_WCH_CLIST_WORD,
+                       WUKONG_THREAD_BASE_WORD, WUKONG_THREAD_HEADER,
+                       WUKONG_THREAD_STO_WORD, WUKONG_THREAD_STO_INIT, initialize_factory_thread_root,
+                       WUKONG_THREAD_CAPS0_WORD, WUKONG_THREAD_CAPS12_WORD,
+                       wukong_wch_header)
+from .uart_tx import UartTx
+from .uart_rx import UartRx
+from .sparse_memory_init import SparseMemoryInitializer
+from shared.architecture_contracts import PROFILES as ARCH_PROFILES, TRACE_UNITS as ARCH_TRACE_UNITS
+
+_WUKONG_ARCH_PROFILE = ARCH_PROFILES["wukong-uart-upload-v2"]
+_WUKONG_TRACE_CONTRACT = ARCH_TRACE_UNITS[_WUKONG_ARCH_PROFILE["traceUnit"]]
+_WUKONG_DMEM_WORDS = _WUKONG_ARCH_PROFILE["totalWords"]
+
+
+class TraceEventDecoder(Elaboratable):
+    """Production opcode-to-trace-event queue decoder.
+
+    Kept separate from the UART/FSM wrapper so focused RTL simulations can
+    verify fused-instruction decoding without elaborating the full FPGA top.
+    """
+
+    def __init__(self):
+        self.instr = Signal(32)
+        self.load_shadow_gt = Signal(32)
+        self.load_new_gt = Signal(32)
+        self.cr12_gt = Signal(32)
+        self.cr5_gt = Signal(32)
+        self.cr6_gt = Signal(32)
+        self.cr14_gt = Signal(32)
+
+        self.event_count = Signal(2)
+        self.event_type = [Signal(8, name=f"event_type{i}") for i in range(3)]
+        self.event_data = [Signal(32, name=f"event_data{i}") for i in range(3)]
+
+    def elaborate(self, platform):
+        m = Module()
+        events = _WUKONG_TRACE_CONTRACT["eventIds"]
+
+        m.d.comb += [
+            self.event_count.eq(1),
+            self.event_type[0].eq(events["RESULT"]),
+            self.event_type[1].eq(0),
+            self.event_type[2].eq(0),
+            self.event_data[0].eq(0),
+            self.event_data[1].eq(0),
+            self.event_data[2].eq(0),
+        ]
+
+        with m.Switch(self.instr[27:32]):
+            with m.Case(ChurchOpcode.LOAD):
+                m.d.comb += [
+                    self.event_count.eq(2),
+                    self.event_type[0].eq(events["LOAD_SHADOW"]),
+                    self.event_data[0].eq(self.load_shadow_gt),
+                    self.event_type[1].eq(events["LOAD_NEW"]),
+                    self.event_data[1].eq(self.load_new_gt),
+                ]
+            with m.Case(ChurchOpcode.CHANGE):
+                m.d.comb += [
+                    self.event_count.eq(3),
+                    self.event_type[0].eq(events["CHANGE_PUSH"]),
+                    self.event_type[1].eq(events["CHANGE_CR12"]),
+                    self.event_data[1].eq(self.cr12_gt),
+                    self.event_type[2].eq(events["CHANGE_CR5"]),
+                    self.event_data[2].eq(self.cr5_gt),
+                ]
+            with m.Case(ChurchOpcode.CALL, ChurchOpcode.ELOADCALL,
+                        ChurchOpcode.XLOADLAMBDA):
+                m.d.comb += [
+                    self.event_count.eq(3),
+                    self.event_type[0].eq(events["CALL_CR6"]),
+                    self.event_data[0].eq(self.cr6_gt),
+                    self.event_type[1].eq(events["CALL_CR14"]),
+                    self.event_data[1].eq(self.cr14_gt),
+                    self.event_type[2].eq(events["CALL_PUSH"]),
+                ]
+            with m.Case(ChurchOpcode.RETURN):
+                m.d.comb += [
+                    self.event_count.eq(3),
+                    self.event_type[0].eq(events["RETURN_POP"]),
+                    self.event_type[1].eq(events["RETURN_CR6"]),
+                    self.event_data[1].eq(self.cr6_gt),
+                    self.event_type[2].eq(events["RETURN_CR14"]),
+                    self.event_data[2].eq(self.cr14_gt),
+                ]
+
+        return m
+
+
+# ── Bitstream build version ────────────────────────────────────────────────────
+# Baked into the 4th byte of the boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
+# Increment this by 1 every time a new bitstream is synthesised and flashed.
+# The bridge reports it to the IDE so the FPGA status page can confirm exactly
+# which build is running — no need to reprogram just to check.
+WUKONG_BUILD_VERSION = 20  # CapabilityTest boot default + corrected ISUB carry
+# A board advertising this build (or newer) supports M6 round-robin Thread
+# selection for projected multi-Thread uploads.  Keep this explicit rather
+# than treating any arbitrary future build number as an accidental capability.
+WUKONG_THREAD_SCHEDULER_MIN_BUILD = 18
+
+# ── Wukong ROM: 3-instruction BOOT_PROGRAM ────────────────────────────────────
+# Architecture doc:             docs/wukong-boot.md
+# BOOT_PROGRAM (3 words) — minimal boot microcode that calls into DMEM:
+#   [0] LOAD CR15, CR15[0]  → load NS root into CR15  (M-elevated during boot)
+#   [1] CHANGE              → load Thread lump; CR6 ← boot c-list at byte 0x400
+#   [2] CALL CR0, CR0[0]    → Thread.caps[0] = factory SelfTest E-GT
+#                              (0x4A000006), matching the simulator lightning bolt.
+#                              An IDE boot-image upload may replace it with the
+#                              user's selected entry.
+# [3] BRANCH -1  → infinite loop guard: if SelfTest ever returns, spin here
+#                   safely until an IRQ fires to load a user program.
+#                   Without this, word 3 is 0x00000000 (a zero-encoded instruction)
+#                   which causes an immediate fault, wiping all CRs and looping
+#                   the entire boot sequence with NULL GTs — the fault LED lights.
+# [4..1023] = 0
+#
+# WukongCallHome remains in the namespace at slot 7 as a selectable abstraction
+# but is no longer the hardwired default CALL target.
+# The WukongCallHome LUMP body is placed in dmem_init below at byte 0x1200.
+_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+_WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [_BRANCH_MINUS_1] + [0] * (1024 - 4)
+_WUKONG_BOOT_WINDOW_BYTES = 4 * 4
+
+# ── Synthesis-time LUMP overflow guard ────────────────────────────────────────
+# WukongCallHome LUMP alloc = 128 words (n_minus_6=1 → 2^7).
+# header (1 word) + code (WUKONG_NUC_PROGRAM) must fit.
+assert len(WUKONG_NUC_PROGRAM) <= 127, (
+    f"WUKONG_NUC_PROGRAM has grown to {len(WUKONG_NUC_PROGRAM)} instructions; "
+    f"header + code = {1 + len(WUKONG_NUC_PROGRAM)} words exceeds 128-word alloc. "
+    "Bump n_minus_6 to 2 (alloc=256) and update WUKONG_DEMO_NAMESPACE slot 7 lim17."
+)
+
+# ── WUKONG_N_INIT — expected init_rom size (number of non-zero DMEM words) ────
+# This replicates the hw_init_pairs count computed inside elaborate() so tests
+# can assert it without running Amaranth elaboration.
+#
+# Derivation:
+#   WUKONG_DEMO_NAMESPACE  — 8 NS slots (32 words, partial occupancy)
+#   WUKONG_DEMO_CLIST      — 11 c-list entries (partial occupancy)
+#   WUKONG_SELFTEST_WORDS  — 512-word canonical SelfTest LUMP body
+#   WukongCallHome header + WUKONG_NUC_PROGRAM — 74 words
+#   WUKONG_WCH_CLIST       — 8-entry WukongCallHome c-list tail
+#   Boot.Thread header words — 4 words
+#
+# If this constant diverges from what elaborate() would produce, the
+# test_wukong_init_rom_size_matches_python_source test in
+# tests/hardware/test_wukong_boot_rom_guard.py fails before synthesis.
+_wch_cw_mod = len(WUKONG_NUC_PROGRAM)
+_dmem_tmp = list(WUKONG_DEMO_NAMESPACE)
+while len(_dmem_tmp) < 256:
+    _dmem_tmp.append(0)
+_dmem_tmp += list(WUKONG_DEMO_CLIST)
+while len(_dmem_tmp) < _WUKONG_DMEM_WORDS:
+    _dmem_tmp.append(0)
+for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+    _dmem_tmp[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_IMAGE_WORDS):
+    _dmem_tmp[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
+for _i, _v in enumerate([wukong_wch_header(_wch_cw_mod)] + list(WUKONG_NUC_PROGRAM)):
+    _dmem_tmp[WUKONG_CALLHOME_BASE_WORD + _i] = _v
+for _i, _v in enumerate(WUKONG_WCH_CLIST):
+    _dmem_tmp[WUKONG_WCH_CLIST_WORD + _i] = _v
+_dmem_tmp[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
+_dmem_tmp[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
+_dmem_tmp[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+    GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
+initialize_factory_thread_root(_dmem_tmp, make_gt(
+    GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0))
+WUKONG_N_INIT = sum(1 for v in _dmem_tmp if v != 0)
+del _dmem_tmp, _wch_cw_mod
+
+
+class FaultRecoveryControl(Elaboratable):
+    """Fail-closed, frame-serialized reboot authorization.
+
+    A fault holds execution until a complete reason-2 snapshot has drained and
+    the bridge authorizes recovery. Explicit manual reboot uses the same safe
+    boundary but intentionally does not require fault-snapshot authorization.
+    """
+
+    def __init__(self):
+        self.fault_halt = Signal()
+        self.snapshot_complete = Signal()
+        self.snapshot_reason = Signal(2)
+        self.manual_reboot_cmd = Signal()
+        self.authorize_recovery_cmd = Signal()
+        self.skip_fault_cmd = Signal()
+        self.reboot_safe = Signal()
+
+        self.hold = Signal()
+        self.reboot_pulse = Signal()
+        self.skip_fault_pulse = Signal()
+        self.rearm_sentinel = Signal()
+
+        # Exposed for focused cycle-level regression tests.
+        self.fault_pending = Signal()
+        self.snapshot_drained = Signal()
+        self.manual_reboot_pending = Signal()
+        self.authorized_reboot_pending = Signal()
+        self.skip_fault_pending = Signal()
+
+    def elaborate(self, platform):
+        m = Module()
+
+        m.d.comb += [
+            self.hold.eq(self.fault_pending | self.fault_halt),
+            self.reboot_pulse.eq(
+                self.reboot_safe &
+                (self.manual_reboot_pending |
+                 self.authorized_reboot_pending)),
+            self.skip_fault_pulse.eq(
+                self.reboot_safe & self.fault_pending &
+                self.snapshot_drained & self.skip_fault_pending &
+                ~self.manual_reboot_pending &
+                ~self.authorized_reboot_pending),
+            self.rearm_sentinel.eq(self.reboot_pulse),
+        ]
+
+        with m.If(self.fault_halt):
+            m.d.sync += [
+                self.fault_pending.eq(1),
+                self.snapshot_drained.eq(0),
+            ]
+
+        with m.If(self.snapshot_complete &
+                  (self.snapshot_reason == 2) &
+                  self.fault_pending):
+            m.d.sync += self.snapshot_drained.eq(1)
+
+        with m.If(self.manual_reboot_cmd):
+            m.d.sync += self.manual_reboot_pending.eq(1)
+
+        with m.If(self.authorize_recovery_cmd &
+                  self.fault_pending & self.snapshot_drained):
+            m.d.sync += self.authorized_reboot_pending.eq(1)
+
+        # Reject pre-snapshot requests. This is deliberately stricter than
+        # merely deferring them: an operator must act on the correlated,
+        # complete fault snapshot, never a speculative fault indication.
+        with m.If(self.skip_fault_cmd & self.fault_pending &
+                  self.snapshot_drained):
+            m.d.sync += self.skip_fault_pending.eq(1)
+
+        with m.If(self.skip_fault_pulse):
+            m.d.sync += [
+                self.fault_pending.eq(0),
+                self.snapshot_drained.eq(0),
+                self.skip_fault_pending.eq(0),
+            ]
+
+        # Keep this assignment last: an explicit reboot intentionally overrides
+        # a same-cycle fault hold once the shared UART boundary is safe.
+        with m.If(self.reboot_pulse):
+            m.d.sync += [
+                self.fault_pending.eq(0),
+                self.snapshot_drained.eq(0),
+                self.manual_reboot_pending.eq(0),
+                self.authorized_reboot_pending.eq(0),
+                self.skip_fault_pending.eq(0),
+            ]
+
+        return m
+
+
+def _add_upload_fsm_states(
+        m, *, uart_valid, uart_data, up_len_bytes, up_len_cnt, up_byte_cnt,
+        up_word_buf, up_byte_in_word, upload_wr_addr_r, upload_wr_en,
+        upload_wr_addr, upload_wr_data, upload_watchdog, watchdog_limit,
+        upload_ack_req, upload_ack_accepted, debug_state):
+    """Add the production upload states to the caller's command-parser FSM."""
+    with m.State("UPLOAD_LEN"):
+        m.d.comb += debug_state.eq(1)
+        with m.If(uart_valid):
+            m.d.sync += upload_watchdog.eq(0)
+            with m.Switch(up_len_cnt):
+                for byte_index in range(4):
+                    with m.Case(byte_index):
+                        m.d.sync += [
+                            up_len_bytes[byte_index].eq(uart_data),
+                            up_len_cnt.eq(byte_index + 1),
+                        ]
+            with m.If(up_len_cnt == 3):
+                m.next = "UPLOAD_LEN_COMMIT"
+        with m.Else():
+            m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
+            with m.If(upload_watchdog == watchdog_limit - 1):
+                m.d.sync += upload_watchdog.eq(0)
+                m.next = "IDLE"
+
+    with m.State("UPLOAD_LEN_COMMIT"):
+        m.d.comb += debug_state.eq(2)
+        up_len_val = Signal(32, name="up_len_val")
+        m.d.comb += up_len_val.eq(
+            Cat(up_len_bytes[3], up_len_bytes[2],
+                up_len_bytes[1], up_len_bytes[0]))
+        with m.If((up_len_val == 0) | (up_len_val > 65536)):
+            m.next = "IDLE"
+        with m.Else():
+            m.d.sync += [
+                up_byte_cnt.eq(up_len_val[0:17]),
+                up_byte_in_word.eq(0),
+                upload_wr_addr_r.eq(0),
+            ]
+            m.next = "UPLOAD_DATA"
+
+    with m.State("UPLOAD_DATA"):
+        m.d.comb += debug_state.eq(3)
+        with m.If(uart_valid):
+            m.d.sync += upload_watchdog.eq(0)
+            with m.Switch(up_byte_in_word):
+                with m.Case(0):
+                    m.d.sync += up_word_buf[0].eq(uart_data)
+                with m.Case(1):
+                    m.d.sync += up_word_buf[1].eq(uart_data)
+                with m.Case(2):
+                    m.d.sync += up_word_buf[2].eq(uart_data)
+            with m.If(up_byte_in_word == 3):
+                m.d.comb += [
+                    upload_wr_en.eq(1),
+                    upload_wr_addr.eq(upload_wr_addr_r),
+                    upload_wr_data.eq(
+                        Cat(uart_data, up_word_buf[2],
+                            up_word_buf[1], up_word_buf[0])),
+                ]
+                m.d.sync += upload_wr_addr_r.eq(upload_wr_addr_r + 1)
+            m.d.sync += up_byte_cnt.eq(up_byte_cnt - 1)
+            with m.If(up_byte_cnt == 1):
+                m.next = "UPLOAD_ACK"
+            with m.Else():
+                m.d.sync += up_byte_in_word.eq(
+                    Mux(up_byte_in_word == 3, 0, up_byte_in_word + 1))
+        with m.Else():
+            m.d.sync += upload_watchdog.eq(upload_watchdog + 1)
+            with m.If(upload_watchdog == watchdog_limit - 1):
+                m.d.sync += upload_watchdog.eq(0)
+                m.next = "IDLE"
+
+    with m.State("UPLOAD_ACK"):
+        m.d.comb += [
+            debug_state.eq(4),
+            upload_ack_req.eq(1),
+        ]
+        with m.If(upload_ack_accepted):
+            m.next = "IDLE"
+
+
+class ChurchWukongXC7A100T(Elaboratable):
+    """Minimal Church Machine top-level for QMTECH Wukong XC7A100T.
+
+    Parameters
+    ----------
+    clk_freq : int
+        Input clock frequency in Hz.  Default 50 000 000 (50 MHz oscillator at M21).
+    baud : int
+        UART baud rate.  Default 57 600 — matches CH340 callhome bridge.
+        UartTx computes divisor = clk_freq // baud = 50_000_000 // 57_600 = 868 (0.006% error).
+    sim_mode : bool
+        Enables direct simulator clocking and a test-only fault-injection input.
+    build_sig : list[int] | None
+        Optional 4-byte build signature (unused in this minimal build).
+
+    Ports
+    -----
+    clk          in  50 MHz oscillator (M21, SRCC bank 34 — hardware confirmed)
+    rst_n        in  Active-low push button (M6)  — reserved, not yet wired
+    led          out [2] Physical LED outputs (G21, G20), ACTIVE-LOW
+    uart_tx_pin  out UART TX (E3, bank 34, LVCMOS33) — idles HIGH; 8N1 at `baud`
+    """
+
+    def __init__(self, clk_freq=50_000_000, baud=57_600, sim_mode=False, build_sig=None,
+                 button_debounce_cycles=None, sim_dmem_init=True,
+                 upload_watchdog_limit=None, sim_upload_only=False):
+        self.clk_freq = clk_freq
+        self.baud     = baud
+        self.sim_mode = sim_mode
+        self.sim_dmem_init = sim_dmem_init
+        self.upload_watchdog_limit = upload_watchdog_limit
+        self.sim_upload_only = sim_upload_only
+        self.button_debounce_cycles = (
+            button_debounce_cycles if button_debounce_cycles is not None
+            else (4 if sim_mode else 50_000))
+
+        self.clk          = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
+        self.rst_n        = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
+        self.uart_tx_pin  = Signal(init=1)  # UART TX (E3) — idles HIGH
+        self.uart_rx_pin  = Signal(init=1)  # UART RX (F3) — idles HIGH; step/run/halt/bp cmds
+        # Test-only input. It is ignored in hardware builds (sim_mode=False)
+        # and lets the full-top UART regression exercise the real fault capture
+        # and recovery sequencer without corrupting production boot memory.
+        self.sim_fault_inject = Signal()
+
+        self.led = [Signal(name=f"led{i}") for i in range(2)]
+
+        # ── Internal ILA observation nets (never board ports) ─────────────────
+        # Preserve names through Yosys and Vivado for optional post-synthesis
+        # ILA insertion. UART telemetry does not depend on ILA being enabled.
+        #
+        #   dbg_boot_complete  — CM has exited the boot phase and is executing user code
+        #   dbg_fault_valid    — live CM fault signal (any fault type, any cycle)
+        #   dbg_nia[31:0]      — NIA of the most-recently retired instruction
+        #   dbg_fault[31:0]    — packed fault telemetry:
+        #                          bits[4:0]  = 0 (reserved)
+        #                          bit[5]     = retire_fault_valid (fault on this retire)
+        #                          bits[10:6] = retire_fault_code (5-bit fault type)
+        #                          bits[31:11] = fault_gt[20:0] (GT word0 upper 21 bits)
+        self.dbg_boot_complete = Signal(attrs={"keep": "true", "mark_debug": "true"})
+        self.dbg_fault_valid   = Signal(attrs={"keep": "true", "mark_debug": "true"})
+        self.dbg_nia           = Signal(32, attrs={"keep": "true", "mark_debug": "true"})
+        self.dbg_fault         = Signal(32, attrs={"keep": "true", "mark_debug": "true"})
+
+        # ── Halt-state signals — exposed for testability ───────────────────────
+        # Declared here so simulation testbenches can read them as top-level
+        # ports without needing a probe submodule.  Both are driven by elaborate().
+        self.step_mode   = Signal(init=0)  # 0 = free-run; 1 = step/halt mode
+        self.step_halted = Signal()        # 1 = CM currently held between retires
+        self.dbg_halt_state_emitted = Signal()  # halted-state UART frame drained
+        # State: 0=IDLE/other, 1=UPLOAD_LEN, 2=UPLOAD_LEN_COMMIT,
+        # 3=UPLOAD_DATA, 4=UPLOAD_ACK.
+        self.dbg_upload_state = Signal(3)
+        self.dbg_upload_watchdog = Signal(24)
+        self.dbg_upload_len_count = Signal(2)
+        self.dbg_upload_bytes_remaining = Signal(17)
+        self.dbg_upload_write_addr = Signal(14)
+        self.dbg_active_thread_slot = Signal(16)
+        self.dbg_thread_count = Signal(2, init=1)
+
+    def elaborate(self, platform):
+        if self.sim_upload_only:
+            if not self.sim_mode:
+                raise ValueError("sim_upload_only requires sim_mode=True")
+            return self._elaborate_upload_only()
+
+        m = Module()
+
+        # ── Sync clock domain ──────────────────────────────────────────────────
+        # Direct assignment — Vivado auto-infers IBUF→BUFG for the M21 SRCC pin.
+        # Do NOT use Instance("BUFG") explicitly: Vivado's opt_design drops the
+        # explicit BUFG for SRCC-sourced clocks, leaving registers without a
+        # global clock buffer.  The auto-inferred chain (clk_IBUF_BUFG) is kept.
+        #
+        # reset_less=True: Artix-7 GSR (Global Set/Reset) fires after bitstream
+        # load and initialises all FFs/BRAMs to their init values before user
+        # logic starts — no soft POR shift-register needed.  A soft rst_sr in
+        # the sync domain that drives ResetSignal("sync") self-deadlocks: under
+        # reset the register is reset to its init value (0xF) every cycle,
+        # keeping reset asserted permanently → boot_triggered never fires →
+        # both LEDs held LOW (active-LOW ON) → 4 solid red forever.
+        #
+        # sim_mode=True: skip the port-driven comb assignment so sim.add_clock()
+        # can drive ClockSignal("sync") directly without a DriverConflict.
+        # self.clk is left undriven (unused) in simulation.
+        m.domains += ClockDomain("sync", reset_less=True)
+        if not self.sim_mode:
+            m.d.comb += ClockSignal("sync").eq(self.clk)
+
+        # ── ChurchCore ─────────────────────────────────────────────────────────
+        core = m.submodules.core = ChurchCore()
+
+        # ── Boot ROM (instruction fetch — read-only BRAM tile) ─────────────────
+        boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
+        m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
+        # imem source mux: NIA 0x0-0xF fetches the three boot instructions plus
+        # the BRANCH -1 return guard from ROM; everything else fetches from DMEM
+        # via a dedicated read port (below),
+        # so the WukongCallHome LUMP body at word 1152 — and any IDE-uploaded
+        # code — actually executes.  Both sources have 1-cycle latency, so the
+        # select is registered to stay aligned with the data.
+        imem_from_dmem = Signal()
+        m.d.sync += imem_from_dmem.eq(
+            core.imem_addr >= _WUKONG_BOOT_WINDOW_BYTES)
+
+        # ── Data memory (BRAM, 16 384 × 32-bit = 64 KB) ───────────────────────
+        # init= is used for simulation accuracy only.  On real FPGA hardware the
+        # hw_init sequencer (below) writes every non-zero word via the write port
+        # before boot_start fires.
+        #
+        # Boot FSM initialises:
+        #   CR15.word1_location = 0      (NS at byte 0)
+        #   CR6.word1_location  = 0x400  (c-list at byte 0x400 = word 256)
+        #
+        # BOOT_PROGRAM[2] = CALL CR0,CR0[0] → Thread.caps[0] (WUKONG_DEMO_CLIST[0])
+        # WUKONG_DEMO_CLIST[0] and Thread.caps[0] carry the factory SelfTest E-GT.
+        #
+        # WukongCallHome LUMP (cc=0): uses CR6 to reach the boot c-list directly.
+        #   WUKONG_NUC_PROGRAM[0] = LOAD CR3, CR6[5]  → LED_DEV (clist[5])
+        #   WUKONG_NUC_PROGRAM[1] = LOAD CR4, CR6[6]  → UART_DEV (clist[6])
+        #   clist_gt_addr LED  = 0x400 + 5*4 = 0x414 = word 261 = WUKONG_DEMO_CLIST[5] ✓
+        #   clist_gt_addr UART = 0x400 + 6*4 = 0x418 = word 262 = WUKONG_DEMO_CLIST[6] ✓
+        # ── DMEM initialisation data ──────────────────────────────────────────
+        # Layout:
+        #   words   0-31  : WUKONG_DEMO_NAMESPACE (8 NS slots × 4 words)
+        #                   slot 7 lim17=127 (alloc=128 for WukongCallHome LUMP)
+        #   words  32-255 : zeros
+        #   words 256-319 : WUKONG_DEMO_CLIST (64 c-list entries)
+        #                   [0]=NULL (IDE upload sets this to ⚡ boot entry E-GT)
+        #                   [5]=LED_DEV, [6]=UART_DEV, [7]=BTN_DEV, [8]=TIMER_DEV
+        #                   [9]=0, [10]=0  (SlideRule/Constants absent in 8-slot NS)
+        #   words 320-383 : zeros
+        #   words 384-895 : canonical SelfTest LUMP (512 words)
+        #   words 896-1151: Boot.Thread LUMP (256-word allocation)
+        #   words 1152-1279: WukongCallHome LUMP (128-word allocation)
+        #   words 1280+   : zeros
+        #
+        # The LUMP body is derived from WUKONG_NUC_PROGRAM at module-load time, so
+        # any future change to WUKONG_NUC_PROGRAM propagates automatically.
+        # The overflow guard at the top of this file catches length growth.
+        dmem_init = list(WUKONG_DEMO_NAMESPACE)    # words 0-31
+        while len(dmem_init) < 256:
+            dmem_init.append(0)                    # words 32-255 = zero
+        dmem_init += list(WUKONG_DEMO_CLIST)       # words 256-319: full c-list
+        while len(dmem_init) < _WUKONG_DMEM_WORDS:
+            dmem_init.append(0)
+
+        # Canonical SelfTest LUMP at DMEM byte 0x0600 = word 384.
+        for _i, _v in enumerate(WUKONG_SELFTEST_WORDS):
+            dmem_init[WUKONG_SELFTEST_BASE_WORD + _i] = _v
+
+        # Factory first abstraction. Its final ELOADCALL enters the resident
+        # SelfTest at slot 6, so both LUMPs remain present in the image.
+        for _i, _v in enumerate(WUKONG_CAPABILITY_TEST_IMAGE_WORDS):
+            dmem_init[WUKONG_CAPABILITY_TEST_BASE_WORD + _i] = _v
+
+        # WukongCallHome LUMP body at DMEM byte 0x1200 = word 1152.
+        # cc=8 → c-list tail at lump words 120-127 ([5]=LED, [6]=UART); the
+        # hardware CALL derives CR6 from the called lump's own header, so a
+        # malformed c-list would make its first LOAD fault NULL_CAP.
+        _wch_cw = len(WUKONG_NUC_PROGRAM)               # 73 — auto-tracks changes
+        for _i, _v in enumerate([wukong_wch_header(_wch_cw)] + list(WUKONG_NUC_PROGRAM)):
+            dmem_init[WUKONG_CALLHOME_BASE_WORD + _i] = _v
+        for _i, _v in enumerate(WUKONG_WCH_CLIST):
+            dmem_init[WUKONG_WCH_CLIST_WORD + _i] = _v
+
+        # Boot.Thread lump at byte 0xE00 (word 896) — see boot_rom.py for the
+        # relocation rationale (a base-0 Thread lump collides with the NS
+        # table: protected Thread STO is NS slot 4 word1).
+        #   header  : valid lump header (size=256, sw=32, cc=12)
+        #   STO     : SZ=1, STO=241, with the validated poison root at +242/+243
+        #   caps[0] : SelfTest E-GT (NS slot 6) — the ⚡ boot entry.
+        #             BOOT_PROGRAM[2] = CALL CR0,CR0[0] resolves THIS word.
+        # CR12 is installed from its permissionless GT by boot CHANGE.
+        dmem_init[WUKONG_THREAD_BASE_WORD]   = WUKONG_THREAD_HEADER
+        dmem_init[WUKONG_THREAD_STO_WORD]    = WUKONG_THREAD_STO_INIT
+        dmem_init[WUKONG_THREAD_CAPS0_WORD] = make_gt(
+            GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0)
+        initialize_factory_thread_root(dmem_init, make_gt(
+            GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0))
+        # Words 0x47A..0x47F remain zero (padding to 128-word init boundary).
+
+        hw_init_pairs = [(addr, val)
+                         for addr, val in enumerate(dmem_init) if val != 0]
+
+        # N_INIT is computed here (before the UART mux) so C(N_INIT & 0xFF, 8)
+        # is available when the boot sentinel mux is elaborated.  The boot FSM
+        # below initializes the same ordered pairs through a clocked ROM.
+        N_INIT = len(hw_init_pairs)
+
+        # The hardware init sequencer below writes every non-zero word before
+        # boot_start, so synthesis does not need to elaborate the complete
+        # 16K-word Python initializer. Keep it for sim_mode accuracy, where
+        # tests inspect memory immediately after elaboration.
+        dmem = m.submodules.dmem = LibMemory(
+            shape=unsigned(32), depth=_WUKONG_DMEM_WORDS,
+            init=dmem_init if self.sim_mode and self.sim_dmem_init else [])
+        dmem_rd = dmem.read_port(domain="sync")
+        # Independent synchronous read port for the stop-state snapshot.
+        # The snapshot is emitted only while the CM is halted, so this port
+        # cannot race an architectural write.
+        snapshot_mem_rd = dmem.read_port(domain="sync")
+        dmem_wr = dmem.write_port()
+
+        # Dedicated instruction-fetch read port (BRAM port; Vivado duplicates
+        # the BRAM to satisfy 3 ports — both copies share the write port, so
+        # IDE uploads stay coherent with executed code).
+        imem_rd = dmem.read_port(domain="sync")
+        m.d.comb += [
+            imem_rd.addr.eq(core.imem_addr[2:16]),
+            core.imem_data.eq(Mux(imem_from_dmem, imem_rd.data, boot_rom.data)),
+        ]
+
+        # ── Memory address mux ─────────────────────────────────────────────────
+        mem_addr = Signal(14)
+        with m.If(core.ns_rd_en | core.ns_wr_en):
+            m.d.comb += mem_addr.eq(core.ns_addr[2:16])
+        with m.Elif(core.clist_rd_en | core.clist_wr_en):
+            m.d.comb += mem_addr.eq(core.clist_addr[2:16])
+        with m.Else():
+            m.d.comb += mem_addr.eq(core.dmem_addr[2:16])
+
+        m.d.comb += [
+            dmem_rd.addr.eq(mem_addr),
+            core.ns_rd_data.eq(Cat(dmem_rd.data, C(0, 96))),
+            core.clist_rd_data.eq(dmem_rd.data),
+        ]
+
+        # ── UART TX ────────────────────────────────────────────────────────────
+        # UartTx(50 MHz, 57600 baud) — 8N1 active-high idle, matches CH340 bridge.
+        # MMIO register 5 write = TX: one-cycle start pulse triggers byte transmit.
+        # MMIO register 6 read  = STATUS: bit[0] = tx_busy (poll before next byte).
+        # MMIO register 7 read  = RX: always 0 (unused; F3 RX handled by UartRx below).
+        uart_tx = m.submodules.uart_tx = UartTx(clk_freq=self.clk_freq, baud=self.baud)
+        m.d.comb += self.uart_tx_pin.eq(uart_tx.tx)
+
+        # ── UART RX ────────────────────────────────────────────────────────────
+        # Receives step/run/halt/breakpoint commands from wukong_bridge.py.
+        # F3 = IO_L5N_T0_34, bank 34, LVCMOS33 — complementary to TX on E3.
+        # Two-stage synchroniser is built into UartRx (rx_sync register).
+        uart_rx = m.submodules.uart_rx = UartRx(clk_freq=self.clk_freq, baud=self.baud)
+        m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
+
+        # ── Trace TX arbitration signals ───────────────────────────────────────
+        # trace_tx_req / trace_tx_byte are driven by the TraceUnit FSM below.
+        # CM MMIO reg-5 writes always win over trace bytes.
+        trace_tx_req  = Signal()   # TraceUnit wants to send a byte
+        trace_tx_byte = Signal(8)  # byte from TraceUnit
+        snapshot_tx_req = Signal()
+        snapshot_tx_byte = Signal(8)
+        snapshot_tx_ack = Signal()
+        snapshot_complete = Signal()
+        snapshot_complete_reason = Signal(2)
+        # Board-state evidence frame, emitted only after an explicit Halt has
+        # been applied to step_mode/step_halted:
+        #   AD 01 01 01 AC
+        # magic, version, state=halted, reason=explicit-halt, XOR checksum.
+        halt_state_pending = Signal()
+        halt_state_phase = Signal(3)
+        halt_state_nonce = Signal(8)
+        halt_cmd_wait_nonce = Signal()
+        halt_nonce_wait_cycles = Signal(20)
+        halt_state_req = Signal()
+        halt_state_byte = Signal(8)
+        halt_state_ack = Signal()
+        # trace_stall: asserted by TraceUnit while events are pending.
+        # OR-ed into halt_req/imem_valid so the CM cannot retire the next
+        # instruction until the TraceUnit drains all queued event packets.
+        trace_stall   = Signal()   # backpressure: stall CM while events pending
+
+        # ── Upload FSM signals (declared early — used in UART TX mux and dmem_wr) ──
+        # These are driven by the upload FSM states (UPLOAD_LEN / UPLOAD_DATA /
+        # UPLOAD_ACK) added to the cmd_parser FSM below.  They must be declared
+        # before the UART TX arbitrator and the dmem_wr write-port selector, both
+        # of which reference them as Python variables.
+        up_len_bytes    = [Signal(8,  name=f"up_len_b{i}") for i in range(4)]
+        up_len_cnt      = Signal(2)   # length-header bytes received so far (0-3)
+        up_byte_cnt     = Signal(17)  # payload bytes still to receive (max 65536)
+        up_word_buf     = [Signal(8,  name=f"up_wb{i}") for i in range(3)]
+        # up_word_buf[0..2] buffer bytes 0-2 (MSB first); byte 3 comes from uart_rx.data
+        up_byte_in_word = Signal(2)   # position within current 4-byte word (0=MSB, 3=LSB)
+        upload_wr_addr_r = Signal(14) # registered DMEM word address for next write
+        upload_wr_en    = Signal()    # combinatorial: write one word to DMEM this cycle
+        upload_wr_addr  = Signal(14)  # combinatorial: target DMEM word address
+        upload_wr_data  = Signal(32)  # combinatorial: 32-bit word to write (big-endian)
+        upload_ack_req  = Signal()    # asserted in UPLOAD_ACK; drives 0x06 onto TX
+        # Watchdog: aborts UPLOAD_LEN/UPLOAD_DATA if no byte arrives for
+        # _UPLOAD_WATCHDOG_LIMIT cycles.  Protects against stuck states when the
+        # UART drops bytes mid-frame (so the RTL does not remain in UPLOAD_DATA
+        # indefinitely, treating any future command bytes as DMEM payload).
+        # Threshold = 20 × one-byte period; safe floor of 1000 cycles.
+        # 20 complete 8N1 byte periods (= 20 × 10 bit-periods each).
+        # At 57 600 baud / 50 MHz: 1 byte = 10 × 868 = 8 680 cycles;
+        # 20 bytes = 173 600 cycles ≈ 3.5 ms.  This is comfortably wider than
+        # any normal inter-byte gap on a local USB-serial link, while still
+        # allowing the board to recover quickly after a truncated upload.
+        _UPLOAD_WATCHDOG_LIMIT = (
+            self.upload_watchdog_limit
+            if self.upload_watchdog_limit is not None
+            else max(self.clk_freq // self.baud * 10 * 20, 1000))
+        upload_watchdog = Signal(range(_UPLOAD_WATCHDOG_LIMIT + 1))
+        m.d.comb += [
+            self.dbg_upload_state.eq(0),
+            self.dbg_upload_watchdog.eq(upload_watchdog),
+            self.dbg_upload_len_count.eq(up_len_cnt),
+            self.dbg_upload_bytes_remaining.eq(up_byte_cnt),
+            self.dbg_upload_write_addr.eq(upload_wr_addr_r),
+        ]
+
+        # ── Boot-triggered / sentinel signals (declared early for arbitrator) ──
+        # boot_triggered is driven by the boot FSM below; sentinel_sent latches
+        # after all sentinel bytes have been accepted by the UART TX.
+        #
+        # Four-byte boot sentinel: 0xBC  N_INIT&0xFF  TU_VERSION  BUILD_VERSION
+        #   0xBC          — magic: new-format sentinel (old bitstreams emit 0xBB 2-byte sentinel)
+        #   N_INIT&0xFF   — count of non-zero DMEM words written by hw_init sequencer
+        #   TU_VERSION    — TraceUnit FSM capability version (see _TU_VERSION_* below)
+        #   BUILD_VERSION — monotonically increasing build identifier baked in at
+        #                   synthesis time; lets the IDE/bridge confirm exactly which
+        #                   bitstream is running without reprogramming.  Increment
+        #                   WUKONG_BUILD_VERSION in wukong_top.py for every new build.
+        #
+        # TU_VERSION constants (must match wukong_bridge.py TU_VERSION_* constants):
+        #   0x02 = TraceUnit emits 3-packet CALL sequence (CALL_CR6/CALL_CR14/CALL_PUSH)
+        #          for ELOADCALL and XLOADLAMBDA — current FSM capability level.
+        #
+        # Old bitstreams (pre-v2 TraceUnit) emit 0xBB N_INIT (2 bytes only).
+        # The bridge detects 0xBB and warns the user that ELOADCALL/XLOADLAMBDA
+        # will silently show wrong CR6/CR14 state (only RESULT is emitted).
+        #
+        # The N_INIT byte is baked in at synthesis time from hw_init_pairs.
+        # The bridge (wukong_bridge.py) reads this byte and compares it against
+        # the count computed from the current boot_rom.py tables.  A mismatch
+        # means the bitstream was built with a different WUKONG_DEMO_NAMESPACE /
+        # WUKONG_DEMO_CLIST than the one currently in source — stale bitstream.
+        _TU_VERSION_CALL_3PKT = 0x02  # TraceUnit emits CALL_CR6/CR14/PUSH for ELOADCALL+XLOADLAMBDA
+        _BUILD_VERSION = WUKONG_BUILD_VERSION  # baked into sentinel byte 4; increment per build
+        boot_triggered  = Signal()
+        sentinel_sent   = Signal()
+        sentinel_phase  = Signal(2)  # 0=0xBC, 1=N_INIT, 2=TU_VERSION, 3=BUILD_VERSION
+
+        # ── Hardware boot banner (declared early; driven by boot FSM below) ─────
+        # Sends "WUKONG\r\n" via UART TX during Phase 2.5 — after hw_init writes
+        # complete but BEFORE boot_start fires.  This gives hardware-level
+        # confirmation that the FPGA is alive and UART TX works, completely
+        # independent of whether the CM executes any instructions correctly.
+        # hw_init_done is also declared here (not in the boot FSM) so the UART
+        # arbitrator below can reference it.
+        _BANNER_BYTES = [ord(c) for c in "WUKONG\r\n"]
+        _N_BANNER = len(_BANNER_BYTES)   # 8
+
+        hw_init_done  = Signal()         # registered: set 1 cycle after last hw_init write
+        banner_idx    = Signal(range(_N_BANNER + 1), init=0)
+        # sim_mode=True: pre-set banner_done so Phase 2.5 is skipped entirely.
+        # The banner takes ~4320 simulation cycles (8 UART bytes × 540 cycles/byte
+        # at div=53), which breaks the hw_init timing test that only allows
+        # 17+N_INIT cycles.  Hardware synthesis is unaffected (sim_mode=False).
+        banner_done   = Signal(init=1 if self.sim_mode else 0)
+
+        # ── MMIO decode ────────────────────────────────────────────────────────
+        # MMIO range: bit[30]=1, bit[31]=0  →  addresses 0x40000000–0x7FFFFFFF
+        # Registers (word-addressed, reg = addr[2:6] = bits[5:2]):
+        #   0  LED0_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[0]  (G21, ACTIVE-LOW)
+        #   1  LED1_RGB   bits[2:0]={B,G,R}; bit 0 = R → led[1]  (G20, ACTIVE-LOW)
+        #   2  LED2_RGB   (no physical pin on this minimal build)
+        #   5  UART.TX    write: byte[7:0] → start UART TX (8N1, 57600 baud, E3)
+        #   6  UART.STATUS read: bit[0]=tx_busy (poll before each TX write)
+        #   7  UART.RX    read: 0 (RX not implemented in V2)
+        #  11  TIMER.TICKS_LO   32-bit free-running counter, low word
+        #  12  TIMER.TICKS_HI   32-bit free-running counter, high word
+        #  13  TIMER.TOD_EPOCH  Unix seconds (R/W, set by IDE at boot)
+        #  14  TIMER.ALARM_CMP  alarm compare vs TICKS_LO (R/W)
+        #  15  TIMER.ALARM_CTL  [0]=arm [1]=fired; write 1→[1] to clear (R/W)
+        is_mmio = Signal()
+        m.d.comb += is_mmio.eq(core.dmem_addr[30] & ~core.dmem_addr[31])
+        mmio_reg_sel = Signal(4)
+        m.d.comb += mmio_reg_sel.eq(core.dmem_addr[2:6])
+
+        mmio_led_reg = [Signal(3, name=f"mmio_led{i}") for i in range(3)]
+
+        timer_lo    = Signal(32)
+        timer_hi    = Signal(32)
+        tod_epoch   = Signal(32)
+        alarm_cmp   = Signal(32)
+        alarm_armed = Signal()
+        alarm_fired = Signal()
+
+        m.d.sync += timer_lo.eq(timer_lo + 1)
+        with m.If(timer_lo == 0xFFFFFFFF):
+            m.d.sync += timer_hi.eq(timer_hi + 1)
+        with m.If(alarm_armed & ~alarm_fired):
+            with m.If(timer_lo == alarm_cmp):
+                m.d.sync += alarm_fired.eq(1)
+
+        is_mmio_write = Signal()
+        m.d.comb += is_mmio_write.eq(is_mmio & core.dmem_wr_en)
+
+        with m.If(is_mmio_write):
+            with m.Switch(mmio_reg_sel):
+                for i in range(3):
+                    with m.Case(i):
+                        m.d.sync += mmio_led_reg[i].eq(core.dmem_wr_data[:3])
+                with m.Case(13):
+                    m.d.sync += tod_epoch.eq(core.dmem_wr_data)
+                with m.Case(14):
+                    m.d.sync += alarm_cmp.eq(core.dmem_wr_data)
+                with m.Case(15):
+                    with m.If(core.dmem_wr_data[0]):
+                        m.d.sync += alarm_armed.eq(1)
+                    with m.If(core.dmem_wr_data[1]):
+                        m.d.sync += alarm_fired.eq(0)
+
+        # ── UART TX arbitrator ─────────────────────────────────────────────────
+        # Priority (highest to lowest):
+        #   1. CM MMIO reg-5 write       — cm_tx_start
+        #   2. HW boot banner            — "WUKONG\r\n", sent before boot_start
+        #   3. Boot sentinel (4 bytes)   — 0xBC, N_INIT, TU_VERSION, BUILD_VERSION
+        #   4. Halt state evidence       — fixed 5-byte 0xAD frame
+        #   5. TraceUnit packets         — fill remaining idle TX cycles
+        #
+        # cm_tx_start is the raw CM write signal; used by the TraceUnit to avoid
+        # colliding with in-flight CM bytes.
+        cm_tx_start = Signal()
+        m.d.comb += cm_tx_start.eq(is_mmio_write & (mmio_reg_sel == 5))
+
+        # ── Banner request logic ──────────────────────────────────────────────
+        # banner_req is active in Phase 2.5: hw_init done, banner not yet sent,
+        # boot not yet triggered (so CM is definitely idle).
+        banner_req  = Signal()
+        banner_byte = Signal(8)
+        m.d.comb += banner_req.eq(hw_init_done & ~banner_done & ~boot_triggered)
+        with m.Switch(banner_idx):
+            for i, b in enumerate(_BANNER_BYTES):
+                with m.Case(i):
+                    m.d.comb += banner_byte.eq(C(b, 8))
+            with m.Default():
+                m.d.comb += banner_byte.eq(0)
+        # tx_free: UART TX can accept a new byte THIS cycle.  ~busy alone is
+        # NOT sufficient: UartTx has a one-cycle DONE state (busy=0, done=1)
+        # during which `start` is ignored — a requester that advances its
+        # byte counter on `~busy` double-increments across that cycle and
+        # silently skips every other byte (bug: sentinel came out as
+        # 0xBC TU_VERSION instead of 0xBC N_INIT TU_VERSION BUILD_VERSION).
+        tx_free = Signal()
+        m.d.comb += tx_free.eq(~uart_tx.busy & ~uart_tx.done)
+
+        # Advance banner on each accepted byte (start pulse fired = accepted)
+        with m.If(banner_req & tx_free & ~cm_tx_start):
+            with m.If(banner_idx == _N_BANNER - 1):
+                m.d.sync += [banner_done.eq(1), banner_idx.eq(0)]
+            with m.Else():
+                m.d.sync += banner_idx.eq(banner_idx + 1)
+
+        # sentinel_req: active until all four sentinel bytes are accepted.
+        # sentinel_phase=0 → send 0xBC; =1 → send N_INIT&0xFF;
+        #               =2 → send TU_VERSION; =3 → send BUILD_VERSION.
+        # After the fourth byte is accepted, sentinel_sent latches and req drops.
+        # 'f' command clears sentinel_sent so the full 4-byte sequence re-fires.
+        # The instruction-fetch gate below holds the CM until this request
+        # drains.  That makes a manual or fault-recovery reboot announce its
+        # complete identity before a newly restarted program can claim UART TX.
+        sentinel_req = Signal()
+        m.d.comb += sentinel_req.eq(boot_triggered & ~sentinel_sent)
+        with m.If(sentinel_req & tx_free & ~cm_tx_start & ~banner_req):
+            with m.If(sentinel_phase == 0):
+                m.d.sync += sentinel_phase.eq(1)   # 0xBC accepted → queue N_INIT byte
+            with m.Elif(sentinel_phase == 1):
+                m.d.sync += sentinel_phase.eq(2)   # N_INIT byte accepted → queue TU_VERSION
+            with m.Elif(sentinel_phase == 2):
+                m.d.sync += sentinel_phase.eq(3)   # TU_VERSION accepted → queue BUILD_VERSION
+            with m.Else():
+                m.d.sync += sentinel_sent.eq(1)    # BUILD_VERSION byte accepted → done
+
+        trace_tx_ack = Signal()  # TraceUnit byte accepted (one-cycle ack)
+        m.d.comb += halt_state_req.eq(halt_state_pending)
+        with m.Switch(halt_state_phase):
+            with m.Case(0):
+                m.d.comb += halt_state_byte.eq(0xAD)
+            with m.Case(1):
+                m.d.comb += halt_state_byte.eq(0x01)
+            with m.Case(2):
+                m.d.comb += halt_state_byte.eq(0x01)
+            with m.Case(3):
+                m.d.comb += halt_state_byte.eq(0x01)
+            with m.Case(4):
+                m.d.comb += halt_state_byte.eq(halt_state_nonce)
+            with m.Default():
+                m.d.comb += halt_state_byte.eq(0xAC ^ halt_state_nonce)
+        m.d.comb += halt_state_ack.eq(
+            halt_state_req & tx_free & ~cm_tx_start & ~sentinel_req &
+            ~banner_req & ~upload_ack_req)
+        with m.If(halt_state_ack):
+            with m.If(halt_state_phase == 5):
+                m.d.sync += [
+                    halt_state_pending.eq(0),
+                    halt_state_phase.eq(0),
+                    self.dbg_halt_state_emitted.eq(1),
+                ]
+            with m.Else():
+                m.d.sync += halt_state_phase.eq(halt_state_phase + 1)
+        m.d.comb += [
+            uart_tx.data.eq(
+                Mux(cm_tx_start,                              core.dmem_wr_data[0:8],
+                Mux(banner_req,                                banner_byte,
+                Mux(sentinel_req & (sentinel_phase == 0),    C(0xBC, 8),
+                Mux(sentinel_req & (sentinel_phase == 1),    C(N_INIT & 0xFF, 8),
+                Mux(sentinel_req & (sentinel_phase == 2),    C(_TU_VERSION_CALL_3PKT, 8),
+                Mux(sentinel_req & (sentinel_phase == 3),    C(_BUILD_VERSION & 0xFF, 8),
+                Mux(upload_ack_req,                          C(0x06, 8),
+                Mux(halt_state_req,                          halt_state_byte,
+                Mux(snapshot_tx_req,                         snapshot_tx_byte,
+                                                               trace_tx_byte))))))))))  ,
+            uart_tx.start.eq(
+                cm_tx_start |
+                (banner_req      & tx_free & ~cm_tx_start) |
+                (sentinel_req    & tx_free & ~cm_tx_start & ~banner_req) |
+                (upload_ack_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req) |
+                (halt_state_req  & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req) |
+                (snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req & ~upload_ack_req & ~halt_state_req) |
+                (trace_tx_req    & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
+                 ~upload_ack_req & ~halt_state_req & ~snapshot_tx_req)),
+            trace_tx_ack.eq(
+                trace_tx_req & tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req &
+                ~upload_ack_req & ~halt_state_req & ~snapshot_tx_req),
+            snapshot_tx_ack.eq(
+                snapshot_tx_req & tx_free & ~cm_tx_start & ~sentinel_req &
+                ~banner_req & ~upload_ack_req & ~halt_state_req),
+        ]
+
+        is_mmio_read = Signal()
+        m.d.comb += is_mmio_read.eq(is_mmio & core.dmem_rd_en)
+
+        mmio_rd_data = Signal(32)
+        with m.Switch(mmio_reg_sel):
+            for i in range(3):
+                with m.Case(i):
+                    m.d.comb += mmio_rd_data.eq(mmio_led_reg[i])
+            with m.Case(6):
+                # UART STATUS: bit[0] = tx_busy  (poll before each TX write)
+                m.d.comb += mmio_rd_data.eq(Cat(uart_tx.busy, C(0, 31)))
+            with m.Case(7):
+                # UART RX: not implemented in V2; always returns 0
+                m.d.comb += mmio_rd_data.eq(0)
+            with m.Case(11):
+                m.d.comb += mmio_rd_data.eq(timer_lo)
+            with m.Case(12):
+                m.d.comb += mmio_rd_data.eq(timer_hi)
+            with m.Case(13):
+                m.d.comb += mmio_rd_data.eq(tod_epoch)
+            with m.Case(14):
+                m.d.comb += mmio_rd_data.eq(alarm_cmp)
+            with m.Case(15):
+                m.d.comb += mmio_rd_data.eq(Cat(alarm_armed, alarm_fired, C(0, 30)))
+            with m.Default():
+                m.d.comb += mmio_rd_data.eq(0)
+
+        m.d.comb += core.dmem_rd_data.eq(Mux(is_mmio_read, mmio_rd_data, dmem_rd.data))
+
+        # ── dmem_rd_valid ──────────────────────────────────────────────────────
+        # BRAM read has 1-cycle latency; MMIO reads are combinatorial.
+        _dmem_rd_valid_r = Signal()
+        m.d.sync += _dmem_rd_valid_r.eq(core.dmem_rd_en & ~is_mmio)
+        m.d.comb += core.dmem_rd_valid.eq(_dmem_rd_valid_r | is_mmio_read)
+
+        # ── hw_init sequencer write path ───────────────────────────────────────
+        # Writes every non-zero DMEM word (one per cycle) before boot_start.
+        # Takes priority over the CPU write path (CPU is idle until boot_complete).
+        hw_init_wr_en   = Signal()
+        hw_init_wr_addr = Signal(14)
+        hw_init_wr_data = Signal(32)
+
+        # ── Memory write path ──────────────────────────────────────────────────
+        cpu_wr_data = Signal(32)
+        cpu_wr_en   = Signal()
+        with m.If(core.ns_wr_en):
+            m.d.comb += [cpu_wr_data.eq(core.ns_wr_data[:32]), cpu_wr_en.eq(1)]
+        with m.Elif(core.clist_wr_en):
+            m.d.comb += [cpu_wr_data.eq(core.clist_wr_data), cpu_wr_en.eq(1)]
+        with m.Elif(~is_mmio):
+            m.d.comb += [cpu_wr_data.eq(core.dmem_wr_data), cpu_wr_en.eq(core.dmem_wr_en)]
+
+        with m.If(hw_init_wr_en):
+            m.d.comb += [
+                dmem_wr.addr.eq(hw_init_wr_addr),
+                dmem_wr.data.eq(hw_init_wr_data),
+                dmem_wr.en.eq(1),
+            ]
+        with m.Elif(upload_wr_en):
+            # Upload takes priority over CPU writes (CM is halted during upload).
+            m.d.comb += [
+                dmem_wr.addr.eq(upload_wr_addr),
+                dmem_wr.data.eq(upload_wr_data),
+                dmem_wr.en.eq(1),
+            ]
+        with m.Else():
+            m.d.comb += [
+                dmem_wr.addr.eq(mem_addr),
+                dmem_wr.data.eq(cpu_wr_data),
+                dmem_wr.en.eq(cpu_wr_en),
+            ]
+
+        # ── Core control signals ───────────────────────────────────────────────
+        fault_latched = Signal()
+        cm_reboot     = Signal()   # 1-cycle serialized reboot pulse from 'f' or authorized 'g'
+        fault_skip_pulse = Signal()
+        m.d.sync += fault_latched.eq(
+            ~(cm_reboot | fault_skip_pulse) &
+            (fault_latched | core.fault_valid))
+        m.d.comb += [
+            core.reboot_req.eq(cm_reboot),
+            core.skip_fault_req.eq(fault_skip_pulse),
+            # ChurchCore remains legacy fail-reset by default for every other
+            # integration. Physical Wukong deliberately preserves fault state
+            # until its complete reason-2 snapshot is serialized.
+            core.defer_fault_reset.eq(1),
+        ]
+
+        # ── M6 round-robin Thread button ──────────────────────────────────────
+        # M6 is active-low.  Two synchronizer flops keep this asynchronous board
+        # input out of the execution domain; stable state plus a saturating
+        # debounce counter emits exactly one pulse per press, never per held
+        # level.  The request is retained until the core accepts it at an
+        # instruction boundary and completes CHANGE.
+        debounce_limit = max(1, int(self.button_debounce_cycles))
+        m6_sync = Signal(2, init=0b11)
+        m6_pressed = Signal()
+        m6_stable_pressed = Signal()
+        m6_debounce = Signal(range(debounce_limit + 1))
+        m6_click = Signal()
+        m.d.sync += [
+            m6_sync.eq(Cat(self.rst_n, m6_sync[0])),
+            m6_click.eq(0),
+        ]
+        m.d.comb += m6_pressed.eq(~m6_sync[1])
+        with m.If(m6_pressed == m6_stable_pressed):
+            m.d.sync += m6_debounce.eq(0)
+        with m.Else():
+            with m.If(m6_debounce == debounce_limit - 1):
+                m.d.sync += [
+                    m6_stable_pressed.eq(m6_pressed),
+                    m6_debounce.eq(0),
+                ]
+                with m.If(m6_pressed):
+                    m.d.sync += m6_click.eq(1)
+            with m.Else():
+                m.d.sync += m6_debounce.eq(m6_debounce + 1)
+
+        # The projected image stores its configured count in the otherwise
+        # non-authoritative W3 of the unused final forward descriptor.  The
+        # serial receiver latches it while writing the upload, so the button
+        # can neither scan arbitrary memory nor accidentally schedule a stale
+        # body.  Factory boot remains Thread.1-only.
+        configured_thread_count = Signal(2, init=1)
+        with m.If(upload_wr_en & (upload_wr_addr == WUKONG_FORWARD_NS_SLOTS * 4 - 1)):
+            with m.If((upload_wr_data[:8] >= 1) & (upload_wr_data[:8] <= WUKONG_PHYSICAL_MAX_THREAD_COUNT)):
+                m.d.sync += configured_thread_count.eq(upload_wr_data[:2])
+            with m.Else():
+                m.d.sync += configured_thread_count.eq(1)
+
+        next_thread_slot = Signal(16)
+        m.d.comb += next_thread_slot.eq(
+            Mux(core.active_thread_slot == 1, 11,
+                Mux(core.active_thread_slot >= (9 + configured_thread_count),
+                    1, core.active_thread_slot + 1)))
+        thread_switch_pending = Signal()
+        with m.If(cm_reboot | core.thread_switch_complete | core.thread_switch_fault):
+            m.d.sync += thread_switch_pending.eq(0)
+        with m.Elif(m6_click & core.boot_complete & ~fault_latched &
+                    (configured_thread_count > 1) & ~thread_switch_pending):
+            m.d.sync += thread_switch_pending.eq(1)
+        m.d.comb += [
+            core.thread_switch_req.eq(thread_switch_pending),
+            core.thread_switch_index.eq(next_thread_slot),
+            self.dbg_active_thread_slot.eq(core.active_thread_slot),
+            self.dbg_thread_count.eq(configured_thread_count),
+        ]
+
+        # step_mode=1 (default when IDE-connected): CM halts after each retired
+        #   instruction and waits for an 's' command before executing the next one.
+        # step_mode=0: CM executes freely; an 's' command requests a clean pause
+        #   at the next instruction boundary.  'h' remains a legacy immediate
+        #   halt command for older bridge versions.
+        # Wukong standalone: init=0 so the CM free-runs without requiring a bridge
+        # to send 'r' first.  The bridge can still send 'h' to enter step mode.
+        step_mode   = self.step_mode   # 0 = free-run (standalone-safe); see __init__
+        step_halted = self.step_halted # 1 = CM currently held between instructions
+        step_grant  = Signal()          # 1-cycle pulse: step command received
+        step_pause_pending = Signal()   # latched: 's' requested from free-run
+        # Complete read-only architectural state is emitted after a stop.
+        # This uses a separate frame from the compact 0xAA trace packets.
+        snapshot_pending = Signal()
+        snapshot_reason = Signal(2)  # 0=step/pause, 1=breakpoint, 2=fault, 3=explicit
+        snapshot_seq = Signal(16)
+        snapshot_busy = Signal()
+        manual_reboot_cmd = Signal()
+        authorize_recovery_cmd = Signal()
+        skip_fault_cmd = Signal()
+        reboot_safe = Signal()
+
+        # ── Breakpoints: 4 NIA slots ──────────────────────────────────────────
+        bp_nia   = [Signal(32, init=0xFFFFFFFF, name=f"bp_nia{i}") for i in range(4)]
+        bp_armed = [Signal(name=f"bp_armed{i}") for i in range(4)]
+        bp_wr_ptr = Signal(2)   # round-robin write pointer for arming slots
+
+        bp_hit = Signal()
+        m.d.comb += bp_hit.eq(
+            core.retire_valid & (
+                (bp_armed[0] & (core.retire_nia == bp_nia[0])) |
+                (bp_armed[1] & (core.retire_nia == bp_nia[1])) |
+                (bp_armed[2] & (core.retire_nia == bp_nia[2])) |
+                (bp_armed[3] & (core.retire_nia == bp_nia[3]))
+            )
+        )
+
+        # Fault halt: any retire with fault_valid=True auto-enters step mode,
+        # exactly like a breakpoint hit.  This lets the IDE single-step through
+        # the fault handler without the CM silently retrying and continuing.
+        fault_halt = Signal()
+        if self.sim_mode:
+            m.d.comb += fault_halt.eq(
+                (core.retire_valid & core.retire_fault_valid) |
+                self.sim_fault_inject)
+        else:
+            m.d.comb += fault_halt.eq(core.retire_valid & core.retire_fault_valid)
+        recovery = m.submodules.fault_recovery = FaultRecoveryControl()
+        m.d.comb += [
+            recovery.fault_halt.eq(fault_halt),
+            recovery.snapshot_complete.eq(snapshot_complete),
+            recovery.snapshot_reason.eq(snapshot_complete_reason),
+            recovery.manual_reboot_cmd.eq(manual_reboot_cmd),
+            recovery.authorize_recovery_cmd.eq(authorize_recovery_cmd),
+            recovery.skip_fault_cmd.eq(skip_fault_cmd),
+            recovery.reboot_safe.eq(reboot_safe),
+            cm_reboot.eq(recovery.reboot_pulse),
+            fault_skip_pulse.eq(recovery.skip_fault_pulse),
+        ]
+        # Use the registered pending state at the fetch gate.  recovery.hold
+        # also includes the same-cycle fault_halt input, which feeds back
+        # through core.imem_valid -> decoder.fault_valid -> retire_valid during
+        # Amaranth elaboration.  The pending latch takes effect on the next
+        # cycle and is the correct architectural boundary for the hold.
+        recovery_hold = recovery.fault_pending
+        stop_retire = Signal()
+        m.d.comb += stop_retire.eq(
+            core.retire_valid & (
+                bp_hit | fault_halt |
+                ((step_mode | step_pause_pending) & ~step_grant)
+            )
+        )
+
+        # Breakpoint hit or fault → force step_mode + halt; takes highest priority.
+        with m.If(bp_hit | fault_halt):
+            m.d.sync += [step_mode.eq(1), step_halted.eq(1)]
+        with m.Elif(step_grant & step_mode):
+            # step_grant clears halt for one retire (re-set on next retire_valid)
+            m.d.sync += step_halted.eq(0)
+        with m.Elif(core.retire_valid & (step_mode | step_pause_pending) & ~step_grant):
+            m.d.sync += step_halted.eq(1)
+            m.d.sync += step_pause_pending.eq(0)
+        with m.Elif(~step_mode):
+            m.d.sync += step_halted.eq(0)
+        with m.If(stop_retire):
+            m.d.sync += [
+                snapshot_pending.eq(1),
+                snapshot_reason.eq(Mux(bp_hit, 1, Mux(fault_halt, 2, 0))),
+            ]
+        # Skip advances NIA while fetch is still held. Emit a fresh reason-3
+        # snapshot from that post-skip boundary so the bridge can prove board
+        # acceptance (a UART write ACK alone is not such proof).
+        with m.If(fault_skip_pulse):
+            m.d.sync += [
+                snapshot_pending.eq(1),
+                snapshot_reason.eq(3),
+            ]
+        # A completed M6 switch is observable in the IDE through the normal
+        # complete architectural snapshot.  This carries the restored CR12
+        # thread base, allowing the server to report the active projected
+        # Thread without confusing it with simulator state.
+        with m.If(core.thread_switch_complete):
+            m.d.sync += [
+                snapshot_pending.eq(1),
+                snapshot_reason.eq(0),
+            ]
+        # Fetch-settle bubble: DMEM BRAM is sync-read; the cycle after
+        # imem_addr changes the read port still presents the OLD word.  Mask
+        # imem_valid for that cycle or the core retires a stale decode right
+        # after every NIA jump (stream slides one slot after the boot CALL).
+        imem_addr_prev = Signal(32, init=0xFFFFFFFF)
+        m.d.sync += imem_addr_prev.eq(core.imem_addr)
+        imem_settled = Signal()
+        m.d.comb += imem_settled.eq(imem_addr_prev == core.imem_addr)
+        m.d.comb += [
+            # trace_stall is OR-ed in so the TraceUnit can drain all event
+            # packets for one instruction before the next retire fires.
+            # The sentinel has priority over trace and CM UART traffic.  Hold
+            # instruction fetch during its four-byte transmission so a forced
+            # reboot cannot execute far enough to starve the announcement that
+            # tells the bridge/IDE which build has actually restarted.
+            core.imem_valid.eq(
+                ~step_halted & ~trace_stall & imem_settled &
+                ~sentinel_req & ~recovery_hold & ~core.thread_switch_busy),
+            core.halt_req.eq(step_halted | trace_stall | recovery_hold),
+            core.free_run_start.eq(0),
+            core.free_run_nia.eq(0),
+            core.gc_start.eq(0),
+        ]
+
+        # ── Command parser FSM ─────────────────────────────────────────────────
+        # Reads one-byte commands from the UART RX FIFO:
+        #   's' (0x73) — step/pause: from halt, release CM for one retire; from
+        #                free-run, enter step mode and halt at the next retire.
+        #   'r' (0x72) — run:        clear step_mode; CM runs freely
+        #   'h' (0x68) — halt: receive one nonce byte, then assert step_mode +
+        #                step_halted and emit nonce-bound board evidence
+        #   'b' (0x62) — breakpoint: read 4 big-endian NIA bytes, then arm/disarm
+        #   'f' (0x66) — force reboot + sentinel: re-arm the full 4-byte
+        #                boot sentinel (0xBC N_INIT TU_VERSION BUILD_VERSION).
+        #   'g' (0x67) — authorize fault recovery after the bridge has durably
+        #                promoted the correlated reason-2 snapshot. Ignored
+        #                unless that exact snapshot has drained.
+        #   'k' (0x6B) — testing-only one-shot Skip Fault. It is accepted only
+        #                for the currently held fault after its reason-2
+        #                snapshot drains; NIA advances by one and remains halted.
+        #   'u' (0x75) — upload:     receive 4-byte big-endian byte-count header,
+        #                            then N raw bytes (big-endian 32-bit words).
+        #                            Halts CM, writes words to DMEM starting at word 0,
+        #                            then sends 0x06 ACK byte via UART TX.
+        #
+        # Breakpoint 'b' + NIA: arms slot bp_wr_ptr with the given NIA.
+        # NIA==0xFFFFFFFF disarms the slot.  Pointer wraps 0→1→2→3→0.
+        #
+        # Upload 'u' protocol:
+        #   Byte 0:     0x75 ('u') — magic, already consumed in IDLE
+        #   Bytes 1-4:  big-endian uint32 — payload byte count (must be >0, ≤65536)
+        #   Bytes 5…:   raw big-endian 32-bit words, MSB first within each word
+        #   After last word: board sends 0x06 (ACK) via UART TX
+        # The bridge in wukong_bridge.py reads the ACK and POSTs upload_ok to the IDE.
+
+        bp_recv_bytes = [Signal(8, name=f"bp_recv_b{i}") for i in range(4)]
+        bp_recv_cnt   = Signal(2)
+
+        # A partial Halt command must never change board state or swallow a
+        # later command indefinitely. The server will not issue another
+        # command while Halt is pending, and this short parser timeout restores
+        # IDLE if the nonce byte is lost on the wire.
+        halt_nonce_timeout = max(256, self.clk_freq // 100)  # ~10 ms
+        halt_nonce_expired = Signal()
+        m.d.comb += halt_nonce_expired.eq(
+            halt_cmd_wait_nonce &
+            (halt_nonce_wait_cycles >= halt_nonce_timeout - 1)
+        )
+        with m.If(halt_cmd_wait_nonce):
+            with m.If(halt_nonce_wait_cycles >= halt_nonce_timeout - 1):
+                m.d.sync += [
+                    halt_cmd_wait_nonce.eq(0),
+                    halt_nonce_wait_cycles.eq(0),
+                ]
+            with m.Else():
+                m.d.sync += halt_nonce_wait_cycles.eq(
+                    halt_nonce_wait_cycles + 1)
+
+        with m.FSM(name="cmd_parser"):
+            with m.State("IDLE"):
+                # On the expiry cycle, interpret an arriving byte as a fresh
+                # command rather than as a late nonce.  Without this guard,
+                # the first Step/Run after a lost nonce could accidentally
+                # halt the CM with that command byte as its nonce.
+                with m.If(uart_rx.valid & halt_cmd_wait_nonce &
+                          ~halt_nonce_expired):
+                    m.d.sync += [
+                        halt_cmd_wait_nonce.eq(0),
+                        halt_nonce_wait_cycles.eq(0),
+                        halt_state_nonce.eq(uart_rx.data),
+                        halt_state_pending.eq(1),
+                        halt_state_phase.eq(0),
+                        self.dbg_halt_state_emitted.eq(0),
+                        step_mode.eq(1),
+                        step_halted.eq(1),
+                        step_pause_pending.eq(0),
+                        snapshot_pending.eq(1),
+                        snapshot_reason.eq(3),
+                    ]
+                with m.Elif(uart_rx.valid):
+                    with m.Switch(uart_rx.data):
+                        with m.Case(0x73):  # 's'
+                            # 's' is the universal pause/step control.  From
+                            # free-run it enters step mode and latches a pending
+                            # pause until the next retirement.  From an
+                            # already halted state it grants exactly one retire.
+                            with m.If(~recovery_hold):
+                                m.d.comb += [
+                                    step_grant.eq(step_mode & step_halted),
+                                ]
+                                m.d.sync += [
+                                    step_mode.eq(1),
+                                    step_pause_pending.eq(~step_mode),
+                                ]
+                        with m.Case(0x72):  # 'r'
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    step_mode.eq(0),
+                                    step_halted.eq(0),
+                                    step_pause_pending.eq(0),
+                                ]
+                        with m.Case(0x68):  # 'h'
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    halt_cmd_wait_nonce.eq(1),
+                                    halt_nonce_wait_cycles.eq(0),
+                                ]
+                        with m.Case(0x62):  # 'b'
+                            m.d.sync += bp_recv_cnt.eq(0)
+                            m.next = "BP_RECV"
+                        with m.Case(0x66):  # 'f' — full CM reboot + sentinel retransmit
+                            # Defer until any in-flight trace/snapshot frame has
+                            # drained. This preserves explicit reboot semantics
+                            # without letting the sentinel split another frame.
+                            m.d.comb += manual_reboot_cmd.eq(1)
+                        with m.Case(0x67):  # 'g' — promoted fault recovery
+                            m.d.comb += authorize_recovery_cmd.eq(1)
+                        with m.Case(0x6B):  # 'k' — testing-only one-shot fault skip
+                            m.d.comb += skip_fault_cmd.eq(1)
+                        with m.Case(0x75):  # 'u' — upload
+                            # Halt the CM immediately; it stays halted until
+                            # UPLOAD_ACK sends the 0x06 completion byte and the
+                            # bridge then issues 'r' to re-enable free-run.
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    step_mode.eq(1), step_halted.eq(1),
+                                    up_len_cnt.eq(0),
+                                ]
+                                m.next = "UPLOAD_LEN"
+                        with m.Case(0x71):  # 'q' — explicit snapshot request
+                            with m.If(~recovery_hold):
+                                m.d.sync += [
+                                    snapshot_pending.eq(1),
+                                    snapshot_reason.eq(3),
+                                ]
+
+            with m.State("BP_RECV"):
+                with m.If(uart_rx.valid):
+                    with m.Switch(bp_recv_cnt):
+                        for i in range(4):
+                            with m.Case(i):
+                                m.d.sync += [bp_recv_bytes[i].eq(uart_rx.data),
+                                             bp_recv_cnt.eq(i + 1)]
+                    with m.If(bp_recv_cnt == 3):
+                        m.next = "BP_COMMIT"
+
+            with m.State("BP_COMMIT"):
+                # Assemble big-endian NIA: byte[0]=MSB .. byte[3]=LSB
+                bp_nia_val = Signal(32)
+                m.d.comb += bp_nia_val.eq(
+                    Cat(bp_recv_bytes[3], bp_recv_bytes[2],
+                        bp_recv_bytes[1], bp_recv_bytes[0])
+                )
+                with m.Switch(bp_wr_ptr):
+                    for slot in range(4):
+                        with m.Case(slot):
+                            with m.If(bp_nia_val == 0xFFFFFFFF):
+                                m.d.sync += bp_armed[slot].eq(0)
+                            with m.Else():
+                                m.d.sync += [bp_nia[slot].eq(bp_nia_val),
+                                             bp_armed[slot].eq(1)]
+                m.d.sync += bp_wr_ptr.eq(bp_wr_ptr + 1)
+                m.next = "IDLE"
+
+            _add_upload_fsm_states(
+                m,
+                uart_valid=uart_rx.valid,
+                uart_data=uart_rx.data,
+                up_len_bytes=up_len_bytes,
+                up_len_cnt=up_len_cnt,
+                up_byte_cnt=up_byte_cnt,
+                up_word_buf=up_word_buf,
+                up_byte_in_word=up_byte_in_word,
+                upload_wr_addr_r=upload_wr_addr_r,
+                upload_wr_en=upload_wr_en,
+                upload_wr_addr=upload_wr_addr,
+                upload_wr_data=upload_wr_data,
+                upload_watchdog=upload_watchdog,
+                watchdog_limit=_UPLOAD_WATCHDOG_LIMIT,
+                upload_ack_req=upload_ack_req,
+                upload_ack_accepted=(
+                    tx_free & ~cm_tx_start & ~sentinel_req & ~banner_req),
+                debug_state=self.dbg_upload_state,
+            )
+
+        # Both reboot paths use the same serialized boundary. In particular,
+        # sentinel_req cannot preempt a trace or snapshot frame, and reason-2
+        # fault recovery remains fail-closed until the bridge's 'g' command.
+        m.d.comb += reboot_safe.eq(
+            ~trace_stall & ~snapshot_busy & ~snapshot_pending)
+        with m.If(recovery.rearm_sentinel):
+            m.d.sync += [
+                sentinel_sent.eq(0),
+                sentinel_phase.eq(0),
+                step_mode.eq(0),
+                step_halted.eq(0),
+            ]
+
+        # ── TraceUnit FSM ──────────────────────────────────────────────────────
+        #
+        # Emits one 12-byte 0xAA packet per *event*.  Multi-cycle instructions
+        # produce multiple events, each with its own packet:
+        #
+        #   Instruction    Events (in order)
+        #   ─────────────────────────────────────────────────────────────────
+        #   LOAD           LOAD_SHADOW (old CR_dst GT) + LOAD_NEW (new GT)
+        #   CHANGE         CHANGE_PUSH + CHANGE_CR12  + CHANGE_CR5
+        #   CALL           CALL_CR6   + CALL_CR14    + CALL_PUSH
+        #   ELOADCALL      CALL_CR6   + CALL_CR14    + CALL_PUSH
+        #   XLOADLAMBDA    CALL_CR6   + CALL_CR14    + CALL_PUSH
+        #   RETURN         RETURN_POP + RETURN_CR6   + RETURN_CR14
+        #   all others     RESULT (single packet, payload=0)
+        #
+        # Packet format — 12 bytes, big-endian:
+        #   [0]     0xAA             magic
+        #   [1..4]  NIA              retiring instruction NIA (big-endian uint32)
+        #   [5]     event_type       TRACE_EV_* constant
+        #   [6..9]  payload          GT word0 (big-endian uint32; 0 for push/pop events)
+        #   [10]    flags            bits[3:0]=NZCV; bits[7:4]=0
+        #   [11]    fault            {bp_hit[7], fault_valid[6], 0[5], fault_code[4:0]}
+        #
+        # Backpressure (no silent drops): trace_stall is asserted while events
+        # are pending, and is OR-ed into core.halt_req / core.imem_valid so the
+        # CM cannot retire the next instruction until the queue drains.
+        #
+        # Must match TRACE_EV_* in wukong_bridge.py and debug-packet-protocol.md.
+
+        # ── Event type constants ──────────────────────────────────────────────
+        _TRACE_MAGIC       = _WUKONG_TRACE_CONTRACT["magic"]
+        _TRACE_PKT_LEN     = _WUKONG_TRACE_CONTRACT["packetBytes"]
+
+        _TRACE_EVENTS = _WUKONG_TRACE_CONTRACT["eventIds"]
+        _TRACE_EV_RESULT      = _TRACE_EVENTS["RESULT"]
+        _TRACE_EV_LOAD_SHADOW = _TRACE_EVENTS["LOAD_SHADOW"]
+        _TRACE_EV_LOAD_NEW    = _TRACE_EVENTS["LOAD_NEW"]
+        _TRACE_EV_CHANGE_PUSH = _TRACE_EVENTS["CHANGE_PUSH"]
+        _TRACE_EV_CHANGE_CR12 = _TRACE_EVENTS["CHANGE_CR12"]
+        _TRACE_EV_CHANGE_CR5  = _TRACE_EVENTS["CHANGE_CR5"]
+        _TRACE_EV_CALL_CR6    = _TRACE_EVENTS["CALL_CR6"]
+        _TRACE_EV_CALL_CR14   = _TRACE_EVENTS["CALL_CR14"]
+        _TRACE_EV_CALL_PUSH   = _TRACE_EVENTS["CALL_PUSH"]
+        _TRACE_EV_RETURN_POP  = _TRACE_EVENTS["RETURN_POP"]
+        _TRACE_EV_RETURN_CR6  = _TRACE_EVENTS["RETURN_CR6"]
+        _TRACE_EV_RETURN_CR14 = _TRACE_EVENTS["RETURN_CR14"]
+
+        # ── Event queue: up to 3 events per retire ────────────────────────────
+        # tq_type[0..2] / tq_data[0..2]: event type + payload for each slot.
+        # tq_len:  total events queued (1, 2, or 3).
+        # tq_ptr:  index of the event currently being sent.
+        # tq_bidx: byte index within the 12-byte packet for the current event.
+        # tq_nia / tq_flags / tq_fault: shared across all events for one retire.
+        tq_type  = [Signal(8,  name=f"tq_type{i}")  for i in range(3)]
+        tq_data  = [Signal(32, name=f"tq_data{i}")  for i in range(3)]
+        tq_len   = Signal(2,  name="tq_len")
+        tq_ptr   = Signal(2,  name="tq_ptr")
+        tq_bidx  = Signal(4,  name="tq_bidx")
+        tq_nia   = Signal(32, name="tq_nia")
+        tq_flags = Signal(8,  name="tq_flags")   # bits[3:0]=NZCV; bits[7:4]=0
+        tq_fault = Signal(8,  name="tq_fault")   # {bp_hit[7], fault_valid[6], 0[5], fault_code[4:0]}
+
+        trace_decode = TraceEventDecoder()
+        m.submodules.trace_decode = trace_decode
+        m.d.comb += [
+            trace_decode.instr.eq(core.retire_instr),
+            trace_decode.load_shadow_gt.eq(core.retire_trace_load_shadow_gt),
+            trace_decode.load_new_gt.eq(core.retire_trace_load_new_gt),
+            trace_decode.cr12_gt.eq(core.retire_trace_cr12_gt),
+            trace_decode.cr5_gt.eq(core.retire_trace_cr5_gt),
+            trace_decode.cr6_gt.eq(core.retire_trace_cr6_gt),
+            trace_decode.cr14_gt.eq(core.retire_trace_cr14_gt),
+        ]
+
+        # Current event's type and payload (combinatorial mux of tq_ptr)
+        _cur_ev_type = Signal(8,  name="cur_ev_type")
+        _cur_ev_data = Signal(32, name="cur_ev_data")
+        with m.Switch(tq_ptr):
+            for _i in range(3):
+                with m.Case(_i):
+                    m.d.comb += [
+                        _cur_ev_type.eq(tq_type[_i]),
+                        _cur_ev_data.eq(tq_data[_i]),
+                    ]
+
+        with m.FSM(name="trace_unit"):
+            with m.State("IDLE"):
+                m.d.comb += [trace_tx_req.eq(0), trace_tx_byte.eq(0),
+                             trace_stall.eq(0)]
+
+                with m.If(core.retire_valid):
+                    # Capture per-instruction shared fields
+                    m.d.sync += [
+                        tq_nia.eq(core.retire_nia),
+                        tq_flags.eq(Cat(
+                            core.retire_flags.V, core.retire_flags.C,
+                            core.retire_flags.Z, core.retire_flags.N, C(0, 4))),
+                        tq_fault.eq(Cat(
+                            core.retire_fault_code[:5],   # bits[4:0]
+                            C(0, 1),                       # bit[5] reserved
+                            core.retire_fault_valid,       # bit[6]
+                            bp_hit,                        # bit[7]
+                        )),
+                        tq_ptr.eq(0),
+                        tq_bidx.eq(0),
+                    ]
+
+                    # Decode the full 5-bit opcode bits[31:27] to determine
+                    # the event sequence.  Using only bits[30:27] aliases
+                    # Turing opcodes onto Church opcodes: DREAD (16/10000b)
+                    # becomes LOAD (0/0000b), which incorrectly emits the
+                    # two LOAD packets for one DREAD retire.
+                    m.d.sync += [
+                        tq_len.eq(trace_decode.event_count),
+                        tq_type[0].eq(trace_decode.event_type[0]),
+                        tq_data[0].eq(trace_decode.event_data[0]),
+                        tq_type[1].eq(trace_decode.event_type[1]),
+                        tq_data[1].eq(trace_decode.event_data[1]),
+                        tq_type[2].eq(trace_decode.event_type[2]),
+                        tq_data[2].eq(trace_decode.event_data[2]),
+                    ]
+                    m.next = "SEND"
+
+            with m.State("SEND"):
+                # Stall the CM while events are pending (no-drop guarantee)
+                m.d.comb += [trace_tx_req.eq(1), trace_stall.eq(1)]
+
+                # Select the byte for the current packet position
+                with m.Switch(tq_bidx):
+                    with m.Case(0):   m.d.comb += trace_tx_byte.eq(_TRACE_MAGIC)
+                    with m.Case(1):   m.d.comb += trace_tx_byte.eq(tq_nia[24:32])
+                    with m.Case(2):   m.d.comb += trace_tx_byte.eq(tq_nia[16:24])
+                    with m.Case(3):   m.d.comb += trace_tx_byte.eq(tq_nia[8:16])
+                    with m.Case(4):   m.d.comb += trace_tx_byte.eq(tq_nia[0:8])
+                    with m.Case(5):   m.d.comb += trace_tx_byte.eq(_cur_ev_type)
+                    with m.Case(6):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[24:32])
+                    with m.Case(7):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[16:24])
+                    with m.Case(8):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[8:16])
+                    with m.Case(9):   m.d.comb += trace_tx_byte.eq(_cur_ev_data[0:8])
+                    with m.Case(10):  m.d.comb += trace_tx_byte.eq(tq_flags)
+                    with m.Case(11):  m.d.comb += trace_tx_byte.eq(tq_fault)
+                    with m.Default(): m.d.comb += trace_tx_byte.eq(0)
+
+                # Cross-domain RETURN: cload commits the restored caller CR14 while
+                # we are still sending events 0 and 1 (trace_stall holds the CM).
+                # Patch tq_data[2] so RETURN_CR14 carries the correct caller value,
+                # not the callee's CR14 that was latched at retire_valid time.
+                # If cload faults the valid pulse never fires; the fault is reported
+                # via fault_valid on the next retire (normal fault path).
+                with m.If(core.retire_trace_return_cr14_valid):
+                    m.d.sync += tq_data[2].eq(core.retire_trace_return_cr14_gt)
+
+                with m.If(trace_tx_ack):
+                    with m.If(tq_bidx == _TRACE_PKT_LEN - 1):
+                        # Last byte of this event's packet
+                        m.d.sync += tq_bidx.eq(0)
+                        with m.If(tq_ptr == tq_len - 1):
+                            # All events for this retire sent → return to IDLE
+                            m.next = "IDLE"
+                        with m.Else():
+                            # More events remain → advance to next event
+                            m.d.sync += tq_ptr.eq(tq_ptr + 1)
+                    with m.Else():
+                        m.d.sync += tq_bidx.eq(tq_bidx + 1)
+
+        # ── Architectural snapshot FSM ───────────────────────────────────────
+        #
+        # Frame format (all multi-byte values big-endian):
+        #   AC 01 len_hi len_lo seq_hi seq_lo payload[284] crc_hi crc_lo
+        #
+        # Payload:
+        #   reason, flags(NZCV in bits 3:0), M, reserved,
+        #   live NIA, live STO, live thread base, stored Thread CR12 GT,
+        #   stored packed PC, stored M flag word,
+        #   CR0..CR15 × [word0, word1, word2],
+        #   DR0..DR15.
+        #
+        # The frame is emitted only while execution is stopped.  The four
+        # synchronous DMEM reads capture the suspended thread object before
+        # the frame starts, so the host never has to infer state from traces.
+        _SNAP_MAGIC       = 0xAC
+        _SNAP_VERSION     = 1
+        _SNAP_PAYLOAD_LEN = 284
+        _SNAP_DATA_LEN    = 6 + _SNAP_PAYLOAD_LEN
+        _SNAP_FRAME_LEN   = _SNAP_DATA_LEN + 2
+        snap_bidx = Signal(range(_SNAP_FRAME_LEN))
+        snap_crc  = Signal(16, init=0xFFFF)
+        snap_thread_cr12_gt = Signal(32)
+        snap_sto = Signal(32)
+        snap_thread_packed_pc = Signal(32)
+        snap_thread_mflag = Signal(32)
+        snap_reason = Signal(2)
+        snap_nia = Signal(32)
+        snap_flags_latched = Signal(4)
+        snap_m_flag_latched = Signal()
+        snap_thread_base = Signal(32)
+        snap_cr_words = [
+            [Signal(32, name=f"snap_cr{cr_idx}_w{word_idx}")
+             for word_idx in range(3)]
+            for cr_idx in range(16)
+        ]
+        snap_dr_words = [
+            Signal(32, name=f"snap_dr{dr_idx}") for dr_idx in range(16)
+        ]
+        snap_mem_addr = Signal(14)
+        snap_payload_idx = Signal(9)
+
+        # CRC-16-CCITT over the header and payload (not the two CRC bytes).
+        def _crc16_byte(crc, byte):
+            value = crc
+            for shift in range(8):
+                top = value[15] ^ byte[7 - shift]
+                shifted = (value << 1) & 0xFFFF
+                # Keep the CRC DAG bounded for full-top simulation as well as
+                # synthesis. Inlining the previous expression twice per bit
+                # expands exponentially across the six-byte header seed.
+                step = Signal(16)
+                m.d.comb += step.eq(Mux(top, shifted ^ 0x1021, shifted))
+                value = step
+            return value
+
+        # The host validates the header and payload together.  Seed the
+        # streaming CRC with the six header bytes for the frame sequence that
+        # is about to be committed.
+        snap_seq_next = Signal(16)
+        m.d.comb += snap_seq_next.eq(snapshot_seq + 1)
+        snap_header_crc = C(0xFFFF, 16)
+        for header_byte in (
+            C(_SNAP_MAGIC, 8), C(_SNAP_VERSION, 8),
+            C(_SNAP_PAYLOAD_LEN >> 8, 8),
+            C(_SNAP_PAYLOAD_LEN & 0xFF, 8),
+            snap_seq_next[8:16], snap_seq_next[0:8],
+        ):
+            snap_header_crc = _crc16_byte(snap_header_crc, header_byte)
+
+        def _be_bytes(word):
+            return [word[24:32], word[16:24], word[8:16], word[0:8]]
+
+        live_snap_flags = Cat(
+            core.flags.V, core.flags.C, core.flags.Z, core.flags.N, C(0, 4))
+        snap_words = [
+            snap_nia, snap_sto,
+            snap_thread_base,
+            snap_thread_cr12_gt,
+            snap_thread_packed_pc,
+            snap_thread_mflag,
+        ]
+        snap_payload_bytes = [
+            Cat(snap_reason, C(0, 6)),
+            Cat(snap_flags_latched, C(0, 4)),
+            Cat(snap_m_flag_latched, C(0, 7)),
+            C(0, 8),
+        ]
+        for word in snap_words:
+            snap_payload_bytes += _be_bytes(word)
+        for cr_idx in range(16):
+            for word_idx in range(3):
+                snap_payload_bytes += _be_bytes(snap_cr_words[cr_idx][word_idx])
+        for dr_idx in range(16):
+            snap_payload_bytes += _be_bytes(snap_dr_words[dr_idx])
+        snap_payload_array = Array(snap_payload_bytes)
+
+        m.d.comb += [
+            snap_mem_addr.eq(0),
+            snapshot_mem_rd.addr.eq(snap_mem_addr),
+            snap_payload_idx.eq(snap_bidx - 6),
+            snapshot_tx_req.eq(0),
+            snapshot_tx_byte.eq(0),
+            snapshot_complete.eq(0),
+            snapshot_complete_reason.eq(0),
+        ]
+        with m.FSM(name="snapshot_unit"):
+            with m.State("IDLE"):
+                with m.If(snapshot_pending & ~trace_stall):
+                    m.d.sync += [
+                        snapshot_pending.eq(0),
+                        snapshot_busy.eq(1),
+                        snapshot_seq.eq(snap_seq_next),
+                        snap_reason.eq(snapshot_reason),
+                        snap_nia.eq(core.nia),
+                        snap_flags_latched.eq(live_snap_flags[:4]),
+                        snap_m_flag_latched.eq(core.debug_m_flag),
+                        # CR12 is the system Thread root. Snapshot backing-store
+                        # telemetry must identify the actually scheduled body.
+                        snap_thread_base.eq(core.active_thread_base),
+                        snap_bidx.eq(0),
+                        snap_crc.eq(snap_header_crc),
+                    ]
+                    for cr_idx in range(16):
+                        for word_idx in range(3):
+                            m.d.sync += snap_cr_words[cr_idx][word_idx].eq(
+                                core.debug_cr_words[cr_idx][word_idx])
+                    for dr_idx in range(16):
+                        m.d.sync += snap_dr_words[dr_idx].eq(
+                            core.debug_dr_words[dr_idx])
+                    m.next = "READ_THREAD_CR12"
+
+            # DMEM is synchronous: each READ state presents an address and
+            # its WAIT state latches the returned word.
+            with m.State("READ_THREAD_CR12"):
+                m.d.comb += snap_mem_addr.eq(
+                    (snap_thread_base >> 2) + 256)
+                m.next = "WAIT_THREAD_CR12"
+            with m.State("WAIT_THREAD_CR12"):
+                m.d.sync += snap_thread_cr12_gt.eq(snapshot_mem_rd.data)
+                m.next = "READ_STO"
+            with m.State("READ_STO"):
+                m.d.comb += snap_mem_addr.eq(
+                    (snap_cr_words[5][1] >> 2))
+                m.next = "WAIT_STO"
+            with m.State("WAIT_STO"):
+                m.d.sync += snap_sto.eq(snapshot_mem_rd.data)
+                m.next = "READ_PACKED_PC"
+            with m.State("READ_PACKED_PC"):
+                m.d.comb += snap_mem_addr.eq(
+                    (snap_thread_base >> 2) + 17)
+                m.next = "WAIT_PACKED_PC"
+            with m.State("WAIT_PACKED_PC"):
+                m.d.sync += snap_thread_packed_pc.eq(snapshot_mem_rd.data)
+                m.next = "READ_THREAD_M"
+            with m.State("READ_THREAD_M"):
+                m.d.comb += snap_mem_addr.eq(
+                    (snap_thread_base >> 2) + 18)
+                m.next = "WAIT_THREAD_M"
+            with m.State("WAIT_THREAD_M"):
+                m.d.sync += snap_thread_mflag.eq(snapshot_mem_rd.data)
+                m.next = "SEND"
+
+            with m.State("SEND"):
+                m.d.comb += snapshot_tx_req.eq(1)
+                with m.Switch(snap_bidx):
+                    with m.Case(0):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_MAGIC)
+                    with m.Case(1):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_VERSION)
+                    with m.Case(2):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_PAYLOAD_LEN >> 8)
+                    with m.Case(3):
+                        m.d.comb += snapshot_tx_byte.eq(_SNAP_PAYLOAD_LEN & 0xFF)
+                    with m.Case(4):
+                        m.d.comb += snapshot_tx_byte.eq(snapshot_seq[8:16])
+                    with m.Case(5):
+                        m.d.comb += snapshot_tx_byte.eq(snapshot_seq[0:8])
+                    with m.Default():
+                        with m.If(snap_bidx < _SNAP_DATA_LEN):
+                            m.d.comb += snapshot_tx_byte.eq(
+                                snap_payload_array[snap_payload_idx])
+                        with m.Elif(snap_bidx == _SNAP_DATA_LEN):
+                            m.d.comb += snapshot_tx_byte.eq(snap_crc[8:16])
+                        with m.Else():
+                            m.d.comb += snapshot_tx_byte.eq(snap_crc[0:8])
+
+                with m.If(snapshot_tx_ack):
+                    crc_next = _crc16_byte(snap_crc, snapshot_tx_byte)
+                    with m.If((snap_bidx >= 6) & (snap_bidx < _SNAP_DATA_LEN)):
+                        m.d.sync += snap_crc.eq(crc_next)
+                    with m.If(snap_bidx == _SNAP_FRAME_LEN - 1):
+                        m.d.comb += [
+                            snapshot_complete.eq(1),
+                            snapshot_complete_reason.eq(snap_reason),
+                        ]
+                        m.d.sync += snapshot_busy.eq(0)
+                        m.next = "IDLE"
+                    with m.Else():
+                        m.d.sync += snap_bidx.eq(snap_bidx + 1)
+
+        # ── Heartbeat (1 Hz blink on led[1] during boot) ──────────────────────
+        hb_ctr   = Signal(range(self.clk_freq))
+        hb_blink = Signal()
+        m.d.sync += hb_ctr.eq(hb_ctr + 1)
+        with m.If(hb_ctr == self.clk_freq - 1):
+            m.d.sync += [hb_ctr.eq(0), hb_blink.eq(~hb_blink)]
+
+        # ── Boot sequence: POR delay → hw_init writes → boot_start ────────────
+        #
+        # Phase 1 (16 cycles): boot_delay counts to 0xF — waits for GSR to
+        #   complete and all FFs to settle at their init values.
+        #
+        # Phase 2 (2*N cycles): fetch then commit each hw_init_pair, writing
+        #   each non-zero DMEM word via the write port.
+        #   This bypasses the Vivado BRAM `initial`-block inference problem.
+        #
+        #   Explicit synchronous-ROM latency is essential: folding the old
+        #   counter + combinatorial ROM into BRAM skipped its first entry.
+        #   Completion is asserted only after the final accepted memory write.
+        #
+        # Phase 3 (1 cycle): boot_start pulsed; boot_triggered latched.
+        #   The LED mux switches to CM-controlled outputs.
+        #   The UART TX arbitrator sends sentinel bytes 0xBC N_INIT TU_VERSION (first free TX slots).
+        boot_delay  = Signal(4, init=0)
+        # hw_init_done declared earlier (near boot_triggered) for UART arbitrator use
+
+        initializer = m.submodules.initializer = SparseMemoryInitializer(hw_init_pairs)
+        m.d.comb += [
+            hw_init_done.eq(initializer.done),
+            hw_init_wr_en.eq(initializer.write_en),
+            hw_init_wr_addr.eq(initializer.write_addr),
+            hw_init_wr_data.eq(initializer.write_data),
+        ]
+
+        # boot_triggered declared early (before UART arbitrator) so the sentinel
+        # logic can reference it; driven here in the boot FSM.
+        with m.If(~boot_triggered):
+            # Phase 1: wait for boot_delay to reach 0xF
+            with m.If(boot_delay < 0xF):
+                m.d.sync += boot_delay.eq(boot_delay + 1)
+
+            # Phase 2: a clocked fetch must precede every memory write.
+            with m.Elif(~hw_init_done):
+                m.d.comb += initializer.enable.eq(1)
+
+            # Phase 2.5: send "WUKONG\r\n" hardware banner before CM starts.
+            # banner_req / banner_byte / banner_done are driven by the UART
+            # arbitrator section above; this Elif just holds boot_start low
+            # until the banner is fully transmitted.
+            with m.Elif(~banner_done):
+                pass  # banner logic in UART arbitrator drives the TX
+
+            # Phase 3: banner done — pulse boot_start and latch boot_triggered
+            with m.Else():
+                m.d.comb += core.boot_start.eq(1)
+                m.d.sync += boot_triggered.eq(1)
+
+        with m.Else():
+            m.d.comb += core.boot_start.eq(0)
+
+        # ── LED output mux  (ACTIVE-LOW: output 0 = LED ON, output 1 = LED OFF) ──
+        # Before boot_triggered: led0 solid ON (booting), led1 heartbeat blink.
+        # After  boot_triggered: led0 CM-controlled via MMIO reg 0 (inverted for
+        #   active-LOW), led1 solid ON (no fault) or OFF if fault latched.
+        with m.If(~boot_triggered):
+            m.d.comb += [
+                self.led[0].eq(0),           # LOW → LED ON  (booting indicator)
+                self.led[1].eq(hb_blink),    # blink: LOW=ON / HIGH=OFF at 1 Hz
+            ]
+        with m.Else():
+            m.d.comb += [
+                # CM writes 1-to-light: invert for active-LOW physical LEDs
+                self.led[0].eq(~mmio_led_reg[0][0]),
+                # fault_latched=0 → ~0=1 → HIGH → LED OFF (normal)
+                # fault_latched=1 → ~1=0 → LOW  → LED ON  (fault visible)
+                self.led[1].eq(~fault_latched),
+            ]
+
+        # Internal observation wiring for optional ILA; no extra package pins.
+        m.d.comb += [
+            self.dbg_boot_complete.eq(core.boot_complete),
+            self.dbg_fault_valid.eq(core.fault_valid),
+            self.dbg_nia.eq(core.retire_nia),
+            # Pack fault telemetry into a single 32-bit word:
+            #   bits[4:0]   = 0 (reserved)
+            #   bit[5]      = retire_fault_valid  (fault on this retire pulse)
+            #   bits[10:6]  = retire_fault_code   (5-bit fault type)
+            #   bits[31:11] = fault_gt[20:0]       (GT word0 of the cap that faulted)
+            self.dbg_fault.eq(Cat(
+                C(0, 5),                   # bits[4:0]   = reserved
+                core.retire_fault_valid,   # bit[5]      = retire_fault_valid
+                core.retire_fault_code,    # bits[10:6]  = fault_code
+                core.fault_gt[:21],        # bits[31:11] = fault_gt upper 21 bits
+            )),
+        ]
+
+        return m
+
+    def _elaborate_upload_only(self):
+        """Elaborate only the production UART upload parser for focused tests.
+
+        The complete top takes minutes to compile into Amaranth's Python
+        simulator even though upload watchdog tests do not exercise the CPU,
+        trace, boot, or snapshot blocks. This profile keeps the production
+        top's public signals and exact upload state transitions while omitting
+        unrelated machinery. It is never selected by hardware generation.
+        """
+        m = Module()
+        uart_rx = m.submodules.uart_rx = UartRx(
+            clk_freq=self.clk_freq, baud=self.baud)
+        m.d.comb += uart_rx.rx.eq(self.uart_rx_pin)
+
+        up_len_bytes = [
+            Signal(8, name=f"sim_up_len_b{i}") for i in range(4)]
+        up_len_cnt = Signal(2)
+        up_byte_cnt = Signal(17)
+        up_word_buf = [
+            Signal(8, name=f"sim_up_word_b{i}") for i in range(3)]
+        up_byte_in_word = Signal(2)
+        upload_wr_addr_r = Signal(14)
+        upload_wr_en = Signal()
+        upload_wr_addr = Signal(14)
+        upload_wr_data = Signal(32)
+        upload_ack_req = Signal()
+        watchdog_limit = (
+            self.upload_watchdog_limit
+            if self.upload_watchdog_limit is not None
+            else max(self.clk_freq // self.baud * 10 * 20, 1000))
+        upload_watchdog = Signal(range(watchdog_limit + 1))
+
+        m.d.comb += [
+            self.uart_tx_pin.eq(1),
+            self.dbg_upload_state.eq(0),
+            self.dbg_upload_watchdog.eq(upload_watchdog),
+            self.dbg_upload_len_count.eq(up_len_cnt),
+            self.dbg_upload_bytes_remaining.eq(up_byte_cnt),
+            self.dbg_upload_write_addr.eq(upload_wr_addr_r),
+            self.dbg_boot_complete.eq(0),
+            self.dbg_fault_valid.eq(0),
+            self.dbg_nia.eq(0),
+            self.dbg_fault.eq(0),
+            self.dbg_active_thread_slot.eq(0),
+            self.dbg_thread_count.eq(1),
+        ]
+
+        with m.FSM(name="upload_only_cmd_parser"):
+            with m.State("IDLE"):
+                with m.If(uart_rx.valid & (uart_rx.data == 0x75)):
+                    m.d.sync += [
+                        self.step_mode.eq(1),
+                        self.step_halted.eq(1),
+                        up_len_cnt.eq(0),
+                    ]
+                    m.next = "UPLOAD_LEN"
+
+            _add_upload_fsm_states(
+                m,
+                uart_valid=uart_rx.valid,
+                uart_data=uart_rx.data,
+                up_len_bytes=up_len_bytes,
+                up_len_cnt=up_len_cnt,
+                up_byte_cnt=up_byte_cnt,
+                up_word_buf=up_word_buf,
+                up_byte_in_word=up_byte_in_word,
+                upload_wr_addr_r=upload_wr_addr_r,
+                upload_wr_en=upload_wr_en,
+                upload_wr_addr=upload_wr_addr,
+                upload_wr_data=upload_wr_data,
+                upload_watchdog=upload_watchdog,
+                watchdog_limit=watchdog_limit,
+                upload_ack_req=upload_ack_req,
+                upload_ack_accepted=1,
+                debug_state=self.dbg_upload_state,
+            )
+
+        return m

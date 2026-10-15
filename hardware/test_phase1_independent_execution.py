@@ -51,6 +51,7 @@ def snapshot(ctx, dut):
         "dr": [ctx.get(x) for x in dut.debug_dr_words],
         "cr": [[ctx.get(x) for x in row] for row in dut.debug_cr_words],
         "flags": tuple(ctx.get(dut.flags[f]) for f in ("N", "Z", "C", "V")),
+        "m": ctx.get(dut.dbg_m_bit_state),
         "nia": ctx.get(dut.nia),
     }
 
@@ -83,6 +84,7 @@ async def execute_data(ctx, dut, word):
     assert snapshot(ctx, dut) == after, "State changed again after retirement"
     assert after["nia"] == before["nia"] + 4
     assert after["cr"] == before["cr"]
+    assert after["m"] == before["m"]
     return before, after
 
 

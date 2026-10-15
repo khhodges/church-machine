@@ -8,17 +8,9 @@ from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT
 class ChurchDRead(Elaboratable):
     """DREAD DR_dst, CR_src, #imm
 
-    Turing-domain bounded data read.  Two addressing modes share opcode 10:
-
-    Immediate mode (imm[14] = 1):
-        offset = imm[13:0]
-        Range: 0 – 16383 words.
-
-    Indexed mode (imm[14] = 0):
-        base   = imm[13:4]  (10-bit compile-time base, 0 – 1023)
-        DRx    = imm[3:0]   (4-bit register index, value read at runtime)
-        offset = base + DR[DRx]
-        DR0 is hardwired zero, so DRx=0 collapses to pure-base mode.
+    Phase 1 opcode 16: unsigned DR[imm[3:0]] plus/minus magnitude
+    imm[13:4] (0–1023); bit14 selects subtraction. DR0 supplies zero.
+    Capture the index at acceptance; reject negative/wrapped offsets.
 
     Security gate: checks R permission on CR_src.word0_gt.perms[PERM_R].
     Bounds gate:   checks effective_offset <= the full descriptor limit and
@@ -30,8 +22,7 @@ class ChurchDRead(Elaboratable):
     no difference — it drives dmem_addr and reads dmem_rd_data either way.
 
     FSM:
-        Immediate mode: IDLE -> PERM_CHECK -> MEM_ACCESS -> MEM_ACCESS_WAIT
-        Indexed mode:   IDLE -> READ_DRX   -> PERM_CHECK -> MEM_ACCESS -> MEM_ACCESS_WAIT
+        IDLE -> PERM_CHECK -> MEM_ACCESS -> MEM_ACCESS_WAIT
     """
 
     def __init__(self):
@@ -100,8 +91,8 @@ class ChurchDRead(Elaboratable):
             has_r.eq(~cr_gt.dom & cr_gt.perm[PERM_R]),
             limit.eq(cr_w2.limit_offset),
             eff_off.eq(Mux(imm_reg[14],
-                           imm_reg[:14],                        # immediate: bits[13:0]
-                           (imm_reg[4:14] + drx_val_reg))),     # indexed: base + full DR[DRx]
+                           Cat(drx_val_reg, C(0, 1)) - imm_reg[4:14],
+                           Cat(drx_val_reg, C(0, 1)) + imm_reg[4:14])),
             in_bounds.eq((eff_off <= limit) & (effective_addr[32:] == 0)),
             exact_m_cap.eq(
                 (cr_gt.gt_type == GT_TYPE_INFORM) &
@@ -117,7 +108,7 @@ class ChurchDRead(Elaboratable):
 
         m.d.comb += [
             self.cr_rd_addr.eq(Mux(self.busy, cr_src_reg, self.cr_src)),
-            self.dr_rd_addr.eq(imm_reg[:4]),   # DRx index (only meaningful in READ_DRX state)
+            self.dr_rd_addr.eq(Mux(self.start, self.imm[:4], imm_reg[:4])),
         ]
 
         with m.FSM(name="dread_fsm"):
@@ -127,21 +118,10 @@ class ChurchDRead(Elaboratable):
                         cr_src_reg.eq(self.cr_src),
                         dr_dst_reg.eq(self.dr_dst),
                         imm_reg.eq(self.imm),
-                        drx_val_reg.eq(0),
+                        drx_val_reg.eq(Mux(self.imm[:4] == 0, 0, self.dr_rd_data)),
                         namespace_authorized_reg.eq(self.namespace_authorized),
                     ]
-                    with m.If(~self.imm[14]):
-                        # Indexed mode: need one extra cycle to read DR[DRx]
-                        m.next = "READ_DRX"
-                    with m.Else():
-                        m.next = "PERM_CHECK"
-
-            with m.State("READ_DRX"):
-                # Drive dr_rd_addr = imm_reg[3:0] (already set in comb above)
-                # and latch dr_rd_data into drx_val_reg on the next clock.
-                m.d.comb += self.busy.eq(1)
-                m.d.sync += drx_val_reg.eq(Mux(imm_reg[:4] == 0, 0, self.dr_rd_data))
-                m.next = "PERM_CHECK"
+                    m.next = "PERM_CHECK"
 
             with m.State("PERM_CHECK"):
                 m.d.comb += self.busy.eq(1)

@@ -8,17 +8,9 @@ from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT
 class ChurchDWrite(Elaboratable):
     """DWRITE DR_src, CR_src, #imm
 
-    Turing-domain bounded data write.  Two addressing modes share opcode 11:
-
-    Immediate mode (imm[14] = 1):
-        offset = imm[13:0]
-        Range: 0 – 16383 words.
-
-    Indexed mode (imm[14] = 0):
-        base   = imm[13:4]  (10-bit compile-time base, 0 – 1023)
-        DRx    = imm[3:0]   (4-bit register index, value read at runtime)
-        offset = base + DR[DRx]
-        DR0 is hardwired zero, so DRx=0 collapses to pure-base mode.
+    Phase 1 opcode 17: unsigned DR[imm[3:0]] plus/minus magnitude
+    imm[13:4] (0–1023); bit14 selects subtraction. DR0 supplies zero.
+    Capture the index at acceptance; reject negative/wrapped offsets.
 
     Security gate: checks W permission on CR_src.word0_gt.perms[PERM_W].
     Bounds gate:   checks effective_offset <= the full descriptor limit and
@@ -29,8 +21,7 @@ class ChurchDWrite(Elaboratable):
     write to the MMIO register file (LED, UART_TX, etc.) instead of BRAM.
 
     FSM:
-        Immediate mode: IDLE -> PERM_CHECK -> MEM_WRITE
-        Indexed mode:   IDLE -> READ_DRX   -> PERM_CHECK -> MEM_WRITE
+        IDLE -> PERM_CHECK -> MEM_WRITE
     """
 
     def __init__(self):
@@ -115,8 +106,8 @@ class ChurchDWrite(Elaboratable):
             has_w.eq(~cr_gt.dom & cr_gt.perm[PERM_W]),
             limit.eq(cr_w2.limit_offset),
             eff_off.eq(Mux(imm_reg[14],
-                           imm_reg[:14],                        # immediate: bits[13:0]
-                           (imm_reg[4:14] + drx_val_reg))),     # indexed: base + full DR[DRx]
+                           Cat(drx_val_reg, C(0, 1)) - imm_reg[4:14],
+                           Cat(drx_val_reg, C(0, 1)) + imm_reg[4:14])),
             in_bounds.eq((eff_off <= limit) & (effective_addr[32:] == 0)),
             exact_m_cap.eq(
                 (cr_gt.gt_type == GT_TYPE_INFORM) &
@@ -136,7 +127,7 @@ class ChurchDWrite(Elaboratable):
             # Port 1 (source data): always driven by dr_src_reg when busy
             self.dr_rd_addr.eq(Mux(self.busy, dr_src_reg, self.dr_src)),
             # Port 2 (DRx for indexed mode): driven by imm[3:0]
-            self.dr_rd_addr2.eq(imm_reg[:4]),
+            self.dr_rd_addr2.eq(Mux(self.start, self.imm[:4], imm_reg[:4])),
         ]
 
         with m.FSM(name="dwrite_fsm"):
@@ -145,24 +136,14 @@ class ChurchDWrite(Elaboratable):
                     m.d.sync += [
                         cr_src_reg.eq(self.cr_src),
                         dr_src_reg.eq(self.dr_src),
-                        imm_reg.eq(Mux(self.private_m_start, 0x4000, self.imm)),
-                        drx_val_reg.eq(0),
+                        imm_reg.eq(Mux(self.private_m_start, 0, self.imm)),
+                        drx_val_reg.eq(Mux(self.private_m_start | (self.imm[:4] == 0),
+                                           0, self.dr_rd_data2)),
                         namespace_authorized_reg.eq(self.namespace_authorized),
                         private_mode_reg.eq(self.private_m_start),
                         private_word_reg.eq(self.private_m_word),
                     ]
-                    with m.If(~self.private_m_start & ~self.imm[14]):
-                        # Indexed mode: need one extra cycle to read DR[DRx]
-                        m.next = "READ_DRX"
-                    with m.Else():
-                        m.next = "PERM_CHECK"
-
-            with m.State("READ_DRX"):
-                # Latch dr_rd_data2 (DR[DRx]) into drx_val_reg.
-                # dr_data for the source is latched in PERM_CHECK (same as immediate path).
-                m.d.comb += self.busy.eq(1)
-                m.d.sync += drx_val_reg.eq(Mux(imm_reg[:4] == 0, 0, self.dr_rd_data2))
-                m.next = "PERM_CHECK"
+                    m.next = "PERM_CHECK"
 
             with m.State("PERM_CHECK"):
                 m.d.comb += self.busy.eq(1)

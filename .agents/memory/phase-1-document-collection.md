@@ -9,6 +9,14 @@ shared collection, starting with the ISA.
 Keep the active Phase 1 reading path short: Master ISA plus hardware acceptance;
 keep expanded rationale, old plans and proposals outside the active folder.
 
+The user also requested a copy of the RTL inside the Phase 1 collection.
+
+**Why:** The Phase 1 handoff should include implementation source alongside the
+specification, without moving or replacing the working hardware tree.
+
+**How to apply:** Treat the copy as an explicitly refreshed reference snapshot,
+not a second maintained implementation or evidence of bitstream qualification.
+
 IADD/ISUB arithmetic immediates remain unsigned, 0–16383.
 
 **Why:** The user explicitly chose preserving existing unsigned hardware behavior
@@ -86,11 +94,14 @@ its write edge must prove completion. Never invent a latency bound from a tied
 done signal. If bounded completion cannot be established, keep recovery writes
 blocked rather than claim a successful save.
 
-Prefer shared checked indexing arithmetic with internal sequencing over
-duplicated parallel index units, while preserving all approved ISA semantics.
+Prefer checked operand calculation at the existing acceptance boundary for
+the current core; resolved multi-cycle operands must then be latched.
 
-**Why:** The user delegated routine FPGA choices in favor of the simplest
-design; sharing arithmetic is the selected direction, not a measured resource win.
+**Why:** Under delegated simplest-design discretion, the RTL implementation
+revised the earlier shared/sequenced-adder preference: adding frontend staging
+would add instruction ownership/replay states. Extra combinational read/arithmetic
+paths preserve the existing acceptance contract more simply. No area/timing
+advantage is claimed; physical resource/timing acceptance remains mandatory.
 
 **How to apply:** Capture operands before register mutation and preserve wide
 intermediates until validation. Do not unify instruction-specific bounds/flags,
