@@ -8683,6 +8683,9 @@ async function openLumpInEditor(token, options) {
         // Keep a previous run visibly stale when this editor context changes.
         var _setSavedLumpEditorSource = function(source) {
             asmEd.value = source == null ? '' : source;
+            if (typeof _syncSavedSourceLanguage === 'function') {
+                _syncSavedSourceLanguage(asmEd.value);
+            }
             if (window.ExecutionIdentity) {
                 window.ExecutionIdentity.updateEditor(asmEd.value);
             }

@@ -12697,10 +12697,15 @@ function _refreshEditorActionIdentity(name) {
     const identityName = document.getElementById('editorCodeName');
     if (identityName) {
         const openMeta = window._editorOpenLumpMeta;
+        const receipt = window._editorSavedBinaryReceipt;
+        const ownedReceipt = receipt && window._editorOpenLumpToken &&
+            receipt.token === window._editorOpenLumpToken ? receipt : null;
         const revision = tab && Number.isInteger(tab.sourceRevision)
             ? tab.sourceRevision
             : (openMeta && Number.isInteger(openMeta.lump_version)
-                ? openMeta.lump_version : null);
+                ? openMeta.lump_version
+                : ownedReceipt && Number.isInteger(ownedReceipt.lump_version)
+                    ? ownedReceipt.lump_version : null);
         identityName.textContent = chosenName +
             (Number.isInteger(revision) ? ` · Source v${revision}` : '');
         identityName.title = chosenName
@@ -12708,6 +12713,17 @@ function _refreshEditorActionIdentity(name) {
                 (Number.isInteger(revision) ? `; source revision v${revision}` : '')
             : 'Program name';
         identityName.setAttribute('aria-label', 'Program name and source revision');
+    }
+}
+
+// Respect the saved document's explicit declaration without rewriting its bytes.
+function _syncSavedSourceLanguage(source) {
+    const selector = document.getElementById('langSelector');
+    if (!selector || typeof source !== 'string') return;
+    if (/^\s*;\s*Language:\s*Assembly\s*$/im.test(source) &&
+            selector.value !== 'assembly') {
+        selector.value = 'assembly';
+        if (typeof onLangChange === 'function') onLangChange(true);
     }
 }
 
@@ -13002,6 +13018,7 @@ function loadEditorState() {
     window._editorStateHydrated = true;
     if (documentState && documentState.owner.type === 'lump' &&
             typeof window._restoreSavedLumpBinaryPresentation === 'function') {
+        _syncSavedSourceLanguage(editor.value);
         // Source hydration is finished; fetch only the adjacent immutable
         // binary. No source-replacement consent or saved-content loader.
         void window._restoreSavedLumpBinaryPresentation(
