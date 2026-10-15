@@ -25,13 +25,6 @@ or application changes.
 Implementation is incomplete. A documented decision is not a passed test.
 Older authorization statements describe their original decision only.
 
-## Look up only when needed
-
-- [Decision history and implementation findings](REVIEW-2026-10-14.md)
-- [Audit and correction status](CONSISTENCY-AUDIT.md)
-- [Supporting documents and historical references](REFERENCE-INDEX.md)
-- [Missing historical PDF](UNAVAILABLE-SOURCES.md)
-
 This folder is self-contained. Keep local files and links current; do not add
-a manifest or symlinks. Historical metadata records provenance, not current
-authority. Run `python3 scripts/check_phase_1_documents.py` to check local links.
+a manifest, symlinks or historical documents.
+Run `python3 scripts/check_phase_1_documents.py` to check local links.

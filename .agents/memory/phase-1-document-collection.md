@@ -7,7 +7,7 @@ Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
 Keep the active Phase 1 reading path short: Master ISA plus hardware acceptance;
-put expanded rationale, old plans and proposals in linked reference/history.
+keep expanded rationale, old plans and proposals outside the active folder.
 
 **Why:** The user explicitly requested less text, KISS and quicker understanding
 when approving the consistency audit's simplifications.
@@ -15,6 +15,9 @@ when approving the consistency audit's simplifications.
 **How to apply:** Remove duplicated normative summaries rather than multiplying
 overrides. Preserve approved details and historical evidence, but do not make
 readers reconcile old and new rules to understand current hardware requirements.
+The user explicitly agreed to move history out of Phase 1. Preserve the expanded
+collection in docs/archive/phase-1-expanded-collection, not as required reading
+or a competing contract inside docs/phase-1.
 
 The user superseded the symlink/single-source collection design: Phase 1 must
 contain real local copies and internal reading links so it can stand alone.

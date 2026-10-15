@@ -56,5 +56,3 @@ still need measured/integrated evidence.
 Compiler, simulator-feature, IDE attribution, Mint and service delivery proceed
 separately. Their incompleteness does not block hardware work or excuse a hardware
 mismatch.
-
-[Previous expanded plan and evidence context](alignment-plan-history.md) — history only.

@@ -4,14 +4,11 @@
 
 - [Document authority](#document-authority)
 - [Approved Phase 1 contract](#approved-phase-1-contract)
-- [October 2026 amendment reconciliation](#october-2026-amendment-reconciliation)
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
 - [Uniform indexed operands](#uniform-indexed-operands)
 - [SWITCH: combined Namespace/Thread handoff](#switch-isolated-register-load)
 - [Retired opcodes and reference forms](#retired-opcodes-and-directindirect-reference-forms)
-- [Historical evidence and inventory](../05-review-history/instruction-set-history.md)
-- [Legacy section links](#historical-section-links)
 
 ## Document authority
 
@@ -42,7 +39,7 @@ override these corrections or establish a new encoding layout.
 ## Approved Phase 1 contract
 
 **Reconciled from explicit Genesis decisions, 2026-10-14.** The
-[resolution log](../REVIEW-2026-10-14.md#resolution-log--guided-review)
+resolution log
 is the decision evidence. These are target requirements, not claims that the
 compiler, simulator, RTL, saved images or physical board already conform.
 Explicit approvals and routine FPGA choices made under delegated engineering
@@ -536,7 +533,7 @@ emit **one designated non-executable word** using existing INVALID_OP.
 Genesis selected **`0xF7000000`** following isolated verification, not a new executable opcode.
 It must remain non-executable in future ISA revisions; HALT is not a substitute.
 
-See [verification evidence and remaining gates](../HARDFAULT-CANDIDATE-VERIFICATION.md).
+See verification evidence and remaining gates.
 Compiler emission remains disabled; physical behavior is not verified.
 
 The compiler records an exact-artifact map:
@@ -598,7 +595,7 @@ service-reload delivery option below, and does not waive admission checks.
 Working Mint, pkverify and controlled nstab remain software-delivery requirements.
 Their completion and the validated reloadable-LUMP delivery path do not block
 the Phase 1 bitstream; do not confuse bitstream readiness with completion of the
-software-inclusive release. The [Mint contract](../03-namespace-thread-mint/ide-mint-forge-contract.md)
+software-inclusive release. The Mint contract
 governs the approved scope, single-slot LAMBDA, proof and publication boundaries.
 
 **Mint object scope — approved:** Phase 1 supports application Abstractions,
@@ -685,7 +682,7 @@ for Phase 1. The revised draft uses [30:27] for that ID, retains B as Bind and
 leaves [24:0] Owner-defined without a required generation/ID split.
 Do not adopt `0x0E000000` as
 a universal PassKey prefix or reserve that combination as its subtype marker.
-See the [format draft](../MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
+See the format draft.
 This does not change the approved separate-proof or sharing requirements.
 
 **PassKey revocation scope — approved:** Revocation invalidates the PassKey
@@ -713,9 +710,9 @@ supersedes the earlier pending status wherever an explicit decision now exists.
 Historical proposals remain evidence, not additional approvals.
 
 **Documentation correction — 2026-10-14.** This section reconciles the
-[October 13 completeness review](../05-review-history/isa-completeness-review-2026-10-13.txt)
+October 13 completeness review
 with this master and the
-[Design Team reconciliation](../05-review-history/isa-amendment-reconciliation-2026-10-13.md).
+Design Team reconciliation.
 It clarifies authority and release requirements; it does **not** approve an
 unresolved instruction encoding, boot replacement, watchdog mechanism, or
 implementation cutover.
@@ -724,10 +721,10 @@ implementation cutover.
 
 The two October 9 review editions are different historical proposals:
 
-* [Special operations and cooperative scheduling](../05-review-history/isa-review-cooperative-round-robin-hard-faults.html)
+* Special operations and cooperative scheduling
   proposes cooperative scheduling and withdraws the earlier IRQRETURN proposal
   within the review series.
-* [Split 13-bit CHANGE magnitude](../05-review-history/isa-review-change-split13-magnitude.html)
+* Split 13-bit CHANGE magnitude
   contains the earlier IRQ exchange/IRQRETURN alternative.
 
 Keep both editions and their manifests unchanged. Neither their dates, their
@@ -766,7 +763,7 @@ No collision or current execution defect is claimed by this inventory.
 | `0x27000002` | Earlier `IRQRETURN` candidate in the split-magnitude review, subsequently withdrawn within the review series. | No executable IRQRETURN allocation is approved here; include this exact word in negative/disposition checks. |
 
 The source observation for `0x27678001` is the three-instruction
-`BOOT_PROGRAM` in [hardware/boot_rom.py](../references/hardware/boot_rom.py):
+`BOOT_PROGRAM` in hardware/boot_rom.py:
 LOAD, CHANGE, CALL. Its legacy encoder computes
 `(4 << 27) | (14 << 23) | (12 << 19) | (15 << 15) | 1`.
 This is not verification of generated ROM bytes, FPGA decoding, flashed
@@ -878,7 +875,7 @@ and CALL validation. The immediate is sign-and-magnitude, not two's complement.
 The three forms are distinct: indexed C-list has bit 18=1; direct runtime has
 [18:16]=001; direct-immediate retains [18:15]=0000 and its 15-bit selector.
 The old indexed A=0/B=6 tag is 011 and remains invalid. See the
-[approved encoding record](../CALL-SINGLE-WORD-DRAFT.md).
+approved encoding record.
 The direct-CALL runtime-method encoding gap is now resolved. Never use
 multiword instruction proposals.
 Approval does not claim implementation or simulator/RTL/physical conformance.
@@ -1013,30 +1010,6 @@ The isolated regression is `node simulator/test_change_one_gt.js`.
 Boot uses the **back half** of the Thread transition: the incoming Thread is
 loaded into CR12. There is no outgoing programmatic Thread context to suspend.
 This special initialization path does not add operands to programmatic CHANGE.
-
-### Earlier IRQ hardware exception — superseded for Phase 1
-
-**Historical status — 2026-10-14:** The following paragraphs retain the
-earlier semantic correction and its distinction between CHANGE and IRQ return.
-The approved Phase 1 contract reserves CR13 NULL and never touched.
-The older IRQ exchange below is not Phase 1 behavior. Do not treat it as approval
-to implement IRQ swapping, add an IRQRETURN opcode, or repurpose ordinary
-`CHANGE CR13`. See the
-[reconciliation status](#october-2026-amendment-reconciliation).
-
-IRQ entry is **not a CHANGE instruction**. Hardware can swap CR12 and CR13
-directly, without the additional work of the general programmatic CHANGE path.
-IRQ return must perform the **matching hidden swap back**, not CHANGE. The
-entry and return operations are paired hardware exceptions; neither uses the
-general programmatic Thread-transition path. The earlier statement that IRQ
-return uses `CHANGE CR12` is withdrawn. The trigger or instruction encoding
-for the return operation is not specified by this correction.
-
-An [M-gated hidden-return proposal](../references/docs/irq-hidden-return-proposal.md) explores
-requiring both CR12.M and CR13.M and a candidate `CHANGE CR13, CR13` trigger.
-It is **discussion only**, not an approved extension to general CHANGE.
-The meaning of a hidden swap with an unchanged CR13, the back-half behavior,
-and the return authorization/consumption rules remain to be agreed.
 
 ### Encoding and implementation status
 
@@ -1292,7 +1265,7 @@ leaves CR15 unchanged; CR13 is NULL and never touched. The earlier blanket
 CR12–CR14 isolated-LOAD qualification is not reaffirmed by this approval.
 The CR15 handoff below retains ordinary admission checks; this does not
 claim simulator or RTL conformance, rewrite saved programs, regenerate boot
-images, or approve hardware. See also [SWITCH lifecycle](switch-lifecycle.md).
+images, or approve hardware. See also SWITCH lifecycle.
 
 In the descriptive notation `SWITCH CR15, CRs, #row`, CR15 denotes the fixed
 destination, not bits to encode as 15. Machine bits 22:19 are required zero.
@@ -1360,273 +1333,3 @@ blacklisting; an already-stale GT does not cause another slot-version change.
 A Boot Thread fault leaves the CM in purgatory, not an automatically reachable
 management or fallback Thread.
 
-# Historical baseline — not current instruction guidance
-
-The repeated baseline has moved to the [Historical ISA baseline reference](../05-review-history/instruction-set-history.md).
-It is evidence only, not current instruction guidance. No saved program has
-been changed. Both distinct RETURN versions and all other historical text
-are preserved; the reference explains the exact-copy inventory.
-
-## Historical section links
-
-Old section anchors below lead to the preserved historical text. For current
-rules, use the normative sections above. Numbered duplicate anchors are also
-retained for links made by Markdown viewers that numbered repeated headings.
-
-## Encoding Format
-
-<a id="encoding-format-1"></a><a id="encoding-format-2"></a><a id="encoding-format-3"></a><a id="encoding-format-4"></a><a id="encoding-format-5"></a><a id="encoding-format-6"></a><a id="encoding-format-7"></a><a id="encoding-format-8"></a><a id="encoding-format-9"></a><a id="encoding-format-10"></a><a id="encoding-format-11"></a><a id="encoding-format-12"></a><a id="encoding-format-13"></a><a id="encoding-format-14"></a><a id="encoding-format-15"></a><a id="encoding-format-16"></a><a id="encoding-format-17"></a><a id="encoding-format-18"></a><a id="encoding-format-19"></a><a id="encoding-format-20"></a><a id="encoding-format-21"></a><a id="encoding-format-22"></a><a id="encoding-format-23"></a><a id="encoding-format-24"></a><a id="encoding-format-25"></a><a id="encoding-format-26"></a><a id="encoding-format-27"></a><a id="encoding-format-28"></a><a id="encoding-format-29"></a><a id="encoding-format-30"></a><a id="encoding-format-31"></a>
-
-Historical only: [Encoding Format](../05-review-history/instruction-set-history.md#encoding-format).
-
-## Condition Codes
-
-<a id="condition-codes-1"></a><a id="condition-codes-2"></a><a id="condition-codes-3"></a><a id="condition-codes-4"></a><a id="condition-codes-5"></a><a id="condition-codes-6"></a><a id="condition-codes-7"></a><a id="condition-codes-8"></a><a id="condition-codes-9"></a><a id="condition-codes-10"></a><a id="condition-codes-11"></a><a id="condition-codes-12"></a><a id="condition-codes-13"></a><a id="condition-codes-14"></a><a id="condition-codes-15"></a><a id="condition-codes-16"></a><a id="condition-codes-17"></a><a id="condition-codes-18"></a><a id="condition-codes-19"></a><a id="condition-codes-20"></a><a id="condition-codes-21"></a><a id="condition-codes-22"></a><a id="condition-codes-23"></a><a id="condition-codes-24"></a><a id="condition-codes-25"></a><a id="condition-codes-26"></a><a id="condition-codes-27"></a><a id="condition-codes-28"></a><a id="condition-codes-29"></a><a id="condition-codes-30"></a><a id="condition-codes-31"></a>
-
-Historical only: [Condition Codes](../05-review-history/instruction-set-history.md#condition-codes).
-
-## Church Domain (10 Instructions)
-
-<a id="church-domain-10-instructions-1"></a><a id="church-domain-10-instructions-2"></a><a id="church-domain-10-instructions-3"></a><a id="church-domain-10-instructions-4"></a><a id="church-domain-10-instructions-5"></a><a id="church-domain-10-instructions-6"></a><a id="church-domain-10-instructions-7"></a><a id="church-domain-10-instructions-8"></a><a id="church-domain-10-instructions-9"></a><a id="church-domain-10-instructions-10"></a><a id="church-domain-10-instructions-11"></a><a id="church-domain-10-instructions-12"></a><a id="church-domain-10-instructions-13"></a><a id="church-domain-10-instructions-14"></a><a id="church-domain-10-instructions-15"></a><a id="church-domain-10-instructions-16"></a><a id="church-domain-10-instructions-17"></a><a id="church-domain-10-instructions-18"></a><a id="church-domain-10-instructions-19"></a><a id="church-domain-10-instructions-20"></a><a id="church-domain-10-instructions-21"></a><a id="church-domain-10-instructions-22"></a><a id="church-domain-10-instructions-23"></a><a id="church-domain-10-instructions-24"></a><a id="church-domain-10-instructions-25"></a><a id="church-domain-10-instructions-26"></a><a id="church-domain-10-instructions-27"></a><a id="church-domain-10-instructions-28"></a><a id="church-domain-10-instructions-29"></a><a id="church-domain-10-instructions-30"></a><a id="church-domain-10-instructions-31"></a>
-
-Historical only: [Church Domain (10 Instructions)](../05-review-history/instruction-set-history.md#church-domain-10-instructions).
-
-### LOAD (opcode 0)
-
-<a id="load-opcode-0-1"></a><a id="load-opcode-0-2"></a><a id="load-opcode-0-3"></a><a id="load-opcode-0-4"></a><a id="load-opcode-0-5"></a><a id="load-opcode-0-6"></a><a id="load-opcode-0-7"></a><a id="load-opcode-0-8"></a><a id="load-opcode-0-9"></a><a id="load-opcode-0-10"></a><a id="load-opcode-0-11"></a><a id="load-opcode-0-12"></a><a id="load-opcode-0-13"></a><a id="load-opcode-0-14"></a><a id="load-opcode-0-15"></a><a id="load-opcode-0-16"></a><a id="load-opcode-0-17"></a><a id="load-opcode-0-18"></a><a id="load-opcode-0-19"></a><a id="load-opcode-0-20"></a><a id="load-opcode-0-21"></a><a id="load-opcode-0-22"></a><a id="load-opcode-0-23"></a><a id="load-opcode-0-24"></a><a id="load-opcode-0-25"></a><a id="load-opcode-0-26"></a><a id="load-opcode-0-27"></a><a id="load-opcode-0-28"></a><a id="load-opcode-0-29"></a><a id="load-opcode-0-30"></a><a id="load-opcode-0-31"></a>
-
-Historical only: [LOAD (opcode 0)](../05-review-history/instruction-set-history.md#load-opcode-0).
-
-### SAVE (opcode 1)
-
-<a id="save-opcode-1-1"></a><a id="save-opcode-1-2"></a><a id="save-opcode-1-3"></a><a id="save-opcode-1-4"></a><a id="save-opcode-1-5"></a><a id="save-opcode-1-6"></a><a id="save-opcode-1-7"></a><a id="save-opcode-1-8"></a><a id="save-opcode-1-9"></a><a id="save-opcode-1-10"></a><a id="save-opcode-1-11"></a><a id="save-opcode-1-12"></a><a id="save-opcode-1-13"></a><a id="save-opcode-1-14"></a><a id="save-opcode-1-15"></a><a id="save-opcode-1-16"></a><a id="save-opcode-1-17"></a><a id="save-opcode-1-18"></a><a id="save-opcode-1-19"></a><a id="save-opcode-1-20"></a><a id="save-opcode-1-21"></a><a id="save-opcode-1-22"></a><a id="save-opcode-1-23"></a><a id="save-opcode-1-24"></a><a id="save-opcode-1-25"></a><a id="save-opcode-1-26"></a><a id="save-opcode-1-27"></a><a id="save-opcode-1-28"></a><a id="save-opcode-1-29"></a><a id="save-opcode-1-30"></a><a id="save-opcode-1-31"></a>
-
-Historical only: [SAVE (opcode 1)](../05-review-history/instruction-set-history.md#save-opcode-1).
-
-### CALL (opcode 2)
-
-<a id="call-opcode-2-1"></a><a id="call-opcode-2-2"></a><a id="call-opcode-2-3"></a><a id="call-opcode-2-4"></a><a id="call-opcode-2-5"></a><a id="call-opcode-2-6"></a><a id="call-opcode-2-7"></a><a id="call-opcode-2-8"></a><a id="call-opcode-2-9"></a><a id="call-opcode-2-10"></a><a id="call-opcode-2-11"></a><a id="call-opcode-2-12"></a><a id="call-opcode-2-13"></a><a id="call-opcode-2-14"></a><a id="call-opcode-2-15"></a><a id="call-opcode-2-16"></a><a id="call-opcode-2-17"></a><a id="call-opcode-2-18"></a><a id="call-opcode-2-19"></a><a id="call-opcode-2-20"></a><a id="call-opcode-2-21"></a><a id="call-opcode-2-22"></a><a id="call-opcode-2-23"></a><a id="call-opcode-2-24"></a><a id="call-opcode-2-25"></a><a id="call-opcode-2-26"></a><a id="call-opcode-2-27"></a><a id="call-opcode-2-28"></a><a id="call-opcode-2-29"></a><a id="call-opcode-2-30"></a><a id="call-opcode-2-31"></a>
-
-Historical only: [CALL (opcode 2)](../05-review-history/instruction-set-history.md#call-opcode-2).
-
-### RETURN (opcode 3)
-
-Historical only: [RETURN (opcode 3), first baseline](../05-review-history/instruction-set-history.md#return-opcode-3).
-
-<a id="return-opcode-3-1"></a><a id="return-opcode-3-2"></a><a id="return-opcode-3-3"></a><a id="return-opcode-3-4"></a><a id="return-opcode-3-5"></a><a id="return-opcode-3-6"></a><a id="return-opcode-3-7"></a><a id="return-opcode-3-8"></a><a id="return-opcode-3-9"></a><a id="return-opcode-3-10"></a><a id="return-opcode-3-11"></a><a id="return-opcode-3-12"></a><a id="return-opcode-3-13"></a><a id="return-opcode-3-14"></a><a id="return-opcode-3-15"></a><a id="return-opcode-3-16"></a><a id="return-opcode-3-17"></a><a id="return-opcode-3-18"></a><a id="return-opcode-3-19"></a><a id="return-opcode-3-20"></a><a id="return-opcode-3-21"></a><a id="return-opcode-3-22"></a><a id="return-opcode-3-23"></a><a id="return-opcode-3-24"></a><a id="return-opcode-3-25"></a><a id="return-opcode-3-26"></a><a id="return-opcode-3-27"></a><a id="return-opcode-3-28"></a><a id="return-opcode-3-29"></a><a id="return-opcode-3-30"></a><a id="return-opcode-3-31"></a>
-
-Historical copies 2–32: [earlier RETURN variant](../05-review-history/instruction-set-history.md#earlier-return-variant).
-
-### CHANGE (opcode 4)
-
-<a id="change-opcode-4-1"></a><a id="change-opcode-4-2"></a><a id="change-opcode-4-3"></a><a id="change-opcode-4-4"></a><a id="change-opcode-4-5"></a><a id="change-opcode-4-6"></a><a id="change-opcode-4-7"></a><a id="change-opcode-4-8"></a><a id="change-opcode-4-9"></a><a id="change-opcode-4-10"></a><a id="change-opcode-4-11"></a><a id="change-opcode-4-12"></a><a id="change-opcode-4-13"></a><a id="change-opcode-4-14"></a><a id="change-opcode-4-15"></a><a id="change-opcode-4-16"></a><a id="change-opcode-4-17"></a><a id="change-opcode-4-18"></a><a id="change-opcode-4-19"></a><a id="change-opcode-4-20"></a><a id="change-opcode-4-21"></a><a id="change-opcode-4-22"></a><a id="change-opcode-4-23"></a><a id="change-opcode-4-24"></a><a id="change-opcode-4-25"></a><a id="change-opcode-4-26"></a><a id="change-opcode-4-27"></a><a id="change-opcode-4-28"></a><a id="change-opcode-4-29"></a><a id="change-opcode-4-30"></a><a id="change-opcode-4-31"></a>
-
-Historical only: [CHANGE (opcode 4)](../05-review-history/instruction-set-history.md#change-opcode-4).
-
-### SWITCH (opcode 5)
-
-<a id="switch-opcode-5-1"></a><a id="switch-opcode-5-2"></a><a id="switch-opcode-5-3"></a><a id="switch-opcode-5-4"></a><a id="switch-opcode-5-5"></a><a id="switch-opcode-5-6"></a><a id="switch-opcode-5-7"></a><a id="switch-opcode-5-8"></a><a id="switch-opcode-5-9"></a><a id="switch-opcode-5-10"></a><a id="switch-opcode-5-11"></a><a id="switch-opcode-5-12"></a><a id="switch-opcode-5-13"></a><a id="switch-opcode-5-14"></a><a id="switch-opcode-5-15"></a><a id="switch-opcode-5-16"></a><a id="switch-opcode-5-17"></a><a id="switch-opcode-5-18"></a><a id="switch-opcode-5-19"></a><a id="switch-opcode-5-20"></a><a id="switch-opcode-5-21"></a><a id="switch-opcode-5-22"></a><a id="switch-opcode-5-23"></a><a id="switch-opcode-5-24"></a><a id="switch-opcode-5-25"></a><a id="switch-opcode-5-26"></a><a id="switch-opcode-5-27"></a><a id="switch-opcode-5-28"></a><a id="switch-opcode-5-29"></a><a id="switch-opcode-5-30"></a><a id="switch-opcode-5-31"></a>
-
-Historical only: [SWITCH (opcode 5)](../05-review-history/instruction-set-history.md#switch-opcode-5).
-
-### TPERM (opcode 6)
-
-<a id="tperm-opcode-6-1"></a><a id="tperm-opcode-6-2"></a><a id="tperm-opcode-6-3"></a><a id="tperm-opcode-6-4"></a><a id="tperm-opcode-6-5"></a><a id="tperm-opcode-6-6"></a><a id="tperm-opcode-6-7"></a><a id="tperm-opcode-6-8"></a><a id="tperm-opcode-6-9"></a><a id="tperm-opcode-6-10"></a><a id="tperm-opcode-6-11"></a><a id="tperm-opcode-6-12"></a><a id="tperm-opcode-6-13"></a><a id="tperm-opcode-6-14"></a><a id="tperm-opcode-6-15"></a><a id="tperm-opcode-6-16"></a><a id="tperm-opcode-6-17"></a><a id="tperm-opcode-6-18"></a><a id="tperm-opcode-6-19"></a><a id="tperm-opcode-6-20"></a><a id="tperm-opcode-6-21"></a><a id="tperm-opcode-6-22"></a><a id="tperm-opcode-6-23"></a><a id="tperm-opcode-6-24"></a><a id="tperm-opcode-6-25"></a><a id="tperm-opcode-6-26"></a><a id="tperm-opcode-6-27"></a><a id="tperm-opcode-6-28"></a><a id="tperm-opcode-6-29"></a><a id="tperm-opcode-6-30"></a><a id="tperm-opcode-6-31"></a>
-
-Historical only: [TPERM (opcode 6)](../05-review-history/instruction-set-history.md#tperm-opcode-6).
-
-#### Encoding
-
-<a id="encoding-1"></a><a id="encoding-2"></a><a id="encoding-3"></a><a id="encoding-4"></a><a id="encoding-5"></a><a id="encoding-6"></a><a id="encoding-7"></a><a id="encoding-8"></a><a id="encoding-9"></a><a id="encoding-10"></a><a id="encoding-11"></a><a id="encoding-12"></a><a id="encoding-13"></a><a id="encoding-14"></a><a id="encoding-15"></a><a id="encoding-16"></a><a id="encoding-17"></a><a id="encoding-18"></a><a id="encoding-19"></a><a id="encoding-20"></a><a id="encoding-21"></a><a id="encoding-22"></a><a id="encoding-23"></a><a id="encoding-24"></a><a id="encoding-25"></a><a id="encoding-26"></a><a id="encoding-27"></a><a id="encoding-28"></a><a id="encoding-29"></a><a id="encoding-30"></a><a id="encoding-31"></a>
-
-Historical only: [Encoding](../05-review-history/instruction-set-history.md#encoding).
-
-#### Mode 1 — Health Check (flag-setting)
-
-<a id="mode-1--health-check-flag-setting"></a>
-
-<a id="mode-1--health-check-flag-setting-1"></a><a id="mode-1--health-check-flag-setting-2"></a><a id="mode-1--health-check-flag-setting-3"></a><a id="mode-1--health-check-flag-setting-4"></a><a id="mode-1--health-check-flag-setting-5"></a><a id="mode-1--health-check-flag-setting-6"></a><a id="mode-1--health-check-flag-setting-7"></a><a id="mode-1--health-check-flag-setting-8"></a><a id="mode-1--health-check-flag-setting-9"></a><a id="mode-1--health-check-flag-setting-10"></a><a id="mode-1--health-check-flag-setting-11"></a><a id="mode-1--health-check-flag-setting-12"></a><a id="mode-1--health-check-flag-setting-13"></a><a id="mode-1--health-check-flag-setting-14"></a><a id="mode-1--health-check-flag-setting-15"></a><a id="mode-1--health-check-flag-setting-16"></a><a id="mode-1--health-check-flag-setting-17"></a><a id="mode-1--health-check-flag-setting-18"></a><a id="mode-1--health-check-flag-setting-19"></a><a id="mode-1--health-check-flag-setting-20"></a><a id="mode-1--health-check-flag-setting-21"></a><a id="mode-1--health-check-flag-setting-22"></a><a id="mode-1--health-check-flag-setting-23"></a><a id="mode-1--health-check-flag-setting-24"></a><a id="mode-1--health-check-flag-setting-25"></a><a id="mode-1--health-check-flag-setting-26"></a><a id="mode-1--health-check-flag-setting-27"></a><a id="mode-1--health-check-flag-setting-28"></a><a id="mode-1--health-check-flag-setting-29"></a><a id="mode-1--health-check-flag-setting-30"></a><a id="mode-1--health-check-flag-setting-31"></a><a id="mode-1-health-check-flag-setting-1"></a><a id="mode-1-health-check-flag-setting-2"></a><a id="mode-1-health-check-flag-setting-3"></a><a id="mode-1-health-check-flag-setting-4"></a><a id="mode-1-health-check-flag-setting-5"></a><a id="mode-1-health-check-flag-setting-6"></a><a id="mode-1-health-check-flag-setting-7"></a><a id="mode-1-health-check-flag-setting-8"></a><a id="mode-1-health-check-flag-setting-9"></a><a id="mode-1-health-check-flag-setting-10"></a><a id="mode-1-health-check-flag-setting-11"></a><a id="mode-1-health-check-flag-setting-12"></a><a id="mode-1-health-check-flag-setting-13"></a><a id="mode-1-health-check-flag-setting-14"></a><a id="mode-1-health-check-flag-setting-15"></a><a id="mode-1-health-check-flag-setting-16"></a><a id="mode-1-health-check-flag-setting-17"></a><a id="mode-1-health-check-flag-setting-18"></a><a id="mode-1-health-check-flag-setting-19"></a><a id="mode-1-health-check-flag-setting-20"></a><a id="mode-1-health-check-flag-setting-21"></a><a id="mode-1-health-check-flag-setting-22"></a><a id="mode-1-health-check-flag-setting-23"></a><a id="mode-1-health-check-flag-setting-24"></a><a id="mode-1-health-check-flag-setting-25"></a><a id="mode-1-health-check-flag-setting-26"></a><a id="mode-1-health-check-flag-setting-27"></a><a id="mode-1-health-check-flag-setting-28"></a><a id="mode-1-health-check-flag-setting-29"></a><a id="mode-1-health-check-flag-setting-30"></a><a id="mode-1-health-check-flag-setting-31"></a>
-
-Historical only: [Mode 1 — Health Check (flag-setting)](../05-review-history/instruction-set-history.md#mode-1-health-check-flag-setting).
-
-##### Conditional Execution: Zero-Cost Try-Catch
-
-<a id="conditional-execution-zero-cost-try-catch-1"></a><a id="conditional-execution-zero-cost-try-catch-2"></a><a id="conditional-execution-zero-cost-try-catch-3"></a><a id="conditional-execution-zero-cost-try-catch-4"></a><a id="conditional-execution-zero-cost-try-catch-5"></a><a id="conditional-execution-zero-cost-try-catch-6"></a><a id="conditional-execution-zero-cost-try-catch-7"></a><a id="conditional-execution-zero-cost-try-catch-8"></a><a id="conditional-execution-zero-cost-try-catch-9"></a><a id="conditional-execution-zero-cost-try-catch-10"></a><a id="conditional-execution-zero-cost-try-catch-11"></a><a id="conditional-execution-zero-cost-try-catch-12"></a><a id="conditional-execution-zero-cost-try-catch-13"></a><a id="conditional-execution-zero-cost-try-catch-14"></a><a id="conditional-execution-zero-cost-try-catch-15"></a><a id="conditional-execution-zero-cost-try-catch-16"></a><a id="conditional-execution-zero-cost-try-catch-17"></a><a id="conditional-execution-zero-cost-try-catch-18"></a><a id="conditional-execution-zero-cost-try-catch-19"></a><a id="conditional-execution-zero-cost-try-catch-20"></a><a id="conditional-execution-zero-cost-try-catch-21"></a><a id="conditional-execution-zero-cost-try-catch-22"></a><a id="conditional-execution-zero-cost-try-catch-23"></a><a id="conditional-execution-zero-cost-try-catch-24"></a><a id="conditional-execution-zero-cost-try-catch-25"></a><a id="conditional-execution-zero-cost-try-catch-26"></a><a id="conditional-execution-zero-cost-try-catch-27"></a><a id="conditional-execution-zero-cost-try-catch-28"></a><a id="conditional-execution-zero-cost-try-catch-29"></a><a id="conditional-execution-zero-cost-try-catch-30"></a><a id="conditional-execution-zero-cost-try-catch-31"></a>
-
-Historical only: [Conditional Execution: Zero-Cost Try-Catch](../05-review-history/instruction-set-history.md#conditional-execution-zero-cost-try-catch).
-
-#### Mode 2 — Permission Restriction (monotonic attenuation)
-
-<a id="mode-2--permission-restriction-monotonic-attenuation"></a>
-
-<a id="mode-2--permission-restriction-monotonic-attenuation-1"></a><a id="mode-2--permission-restriction-monotonic-attenuation-2"></a><a id="mode-2--permission-restriction-monotonic-attenuation-3"></a><a id="mode-2--permission-restriction-monotonic-attenuation-4"></a><a id="mode-2--permission-restriction-monotonic-attenuation-5"></a><a id="mode-2--permission-restriction-monotonic-attenuation-6"></a><a id="mode-2--permission-restriction-monotonic-attenuation-7"></a><a id="mode-2--permission-restriction-monotonic-attenuation-8"></a><a id="mode-2--permission-restriction-monotonic-attenuation-9"></a><a id="mode-2--permission-restriction-monotonic-attenuation-10"></a><a id="mode-2--permission-restriction-monotonic-attenuation-11"></a><a id="mode-2--permission-restriction-monotonic-attenuation-12"></a><a id="mode-2--permission-restriction-monotonic-attenuation-13"></a><a id="mode-2--permission-restriction-monotonic-attenuation-14"></a><a id="mode-2--permission-restriction-monotonic-attenuation-15"></a><a id="mode-2--permission-restriction-monotonic-attenuation-16"></a><a id="mode-2--permission-restriction-monotonic-attenuation-17"></a><a id="mode-2--permission-restriction-monotonic-attenuation-18"></a><a id="mode-2--permission-restriction-monotonic-attenuation-19"></a><a id="mode-2--permission-restriction-monotonic-attenuation-20"></a><a id="mode-2--permission-restriction-monotonic-attenuation-21"></a><a id="mode-2--permission-restriction-monotonic-attenuation-22"></a><a id="mode-2--permission-restriction-monotonic-attenuation-23"></a><a id="mode-2--permission-restriction-monotonic-attenuation-24"></a><a id="mode-2--permission-restriction-monotonic-attenuation-25"></a><a id="mode-2--permission-restriction-monotonic-attenuation-26"></a><a id="mode-2--permission-restriction-monotonic-attenuation-27"></a><a id="mode-2--permission-restriction-monotonic-attenuation-28"></a><a id="mode-2--permission-restriction-monotonic-attenuation-29"></a><a id="mode-2--permission-restriction-monotonic-attenuation-30"></a><a id="mode-2--permission-restriction-monotonic-attenuation-31"></a><a id="mode-2-permission-restriction-monotonic-attenuation-1"></a><a id="mode-2-permission-restriction-monotonic-attenuation-2"></a><a id="mode-2-permission-restriction-monotonic-attenuation-3"></a><a id="mode-2-permission-restriction-monotonic-attenuation-4"></a><a id="mode-2-permission-restriction-monotonic-attenuation-5"></a><a id="mode-2-permission-restriction-monotonic-attenuation-6"></a><a id="mode-2-permission-restriction-monotonic-attenuation-7"></a><a id="mode-2-permission-restriction-monotonic-attenuation-8"></a><a id="mode-2-permission-restriction-monotonic-attenuation-9"></a><a id="mode-2-permission-restriction-monotonic-attenuation-10"></a><a id="mode-2-permission-restriction-monotonic-attenuation-11"></a><a id="mode-2-permission-restriction-monotonic-attenuation-12"></a><a id="mode-2-permission-restriction-monotonic-attenuation-13"></a><a id="mode-2-permission-restriction-monotonic-attenuation-14"></a><a id="mode-2-permission-restriction-monotonic-attenuation-15"></a><a id="mode-2-permission-restriction-monotonic-attenuation-16"></a><a id="mode-2-permission-restriction-monotonic-attenuation-17"></a><a id="mode-2-permission-restriction-monotonic-attenuation-18"></a><a id="mode-2-permission-restriction-monotonic-attenuation-19"></a><a id="mode-2-permission-restriction-monotonic-attenuation-20"></a><a id="mode-2-permission-restriction-monotonic-attenuation-21"></a><a id="mode-2-permission-restriction-monotonic-attenuation-22"></a><a id="mode-2-permission-restriction-monotonic-attenuation-23"></a><a id="mode-2-permission-restriction-monotonic-attenuation-24"></a><a id="mode-2-permission-restriction-monotonic-attenuation-25"></a><a id="mode-2-permission-restriction-monotonic-attenuation-26"></a><a id="mode-2-permission-restriction-monotonic-attenuation-27"></a><a id="mode-2-permission-restriction-monotonic-attenuation-28"></a><a id="mode-2-permission-restriction-monotonic-attenuation-29"></a><a id="mode-2-permission-restriction-monotonic-attenuation-30"></a><a id="mode-2-permission-restriction-monotonic-attenuation-31"></a>
-
-Historical only: [Mode 2 — Permission Restriction (monotonic attenuation)](../05-review-history/instruction-set-history.md#mode-2-permission-restriction-monotonic-attenuation).
-
-#### Preset Table
-
-<a id="preset-table-1"></a><a id="preset-table-2"></a><a id="preset-table-3"></a><a id="preset-table-4"></a><a id="preset-table-5"></a><a id="preset-table-6"></a><a id="preset-table-7"></a><a id="preset-table-8"></a><a id="preset-table-9"></a><a id="preset-table-10"></a><a id="preset-table-11"></a><a id="preset-table-12"></a><a id="preset-table-13"></a><a id="preset-table-14"></a><a id="preset-table-15"></a><a id="preset-table-16"></a><a id="preset-table-17"></a><a id="preset-table-18"></a><a id="preset-table-19"></a><a id="preset-table-20"></a><a id="preset-table-21"></a><a id="preset-table-22"></a><a id="preset-table-23"></a><a id="preset-table-24"></a><a id="preset-table-25"></a><a id="preset-table-26"></a><a id="preset-table-27"></a><a id="preset-table-28"></a><a id="preset-table-29"></a><a id="preset-table-30"></a><a id="preset-table-31"></a>
-
-Historical only: [Preset Table](../05-review-history/instruction-set-history.md#preset-table).
-
-#### Design Rationale
-
-<a id="design-rationale-1"></a><a id="design-rationale-2"></a><a id="design-rationale-3"></a><a id="design-rationale-4"></a><a id="design-rationale-5"></a><a id="design-rationale-6"></a><a id="design-rationale-7"></a><a id="design-rationale-8"></a><a id="design-rationale-9"></a><a id="design-rationale-10"></a><a id="design-rationale-11"></a><a id="design-rationale-12"></a><a id="design-rationale-13"></a><a id="design-rationale-14"></a><a id="design-rationale-15"></a><a id="design-rationale-16"></a><a id="design-rationale-17"></a><a id="design-rationale-18"></a><a id="design-rationale-19"></a><a id="design-rationale-20"></a><a id="design-rationale-21"></a><a id="design-rationale-22"></a><a id="design-rationale-23"></a><a id="design-rationale-24"></a><a id="design-rationale-25"></a><a id="design-rationale-26"></a><a id="design-rationale-27"></a><a id="design-rationale-28"></a><a id="design-rationale-29"></a><a id="design-rationale-30"></a><a id="design-rationale-31"></a>
-
-Historical only: [Design Rationale](../05-review-history/instruction-set-history.md#design-rationale).
-
-### LAMBDA (opcode 7)
-
-<a id="lambda-opcode-7-1"></a><a id="lambda-opcode-7-2"></a><a id="lambda-opcode-7-3"></a><a id="lambda-opcode-7-4"></a><a id="lambda-opcode-7-5"></a><a id="lambda-opcode-7-6"></a><a id="lambda-opcode-7-7"></a><a id="lambda-opcode-7-8"></a><a id="lambda-opcode-7-9"></a><a id="lambda-opcode-7-10"></a><a id="lambda-opcode-7-11"></a><a id="lambda-opcode-7-12"></a><a id="lambda-opcode-7-13"></a><a id="lambda-opcode-7-14"></a><a id="lambda-opcode-7-15"></a><a id="lambda-opcode-7-16"></a><a id="lambda-opcode-7-17"></a><a id="lambda-opcode-7-18"></a><a id="lambda-opcode-7-19"></a><a id="lambda-opcode-7-20"></a><a id="lambda-opcode-7-21"></a><a id="lambda-opcode-7-22"></a><a id="lambda-opcode-7-23"></a><a id="lambda-opcode-7-24"></a><a id="lambda-opcode-7-25"></a><a id="lambda-opcode-7-26"></a><a id="lambda-opcode-7-27"></a><a id="lambda-opcode-7-28"></a><a id="lambda-opcode-7-29"></a><a id="lambda-opcode-7-30"></a><a id="lambda-opcode-7-31"></a>
-
-Historical only: [LAMBDA (opcode 7)](../05-review-history/instruction-set-history.md#lambda-opcode-7).
-
-### ELOADCALL (opcode 8)
-
-<a id="eloadcall-opcode-8-1"></a><a id="eloadcall-opcode-8-2"></a><a id="eloadcall-opcode-8-3"></a><a id="eloadcall-opcode-8-4"></a><a id="eloadcall-opcode-8-5"></a><a id="eloadcall-opcode-8-6"></a><a id="eloadcall-opcode-8-7"></a><a id="eloadcall-opcode-8-8"></a><a id="eloadcall-opcode-8-9"></a><a id="eloadcall-opcode-8-10"></a><a id="eloadcall-opcode-8-11"></a><a id="eloadcall-opcode-8-12"></a><a id="eloadcall-opcode-8-13"></a><a id="eloadcall-opcode-8-14"></a><a id="eloadcall-opcode-8-15"></a><a id="eloadcall-opcode-8-16"></a><a id="eloadcall-opcode-8-17"></a><a id="eloadcall-opcode-8-18"></a><a id="eloadcall-opcode-8-19"></a><a id="eloadcall-opcode-8-20"></a><a id="eloadcall-opcode-8-21"></a><a id="eloadcall-opcode-8-22"></a><a id="eloadcall-opcode-8-23"></a><a id="eloadcall-opcode-8-24"></a><a id="eloadcall-opcode-8-25"></a><a id="eloadcall-opcode-8-26"></a><a id="eloadcall-opcode-8-27"></a><a id="eloadcall-opcode-8-28"></a><a id="eloadcall-opcode-8-29"></a><a id="eloadcall-opcode-8-30"></a><a id="eloadcall-opcode-8-31"></a>
-
-Historical only: [ELOADCALL (opcode 8)](../05-review-history/instruction-set-history.md#eloadcall-opcode-8).
-
-### XLOADLAMBDA (opcode 9)
-
-<a id="xloadlambda-opcode-9-1"></a><a id="xloadlambda-opcode-9-2"></a><a id="xloadlambda-opcode-9-3"></a><a id="xloadlambda-opcode-9-4"></a><a id="xloadlambda-opcode-9-5"></a><a id="xloadlambda-opcode-9-6"></a><a id="xloadlambda-opcode-9-7"></a><a id="xloadlambda-opcode-9-8"></a><a id="xloadlambda-opcode-9-9"></a><a id="xloadlambda-opcode-9-10"></a><a id="xloadlambda-opcode-9-11"></a><a id="xloadlambda-opcode-9-12"></a><a id="xloadlambda-opcode-9-13"></a><a id="xloadlambda-opcode-9-14"></a><a id="xloadlambda-opcode-9-15"></a><a id="xloadlambda-opcode-9-16"></a><a id="xloadlambda-opcode-9-17"></a><a id="xloadlambda-opcode-9-18"></a><a id="xloadlambda-opcode-9-19"></a><a id="xloadlambda-opcode-9-20"></a><a id="xloadlambda-opcode-9-21"></a><a id="xloadlambda-opcode-9-22"></a><a id="xloadlambda-opcode-9-23"></a><a id="xloadlambda-opcode-9-24"></a><a id="xloadlambda-opcode-9-25"></a><a id="xloadlambda-opcode-9-26"></a><a id="xloadlambda-opcode-9-27"></a><a id="xloadlambda-opcode-9-28"></a><a id="xloadlambda-opcode-9-29"></a><a id="xloadlambda-opcode-9-30"></a><a id="xloadlambda-opcode-9-31"></a>
-
-Historical only: [XLOADLAMBDA (opcode 9)](../05-review-history/instruction-set-history.md#xloadlambda-opcode-9).
-
-## Turing Domain (10 Instructions + shared RETURN)
-
-<a id="turing-domain-10-instructions--shared-return"></a>
-
-<a id="turing-domain-10-instructions--shared-return-1"></a><a id="turing-domain-10-instructions--shared-return-2"></a><a id="turing-domain-10-instructions--shared-return-3"></a><a id="turing-domain-10-instructions--shared-return-4"></a><a id="turing-domain-10-instructions--shared-return-5"></a><a id="turing-domain-10-instructions--shared-return-6"></a><a id="turing-domain-10-instructions--shared-return-7"></a><a id="turing-domain-10-instructions--shared-return-8"></a><a id="turing-domain-10-instructions--shared-return-9"></a><a id="turing-domain-10-instructions--shared-return-10"></a><a id="turing-domain-10-instructions--shared-return-11"></a><a id="turing-domain-10-instructions--shared-return-12"></a><a id="turing-domain-10-instructions--shared-return-13"></a><a id="turing-domain-10-instructions--shared-return-14"></a><a id="turing-domain-10-instructions--shared-return-15"></a><a id="turing-domain-10-instructions--shared-return-16"></a><a id="turing-domain-10-instructions--shared-return-17"></a><a id="turing-domain-10-instructions--shared-return-18"></a><a id="turing-domain-10-instructions--shared-return-19"></a><a id="turing-domain-10-instructions--shared-return-20"></a><a id="turing-domain-10-instructions--shared-return-21"></a><a id="turing-domain-10-instructions--shared-return-22"></a><a id="turing-domain-10-instructions--shared-return-23"></a><a id="turing-domain-10-instructions--shared-return-24"></a><a id="turing-domain-10-instructions--shared-return-25"></a><a id="turing-domain-10-instructions--shared-return-26"></a><a id="turing-domain-10-instructions--shared-return-27"></a><a id="turing-domain-10-instructions--shared-return-28"></a><a id="turing-domain-10-instructions--shared-return-29"></a><a id="turing-domain-10-instructions--shared-return-30"></a><a id="turing-domain-10-instructions--shared-return-31"></a><a id="turing-domain-10-instructions-shared-return-1"></a><a id="turing-domain-10-instructions-shared-return-2"></a><a id="turing-domain-10-instructions-shared-return-3"></a><a id="turing-domain-10-instructions-shared-return-4"></a><a id="turing-domain-10-instructions-shared-return-5"></a><a id="turing-domain-10-instructions-shared-return-6"></a><a id="turing-domain-10-instructions-shared-return-7"></a><a id="turing-domain-10-instructions-shared-return-8"></a><a id="turing-domain-10-instructions-shared-return-9"></a><a id="turing-domain-10-instructions-shared-return-10"></a><a id="turing-domain-10-instructions-shared-return-11"></a><a id="turing-domain-10-instructions-shared-return-12"></a><a id="turing-domain-10-instructions-shared-return-13"></a><a id="turing-domain-10-instructions-shared-return-14"></a><a id="turing-domain-10-instructions-shared-return-15"></a><a id="turing-domain-10-instructions-shared-return-16"></a><a id="turing-domain-10-instructions-shared-return-17"></a><a id="turing-domain-10-instructions-shared-return-18"></a><a id="turing-domain-10-instructions-shared-return-19"></a><a id="turing-domain-10-instructions-shared-return-20"></a><a id="turing-domain-10-instructions-shared-return-21"></a><a id="turing-domain-10-instructions-shared-return-22"></a><a id="turing-domain-10-instructions-shared-return-23"></a><a id="turing-domain-10-instructions-shared-return-24"></a><a id="turing-domain-10-instructions-shared-return-25"></a><a id="turing-domain-10-instructions-shared-return-26"></a><a id="turing-domain-10-instructions-shared-return-27"></a><a id="turing-domain-10-instructions-shared-return-28"></a><a id="turing-domain-10-instructions-shared-return-29"></a><a id="turing-domain-10-instructions-shared-return-30"></a><a id="turing-domain-10-instructions-shared-return-31"></a>
-
-Historical only: [Turing Domain (10 Instructions + shared RETURN)](../05-review-history/instruction-set-history.md#turing-domain-10-instructions-shared-return).
-
-### DREAD (opcode 16)
-
-<a id="dread-opcode-16-1"></a><a id="dread-opcode-16-2"></a><a id="dread-opcode-16-3"></a><a id="dread-opcode-16-4"></a><a id="dread-opcode-16-5"></a><a id="dread-opcode-16-6"></a><a id="dread-opcode-16-7"></a><a id="dread-opcode-16-8"></a><a id="dread-opcode-16-9"></a><a id="dread-opcode-16-10"></a><a id="dread-opcode-16-11"></a><a id="dread-opcode-16-12"></a><a id="dread-opcode-16-13"></a><a id="dread-opcode-16-14"></a><a id="dread-opcode-16-15"></a><a id="dread-opcode-16-16"></a><a id="dread-opcode-16-17"></a><a id="dread-opcode-16-18"></a><a id="dread-opcode-16-19"></a><a id="dread-opcode-16-20"></a><a id="dread-opcode-16-21"></a><a id="dread-opcode-16-22"></a><a id="dread-opcode-16-23"></a><a id="dread-opcode-16-24"></a><a id="dread-opcode-16-25"></a><a id="dread-opcode-16-26"></a><a id="dread-opcode-16-27"></a><a id="dread-opcode-16-28"></a><a id="dread-opcode-16-29"></a><a id="dread-opcode-16-30"></a><a id="dread-opcode-16-31"></a>
-
-Historical only: [DREAD (opcode 16)](../05-review-history/instruction-set-history.md#dread-opcode-16).
-
-### DWRITE (opcode 17)
-
-<a id="dwrite-opcode-17-1"></a><a id="dwrite-opcode-17-2"></a><a id="dwrite-opcode-17-3"></a><a id="dwrite-opcode-17-4"></a><a id="dwrite-opcode-17-5"></a><a id="dwrite-opcode-17-6"></a><a id="dwrite-opcode-17-7"></a><a id="dwrite-opcode-17-8"></a><a id="dwrite-opcode-17-9"></a><a id="dwrite-opcode-17-10"></a><a id="dwrite-opcode-17-11"></a><a id="dwrite-opcode-17-12"></a><a id="dwrite-opcode-17-13"></a><a id="dwrite-opcode-17-14"></a><a id="dwrite-opcode-17-15"></a><a id="dwrite-opcode-17-16"></a><a id="dwrite-opcode-17-17"></a><a id="dwrite-opcode-17-18"></a><a id="dwrite-opcode-17-19"></a><a id="dwrite-opcode-17-20"></a><a id="dwrite-opcode-17-21"></a><a id="dwrite-opcode-17-22"></a><a id="dwrite-opcode-17-23"></a><a id="dwrite-opcode-17-24"></a><a id="dwrite-opcode-17-25"></a><a id="dwrite-opcode-17-26"></a><a id="dwrite-opcode-17-27"></a><a id="dwrite-opcode-17-28"></a><a id="dwrite-opcode-17-29"></a><a id="dwrite-opcode-17-30"></a><a id="dwrite-opcode-17-31"></a>
-
-Historical only: [DWRITE (opcode 17)](../05-review-history/instruction-set-history.md#dwrite-opcode-17).
-
-### BFEXT (opcode 18)
-
-<a id="bfext-opcode-18-1"></a><a id="bfext-opcode-18-2"></a><a id="bfext-opcode-18-3"></a><a id="bfext-opcode-18-4"></a><a id="bfext-opcode-18-5"></a><a id="bfext-opcode-18-6"></a><a id="bfext-opcode-18-7"></a><a id="bfext-opcode-18-8"></a><a id="bfext-opcode-18-9"></a><a id="bfext-opcode-18-10"></a><a id="bfext-opcode-18-11"></a><a id="bfext-opcode-18-12"></a><a id="bfext-opcode-18-13"></a><a id="bfext-opcode-18-14"></a><a id="bfext-opcode-18-15"></a><a id="bfext-opcode-18-16"></a><a id="bfext-opcode-18-17"></a><a id="bfext-opcode-18-18"></a><a id="bfext-opcode-18-19"></a><a id="bfext-opcode-18-20"></a><a id="bfext-opcode-18-21"></a><a id="bfext-opcode-18-22"></a><a id="bfext-opcode-18-23"></a><a id="bfext-opcode-18-24"></a><a id="bfext-opcode-18-25"></a><a id="bfext-opcode-18-26"></a><a id="bfext-opcode-18-27"></a><a id="bfext-opcode-18-28"></a><a id="bfext-opcode-18-29"></a><a id="bfext-opcode-18-30"></a><a id="bfext-opcode-18-31"></a>
-
-Historical only: [BFEXT (opcode 18)](../05-review-history/instruction-set-history.md#bfext-opcode-18).
-
-### BFINS (opcode 19)
-
-<a id="bfins-opcode-19-1"></a><a id="bfins-opcode-19-2"></a><a id="bfins-opcode-19-3"></a><a id="bfins-opcode-19-4"></a><a id="bfins-opcode-19-5"></a><a id="bfins-opcode-19-6"></a><a id="bfins-opcode-19-7"></a><a id="bfins-opcode-19-8"></a><a id="bfins-opcode-19-9"></a><a id="bfins-opcode-19-10"></a><a id="bfins-opcode-19-11"></a><a id="bfins-opcode-19-12"></a><a id="bfins-opcode-19-13"></a><a id="bfins-opcode-19-14"></a><a id="bfins-opcode-19-15"></a><a id="bfins-opcode-19-16"></a><a id="bfins-opcode-19-17"></a><a id="bfins-opcode-19-18"></a><a id="bfins-opcode-19-19"></a><a id="bfins-opcode-19-20"></a><a id="bfins-opcode-19-21"></a><a id="bfins-opcode-19-22"></a><a id="bfins-opcode-19-23"></a><a id="bfins-opcode-19-24"></a><a id="bfins-opcode-19-25"></a><a id="bfins-opcode-19-26"></a><a id="bfins-opcode-19-27"></a><a id="bfins-opcode-19-28"></a><a id="bfins-opcode-19-29"></a><a id="bfins-opcode-19-30"></a><a id="bfins-opcode-19-31"></a>
-
-Historical only: [BFINS (opcode 19)](../05-review-history/instruction-set-history.md#bfins-opcode-19).
-
-### MCMP (opcode 20)
-
-<a id="mcmp-opcode-20-1"></a><a id="mcmp-opcode-20-2"></a><a id="mcmp-opcode-20-3"></a><a id="mcmp-opcode-20-4"></a><a id="mcmp-opcode-20-5"></a><a id="mcmp-opcode-20-6"></a><a id="mcmp-opcode-20-7"></a><a id="mcmp-opcode-20-8"></a><a id="mcmp-opcode-20-9"></a><a id="mcmp-opcode-20-10"></a><a id="mcmp-opcode-20-11"></a><a id="mcmp-opcode-20-12"></a><a id="mcmp-opcode-20-13"></a><a id="mcmp-opcode-20-14"></a><a id="mcmp-opcode-20-15"></a><a id="mcmp-opcode-20-16"></a><a id="mcmp-opcode-20-17"></a><a id="mcmp-opcode-20-18"></a><a id="mcmp-opcode-20-19"></a><a id="mcmp-opcode-20-20"></a><a id="mcmp-opcode-20-21"></a><a id="mcmp-opcode-20-22"></a><a id="mcmp-opcode-20-23"></a><a id="mcmp-opcode-20-24"></a><a id="mcmp-opcode-20-25"></a><a id="mcmp-opcode-20-26"></a><a id="mcmp-opcode-20-27"></a><a id="mcmp-opcode-20-28"></a><a id="mcmp-opcode-20-29"></a><a id="mcmp-opcode-20-30"></a><a id="mcmp-opcode-20-31"></a>
-
-Historical only: [MCMP (opcode 20)](../05-review-history/instruction-set-history.md#mcmp-opcode-20).
-
-### IADD (opcode 21)
-
-<a id="iadd-opcode-21-1"></a><a id="iadd-opcode-21-2"></a><a id="iadd-opcode-21-3"></a><a id="iadd-opcode-21-4"></a><a id="iadd-opcode-21-5"></a><a id="iadd-opcode-21-6"></a><a id="iadd-opcode-21-7"></a><a id="iadd-opcode-21-8"></a><a id="iadd-opcode-21-9"></a><a id="iadd-opcode-21-10"></a><a id="iadd-opcode-21-11"></a><a id="iadd-opcode-21-12"></a><a id="iadd-opcode-21-13"></a><a id="iadd-opcode-21-14"></a><a id="iadd-opcode-21-15"></a><a id="iadd-opcode-21-16"></a><a id="iadd-opcode-21-17"></a><a id="iadd-opcode-21-18"></a><a id="iadd-opcode-21-19"></a><a id="iadd-opcode-21-20"></a><a id="iadd-opcode-21-21"></a><a id="iadd-opcode-21-22"></a><a id="iadd-opcode-21-23"></a><a id="iadd-opcode-21-24"></a><a id="iadd-opcode-21-25"></a><a id="iadd-opcode-21-26"></a><a id="iadd-opcode-21-27"></a><a id="iadd-opcode-21-28"></a><a id="iadd-opcode-21-29"></a><a id="iadd-opcode-21-30"></a><a id="iadd-opcode-21-31"></a>
-
-Historical only: [IADD (opcode 21)](../05-review-history/instruction-set-history.md#iadd-opcode-21).
-
-### ISUB (opcode 22)
-
-<a id="isub-opcode-22-1"></a><a id="isub-opcode-22-2"></a><a id="isub-opcode-22-3"></a><a id="isub-opcode-22-4"></a><a id="isub-opcode-22-5"></a><a id="isub-opcode-22-6"></a><a id="isub-opcode-22-7"></a><a id="isub-opcode-22-8"></a><a id="isub-opcode-22-9"></a><a id="isub-opcode-22-10"></a><a id="isub-opcode-22-11"></a><a id="isub-opcode-22-12"></a><a id="isub-opcode-22-13"></a><a id="isub-opcode-22-14"></a><a id="isub-opcode-22-15"></a><a id="isub-opcode-22-16"></a><a id="isub-opcode-22-17"></a><a id="isub-opcode-22-18"></a><a id="isub-opcode-22-19"></a><a id="isub-opcode-22-20"></a><a id="isub-opcode-22-21"></a><a id="isub-opcode-22-22"></a><a id="isub-opcode-22-23"></a><a id="isub-opcode-22-24"></a><a id="isub-opcode-22-25"></a><a id="isub-opcode-22-26"></a><a id="isub-opcode-22-27"></a><a id="isub-opcode-22-28"></a><a id="isub-opcode-22-29"></a><a id="isub-opcode-22-30"></a><a id="isub-opcode-22-31"></a>
-
-Historical only: [ISUB (opcode 22)](../05-review-history/instruction-set-history.md#isub-opcode-22).
-
-### BRANCH (opcode 23)
-
-<a id="branch-opcode-23-1"></a><a id="branch-opcode-23-2"></a><a id="branch-opcode-23-3"></a><a id="branch-opcode-23-4"></a><a id="branch-opcode-23-5"></a><a id="branch-opcode-23-6"></a><a id="branch-opcode-23-7"></a><a id="branch-opcode-23-8"></a><a id="branch-opcode-23-9"></a><a id="branch-opcode-23-10"></a><a id="branch-opcode-23-11"></a><a id="branch-opcode-23-12"></a><a id="branch-opcode-23-13"></a><a id="branch-opcode-23-14"></a><a id="branch-opcode-23-15"></a><a id="branch-opcode-23-16"></a><a id="branch-opcode-23-17"></a><a id="branch-opcode-23-18"></a><a id="branch-opcode-23-19"></a><a id="branch-opcode-23-20"></a><a id="branch-opcode-23-21"></a><a id="branch-opcode-23-22"></a><a id="branch-opcode-23-23"></a><a id="branch-opcode-23-24"></a><a id="branch-opcode-23-25"></a><a id="branch-opcode-23-26"></a><a id="branch-opcode-23-27"></a><a id="branch-opcode-23-28"></a><a id="branch-opcode-23-29"></a><a id="branch-opcode-23-30"></a><a id="branch-opcode-23-31"></a>
-
-Historical only: [BRANCH (opcode 23)](../05-review-history/instruction-set-history.md#branch-opcode-23).
-
-### SHL (opcode 24)
-
-<a id="shl-opcode-24-1"></a><a id="shl-opcode-24-2"></a><a id="shl-opcode-24-3"></a><a id="shl-opcode-24-4"></a><a id="shl-opcode-24-5"></a><a id="shl-opcode-24-6"></a><a id="shl-opcode-24-7"></a><a id="shl-opcode-24-8"></a><a id="shl-opcode-24-9"></a><a id="shl-opcode-24-10"></a><a id="shl-opcode-24-11"></a><a id="shl-opcode-24-12"></a><a id="shl-opcode-24-13"></a><a id="shl-opcode-24-14"></a><a id="shl-opcode-24-15"></a><a id="shl-opcode-24-16"></a><a id="shl-opcode-24-17"></a><a id="shl-opcode-24-18"></a><a id="shl-opcode-24-19"></a><a id="shl-opcode-24-20"></a><a id="shl-opcode-24-21"></a><a id="shl-opcode-24-22"></a><a id="shl-opcode-24-23"></a><a id="shl-opcode-24-24"></a><a id="shl-opcode-24-25"></a><a id="shl-opcode-24-26"></a><a id="shl-opcode-24-27"></a><a id="shl-opcode-24-28"></a><a id="shl-opcode-24-29"></a><a id="shl-opcode-24-30"></a><a id="shl-opcode-24-31"></a>
-
-Historical only: [SHL (opcode 24)](../05-review-history/instruction-set-history.md#shl-opcode-24).
-
-### SHR (opcode 25)
-
-<a id="shr-opcode-25-1"></a><a id="shr-opcode-25-2"></a><a id="shr-opcode-25-3"></a><a id="shr-opcode-25-4"></a><a id="shr-opcode-25-5"></a><a id="shr-opcode-25-6"></a><a id="shr-opcode-25-7"></a><a id="shr-opcode-25-8"></a><a id="shr-opcode-25-9"></a><a id="shr-opcode-25-10"></a><a id="shr-opcode-25-11"></a><a id="shr-opcode-25-12"></a><a id="shr-opcode-25-13"></a><a id="shr-opcode-25-14"></a><a id="shr-opcode-25-15"></a><a id="shr-opcode-25-16"></a><a id="shr-opcode-25-17"></a><a id="shr-opcode-25-18"></a><a id="shr-opcode-25-19"></a><a id="shr-opcode-25-20"></a><a id="shr-opcode-25-21"></a><a id="shr-opcode-25-22"></a><a id="shr-opcode-25-23"></a><a id="shr-opcode-25-24"></a><a id="shr-opcode-25-25"></a><a id="shr-opcode-25-26"></a><a id="shr-opcode-25-27"></a><a id="shr-opcode-25-28"></a><a id="shr-opcode-25-29"></a><a id="shr-opcode-25-30"></a><a id="shr-opcode-25-31"></a>
-
-Historical only: [SHR (opcode 25)](../05-review-history/instruction-set-history.md#shr-opcode-25).
-
-## Assembly Syntax
-
-<a id="assembly-syntax-1"></a><a id="assembly-syntax-2"></a><a id="assembly-syntax-3"></a><a id="assembly-syntax-4"></a><a id="assembly-syntax-5"></a><a id="assembly-syntax-6"></a><a id="assembly-syntax-7"></a><a id="assembly-syntax-8"></a><a id="assembly-syntax-9"></a><a id="assembly-syntax-10"></a><a id="assembly-syntax-11"></a><a id="assembly-syntax-12"></a><a id="assembly-syntax-13"></a><a id="assembly-syntax-14"></a><a id="assembly-syntax-15"></a><a id="assembly-syntax-16"></a><a id="assembly-syntax-17"></a><a id="assembly-syntax-18"></a><a id="assembly-syntax-19"></a><a id="assembly-syntax-20"></a><a id="assembly-syntax-21"></a><a id="assembly-syntax-22"></a><a id="assembly-syntax-23"></a><a id="assembly-syntax-24"></a><a id="assembly-syntax-25"></a><a id="assembly-syntax-26"></a><a id="assembly-syntax-27"></a><a id="assembly-syntax-28"></a><a id="assembly-syntax-29"></a><a id="assembly-syntax-30"></a><a id="assembly-syntax-31"></a>
-
-Historical only: [Assembly Syntax](../05-review-history/instruction-set-history.md#assembly-syntax).
-
-### Labels
-
-<a id="labels-1"></a><a id="labels-2"></a><a id="labels-3"></a><a id="labels-4"></a><a id="labels-5"></a><a id="labels-6"></a><a id="labels-7"></a><a id="labels-8"></a><a id="labels-9"></a><a id="labels-10"></a><a id="labels-11"></a><a id="labels-12"></a><a id="labels-13"></a><a id="labels-14"></a><a id="labels-15"></a><a id="labels-16"></a><a id="labels-17"></a><a id="labels-18"></a><a id="labels-19"></a><a id="labels-20"></a><a id="labels-21"></a><a id="labels-22"></a><a id="labels-23"></a><a id="labels-24"></a><a id="labels-25"></a><a id="labels-26"></a><a id="labels-27"></a><a id="labels-28"></a><a id="labels-29"></a><a id="labels-30"></a><a id="labels-31"></a>
-
-Historical only: [Labels](../05-review-history/instruction-set-history.md#labels).
-
-### Comments
-
-<a id="comments-1"></a><a id="comments-2"></a><a id="comments-3"></a><a id="comments-4"></a><a id="comments-5"></a><a id="comments-6"></a><a id="comments-7"></a><a id="comments-8"></a><a id="comments-9"></a><a id="comments-10"></a><a id="comments-11"></a><a id="comments-12"></a><a id="comments-13"></a><a id="comments-14"></a><a id="comments-15"></a><a id="comments-16"></a><a id="comments-17"></a><a id="comments-18"></a><a id="comments-19"></a><a id="comments-20"></a><a id="comments-21"></a><a id="comments-22"></a><a id="comments-23"></a><a id="comments-24"></a><a id="comments-25"></a><a id="comments-26"></a><a id="comments-27"></a><a id="comments-28"></a><a id="comments-29"></a><a id="comments-30"></a><a id="comments-31"></a>
-
-Historical only: [Comments](../05-review-history/instruction-set-history.md#comments).
-
-### Register Names
-
-<a id="register-names-1"></a><a id="register-names-2"></a><a id="register-names-3"></a><a id="register-names-4"></a><a id="register-names-5"></a><a id="register-names-6"></a><a id="register-names-7"></a><a id="register-names-8"></a><a id="register-names-9"></a><a id="register-names-10"></a><a id="register-names-11"></a><a id="register-names-12"></a><a id="register-names-13"></a><a id="register-names-14"></a><a id="register-names-15"></a><a id="register-names-16"></a><a id="register-names-17"></a><a id="register-names-18"></a><a id="register-names-19"></a><a id="register-names-20"></a><a id="register-names-21"></a><a id="register-names-22"></a><a id="register-names-23"></a><a id="register-names-24"></a><a id="register-names-25"></a><a id="register-names-26"></a><a id="register-names-27"></a><a id="register-names-28"></a><a id="register-names-29"></a><a id="register-names-30"></a><a id="register-names-31"></a>
-
-Historical only: [Register Names](../05-review-history/instruction-set-history.md#register-names).
-
-### Immediate Values
-
-<a id="immediate-values-1"></a><a id="immediate-values-2"></a><a id="immediate-values-3"></a><a id="immediate-values-4"></a><a id="immediate-values-5"></a><a id="immediate-values-6"></a><a id="immediate-values-7"></a><a id="immediate-values-8"></a><a id="immediate-values-9"></a><a id="immediate-values-10"></a><a id="immediate-values-11"></a><a id="immediate-values-12"></a><a id="immediate-values-13"></a><a id="immediate-values-14"></a><a id="immediate-values-15"></a><a id="immediate-values-16"></a><a id="immediate-values-17"></a><a id="immediate-values-18"></a><a id="immediate-values-19"></a><a id="immediate-values-20"></a><a id="immediate-values-21"></a><a id="immediate-values-22"></a><a id="immediate-values-23"></a><a id="immediate-values-24"></a><a id="immediate-values-25"></a><a id="immediate-values-26"></a><a id="immediate-values-27"></a><a id="immediate-values-28"></a><a id="immediate-values-29"></a><a id="immediate-values-30"></a><a id="immediate-values-31"></a>
-
-Historical only: [Immediate Values](../05-review-history/instruction-set-history.md#immediate-values).
-
-## Three-Tier Fault Recovery (Task #1077)
-
-<a id="three-tier-fault-recovery-task-1077-1"></a><a id="three-tier-fault-recovery-task-1077-2"></a><a id="three-tier-fault-recovery-task-1077-3"></a><a id="three-tier-fault-recovery-task-1077-4"></a><a id="three-tier-fault-recovery-task-1077-5"></a><a id="three-tier-fault-recovery-task-1077-6"></a><a id="three-tier-fault-recovery-task-1077-7"></a><a id="three-tier-fault-recovery-task-1077-8"></a><a id="three-tier-fault-recovery-task-1077-9"></a><a id="three-tier-fault-recovery-task-1077-10"></a><a id="three-tier-fault-recovery-task-1077-11"></a><a id="three-tier-fault-recovery-task-1077-12"></a><a id="three-tier-fault-recovery-task-1077-13"></a><a id="three-tier-fault-recovery-task-1077-14"></a><a id="three-tier-fault-recovery-task-1077-15"></a><a id="three-tier-fault-recovery-task-1077-16"></a><a id="three-tier-fault-recovery-task-1077-17"></a><a id="three-tier-fault-recovery-task-1077-18"></a><a id="three-tier-fault-recovery-task-1077-19"></a><a id="three-tier-fault-recovery-task-1077-20"></a><a id="three-tier-fault-recovery-task-1077-21"></a><a id="three-tier-fault-recovery-task-1077-22"></a><a id="three-tier-fault-recovery-task-1077-23"></a><a id="three-tier-fault-recovery-task-1077-24"></a><a id="three-tier-fault-recovery-task-1077-25"></a><a id="three-tier-fault-recovery-task-1077-26"></a><a id="three-tier-fault-recovery-task-1077-27"></a><a id="three-tier-fault-recovery-task-1077-28"></a><a id="three-tier-fault-recovery-task-1077-29"></a><a id="three-tier-fault-recovery-task-1077-30"></a><a id="three-tier-fault-recovery-task-1077-31"></a>
-
-Historical only: [Three-Tier Fault Recovery (Task #1077)](../05-review-history/instruction-set-history.md#three-tier-fault-recovery-task-1077).
-
-### Tier 1 — `.catch` Method on the Faulting Abstraction
-
-<a id="tier-1-catch-method-on-the-faulting-abstraction"></a><a id="tier-1--catch-method-on-the-faulting-abstraction"></a>
-
-<a id="tier-1--catch-method-on-the-faulting-abstraction-1"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-2"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-3"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-4"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-5"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-6"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-7"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-8"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-9"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-10"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-11"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-12"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-13"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-14"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-15"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-16"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-17"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-18"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-19"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-20"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-21"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-22"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-23"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-24"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-25"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-26"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-27"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-28"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-29"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-30"></a><a id="tier-1--catch-method-on-the-faulting-abstraction-31"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-1"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-2"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-3"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-4"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-5"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-6"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-7"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-8"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-9"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-10"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-11"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-12"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-13"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-14"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-15"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-16"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-17"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-18"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-19"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-20"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-21"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-22"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-23"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-24"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-25"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-26"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-27"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-28"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-29"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-30"></a><a id="tier-1-codecatchcode-method-on-the-faulting-abstraction-31"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-1"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-2"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-3"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-4"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-5"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-6"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-7"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-8"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-9"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-10"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-11"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-12"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-13"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-14"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-15"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-16"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-17"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-18"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-19"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-20"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-21"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-22"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-23"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-24"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-25"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-26"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-27"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-28"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-29"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-30"></a><a id="tier-1-catch-method-on-the-faulting-abstraction-31"></a>
-
-Historical only: [Tier 1 — `.catch` Method on the Faulting Abstraction](../05-review-history/instruction-set-history.md#tier-1-catch-method-on-the-faulting-abstraction).
-
-### Tier 2 — Scheduler.IRQ (Hidden ELOADCALL)
-
-<a id="tier-2--schedulerirq-hidden-eloadcall"></a>
-
-<a id="tier-2--schedulerirq-hidden-eloadcall-1"></a><a id="tier-2--schedulerirq-hidden-eloadcall-2"></a><a id="tier-2--schedulerirq-hidden-eloadcall-3"></a><a id="tier-2--schedulerirq-hidden-eloadcall-4"></a><a id="tier-2--schedulerirq-hidden-eloadcall-5"></a><a id="tier-2--schedulerirq-hidden-eloadcall-6"></a><a id="tier-2--schedulerirq-hidden-eloadcall-7"></a><a id="tier-2--schedulerirq-hidden-eloadcall-8"></a><a id="tier-2--schedulerirq-hidden-eloadcall-9"></a><a id="tier-2--schedulerirq-hidden-eloadcall-10"></a><a id="tier-2--schedulerirq-hidden-eloadcall-11"></a><a id="tier-2--schedulerirq-hidden-eloadcall-12"></a><a id="tier-2--schedulerirq-hidden-eloadcall-13"></a><a id="tier-2--schedulerirq-hidden-eloadcall-14"></a><a id="tier-2--schedulerirq-hidden-eloadcall-15"></a><a id="tier-2--schedulerirq-hidden-eloadcall-16"></a><a id="tier-2--schedulerirq-hidden-eloadcall-17"></a><a id="tier-2--schedulerirq-hidden-eloadcall-18"></a><a id="tier-2--schedulerirq-hidden-eloadcall-19"></a><a id="tier-2--schedulerirq-hidden-eloadcall-20"></a><a id="tier-2--schedulerirq-hidden-eloadcall-21"></a><a id="tier-2--schedulerirq-hidden-eloadcall-22"></a><a id="tier-2--schedulerirq-hidden-eloadcall-23"></a><a id="tier-2--schedulerirq-hidden-eloadcall-24"></a><a id="tier-2--schedulerirq-hidden-eloadcall-25"></a><a id="tier-2--schedulerirq-hidden-eloadcall-26"></a><a id="tier-2--schedulerirq-hidden-eloadcall-27"></a><a id="tier-2--schedulerirq-hidden-eloadcall-28"></a><a id="tier-2--schedulerirq-hidden-eloadcall-29"></a><a id="tier-2--schedulerirq-hidden-eloadcall-30"></a><a id="tier-2--schedulerirq-hidden-eloadcall-31"></a><a id="tier-2-schedulerirq-hidden-eloadcall-1"></a><a id="tier-2-schedulerirq-hidden-eloadcall-2"></a><a id="tier-2-schedulerirq-hidden-eloadcall-3"></a><a id="tier-2-schedulerirq-hidden-eloadcall-4"></a><a id="tier-2-schedulerirq-hidden-eloadcall-5"></a><a id="tier-2-schedulerirq-hidden-eloadcall-6"></a><a id="tier-2-schedulerirq-hidden-eloadcall-7"></a><a id="tier-2-schedulerirq-hidden-eloadcall-8"></a><a id="tier-2-schedulerirq-hidden-eloadcall-9"></a><a id="tier-2-schedulerirq-hidden-eloadcall-10"></a><a id="tier-2-schedulerirq-hidden-eloadcall-11"></a><a id="tier-2-schedulerirq-hidden-eloadcall-12"></a><a id="tier-2-schedulerirq-hidden-eloadcall-13"></a><a id="tier-2-schedulerirq-hidden-eloadcall-14"></a><a id="tier-2-schedulerirq-hidden-eloadcall-15"></a><a id="tier-2-schedulerirq-hidden-eloadcall-16"></a><a id="tier-2-schedulerirq-hidden-eloadcall-17"></a><a id="tier-2-schedulerirq-hidden-eloadcall-18"></a><a id="tier-2-schedulerirq-hidden-eloadcall-19"></a><a id="tier-2-schedulerirq-hidden-eloadcall-20"></a><a id="tier-2-schedulerirq-hidden-eloadcall-21"></a><a id="tier-2-schedulerirq-hidden-eloadcall-22"></a><a id="tier-2-schedulerirq-hidden-eloadcall-23"></a><a id="tier-2-schedulerirq-hidden-eloadcall-24"></a><a id="tier-2-schedulerirq-hidden-eloadcall-25"></a><a id="tier-2-schedulerirq-hidden-eloadcall-26"></a><a id="tier-2-schedulerirq-hidden-eloadcall-27"></a><a id="tier-2-schedulerirq-hidden-eloadcall-28"></a><a id="tier-2-schedulerirq-hidden-eloadcall-29"></a><a id="tier-2-schedulerirq-hidden-eloadcall-30"></a><a id="tier-2-schedulerirq-hidden-eloadcall-31"></a>
-
-Historical only: [Tier 2 — Scheduler.IRQ (Hidden ELOADCALL)](../05-review-history/instruction-set-history.md#tier-2-schedulerirq-hidden-eloadcall).
-
-### Tier 3 — Double-Fault (CHANGE to CR13)
-
-<a id="tier-3--double-fault-change-to-cr13"></a>
-
-<a id="tier-3--double-fault-change-to-cr13-1"></a><a id="tier-3--double-fault-change-to-cr13-2"></a><a id="tier-3--double-fault-change-to-cr13-3"></a><a id="tier-3--double-fault-change-to-cr13-4"></a><a id="tier-3--double-fault-change-to-cr13-5"></a><a id="tier-3--double-fault-change-to-cr13-6"></a><a id="tier-3--double-fault-change-to-cr13-7"></a><a id="tier-3--double-fault-change-to-cr13-8"></a><a id="tier-3--double-fault-change-to-cr13-9"></a><a id="tier-3--double-fault-change-to-cr13-10"></a><a id="tier-3--double-fault-change-to-cr13-11"></a><a id="tier-3--double-fault-change-to-cr13-12"></a><a id="tier-3--double-fault-change-to-cr13-13"></a><a id="tier-3--double-fault-change-to-cr13-14"></a><a id="tier-3--double-fault-change-to-cr13-15"></a><a id="tier-3--double-fault-change-to-cr13-16"></a><a id="tier-3--double-fault-change-to-cr13-17"></a><a id="tier-3--double-fault-change-to-cr13-18"></a><a id="tier-3--double-fault-change-to-cr13-19"></a><a id="tier-3--double-fault-change-to-cr13-20"></a><a id="tier-3--double-fault-change-to-cr13-21"></a><a id="tier-3--double-fault-change-to-cr13-22"></a><a id="tier-3--double-fault-change-to-cr13-23"></a><a id="tier-3--double-fault-change-to-cr13-24"></a><a id="tier-3--double-fault-change-to-cr13-25"></a><a id="tier-3--double-fault-change-to-cr13-26"></a><a id="tier-3--double-fault-change-to-cr13-27"></a><a id="tier-3--double-fault-change-to-cr13-28"></a><a id="tier-3--double-fault-change-to-cr13-29"></a><a id="tier-3--double-fault-change-to-cr13-30"></a><a id="tier-3--double-fault-change-to-cr13-31"></a><a id="tier-3-double-fault-change-to-cr13-1"></a><a id="tier-3-double-fault-change-to-cr13-2"></a><a id="tier-3-double-fault-change-to-cr13-3"></a><a id="tier-3-double-fault-change-to-cr13-4"></a><a id="tier-3-double-fault-change-to-cr13-5"></a><a id="tier-3-double-fault-change-to-cr13-6"></a><a id="tier-3-double-fault-change-to-cr13-7"></a><a id="tier-3-double-fault-change-to-cr13-8"></a><a id="tier-3-double-fault-change-to-cr13-9"></a><a id="tier-3-double-fault-change-to-cr13-10"></a><a id="tier-3-double-fault-change-to-cr13-11"></a><a id="tier-3-double-fault-change-to-cr13-12"></a><a id="tier-3-double-fault-change-to-cr13-13"></a><a id="tier-3-double-fault-change-to-cr13-14"></a><a id="tier-3-double-fault-change-to-cr13-15"></a><a id="tier-3-double-fault-change-to-cr13-16"></a><a id="tier-3-double-fault-change-to-cr13-17"></a><a id="tier-3-double-fault-change-to-cr13-18"></a><a id="tier-3-double-fault-change-to-cr13-19"></a><a id="tier-3-double-fault-change-to-cr13-20"></a><a id="tier-3-double-fault-change-to-cr13-21"></a><a id="tier-3-double-fault-change-to-cr13-22"></a><a id="tier-3-double-fault-change-to-cr13-23"></a><a id="tier-3-double-fault-change-to-cr13-24"></a><a id="tier-3-double-fault-change-to-cr13-25"></a><a id="tier-3-double-fault-change-to-cr13-26"></a><a id="tier-3-double-fault-change-to-cr13-27"></a><a id="tier-3-double-fault-change-to-cr13-28"></a><a id="tier-3-double-fault-change-to-cr13-29"></a><a id="tier-3-double-fault-change-to-cr13-30"></a><a id="tier-3-double-fault-change-to-cr13-31"></a>
-
-Historical only: [Tier 3 — Double-Fault (CHANGE to CR13)](../05-review-history/instruction-set-history.md#tier-3-double-fault-change-to-cr13).
-
-### Scheduler.pause and Timer Interrupts
-
-<a id="schedulerpause-and-timer-interrupts-1"></a><a id="schedulerpause-and-timer-interrupts-2"></a><a id="schedulerpause-and-timer-interrupts-3"></a><a id="schedulerpause-and-timer-interrupts-4"></a><a id="schedulerpause-and-timer-interrupts-5"></a><a id="schedulerpause-and-timer-interrupts-6"></a><a id="schedulerpause-and-timer-interrupts-7"></a><a id="schedulerpause-and-timer-interrupts-8"></a><a id="schedulerpause-and-timer-interrupts-9"></a><a id="schedulerpause-and-timer-interrupts-10"></a><a id="schedulerpause-and-timer-interrupts-11"></a><a id="schedulerpause-and-timer-interrupts-12"></a><a id="schedulerpause-and-timer-interrupts-13"></a><a id="schedulerpause-and-timer-interrupts-14"></a><a id="schedulerpause-and-timer-interrupts-15"></a><a id="schedulerpause-and-timer-interrupts-16"></a><a id="schedulerpause-and-timer-interrupts-17"></a><a id="schedulerpause-and-timer-interrupts-18"></a><a id="schedulerpause-and-timer-interrupts-19"></a><a id="schedulerpause-and-timer-interrupts-20"></a><a id="schedulerpause-and-timer-interrupts-21"></a><a id="schedulerpause-and-timer-interrupts-22"></a><a id="schedulerpause-and-timer-interrupts-23"></a><a id="schedulerpause-and-timer-interrupts-24"></a><a id="schedulerpause-and-timer-interrupts-25"></a><a id="schedulerpause-and-timer-interrupts-26"></a><a id="schedulerpause-and-timer-interrupts-27"></a><a id="schedulerpause-and-timer-interrupts-28"></a><a id="schedulerpause-and-timer-interrupts-29"></a><a id="schedulerpause-and-timer-interrupts-30"></a><a id="schedulerpause-and-timer-interrupts-31"></a>
-
-Historical only: [Scheduler.pause and Timer Interrupts](../05-review-history/instruction-set-history.md#schedulerpause-and-timer-interrupts).
-
-<a id="church-machine-instruction-set-1"></a><a id="church-machine-instruction-set-2"></a><a id="church-machine-instruction-set-3"></a><a id="church-machine-instruction-set-4"></a><a id="church-machine-instruction-set-5"></a><a id="church-machine-instruction-set-6"></a><a id="church-machine-instruction-set-7"></a><a id="church-machine-instruction-set-8"></a><a id="church-machine-instruction-set-9"></a><a id="church-machine-instruction-set-10"></a><a id="church-machine-instruction-set-11"></a><a id="church-machine-instruction-set-12"></a><a id="church-machine-instruction-set-13"></a><a id="church-machine-instruction-set-14"></a><a id="church-machine-instruction-set-15"></a><a id="church-machine-instruction-set-16"></a><a id="church-machine-instruction-set-17"></a><a id="church-machine-instruction-set-18"></a><a id="church-machine-instruction-set-19"></a><a id="church-machine-instruction-set-20"></a><a id="church-machine-instruction-set-21"></a><a id="church-machine-instruction-set-22"></a><a id="church-machine-instruction-set-23"></a><a id="church-machine-instruction-set-24"></a><a id="church-machine-instruction-set-25"></a><a id="church-machine-instruction-set-26"></a><a id="church-machine-instruction-set-27"></a><a id="church-machine-instruction-set-28"></a><a id="church-machine-instruction-set-29"></a><a id="church-machine-instruction-set-30"></a><a id="church-machine-instruction-set-31"></a>
-
-[Historical baseline copies](../05-review-history/instruction-set-history.md#preservation-inventory).
