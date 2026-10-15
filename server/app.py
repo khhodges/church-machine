@@ -5088,8 +5088,12 @@ def namespace_design_v1():
     from pathlib import Path
     from urllib.parse import urlparse
     from server.namespace_design_v1 import DesignStore
-    store = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" / "ascending-v1.json",
-                        LUMPS_DIR, NS_STATE_PATH)
+    profile = request.args.get("profile", "ascending")
+    if profile not in ("ascending", "phase1"):
+        return jsonify(ok=False, error="Unknown Namespace design profile"), 400
+    store = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
+                        ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
+                        LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
     try:
         if request.method == "PUT":
             if not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign":
@@ -27853,6 +27857,7 @@ def _change_confirmation_paths():
              BOOT_IMAGE_PATH, BOOT_IMAGE_PROVENANCE_PATH]
     if request.path == "/api/namespace/design-v1":
         paths.append(Path(NS_STATE_PATH).parent / "design-drafts" / "ascending-v1.json")
+        paths.append(Path(NS_STATE_PATH).parent / "design-drafts" / "phase1.json")
     for pattern in ("*.lump", "*.json", "*.bin"):
         # Lease heartbeats are coordination state, not reviewed artifacts.
         # Exclude only the registry; manifests and other JSON stay protected.
@@ -28009,7 +28014,11 @@ def _describe_protected_change(payload):
         from server.namespace_design_v1 import validate
         document = validate(payload.get("document"))
         return [
-            "Save the editable ascending Namespace design only.",
+            ("Save the separate Phase 1 Namespace design only."
+             if document["format"] == "phase1-nst-metadata-slot0-v1"
+             else "Save the editable ascending Namespace design only."),
+            f"Table capacity: {document['slotCount']} slots including metadata; "
+            f"CR15 table-only limit: {4 * document['slotCount'] - 1}.",
             "Slot 0: four-word header; slot 1: Namespace self; slot 2: entry Thread.",
             "API-only output profile. No LUMP, committed image, bitstream or simulator state is changed.",
             *[f"NS[{row['slot']}] {row['name']} — {row['policy']}"

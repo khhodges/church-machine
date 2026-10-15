@@ -8,8 +8,12 @@
     const state = {active:true, loading:false, saving:false, document:null, fingerprint:null,
         projection:null, error:'', dirty:false};
     const endpoint = '/api/namespace/design-v1';
+    state.profile = 'ascending';
+    const drafts = {};
+    const slotCount = () => state.document.slotCount || 64;
+    const metadata = () => [(0xf8800100 | (slotCount() << 10)) >>> 0, 0, state.document.rows.length - 1, 0];
     async function request(method, body) {
-        const response = await fetch(endpoint, {method, cache:'no-store',
+        const response = await fetch(endpoint + (state.profile === 'phase1' ? '?profile=phase1' : ''), {method, cache:'no-store',
             headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign'},
             ...(body ? {body:JSON.stringify(body)} : {})});
         const data = await response.json();
@@ -31,7 +35,19 @@
         finally { state.loading = false; render(); }
     }
     function setProfile(value) {
-        state.active = value === 'ascending';
+        if (!['ascending','phase1','legacy'].includes(value)) return;
+        if (state.loading || state.saving) {
+            const select = document.getElementById('namespaceDesignProfile');
+            if (select) select.value = state.active ? state.profile : 'legacy';
+            return;
+        }
+        drafts[state.profile] = {...state};
+        state.active = value !== 'legacy';
+        if (state.active && value !== state.profile) {
+            Object.assign(state, drafts[value] || {document:null, fingerprint:null,
+                projection:null, error:'', dirty:false, loading:false, saving:false},
+                {profile:value, active:true});
+        }
         const legacy = document.getElementById('bootCapacityPanel');
         if (legacy) legacy.hidden = state.active;
         root.updateNamespace();
@@ -55,14 +71,14 @@
     }
     function snapshot() {
         const rows=state.document.rows;
-        return {counts:{max:64,assigned:rows.length,resident:rows.filter(r=>r.policy!=='Lazy').length,
-            lazy:rows.filter(r=>r.policy==='Lazy').length,garbage:0,free:63-rows.length}};
+        return {counts:{max:slotCount(),assigned:rows.length,resident:rows.filter(r=>r.policy!=='Lazy').length,
+            lazy:rows.filter(r=>r.policy==='Lazy').length,garbage:0,free:slotCount()-1-rows.length}};
     }
     function renderRows(html, host) {
         const d=state.document, p=state.projection;
         // Keep the original 11-column table and its compact controls.
-        html+=`<tr id="ns-row-0" class="ns-row"><td class="ns-idx-cell">0</td><td class="ns-saved-version-col">—</td><td class="ns-label ns-label-clickable" onclick="NamespaceDesignV1.inspect(0)">Namespace header</td><td>${hex(0xf8810100)}</td><td colspan="5">W1 base ${hex(0)} · W2 members ${d.rows.length-1} · W3 ${hex(0)}</td><td>—</td><td><button class="btn btn-xs ns-inspect-btn" onclick="NamespaceDesignV1.inspect(0)">Inspect</button></td></tr>`;
-        const displayCount=Math.min(64,Math.max(...d.rows.map(row=>row.slot))+1);
+        html+=`<tr id="ns-row-0" class="ns-row"><td class="ns-idx-cell">0</td><td class="ns-saved-version-col">—</td><td class="ns-label ns-label-clickable" onclick="NamespaceDesignV1.inspect(0)">Namespace header</td><td>${hex(metadata()[0])}</td><td colspan="5">W1 base ${hex(0)} · W2 members ${d.rows.length-1} · W3 ${hex(0)}</td><td>—</td><td><button class="btn btn-xs ns-inspect-btn" onclick="NamespaceDesignV1.inspect(0)">Inspect</button></td></tr>`;
+        const displayCount=Math.min(slotCount(),Math.max(...d.rows.map(row=>row.slot))+1);
         for(let slot=1;slot<displayCount;slot++) {
             const r=d.rows.find(r=>r.slot===slot);
             if(!r) {
@@ -72,7 +88,7 @@
             const projection=p.rows.find(v=>v.slot===slot);
             const current=!state.dirty && projection && projection.policy===r.policy && projection.name===r.name;
             const location=r.kind==='namespace'?0:r.kind==='mmio'?r.address:current?projection.location:null;
-            const limit=r.kind==='namespace'?255:r.kind==='mmio'?r.limit:current?projection.limit:null;
+            const limit=r.kind==='namespace'?slotCount()*4-1:r.kind==='mmio'?r.limit:current?projection.limit:null;
             const select=r.kind==='lump'?`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`:
                 `<span class="ns-fixed-policy">${r.kind==='mmio'?'Resident I/O register':r.kind==='thread'?'Resident · Thread':'Bootstrap'}</span>`;
             const clear=r.kind==='lump'&&!r.boot?`<button class="btn btn-xs" onclick="NamespaceDesignV1.clear(${slot})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;">Clear</button>`:'';
@@ -90,6 +106,7 @@
             <td class="ns-entry-actions"><button class="btn btn-xs ns-inspect-btn" onclick="NamespaceDesignV1.inspect(${slot})">Inspect and resolve</button>${r.kind==='lump'?`<button class="btn btn-xs" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35)" onclick="NamespaceDesignV1.source(${slot})">Open LUMP</button>`:''}${select}${r.kind==='lump'?`<button class="btn btn-xs ns-identity-btn" style="background:#27233b;color:#c4a7ff;border:1px solid rgba(196,167,255,0.35);margin-left:5px;font-size:0.65rem;padding:1px 5px" onclick="NamespaceDesignV1.identity(${slot})">Identity</button>`:''}</td></tr>`;
         }
         html+='</tbody></table><p id="nsSaveLayoutNote" role="status"></p>';
+        if(state.profile==='phase1') html+=`<p>Phase 1: slot 0 metadata · 1 self · 2 entry Thread · 8 UART · 9 ide.Mint (requested E) · 14 nstab (requested RW) · 15 pkverify (requested E). Requested rights are design intent, not granted capabilities.</p><label>Total slots (including metadata) <input type="number" min="16" max="4096" value="${slotCount()}" onchange="NamespaceDesignV1.capacity(this.value)" ${state.saving?'disabled':''}></label><p>${slotCount()*4} table words / ${slotCount()*16} bytes · CR15 table-only limit ${slotCount()*4-1}. Unfinished placements remain non-executable.</p>`;
         host.innerHTML=html;
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
@@ -97,7 +114,7 @@
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
         host.querySelector('#nsSaveLayoutNote').textContent=state.error ||
-            'Ascending layout · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
+            (state.profile==='phase1'?'Phase 1':'Ascending layout')+' · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
             p.warnings.join('; ');
         const bolt=host.querySelector('#nsBoltDrag');
         bolt.ondragstart=e=>e.dataTransfer.setData('text/plain','ascending-boot');
@@ -115,10 +132,10 @@
         if(state.saving) return;
         const name=document.getElementById('_nsPlacementName').value.trim();
         const slotText=document.getElementById('_nsPlacementSlot').value;
-        const slot=slotText?Number(slotText):Array.from({length:61},(_,i)=>i+3).find(i=>!state.document.rows.some(r=>r.slot===i));
+        const slot=slotText?Number(slotText):Array.from({length:slotCount()-3},(_,i)=>i+3).find(i=>!state.document.rows.some(r=>r.slot===i));
         const error=document.getElementById('_nsAddError');
-        if(!name || name.length>128 || /[\x00-\x1f\x7f]/.test(name) || !Number.isInteger(slot) || slot<3 || slot>63 || state.document.rows.some(r=>r.slot===slot||r.name===name)) {
-            error.textContent='Choose a unique name and a free slot from 3 to 63.';return;
+        if(!name || name.length>128 || /[\x00-\x1f\x7f]/.test(name) || !Number.isInteger(slot) || slot<3 || slot>=slotCount() || state.document.rows.some(r=>r.slot===slot||r.name===name)) {
+            error.textContent=`Choose a unique name and a free slot from 3 to ${slotCount()-1}.`;return;
         }
         const picker=document.getElementById('_nsAddSelect');
         const record=picker && (root._nsAddAvailableList||[])[picker.selectedIndex-1];
@@ -150,7 +167,7 @@
     }
     function inspect(slot) {
         const row = slot===0 ? {slot:0, entryWord:0,
-            metadataWords:[0xf8810100,0,state.document.rows.length-1,0], executable:false} :
+            metadataWords:metadata(), executable:false} :
             {...state.document.rows.find(r=>r.slot===slot), entryWord:slot*4,
                 ...(!state.dirty ? {proposedDescriptor:state.projection.rows.find(r=>r.slot===slot)} : {})};
         dialog(`Namespace slot ${slot} — design inspection`,
@@ -213,11 +230,11 @@
         if(state.saving) return;
         const original=state.document.rows.find(r=>r.slot===slot);
         if(original && original.kind!=='lump') return;
-        const free=Array.from({length:61},(_,i)=>i+3).find(s=>!state.document.rows.some(r=>r.slot===s));
+        const free=Array.from({length:slotCount()-3},(_,i)=>i+3).find(s=>!state.document.rows.some(r=>r.slot===s));
         const overlay=dialog(original?'Edit Namespace member':'Add LUMP to Namespace',
             `<label>Saved LUMP (optional)<select id="nsDraftLump" style="width:100%"><option value="">Unfinished / name only</option></select></label>
             <p><label>Pet name <input id="nsDraftName" maxlength="128" value="${esc(original?original.name:'')}" style="width:100%"></label></p>
-            <p><label>Slot <input id="nsDraftSlot" type="number" min="3" max="63" value="${original?original.slot:preferred||free||''}"></label></p>
+            <p><label>Slot <input id="nsDraftSlot" type="number" min="3" max="${slotCount()-1}" value="${original?original.slot:preferred||free||''}"></label></p>
             <p><label>Policy <select id="nsDraftPolicy"><option>Lazy</option><option>Resident</option></select></label></p>
             <p><label><input id="nsDraftBoot" type="checkbox" ${original&&original.boot?'checked':''}> Boot target in this design</label></p>
             <p>Unfinished entries are allowed. Placement does not grant execution authority.</p>
@@ -238,9 +255,9 @@
         overlay.querySelector('#nsDraftApply').onclick=()=>{
             const value=name.value.trim(), next=Number(slotEl.value);
             const error=overlay.querySelector('#nsDraftError');
-            if(!value || /[\x00-\x1f\x7f]/.test(value) || !Number.isInteger(next) || next<3 || next>=64 ||
+            if(!value || /[\x00-\x1f\x7f]/.test(value) || !Number.isInteger(next) || next<3 || next>=slotCount() ||
                 state.document.rows.some(r=>r!==original && (r.slot===next || r.name===value))) {
-                error.textContent='Choose a unique pet name and a free slot from 3 to 63.'; return;
+                error.textContent=`Choose a unique pet name and a free slot from 3 to ${slotCount()-1}.`; return;
             }
             if(original && next!==original.slot) {
                 error.textContent='Clear and add a separate design placement to change its slot; existing bindings are not rewritten.'; return;
@@ -287,7 +304,16 @@
             'No executable image was changed. Your Namespace draft is retained.'; }
         finally { state.saving=false; render(); }
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity};
+    function capacity(value) {
+        if(state.saving || state.profile!=='phase1') return;
+        const n=Number(value);
+        if(!Number.isInteger(n) || n<16 || n>4096 || state.document.rows.some(r=>r.slot>=n)) {
+            state.error='Choose 16–4096 slots, including every occupied slot. No rows were removed.';
+            render(); return;
+        }
+        state.document.slotCount=n; changed();
+    }
+    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity};
     if(typeof document!=='undefined') {
         if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',render);
         else render();

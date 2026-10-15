@@ -52,3 +52,12 @@ that worked." The request is a data/geometry adaptation, not a redesign.
 **How to apply:** Change the original table's data adapter and format-dependent
 header/slot interpretation. Verify feature parity against the original view,
 including version, type, F/G, limit, sequence, integrity and Source controls.
+
+Keep the Phase 1 design separate from the earlier 64-slot ascending draft and
+from installed Namespace state.
+
+**Why:** Adding the approved 256-slot-default layout must not migrate or erase
+earlier design work, and view selection is not authorization to install an image.
+
+**How to apply:** Reuse the original table controls with profile-specific draft
+storage, capacity and table-only limits; preserve unsaved edits across view changes.

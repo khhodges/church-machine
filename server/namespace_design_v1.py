@@ -11,6 +11,7 @@ import struct
 import tempfile
 
 FORMAT = "ascending-nst-metadata-slot0-v1"
+PHASE1_FORMAT = "phase1-nst-metadata-slot0-v1"
 PINS = [
     (7, "WukongCallHome", "WukongCallHome.1.7084172e.lump",
      "549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738", 20, "232f0de4"),
@@ -68,16 +69,30 @@ def seed(legacy):
                 outputProfile="api", rows=sorted(rows, key=lambda r: r["slot"]))
 
 
+def phase1_seed():
+    document = seed({})
+    document.update(format=PHASE1_FORMAT, slotCount=256)
+    for slot, name in [(9, "ide.Mint"), (14, "nstab"), (15, "pkverify")]:
+        document["rows"].append(dict(slot=slot, name=name, kind="lump",
+                                     policy="Lazy", sequence=0))
+    document["rows"].sort(key=lambda row: row["slot"])
+    return document
+
+
 def validate(document):
     if not isinstance(document, dict) or set(document) != {
         "format", "capacityWords", "slotCount", "outputProfile", "rows"
     }:
         raise ValueError("Expected a complete Namespace design")
-    if (document["format"], document["capacityWords"], document["slotCount"],
-            document["outputProfile"]) != (FORMAT, 16384, 64, "api"):
-        raise ValueError("This design uses ascending-v1, 64 slots, 16384 words and API-only output")
+    count = document["slotCount"]
+    phase1 = document["format"] == PHASE1_FORMAT
+    if (document["format"] not in (FORMAT, PHASE1_FORMAT) or
+            document["capacityWords"] != 16384 or document["outputProfile"] != "api" or
+            type(count) is not int or
+            (not phase1 and count != 64) or (phase1 and not 16 <= count <= 4096)):
+        raise ValueError("Expected ascending-v1 with 64 slots or Phase 1 with 16–4096 slots, 16384 words and API-only output")
     rows = document["rows"]
-    if not isinstance(rows, list) or len(rows) > 63:
+    if not isinstance(rows, list) or len(rows) > count - 1:
         raise ValueError("Invalid Namespace member count")
     slots, names = set(), set()
     for row in rows:
@@ -87,8 +102,8 @@ def validate(document):
         }:
             raise ValueError("Unexpected Namespace row fields")
         slot, name = row.get("slot"), row.get("name")
-        if type(slot) is not int or not 1 <= slot < 64 or slot in slots:
-            raise ValueError("Choose a unique slot from 1 to 63; slot 0 is metadata")
+        if type(slot) is not int or not 1 <= slot < count or slot in slots:
+            raise ValueError(f"Choose a unique slot from 1 to {count - 1}; slot 0 is metadata")
         if not isinstance(name, str) or not name.strip() or name != name.strip() or len(name) > 128 or re.search(r"[\x00-\x1f\x7f]", name) or name in names:
             raise ValueError("Each row requires a unique, nonempty pet name")
         slots.add(slot)
@@ -163,7 +178,7 @@ def api_size(row, lumps):
 
 def project(document, lumps):
     validate(document)
-    rows, cursor, warnings = [], 256, []
+    rows, cursor, warnings = [], 4 * document["slotCount"], []
     # Keep the reviewed resident order, then place added residents by slot.
     order = {slot: index for index, slot in enumerate([1, 2, 7, 10, 6, 11, 12])}
     for original in sorted(document["rows"], key=lambda r: (order.get(r["slot"], 100+r["slot"]))):
@@ -172,7 +187,7 @@ def project(document, lumps):
         row["allocationWords"] = 0
         row["location"] = None
         if row["kind"] == "namespace":
-            row.update(location=0, limit=255)
+            row.update(location=0, limit=4 * document["slotCount"] - 1)
         elif row["kind"] == "mmio":
             row["location"] = row["address"]
         elif row["kind"] == "thread":
@@ -194,20 +209,29 @@ def project(document, lumps):
         rows.append(row)
     if cursor is not None and cursor > document["capacityWords"]:
         warnings.append("Resident allocations exceed Namespace capacity; design remains editable")
-    header = ((31 << 27) | ((14-13) << 23) | (64 << 10) | (1 << 8))
+    header = ((31 << 27) | ((14-13) << 23) | (document["slotCount"] << 10) | (1 << 8))
     return dict(rows=sorted(rows, key=lambda r: r["slot"]),
-                metadataWords=[header, 0, len(rows)-1, 0], tableWords=256,
+                metadataWords=[header, 0, len(rows)-1, 0], tableWords=4 * document["slotCount"],
                 usedWords=cursor, warnings=warnings, activationAllowed=False,
                 buildReady=False, addressesAreProposed=True)
 
 
 class DesignStore:
-    def __init__(self, path, lumps, legacy_path):
+    def __init__(self, path, lumps, legacy_path, phase1=False):
         self.path, self.lumps, self.legacy_path = Path(path), Path(lumps), Path(legacy_path)
+        self.phase1 = phase1
+
+    def validate_profile(self, document):
+        validate(document)
+        if document["format"] != (PHASE1_FORMAT if self.phase1 else FORMAT):
+            raise ValueError("Design profile does not match the selected view")
+        return document
 
     def read_document(self):
         if self.path.exists():
-            return validate(json.loads(self.path.read_text()))
+            return self.validate_profile(json.loads(self.path.read_text()))
+        if self.phase1:
+            return self.validate_profile(phase1_seed())
         legacy = json.loads(self.legacy_path.read_text())
         return validate(seed(legacy))
 
@@ -221,7 +245,7 @@ class DesignStore:
     def save(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"fingerprint", "document"}:
             raise ValueError("Expected reviewed fingerprint and design")
-        document = validate(copy.deepcopy(payload["document"]))
+        document = self.validate_profile(copy.deepcopy(payload["document"]))
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(str(self.path)+".lock", "a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)

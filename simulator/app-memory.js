@@ -4909,7 +4909,7 @@ function _nsTableAdd() {
                     <input id="_nsPlacementName" placeholder="Example.Service" oninput="_nsUpdatePlacementButton()" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
                 </label>
                 <label style="display:block;margin-bottom:8px;">Design-time slot (blank = first free)
-                    <input id="_nsPlacementSlot" type="number" min="2" max="${sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
+                    <input id="_nsPlacementSlot" type="number" min="2" max="${window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active ? window.NamespaceDesignV1.state.document.slotCount - 1 : sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
                 </label>
                 <div style="font-size:0.74rem;color:#f0a040;margin-bottom:8px;">Add to Namespace saves the selection without executing or changing its saved bytes. Install executable is a separate advanced action requiring exact compiler-approved, unmodified binary bytes.</div>
                 <div id="_nsAddMeta" style="margin-bottom:8px;"></div>
@@ -4953,7 +4953,8 @@ function _nsTableAdd() {
                 slot.type = 'number';
                 slot.placeholder = 'Slot (blank = first free)';
                 slot.min = 2;
-                slot.max = sim.MAX_NS_ENTRIES - 1;
+                slot.max = window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active ?
+                    window.NamespaceDesignV1.state.document.slotCount - 1 : sim.MAX_NS_ENTRIES - 1;
                 slot.style.cssText = 'width:100%;box-sizing:border-box;margin-bottom:8px;';
                 const error = document.createElement('div');
                 error.id = '_nsAddError';
