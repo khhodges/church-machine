@@ -748,7 +748,30 @@ and `BFINS DRd, DRs, #lsb, #width`, preserving the existing assembler syntax.
 Immediate bits 4:0 encode width directly (1–31); bits 9:5 encode lsb (0–31).
 Zero width and lsb + width > 32 fault with BOUNDS, without changing registers
 or condition flags. Assemblers reject out-of-range operands before masking.
-No new interpretation of immediate bits 14:10 is introduced here.
+The subsequent Phase 1 runtime-position extension below assigns bits 14:10;
+the former zero-field interpretation is superseded for that extension.
+
+**Runtime position indexing — approved for Phase 1:** Keep the source and
+destination DR fields unchanged and use this single-word operand layout:
+
+| Bits | Meaning |
+|---|---|
+| 14 | Subtract flag: 0 adds, 1 subtracts |
+| 13:10 | Position-index DR0–DR15 |
+| 9:5 | Unsigned position magnitude, 0–31 |
+| 4:0 | Width, 1–31; zero remains invalid |
+
+```text
+position = unsigned32(DR[index]) + (S ? -magnitude : magnitude)
+```
+
+DR0 with addition preserves the existing immediate-position encodings.
+Compute without wrapping or truncation. Width zero, a position outside 0–31,
+or position + width > 32 faults with BOUNDS, without changing registers or
+flags. Capture all inputs before any destination write, including overlapping
+source, destination and index registers; BFINS retains its pre-write destination
+bits outside the inserted field. No prefix or extension word is introduced.
+This approval selects the format, not implementation or hardware conformance.
 
 BFEXT zero-extends the selected source field. BFINS replaces only the selected
 destination field with the low width bits of the pre-write source. Both set

@@ -16,6 +16,11 @@ Phase 1 BRANCH now uses index DR [22:19], subtract flag bit 18 and unsigned
 18-bit magnitude [17:0], relative to this BRANCH's address. The historical
 signed-15-bit diagrams below are superseded by the
 [approved single-word layout](instruction-set.md#single-word-indexed-branch--approved-for-phase-1).
+Phase 1 BFEXT/BFINS now assigns bit 14 to subtraction and bits 13:10 to a
+position-index DR; bits 9:5 remain the position magnitude and 4:0 the width.
+The historical claim that all bits 14:10 are unused is superseded. DR0 with
+addition preserves existing immediate-position encodings; see the
+[bitfield contract](instruction-set.md#bfextbfins-bitfield-contract).
 
 **Authority:** [Church Machine Instruction Set](instruction-set.md) is the master
 ISA document. This supporting encoding record must defer to it.

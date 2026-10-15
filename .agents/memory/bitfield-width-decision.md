@@ -19,3 +19,14 @@ The user subsequently approved preserving the simulator bit layout: width in
 bits 4:0, lsb in bits 9:5, rejecting fields extending beyond bit 31 without
 register or flag changes. **Why:** preserve existing encoded artifacts while
 correcting the FPGA, rather than migrate saved instructions.
+
+Phase 1 now permits runtime bit-position indexing in BFEXT/BFINS, using the
+previously unused operand bits while retaining width 1–31.
+
+**Why:** The user approved reclaiming five unused bits for a position DR and
+separate sign, with DR0/addition preserving existing immediate-position words.
+
+**How to apply:** Do not treat the upper operand bits as universally unused or
+reopen width-zero semantics. Compute position without wrapping, check bounds
+before register/flag changes, and capture overlapping-register inputs before
+writing the destination. Encoding approval is not implementation authorization.
