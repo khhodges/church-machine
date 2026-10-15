@@ -248,8 +248,16 @@ succeed. Proof generation mechanism, protected storage, transfer and verificatio
 ABI remain unresolved.
 
 The following symbolic outline records Mint's additional responsibility.
-It does not select a public method name, register ABI, first-issuance authority
+It does not select a public method name, register ABI, first-issuance mechanism
 or token/proof format. All failed checks hard-fault.
+
+**Initial PassKey issuance — approved:** Mint creates the initial
+GT/separate-128-bit-proof pairs through a separate Genesis-authorized setup
+procedure, for explicitly approved recipients and permissions. No
+unauthenticated first-caller shortcut is permitted. Ordinary Create, Replace
+and Destroy still require valid, operation/target-authorized PassKeys. Setup
+mechanics, authorization representation and protected delivery remain software
+TBD; the outline below does not implement the bootstrap procedure.
 
 ```text
 # Mint responsibility; exact callable interface TBD.
@@ -266,7 +274,7 @@ Mint_create_and_share_passkey(request):
 
 Any Namespace access requiring NSRW-GT remains confined to Mint's same-scope,
 single-slot LAMBDA. This decision does not settle the proof-generation mechanism,
-credential storage, revocation, replay, onward sharing or bootstrap issuance.
+credential storage, revocation, replay, onward sharing or bootstrap mechanics.
 It does not equate the passkey-GT with NSRW-GT or grant the recipient table RW.
 
 ```text

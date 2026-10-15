@@ -69,7 +69,7 @@ not executable implementations.
   requested case against Genesis-approved authority. Missing, invalid, revoked
   or insufficiently authorized credentials hard-fault before protected changes.
   This does not assign a distinct credential per type or settle bootstrap
-  issuance, and does not add proof checks to ordinary ISA LS/RW accesses.
+  mechanics, and does not add proof checks to ordinary ISA LS/RW accesses.
 - **Only a same-scope LAMBDA references NSRW-GT**, one Namespace slot at a time,
   including reads and commit rechecks. No separate LAMBDA service LUMP or
   automatic delegation to callers/pkverify.
@@ -99,8 +99,14 @@ not executable implementations.
   revoker may revoke a PassKey GT/proof pair. Possession of the pair alone
   does not grant revocation authority. Unauthorized revocation attempts
   hard-fault under the existing authorization rule.
+- **Initial PassKey issuance — approved:** A separate Genesis-authorized setup
+  procedure has Mint create the initial GT/separate-128-bit-proof pairs for
+  explicitly approved recipients and permissions. No unauthenticated first-caller
+  shortcut. Ordinary Create, Replace and Destroy still require valid,
+  operation/target-authorized PassKeys. Setup mechanics, authorization
+  representation and protected delivery remain software TBD.
 - Proof generation, protected storage/transfer, ABI, concrete revocation
-  mechanics, list representation and bootstrap issuance remain software TBD.
+  mechanics, list representation and bootstrap implementation remain software TBD.
 - Track used/free blocks per LUMP size class, separately from slots/generations.
   **No GC in Phase 1.** G-setting location/control is Phase 2 TBD.
 - Software versions are 9 bits. A genuinely never-used slot starts at 0.

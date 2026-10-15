@@ -108,7 +108,7 @@ RW data object requires a valid PassKey GT and its separate 128-bit proof.
 Validate authority for that operation and target, not merely pair validity.
 Missing, invalid, revoked or insufficiently authorized credentials hard-fault
 before protected changes. This neither assigns separate credentials per type
-nor changes ordinary ISA access checks; bootstrap issuance remains unresolved.
+nor changes ordinary ISA access checks; bootstrap mechanics remain unresolved.
 
 Replacement is not blanket permission to overwrite executing code, the active
 Thread, the Namespace itself, Mint or pkverify. Eligibility, exclusion, old
@@ -140,6 +140,13 @@ enforcement and issuance/sharing mechanics remain unresolved.
 Do not infer IDE-only access, unrestricted CM
 access, onward-sharing permission or NSRW-GT delegation. The pkverify proof
 contract remains open; GT equality alone is not implicitly approved as proof.
+
+**Initial PassKey issuance — approved:** Use a separate Genesis-authorized setup
+procedure in which Mint creates the initial GT/separate-128-bit-proof pairs for
+explicitly approved recipients and permissions. Do not permit an unauthenticated
+first-caller shortcut. Ordinary Create, Replace and Destroy still require valid,
+operation/target-authorized PassKeys. The setup mechanism, authorization
+representation and protected delivery remain software TBD.
 
 **Approved:** Mint uses a **same-scope LAMBDA** as the only code referencing
 `NSRW-GT`, accessing **one Namespace slot at a time**. Surrounding Mint code and

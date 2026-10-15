@@ -540,3 +540,14 @@ addition to the existing RESIDENT replacement prohibition.
 **How to apply:** Keep active-use detection and direct replacement's slot/version
 policy as software TBD. Do not import Destroy's version/invalidation semantics
 into Replace or treat this documentation approval as implementation evidence.
+
+Initial PassKey pairs are created by Mint through a separate Genesis-authorized
+setup procedure for explicitly approved recipients and permissions, never an
+unauthenticated first-caller shortcut.
+
+**Why:** The user approved a separate initial-issuance authority to avoid the
+circular dependency on an already-issued PassKey.
+
+**How to apply:** Ordinary Create, Replace and Destroy retain PassKey checks.
+Keep setup mechanics, authorization representation and protected delivery
+software TBD; do not infer NSRW-GT delegation or unrestricted later issuance.

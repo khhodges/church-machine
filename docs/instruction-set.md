@@ -438,7 +438,14 @@ Threads, LS C-list objects and RW data objects. Validate authorization for the
 specific operation and target; one valid pair is not blanket authority.
 Missing, invalid, revoked or insufficiently authorized credentials hard-fault
 before protected changes. This does not select credential allocation per type,
-resolve bootstrap issuance or add PassKey checks to ordinary ISA LS/RW accesses.
+resolve bootstrap mechanics or add PassKey checks to ordinary ISA LS/RW accesses.
+
+**Initial PassKey issuance — approved:** Use a separate Genesis-authorized setup
+procedure in which Mint creates the initial GT/separate-128-bit-proof pairs for
+explicitly approved recipients and permissions. No unauthenticated first-caller
+shortcut is permitted. Ordinary Create, Replace and Destroy still require valid,
+operation/target-authorized PassKeys. The setup mechanism, authorization
+representation and protected delivery remain software TBD.
 
 **PassKey lifetime — approved:** The issued PassKey GT and separate 128-bit
 proof are reusable until revoked. Successful use does not consume the pair.
