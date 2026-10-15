@@ -4,6 +4,8 @@ import json
 import os
 import re
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
+from package_phase_1_documents import links
 
 
 def main():
@@ -12,6 +14,30 @@ def main():
     manifest = json.loads((folder / "manifest.json").read_text())
     entries = manifest["documents"]
     assert entries[0] == [manifest["entrypoint"], "docs/instruction-set.md"]
+    if manifest.get("storage") == "local-copies":
+        paths = set()
+        records = json.loads((folder / "package-index.json").read_text())
+        for record in records:
+            name = record["path"]
+            assert name not in paths, f"Duplicate packaged path: {name}"
+            paths.add(name)
+            assert (folder / name).is_file(), f"Missing packaged file: {name}"
+        assert {name for name, _ in entries} <= paths
+        checked = 0
+        for file in folder.rglob("*"):
+            assert not file.is_symlink(), f"Non-portable symlink: {file}"
+            if not file.is_file() or file.suffix.lower() not in (".md", ".html", ".htm"):
+                continue
+            for _, href in links(file.read_text()):
+                parsed = urlsplit(href.strip("<>"))
+                if parsed.scheme or parsed.netloc or not parsed.path:
+                    continue
+                target = (file.parent / unquote(parsed.path)).resolve()
+                assert target.is_relative_to(folder), f"Link escapes package: {file}: {href}"
+                assert target.is_file(), f"Missing link target: {file}: {href}"
+                checked += 1
+        print(f"PASS Phase 1: {len(paths)} local files, {checked} local links, no symlinks or escaping links")
+        return
     names, sources = set(), set()
     for name, source in entries:
         assert name not in names, f"Duplicate collection path: {name}"

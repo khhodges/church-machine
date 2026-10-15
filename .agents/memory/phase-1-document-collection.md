@@ -6,6 +6,17 @@ description: User-requested ISA-first organization and single-source preservatio
 Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
+The user superseded the symlink/single-source collection design: Phase 1 must
+contain real local copies and internal reading links so it can stand alone.
+
+**Why:** The user explicitly asked to copy missing items and change links into
+Phase 1 so nothing depends on documents outside that folder.
+
+**How to apply:** Maintain the local Phase 1 checkpoint explicitly; edits to
+repository originals no longer update it automatically. Keep originals and
+audit evidence intact, record copy provenance, and disclose unavailable source
+material rather than substituting unrelated documents or claiming completeness.
+
 Apply explicit approvals and routine FPGA engineering choices made under the
 user's delegated discretion when reconciling active specifications; distinguish
 the two. Preserve original audit snapshots and historical evidence, and keep
@@ -15,8 +26,8 @@ software TBDs visible.
 then explicitly delegated routine FPGA edge details to the agent: choose the
 easiest design and report the decision rather than asking each small question.
 
-**How to apply:** Correct active original files through the single-source
-collection; use explicit profile/supersession boundaries for retained old
+**How to apply:** Correct active Phase 1 local files and reconcile repository
+originals explicitly where needed; use profile/supersession boundaries for old
 descriptions. Resolve routine implementation details consistently with the
 approved contract and report them together. Ask only for consequential changes
 to authority, ISA behavior, compatibility or hardware scope; do not invent
@@ -64,8 +75,8 @@ the Master ISA reconciliation. Scattered review editions had made their status
 and relationships difficult to follow.
 
 **How to apply:** Add future related documents to the shared reading index.
-Preserve a single authoritative original and existing paths rather than creating
-competing copies. Keep historical evidence and unapproved proposals visibly
+Preserve existing source paths and the copied checkpoint's provenance. Keep
+historical evidence and unapproved proposals visibly
 separate from controlling specifications; collection membership does not grant
 approval.
 

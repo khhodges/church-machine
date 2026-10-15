@@ -7,7 +7,7 @@ is created by this document. The resolution log in
 
 This is a new review output, not an additional member of the original 45-file
 audit snapshot. Approved requirements have been reconciled into the
-[active Mint contract](../ide-mint-forge-contract.md) and Master ISA. Older
+[active Mint contract](03-namespace-thread-mint/ide-mint-forge-contract.md) and Master ISA. Older
 proposal sections remain explicitly superseded evidence; software TBDs remain.
 
 ## 1. Approved service scope

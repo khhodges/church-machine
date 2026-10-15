@@ -1,1 +1,12 @@
-../../../reports/isa-review-change-split13-magnitude.manifest.json
+{
+  "status": "review-only-unapproved",
+  "master_sha256": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+  "proposal_sha256": "f5efa82c5be5171ea35a0f0ba5c3cbba84d9762273ffe7d2e1f03f99e5bd3c75",
+  "html_sha256": "e480cd520b9ecbfe19853facdad69b19e59eb2f4d7315271cfee5569bdece7f7",
+  "binary_examples_verified": 8,
+  "magnitude_roundtrip_range": [
+    0,
+    8191
+  ],
+  "master_unchanged": true
+}

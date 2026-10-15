@@ -1,0 +1,30 @@
+ISA Amendments (2026-10-09) — Completeness Review
+Oct 13, 2026 · @Ken
+Review of the Master ISA — proposed red-text amendments (review edition dated 2026-10-09), assessed for completeness and for consistency with the decisions made on 2026-10-12.
+Verdict
+As a self-contained proposal the document is substantially complete and honestly scoped: seven numbered items, each marked proposed / baseline / user-decided, with explicit fault allocations, worked binary examples, a validation-ordering spec, a full post-CHANGE register table, and an acceptance checklist. It repeatedly refuses to claim implementation conformance, which is the right discipline.
+The problem that matters more than any internal gap: the document is dated 2026-10-09 and is stale against the 2026-10-12 decisions — in two places it conflicts with them. It should not be reviewed for approval as-is. Either re-date it as the historical 10-09 proposal and let the 10-12 decisions override the two stale sections, or issue a short reconciliation note. Nothing in the document's craft is at fault; it is simply four days behind the decisions, and dated proposals must be read against what was decided after them.
+The staleness problem
+Two sections conflict with decisions made on 2026-10-12. These are the items to resolve before the document is treated as current.
+§1 — indexed CHANGE contradicts the INDEX deferral. §1 proposes CHANGE CRlist[DRr + immediate] as a full Phase-1 encoding, with seven worked binary examples and a split ±8191 displacement range. But on 2026-10-12 INDEX was deferred from Phase 1, and register-indexing on the privileged transitions (CHANGE / SWITCH) was specifically to wait for the handoff contract. These positions cannot both stand. The most likely reading is that §1's indexed form is stale and indexed CHANGE is deferred along with INDEX generally; §1 should reduce to direct CHANGE only for Phase 1.
+§3.1 — boot marker and “final boot CALL” overlap the 2026-10-12 boot contract. §3's cooperative round-robin + watchdog model is consistent with the run-to-suspension direction and correctly withdraws the IRQ-swap proposal — that part is aligned. But §3.1 still assigns a boot marker (0x27000001) and references advancing to “the final boot CALL,” whereas the later boot contract establishes a hardware-rooted CR12-only M grant and canonical-frame entry with the ROM CALL removed. The boot contract is the authority; §3.1's CALL reference is stale.
+Consistent (not stale): CR13 disposition — reserved, cleared NULL on boot and on every CHANGE, no IRQ role — matches the ISA approval draft's “CR13 is a protected System CR with no automatic IRQ role.”
+Internal completeness
+Setting staleness aside, the document is internally thorough. It covers well: the CHANGE encoding with field layout and seven worked examples; encoding-before-condition validation ordering; a full transition-validation sequence with preserved specific faults; proposed fault allocations (0x1D THREAD_CONTEXT, 0x1E THREAD_PERMISSIONS, 0x1F WATCHDOG); the cooperative scheduler, ready-queue, budget and watchdog-capture model; Namespace bootstrap / CR15 identity; the Heap-derivation geometry; and the complete post-CHANGE register table.
+The gaps it leaves open are flagged honestly by the document itself — these are genuine “not done,” not oversights:
+• Boot-marker reset-ROM fetch authority (§3.1) — “an explicit specification item.”
+• Watchdog memory-backed capture authority (§3.6) — unresolved.
+• Protected configuration interface, timebase and numeric budget values (§3.5, §3.7) — deferred to the platform binding.
+• Indexed CALL allocation (§1) — “must be reconciled explicitly; do not copy CHANGE's layout.”
+• GT bit layout — not covered here at all, correctly deferred to the GT-layout document (itself still a draft with disagreements).
+So ISA-encoding completeness and GT-encoding completeness are two separate, both-incomplete tracks, as already noted elsewhere.
+One cross-check the document does not flag
+§1's candidate encoding changes the direct CHANGE word: CHANGE CR12 becomes 0x27060000, not the old 0x27660000. That is a real binary change to a core instruction. The boot marker in §3.1 is 0x27000001, and the boot contract's first CHANGE installs CR12.
+Confirm the boot contract's first-Thread CHANGE uses the new direct encoding (0x27060000 form), not a stale one. If the boot migration and this ISA amendment land in different releases, the boot CHANGE could be encoded one way and decoded another — exactly the “all consumers must reconstruct the full magnitude; a leftover 10-bit mask silently selects the wrong entry” hazard the document itself warns about at the end of §1, applied to the boot path. Worth a one-line cross-check before either lands.
+Recommendation
+Do not review this document for approval as-is. Issue a short reconciliation note that states, item by item, what the 2026-10-12 decisions supersede:
+• Indexed CHANGE (§1) is deferred along with INDEX; Phase 1 uses direct CHANGE only.
+• §3.1 boot entry follows the boot contract: canonical-frame entry, CR12-only hardware M grant, ROM CALL removed.
+• Everything else in the document stands as a proposal, read at its stated strength.
+This matches how every other supersession this week has been handled: mark the staleness explicitly rather than let a dated document silently carry contradicted proposals.
+Process notes. The PDF rendering was delivered separately (isa-amendments-review-2026-10-09.pdf, 9 pages); one comparison table lost its column grid but all content is intact. Nothing normative was changed by this review, and no document was edited — per the Security Regulator ownership policy, review findings are for the Design Team to act on.

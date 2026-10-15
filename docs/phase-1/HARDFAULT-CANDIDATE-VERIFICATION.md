@@ -12,7 +12,7 @@ The integration supplement below does not make or renew an encoding selection.
 Exact-artifact attribution and physical acceptance remain open.
 Release approval is deferred by the user; closing this investigation does not
 authorize emission, deployment, or hardware use.
-The approach approved in [the ISA](../instruction-set.md#standard-software-hard-fault)
+The approach approved in [the ISA](01-isa/instruction-set.md#standard-software-hard-fault)
 and [Mint draft](MINT-CODE-DRAFT.md) remains unchanged. The original investigation
 changed no compiler, simulator, decoder, runtime fault handling, live LUMP, or
 hardware image. The subsequent full-top supplement documents its narrow RTL

@@ -1,0 +1,502 @@
+[
+  {
+    "path": "01-isa/instruction-set.md",
+    "source": "docs/instruction-set.md",
+    "source_sha256": "477d1eda0e46e0705a4982b84286dbbe38e9f7feb73241d68ea6b16af47b20cf"
+  },
+  {
+    "path": "01-isa/cloomc-petname-execution-model-phase-1.md",
+    "source": "docs/cloomc-petname-execution-model-phase-1.md",
+    "source_sha256": "e42b5be41342167e827f3161a2649122965d169d3e53d7af70d39cbc9697f18e"
+  },
+  {
+    "path": "01-isa/architecture.md",
+    "source": "docs/architecture.md",
+    "source_sha256": "67db73e88a316e1026aa69508137a770fd215d308386a409adce1f0f3c22fed2"
+  },
+  {
+    "path": "01-isa/mload.md",
+    "source": "docs/mload.md",
+    "source_sha256": "0ac1c4d1e5d9421f68e6c0eb17ea9a601e4d82e94d246ccf408a09d2c8357234"
+  },
+  {
+    "path": "01-isa/switch-lifecycle.md",
+    "source": "docs/switch-lifecycle.md",
+    "source_sha256": "9fe01139f178b5bea60d16e81f3db66aa5733381cd900ced99eb4ac83703254c"
+  },
+  {
+    "path": "01-isa/isa-indexed-operands-proposal.md",
+    "source": "docs/isa-indexed-operands-proposal.md",
+    "source_sha256": "f5ad0c69b24a5ba6813e4b29155e483a72b8b0dd0c1cc409abdce6b9541d2cd4"
+  },
+  {
+    "path": "01-isa/isa-indexed-encoding.md",
+    "source": "docs/isa-indexed-encoding.md",
+    "source_sha256": "d8cb7843e92744aa79e43ee11a69bd8a833923a1dd90397e67cde466743cbae6"
+  },
+  {
+    "path": "01-isa/isa-indexed-profile.md",
+    "source": "docs/isa-indexed-profile.md",
+    "source_sha256": "de09983b3570f054acadfcf91e827f0745abebbec0869de80459a0219ac51485"
+  },
+  {
+    "path": "01-isa/isa-indexed-containment.md",
+    "source": "docs/isa-indexed-containment.md",
+    "source_sha256": "42de24678d5cc93929488535ddeacc13eb1ae9ed41e291c17e47d43c84b8825e"
+  },
+  {
+    "path": "02-tokens-lumps-security/golden-tokens.md",
+    "source": "docs/golden-tokens.md",
+    "source_sha256": "7eadf4f9fc2f5435fc0f9bc42f516e15b23bfa7d1fb201a10dd534d23ec806ee"
+  },
+  {
+    "path": "02-tokens-lumps-security/golden-tokens-v2.md",
+    "source": "docs/golden-tokens-v2.md",
+    "source_sha256": "421bf3bb638bf2090a7c2e6695732f8a525ac665e30de6e17b0560aada8cae3f"
+  },
+  {
+    "path": "02-tokens-lumps-security/GoldenDetails.md",
+    "source": "docs/GoldenDetails.md",
+    "source_sha256": "75bf31fb5441d198920cb83df42d23a24c878a078b56286533105d78e841f872"
+  },
+  {
+    "path": "02-tokens-lumps-security/abstract-gt.md",
+    "source": "docs/abstract-gt.md",
+    "source_sha256": "05376e11d5594fe241bacbedcf5b390df8af805bc4e93ee8b5ef3574a812ddf5"
+  },
+  {
+    "path": "02-tokens-lumps-security/gt-parity-integrity.md",
+    "source": "docs/gt-parity-integrity.md",
+    "source_sha256": "301ac9d1855d91d967601ee5e8c684fb429fb61cb9c00fb508dcd2b07c030a7f"
+  },
+  {
+    "path": "02-tokens-lumps-security/CM_LUMP_SPECIFICATION.md",
+    "source": "docs/CM_LUMP_SPECIFICATION.md",
+    "source_sha256": "7f2742d1b3e8d859436e77828459286cf9f912fa34af4f293381c5f00ae795b4"
+  },
+  {
+    "path": "02-tokens-lumps-security/compact-lump-api-contract.md",
+    "source": "docs/compact-lump-api-contract.md",
+    "source_sha256": "9b60657ea5bd18e81a481a7c43cf93a27b283d7cb151141ee4368fd0be155470"
+  },
+  {
+    "path": "02-tokens-lumps-security/TRUSTED_COMPILER_AND_UNTRUSTED_LUMP_ADMISSION.md",
+    "source": "docs/TRUSTED_COMPILER_AND_UNTRUSTED_LUMP_ADMISSION.md",
+    "source_sha256": "c80ee10e4ad8366811171844da99772af363e503ee54fd843255c0efb4e53f56"
+  },
+  {
+    "path": "02-tokens-lumps-security/namespace-security.md",
+    "source": "docs/namespace-security.md",
+    "source_sha256": "5d1f924fcc246175f8c9d080f41da731b89e54788f50f50e70a6f436741ec111"
+  },
+  {
+    "path": "02-tokens-lumps-security/trusted-security-base.md",
+    "source": "docs/trusted-security-base.md",
+    "source_sha256": "97bae62a2b23af44c6b84ba189c5b82ac27758ea67e9c69f489350a06a5bf995"
+  },
+  {
+    "path": "02-tokens-lumps-security/boot-permission-rules.md",
+    "source": "docs/boot-permission-rules.md",
+    "source_sha256": "6188c7d6ad99706917d5cededba22514e9da311ee3277427c3268b27da3b00f2"
+  },
+  {
+    "path": "02-tokens-lumps-security/phase-1-security-todo.md",
+    "source": "docs/phase-1-security-todo.md",
+    "source_sha256": "be9b84b3b00627f2cae61fa537d16257867f82950dc877e489d34993d3ce8929"
+  },
+  {
+    "path": "03-namespace-thread-mint/system-namespace-handoff-contract.md",
+    "source": "docs/system-namespace-handoff-contract.md",
+    "source_sha256": "c5ee91d6df83ebb2463f7ac7e014e031f9d42c96c007394e2dc5356d82f3ccfe"
+  },
+  {
+    "path": "03-namespace-thread-mint/boot-system-handoff-first-pass.md",
+    "source": "docs/boot-system-handoff-first-pass.md",
+    "source_sha256": "d84f5775bce7c42fb8d02152939d174fec222f41565ce2da41caf1832e3dfe74"
+  },
+  {
+    "path": "03-namespace-thread-mint/namespace-plan-contract.md",
+    "source": "docs/namespace-plan-contract.md",
+    "source_sha256": "312cea2f9a068f6ebb8c0447c1033aa13e95143ea824dc8e9b23f019cc08a33f"
+  },
+  {
+    "path": "03-namespace-thread-mint/prepared-thread-release-evidence.md",
+    "source": "docs/prepared-thread-release-evidence.md",
+    "source_sha256": "0805e229f93dbe3264d46214a525f949c0cd2c31a79324f3cb525b8a7742784b"
+  },
+  {
+    "path": "03-namespace-thread-mint/boot-rom-layout.md",
+    "source": "docs/boot-rom-layout.md",
+    "source_sha256": "749c8a3d1a83520cebbce3600d38864f6e4f13664b8eae8e774f7c987fb6ec58"
+  },
+  {
+    "path": "03-namespace-thread-mint/ide-mint-forge-contract.md",
+    "source": "docs/ide-mint-forge-contract.md",
+    "source_sha256": "4a2e78714fa65889cbc88a79fc78328e2333e4e30ace9a83ea637acdb6a2539b"
+  },
+  {
+    "path": "03-namespace-thread-mint/ide-mint-hardware-atomicity-review.md",
+    "source": "docs/ide-mint-hardware-atomicity-review.md",
+    "source_sha256": "3e704a5ae440324c2b742172b97ebbfecae689edb36156ceaafda935bab2ceb6"
+  },
+  {
+    "path": "03-namespace-thread-mint/mint-phase1-bounded-rule.md",
+    "source": "attached_assets/mint-phase1-bounded-rule_1791705504631.md",
+    "source_sha256": "01fac401f3d16619a36bb1378377e72eac3a9748dfdbce28721c44d80e6f2642"
+  },
+  {
+    "path": "04-release/isa-to-fpga-alignment-plan.md",
+    "source": "docs/releases/isa-to-fpga-alignment-plan.md",
+    "source_sha256": "bf9ed08695a6e3ea68f98d00111ba33b8f373ec88c9f3c7de7c9f4ab05a472a3"
+  },
+  {
+    "path": "04-release/bitstream-candidate-readiness.md",
+    "source": "reports/bitstream-candidate-readiness.md",
+    "source_sha256": "d720c6eea351771be47b72640bb3de8b11ec1d11a4afeec437e307836bb8e5a9"
+  },
+  {
+    "path": "04-release/wukong-boot-verification.md",
+    "source": "docs/wukong-boot-verification.md",
+    "source_sha256": "24cf1176ffd2bfa00bb4206a688e2ab2671f05af76d54d587a3e15a4af313118"
+  },
+  {
+    "path": "04-release/portable-lump-compilation-and-fpga-loading.md",
+    "source": "docs/portable-lump-compilation-and-fpga-loading.md",
+    "source_sha256": "cc0d49f02e25747da4125fbbab67d56937bd58705ba2f163697a2996bb0e4f69"
+  },
+  {
+    "path": "05-review-history/isa-amendment-reconciliation-2026-10-13.md",
+    "source": "reports/isa-amendment-reconciliation-2026-10-13.md",
+    "source_sha256": "443724ef096d47be1e2bbcf3958cab2f6d42e51f901bc1058b8160b8fc3f67c6"
+  },
+  {
+    "path": "05-review-history/isa-completeness-review-2026-10-13.txt",
+    "source": "attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791978480955.txt",
+    "source_sha256": "6c9c24e92e70b718615e37595541a186b753d43defd4f29c7cdfed2a3504de5b"
+  },
+  {
+    "path": "05-review-history/isa-review-cooperative-round-robin-hard-faults.html",
+    "source": "reports/isa-review-cooperative-round-robin-hard-faults.html",
+    "source_sha256": "62b32e62686d225c3009794de32ba77e99512c3ffc25953e5d556482391cfc48"
+  },
+  {
+    "path": "05-review-history/isa-review-cooperative-round-robin-hard-faults.manifest.json",
+    "source": "reports/isa-review-cooperative-round-robin-hard-faults.manifest.json",
+    "source_sha256": "e9deedd9829cabb0aa69fcaf06e9c3fde1eb42c2f3c44da24fa8d8d2bdde6061"
+  },
+  {
+    "path": "05-review-history/isa-review-change-split13-magnitude.html",
+    "source": "reports/isa-review-change-split13-magnitude.html",
+    "source_sha256": "e480cd520b9ecbfe19853facdad69b19e59eb2f4d7315271cfee5569bdece7f7"
+  },
+  {
+    "path": "05-review-history/isa-review-change-split13-magnitude.manifest.json",
+    "source": "reports/isa-review-change-split13-magnitude.manifest.json",
+    "source_sha256": "0d353f22ed2ba22c4d3dc1c18409cd5444388df128f78ac6cac44cbc2e114164"
+  },
+  {
+    "path": "05-review-history/isa-review-hardwired-authority.html",
+    "source": "reports/isa-review-hardwired-authority.html",
+    "source_sha256": "7fb3420b33e21d03d6e60fe56f8524887f8213fd77da531c8ec65ecaa233235c"
+  },
+  {
+    "path": "05-review-history/isa-review-hardwired-authority.manifest.json",
+    "source": "reports/isa-review-hardwired-authority.manifest.json",
+    "source_sha256": "13b1f2969b1e6f899986c49d28cc2a7bc64163e1932752d61ed500b124b0b3bc"
+  },
+  {
+    "path": "05-review-history/instruction-set-history.md",
+    "source": "docs/instruction-set-history.md",
+    "source_sha256": "34d7d88d750b0c9ac0eb6b06a96d311971a9c09a9aedbd757516987d6d79d977"
+  },
+  {
+    "path": "05-review-history/instruction-set-history-inventory.json",
+    "source": "docs/instruction-set-history-inventory.json",
+    "source_sha256": "d4d568364c73b13b7bab9b08de080c425be3a676b53ee4c54fd18e57ae2b73bc"
+  },
+  {
+    "path": "05-review-history/isa_reference.md",
+    "source": "docs/isa_reference.md",
+    "source_sha256": "e85d7846b9a6b30a4bb69758504b5aa3d8e512549dedf1838c21e7f0d07ce313"
+  },
+  {
+    "path": "05-review-history/isa_encoding.md",
+    "source": "docs/isa_encoding.md",
+    "source_sha256": "4ee58cdda2e25c1c98f9f0f1185d453bb0ced281a1575d8d07d6ca25209434f9"
+  },
+  {
+    "path": "REVIEW-2026-10-14-sources.json",
+    "source": "docs/phase-1/REVIEW-2026-10-14-sources.json",
+    "source_sha256": "c716efe3dbcd5ed46d56ef9a4a2321be2049a22cc1e0ffe1f844d9ebfb9cb512"
+  },
+  {
+    "path": "HARDFAULT-CANDIDATE-VERIFICATION.md",
+    "source": "docs/phase-1/HARDFAULT-CANDIDATE-VERIFICATION.md",
+    "source_sha256": "1e4905ecebd54b0c4d6634c21cbd3542b87631ee47fd30c001c85382baa9fc7f"
+  },
+  {
+    "path": "HARDFAULT-STATIC-MAPS.md",
+    "source": "docs/phase-1/HARDFAULT-STATIC-MAPS.md",
+    "source_sha256": "07e2d69232bc1a5adadaf8d2dff2ac9d9b4211275a8930a0517deb7fd9c09e6b"
+  },
+  {
+    "path": "MINT-FIRST-DRAFT.md",
+    "source": "docs/phase-1/MINT-FIRST-DRAFT.md",
+    "source_sha256": "76fae32b57b711603181a46c22a8c0ef60a22e68ff86c47da2b7900675abf29b"
+  },
+  {
+    "path": "MINT-CODE-DRAFT.md",
+    "source": "docs/phase-1/MINT-CODE-DRAFT.md",
+    "source_sha256": "26fc842b2b1be253652b904d7b2deae69ab7336b96dab42fb76a6447635885fd"
+  },
+  {
+    "path": "CALL-SINGLE-WORD-DRAFT.md",
+    "source": "docs/phase-1/CALL-SINGLE-WORD-DRAFT.md",
+    "source_sha256": "b88000ccc22bd7d7f0d44460cf8eb9c40eec89985d0c0d7371baaa5502d16a60"
+  },
+  {
+    "path": "REVIEW-2026-10-14.md",
+    "source": "docs/phase-1/REVIEW-2026-10-14.md",
+    "source_sha256": "1f277e2dd1dbca31492b826115e3826d401eb74018ede9558aee7879ff62df5e"
+  },
+  {
+    "path": "UNAVAILABLE-SOURCES.md",
+    "source": "docs/phase-1/UNAVAILABLE-SOURCES.md",
+    "source_sha256": "3f6f78f710f1c530d0350fd3cc7828465034fa4403d17c6f611f899271551b23"
+  },
+  {
+    "path": "HISTORICAL-REFERENCES.md",
+    "source": "docs/phase-1/HISTORICAL-REFERENCES.md",
+    "source_sha256": "2aa09a6dfe90f67f1ac4faa5e9cc25a7687b7c28321522bc3519335a77c89ea5"
+  },
+  {
+    "path": "README.md",
+    "source": "docs/phase-1/README.md",
+    "source_sha256": "01e09118784ef12c711fd6f8dafa7c235b639dcd5abc82029ace0cfb50132697"
+  },
+  {
+    "path": "source-drafts/ide.Mint.cloomc",
+    "source": "docs/phase-1/source-drafts/ide.Mint.cloomc",
+    "source_sha256": "a6d5f41c7bf4685ce71686092e5856b18c0bdf3aefb1410e71001deedbf8458a"
+  },
+  {
+    "path": "source-drafts/README.md",
+    "source": "docs/phase-1/source-drafts/README.md",
+    "source_sha256": "cdd599c9f1aef583e9ecb76fbfe42a540f080f67e8be9448867f9936f3db8244"
+  },
+  {
+    "path": "source-drafts/pkverify.cloomc",
+    "source": "docs/phase-1/source-drafts/pkverify.cloomc",
+    "source_sha256": "0e42c0843c1067112a1d9dc708bc0d2652f82dd36abd55f5b7f04445cbbd2e85"
+  },
+  {
+    "path": "source-drafts/ns-slot-lambda.cloomc",
+    "source": "docs/phase-1/source-drafts/ns-slot-lambda.cloomc",
+    "source_sha256": "8df4df82219d9ed7ef4223331761f0b8a76a5a7256971d821f7129dc3645009b"
+  },
+  {
+    "path": "references/hardware/boot_rom.py",
+    "source": "hardware/boot_rom.py",
+    "source_sha256": "ed4aafd33b597c45f31e067cce8ad06ca635166261c75be0aa505c0643fd2b52"
+  },
+  {
+    "path": "references/docs/irq-hidden-return-proposal.md",
+    "source": "docs/irq-hidden-return-proposal.md",
+    "source_sha256": "af745c168efa26ead1bce28abb258396ae2dd9d7da51f312001167e57f1f0e88"
+  },
+  {
+    "path": "references/shared/architecture_contracts.json",
+    "source": "shared/architecture_contracts.json",
+    "source_sha256": "874efb463d26c4509b6c8b92d6f587db99a1350cfb1e6ba1a33aa0b530b9319b"
+  },
+  {
+    "path": "references/docs/figures/namespace-architecture.html",
+    "source": "docs/figures/namespace-architecture.html",
+    "source_sha256": "5236d6813e63fbde6a01702df884679e43b43877648211480d6eebeafbc6d089"
+  },
+  {
+    "path": "references/docs/abstract-io-addressing.md",
+    "source": "docs/abstract-io-addressing.md",
+    "source_sha256": "94047690ba3f3aa50e7460150550f92deaa443ae8a6eb20f986ee21a15ae197a"
+  },
+  {
+    "path": "references/docs/church-machine-lifecycle-design.md",
+    "source": "docs/church-machine-lifecycle-design.md",
+    "source_sha256": "2fb730f624cb793b5a4cd9ada0f778d6324ff88e3e33606d98eb386830cd61b0"
+  },
+  {
+    "path": "references/docs/locator.md",
+    "source": "docs/locator.md",
+    "source_sha256": "8b42d749a756ff456400d5763bbc01f70cadc78cdffed98a6507422b7abf0b2c"
+  },
+  {
+    "path": "references/docs/compile-api.md",
+    "source": "docs/compile-api.md",
+    "source_sha256": "67844fd6c60239ae2669637dc0807bbfaa94c362ed45f7b35d2966ed8103c79b"
+  },
+  {
+    "path": "references/CHANGELOG.md",
+    "source": "CHANGELOG.md",
+    "source_sha256": "c9574cd504aa1e1ecbef3e96ad087990f21e256270459a52c2ef9faec11fa6f1"
+  },
+  {
+    "path": "references/reports/namespace-handoff-feasibility.md",
+    "source": "reports/namespace-handoff-feasibility.md",
+    "source_sha256": "80ca2e3ef046133364b8792f2b43d1004f34e5624425ab52625fc470e6e9ba9f"
+  },
+  {
+    "path": "references/docs/cloomc-foundation.md",
+    "source": "docs/cloomc-foundation.md",
+    "source_sha256": "c34dbdd6a65e1d5c30a5fce73f0e72a8682272f92d13bde6490bfa353ddc6913"
+  },
+  {
+    "path": "references/docs/wukong-vivado-flash-guide.md",
+    "source": "docs/wukong-vivado-flash-guide.md",
+    "source_sha256": "1e01d5c5dd0459f8bda3e14e8ce34c84dd4ce97b9951d65363a2ccc3e5b0aa37"
+  },
+  {
+    "path": "references/attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791900330097.txt",
+    "source": "attached_assets/Pasted-ISA-Amendments-2026-10-09-Completeness-Review-Oct-13-20_1791900330097.txt",
+    "source_sha256": "1daef43602f5e82cbbd68fd99d11a6b57414e15412a3f94180eae169e4057b89"
+  },
+  {
+    "path": "references/docs/archive/quick-start-ti60.md",
+    "source": "docs/archive/quick-start-ti60.md",
+    "source_sha256": "5d1e8361b56e4f4661edf7986946f5d66858b7b3cec6597609cbe165021ffde0"
+  },
+  {
+    "path": "references/docs/archive/StartupCM-ti60.md",
+    "source": "docs/archive/StartupCM-ti60.md",
+    "source_sha256": "fa69d9b3d24da102d79553252cfb87eab73ade025357f02fe11d2171f583d3cc"
+  },
+  {
+    "path": "references/docs/network-transparency.md",
+    "source": "docs/network-transparency.md",
+    "source_sha256": "23d2abcbb6affbcb7f1f9f881e6ca1034a20655a6fa2ea3af53e21b88d0c9caa"
+  },
+  {
+    "path": "references/docs/quick-start.md",
+    "source": "docs/quick-start.md",
+    "source_sha256": "3a7b0bbc6870f92bb093dc585fc0b4edfe618773b9f28e517d6b3bf7a22bf25d"
+  },
+  {
+    "path": "references/docs/json-information.md",
+    "source": "docs/json-information.md",
+    "source_sha256": "9698d60a97c1dee46e713c673b158e35740d1f905de6f9096d112eb1958594cd"
+  },
+  {
+    "path": "references/docs/abstractions.md",
+    "source": "docs/abstractions.md",
+    "source_sha256": "f2d4a7000086f14bfd19e79b3f546dddfe1ae8542f94ae06d78e82cf4d3adeb0"
+  },
+  {
+    "path": "references/reports/namespace-handoff-full-core.md",
+    "source": "reports/namespace-handoff-full-core.md",
+    "source_sha256": "6bf82697d98ac098bb8099b7eeebe7a641fb0bed31ce3cb0b1134d2e52ff0dc7"
+  },
+  {
+    "path": "references/docs/ctmm-memory-map.md",
+    "source": "docs/ctmm-memory-map.md",
+    "source_sha256": "32402cc81e2105503bdfa67a65029bc58c82a86d482e576e3197f299c02a34ed"
+  },
+  {
+    "path": "references/docs/plan-lazy-load.md",
+    "source": "docs/plan-lazy-load.md",
+    "source_sha256": "5b320b174939ddf170aae3f25939aad9f2f2be7b7e43da34c47b8e6803b15f03"
+  },
+  {
+    "path": "references/docs/HARDWARE.md",
+    "source": "docs/HARDWARE.md",
+    "source_sha256": "8af8f001ad7d5c86175d33afdb75509f18a04908d468941dfeceff1eb0fac2ce"
+  },
+  {
+    "path": "references/docs/StartupCM.md",
+    "source": "docs/StartupCM.md",
+    "source_sha256": "685c73bd858faf685c6f6ee5ca9d2f129b485fbd0537cf926f3f88c529332d9d"
+  },
+  {
+    "path": "references/simulator/toolbar-icons.png",
+    "source": "simulator/toolbar-icons.png",
+    "source_sha256": "d5cea910524848d2c5d0c5010468224c504fc59069cf7b6b102d6c35bab3ed01"
+  },
+  {
+    "path": "references/docs/namespace-vocabulary-tutorial.md",
+    "source": "docs/namespace-vocabulary-tutorial.md",
+    "source_sha256": "c2bd7bc28ec60a4d4f97e0fb5f30e2377525e984644b9d57cde6c2b0bd1601ce"
+  },
+  {
+    "path": "references/docs/contributing.md",
+    "source": "docs/contributing.md",
+    "source_sha256": "86f221e4d11e57d81b523bf516169da21f1423731de669cf71905d773263c50d"
+  },
+  {
+    "path": "references/docs/bridge-setup-chromeos.md",
+    "source": "docs/bridge-setup-chromeos.md",
+    "source_sha256": "c1686aa8155b02fc652f7c6c86e4ed15dbfbc392c14cf9e7bd080b0da960c597"
+  },
+  {
+    "path": "references/docs/tunnel-messaging-example.md",
+    "source": "docs/tunnel-messaging-example.md",
+    "source_sha256": "9a0954ca6c5e3191d26756082da7320f8e2044ed859c2b86418c32cf1758f4b6"
+  },
+  {
+    "path": "references/docs/gt-literals.md",
+    "source": "docs/gt-literals.md",
+    "source_sha256": "fabbc1f6ec01746e11f814cc96116472f1cad372edb80fda0110c361fbb4a0b9"
+  },
+  {
+    "path": "references/docs/lambda-instruction.md",
+    "source": "docs/lambda-instruction.md",
+    "source_sha256": "3ad331ff5f4ca7d7a157aa949d34da7e14924457867e47c01d4af012717cc88f"
+  },
+  {
+    "path": "references/docs/RUNBOOK.md",
+    "source": "docs/RUNBOOK.md",
+    "source_sha256": "b0a5b69f193d21caae778848db932e328a0f2895d8eaa72131a95188c4dfc353"
+  },
+  {
+    "path": "references/docs/api-reference.md",
+    "source": "docs/api-reference.md",
+    "source_sha256": "2f8ef7d2e184efd956f7319ea86a2dfb2e567eb11a1beaaf8313af04632f4edb"
+  },
+  {
+    "path": "references/docs/cm-msg-protocol.md",
+    "source": "docs/cm-msg-protocol.md",
+    "source_sha256": "fd476f9ac42f86cfb4fe5c05c0502d9e6aac65ea3d9cc304e3f09bc3870f3c62"
+  },
+  {
+    "path": "references/docs/bridge-setup-windows.md",
+    "source": "docs/bridge-setup-windows.md",
+    "source_sha256": "9b2748cc16fad906014f003250525c8ae4b29e845f5f67551bc76511bc01f3da"
+  },
+  {
+    "path": "references/docs/introducing-cloomc.md",
+    "source": "docs/introducing-cloomc.md",
+    "source_sha256": "ad2484b24e7649c99c44ff99190bc508b2acd1b1492beed6759f008688be2163"
+  },
+  {
+    "path": "references/docs/pet-name-language.md",
+    "source": "docs/pet-name-language.md",
+    "source_sha256": "501a4eca3d1ad9cf00c19d9b711ffbd39255a6aedfa72eace5466e326392e894"
+  },
+  {
+    "path": "references/docs/method-access-control.md",
+    "source": "docs/method-access-control.md",
+    "source_sha256": "d90feedc6560b3d374d1b6131b83dbe17b739c316e38edb060b35dc44b10ad1a"
+  },
+  {
+    "path": "references/docs/dispatch-styles.md",
+    "source": "docs/dispatch-styles.md",
+    "source_sha256": "4b780fa7f5e4a894403a26a62b480f5e416a3c31aea2aa07447ca2b5c6f3cfa6"
+  },
+  {
+    "path": "references/docs/archive/bridge-setup-chromeos-ti60.md",
+    "source": "docs/archive/bridge-setup-chromeos-ti60.md",
+    "source_sha256": "a0966fc7a3d83128a990ea2e7df453c75298a2af014dd0cbad0395f3311585d2"
+  },
+  {
+    "path": "references/docs/family-registry.md",
+    "source": "docs/family-registry.md",
+    "source_sha256": "01f7566f35330ddc9c09fa79a2de8f24b46ae4613d993e0b3da5f2886a16c5bf"
+  }
+]

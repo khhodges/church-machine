@@ -1,1 +1,119 @@
-../../boot-rom-layout.md
+# Boot ROM Layout
+
+> **Legacy implementation profile, not the new Phase 1 layout.** The separate
+> 16-word Header V2, tail table, NS[0] self-entry and NS[1] Thread below describe
+> existing images/ROM evidence. The [approved master](../01-isa/instruction-set.md#active-namespace-geometry)
+> instead uses ascending slots 0 metadata, 1 self, 2 reset/handoff Thread,
+> UART 8, Mint 9, nstab 14 and pkverify 15; default 256 slots / 4 KiB,
+> CR15 limit 1023, within half the FPGA memory. Reset marker **0x27000001** is
+> approved for one-shot incoming-only activation of slot 2 into CR12 at the
+> designated trusted reset-ROM instruction. Hardware-controlled fetch authority
+> is bounded to immutable reset ROM during bootstrap, with no extra data/table
+> permissions or software enablement. Retain final ROM **CALL CR0** with normal
+> CALL validation; successful transfer ends reset-ROM fetch authority.
+> Consume marker admission at valid acceptance before activation. Faults do not
+> re-arm it; only fresh reset does. No additional CR12.M grant is required or
+> issued solely for the marker; initial Namespace authority and ordinary
+> validation/M rules are unchanged.
+> No image migration or ROM rebuild follows.
+
+**v1.1 — 2026-07-23**
+
+**New Phase 1 guard scope:** The proposed slot-1/slot-2 build/image matching
+guard is intended to catch accidental wrong-image loading, not authenticate
+against malicious replacement. It identifies the approved slot-1/slot-2 boot
+configuration, not every complete image revision. Unrelated application LUMP
+changes and normal runtime Namespace updates do not require a new value;
+a changed boot configuration requires matching bitstream and boot metadata.
+Use the approved special-case **18-bit concatenation of the existing versions**:
+`(slot1_version << 9) | slot2_version`. The IDE assigns the two independent
+nine-bit halves independently from 0–510, excluding 511, and embeds their
+expected pair in the bitstream. The 18-bit packing contains 261,121 permitted
+pairs, not all 262,144 bit patterns. No separate
+guard metadata copies are needed. GTs for the guarded boot objects use their
+assigned versions, including the hardwired entry GT; do not assume version zero
+for this pair or copy a live descriptor version to satisfy a check. Check slot 1
+during Namespace admission, then slot 2 during Thread admission before activation.
+A second-stage failure may leave CR15 changed: hard-fault without rollback and
+do not activate the target Thread. Other slot policies remain unchanged.
+Report either guard mismatch as `VERSION`, identifying the failing slot
+(1 for Namespace, 2 for Thread); no separate boot-guard fault category is added.
+Generate the pair once on approval of a new boot configuration and retain it
+with that configuration. Unchanged rebuilds, exports, uploads, resets and
+unrelated application LUMP changes reuse it. Only explicit approval of a changed
+boot configuration generates a new pair. Detailed configuration identity,
+storage schema and provisioning mechanics remain TBD.
+For changes only to the boot Thread's CR0 startup selection, an IDE setting
+chooses retaining the guard or requiring a new guard and matching bitstream.
+The latter follows explicit changed-configuration approval; both retain normal
+`CALL CR0` validation and guard enforcement. This does not cover replacement
+of the boot Namespace or entry Thread. The approved default is **retain the
+existing guard**; requiring a new guard remains an explicit option. Save this
+policy with each boot configuration and preserve it when shared or reopened,
+not as an IDE-wide preference. New configurations default to retain. The
+concrete storage schema remains TBD.
+**CONFIDENTIAL**
+
+The Boot ROM and RAM are defined by the FPGA bitstream used to flash the FPGA. It is defined by the IDE under program control, size is defined in words (4 bytes each). The ROM is read-only instruction memory, carried from the IDE to the FPGA in `hardware/boot_rom.py` and instantiated as the `BootRom` class with the following three CLOOMC boot instructions: LOAD CR15, CHANGE that suspends the current thread and starts Boot.Thread, and CALL CR0, the programmer-selected lightning bolt slot in the IDE-defined namespace as Lazy Load.
+
+The address bus is 10 bits wide (`addr[9:0]`), data bus is 32 bits (`data[31:0]`), and read latency is one clock cycle (registered output). Xilinx BRAM on 7-series has ECC built in — the block RAM primitives support single-error-correct, double-error-detect natively, and Yosys/nextpnr can infer and instantiate directly. That covers stored words.
+
+The CR registers are the harder part, since they are LUT-based. Options in ascending cost: parity on each 32-bit GT word (one bit, detects single flips, cheap).
+
+---
+
+## IMEM Map
+
+```
+ Word Index      Byte Address     Region
+─────────────────────────────────────────────────────────
+ [  0 : 255 ]    0x000 – 0x3FC    3 Instruction BOOT_PROGRAM  (256 words, remainder zero-padded)
+─────────────────────────────────────────────────────────
+```
+
+---
+
+## 1. ROM BOOT_PROGRAM  `[0:255]`
+
+Secure-boot firmware.  Three real instructions, remainder zero-padded to 256.
+
+| Word | Instruction              | Comment                                                   |
+|------|--------------------------|-----------------------------------------------------------|
+| 0    | `LOAD CR15, Slot 0`      | Load Namespace from Slot 0 into CR15                      |
+| 1    | `CHANGE CR12, CR15, #1`  | Start Boot.Thread at NS Slot 1 — thread save skipped at boot and on fault to prevent error loops |
+| 2    | `CALL CR0`               | Enter IDE-selected first abstraction (lightning bolt); CR5 and CR14 inserted by IDE |
+
+---
+
+## 2. RAM `[256: LUMP size-1024 the NS table]`
+
+The programmer takes control at this point; the hardwired Boot ends and software takes control.
+
+## Namespace Header V2 boot-image contract
+
+The Namespace allocation begins with a physical 16-word Header V2 block; it is
+not synthesized display metadata and it is not a Thread header. Namespace
+Header V2 Word 0 has
+`magic=0x1F`, `typ=01` (Namespace/data), the Namespace n−13 size field, plain
+13-bit `cw=slot_count` (0..8,191), and `cc=0`. The count describes fixed
+four-word NS entries; `cc` is not part of the count. Word 1 is `0x4E534832` (`NSH2`); words 2,
+3, and 4 respectively hold the allocation base byte address, table offset in
+words, and boot-entry byte location. Word 3 is exactly
+`capacity_words − 4×slot_count`; word 5 is the fixed future-seal boundary (6);
+words 6..15 are zero until a separately versioned seal design is implemented.
+
+The four-word NS table is physically tail-anchored. A loader rejects a
+missing/unknown marker as legacy/unsupported rather
+than treating raw table or Thread-at-zero layouts as V2. Cryptographic sealing
+and composite-digest verification are deferred, but their reserved boundary is
+already part of the binary contract.
+
+---
+
+## See Also
+
+- [cloomc-foundation.md](../references/docs/cloomc-foundation.md) — **Authoritative architectural overview**: explains the heritage of this layout, the TSB principle, the old 6-region layout's problems, and the 3-LUMP model that supersedes it.
+- [CM_LUMP_SPECIFICATION.md](../02-tokens-lumps-security/CM_LUMP_SPECIFICATION.md) — Lump object structure, Header Word encoding, and zone layout
+
+---
+*Confidential — Kenneth Hamer-Hodges — July 2026*

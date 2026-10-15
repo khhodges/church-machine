@@ -1,1 +1,9 @@
-../../../reports/isa-review-hardwired-authority.manifest.json
+{
+  "status": "review-only-unapproved",
+  "master": "docs/instruction-set.md",
+  "master_sha256": "72c3fb50f301880a7b782be55ce4d3477fa4eb195f38ca55187b86dc84f0fcce",
+  "proposal_sha256": "9064e7e610c57c5ebe7b7492a8057c06a5358cf2b0086c354a472391f0f05b42",
+  "html_sha256": "7fb3420b33e21d03d6e60fe56f8524887f8213fd77da531c8ec65ecaa233235c",
+  "numbered_review_items": 7,
+  "master_unchanged": true
+}
