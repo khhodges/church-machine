@@ -701,6 +701,10 @@ and verification remain outstanding, not a new authority decision.
 Indexed CALL's exact binary-field transcription must be reconciled separately:
 do not copy CHANGE's candidate layout. This is a missing encoding record, not
 evidence that the already agreed indexed-CALL feature was rejected or deferred.
+**User constraint:** Do not use multiword instruction proposals. Reclaim the
+zero/fixed fields in the one-word indexed CALL instead. The
+[single-word draft](phase-1/CALL-SINGLE-WORD-DRAFT.md) is a new unapproved
+candidate, not an adopted encoding or implementation.
 GT-layout completeness is a separate track; this amendment does not select
 or alter a Golden Token bit layout.
 

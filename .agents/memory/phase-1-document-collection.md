@@ -686,3 +686,13 @@ entries checked on use and explicitly specified mLoad for CHANGE CRn loads.
 **How to apply:** Do not restore unchecked CR-held GTs or scan every unused
 C-List row. Preserve structural/resume checks and applicable mLoad NULL/Abstract
 semantics. Simulator pre-scan behavior is not a hardware requirement.
+
+Never propose multiword instructions for this review. Indexed CALL must reclaim
+zero/fixed fields within one 32-bit word; the new layout remains a proposal.
+
+**Why:** The user explicitly rejected the multiword alternative and requested
+a better single-word encoding using the existing unused fields.
+
+**How to apply:** Keep IDX1 as historical evidence, not an option to revive.
+Distinguish an unapproved replacement encoding from implemented or approved
+hardware; disclose any direct-CALL indexing gap and old-binary incompatibility.
