@@ -400,6 +400,26 @@ The existing same-cycle instruction-fault reporting priority remains unchanged:
 if an instruction fault also occurs, report that fault rather than WATCHDOG,
 without allowing the exemption write or suppressing watchdog containment.
 
+**Watchdog implementation direction — selected under delegated FPGA-design
+discretion:** Use one synchronous countdown timer, not four timers. Load its
+duration from the selected timeout only at an approved start/renewal, so later
+selector writes cannot change the active deadline. Derive the four count
+constants from the actual fixed, ungated system-clock frequency at elaboration;
+instruction retirement, pipeline stalls and bus waits must not gate counting.
+Require representable integral cycle counts for all four durations rather than
+silently rounding. Actual clock frequency, oscillator tolerance, counter sizing
+and exact-build timing remain implementation evidence to establish.
+
+Control readback returns the programmed selector and exemption, not the
+duration captured by the running timer. Do not add a countdown/status register
+or an extra software-visible timer interface merely for implementation convenience.
+Use one atomic control-update enable after access and value validation. A
+same-edge accepted selector update and approved timer start/renewal uses the
+new selector; expiry still prevents renewal and rejects program control writes.
+There is no write queue or deferred replay of a rejected write.
+These are engineering selections, not claims of implemented or verified RTL,
+and do not weaken any previously approved validation or fault rule.
+
 The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
 delivery gate or passed hardware-conformance claim is introduced here.

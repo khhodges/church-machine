@@ -6,15 +6,22 @@ description: User-requested ISA-first organization and single-source preservatio
 Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
-Apply only explicit approvals when reconciling active specifications; preserve
-original audit snapshots and historical evidence, and keep software TBDs visible.
+Apply explicit approvals and routine FPGA engineering choices made under the
+user's delegated discretion when reconciling active specifications; distinguish
+the two. Preserve original audit snapshots and historical evidence, and keep
+software TBDs visible.
 
-**Why:** The user specifically selected approved-decisions-only reconciliation,
-not inferred design completion, implementation or hardware changes.
+**Why:** The user initially selected approved-decisions-only reconciliation,
+then explicitly delegated routine FPGA edge details to the agent: choose the
+easiest design and report the decision rather than asking each small question.
 
 **How to apply:** Correct active original files through the single-source
 collection; use explicit profile/supersession boundaries for retained old
-descriptions. Do not convert a TBD or an implementation observation into approval.
+descriptions. Resolve routine implementation details consistently with the
+approved contract and report them together. Ask only for consequential changes
+to authority, ISA behavior, compatibility or hardware scope; do not invent
+user approval or claim implementation evidence. Delegation does not authorize
+runtime changes, builds or flashing in this documentation-only review.
 
 **Why:** The user explicitly requested one place for the related documents after
 the Master ISA reconciliation. Scattered review editions had made their status
