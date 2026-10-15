@@ -283,37 +283,40 @@ Mint_create_and_share_passkey(request):
 
 ### Abstract PassKey format — unapproved draft
 
-The user explicitly retained this format as **an unapproved draft**, correcting
-the proposed fixed permission/domain fields: bits **30:28 and 27 are free for
-reuse as defined by the Owner**. They are not fixed to `000` and `1`, respectively,
-and must not be assumed to grant ordinary Inform memory/C-list/execution rights.
+The format remains **an unapproved draft**. The user clarified that each Owner
+is **an abstraction hierarchy**, with an **A-GT-id**, “say 4 bits for Phase 1”.
+The revised draft places that four-bit Owner identifier at [30:27], retains
+B as Bind and leaves [24:0] Owner-defined. Four means the proposed field width,
+not a selected numeric Owner ID. The earlier fixed permission/domain values
+and generation/ID split are not adopted.
 
 | Bits | Draft field | Status |
 |---|---|---|
-| 31 | B=0, ordinary SAVE forbidden | Proposed PassKey assignment; not approved by retaining this draft |
-| 30:27 | Owner-defined four-bit field | User correction; no fixed permission/domain values or subtype marker |
+| 31 | B — Bind | Retain Bind semantics; do not fix B=0 as the universal format |
+| 30:27 | Owner A-GT-id | Proposed four-bit Phase 1 identifier for an abstraction hierarchy |
 | 26:25 | `11`, Abstract | Existing Abstract type position; not the historical [24:23] layout |
-| 24:16 | Credential generation | Proposed interpretation; lifecycle/reuse policy unresolved |
-| 15:0 | PassKey ID, not a Namespace slot | Proposed interpretation; identity/binding unresolved |
+| 24:0 | Owner-defined payload | No mandatory generation/ID split or Namespace-slot interpretation |
 
-For illustration only, the revised proposed packing with B=0 is:
+For illustration only, the revised draft packing is:
 
 ```text
-draft_GT = (owner_bits << 27) | 0x06000000
-         | (generation << 16) | passkey_id
+draft_GT = (B << 31) | (owner_agt_id << 27) | 0x06000000
+         | owner_payload
 ```
 
-Here `owner_bits` is four bits, `generation` nine bits and `passkey_id` sixteen
-bits. This is not an approved encoder or issuance rule. The previous proposed
-`0x0E000000` prefix is not a universal PassKey prefix; it is only the particular
-case `owner_bits=1`. The proposed Church/zero-permission subtype reservation
-is not adopted. SAVE's approved Abstract PassKey detection requirement cannot
-depend on these four bits having those fixed values; the precise distinction
-from other Abstract GTs remains to be specified.
+Here B is one bit, `owner_agt_id` four bits and `owner_payload` 25 bits.
+Four bits provide 16 encodings, not an approved allocation of 16 usable Owners;
+reserved values, assignment authority, uniqueness scope and reuse remain TBD.
+This is not an approved encoder or issuance rule. Neither `0x0E000000` nor
+Owner ID 4 is a universal PassKey prefix. Owner IDs do not grant ordinary Inform
+permissions. SAVE's approved Abstract PassKey detection requirement remains;
+the precise distinction from other Abstract GTs and authorized Bind handling
+remain to be specified, not inferred from Owner ID or B alone.
 
-The independent 128-bit proof remains outside the 32-bit GT. The proposed
-trusted-record binding of ID/generation to proof, authorization and revocation
-state remains a draft mechanism. Owner-defined fields do not by themselves
+The independent 128-bit proof remains outside the 32-bit GT. Binding the
+Owner-defined identity to proof, authorization and revocation state remains
+unresolved; do not impose the earlier proposed generation/ID record format.
+Owner-defined fields and B do not by themselves
 waive Genesis-authorized issuance/sharing or the unauthorized-sharing hard fault.
 No runtime, saved image or hardware change follows from this draft.
 

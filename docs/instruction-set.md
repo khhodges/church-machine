@@ -466,7 +466,11 @@ simulator, RTL and physical FPGA conformance remains to be verified.
 
 **PassKey format review — not approved:** The proposed bit format remains an
 unapproved draft. The user's correction makes bits 30:27 free for reuse as
-defined by the Owner, not fixed `perm=000, dom=1`. Do not adopt `0x0E000000` as
+defined by the Owner, not fixed `perm=000, dom=1`. The user further clarified
+that an Owner is an abstraction hierarchy with an A-GT-id, proposing four bits
+for Phase 1. The revised draft uses [30:27] for that ID, retains B as Bind and
+leaves [24:0] Owner-defined without a required generation/ID split.
+Do not adopt `0x0E000000` as
 a universal PassKey prefix or reserve that combination as its subtype marker.
 See the [format draft](phase-1/MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
 This does not change the approved separate-proof or sharing requirements.

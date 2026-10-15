@@ -169,6 +169,11 @@ as unapproved and corrected bits 30:27 to be free for reuse as defined by the
 Owner. Do not fix them to permission `000`/domain `1`, infer ordinary memory
 rights from them, or use `0x0E000000` as a universal PassKey subtype prefix.
 The separate 128-bit proof and Genesis-authorized sharing requirements remain.
+The user further clarified that each Owner is an abstraction hierarchy with an
+A-GT-id, proposing four bits for Phase 1. The revised draft uses [30:27] for
+that identifier, retains B as Bind and leaves [24:0] Owner-defined without a
+mandated generation/ID split. This is not numeric Owner ID 4 or final approval
+of the format.
 
 - Mint performs authorized creation/replacement and Namespace publication.
 - pkverify verifies the agreed proof/credential contract; token equality alone

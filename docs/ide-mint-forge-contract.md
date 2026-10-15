@@ -110,7 +110,9 @@ not executable implementations.
 - **Format review — unapproved draft:** Bits 30:27 are free for reuse as defined
   by the Owner, not fixed permission/domain values. Do not adopt the proposed
   `0x0E000000` prefix or Church/zero-permission subtype marker. Other proposed
-  field assignments remain unapproved; see the
+  field assignments remain unapproved. The Owner is an abstraction hierarchy
+  with an A-GT-id, proposed as four bits for Phase 1 at [30:27]; retain B as Bind
+  and [24:0] as Owner-defined, not a required generation/ID split. See the
   [format draft](phase-1/MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
 - **Initial PassKey issuance — approved:** A separate Genesis-authorized setup
   procedure has Mint create the initial GT/separate-128-bit-proof pairs for

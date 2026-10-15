@@ -566,13 +566,17 @@ recipient identification and separate proof protection/transfer TBD. Do not
 equate GT detection with arbitrary proof-byte-copy detection or claim physical
 conformance without evidence.
 
-The Abstract PassKey bit format remains an unapproved draft. Bits 30:28 and 27
-are free for reuse as defined by the Owner, not fixed permissions/domain.
+The Abstract PassKey bit format remains an unapproved draft. An Owner is an
+abstraction hierarchy with an A-GT-id, proposed as four bits for Phase 1 in
+[30:27]. Retain B as Bind; [24:0] is Owner-defined, not a required generation/ID
+split. Four is the field width, not numeric Owner ID 4.
 
 **Why:** The user explicitly declined format approval and corrected the proposed
-`perm=000, dom=1` interpretation.
+`perm=000, dom=1` interpretation, then clarified the Owner as an abstraction
+hierarchy with its own A-GT-id and requested B remain Bind.
 
 **How to apply:** Do not reserve `0x0E000000` as a universal PassKey prefix or
-assume those four bits identify the subtype. Other proposed field meanings
-remain drafts. Preserve SAVE detection, separate proof and Genesis sharing
+assume those four bits identify the subtype. Owner-ID allocation, reservations,
+scope and reuse remain unresolved; do not assume all 16 encodings are usable.
+Preserve SAVE detection, separate proof and Genesis sharing
 requirements without claiming their exact encoding has been approved.
