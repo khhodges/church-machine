@@ -141,11 +141,14 @@ selector, and bits 31:3 reserved (read zero, require zero on writes).
 watchdog MMIO GT must exist at Genesis under the MMIO abstraction.
 The user subsequently approved the control layout, asked about four timeout
 variations, then approved 0.25/0.5/1/2 seconds with initial selection 1 second.
+The user explicitly selected next-start/renewal application of timeout changes,
+preserving the current deadline for both shorter and longer selections.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
-sentence. Address and GT distribution remain open. Selector-code mapping,
-active-interval change behavior and selector reset retention remain unresolved.
-Do not infer renewal on selector writes.
+sentence. Address and GT distribution remain open. Selector-code mapping and
+selector reset retention remain unresolved. A changed timeout takes effect at
+the next approved timer start/renewal; the current duration/deadline is unchanged.
+Selector writes alone never restart or extend the active interval.
 Preserve the approved timing/renewal rules. Mint's MMIO-creation exclusion does
 not exclude Genesis-provisioned platform MMIO, and software is not a bitstream gate.
 

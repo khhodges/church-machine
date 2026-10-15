@@ -339,10 +339,16 @@ initializes bit 0 to 1 for Phase 1 bootstrap; hardware reset preserves it.
 Clearing the exemption starts a fresh selected interval. This selects the
 control-word layout, not a register address, Namespace slot or software API.
 This supersedes the earlier fixed-one-second rule and reservation of bits 2:1.
-The mapping of selector codes to durations, changes during an active interval,
-and reset retention of the new selector remain unspecified; exemption retention
-is already approved. Do not infer that merely writing a selector renews the
-timer. Exact timing/resource implementation and conformance need evidence.
+The mapping of selector codes to durations and reset retention of the new
+selector remain unspecified; exemption retention is already approved.
+Exact timing/resource implementation and conformance need evidence.
+
+**Timeout selection during an active interval — approved:** A selector change
+takes effect at the next approved timer start or renewal. The active interval
+keeps its original duration and deadline, whether the new selection is shorter
+or longer. Writing the selector alone neither restarts nor extends that interval.
+At the next start/renewal, use the then-current selection for the full new
+interval. Preserve existing renewal events and expiry-at-equality precedence.
 
 The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
