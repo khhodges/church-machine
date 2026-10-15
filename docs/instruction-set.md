@@ -354,6 +354,14 @@ This is the initialization value, not a hardware-reset overwrite: reset
 retains the current selector and exemption under the rule below.
 Exact timing/resource implementation and conformance need evidence.
 
+**Reserved-bit write rejection — approved:** A watchdog control write with
+any bit in [31:3] set hard-faults and is rejected in its entirety. Do not
+partially apply bits 2:0 or mask away the invalid bits. The rejected write
+does not change exemption, timeout selection, active duration or deadline,
+and does not restart or extend the timer. This is absence of write effects,
+not a freeze of elapsed time or a waiver of independent expiry/fault handling.
+The specific fault-code assignment remains undecided.
+
 **Timeout selector across reset — approved:** Hardware reset preserves the
 selected timeout, just as it preserves exemption. It does not preserve elapsed
 countdown time: execution start after reset begins a fresh interval using the
