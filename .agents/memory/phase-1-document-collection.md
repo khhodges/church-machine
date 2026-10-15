@@ -34,6 +34,18 @@ guards and one-shot reset admission.
 Treat exact placement/wiring and physical verification as outstanding evidence,
 not repeated architectural approval questions or permission to build/flash.
 
+Prefer serialized program writes and protocol-proven completion before
+watchdog recovery memory use; no rollback or retry queue.
+
+**Why:** Under delegated simplest-FPGA-design discretion, a single outstanding
+write keeps fault containment simple without weakening the approved rule that
+accepted writes finish before validated Thread-save memory access.
+
+**How to apply:** Synchronous RAM need not gain an unnecessary handshake, but
+its write edge must prove completion. Never invent a latency bound from a tied
+done signal. If bounded completion cannot be established, keep recovery writes
+blocked rather than claim a successful save.
+
 **Why:** The user explicitly requested one place for the related documents after
 the Master ISA reconciliation. Scattered review editions had made their status
 and relationships difficult to follow.

@@ -442,6 +442,23 @@ Recovery's validated Thread-save writes are a separate operation and retain
 their checks. The acceptance/completion boundary and exact bound require
 hardware evidence; do not assume completion merely from elapsed time or reset.
 
+**Write completion before watchdog recovery — selected under delegated FPGA
+discretion:** Serialize program-side memory writes with at most one accepted
+write awaiting completion. On expiry, stop admission of new program writes;
+wait only for the previously accepted write before permitting the validated
+Thread-save path to use memory. Do not finish unaccepted writes belonging to
+the interrupted instruction, replay requests, retry, or roll back committed data.
+
+For synchronous on-chip RAM, acceptance and completion may be the same
+documented write edge; do not introduce a redundant handshake. For a delayed
+interface, establish completion through the actual interface protocol. A tied
+completion signal is evidence only when the memory timing contract proves it,
+not by itself. Determine and verify the finite worst-case completion bound from
+the integrated hardware; no numeric bound is selected without evidence.
+If completion is not established within that bound, remain fault-stopped and
+do not begin recovery memory writes or claim successful context capture.
+This is containment, not a new recovery strategy or fault-code allocation.
+
 **Same-cycle fault priority — approved:** If an instruction fault and watchdog
 expiry occur on the same clock edge, report the instruction fault code rather
 than WATCHDOG. Execution still stops immediately; watchdog deadline containment,
