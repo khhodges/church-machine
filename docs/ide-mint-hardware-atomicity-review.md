@@ -17,6 +17,16 @@ those properties or authorize dynamic replacement.
 
 ## Conclusion
 
+**Subsequent Phase 1 watchdog decision:** At watchdog expiry, latch the fault
+immediately and stop new program-side writes. Already-accepted writes must
+finish within a verified hardware bound before recovery uses memory. This
+does not authorize the remaining unaccepted writes of a partially completed
+operation, extend program execution, or promise rollback. Recovery's validated
+Thread-save writes remain separate. The [Master ISA](instruction-set.md)
+records this requirement; the static findings below do not prove the completion
+bound, acceptance/completion handshake or exact-build behavior. This decision
+does not settle all other reset/interruption cases or software atomicity.
+
 The existing Mint FSM provides sequential installation with local CPU execution
 exclusion. It does **not** establish the authenticated, atomic,
 interruption-safe create/replace operation required by

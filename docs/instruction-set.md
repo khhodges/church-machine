@@ -322,6 +322,15 @@ to bypass validation or claim capture succeeded. This selects capture authority,
 not a new recovery handler or CR13 role; preserve the existing save-first
 recovery direction. Exact implementation and hardware evidence remain required.
 
+**Watchdog accepted-write boundary — approved:** Latch the watchdog fault at
+the deadline and stop new program-side writes. Already-accepted memory writes
+must finish within a verified hardware bound before recovery uses memory.
+This is not extra program execution time, cancellation of committed writes,
+rollback or permission to complete unaccepted writes of a multi-write operation.
+Recovery's validated Thread-save writes are a separate operation and retain
+their checks. The acceptance/completion boundary and exact bound require
+hardware evidence; do not assume completion merely from elapsed time or reset.
+
 ### Phase 1 hardware fault-code assignments — approved
 
 | Fault code | Name |

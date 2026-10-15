@@ -622,3 +622,14 @@ watchdog capture.
 **How to apply:** Do not reopen capture authority or permit validation bypass
 to obtain diagnostics. Preserve existing save-first recovery and CR13 rules;
 implementation and hardware evidence remain outstanding.
+
+At watchdog expiry, latch the fault immediately and stop new program writes.
+Already-accepted writes finish within a verified hardware bound before recovery
+uses memory; validated recovery Thread-save writes are separate.
+
+**Why:** The user approved bounded completion of accepted writes without
+delaying fault latching or granting extra program execution time.
+
+**How to apply:** Do not complete unaccepted writes from a multi-write operation
+or promise rollback. Establish the acceptance/completion boundary and exact bound
+with hardware evidence; reset or elapsed time alone does not prove completion.
