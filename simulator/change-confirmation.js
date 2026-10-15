@@ -21,6 +21,121 @@
         if (window.console) window.console.warn(
             'Change remains cancelled. Its rejection audit could not be delivered. No mutation was retried.');
     }
+
+    var DIFF_CELL_LIMIT = 2000000; // Bounded LCS work; larger middles fall back to block replace.
+    function splitLines(text) { return String(text).split('\n'); }
+    // Returns rows: {type:'same'|'del'|'add'|'mod', oldNo, oldText, newNo, newText}.
+    function diffRows(before, after) {
+        var a = splitLines(before), b = splitLines(after);
+        var start = 0, endA = a.length, endB = b.length;
+        while (start < endA && start < endB && a[start] === b[start]) start++;
+        while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+        var ops = []; // [kind, aIndex, bIndex]
+        var i, j;
+        for (i = 0; i < start; i++) ops.push(['=', i, i]);
+        var n = endA - start, m = endB - start;
+        if (n && m && (n + 1) * (m + 1) <= DIFF_CELL_LIMIT) {
+            var w = m + 1, t = new Uint32Array((n + 1) * w);
+            for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) {
+                t[i * w + j] = a[start + i] === b[start + j] ? t[(i + 1) * w + j + 1] + 1 :
+                    Math.max(t[(i + 1) * w + j], t[i * w + j + 1]);
+            }
+            i = 0; j = 0;
+            while (i < n || j < m) {
+                if (i < n && j < m && a[start + i] === b[start + j]) { ops.push(['=', start + i, start + j]); i++; j++; }
+                else if (j < m && (i >= n || t[i * w + j + 1] >= t[(i + 1) * w + j])) { ops.push(['+', -1, start + j]); j++; }
+                else { ops.push(['-', start + i, -1]); i++; }
+            }
+        } else {
+            for (i = start; i < endA; i++) ops.push(['-', i, -1]);
+            for (j = start; j < endB; j++) ops.push(['+', -1, j]);
+        }
+        for (i = endA, j = endB; i < a.length; i++, j++) ops.push(['=', i, j]);
+        var rows = [], k = 0;
+        while (k < ops.length) {
+            if (ops[k][0] === '=') {
+                rows.push({type: 'same', oldNo: ops[k][1] + 1, oldText: a[ops[k][1]], newNo: ops[k][2] + 1, newText: b[ops[k][2]]});
+                k++; continue;
+            }
+            var dels = [], adds = [];
+            while (k < ops.length && ops[k][0] !== '=') { (ops[k][0] === '-' ? dels : adds).push(ops[k]); k++; }
+            for (var r = 0; r < Math.max(dels.length, adds.length); r++) {
+                var d = dels[r], ad = adds[r];
+                rows.push({type: d && ad ? 'mod' : d ? 'del' : 'add',
+                    oldNo: d ? d[1] + 1 : null, oldText: d ? a[d[1]] : null,
+                    newNo: ad ? ad[2] + 1 : null, newText: ad ? b[ad[2]] : null});
+            }
+        }
+        return rows;
+    }
+    var MONO = 'font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;line-height:1.45;';
+    function cell(text, css) {
+        var el = document.createElement('div');
+        el.style.cssText = css;
+        el.textContent = text;
+        return el;
+    }
+    function renderDiff(before, after) {
+        var wrap = document.createElement('div');
+        wrap.setAttribute('role', 'table');
+        wrap.setAttribute('aria-label', 'Source changes, Before and After side by side');
+        wrap.style.cssText = 'max-height:50vh;overflow:auto;border:1px solid #3a4a66;border-radius:6px;background:#0f1828;margin:8px 0';
+        var grid = document.createElement('div');
+        grid.style.cssText = MONO + 'display:grid;grid-template-columns:3.5em 1.4em minmax(260px,1fr) 3.5em 1.4em minmax(260px,1fr);min-width:640px';
+        var head = 'position:sticky;top:0;background:#22314b;color:#e8b94f;font-weight:600;padding:4px 8px;border-bottom:1px solid #3a4a66;';
+        grid.appendChild(cell('Before', head + 'grid-column:1 / span 3'));
+        grid.appendChild(cell('After', head + 'grid-column:4 / span 3;border-left:1px solid #3a4a66'));
+        var rows = diffRows(before, after);
+        var DEL = 'background:#4a1d24;color:#ffd7d7;', ADD = 'background:#173d27;color:#d3f5dc;',
+            SAME = 'color:#c9d3e3;', EMPTY = 'background:#141e30;';
+        var num = 'text-align:right;padding:0 6px;opacity:.6;user-select:none;';
+        var cue = 'text-align:center;user-select:none;font-weight:700;';
+        var txt = 'white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;padding:0 8px;';
+        rows.forEach(function (row) {
+            var hasOld = row.oldNo !== null, hasNew = row.newNo !== null;
+            var oc = row.type === 'same' ? SAME : hasOld ? DEL : EMPTY;
+            var nc = row.type === 'same' ? SAME : hasNew ? ADD : EMPTY;
+            grid.appendChild(cell(hasOld ? String(row.oldNo) : '', num + oc));
+            grid.appendChild(cell(row.type !== 'same' && hasOld ? '-' : '', cue + oc));
+            grid.appendChild(cell(hasOld ? row.oldText : '', txt + oc));
+            grid.appendChild(cell(hasNew ? String(row.newNo) : '', num + nc + 'border-left:1px solid #3a4a66;'));
+            grid.appendChild(cell(row.type !== 'same' && hasNew ? '+' : '', cue + nc));
+            grid.appendChild(cell(hasNew ? row.newText : '', txt + nc));
+        });
+        wrap.appendChild(grid);
+        return wrap;
+    }
+    function renderChanges(list) {
+        var container = document.createElement('div');
+        container.style.cssText = 'max-height:60vh;overflow:auto';
+        var bi = -1, ai = -1;
+        list.forEach(function (c, idx) {
+            if (typeof c !== 'string') return;
+            if (bi < 0 && c.indexOf('Before:\n') === 0) bi = idx;
+            else if (bi >= 0 && ai < 0 && c.indexOf('After:\n') === 0) ai = idx;
+        });
+        var rest = [];
+        function flush() {
+            if (!rest.length) return;
+            var pre = document.createElement('pre');
+            pre.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto';
+            pre.textContent = rest.join('\n\n');
+            container.appendChild(pre);
+            rest = [];
+        }
+        list.forEach(function (c, idx) {
+            if (idx === ai) return;
+            if (idx === bi && ai >= 0) {
+                flush();
+                container.appendChild(renderDiff(c.slice(8), list[ai].slice(7)));
+                return;
+            }
+            rest.push(c);
+        });
+        flush();
+        return container;
+    }
+    window._sourceDiffRows = diffRows;
     function show(details) {
         return new Promise(function (resolve) {
             var previous = document.activeElement;
@@ -33,10 +148,7 @@
             var reason = document.createElement('p');
             reason.textContent = details.reason || 'This action changes protected data.';
             dialog.appendChild(reason);
-            var changes = document.createElement('pre');
-            changes.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;max-height:45vh;overflow:auto';
-            changes.textContent = (details.changes || []).join('\n\n');
-            dialog.appendChild(changes);
+            dialog.appendChild(renderChanges(details.changes || []));
             var reject = document.createElement('button');
             reject.textContent = 'Reject — keep unchanged';
             var confirm = document.createElement('button');
