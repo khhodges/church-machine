@@ -1,10 +1,12 @@
-# Single-word indexed CALL — revised proposal
+# Single-word indexed CALL — Phase 1 approved encoding
 
-Status: **unapproved encoding draft**. The user rejected multiword proposals
-and requested reclaiming the zero/fixed fields of the existing indexed CALL.
+Status: **Genesis approved for Phase 1**. The user rejected multiword proposals
+and approved this replacement of the zero/fixed fields of the existing indexed CALL.
 This document changes no decoder, assembler, saved artifact or hardware.
+The filename is retained to preserve review links; it no longer denotes
+unapproved status.
 
-## Proposed C-list CALL layout
+## Approved C-list CALL layout
 
 Keep opcode 2 and the ordinary condition field. CR6 is implicit, so there is
 no reason to spend four bits encoding the constant register number 6.
@@ -37,7 +39,7 @@ Arithmetic must not wrap or truncate; reject negative/overflowing indices and
 out-of-bounds accesses under the applicable checks. Latch both DR values before
 CALL changes register state. Retain mLoad and CALL authority/entry validation.
 Method here is the runtime selector, not a source-level ordinal plus one.
-No new fault priority or method-table semantics is selected by this draft.
+No new fault priority or method-table semantics is selected by this encoding.
 
 ## Direct CALL separation
 
@@ -51,14 +53,14 @@ Existing direct CALL remains:
 | 18:15 | Required zero |
 | 14:0 | Immediate method selector |
 
-Bit 18 therefore distinguishes the proposed indexed form from valid direct
+Bit 18 therefore distinguishes the approved indexed form from valid direct
 CALL without losing any target CR values. In direct mode, bits 17:15 must
-still be zero. This draft improves the C-list form only; direct CALL's
+still be zero. This approval covers the C-list form only; direct CALL's
 DR-based method indexing is not solved by retaining its existing format.
-Do not claim complete uniform-indexed-CALL conformance from this proposal.
+Do not claim complete uniform-indexed-CALL conformance from this approval.
 
 The previous indexed form (A=0, B=6) has bit 18=0 but nonzero bits 17:15.
-It is not the proposed form and would be invalid under this draft's direct-mode
+It is not the approved form and is invalid under this encoding's direct-mode
 rule. Do not silently reinterpret old indexed binaries. No migration, rewriting
 or compatibility mode is authorized.
 
@@ -71,10 +73,14 @@ For an AL CALL with `row = DR3 + 5` and `method = DR9 - 2`:
 | (9 << 14) | (0 << 13) | (1 << 12) | (2 << 5) | 5
 ```
 
-This is a candidate arithmetic example, not simulator/RTL/FPGA conformance.
+The encoded word is **`0x171E5045`**. This is an arithmetic example, not
+simulator/RTL/FPGA conformance.
 
 ## Decision boundary
 
-Only the rejection of multiword proposals is user direction. The bit allocation,
-mode discriminator and candidate decode rules above await approval.
+Genesis explicitly approved this single-word format for Phase 1. The bit
+allocation, mode discriminator and decode rules above are selected.
+Arithmetic field-packing checks do not establish assembler, simulator, RTL or
+exact-build physical conformance; those remain outstanding. No implementation,
+artifact migration, build, upload, flashing or GitHub push is authorized.
 The original 45-source audit snapshot is unchanged.

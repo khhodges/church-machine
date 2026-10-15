@@ -688,11 +688,15 @@ C-List row. Preserve structural/resume checks and applicable mLoad NULL/Abstract
 semantics. Simulator pre-scan behavior is not a hardware requirement.
 
 Never propose multiword instructions for this review. Indexed CALL must reclaim
-zero/fixed fields within one 32-bit word; the new layout remains a proposal.
+zero/fixed fields within one 32-bit word. Genesis approved the revised indexed
+C-list CALL layout for Phase 1; direct CALL's runtime-method indexing remains
+a separate gap.
 
 **Why:** The user explicitly rejected the multiword alternative and requested
-a better single-word encoding using the existing unused fields.
+a better single-word encoding using the existing unused fields, then explicitly
+approved the resulting proposal for Phase 1.
 
 **How to apply:** Keep IDX1 as historical evidence, not an option to revive.
-Distinguish an unapproved replacement encoding from implemented or approved
-hardware; disclose any direct-CALL indexing gap and old-binary incompatibility.
+Distinguish approved encoding from implemented/verified hardware. Do not reopen
+its allocation or silently reinterpret old indexed binaries. Preserve the
+direct-CALL indexing gap; no implementation or migration was authorized.

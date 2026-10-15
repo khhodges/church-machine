@@ -698,13 +698,34 @@ Watchdog memory-backed capture authority is also settled: use the validated
 Thread-save path, without an unrestricted RAM-write bypass. Its implementation
 and verification remain outstanding, not a new authority decision.
 
-Indexed CALL's exact binary-field transcription must be reconciled separately:
-do not copy CHANGE's candidate layout. This is a missing encoding record, not
-evidence that the already agreed indexed-CALL feature was rejected or deferred.
-**User constraint:** Do not use multiword instruction proposals. Reclaim the
-zero/fixed fields in the one-word indexed CALL instead. The
-[single-word draft](phase-1/CALL-SINGLE-WORD-DRAFT.md) is a new unapproved
-candidate, not an adopted encoding or implementation.
+**Indexed C-list CALL encoding — Genesis approved for Phase 1:** Use one
+32-bit word, implicit CR6, and the following fields:
+
+| Bits | Meaning |
+|---|---|
+| 31:27 | CALL opcode 2 |
+| 26:23 | Condition |
+| 22:19 | Row-index DR selector |
+| 18 | Indexed mode = 1 |
+| 17:14 | Method-index DR selector |
+| 13 | Row subtract flag |
+| 12 | Method subtract flag |
+| 11:5 | Method immediate magnitude, 0–127 |
+| 4:0 | Row immediate magnitude, 0–31 |
+
+Compute row and runtime method selector independently as the selected DR value
+plus/minus its immediate magnitude. DR0 supports immediate-only indexing.
+Latch both DR inputs before CALL changes registers; arithmetic must not wrap
+or truncate. Retain bounds, mLoad and CALL authority/entry checks.
+Bit 18 distinguishes this form from direct CALL, which retains target CR at
+[22:19], required-zero [18:15] and immediate method selector at [14:0].
+The old indexed A=0/B=6 encoding is not valid under this new layout; no silent
+reinterpretation, migration or compatibility mode is authorized.
+
+See the [approved encoding record](phase-1/CALL-SINGLE-WORD-DRAFT.md).
+The indexed C-list format is settled; direct CALL's DR-based method indexing
+remains a separate gap. Never use multiword instruction proposals.
+Approval does not claim implementation or simulator/RTL/physical conformance.
 GT-layout completeness is a separate track; this amendment does not select
 or alter a Golden Token bit layout.
 

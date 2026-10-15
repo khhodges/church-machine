@@ -2,8 +2,8 @@
 
 **Review disposition:** The user explicitly rejected multiword instruction
 proposals. This packet design is retained as historical evidence only, not a
-candidate to revive. See the unapproved
-[single-word CALL draft](phase-1/CALL-SINGLE-WORD-DRAFT.md).
+candidate to revive. See the Genesis-approved Phase 1
+[single-word CALL encoding](phase-1/CALL-SINGLE-WORD-DRAFT.md).
 
 **CHANGE correction:** Programmatic CHANGE takes one GT already in the operand
 register, not an indexed operand. All CHANGE indexing modes and byte examples
