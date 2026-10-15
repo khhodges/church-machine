@@ -290,14 +290,15 @@ is skipped, with no CR13 operand checks or instruction effects. This is the
 approved reserved-operand disposition, not permission to execute CR13 operations
 or a waiver of independent fetch/encoding faults.
 
-The watchdog is **one second of elapsed time to hard fault**, except in IDE
-Debug or IDE Trace mode. Every successful CHANGE/SWITCH renews a full second,
+The watchdog uses a selectable **0.25, 0.5, 1 or 2 seconds of elapsed time to
+hard fault**, initially **1 second**, except in IDE Debug or IDE Trace mode.
+Every successful CHANGE/SWITCH renews a full selected interval,
 including self/helper transfers. Retirement, CALL and RETURN do not renew it;
 failed or condition-skipped transfers do not renew it. This bounds time between
 transfers, not useful progress or return to a scheduler.
 
 Arm on execution start after reset, including boot unless exempt. On leaving
-both exempt modes, start a fresh second. Expiry wins at equality: a transfer
+both exempt modes, start a fresh selected interval. Expiry wins at equality: a transfer
 must complete strictly before its deadline. Stalls do not extend the interval.
 No automatic IRQ, CR13 action, maintenance exemption or hardware timer ABI is
 introduced by this policy; exact target timing/capture needs implementation evidence.
@@ -306,7 +307,7 @@ introduced by this policy; exact target timing/capture needs implementation evid
 existing Debug/Trace exemption rather than clearing it. An active exemption
 therefore remains active across reset; reset does not create an exemption
 when none was active. The MMIO abstraction remains in control. Leaving both
-exempt modes starts a fresh one-second interval under the existing rule.
+exempt modes starts a fresh selected interval under the existing rule.
 This is reset retention, distinct from the Phase 1 initialization rule below;
 it does not promise persistence of the previous state across power loss or
 FPGA reconfiguration.
@@ -316,8 +317,9 @@ FPGA configuration, start with the Debug/Trace watchdog exemption **enabled**.
 This is a Phase 1 bootstrap decision where **Genesis = IDE**, not a universal
 default for later phases. The MMIO abstraction remains in charge; this does
 not impose an IDE-only hardware-control path. Hardware reset preserves the
-current exemption state. When both exempt modes are left, start a fresh
-one-second interval under the existing rule. Initial enabled state is not
+current exemption state. The initial timeout selection is **1 second**.
+When both exempt modes are left, start a fresh selected interval under the
+existing rule. Initial enabled state is not
 retention of whatever state existed before power loss or reconfiguration.
 
 **Watchdog MMIO authority — approved:** The watchdog register must exist as a
@@ -325,18 +327,22 @@ Genesis-provisioned MMIO GT; the MMIO abstraction is in charge. Do not replace
 this capability-mediated control with an IDE-only hardware-control restriction.
 This does not grant the GT to every Thread or authorize arbitrary watchdog
 writes. Address and capability distribution remain unspecified; retain the
-approved one-second deadline, Debug/Trace
+approved selected-duration deadline, Debug/Trace
 exception and CHANGE/SWITCH renewal rules.
 
 **Watchdog MMIO control word — approved for Phase 1:** One 32-bit word:
-bit 0 is the exemption flag (1 = exempt, 0 = normal one-second enforcement).
-Bits 31:1 are reserved, read as zero and must be zero on writes. Setting
+bit 0 is the exemption flag (1 = exempt, 0 = selected-timeout enforcement).
+Bits 2:1 select among **0.25, 0.5, 1 and 2 seconds**, initially **1 second**.
+Bits 31:3 are reserved, read as zero and must be zero on writes. Setting
 reserved bits is not a defined control operation. Power-on/FPGA configuration
 initializes bit 0 to 1 for Phase 1 bootstrap; hardware reset preserves it.
-Clearing the exemption starts a fresh one-second interval. This selects the
+Clearing the exemption starts a fresh selected interval. This selects the
 control-word layout, not a register address, Namespace slot or software API.
-Selectable timeout durations are under discussion, not approved; bits 2:1
-remain reserved unless a subsequent explicit decision assigns them.
+This supersedes the earlier fixed-one-second rule and reservation of bits 2:1.
+The mapping of selector codes to durations, changes during an active interval,
+and reset retention of the new selector remain unspecified; exemption retention
+is already approved. Do not infer that merely writing a selector renews the
+timer. Exact timing/resource implementation and conformance need evidence.
 
 The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software

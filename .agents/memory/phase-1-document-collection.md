@@ -95,17 +95,18 @@ distracted from it by retaining separate SWITCH protected-load qualifications.
 in reconciliation. These are internal phases, not separate instructions.
 Do not treat the assistant's withdrawn CR12/CR14 qualification as user approval.
 
-Phase 1 uses bounded execution turns with a watchdog hard fault at **one
-second**, except in IDE Debug or IDE Trace mode. Instruction retirement does
-not renew the deadline. Every successful CHANGE or SWITCH starts a fresh second,
+Phase 1 uses bounded execution turns with a selectable watchdog hard fault at
+0.25, 0.5, 1 or 2 seconds, initially 1 second, except in IDE Debug or IDE Trace
+mode. Instruction retirement does not renew the deadline. Every successful
+CHANGE or SWITCH starts a fresh selected interval,
 including self-transfers and helper-Thread transfers; renewal is not restricted
 to scheduler handoffs.
 When normal execution resumes with neither IDE Debug nor IDE Trace active,
-start a fresh second rather than restoring a partially spent interval.
+start a fresh selected interval rather than restoring a partially spent interval.
 Hardware reset preserves the existing Debug/Trace exemption; it does not clear
 an active exemption or create one when none was active.
 For Phase 1 bootstrap, power-on/FPGA configuration initializes the exemption
-enabled; Genesis = IDE in this scope.
+enabled and timeout selection to 1 second; Genesis = IDE in this scope.
 
 **Why:** The user selected bounded turns and explicitly fixed “ONE second to
 Hard Fault unless in IDE debug or IDE Trace mode.” They then explicitly selected
@@ -113,16 +114,18 @@ every successful CHANGE/SWITCH as the renewal event.
 They also explicitly selected a fresh second on return from Debug/Trace.
 They approved arming when execution starts after reset (including boot, except
 in the exempt IDE modes), elapsed-time rather than instruction-count timing,
-and expiry winning at exactly one second. A transfer must complete strictly
+and expiry winning at the deadline. A transfer must complete strictly
 before the deadline to renew it.
 The user subsequently selected preserving the exemption across hardware reset,
 not the offered clear-on-reset recommendation.
 The user then explicitly selected enabled initialization as a Phase 1 bootstrap
 decision where Genesis = IDE, rather than the offered normal-protection default.
+They later approved four timeout choices, replacing fixed-one-second policy
+while keeping 1 second as the initial selection.
 
 **How to apply:** Preserve the duration, exceptions and transfer-based renewal.
 Do not introduce scheduler-only renewal, or claim this guarantees useful progress
-or return to a scheduler. Preserve fresh-second mode exit; broader maintenance
+or return to a scheduler. Preserve fresh-interval mode exit; broader maintenance
 exemptions must not be inferred. CR13 remains untouched.
 Distinguish reset retention from enabled Phase 1 initialization: reset preserves
 even a subsequently disabled state; power-on/configuration initializes enabled,
@@ -131,17 +134,18 @@ later phases. The MMIO abstraction remains in control.
 
 The watchdog register must exist as a Genesis-provisioned MMIO GT; the MMIO
 abstraction is in charge, not an IDE-only hardware control.
-Its approved Phase 1 control word has bit 0 as exemption and bits 31:1 reserved
-(read zero, require zero on writes). Timeout variation is not yet approved.
+Its approved Phase 1 control word has bit 0 as exemption, bits 2:1 as timeout
+selector, and bits 31:3 reserved (read zero, require zero on writes).
 
 **Why:** The user corrected the IDE-only proposal and specified that the
 watchdog MMIO GT must exist at Genesis under the MMIO abstraction.
-The user subsequently approved the control layout, while asking only about the
-feasibility of four timeout variations.
+The user subsequently approved the control layout, asked about four timeout
+variations, then approved 0.25/0.5/1/2 seconds with initial selection 1 second.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
-sentence. Address and GT distribution remain open. Do not assign reserved bits
-to a timeout selector or replace the one-second rule without explicit approval.
+sentence. Address and GT distribution remain open. Selector-code mapping,
+active-interval change behavior and selector reset retention remain unresolved.
+Do not infer renewal on selector writes.
 Preserve the approved timing/renewal rules. Mint's MMIO-creation exclusion does
 not exclude Genesis-provisioned platform MMIO, and software is not a bitstream gate.
 
