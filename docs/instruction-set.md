@@ -380,6 +380,16 @@ or longer. Writing the selector alone neither restarts nor extends that interval
 At the next start/renewal, use the then-current selection for the full new
 interval. Preserve existing renewal events and expiry-at-equality precedence.
 
+**Combined selector/exemption write — approved:** A valid control-word write
+that changes the timeout and clears an existing exemption (bit 0 transitions
+from 1 to 0) is one atomic update. Start the fresh interval using the new
+selector in that same write, not the previous selection. For example,
+`0x00000006` selects 2 seconds and clears exemption, starting a fresh 2-second
+interval when leaving exemption. Writing bit 0=0 when already non-exempt is
+not an exemption exit and does not grant an additional timer renewal.
+Invalid writes and writes rejected under the expiry precedence rules do not
+partially update either control field or start an interval.
+
 **Exemption write at the deadline — approved:** If a valid write enabling
 exemption would take effect on the same clock edge as watchdog expiry, expiry
 wins. Reject the entire control write, leaving exemption and timeout selection

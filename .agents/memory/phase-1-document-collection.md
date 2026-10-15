@@ -153,6 +153,8 @@ They agreed to reuse INVALID_OP (0x0B) for those writes, keeping WATCHDOG (0x1F)
 for timeout expiry rather than malformed control values.
 They explicitly chose expiry over a valid exemption write on the same clock
 edge, with whole-write rejection and unchanged control settings.
+They agreed that a combined selector change and exemption exit is atomic and
+starts the interval with the new selection, not the previous one.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
 sentence. Address and GT distribution remain open; selector-code mapping is
@@ -162,6 +164,8 @@ starts a fresh retained-duration interval unless exempt.
 A changed timeout takes effect at
 the next approved timer start/renewal; the current duration/deadline is unchanged.
 Selector writes alone never restart or extend the active interval.
+An exemption exit (1→0) uses the selector from that same valid control write;
+writing exemption=0 when already non-exempt is not a new timer-start event.
 Reserved-bit writes report INVALID_OP and must not change controls or the active
 deadline. This does not freeze elapsed time or suppress expiry.
 An exemption write must take effect strictly before expiry; same-edge writes
