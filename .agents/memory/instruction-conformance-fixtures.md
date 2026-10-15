@@ -14,6 +14,16 @@ Keep unresolved ISA policies blocked rather than adopting an implementation's
 flags or operand roles. Generated RTL must evaluate the independent oracle,
 not just compare against Amaranth output.
 
+Keep known conformance mismatches as real failures in the explicitly invoked
+qualification suite, not xfails or revised expectations copied from the DUT.
+
+**Why:** The Phase 1 test effort is intended to expose hardware/specification
+differences; a green regression wrapper must not be mistaken for qualification.
+
+**How to apply:** Report decoder-only, unit and integrated-core coverage
+separately. Do not apply architectural descriptor-limit semantics directly to
+an internal unit's count interface without establishing the caller contract.
+
 For large-core CXXRTL tests, preserve hierarchy and enough debug metadata to
 retain aliased observation ports.
 
