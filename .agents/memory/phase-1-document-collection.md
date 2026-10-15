@@ -131,12 +131,17 @@ later phases. The MMIO abstraction remains in control.
 
 The watchdog register must exist as a Genesis-provisioned MMIO GT; the MMIO
 abstraction is in charge, not an IDE-only hardware control.
+Its approved Phase 1 control word has bit 0 as exemption and bits 31:1 reserved
+(read zero, require zero on writes). Timeout variation is not yet approved.
 
 **Why:** The user corrected the IDE-only proposal and specified that the
 watchdog MMIO GT must exist at Genesis under the MMIO abstraction.
+The user subsequently approved the control layout, while asking only about the
+feasibility of four timeout variations.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
-sentence. Address, fields, permitted writes and GT distribution remain open.
+sentence. Address and GT distribution remain open. Do not assign reserved bits
+to a timeout selector or replace the one-second rule without explicit approval.
 Preserve the approved timing/renewal rules. Mint's MMIO-creation exclusion does
 not exclude Genesis-provisioned platform MMIO, and software is not a bitstream gate.
 

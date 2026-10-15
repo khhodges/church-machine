@@ -324,9 +324,19 @@ retention of whatever state existed before power loss or reconfiguration.
 Genesis-provisioned MMIO GT; the MMIO abstraction is in charge. Do not replace
 this capability-mediated control with an IDE-only hardware-control restriction.
 This does not grant the GT to every Thread or authorize arbitrary watchdog
-writes. Address, register fields, permitted writes and capability distribution
-remain unspecified; retain the approved one-second deadline, Debug/Trace
+writes. Address and capability distribution remain unspecified; retain the
+approved one-second deadline, Debug/Trace
 exception and CHANGE/SWITCH renewal rules.
+
+**Watchdog MMIO control word — approved for Phase 1:** One 32-bit word:
+bit 0 is the exemption flag (1 = exempt, 0 = normal one-second enforcement).
+Bits 31:1 are reserved, read as zero and must be zero on writes. Setting
+reserved bits is not a defined control operation. Power-on/FPGA configuration
+initializes bit 0 to 1 for Phase 1 bootstrap; hardware reset preserves it.
+Clearing the exemption starts a fresh one-second interval. This selects the
+control-word layout, not a register address, Namespace slot or software API.
+Selectable timeout durations are under discussion, not approved; bits 2:1
+remain reserved unless a subsequent explicit decision assigns them.
 
 The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
