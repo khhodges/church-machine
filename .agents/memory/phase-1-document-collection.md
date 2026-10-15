@@ -100,9 +100,19 @@ Phase 1 document reviews must cover the collection but stay within it.
 
 **Why:** The user explicitly asked to review “all but only Phase 1 documents.”
 
-**How to apply:** Use the collection manifest as the audit boundary. Treat
+**How to apply:** Use actual active files as the audit boundary, not a manifest. Treat
 references to excluded code or documents as unverified dependencies, not
 permission to expand the review or claim runtime conformance.
+
+Archiving rationale must not remove current baseline instruction definitions
+or the independent expected outcomes needed for FPGA tests.
+
+**Why:** Simplifying the collection exposed missing baseline execution rules;
+the user then required review-question coverage sufficient for reliable FPGA tests.
+
+**How to apply:** Check decisions against explicit test outcomes, not merely
+links or heading presence. Keep unresolved hardware oracle gaps visible and
+separate software delivery from hardware qualification.
 
 Resolve the completeness-review findings with the user one at a time in
 priority/dependency order, recording a resolution per item in the review.

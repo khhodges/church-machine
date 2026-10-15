@@ -25,6 +25,10 @@ or application changes.
 Implementation is incomplete. A documented decision is not a passed test.
 Older authorization statements describe their original decision only.
 
+For testing, start with the acceptance plan's H01–H20 cases. Its explicit
+blockers and the ISA's “Oracle closure” list must be closed before a complete
+FPGA pass can be claimed. Software acceptance is listed separately as S01–S07.
+
 This folder is self-contained. Keep local files and links current; do not add
 a manifest, symlinks or historical documents.
 Run `python3 scripts/check_phase_1_documents.py` to check local links.

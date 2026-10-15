@@ -2,6 +2,7 @@
 
 ## Navigation
 
+- [Core execution reference](#core-execution-reference)
 - [Document authority](#document-authority)
 - [Approved Phase 1 contract](#approved-phase-1-contract)
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
@@ -35,6 +36,96 @@ The one-GT CHANGE and indexed-operand corrections below are authoritative.
 Existing encoding tables and repeated instruction descriptions elsewhere in
 this document remain baseline records pending reconciliation; they do not
 override these corrections or establish a new encoding layout.
+
+## Core execution reference
+
+Instructions are one 32-bit word. Opcode is [31:27], condition [26:23].
+Ordinary register fields are A=[22:19], B=[18:15], operand=[14:0].
+CALL, BRANCH and indexed formats below explicitly repurpose these fields.
+Do not decode them with the ordinary-field interpretation.
+
+### Predication
+
+| Condition | Execute when | Condition | Execute when |
+|---|---|---|---|
+| 0 EQ | Z | 1 NE | not Z |
+| 2 CS/HS | C | 3 CC/LO | not C |
+| 4 MI | N | 5 PL | not N |
+| 6 VS | V | 7 VC | not V |
+| 8 HI | C and not Z | 9 LS | not C or Z |
+| 10 GE | N=V | 11 LT | N≠V |
+| 12 GT | not Z and N=V | 13 LE | Z or N≠V |
+| 14 AL | always | 15 NV | reserved; see oracle closure below |
+
+A false condition skips operand checks, writes and instruction-generated faults;
+flags and capabilities remain unchanged. Fetch protection and watchdog expiry
+are independent. Advance to the next instruction, not into an extension word.
+DR0 reads zero; a destination write cannot make it nonzero.
+
+### Ordinary data instructions
+
+These baseline rules remain applicable; the indexed rules later in this document
+replace the older memory/BRANCH/bitfield operand encodings.
+
+| Opcode | Operation | Encoding and result |
+|---|---|---|
+| 20 MCMP | Compare DR[A]−DR[B], no data write | Operand field zero. NZCV records subtraction: N=result bit 31, Z=result zero, C=no unsigned borrow, V=signed overflow. |
+| 21 IADD | DR[A]←DR[B]+third operand | Operand bit 14=0: third operand is DR[3:0], bits 13:4 zero. Bit 14=1: sign-extend bits 13:0 (−8192…8191). |
+| 22 ISUB | DR[A]←DR[B]−third operand | Same two operand forms as IADD. |
+| 24 SHL | DR[A]←DR[B] shifted left | Amount bits 4:0, 0…31; logical zero fill. |
+| 25 SHR | DR[A]←DR[B] shifted right | Amount bits 4:0; bit 5=0 logical, bit 5=1 arithmetic sign extension. |
+
+Arithmetic results are 32-bit. IADD/ISUB set NZCV; addition C is carry out,
+subtraction C is no borrow, V is signed overflow. Capture inputs before writes,
+including aliased operands and DR0 destinations. Do not substitute the checked,
+non-wrapping address arithmetic for ordinary integer-result arithmetic.
+
+### Capability operations and calls
+
+| Opcode | Required effect |
+|---|---|
+| 0 LOAD | Load the indexed GT through the source c-list capability into the destination CR using mLoad validation. The CR6 execution-context exception must not become a general permission bypass. |
+| 1 SAVE | Store the source GT through the destination c-list capability; require destination S and source B, with mSave validation. Abstract PassKey policy is separately specified below. |
+| 2 CALL | Validate the selected E-GT and method entry. Save caller E authority and continuation; derive callee CR6/c-list and CR14/code. Never preserve transient L authority as caller E authority. |
+| 3 RETURN | Revalidate saved caller E authority; reconstruct CR6/CR14 and resume the saved continuation. Empty/poison-root return faults STACK_UNDERFLOW; it is not a reset or halt. |
+| 4 CHANGE | Validated outgoing save → incoming Thread activation. See the complete contract below. |
+| 5 SWITCH | Outgoing save → Namespace load → incoming slot-2 activation. |
+| 6 TPERM | Query/attenuation; NULL and EXACT rules below override older reserved-preset descriptions. |
+| 7 LAMBDA | Execute an X-authorized code object in the caller's capability scope; do not replace its c-list. Return must validate the continuation; no unvalidated fast-path exception. |
+| 8, 9 | Retired. Not executable aliases or automatic translations. |
+| 16 DREAD / 17 DWRITE | Read/write a 32-bit DATA word with R/W authority using the approved indexed layout. |
+| 18 BFEXT / 19 BFINS | Approved checked bitfield operation below. |
+| 23 BRANCH | Approved checked PC-relative indexed branch below. |
+
+CALL's ordinary saved frame has caller E-GT plus packed NIA/indicators, not a
+hidden CR/DR snapshot. Method zero enters word 1; method n>0 reads word n
+as a lump-relative word offset. Zero/private entries and header execution are
+invalid. Check method-table and executable bounds before entry.
+
+RETURN uses opcode 3, condition [26:23], zero [22:12], keep mask [11:0].
+Mask bits 0–4 and 7–11 retain their corresponding CR when set, otherwise clear
+it without resolving that cleared GT. Bits 5/6 do not select restoration:
+CR5 descriptor stays unchanged and CR6 is reconstructed. DRs and CR12/CR15
+descriptors are retained; CR13 remains untouched. The two-word frame does not
+restore old values for masked CRs.
+
+### Oracle closure
+
+The review did **not** settle every baseline corner. Before claiming complete
+instruction conformance, close these exact test expectations:
+
+- NV/reserved-condition disposition and malformed reserved fields.
+- SHL/SHR flag effects and treatment of unused shift bits.
+- Full ordinary TPERM mode/preset/modifier packing and fault/flag precedence;
+  plain NULL=15 and B-modified NULL=31 are already settled.
+- Exact protected Thread-frame/indicator packing, CALL/RETURN M-bit effects
+  consistent with untouched CR13, and LAMBDA continuation representation.
+- Unspecified multi-fault precedence and exact numeric fault codes where only
+  a named outcome is currently defined.
+
+Do not pick an answer merely because current RTL emits it. These are explicit
+oracle gaps, not permission to drop tests or label them passed. The already
+approved formats and behavior in the remainder of this document remain binding.
 
 ## Approved Phase 1 contract
 
