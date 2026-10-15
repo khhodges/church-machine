@@ -20,8 +20,11 @@ collection; use explicit profile/supersession boundaries for retained old
 descriptions. Resolve routine implementation details consistently with the
 approved contract and report them together. Ask only for consequential changes
 to authority, ISA behavior, compatibility or hardware scope; do not invent
-user approval or claim implementation evidence. Delegation does not authorize
-runtime changes, builds or flashing in this documentation-only review.
+user approval or claim implementation evidence. The user subsequently explicitly
+authorized hardware RTL implementation and simulation. Application changes,
+saved-artifact migration, vendor builds, uploads and flashing remain excluded.
+Earlier documentation-only restrictions are historical for authorized hardware
+implementation, not a reason to keep postponing it.
 
 Prefer immutable bitstream parameters for protected bootstrap configuration,
 not a new runtime-writable register bank or unlock protocol.

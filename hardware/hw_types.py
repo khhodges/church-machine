@@ -364,6 +364,9 @@ class FaultType(IntEnum):
                              #   FETCH_GT and hardware/church_outform.py.
     IMMUTABLE_SELF_CAP = 0x1B  # SAVE: c-list row 0 is the immutable self capability
     STRUCTURAL_REG = 0x1C      # LOAD: machine-owned structural register target
+    THREAD_CONTEXT = 0x1D     # Phase 1: Thread-context validation failure
+    THREAD_PERMISSIONS = 0x1E # Phase 1: supplied Thread GT has permissions
+    WATCHDOG = 0x1F           # Phase 1: execution deadline expired
 
 
 class BootState(IntEnum):

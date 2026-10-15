@@ -2,6 +2,20 @@
 
 **Start with the [Master ISA](../instruction-set.md).**
 
+## Current decision and implementation entry points
+
+- [Master ISA: approved contract and delegated hardware choices](../instruction-set.md#approved-phase-1-contract).
+- [Decision ledger and source-level implementation gaps](REVIEW-2026-10-14.md#resolution-log--guided-review).
+- [Approved single-word CALL encoding](CALL-SINGLE-WORD-DRAFT.md) — retained filename, not draft status.
+- [Hardware acceptance plan](../releases/isa-to-fpga-alignment-plan.md#hardware-only-acceptance-reconciliation).
+
+The user has now authorized hardware RTL implementation and simulation.
+Earlier documentation-only entries remain historical; this does not authorize
+vendor bitstream builds, uploading, flashing, saved-artifact migration or
+application changes. Collected decisions are not proof of hardware readiness.
+Implementation and simulation results must be recorded separately from
+physical qualification. The original 45-source audit remains preserved.
+
 **Review boundary:** Software cannot block the Phase 1 bitstream. Keep software
 TBDs, including the Abstract PassKey Owner-ID/payload format, separate from
 hardware readiness. Software delivery remains required but is not a bitstream
