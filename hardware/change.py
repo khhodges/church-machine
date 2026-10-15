@@ -23,6 +23,8 @@ class ChurchChange(Elaboratable):
         self.change_start = Signal()
         # Explicit decoded programmatic operation; not a scheduler request.
         self.ordinary = Signal()
+        self.namespace_handoff = Signal()
+        self.incoming_namespace = Signal(CAP_REG_LAYOUT)
         self.cr_src = Signal(4)
         self.index = Signal(16)
         self.change_mask = Signal(16)
@@ -85,9 +87,8 @@ class ChurchChange(Elaboratable):
         self.nia_restore_val = Signal(32)
         self.flags_in = Signal(COND_FLAGS_LAYOUT)
         self.nia_current = Signal(32)
-        # NIA is separate core state. CHANGE does not persist the outgoing NIA;
-        # an incoming Thread starts at the CR0-selected abstraction's word 1.
-        # FLAGS/SZ/STO are persisted independently in protected Thread word +17.
+        # Ordinary CHANGE saves its accepted continuation in the protected
+        # frame. Legacy boot/scheduler interfaces remain separate below.
         self.flags_restore_en = Signal()
         self.flags_restore_data = Signal(COND_FLAGS_LAYOUT)
 
@@ -95,7 +96,7 @@ class ChurchChange(Elaboratable):
         m = Module()
         m.submodules.ordinary = ordinary = OrdinaryChange(self)
         ordinary_selected = Signal()
-        with m.If(self.change_start):
+        with m.If(self.change_start & ~self.change_busy):
             m.d.sync += ordinary_selected.eq(self.ordinary)
         for name in ordinary.INPUTS:
             m.d.comb += getattr(ordinary, name).eq(getattr(self, name))
@@ -124,6 +125,7 @@ class ChurchChange(Elaboratable):
         outgoing_thread_base = Signal(32)
         outgoing_thread_owned = Signal()
         incoming_thread_base = Signal(32)
+        scheduler_thread_cap = Signal(CAP_REG_LAYOUT)
         thread_loaded = Signal()
         fault_latched    = Signal()
         fault_type_latched = Signal(5)
@@ -320,8 +322,12 @@ class ChurchChange(Elaboratable):
             outgoing_egt_view.dom.eq(1),
             outgoing_egt_view.perm.eq(0b100),
             outgoing_egt_view.b_flag.eq(outgoing_cr6_gt.b_flag),
-            cr5_new_gt.slot_id.eq(0),
-            cr5_new_gt.gt_seq.eq(0),
+            cr5_new_gt.slot_id.eq(Mux(thread_change_lat,
+                View(CAP_REG_LAYOUT, scheduler_thread_cap).word0_gt.slot_id,
+                cr12_view.word0_gt.slot_id)),
+            cr5_new_gt.gt_seq.eq(Mux(thread_change_lat,
+                View(CAP_REG_LAYOUT, scheduler_thread_cap).word0_gt.gt_seq,
+                cr12_view.word0_gt.gt_seq)),
             cr5_new_gt.gt_type.eq(GT_TYPE_INFORM),
             # Turing domain (dom=0): perm=0b011 (R=perm[0]=1, W=perm[1]=1, X=perm[2]=0)
             cr5_new_gt.dom.eq(0),
@@ -567,6 +573,7 @@ class ChurchChange(Elaboratable):
                         mload_done_latched.eq(1),
                         preflight_base.eq(u_mload.resolved_base),
                         incoming_thread_base.eq(u_mload.resolved_base),
+                        scheduler_thread_cap.eq(u_mload.resolved_cap),
                     ]
                 with m.If(u_mload.sub_fault):
                     m.d.sync += [
@@ -1129,6 +1136,20 @@ class ChurchChange(Elaboratable):
                 # at +17 is outside this capability.
                 # base = thread_base + 18 words; limit_offset = heapWords - 1.
                 m.d.comb += cr5_install_active.eq(1)
+                with m.If(thread_change_lat):
+                    m.next = "COMMIT_ACTIVE_THREAD"
+                with m.Else():
+                    m.next = "COMPLETE"
+
+            with m.State("COMMIT_ACTIVE_THREAD"):
+                # The manual scheduler must publish the same architectural
+                # active identity as ordinary CHANGE. Its transient internal
+                # L/S access is never exported in CR12.
+                m.d.comb += [
+                    self.cr_wr_en.eq(1), self.cr_wr_addr.eq(12),
+                    self.cr_wr_data.eq(scheduler_thread_cap.as_value() &
+                                       ~(Const(7, 96) << 28)),
+                ]
                 m.next = "COMPLETE"
 
             with m.State("COMPLETE"):
@@ -1151,6 +1172,10 @@ class ChurchChange(Elaboratable):
                 if name == "thread_hdr_out":
                     continue
                 m.d.comb += getattr(self, name).eq(getattr(ordinary, name))
+        # Select the operand read at acceptance, but never select busy from
+        # start: core's start is itself qualified by ~busy.
+        with m.If(self.change_start & self.ordinary):
+            m.d.comb += self.cr_rd_addr.eq(self.cr_src)
         # Admission headers are speculative. A failed CHANGE must not replace
         # the running Thread's hidden stack geometry consumed by CALL/RETURN.
         published_header = Signal(32)

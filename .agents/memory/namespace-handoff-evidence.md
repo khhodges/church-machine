@@ -64,15 +64,14 @@ target, because they need to see the new layout to test it.
 rows and installed-image evidence. Do not confuse design approval with completed
 executable binding, image admission, or activation.
 
-Successful combined Namespace SWITCH clears CR13 completely, including its M
-bit. The destination Thread manager must explicitly install its own IRQ Thread.
+Phase 1 CHANGE and combined SWITCH leave reserved CR13 untouched, including
+its M bit. The active Master supersedes the older IRQ-role/clearing decision.
 
-**Why:** The user approved clearing, rather than requiring CR13 to be NULL.
-Ordinary CHANGE preserves CR13, which cannot implicitly preserve IRQ authority
-across a Namespace boundary where equal slot/generation values mean nothing.
+**Why:** The approved Phase 1 contract explicitly excludes loading, restoring
+or clearing CR13; the former Namespace-switch clearing rule is historical.
 
-**How to apply:** Clear it on successful handoff. Do not add a non-NULL CR13
-rejection precondition or describe this architectural clearing as fault recovery.
+**How to apply:** Follow the active Master rather than reintroducing the older
+IRQ policy. CR15.M alone authorizes and is consumed by combined SWITCH.
 
 New-format execution must be selected explicitly rather than silently upgrading
 a historical live image. Its execution metadata must not inherit the host's

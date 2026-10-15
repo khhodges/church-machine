@@ -67,7 +67,7 @@ def test_descendant_cleanup(tmp_path, tool_timeout, monkeypatch):
         stat = Path(f"/proc/{pid}/stat")
         try:
             state = stat.read_text().split()[2]
-        except FileNotFoundError:
+        except (FileNotFoundError, ProcessLookupError):
             break
         if state == "Z":
             break

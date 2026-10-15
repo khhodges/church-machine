@@ -255,7 +255,8 @@ class BootChange(Elaboratable):
                 heap = View(CAP_REG_LAYOUT, self.cr_data)
                 m.d.comb += [
                     self.cr_en.eq(1), self.cr_addr.eq(5),
-                    heap.word0_gt.eq(0x32000000),
+                    heap.word0_gt.eq(
+                        (tv.word0_gt.as_value() & 0x87FFFFFF) | 0x30000000),
                     heap.word1_location.eq(tv.word1_location + 72),
                     heap.word2_w2.eq(size - header[10:23] - 31),
                 ]

@@ -347,6 +347,9 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         dmem[word + 3] = 0
 
     descriptor(target_thread_slot, target_thread_base, body_words - 1)
+    # The decoded Phase 1 CHANGE path uses CR15's word-offset table bound.
+    # This synthetic table has 64 entries; no saved/release image is changed.
+    descriptor(0, 0, 255)
     descriptor(target_code_slot, target_code_base, 4095)
     target_gt = make_gt(
         GT_TYPE_INFORM, PERM_MASK_E, slot_id=target_code_slot)
@@ -362,7 +365,7 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         dmem[source_word + 2] = encode_church(
             ChurchOpcode.CHANGE,
             CondCode.AL,
-            cr_dst=1,
+            cr_dst=0,
             cr_src=1,
             imm=0,
         )
@@ -622,7 +625,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
     change_back = encode_church(
         ChurchOpcode.CHANGE,
         CondCode.AL,
-        cr_dst=1,
+        cr_dst=0,
         cr_src=1,
         imm=0,
     )
@@ -647,6 +650,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
     dut = BootRomHarness(dmem)
     observed = []
     flag_snapshots = {}
+    recent_reads = []
 
     async def bench(ctx):
         ctx.set(dut.core.thread_switch_req, 0)
@@ -675,6 +679,8 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
         switched_out = False
         resume_requested = False
         for _ in range(5000):
+            if ctx.get(dut.core.dmem_rd_en):
+                recent_reads.append(hex(ctx.get(dut.core.dmem_addr)))
             if (
                 "before_switch" not in flag_snapshots
                 and ctx.get(dut.core.nia) == target_first
@@ -717,7 +723,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
                 if event[2]:
                     raise AssertionError(
                         "instruction faulted before resumed branch completed: "
-                        f"{event}")
+                        f"{event}, fault={ctx.get(dut.core.fault)}, reads={recent_reads[-16:]}")
             await ctx.tick()
         else:
             raise AssertionError(

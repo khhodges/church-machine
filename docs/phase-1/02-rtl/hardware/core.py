@@ -593,7 +593,7 @@ class ChurchCore(Elaboratable):
                     m.d.comb += required_perms.eq(PERM_MASK_E)
             if not self.iot_profile:
                 with m.Case(ChurchOpcode.SWITCH):
-                    m.d.comb += required_perms.eq(PERM_MASK_L)
+                    m.d.comb += required_perms.eq(0)  # checked by SWITCH at acceptance
                 with m.Case(ChurchOpcode.CHANGE):
                     # Permission check is done inside ChurchChange (change.py):
                     # CR12/CR13 require S-perm + location match; CR14/CR15 require L-perm.
@@ -618,6 +618,7 @@ class ChurchCore(Elaboratable):
                 cond_exec_enable & is_church_op & ~any_unit_busy &
                 ~boot_microcode_active &
                 (church_op != ChurchOpcode.CHANGE) &
+                (church_op != ChurchOpcode.SWITCH) &
                 # NULL and EXACT own their type checks in the TPERM unit.
                 # The generic NULL gate would reject the NULL query itself
                 # and attribute EXACT failures to the wrong pipeline stage.
@@ -1000,11 +1001,6 @@ class ChurchCore(Elaboratable):
                 m.d.sync += nia_reg.eq(u_lambda.nia_value)
             with m.Elif(u_xloadlambda.nia_set):
                 m.d.sync += nia_reg.eq(u_xloadlambda.nia_value)
-            with m.Elif(u_switch.switch_complete):
-                # SWITCH owns its issuing NIA until its authorization/load FSM
-                # reaches a successful terminal event. Faults leave NIA here
-                # for fault retirement; success advances exactly once.
-                m.d.sync += nia_reg.eq(nia_reg + 4)
         with m.Elif(u_return.nia_set):
             m.d.sync += nia_reg.eq(u_return.nia_value)
         with m.Elif(u_call.nia_set):
@@ -1573,7 +1569,8 @@ class ChurchCore(Elaboratable):
         m.d.comb += [
             compact_index_selected.eq(
                 is_church_op & ((church_op == ChurchOpcode.LOAD) |
-                                (church_op == ChurchOpcode.SAVE)) & ~any_unit_busy),
+                                (church_op == ChurchOpcode.SAVE) |
+                                (church_op == ChurchOpcode.SWITCH)) & ~any_unit_busy),
             compact_index.eq(Mux(u_decoder.immediate[14],
                 Cat(u_regs.dr_rd_data1, C(0, 1)) - u_decoder.immediate[4:14],
                 Cat(u_regs.dr_rd_data1, C(0, 1)) + u_decoder.immediate[4:14])),
@@ -1588,6 +1585,9 @@ class ChurchCore(Elaboratable):
                         bfext_start_sig | bfins_start_sig | mcmp_start_sig,
                         cr_src, 0))))
         )
+        if not self.iot_profile:
+            with m.If(u_change.change_busy):
+                m.d.comb += u_regs.dr_rd_addr1.eq(u_change.dr_rd_addr)
 
         # 33-bit results. IADD bit 32 is carry-out. For ISUB the ISA follows
         # ARM-style condition semantics: C=1 means no borrow, C=0 means borrow.
@@ -1830,11 +1830,14 @@ class ChurchCore(Elaboratable):
                 self.thread_switch_req & self.boot_complete & ~any_unit_busy)
             m.d.comb += change_start_sig.eq(
                 (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy) |
-                thread_switch_start_sig
+                thread_switch_start_sig | u_switch.handoff_start
             )
             m.d.comb += [
                 u_change.change_start.eq(change_start_sig),
-                u_change.ordinary.eq(~thread_switch_start_sig & ~boot_microcode_active),
+                u_change.ordinary.eq(u_switch.handoff_start |
+                                    (~thread_switch_start_sig & ~boot_microcode_active)),
+                u_change.namespace_handoff.eq(u_switch.handoff_start),
+                u_change.incoming_namespace.eq(u_switch.incoming_namespace),
                 u_change.cr_src.eq(Mux(thread_switch_start_sig, 15, cr_src)),
                 u_change.cr_dst.eq(Mux(thread_switch_start_sig, 14, cr_dst)),
                 u_change.m_elevated.eq(
@@ -1852,17 +1855,20 @@ class ChurchCore(Elaboratable):
                 u_change.mem_wr_done.eq(1),
                 u_change.dr_rd_data.eq(u_regs.dr_rd_data1),
                 u_change.boot_window.eq(boot_microcode_active),
-                u_change.flags_in.eq(u_regs.flags),
+                u_change.flags_in.eq(Mux(u_switch.handoff_start,
+                                        u_switch.accepted_flags, u_regs.flags)),
                 # ChurchChange encodes the decoded instruction's return NIA by
                 # adding one word. An external M6 request already arrives at an
                 # instruction boundary, so bias its input back one word and
                 # preserve the exact next NIA in the canonical frame.
                 u_change.nia_current.eq(
-                    Mux(thread_switch_start_sig, nia_reg - 4, nia_reg)),
+                    Mux(u_switch.handoff_start, u_switch.accepted_nia,
+                        Mux(thread_switch_start_sig, nia_reg - 4, nia_reg))),
             ]
             with m.If(change_start_sig & ~thread_switch_start_sig):
                 m.d.sync += [
-                    change_issuer_nia.eq(nia_reg),
+                    change_issuer_nia.eq(Mux(u_switch.handoff_start,
+                                            u_switch.accepted_nia, nia_reg)),
                     decoded_thread_change_inflight.eq(
                         ~boot_microcode_active),
                 ]
@@ -1903,22 +1909,22 @@ class ChurchCore(Elaboratable):
             ]
 
             m.d.comb += switch_start_sig.eq(
-                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SWITCH) & ~any_unit_busy
+                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.SWITCH) &
+                ~any_unit_busy & ~compact_index_fault
             )
             m.d.comb += [
                 u_switch.switch_start.eq(switch_start_sig),
                 u_switch.cr_src.eq(cr_src),
                 u_switch.target.eq(cr_dst),
-                u_switch.index.eq(cap_index),
-                # Do not use a subtract-and-bit-select here: malformed CRd
-                # values must not dynamically alias an isolated M latch.
-                u_switch.target_m.eq(
-                    Mux(cr_dst == SWITCH_TGT_CR12, u_regs.isolated_m_flags[0],
-                        Mux(cr_dst == SWITCH_TGT_CR13, u_regs.isolated_m_flags[1],
-                            Mux(cr_dst == SWITCH_TGT_CR14, u_regs.isolated_m_flags[2],
-                                Mux(cr_dst == SWITCH_TGT_CR15,
-                                    u_regs.isolated_m_flags[3], 0))))
-                ),
+                u_switch.index.eq(compact_index[:32]),
+                # Required-zero CRd never indexes M: the fixed destination
+                # is CR15, sharing its authorization with incoming CR12.
+                u_switch.target_m.eq(u_regs.isolated_m_flags[3]),
+                u_switch.nia_current.eq(nia_reg),
+                u_switch.flags_in.eq(u_regs.flags),
+                u_switch.handoff_done.eq(u_change.change_complete),
+                u_switch.handoff_fault.eq(u_change.change_fault),
+                u_switch.handoff_fault_type.eq(u_change.fault_type),
                 u_switch.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_switch.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_switch.mem_rd_data.eq(self.dmem_rd_data),
@@ -2832,7 +2838,8 @@ class ChurchCore(Elaboratable):
         )
         if not self.iot_profile:
             delayed_issue = delayed_issue | (
-                change_start_sig | switch_start_sig | lambda_start_sig |
+                (change_start_sig & ~u_switch.handoff_start) |
+                switch_start_sig | lambda_start_sig |
                 eloadcall_start_sig | xloadlambda_start_sig
             )
             delayed_fault = delayed_fault | (
@@ -2920,7 +2927,7 @@ class ChurchCore(Elaboratable):
                 u_lambda.nia_set |
                 u_xloadlambda.nia_set |
                 u_eloadcall.nia_set |
-                u_switch.switch_complete |
+                # SWITCH retires through the shared change_retire pulse.
                 u_irq_dispatch.nia_set
             )
         else:

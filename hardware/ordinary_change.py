@@ -10,6 +10,7 @@ from amaranth.lib.data import View
 from .layouts import CAP_REG_LAYOUT, GT_LAYOUT, WORD2_LAYOUT
 from .hw_types import FaultType, GT_TYPE_INFORM, GT_TYPE_ABSTRACT
 from .ns_gate import ChurchNSGate
+from .mload import ChurchMLoad
 from .thread_design import THREAD_MIN_N_MINUS_6, THREAD_MAX_N_MINUS_6
 
 
@@ -19,6 +20,7 @@ class OrdinaryChange(Elaboratable):
         "cr15_namespace", "active_thread_base", "active_thread_owned",
         "mem_rd_data", "mem_rd_valid", "mem_wr_done", "dr_rd_data",
         "flags_in", "nia_current",
+        "namespace_handoff", "incoming_namespace",
     )
     OUTPUTS = (
         "change_busy", "change_complete", "change_fault", "fault_type",
@@ -38,7 +40,11 @@ class OrdinaryChange(Elaboratable):
     def elaborate(self, platform):
         m = Module()
         m.submodules.gate = gate = ChurchNSGate(enable_seal_check=True)
+        m.submodules.home_load = home_load = ChurchMLoad(enable_seal_check=True)
         namespace = Signal(96)
+        home_namespace = Signal(CAP_REG_LAYOUT)
+        hnv = View(CAP_REG_LAYOUT, home_namespace)
+        hnw = View(WORD2_LAYOUT, hnv.word2_w2)
         thread = Signal(96)
         entry = Signal(96)
         homes = Array(Signal(96, name=f"incoming_cr{i}") for i in range(12))
@@ -58,6 +64,7 @@ class OrdinaryChange(Elaboratable):
         indicator, frame, out_indicator = Signal(32), Signal(32), Signal(32)
         out_base, out_egt = Signal(32), Signal(32)
         owned, self_target = Signal(), Signal()
+        handoff, root_entry = Signal(), Signal()
         flags, nia = Signal(4), Signal(15)
         row = Signal(8)
         phase = Signal(2)  # target Thread, incoming homes, frame E-GT, C-List
@@ -70,8 +77,10 @@ class OrdinaryChange(Elaboratable):
             gate.gt_word0.eq(gt), gate.cr15_namespace.eq(namespace),
             gate.m_elevated.eq(0), gate.mem_rd_data.eq(self.mem_rd_data),
             gate.mem_rd_valid.eq(self.mem_rd_valid & gate.ns_gate_busy),
-            self.mem_rd_en.eq(Mux(gate.ns_gate_busy, gate.mem_rd_en, rd)),
-            self.mem_rd_addr.eq(Mux(gate.ns_gate_busy, gate.mem_addr, addr)),
+            self.mem_rd_en.eq(Mux(home_load.sub_busy, home_load.mem_rd_en,
+                                 Mux(gate.ns_gate_busy, gate.mem_rd_en, rd))),
+            self.mem_rd_addr.eq(Mux(home_load.sub_busy, home_load.mem_addr,
+                                   Mux(gate.ns_gate_busy, gate.mem_addr, addr))),
             size.eq(Const(1, 16) << (header[23:27] + 6)),
             out_size.eq(Const(1, 16) << (out_header[23:27] + 6)),
             entry_size.eq(Const(1, 16) << (entry_header[23:27] + 6)),
@@ -87,10 +96,21 @@ class OrdinaryChange(Elaboratable):
             code_w2.gt_seq.eq(ew.gt_seq),
             clist_w2.limit_offset.eq(entry_header[:8] - 1),
             clist_w2.gt_seq.eq(ew.gt_seq),
+            home_load.sub_direct.eq(1),
+            home_load.sub_direct_gt.eq(gt),
+            home_load.sub_validate_only.eq(1),
+            home_load.sub_m_elevated.eq(0),
+            home_namespace.eq(namespace),
+            hnw.limit_offset.eq(nw.limit_offset >> 2),
+            home_load.cr15_namespace.eq(home_namespace),
+            home_load.mem_rd_data.eq(self.mem_rd_data),
+            home_load.mem_rd_valid.eq(self.mem_rd_valid & home_load.sub_busy),
         ]
 
         def fail(kind):
-            m.d.sync += code.eq(kind)
+            # Context checks share the approved hard-fault category. Encoding
+            # and the operand's permissions are checked separately at accept.
+            m.d.sync += code.eq(FaultType.THREAD_CONTEXT)
             m.next = "FAULT"
 
         def read(address):
@@ -113,34 +133,60 @@ class OrdinaryChange(Elaboratable):
         with m.FSM() as fsm:
             with m.State("IDLE"):
                 with m.If(self.change_start):
+                    m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                     m.d.sync += [
-                        operand.eq(self.cr_src), namespace.eq(self.cr15_namespace),
+                        operand.eq(self.cr_src),
+                        namespace.eq(Mux(self.namespace_handoff,
+                                         self.incoming_namespace, self.cr15_namespace)),
+                        handoff.eq(self.namespace_handoff), root_entry.eq(0),
+                        gt.eq(Mux(self.namespace_handoff, 0x02000002,
+                                  self.cr_rd_data.as_value()[:32])),
                         owned.eq(self.active_thread_owned),
-                        out_base.eq(self.active_thread_base),
+                        # CR12 is the architectural Thread identity. The
+                        # scheduler's backing-address hint is not authority.
+                        out_base.eq(View(CAP_REG_LAYOUT, self.cr12_thread).word1_location),
                         flags.eq(self.flags_in), nia.eq(self.nia_current[2:17] + 1),
                         phase.eq(0), row.eq(0), armed.eq(0), code.eq(0),
                     ]
-                    # Existing one-operand assembler word repeats CRn; indexed
-                    # legacy words must not silently acquire new semantics.
-                    with m.If((self.cr_src != self.cr_dst) | (self.index != 0)):
-                        fail(FaultType.INVALID_OP)
+                    with m.If(~self.namespace_handoff &
+                              ((self.cr_dst != 0) | (self.index != 0) |
+                               (self.cr_src == 13))):
+                        m.d.sync += code.eq(FaultType.INVALID_OP)
+                        m.next = "FAULT"
                     with m.Else():
-                        m.next = "OPERAND"
-            with m.State("OPERAND"):
-                m.d.comb += self.cr_rd_addr.eq(operand)
-                m.d.sync += gt.eq(self.cr_rd_data.as_value()[:32])
-                m.next = "CHECK"
+                        m.next = "CHECK"
             with m.State("CHECK"):
                 with m.If(gv.gt_type != GT_TYPE_INFORM):
                     fail(FaultType.NULL_CAP)
                 with m.Elif((phase == 0) & (gv.perm != 0)):
-                    fail(FaultType.PERM_S)
+                    m.d.sync += code.eq(FaultType.THREAD_PERMISSIONS)
+                    m.next = "FAULT"
                 with m.Elif((phase == 2) & (~gv.dom | (gv.perm != 4))):
                     fail(FaultType.PERM_E)
-                with m.Elif(gv.slot_id > nw.limit_offset):
+                with m.Elif((gv.slot_id == 0) |
+                            (((gv.slot_id << 2) + 3) > nw.limit_offset) |
+                            ((View(CAP_REG_LAYOUT, namespace).word1_location +
+                              (gv.slot_id << 4) + 15) > 0xFFFFFFFF)):
                     fail(FaultType.BOUNDS)
                 with m.Else():
-                    m.next = "GATE"
+                    with m.If(phase == 1):
+                        m.next = "HOME_LOAD"
+                    with m.Else():
+                        m.next = "GATE"
+            with m.State("HOME_LOAD"):
+                m.d.comb += home_load.sub_start.eq(1)
+                m.next = "HOME_WAIT"
+            with m.State("HOME_WAIT"):
+                with m.If(home_load.sub_fault):
+                    fail(home_load.sub_fault_type)
+                with m.Elif(home_load.sub_done):
+                    restored = View(CAP_REG_LAYOUT, home_load.resolved_cap)
+                    with m.If(View(WORD2_LAYOUT, restored.word2_w2).f_flag |
+                              (restored.word1_location[:2] != 0)):
+                        fail(FaultType.BOUNDS)
+                    with m.Else():
+                        m.d.sync += homes[row].eq(home_load.resolved_cap)
+                        m.next = "HOME_NEXT"
             with m.State("GATE"):
                 m.d.comb += gate.ns_gate_start.eq(1)
                 m.next = "WAIT"
@@ -153,7 +199,7 @@ class OrdinaryChange(Elaboratable):
                     with m.Elif(phase == 0):
                         m.d.sync += [
                             thread.eq(resolved), armed.eq(0),
-                            self_target.eq(owned & (gate.raw_base == out_base)),
+                            self_target.eq(~handoff & owned & (gate.raw_base == out_base)),
                         ]
                         m.next = "HEADER"
                     with m.Elif(phase == 1):
@@ -206,7 +252,12 @@ class OrdinaryChange(Elaboratable):
                     m.d.sync += [frame.eq(self.mem_rd_data), armed.eq(0)]
                     m.next = "FRAME_CHECK"
             with m.State("FRAME_CHECK"):
-                with m.If(frame[13:28] == 0x7FFF):
+                with m.If(handoff & (frame == ((caps - 1) | 0x1000 |
+                                               (0x7FFF << 13))) &
+                          (indicator == ((caps - 3) | 0x1000))):
+                    m.d.sync += root_entry.eq(1)
+                    m.next = "EGT"
+                with m.Elif(frame[13:28] == 0x7FFF):
                     fail(FaultType.STACK_UNDERFLOW)
                 with m.Elif(frame[:12] != indicator[:12] + 2):
                     fail(FaultType.STACK_CORRUPT)
@@ -223,7 +274,7 @@ class OrdinaryChange(Elaboratable):
                     m.d.sync += [entry_header.eq(self.mem_rd_data), armed.eq(0)]
                     m.next = "ENTRY_CHECK"
             with m.State("ENTRY_CHECK"):
-                with m.If(frame[13:28] == 0x7FFF):
+                with m.If(~root_entry & (frame[13:28] == 0x7FFF)):
                     fail(FaultType.STACK_UNDERFLOW)
                 with m.Elif((entry_header[27:32] != 31) |
                           (entry_header[8:10] != 0) |
@@ -234,9 +285,9 @@ class OrdinaryChange(Elaboratable):
                           (entry_header[10:23] >= entry_size - entry_header[:8]) |
                           (ew.limit_offset != entry_size - 1) |
                           ((ev.word1_location + ((entry_size - 1) << 2)) > 0xFFFFFFFF) |
-                          ((frame[13:28] << 2) < ev.word1_location + 4) |
+                          (~root_entry & (((frame[13:28] << 2) < ev.word1_location + 4) |
                           ((frame[13:28] << 2) >=
-                           ev.word1_location + 4 + (entry_header[10:23] << 2))):
+                           ev.word1_location + 4 + (entry_header[10:23] << 2))))):
                     fail(FaultType.BOUNDS)
                 with m.Else():
                     m.d.sync += [row.eq(0), phase.eq(3)]
@@ -253,7 +304,9 @@ class OrdinaryChange(Elaboratable):
                     with m.Else():
                         m.next = "CHECK"
             with m.State("CLIST_NEXT"):
-                with m.If(row + 1 >= entry_header[:8]):
+                # Structure and executable SELF suffice. Other rows are
+                # checked by mLoad when used, never eagerly scanned here.
+                with m.If(row == 0):
                     m.d.sync += [row.eq(0), phase.eq(1)]
                     m.next = "HOME"
                 with m.Else():
@@ -264,7 +317,7 @@ class OrdinaryChange(Elaboratable):
                 m.d.comb += self.cr_rd_addr.eq(row)
                 with m.If(self_target):
                     m.d.sync += [gt.eq(self.cr_rd_data.as_value()[:32]), armed.eq(0)]
-                    with m.If((self.cr_rd_data.as_value()[:32] == 0) |
+                    with m.If((self.cr_rd_data.as_value()[25:27] == 0) |
                               (self.cr_rd_data.as_value()[25:27] == GT_TYPE_ABSTRACT)):
                         m.d.sync += homes[row].eq(Cat(
                             self.cr_rd_data.as_value()[:32], Const(0, 64)))
@@ -273,7 +326,10 @@ class OrdinaryChange(Elaboratable):
                         m.next = "CHECK"
                 with m.Elif(armed & self.mem_rd_valid):
                     m.d.sync += [gt.eq(self.mem_rd_data), armed.eq(0)]
-                    with m.If((self.mem_rd_data == 0) |
+                    with m.If(root_entry & (row == 0) &
+                              (self.mem_rd_data != ev.word0_gt.as_value())):
+                        fail(FaultType.STACK_CORRUPT)
+                    with m.Elif((self.mem_rd_data[25:27] == 0) |
                               (self.mem_rd_data[25:27] == GT_TYPE_ABSTRACT)):
                         m.d.sync += homes[row].eq(Cat(self.mem_rd_data, Const(0, 64)))
                         m.next = "HOME_NEXT"
@@ -299,7 +355,7 @@ class OrdinaryChange(Elaboratable):
                         with m.If(owned):
                             m.next = "OUT_HEADER"
                         with m.Else():
-                            m.next = "POP"
+                            m.next = "NAMESPACE"
                     with m.Else():
                         m.d.sync += row.eq(row + 1)
             with m.State("OUT_HEADER"):
@@ -365,9 +421,19 @@ class OrdinaryChange(Elaboratable):
                 with m.If(self.mem_wr_done):
                     with m.If(row == 15):
                         m.d.sync += row.eq(0)
-                        m.next = "POP"
+                        m.next = "NAMESPACE"
                     with m.Else():
                         m.d.sync += row.eq(row + 1)
+            with m.State("NAMESPACE"):
+                # All destination admission and outgoing save has completed.
+                # Keep the core busy across this architectural midpoint.
+                with m.If(handoff):
+                    m.d.comb += [self.cr_wr_en.eq(1), self.cr_wr_addr.eq(15),
+                                 self.cr_wr_data.eq(namespace)]
+                with m.If(root_entry):
+                    m.next = "COMMIT_HOMES"
+                with m.Else():
+                    m.next = "POP"
             with m.State("POP"):
                 write(tv.word1_location + 68, Cat(frame[:13], Const(0, 15), frame[28:32]))
                 with m.If(self.mem_wr_done):
@@ -416,7 +482,8 @@ class OrdinaryChange(Elaboratable):
                         (ev.word0_gt.as_value() & 0x87FFFFFF) | 0x18000000,
                         (ev.word1_location + ((entry_size - entry_header[:8]) << 2))[:32],
                         clist_w2)),
-                    self.nia_restore_en.eq(1), self.nia_restore_val.eq(frame[13:28] << 2),
+                    self.nia_restore_en.eq(1),
+                    self.nia_restore_val.eq(Mux(root_entry, 0, frame[13:28] << 2)),
                     self.flags_restore_en.eq(1), self.flags_restore_data.eq(frame[28:32]),
                 ]
                 m.next = "DONE"

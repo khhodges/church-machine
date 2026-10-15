@@ -137,7 +137,7 @@ def test_boot_installs_complete_thread_without_scratch_or_context_save():
     expected = list(r["before"])
     expected[12] = cap(0x02000001, 0x2600, 255)
     expected[0] = cap(0x4A00000A, 0x2E00, 1023)
-    expected[5] = cap(0x32000000, 0x2648, 193)
+    expected[5] = cap(0x32000001, 0x2648, 193)
     assert r["after"] == expected  # all 16 full GT/base/W2 triples
     assert [index for index, _ in r["writes"]] == [12, 0, 5]
     assert r["thread_base_en"] and r["thread_base"] == 0x2600
@@ -196,7 +196,7 @@ def test_factory_capability_test_full_core_boot():
                     expected = [list(row) for row in before]
                     expected[12] = [0x02000001, b.WUKONG_THREAD_BASE_WORD * 4, 255]
                     expected[0] = [entry_gt, start * 4, b.WUKONG_CAPABILITY_TEST_ALLOC - 1]
-                    expected[5] = [0x32000000, b.WUKONG_THREAD_BASE_WORD * 4 + 72, 193]
+                    expected[5] = [0x32000001, b.WUKONG_THREAD_BASE_WORD * 4 + 72, 193]
                     assert registers() == expected
                 if nia == 8:
                     assert retired == [0, 4, 8]

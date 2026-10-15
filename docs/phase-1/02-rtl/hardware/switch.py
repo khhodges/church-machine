@@ -1,8 +1,13 @@
+"""Read-only SWITCH admission, followed by the shared checked Thread transition.
+
+The Namespace candidate is never written here. ChurchChange saves the outgoing
+Thread, publishes CR15 at the midpoint, and activates slot 2 while both units
+keep the issuing instruction busy. Only the final completion consumes CR15.M.
+"""
 from amaranth import *
 from amaranth.lib.data import View
-
-from .hw_types import *
-from .layouts import GT_LAYOUT, CAP_REG_LAYOUT
+from .hw_types import FaultType
+from .layouts import CAP_REG_LAYOUT, WORD2_LAYOUT, COND_FLAGS_LAYOUT
 from .mload import ChurchMLoad
 
 
@@ -10,162 +15,172 @@ class ChurchSwitch(Elaboratable):
     def __init__(self):
         self.switch_start = Signal()
         self.cr_src = Signal(4)
-        self.target = Signal(4)
-        self.index = Signal(16)
-        # Combinatorial M state for target.  It is sampled together with the
-        # instruction operands on switch_start, so later device writes cannot
-        # change the authorization decision of an in-flight SWITCH.
-        self.target_m = Signal()
+        self.target = Signal(4)  # required-zero encoding, NOT a CR selector
+        self.index = Signal(32)
+        self.target_m = Signal()  # CR15.M at acceptance
         self.switch_busy = Signal()
         self.switch_complete = Signal()
-        # Pulses only when the delegated normal LOAD completed successfully.
-        # The register file uses this to consume the M latch sampled at accept.
-        self.m_consume_en = Signal()
-        self.m_consume_target = Signal(2)
         self.switch_fault = Signal()
         self.fault_type = Signal(5)
-
+        self.m_consume_en = Signal()
+        self.m_consume_target = Signal(2)
         self.cr_rd_addr = Signal(4)
         self.cr_rd_data = Signal(CAP_REG_LAYOUT)
+        self.cr15_namespace = Signal(CAP_REG_LAYOUT)
         self.cr_wr_addr = Signal(4)
         self.cr_wr_data = Signal(CAP_REG_LAYOUT)
         self.cr_wr_en = Signal()
-        self.cr15_namespace = Signal(CAP_REG_LAYOUT)
-
+        self.thread_wr_en = Signal()
+        self.thread_wr_idx = Signal(4)
+        self.thread_wr_data = Signal(32)
         self.mem_addr = Signal(32)
         self.mem_rd_en = Signal()
         self.mem_rd_data = Signal(32)
         self.mem_rd_valid = Signal()
-
-        self.thread_wr_en = Signal()
-        self.thread_wr_idx = Signal(4)
-        self.thread_wr_data = Signal(32)
+        self.handoff_start = Signal()
+        self.handoff_done = Signal()
+        self.handoff_fault = Signal()
+        self.handoff_fault_type = Signal(5)
+        self.incoming_namespace = Signal(CAP_REG_LAYOUT)
+        self.nia_current = Signal(32)
+        self.flags_in = Signal(COND_FLAGS_LAYOUT)
+        self.accepted_nia = Signal(32)
+        self.accepted_flags = Signal(COND_FLAGS_LAYOUT)
 
     def elaborate(self, platform):
         m = Module()
-
-        u_mload = ChurchMLoad()
-        m.submodules.u_mload = u_mload
-
-        src_latched = Signal(4)
-        target_latched = Signal(4)
-        index_latched = Signal(16)
-        target_m_latched = Signal()
-        fault_latched = Signal()
-        fault_type_latched = Signal(5)
-        sub_start = Signal()
-
-        # SWITCH is the isolated-register form of LOAD.  Its only additional
-        # checks are destination class and the destination's accepted M latch.
-        target_valid = Signal()
-        m.d.comb += target_valid.eq(
-            (target_latched >= SWITCH_TGT_CR12) &
-            (target_latched <= SWITCH_TGT_CR15)
-        )
-        boot_cr15_noop = Signal()
-        m.d.comb += boot_cr15_noop.eq(
-            (target_latched == SWITCH_TGT_CR15) &
-            (src_latched == SWITCH_TGT_CR15)
-        )
-
+        m.submodules.load = load = ChurchMLoad(enable_seal_check=True)
+        src = Signal(CAP_REG_LAYOUT)
+        namespace = Signal(CAP_REG_LAYOUT)
+        row = Signal(32)
+        code = Signal(5)
+        armed = Signal()
+        header = Signal(32)
+        metadata_word = Signal(2)
+        allocation_words = Signal(33)
+        candidate = View(CAP_REG_LAYOUT, self.incoming_namespace)
+        sw = View(WORD2_LAYOUT, View(CAP_REG_LAYOUT, src).word2_w2)
+        cw = View(WORD2_LAYOUT, candidate.word2_w2)
+        nw = View(WORD2_LAYOUT, View(CAP_REG_LAYOUT, namespace).word2_w2)
+        # mLoad's historical interface expresses its NS bound in slots.
+        # Adapt this internal input only; architectural CR15 stays word-based.
+        lookup_namespace = Signal(CAP_REG_LAYOUT)
+        lookup = View(CAP_REG_LAYOUT, lookup_namespace)
+        lw = View(WORD2_LAYOUT, lookup.word2_w2)
         m.d.comb += [
-            u_mload.sub_start.eq(sub_start),
-            u_mload.sub_cr_src.eq(src_latched),
-            u_mload.sub_cr_dst.eq(target_latched),
-            u_mload.sub_index.eq(index_latched),
-            u_mload.sub_direct.eq(0),
-            u_mload.sub_direct_gt.eq(0),
-            # Destination M authorises entering this path; it never elevates
-            # source capability checks or Namespace validation.
-            u_mload.sub_m_elevated.eq(0),
-            u_mload.cr_rd_data.eq(self.cr_rd_data),
-            u_mload.cr15_namespace.eq(self.cr15_namespace),
-            u_mload.mem_rd_data.eq(self.mem_rd_data),
-            u_mload.mem_rd_valid.eq(self.mem_rd_valid),
+            lookup_namespace.eq(namespace),
+            lw.limit_offset.eq(nw.limit_offset >> 2),
+            load.sub_index.eq(row), load.sub_validate_only.eq(1),
+            load.cr_rd_data.eq(src), load.cr15_namespace.eq(lookup_namespace),
+            load.mem_rd_data.eq(self.mem_rd_data),
+            load.mem_rd_valid.eq(self.mem_rd_valid & load.sub_busy),
+            self.mem_addr.eq(load.mem_addr), self.mem_rd_en.eq(load.mem_rd_en),
+            self.m_consume_target.eq(3), self.fault_type.eq(code),
+            allocation_words.eq(Const(1, 33) << (header[23:27] + 13)),
         ]
 
-        m.d.comb += [
-            self.cr_wr_addr.eq(u_mload.cr_wr_addr),
-            self.cr_wr_data.eq(u_mload.cr_wr_data),
-            self.cr_wr_en.eq(u_mload.cr_wr_en),
-            self.mem_addr.eq(u_mload.mem_addr),
-            self.mem_rd_en.eq(u_mload.mem_rd_en),
-            self.thread_wr_en.eq(u_mload.thread_wr_en),
-            self.thread_wr_idx.eq(u_mload.thread_wr_idx),
-            self.thread_wr_data.eq(u_mload.thread_wr_data),
-        ]
+        def fail(kind):
+            m.d.sync += code.eq(kind)
+            m.next = "FAULT"
 
-        m.d.comb += self.cr_rd_addr.eq(u_mload.cr_rd_addr)
-
-        with m.FSM(name="switch") as fsm:
+        with m.FSM() as fsm:
             with m.State("IDLE"):
-                m.d.sync += [fault_latched.eq(0), fault_type_latched.eq(FaultType.NONE)]
+                m.d.comb += self.cr_rd_addr.eq(self.cr_src)
                 with m.If(self.switch_start):
                     m.d.sync += [
-                        src_latched.eq(self.cr_src),
-                        target_latched.eq(self.target),
-                        index_latched.eq(self.index),
-                        target_m_latched.eq(self.target_m),
+                        src.eq(self.cr_rd_data), namespace.eq(self.cr15_namespace),
+                        row.eq(self.index), armed.eq(0), code.eq(0),
+                        self.accepted_nia.eq(self.nia_current),
+                        self.accepted_flags.eq(self.flags_in),
                     ]
-                    m.next = "CHECK_TARGET"
-
-            with m.State("CHECK_TARGET"):
-                with m.If(~target_valid):
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.INVALID_OP)]
-                    m.next = "IDLE"
+                    with m.If((self.target != 0) | (self.cr_src > 11)):
+                        fail(FaultType.INVALID_OP)
+                    with m.Elif(~self.target_m):
+                        fail(FaultType.PERM_L)
+                    with m.Else():
+                        m.next = "SOURCE"
+            with m.State("SOURCE"):
+                # Reject before mLoad narrows the physical address.
+                with m.If((row > sw.limit_offset) |
+                          ((View(CAP_REG_LAYOUT, src).word1_location +
+                            (row << 2) + 3) > 0xFFFFFFFF)):
+                    fail(FaultType.BOUNDS)
                 with m.Else():
-                    m.next = "CHECK_SRC"
-
-            with m.State("CHECK_SRC"):
-                # The exact CR15/CR15 encoding is a temporary guarded Boot
-                # placeholder. It advances without inventing a GT or touching
-                # register/memory state.
-                with m.If(boot_cr15_noop):
-                    m.next = "NOOP_COMPLETE"
-                with m.Elif(src_latched > 11):
-                    m.d.sync += [
-                        fault_latched.eq(1),
-                        fault_type_latched.eq(FaultType.INVALID_OP),
-                    ]
-                    m.next = "IDLE"
+                    m.next = "LOAD"
+            with m.State("LOAD"):
+                m.d.comb += load.sub_start.eq(1)
+                m.next = "WAIT"
+            with m.State("WAIT"):
+                with m.If(load.sub_fault):
+                    fail(load.sub_fault_type)
+                with m.Elif(load.sub_done):
+                    m.d.sync += self.incoming_namespace.eq(load.resolved_cap)
+                    m.next = "CANDIDATE"
+            with m.State("CANDIDATE"):
+                with m.If((candidate.word0_gt.gt_type != 1) |
+                          (candidate.word0_gt.slot_id == 0) |
+                          cw.f_flag | (candidate.word1_location[:2] != 0) |
+                          (cw.limit_offset < 11) | (cw.limit_offset[:2] != 3) |
+                          ((candidate.word1_location + (cw.limit_offset << 2) + 3) >
+                           0xFFFFFFFF)):
+                    fail(FaultType.BOUNDS)
                 with m.Else():
-                    m.next = "CHECK_DEST_M"
-
-            with m.State("CHECK_DEST_M"):
-                with m.If(~target_m_latched):
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(FaultType.PERM_L)]
-                    m.next = "IDLE"
+                    m.next = "HEADER"
+            with m.State("HEADER"):
+                m.d.comb += [self.mem_rd_en.eq(1),
+                             self.mem_addr.eq(candidate.word1_location)]
+                m.d.sync += armed.eq(1)
+                with m.If(armed & self.mem_rd_valid):
+                    m.d.sync += [armed.eq(0), header.eq(self.mem_rd_data)]
+                    # Ascending slot-0 metadata: magic, Namespace type,
+                    # table count N, zero cc, supported allocation exponent.
+                    with m.If((self.mem_rd_data[27:32] != 31) |
+                              (self.mem_rd_data[8:10] != 1) |
+                              (self.mem_rd_data[:8] != 0) |
+                              (self.mem_rd_data[23:27] > 9) |
+                              ((self.mem_rd_data[10:23] << 2) != cw.limit_offset + 1)):
+                        fail(FaultType.BOUNDS)
+                    with m.Else():
+                        m.next = "GEOMETRY"
+            with m.State("GEOMETRY"):
+                with m.If((cw.limit_offset >= allocation_words) |
+                          ((candidate.word1_location + (allocation_words << 2)) >
+                           0x100000000)):
+                    fail(FaultType.BOUNDS)
                 with m.Else():
-                    m.next = "START_SUB"
-
-            with m.State("NOOP_COMPLETE"):
+                    m.d.sync += metadata_word.eq(1)
+                    m.next = "METADATA"
+            with m.State("METADATA"):
+                m.d.comb += [
+                    self.mem_rd_en.eq(1),
+                    self.mem_addr.eq(candidate.word1_location + (metadata_word << 2)),
+                ]
+                m.d.sync += armed.eq(1)
+                with m.If(armed & self.mem_rd_valid):
+                    m.d.sync += armed.eq(0)
+                    with m.If(((metadata_word == 1) &
+                               (self.mem_rd_data != candidate.word1_location)) |
+                              ((metadata_word == 2) &
+                               (self.mem_rd_data >= header[10:23])) |
+                              ((metadata_word == 3) & (self.mem_rd_data != 0))):
+                        fail(FaultType.BOUNDS)
+                    with m.Elif(metadata_word == 3):
+                        m.next = "HANDOFF"
+                    with m.Else():
+                        m.d.sync += metadata_word.eq(metadata_word + 1)
+            with m.State("HANDOFF"):
+                m.d.comb += self.handoff_start.eq(1)
+                m.next = "TRANSITION"
+            with m.State("TRANSITION"):
+                with m.If(self.handoff_fault):
+                    # Shared CHANGE already reports the hard fault to core;
+                    # do not manufacture a second retirement one cycle later.
+                    m.next = "IDLE"
+                with m.Elif(self.handoff_done):
+                    m.d.comb += [self.switch_complete.eq(1), self.m_consume_en.eq(1)]
+                    m.next = "IDLE"
+            with m.State("FAULT"):
+                m.d.comb += self.switch_fault.eq(1)
                 m.next = "IDLE"
-
-            with m.State("START_SUB"):
-                m.d.comb += sub_start.eq(1)
-                m.next = "WAIT_ACK"
-
-            with m.State("WAIT_ACK"):
-                m.d.comb += sub_start.eq(1)
-                with m.If(u_mload.sub_busy):
-                    m.next = "CALL_SUB"
-
-            with m.State("CALL_SUB"):
-                with m.If(u_mload.sub_fault):
-                    m.d.sync += [fault_latched.eq(1), fault_type_latched.eq(u_mload.sub_fault_type)]
-                with m.If(u_mload.sub_done | u_mload.sub_fault):
-                    m.next = "IDLE"
-
-        m.d.comb += [
-            self.switch_busy.eq(~fsm.ongoing("IDLE")),
-            self.switch_complete.eq(
-                fsm.ongoing("NOOP_COMPLETE") |
-                (fsm.ongoing("CALL_SUB") & u_mload.sub_done)
-            ),
-            self.m_consume_en.eq(fsm.ongoing("CALL_SUB") & u_mload.sub_done),
-            self.m_consume_target.eq(target_latched - SWITCH_TGT_CR12),
-            self.switch_fault.eq(fault_latched),
-            self.fault_type.eq(fault_type_latched),
-        ]
-
+        m.d.comb += self.switch_busy.eq(~fsm.ongoing("IDLE"))
         return m

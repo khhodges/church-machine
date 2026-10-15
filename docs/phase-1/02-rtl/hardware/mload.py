@@ -69,6 +69,8 @@ class ChurchMLoad(Elaboratable):
 
         self.ns_entry_addr_out = Signal(32)
         self.resolved_base = Signal(32)
+        # Also available on validate-only completion; no architectural write.
+        self.resolved_cap = Signal(CAP_REG_LAYOUT)
         self.gbit_reset_done = Signal()
 
         self.thread_wr_en = Signal()
@@ -175,6 +177,7 @@ class ChurchMLoad(Elaboratable):
         m.d.comb += [
             self.ns_entry_addr_out.eq(u_ns_gate.ns_entry_addr_out),
             self.resolved_base.eq(u_ns_gate.raw_base),
+            self.resolved_cap.eq(result_cap),
         ]
 
         with m.FSM(name="mload") as fsm:

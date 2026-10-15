@@ -6,6 +6,16 @@ description: Constant combinational emission and preserving the elaboration used
 Model simulation success is not evidence that emitted plain Verilog simulates
 identically. Check constant-only combinational blocks with a four-state simulator.
 
+Also run structural RTL conversion when changing acceptance/busy multiplexers.
+Do not select a unit's busy output using its accepted-start signal.
+
+**Why:** Accepted start is qualified by the core's aggregate busy signal.
+Selecting busy with start closes a combinational loop that behavioral simulation
+may settle, while netlist conversion rejects it.
+
+**How to apply:** Keep busy selection registered; acceptance-cycle overrides
+should affect only the operand-read path, not the whole output bundle.
+
 Subsystem mapping evidence must preserve the production clock/reset domain.
 Extract the actual subsystem from the same full-top elaboration rather than
 re-elaborating a standalone replacement with an implicit reset.
