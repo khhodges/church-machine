@@ -559,7 +559,9 @@ attempts must hard-fault.
 **Why:** The user approved the authorization restriction and explicitly added
 “Hard Fault when attempted”.
 
-**How to apply:** Preserve the hard-fault requirement, while keeping recipient
-identification, detection and enforcement software TBD. Do not claim that policy
-alone makes reusable proofs uncopyable or that arbitrary copying is detectable;
-no new ISA mechanism has been approved.
+**How to apply:** Preserve the hard-fault requirement. The user corrected blanket
+detection-TBD wording: “Save GT detects Abstract Passkeys”. SAVE is the identified
+GT-side detection point. Keep Genesis-authorized sharing representation,
+recipient identification and separate proof protection/transfer TBD. Do not
+equate GT detection with arbitrary proof-byte-copy detection or claim physical
+conformance without evidence.

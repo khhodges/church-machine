@@ -261,10 +261,12 @@ TBD; the outline below does not implement the bootstrap procedure.
 
 **Onward sharing — approved:** Require explicit Genesis authorization before a
 holder shares its GT/proof pair onward. Possession alone grants no delegation
-rights. Unauthorized attempts must hard-fault. Recipient identification,
-detection and enforcement remain software TBD. This requirement is not an
-implemented copy detector, does not make reusable proofs uncopyable and selects
-no new ISA mechanism.
+rights. Unauthorized attempts must hard-fault. **SAVE GT detects Abstract
+PassKeys**; the GT-side detection point is therefore identified. Genesis-authorized
+sharing representation, recipient identification and separate proof
+protection/transfer remain TBD. SAVE's GT check is not a claim that arbitrary
+proof-byte copying is detected or that simulator/RTL/physical FPGA conformance
+has been verified.
 
 ```text
 # Mint responsibility; exact callable interface TBD.

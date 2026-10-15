@@ -457,9 +457,12 @@ concrete revocation mechanics.
 **PassKey onward sharing — approved:** A holder may share its GT/proof pair
 onward only with explicit Genesis authorization. Possession of a valid pair
 does not confer delegation rights. Unauthorized onward-sharing attempts must
-hard-fault. Recipient identification, detection and enforcement remain software
-TBD; this policy does not by itself prevent copying a reusable proof or establish
-that arbitrary copying is currently detectable. No new ISA mechanism is selected.
+hard-fault. **SAVE GT detects Abstract PassKeys**; this is the identified
+GT-side detection point, not an entirely unspecified copy detector.
+Representation of Genesis-authorized sharing, recipient identification and
+protection/transfer of the separate 128-bit proof remain TBD. SAVE's GT check
+must not be presented as detection of arbitrary proof-byte copying. Exact
+simulator, RTL and physical FPGA conformance remains to be verified.
 
 **PassKey revocation scope — approved:** Revocation invalidates the PassKey
 GT/proof pair, not object GTs previously issued under its authority. No automatic
