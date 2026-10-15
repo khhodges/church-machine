@@ -464,6 +464,13 @@ protection/transfer of the separate 128-bit proof remain TBD. SAVE's GT check
 must not be presented as detection of arbitrary proof-byte copying. Exact
 simulator, RTL and physical FPGA conformance remains to be verified.
 
+**PassKey format review — not approved:** The proposed bit format remains an
+unapproved draft. The user's correction makes bits 30:27 free for reuse as
+defined by the Owner, not fixed `perm=000, dom=1`. Do not adopt `0x0E000000` as
+a universal PassKey prefix or reserve that combination as its subtype marker.
+See the [format draft](phase-1/MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
+This does not change the approved separate-proof or sharing requirements.
+
 **PassKey revocation scope — approved:** Revocation invalidates the PassKey
 GT/proof pair, not object GTs previously issued under its authority. No automatic
 cascading revocation is required or implied. Previously issued object GTs

@@ -281,6 +281,42 @@ Mint_create_and_share_passkey(request):
     return UNRESOLVED_SUCCESS_WITHOUT_PRIVATE_STATE()
 ```
 
+### Abstract PassKey format — unapproved draft
+
+The user explicitly retained this format as **an unapproved draft**, correcting
+the proposed fixed permission/domain fields: bits **30:28 and 27 are free for
+reuse as defined by the Owner**. They are not fixed to `000` and `1`, respectively,
+and must not be assumed to grant ordinary Inform memory/C-list/execution rights.
+
+| Bits | Draft field | Status |
+|---|---|---|
+| 31 | B=0, ordinary SAVE forbidden | Proposed PassKey assignment; not approved by retaining this draft |
+| 30:27 | Owner-defined four-bit field | User correction; no fixed permission/domain values or subtype marker |
+| 26:25 | `11`, Abstract | Existing Abstract type position; not the historical [24:23] layout |
+| 24:16 | Credential generation | Proposed interpretation; lifecycle/reuse policy unresolved |
+| 15:0 | PassKey ID, not a Namespace slot | Proposed interpretation; identity/binding unresolved |
+
+For illustration only, the revised proposed packing with B=0 is:
+
+```text
+draft_GT = (owner_bits << 27) | 0x06000000
+         | (generation << 16) | passkey_id
+```
+
+Here `owner_bits` is four bits, `generation` nine bits and `passkey_id` sixteen
+bits. This is not an approved encoder or issuance rule. The previous proposed
+`0x0E000000` prefix is not a universal PassKey prefix; it is only the particular
+case `owner_bits=1`. The proposed Church/zero-permission subtype reservation
+is not adopted. SAVE's approved Abstract PassKey detection requirement cannot
+depend on these four bits having those fixed values; the precise distinction
+from other Abstract GTs remains to be specified.
+
+The independent 128-bit proof remains outside the 32-bit GT. The proposed
+trusted-record binding of ID/generation to proof, authorization and revocation
+state remains a draft mechanism. Owner-defined fields do not by themselves
+waive Genesis-authorized issuance/sharing or the unauthorized-sharing hard fault.
+No runtime, saved image or hardware change follows from this draft.
+
 Any Namespace access requiring NSRW-GT remains confined to Mint's same-scope,
 single-slot LAMBDA. This decision does not settle the proof-generation mechanism,
 credential storage, revocation, replay, onward-sharing enforcement or bootstrap

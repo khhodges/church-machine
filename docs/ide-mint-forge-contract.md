@@ -107,6 +107,11 @@ not executable implementations.
   revoker may revoke a PassKey GT/proof pair. Possession of the pair alone
   does not grant revocation authority. Unauthorized revocation attempts
   hard-fault under the existing authorization rule.
+- **Format review — unapproved draft:** Bits 30:27 are free for reuse as defined
+  by the Owner, not fixed permission/domain values. Do not adopt the proposed
+  `0x0E000000` prefix or Church/zero-permission subtype marker. Other proposed
+  field assignments remain unapproved; see the
+  [format draft](phase-1/MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
 - **Initial PassKey issuance — approved:** A separate Genesis-authorized setup
   procedure has Mint create the initial GT/separate-128-bit-proof pairs for
   explicitly approved recipients and permissions. No unauthenticated first-caller

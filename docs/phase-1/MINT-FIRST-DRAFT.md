@@ -163,6 +163,13 @@ it through the LAMBDA; do not introduce a separate service LUMP.
 This does not settle the LAMBDA ABI, capability provisioning, atomicity,
 external-writer exclusion or interruption behavior.
 
+**PassKey format — unapproved draft:** The user retained the
+[format proposal](MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft)
+as unapproved and corrected bits 30:27 to be free for reuse as defined by the
+Owner. Do not fix them to permission `000`/domain `1`, infer ordinary memory
+rights from them, or use `0x0E000000` as a universal PassKey subtype prefix.
+The separate 128-bit proof and Genesis-authorized sharing requirements remain.
+
 - Mint performs authorized creation/replacement and Namespace publication.
 - pkverify verifies the agreed proof/credential contract; token equality alone
   must not be silently substituted for the required separate 128-bit proof.

@@ -565,3 +565,14 @@ GT-side detection point. Keep Genesis-authorized sharing representation,
 recipient identification and separate proof protection/transfer TBD. Do not
 equate GT detection with arbitrary proof-byte-copy detection or claim physical
 conformance without evidence.
+
+The Abstract PassKey bit format remains an unapproved draft. Bits 30:28 and 27
+are free for reuse as defined by the Owner, not fixed permissions/domain.
+
+**Why:** The user explicitly declined format approval and corrected the proposed
+`perm=000, dom=1` interpretation.
+
+**How to apply:** Do not reserve `0x0E000000` as a universal PassKey prefix or
+assume those four bits identify the subtype. Other proposed field meanings
+remain drafts. Preserve SAVE detection, separate proof and Genesis sharing
+requirements without claiming their exact encoding has been approved.
