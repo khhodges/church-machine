@@ -957,9 +957,32 @@ recompilation. This is not permission to delete or automatically rewrite saved
 files. Focused assembler, simulator and Amaranth compact LOAD/SAVE tests now
 pass; this does not certify every instruction or the currently flashed FPGA.
 
-The ordinary DREAD/DWRITE indexed forms already implement register-plus-immediate
-addition within their existing field limits. Immediate-only LOAD/SAVE now uses
-the selected compact field with DR0; it is not an exception to the uniform rule.
+### DREAD/DWRITE common indexed operand — approved for Phase 1
+
+DREAD and DWRITE use the same single-word operand layout as LOAD/SAVE:
+bit 14 is the add/subtract flag, bits 13:4 are the unsigned magnitude 0–1023,
+and bits 3:0 select DR0–DR15. The data DR and base capability CR fields remain
+unchanged. The result is a word offset:
+
+```text
+word_offset = unsigned32(DR[R]) + (S ? -M : M)
+```
+
+DR0 supplies zero for immediate-only offsets; zero magnitude gives register-only
+indexing. The immediate offset range is −1023 through +1023, with a separate
+sign bit, not two's complement. Effective offsets may be larger through a DR,
+subject to non-wrapping arithmetic and normal type, permission and bounds checks.
+Do not truncate or allow a negative/overflowing result to reach memory or MMIO.
+Use the common zero-magnitude canonicalization described above.
+
+This replaces the prior bit-14 immediate-mode selector and its 14-bit
+immediate-only range 0–16383. Bit 14 now means subtraction, not immediate mode.
+Existing DREAD/DWRITE binaries are not assumed compatible; no automatic
+rewriting, migration or legacy decode mode is authorized. The approval selects
+the encoding, not implementation or simulator/RTL/physical conformance.
+
+Immediate-only LOAD/SAVE also uses the selected compact field with DR0;
+it is not an exception to the uniform rule.
 Assembler, simulator and Amaranth must follow the same reconciled encoding.
 This documentation correction does not itself rewrite saved programs,
 Namespace contents or boot images. Existing binaries are not compatibility

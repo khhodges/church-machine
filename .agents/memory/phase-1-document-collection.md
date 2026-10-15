@@ -702,3 +702,13 @@ Distinguish approved encoding from implemented/verified hardware. Do not reopen
 its allocation or silently reinterpret old indexed binaries. Preserve the
 direct-immediate form alongside both new forms; no implementation or migration
 was authorized.
+
+Phase 1 DREAD/DWRITE adopts the common LOAD/SAVE signed-offset operand layout,
+including the ±1023 immediate range; larger effective offsets can come from DRs.
+
+**Why:** The user explicitly approved the common layout after being told it
+replaces the old 14-bit immediate-only range.
+
+**How to apply:** Do not preserve the old immediate-mode meaning of bit 14 or
+silently reinterpret old binaries. Keep checked arithmetic and access validation;
+encoding approval is not implementation, migration or hardware-test approval.

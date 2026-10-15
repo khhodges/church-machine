@@ -7,6 +7,11 @@ catalog. In particular, opcode 8 (ELOADCALL) and opcode 9 (XLOADLAMBDA) are
 retired; their operand layouts and backward-compatibility claims are obsolete.
 Current LOAD/SAVE uses the master's single-word DR-plus-signed-magnitude layout,
 not the baseline immediate-only field or the experimental IDX1 packet format.
+Phase 1 DREAD/DWRITE is now approved to use that same operand layout:
+bit 14 sign, bits 13:4 magnitude, bits 3:0 DR selector. The historical
+DREAD/DWRITE bit-14 immediate-mode interpretation is superseded; see the
+[approved common layout](instruction-set.md#dreaddwrite-common-indexed-operand--approved-for-phase-1).
+This is an encoding decision, not implementation or conformance evidence.
 
 **Authority:** [Church Machine Instruction Set](instruction-set.md) is the master
 ISA document. This supporting encoding record must defer to it.
