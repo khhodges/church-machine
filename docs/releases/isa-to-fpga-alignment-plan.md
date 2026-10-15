@@ -9,17 +9,53 @@ Use the [reconciled Master ISA](../instruction-set.md#approved-phase-1-contract)
 and [Mint contract](../ide-mint-forge-contract.md). Older broad feature lists
 below are inventory, not blanket Phase 1 requirements. No GC; direct CM-to-CM
 and multiple IDEs deferred; two Namespaces/one FPGA networking tests are Phase 2.
-One IDE/several CMs and working Mint/pkverify/controlled nstab are required.
+One IDE/several CMs and working Mint/pkverify/controlled nstab remain software
+delivery scope, not prerequisites for the Phase 1 hardware bitstream.
 Use the ascending 256-slot default and half-FPGA-memory budget; CR13 untouched,
-combined SWITCH, elapsed one-second watchdog, and the approved TPERM changes.
+combined SWITCH, selectable elapsed-time watchdog (0.25/0.5/1/2 seconds,
+initially 1 second with exemption enabled), and the approved TPERM changes.
 No new T encoding, reset word or HARDFAULT machine word is silently selected.
 
-Require simulator, RTL and exact-release-build physical FPGA evidence for
-TPERM NULL/EXACT (NULL/NULL and skips included), HARDFAULT/IDE attribution and
-exclusive Mint publication, **with Genesis override**. Record overrides as
+Require RTL and exact-release-build physical FPGA evidence for the hardware
+contract, including TPERM NULL/EXACT (NULL/NULL and skips included) and the
+non-executable HARDFAULT word. Simulator agreement, IDE attribution and
+exclusive Mint publication remain separate cross-layer/software acceptance,
+not bitstream gates. Retain **Genesis override** as previously scoped. Record overrides as
 overrides, not passed tests; no override is exercised by this plan.
 Record all other pending evidence honestly. This document does not authorize
 source implementation, migration, building, uploading or flashing now.
+
+### Hardware-only acceptance reconciliation
+
+This section supersedes any interpretation of the numbered cross-layer plan
+below that makes compiler, IDE, simulator-feature or service completion a
+prerequisite for the Phase 1 bitstream. Hardware tests may use independently
+checked exact instruction words and controlled fixtures; production software
+delivery is not required to establish their expectations. Test infrastructure
+must still work and its inputs must be validated. Software failures cannot be
+used to waive a hardware mismatch.
+
+| Hardware area | Required evidence for the current contract |
+|---|---|
+| Decode and indexed execution | All three CALL forms; compact LOAD/SAVE, SWITCH and DREAD/DWRITE; indexed BRANCH and BFEXT/BFINS. Check field separation, malformed/retired encodings, DR0 and all index selectors, signs, boundary magnitudes, register overlap, predication, flags and checked arithmetic before effects. |
+| Capability and context enforcement | Required type, permission, generation, integrity and bounds checks; approved 9-bit generation equality without hardware mutation; Namespace geometry; runtime mLoad checks rather than a whole-C-list scan; validated Thread save/load and reserved CR13 behavior. |
+| Boot and handoff | Immutable reset parameters, matching version-pair admission, one-shot marker consumption, slot-2 activation, final CALL CR0 and ending ROM-fetch authority. Include mismatch, replay, failed admission, cold boot and hardware reset. |
+| Watchdog controls and timing | All four selector codes, bootstrap control 0x5, retained controls across hardware reset, fresh intervals, deferred selection changes, atomic exemption exit, INVALID_OP on reserved bits, deadline-equal write rejection, renewal rules, instruction-fault reporting priority and counting through stalls. Measure actual clock/timing tolerance. |
+| Write containment and recovery | At most one accepted program write awaiting completion; no new writes after expiry; protocol-proven bounded completion before validated Thread-save memory use; no retry, partial-instruction completion or rollback. Missing completion must not trigger recovery writes. |
+| Exact hardware artifact | Matching source/ROM/configuration provenance, reset initialization, actual mapped behavior, resource and timing reports, board pin/clock constraints, exact bundle hashes and physical observations tied to the programmed bytes. |
+
+This is an acceptance checklist, not a pass report or an exhaustive replacement
+for the Master ISA. Retain distinct **not run**, **failed**, **passed** and
+explicitly **overridden** outcomes. Field-packing arithmetic and documentation
+checks cannot satisfy RTL, synthesis or physical acceptance.
+Shared arithmetic, immutable configuration and serialized writes are selected
+engineering directions; their resource/timing results remain unmeasured.
+Exact MMIO placement and accepted-write latency still require integration
+evidence, not guessed constants.
+
+Keep build qualification separate from physical qualification: a successfully
+built bundle is not board-tested. Neither this reconciliation nor completion
+of the documentation authorizes implementation, a vendor build or programming.
 
 ## Goal and authority
 
