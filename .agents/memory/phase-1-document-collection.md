@@ -602,3 +602,13 @@ issue and software cannot block the Phase 1 bitstream”.
 readiness. Do not require software-contract closure, service completion or
 reload-path validation before proceeding with bitstream review. Preserve hardware
 ISA/conformance requirements and do not interpret this as build/flash permission.
+
+Phase 1 fault-code assignments are approved: THREAD_CONTEXT=0x1D,
+THREAD_PERMISSIONS=0x1E and WATCHDOG=0x1F, within the existing five-bit field.
+
+**Why:** The user explicitly approved all three proposed hardware assignments.
+
+**How to apply:** Do not reopen their numeric allocation or confuse them with
+instruction opcodes/TPERM operands. Additional trigger conditions and precedence
+were not selected by this approval; implementation and exact-build evidence
+remain separate from the documentation decision.

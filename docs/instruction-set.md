@@ -314,6 +314,20 @@ The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
 delivery gate or passed hardware-conformance claim is introduced here.
 
+### Phase 1 hardware fault-code assignments — approved
+
+| Fault code | Name |
+|---|---|
+| `0x1D` | `THREAD_CONTEXT` |
+| `0x1E` | `THREAD_PERMISSIONS` |
+| `0x1F` | `WATCHDOG` |
+
+These assignments occupy the existing five-bit fault-code field; they are not
+instruction opcodes or TPERM operand encodings. Approval selects the numbers,
+not additional trigger conditions, precedence rules or implementation details.
+Retain already approved fault behavior. Simulator, RTL, telemetry and exact-build
+physical conformance remain to be verified; no runtime change is made here.
+
 ### TPERM NULL and EXACT
 
 | Form | Phase 1 behavior |
@@ -553,7 +567,7 @@ These remain requests for confirmation, not established supersessions.
 | Direct CHANGE encoding | Approved: opcode 4, ordinary condition, bits 22:19 zero, source CRn in 18:15, bits 14:0 zero; destination CR12 implicit. AL CHANGE CR12 = `0x27060000`. No IDX field or migration policy is approved. |
 | Reset boot | Approved marker `0x27000001`: trusted reset ROM only, incoming-only activation of NS[2] into CR12; no additional CR12.M grant. Consume admission on valid acceptance, before activation; only fresh reset re-arms it. ROM fetch authority ends on successful final CALL CR0 transfer. Initial Namespace authority and ordinary M rules are unchanged. |
 | CR13 | Reserved NULL and never touched in Phase 1. Executed CHANGE CR13 or SWITCH targeting CR13 faults INVALID_OP before instruction effects; condition-false instructions skip the CR13 check. Earlier IRQ-swap proposals are superseded. |
-| Other amendment items | Keep their individual proposed/baseline/user-decided status. No blanket approval is implied for transition fault numbers, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
+| Other amendment items | Keep their individual proposed/baseline/user-decided status. The three Phase 1 fault-code assignments are explicitly approved above; no blanket approval is implied for additional trigger conditions, watchdog capture, protected configuration, budgets, derived views, or the complete post-CHANGE register table. |
 
 Namespace handoff and reset entry remain distinct contracts, but both now
 explicitly use slot 2. Neither operation touches CR13, including clearing it.
@@ -617,9 +631,10 @@ remaining detailed boot-entry binding (slot 2, consume-on-acceptance marker,
 no additional CR12.M grant, retained final CALL CR0 and ROM-fetch handoff point
 are settled);
 watchdog memory-backed capture authority; protected configuration interface;
-target timing-source implementation; and the
-proposed `THREAD_CONTEXT` (`0x1D`), `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG`
-(`0x1F`) fault allocations.
+target timing-source implementation. The `THREAD_CONTEXT` (`0x1D`),
+`THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG` (`0x1F`) fault-code assignments
+are approved, not open allocation decisions; additional trigger details and
+implementation evidence remain separate.
 
 Indexed CALL's exact binary-field transcription must be reconciled separately:
 do not copy CHANGE's candidate layout. This is a missing encoding record, not
