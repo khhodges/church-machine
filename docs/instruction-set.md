@@ -302,6 +302,18 @@ must complete strictly before its deadline. Stalls do not extend the interval.
 No automatic IRQ, CR13 action, maintenance exemption or hardware timer ABI is
 introduced by this policy; exact target timing/capture needs implementation evidence.
 
+**Watchdog MMIO authority — approved:** The watchdog register must exist as a
+Genesis-provisioned MMIO GT; the MMIO abstraction is in charge. Do not replace
+this capability-mediated control with an IDE-only hardware-control restriction.
+This does not grant the GT to every Thread or authorize arbitrary watchdog
+writes. Address, register fields, permitted writes and capability distribution
+remain unspecified; retain the approved one-second deadline, Debug/Trace
+exception and CHANGE/SWITCH renewal rules.
+
+The Phase 1 Mint exclusion of MMIO creation does not exclude this
+Genesis-provisioned platform MMIO object. No new slot, register ABI, software
+delivery gate or passed hardware-conformance claim is introduced here.
+
 ### TPERM NULL and EXACT
 
 | Form | Phase 1 behavior |

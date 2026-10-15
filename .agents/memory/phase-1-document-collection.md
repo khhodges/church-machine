@@ -117,6 +117,17 @@ Do not introduce scheduler-only renewal, or claim this guarantees useful progres
 or return to a scheduler. Preserve fresh-second mode exit; broader maintenance
 exemptions must not be inferred. CR13 remains untouched.
 
+The watchdog register must exist as a Genesis-provisioned MMIO GT; the MMIO
+abstraction is in charge, not an IDE-only hardware control.
+
+**Why:** The user corrected the IDE-only proposal and specified that the
+watchdog MMIO GT must exist at Genesis under the MMIO abstraction.
+
+**How to apply:** Do not infer access for all Threads from the user's unfinished
+sentence. Address, fields, permitted writes and GT distribution remain open.
+Preserve the approved timing/renewal rules. Mint's MMIO-creation exclusion does
+not exclude Genesis-provisioned platform MMIO, and software is not a bitstream gate.
+
 Phase 1 gt_seq is 9 bits, values 0–511, for GTs and corresponding Namespace
 descriptors.
 Generation management is exclusively software-controlled. Hardware's generation
