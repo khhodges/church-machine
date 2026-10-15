@@ -149,6 +149,8 @@ They approved ascending selector codes 00/01/10/11 for 0.25/0.5/1/2 seconds,
 making the initial exempt control word 0x00000005.
 They explicitly approved whole-write rejection and hard fault for reserved-bit
 writes, rather than masking invalid bits and partially updating controls.
+They agreed to reuse INVALID_OP (0x0B) for those writes, keeping WATCHDOG (0x1F)
+for timeout expiry rather than malformed control values.
 
 **How to apply:** Do not infer access for all Threads from the user's unfinished
 sentence. Address and GT distribution remain open; selector-code mapping is
@@ -158,8 +160,8 @@ starts a fresh retained-duration interval unless exempt.
 A changed timeout takes effect at
 the next approved timer start/renewal; the current duration/deadline is unchanged.
 Selector writes alone never restart or extend the active interval.
-Reserved-bit writes must not change controls or the active deadline; their fault
-code is still undecided. This does not freeze elapsed time or suppress expiry.
+Reserved-bit writes report INVALID_OP and must not change controls or the active
+deadline. This does not freeze elapsed time or suppress expiry.
 Preserve the approved timing/renewal rules. Mint's MMIO-creation exclusion does
 not exclude Genesis-provisioned platform MMIO, and software is not a bitstream gate.
 

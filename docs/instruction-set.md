@@ -360,7 +360,10 @@ partially apply bits 2:0 or mask away the invalid bits. The rejected write
 does not change exemption, timeout selection, active duration or deadline,
 and does not restart or extend the timer. This is absence of write effects,
 not a freeze of elapsed time or a waiver of independent expiry/fault handling.
-The specific fault-code assignment remains undecided.
+**Fault-code assignment — approved:** Report **INVALID_OP (`0x0B`)** for this
+reserved-bit write rejection. **WATCHDOG (`0x1F`)** remains the timeout-expiry
+code, not the malformed-control-write code. Whole-write rejection and the
+existing same-cycle instruction-fault/expiry precedence remain unchanged.
 
 **Timeout selector across reset — approved:** Hardware reset preserves the
 selected timeout, just as it preserves exemption. It does not preserve elapsed
