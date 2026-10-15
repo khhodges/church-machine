@@ -5,6 +5,17 @@ description: The serialized Namespace Table, not the catalog manifest or loose f
 
 The Namespace Table is the sole authoritative source of LUMPs and their metadata in a bitstream. Truth is ordered as: (1) the Namespace Table, then (2) the assigned slots and LUMPs represented by that table. The manifest is not authoritative for membership, metadata, identity, version, slot, size, or any other property.
 
+The user reaffirmed this specifically for Phase 1 when rejecting manifests as
+competing sources of truth.
+
+**Why:** The user considers the Phase 1 Namespace Table the replacement for
+manifest-based Namespace authority, not one more inventory to reconcile.
+
+**How to apply:** Do not introduce a substitute authoritative manifest. Keep
+referenced LUMP bytes and validation evidence distinct from Namespace inventory;
+a document-package index is bookkeeping, not runtime authority. This does not
+authorize deleting historical evidence or required payload bytes.
+
 Refresh capacity and Refresh Image must follow this same saved-slot authority, never require legacy catalog occupants or recover omitted bodies from the old image.
 
 **Why:** The user explicitly rejected legacy rules after clearing slots left the capacity report demanding Tunnel and Ethernet.
