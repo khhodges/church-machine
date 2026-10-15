@@ -15,8 +15,10 @@ not executable implementations.
 
 - Provide working ide.Mint (NS[9], E), nstab (NS[14], RW) and pkverify
   (NS[15], E). Slot assignment does not itself issue capabilities. The agent
-  owns delivery. Prefer finish-before-bitstream; otherwise demonstrate a
-  validated reloadable-LUMP path. Services must work before release.
+  owns delivery. Software cannot block the Phase 1 bitstream: service completion,
+  unresolved software contracts and reload-path validation are not bitstream
+  gates. Services and a validated delivery path remain software-release
+  requirements, separate from hardware readiness.
 - Automatic IDE-assisted lazy loading is deferred to Phase 2. Phase 1 uses
   explicit IDE-controlled loading before execution. This does not remove the
   validated service-reload delivery option or authorize automatic

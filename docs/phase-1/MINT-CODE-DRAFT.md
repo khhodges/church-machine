@@ -3,6 +3,12 @@
 Status: **review-only algorithm draft, not executable CLOOMC**.
 Written before choosing growth headroom, at the user's request.
 
+**Approved scope boundary:** Software cannot block the Phase 1 bitstream.
+Unresolved contracts in this draft block treating the software as operational,
+not bitstream readiness. The Abstract PassKey Owner-ID/payload format is a
+software issue. Software delivery/acceptance and hardware ISA/conformance remain
+separate; this is not build, upload or flashing authorization.
+
 The subsequent requested **CLOOMC source drafts** are in
 [source-drafts/](source-drafts/README.md). They use actual instruction syntax,
 with undefined labels deliberately blocking compilation of unresolved contracts.

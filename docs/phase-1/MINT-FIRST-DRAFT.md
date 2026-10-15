@@ -20,9 +20,13 @@ proposal sections remain explicitly superseded evidence; software TBDs remain.
 
 The table has 256 slots including metadata slot 0. Existing slot assignments
 stay fixed; actual resident-body placement is a separate layout calculation.
-The agent owns delivery. Prefer completing and validating the services before
-the bitstream build; alternatively demonstrate a reloadable-LUMP path.
-All services must work before Phase 1 is complete.
+The agent owns delivery. **Software cannot block the Phase 1 bitstream.**
+Service completion, unresolved software contracts (including Abstract PassKey
+Owner-ID/payload format) and reload-path validation are not bitstream gates.
+Working services and a validated delivery path remain required for completion
+of the software-inclusive Phase 1 release, separate from hardware readiness.
+This supersedes the earlier finish-before-bitstream/validated-reload-first
+sequencing; it does not waive hardware acceptance or authorize hardware work.
 
 **No GC in Phase 1.** The PP250 garbage-to-NULL suggestion is withdrawn.
 Phase 2 hardware G-bit inversion requires the system GC-enable setting to be

@@ -580,3 +580,14 @@ assume those four bits identify the subtype. Owner-ID allocation, reservations,
 scope and reuse remain unresolved; do not assume all 16 encodings are usable.
 Preserve SAVE detection, separate proof and Genesis sharing
 requirements without claiming their exact encoding has been approved.
+
+Software cannot block the Phase 1 bitstream. The Abstract PassKey Owner-ID
+and Owner-defined payload format are software issues, not bitstream gates.
+
+**Why:** The user explicitly corrected the review scope: “This is a software
+issue and software cannot block the Phase 1 bitstream”.
+
+**How to apply:** Keep software delivery and acceptance separate from hardware
+readiness. Do not require software-contract closure, service completion or
+reload-path validation before proceeding with bitstream review. Preserve hardware
+ISA/conformance requirements and do not interpret this as build/flash permission.

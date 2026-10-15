@@ -39,6 +39,14 @@ compiler, simulator, RTL, saved images or physical board already conform.
 Only approved decisions are incorporated; software TBDs are not implementation
 defaults. No build, migration, upload or flash is authorized by this edit.
 
+**Software/bitstream boundary — approved:** Software cannot block the Phase 1
+bitstream. Abstract PassKey Owner-ID/payload format and remaining software
+contracts are software work, not bitstream prerequisites. Keep required software
+delivery and its acceptance separate from hardware readiness; do not turn
+unresolved software details or reload-path validation into a bitstream gate.
+This does not waive hardware ISA/conformance requirements, claim tests passed,
+or authorize a build or flash.
+
 ### Execution and watchdog
 
 ```text
@@ -383,9 +391,10 @@ an execution-triggered request/install/continue path for nonresident LUMPs.
 This does not remove the required services or the separately validated
 service-reload delivery option below, and does not waive admission checks.
 
-Working Mint, pkverify and controlled nstab are required, preferably completed
-before bitstream build; alternatively a validated reloadable-LUMP path, never
-unfinished services at release. The [Mint contract](ide-mint-forge-contract.md)
+Working Mint, pkverify and controlled nstab remain software-delivery requirements.
+Their completion and the validated reloadable-LUMP delivery path do not block
+the Phase 1 bitstream; do not confuse bitstream readiness with completion of the
+software-inclusive release. The [Mint contract](ide-mint-forge-contract.md)
 governs the approved scope, single-slot LAMBDA, proof and publication boundaries.
 
 **Mint object scope — approved:** Phase 1 supports application Abstractions,

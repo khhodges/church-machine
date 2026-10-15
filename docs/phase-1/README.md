@@ -2,6 +2,12 @@
 
 **Start with the [Master ISA](../instruction-set.md).**
 
+**Review boundary:** Software cannot block the Phase 1 bitstream. Keep software
+TBDs, including the Abstract PassKey Owner-ID/payload format, separate from
+hardware readiness. Software delivery remains required but is not a bitstream
+prerequisite; hardware conformance is not waived. See the
+[resolution log](REVIEW-2026-10-14.md#resolution-log--guided-review).
+
 Latest collection review: [conflicts and missing information — 2026-10-14](REVIEW-2026-10-14.md).
 
 Approved decisions have now been reconciled into the
