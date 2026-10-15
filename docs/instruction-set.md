@@ -380,6 +380,16 @@ or longer. Writing the selector alone neither restarts nor extends that interval
 At the next start/renewal, use the then-current selection for the full new
 interval. Preserve existing renewal events and expiry-at-equality precedence.
 
+**Exemption write at the deadline — approved:** If a valid write enabling
+exemption would take effect on the same clock edge as watchdog expiry, expiry
+wins. Reject the entire control write, leaving exemption and timeout selection
+unchanged, and latch the watchdog fault. An exemption write must take effect
+strictly before the deadline to prevent expiry; issuing a request earlier does
+not itself establish that it took effect. Preserve deadline containment.
+The existing same-cycle instruction-fault reporting priority remains unchanged:
+if an instruction fault also occurs, report that fault rather than WATCHDOG,
+without allowing the exemption write or suppressing watchdog containment.
+
 The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
 delivery gate or passed hardware-conformance claim is introduced here.
