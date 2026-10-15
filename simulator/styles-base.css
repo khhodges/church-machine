@@ -18,6 +18,14 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Wide-screen touch IDE: suppress browser pull-to-refresh at the viewport
+   boundary, without cancelling touch events or disabling panel scrolling. */
+@media (min-width: 1024px) {
+    html, body {
+        overscroll-behavior-y: none;
+    }
+}
+
 body {
     font-family: 'Segoe UI', system-ui, sans-serif;
     background: var(--bg-dark);
