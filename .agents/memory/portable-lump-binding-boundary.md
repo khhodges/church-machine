@@ -3,6 +3,20 @@ name: Portable LUMP binding boundary
 description: Security boundary between portable unresolved artifacts and destination-local capability materialization.
 ---
 
+## Simulator binding lifecycle
+
+Resolve declared dot-names afresh on every simulator load or restart; never
+assume existing destination GTs are still correct. Run, Step and Walk must not
+trigger rebinding or change the established bindings.
+
+**Why:** The user explicitly rejected reuse of old bindings, then confirmed
+that continuation controls must preserve them.
+
+**How to apply:** Validate fresh destination bindings before execution and show
+one movable, staggered overlapping inspection window per C-list, all together.
+Show actual binding results, not inferred labels. Namespace edits during execution
+must not silently relink the session; they apply at the next load or restart.
+
 Canonical portable LUMPs must contain symbolic Self and unresolved dependency
 rows. Local slots, sequences, and GTs are permitted only in a destination copy
 after exact N, T, actual-byte full hash, identity hash, authorization, rights,
