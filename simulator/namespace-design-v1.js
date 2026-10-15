@@ -9,6 +9,14 @@
         projection:null, error:'', dirty:false};
     const endpoint = '/api/namespace/design-v1';
     state.profile = 'ascending';
+    const profileKey = 'church_namespace_design_profile';
+    try {
+        const saved = root.localStorage.getItem(profileKey);
+        if (['ascending','phase1','legacy'].includes(saved)) {
+            state.active = saved !== 'legacy';
+            if (state.active) state.profile = saved;
+        }
+    } catch (_) { /* Storage may be unavailable; keep the default view usable. */ }
     const drafts = {};
     const slotCount = () => state.document.slotCount || 64;
     const metadata = () => [(0xf8800100 | (slotCount() << 10)) >>> 0, 0, state.document.rows.length - 1, 0];
@@ -48,12 +56,16 @@
                 projection:null, error:'', dirty:false, loading:false, saving:false},
                 {profile:value, active:true});
         }
+        try { root.localStorage.setItem(profileKey, value); }
+        catch (_) { state.error = 'Browser storage is unavailable; this layout choice cannot survive a restart.'; }
         const legacy = document.getElementById('bootCapacityPanel');
         if (legacy) legacy.hidden = state.active;
         root.updateNamespace();
     }
     function changed() { state.dirty=true; state.error=''; render(); }
     function render() {
+        const selector = document.getElementById('namespaceDesignProfile');
+        if (selector) selector.value = state.active ? state.profile : 'legacy';
         if (!state.active) return;
         const host = document.getElementById('namespaceTable');
         if (!host) return;
@@ -89,7 +101,7 @@
             const current=!state.dirty && projection && projection.policy===r.policy && projection.name===r.name;
             const location=r.kind==='namespace'?0:r.kind==='mmio'?r.address:current?projection.location:null;
             const limit=r.kind==='namespace'?slotCount()*4-1:r.kind==='mmio'?r.limit:current?projection.limit:null;
-            const select=r.kind==='lump'?`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`:
+            const select=r.kind==='lump'?(state.profile==='phase1'?'<span class="ns-fixed-policy">Resident</span>':`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`):
                 `<span class="ns-fixed-policy">${r.kind==='mmio'?'Resident I/O register':r.kind==='thread'?'Resident · Thread':'Bootstrap'}</span>`;
             const clear=r.kind==='lump'&&!r.boot?`<button class="btn btn-xs" onclick="NamespaceDesignV1.clear(${slot})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;">Clear</button>`:'';
             const selection=r.selection||{};
@@ -125,6 +137,7 @@
     }
     function policy(slot,value) {
         if(state.saving) return;
+        if(state.profile==='phase1' && value!=='Resident') return;
         const row=state.document.rows.find(r=>r.slot===slot);
         if(row && row.kind==='lump' && ['Lazy','Resident'].includes(value)) {row.policy=value;changed();}
     }
@@ -139,7 +152,7 @@
         }
         const picker=document.getElementById('_nsAddSelect');
         const record=picker && (root._nsAddAvailableList||[])[picker.selectedIndex-1];
-        const row={slot,name,kind:'lump',policy:'Lazy',sequence:0};
+        const row={slot,name,kind:'lump',policy:state.profile==='phase1'?'Resident':'Lazy',sequence:0};
         if(record) row.selection={token:record.token,filename:record.filename,
             binaryHash:record.binary_hash,revision:record.lump_version};
         state.document.rows.push(row);changed();
@@ -235,13 +248,13 @@
             `<label>Saved LUMP (optional)<select id="nsDraftLump" style="width:100%"><option value="">Unfinished / name only</option></select></label>
             <p><label>Pet name <input id="nsDraftName" maxlength="128" value="${esc(original?original.name:'')}" style="width:100%"></label></p>
             <p><label>Slot <input id="nsDraftSlot" type="number" min="3" max="${slotCount()-1}" value="${original?original.slot:preferred||free||''}"></label></p>
-            <p><label>Policy <select id="nsDraftPolicy"><option>Lazy</option><option>Resident</option></select></label></p>
+            <p><label>Policy <select id="nsDraftPolicy" ${state.profile==='phase1'?'disabled':''}>${state.profile==='phase1'?'':'<option>Lazy</option>'}<option>Resident</option></select></label></p>
             <p><label><input id="nsDraftBoot" type="checkbox" ${original&&original.boot?'checked':''}> Boot target in this design</label></p>
             <p>Unfinished entries are allowed. Placement does not grant execution authority.</p>
             <p id="nsDraftError" role="alert"></p><button class="btn" id="nsDraftApply">${original?'Apply changes':'Add to Namespace (design)'}</button> `);
         const name=overlay.querySelector('#nsDraftName'), slotEl=overlay.querySelector('#nsDraftSlot');
         const policy=overlay.querySelector('#nsDraftPolicy'), picker=overlay.querySelector('#nsDraftLump');
-        policy.value=original?original.policy:'Lazy';
+        policy.value=state.profile==='phase1'?'Resident':original?original.policy:'Lazy';
         let selected=original && original.selection;
         let records=[];
         picker.onchange=()=>{
@@ -262,7 +275,7 @@
             if(original && next!==original.slot) {
                 error.textContent='Clear and add a separate design placement to change its slot; existing bindings are not rewritten.'; return;
             }
-            const row={slot:next,name:value,kind:'lump',policy:policy.value,sequence:original?original.sequence:0};
+            const row={slot:next,name:value,kind:'lump',policy:state.profile==='phase1'?'Resident':policy.value,sequence:original?original.sequence:0};
             if(selected) row.selection=clone(selected);
             const boot=overlay.querySelector('#nsDraftBoot').checked;
             if(original && original.boot && !boot) {

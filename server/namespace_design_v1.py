@@ -74,7 +74,7 @@ def phase1_seed():
     document.update(format=PHASE1_FORMAT, slotCount=256)
     for slot, name in [(9, "ide.Mint"), (14, "nstab"), (15, "pkverify")]:
         document["rows"].append(dict(slot=slot, name=name, kind="lump",
-                                     policy="Lazy", sequence=0))
+                                     policy="Resident", sequence=0))
     document["rows"].sort(key=lambda row: row["slot"])
     return document
 
@@ -115,6 +115,8 @@ def validate(document):
             raise ValueError("Invalid member kind")
         if row.get("policy") not in ("Resident", "Lazy", "Hardware"):
             raise ValueError("Invalid load policy")
+        if phase1 and kind == "lump" and row["policy"] != "Resident":
+            raise ValueError("Phase 1 LUMPs must be Resident; Lazy placements are not allowed")
         if kind != "lump" and row["policy"] != ("Hardware" if kind == "mmio" else "Resident"):
             raise ValueError("Architectural objects retain their residency")
         if kind == "thread" and row.get("words") != 256:

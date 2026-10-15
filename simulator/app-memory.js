@@ -5237,7 +5237,9 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
     // Approved fields are presentation hints only; Namespace owns placement.
     const displayMetadata = approvedMetadata || {};
     const bootResident  = !!(displayMetadata.boot_resident);
-    const loadPolicyDefault = ['Resident', 'Preload', 'Lazy'].includes(
+    const phase1Design = window.NamespaceDesignV1?.state.active &&
+        window.NamespaceDesignV1.state.profile === 'phase1';
+    const loadPolicyDefault = phase1Design ? 'Resident' : ['Resident', 'Preload', 'Lazy'].includes(
         displayMetadata.loadPolicy || displayMetadata.load_policy)
         ? (displayMetadata.loadPolicy || displayMetadata.load_policy)
         : (bootResident ? 'Resident' : 'Lazy');
@@ -5295,10 +5297,10 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
                 <div>
                     <span style="${sLabel}">Load Policy</span>
-                    <select id="_nsLoadPolicy" style="${sSelect}" title="The IDE derives transport, capacity, hash, and Namespace metadata.">
+                    <select id="_nsLoadPolicy" ${phase1Design ? 'disabled' : ''} style="${sSelect}" title="The IDE derives transport, capacity, hash, and Namespace metadata.">
                         <option value="Resident" ${loadPolicyDefault === 'Resident' ? 'selected' : ''}>Resident</option>
-                        <option value="Preload" ${loadPolicyDefault === 'Preload' ? 'selected' : ''}>Preload</option>
-                        <option value="Lazy" ${loadPolicyDefault === 'Lazy' ? 'selected' : ''}>Lazy load</option>
+                        ${phase1Design ? '' : `<option value="Preload" ${loadPolicyDefault === 'Preload' ? 'selected' : ''}>Preload</option>
+                        <option value="Lazy" ${loadPolicyDefault === 'Lazy' ? 'selected' : ''}>Lazy load</option>`}
                     </select>
                     <div style="color:#6b7280;font-size:0.68rem;margin-top:3px;">Empty is available from an installed Namespace row.</div>
                 </div>

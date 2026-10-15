@@ -27,7 +27,7 @@ def test_separate_persistence_and_high_slot(tmp_path):
     r = new.read()
     d = copy.deepcopy(r["document"])
     d["rows"].append(dict(slot=255, name="ide.Future", kind="lump",
-                          policy="Lazy", sequence=0))
+                          policy="Resident", sequence=0))
     saved = new.save(dict(fingerprint=r["fingerprint"], document=d))
     assert new.read()["document"] == d
     assert saved["persisted"]
@@ -51,3 +51,23 @@ def test_capacity_is_configurable_and_old_geometry_stays(tmp_path):
         d["slotCount"] = bad
         with pytest.raises(ValueError):
             validate(d)
+
+
+def test_phase1_rejects_lazy_and_recovers_named_slots(tmp_path):
+    live = tmp_path / "ns-state.json"
+    live.write_text('{"abstractions":[]}')
+    store = DesignStore(tmp_path / "phase1.json", tmp_path, live, phase1=True)
+    response = store.read()
+    document = response["document"]
+    assert all(r["policy"] == "Resident" for r in document["rows"] if r["kind"] == "lump")
+    for slot, name in [(16, "ide.Alace"), (17, "ide.Mallory")]:
+        document["rows"].append(dict(slot=slot, name=name, kind="lump",
+                                    policy="Resident", sequence=0))
+    store.save(dict(fingerprint=response["fingerprint"], document=document))
+    reopened = DesignStore(tmp_path / "phase1.json", tmp_path, live, phase1=True).read()
+    assert reopened["persisted"]
+    assert reopened["document"] == document
+    document["rows"][-1]["policy"] = "Lazy"
+    with pytest.raises(ValueError, match="must be Resident"):
+        store.save(dict(fingerprint=reopened["fingerprint"], document=document))
+    assert store.read() == reopened

@@ -15,6 +15,15 @@ and 17: “everything in phase 1 is RESIDENT.”
 unfinished named entries. Residency intent does not supply missing artifact
 bytes or authorize installation. Keep hardware I/O descriptor semantics intact.
 
+Remember the selected Namespace design across IDE restarts in the same browser.
+
+**Why:** The user explicitly required persistent layout selection after losing
+track of Phase 1 entries on reload.
+
+**How to apply:** Restore the selected profile independently of saved design
+content; remembering a view must not save drafts, alter installed images, or
+authorize hardware operations.
+
 Keep the active Phase 1 reading path short: Master ISA plus hardware acceptance;
 keep expanded rationale, old plans and proposals outside the active folder.
 
