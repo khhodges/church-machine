@@ -23,6 +23,17 @@ to authority, ISA behavior, compatibility or hardware scope; do not invent
 user approval or claim implementation evidence. Delegation does not authorize
 runtime changes, builds or flashing in this documentation-only review.
 
+Prefer immutable bitstream parameters for protected bootstrap configuration,
+not a new runtime-writable register bank or unlock protocol.
+
+**Why:** Under the user's delegated simplest-FPGA-design instruction, this
+avoids an additional mutable authority path while preserving approved boot
+guards and one-shot reset admission.
+
+**How to apply:** Keep the watchdog's separately authorized control writable.
+Treat exact placement/wiring and physical verification as outstanding evidence,
+not repeated architectural approval questions or permission to build/flash.
+
 **Why:** The user explicitly requested one place for the related documents after
 the Master ISA reconciliation. Scattered review editions had made their status
 and relationships difficult to follow.

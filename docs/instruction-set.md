@@ -36,8 +36,9 @@ override these corrections or establish a new encoding layout.
 [resolution log](phase-1/REVIEW-2026-10-14.md#resolution-log--guided-review)
 is the decision evidence. These are target requirements, not claims that the
 compiler, simulator, RTL, saved images or physical board already conform.
-Only approved decisions are incorporated; software TBDs are not implementation
-defaults. No build, migration, upload or flash is authorized by this edit.
+Explicit approvals and routine FPGA choices made under delegated engineering
+discretion are distinguished below; software TBDs are not implementation defaults.
+No build, migration, upload or flash is authorized by this edit.
 
 **Software/bitstream boundary — approved:** Software cannot block the Phase 1
 bitstream. Abstract PassKey Owner-ID/payload format and remaining software
@@ -775,14 +776,38 @@ Before releasing a separately approved encoding or boot change:
 conformance checks and exact-image/board acceptance are **NOT RUN**. No new
 encoding, saved-image migration, ROM build, or hardware operation is certified.
 
-### Open authority and platform decisions
+### Hardware configuration and remaining evidence
 
-The following remain visible approval blockers rather than implied defaults:
-remaining detailed boot-entry binding (slot 2, consume-on-acceptance marker,
-no additional CR12.M grant, retained final CALL CR0 and ROM-fetch handoff point
-are settled);
-protected configuration interface;
-target timing-source implementation. The `THREAD_CONTEXT` (`0x1D`),
+**Protected bootstrap configuration — selected under delegated FPGA-design
+discretion:** Encode the trusted reset-ROM bounds, authorized marker instruction
+address and expected boot-version pair as immutable elaboration-time parameters
+in the bitstream. Do not add runtime-writable configuration registers, an unlock
+sequence or an MMIO path that changes these values. Derive the marker address
+from the matching ROM build rather than maintaining an unrelated hand-entered
+address. Check at elaboration that the authorized marker address is aligned and
+inside the designated reset ROM and that the expected version halves are within
+the approved 0–510 range. Configuration changes require the corresponding
+rebuilt bitstream; ordinary machine reset does not change these parameters.
+
+Retain the existing one-shot admission, slot-2 entry binding, CR12/CR15
+destinations, absence of an extra CR12.M grant, final CALL CR0 and ROM-fetch
+handoff point. Immutability does not replace runtime capability, version, type
+or Thread-context checks. This selects protection of bootstrap configuration,
+not a new boot authority or a new rule for when the approved guard changes.
+The capability-controlled watchdog word remains separately writable under its
+approved contract; immutable bootstrap parameters do not make it read-only.
+
+The previous generic “protected configuration interface” approval blocker is
+resolved by this engineering selection. Exact ROM placement, parameter values
+and wiring still need implementation verification, not guessed addresses.
+The fixed ungated timing-source direction is selected above; actual frequency,
+counter implementation, accepted-write completion bound and exact-build evidence
+remain outstanding. Watchdog MMIO address integration and provisioning must
+remain explicit; software capability-distribution mechanics are not a bitstream
+approval gate. Do not mistake these remaining evidence/integration needs for
+new permission to implement, build or flash.
+
+The `THREAD_CONTEXT` (`0x1D`),
 `THREAD_PERMISSIONS` (`0x1E`) and `WATCHDOG` (`0x1F`) fault-code assignments
 are approved, not open allocation decisions; additional trigger details and
 implementation evidence remain separate.
