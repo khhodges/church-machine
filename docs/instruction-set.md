@@ -717,14 +717,25 @@ Compute row and runtime method selector independently as the selected DR value
 plus/minus its immediate magnitude. DR0 supports immediate-only indexing.
 Latch both DR inputs before CALL changes registers; arithmetic must not wrap
 or truncate. Retain bounds, mLoad and CALL authority/entry checks.
-Bit 18 distinguishes this form from direct CALL, which retains target CR at
+Bit 18 distinguishes this form from direct-immediate CALL, which retains target CR at
 [22:19], required-zero [18:15] and immediate method selector at [14:0].
 The old indexed A=0/B=6 encoding is not valid under this new layout; no silent
 reinterpretation, migration or compatibility mode is authorized.
 
-See the [approved encoding record](phase-1/CALL-SINGLE-WORD-DRAFT.md).
-The indexed C-list format is settled; direct CALL's DR-based method indexing
-remains a separate gap. Never use multiword instruction proposals.
+**Direct CALL runtime-method extension — approved for Phase 1:** Opcode 2
+at [31:27], condition [26:23], target CR [22:19], mode tag `001` at [18:16],
+method-index DR [15:12], subtract flag bit 11 and unsigned immediate magnitude
+[10:0] (0–2047). Compute the runtime method selector as DR plus/minus magnitude;
+any DR0–DR15 may be selected. Capture the target GT and DR input before CALL
+changes register state. Retain checked non-wrapping arithmetic, method bounds
+and CALL validation. The immediate is sign-and-magnitude, not two's complement.
+
+The three forms are distinct: indexed C-list has bit 18=1; direct runtime has
+[18:16]=001; direct-immediate retains [18:15]=0000 and its 15-bit selector.
+The old indexed A=0/B=6 tag is 011 and remains invalid. See the
+[approved encoding record](phase-1/CALL-SINGLE-WORD-DRAFT.md).
+The direct-CALL runtime-method encoding gap is now resolved. Never use
+multiword instruction proposals.
 Approval does not claim implementation or simulator/RTL/physical conformance.
 GT-layout completeness is a separate track; this amendment does not select
 or alter a Golden Token bit layout.

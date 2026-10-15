@@ -41,9 +41,9 @@ CALL changes register state. Retain mLoad and CALL authority/entry validation.
 Method here is the runtime selector, not a source-level ordinal plus one.
 No new fault priority or method-table semantics is selected by this encoding.
 
-## Direct CALL separation
+## Direct-immediate CALL — retained
 
-Existing direct CALL remains:
+Existing direct-immediate CALL remains:
 
 | Bits | Meaning |
 |---|---|
@@ -53,15 +53,45 @@ Existing direct CALL remains:
 | 18:15 | Required zero |
 | 14:0 | Immediate method selector |
 
-Bit 18 therefore distinguishes the approved indexed form from valid direct
-CALL without losing any target CR values. In direct mode, bits 17:15 must
-still be zero. This approval covers the C-list form only; direct CALL's
-DR-based method indexing is not solved by retaining its existing format.
-Do not claim complete uniform-indexed-CALL conformance from this approval.
+## Direct CALL with runtime method index — Phase 1 approved
+
+| Bits | Width | Meaning |
+|---|---:|---|
+| 31:27 | 5 | CALL opcode 2 |
+| 26:23 | 4 | Condition |
+| 22:19 | 4 | Target CR |
+| 18:16 | 3 | Mode tag `001` |
+| 15:12 | 4 | Method-index DR selector |
+| 11 | 1 | Subtract flag |
+| 10:0 | 11 | Immediate magnitude, 0–2047 |
+
+```text
+method = DR[selected_register] +/- immediate_magnitude
+CALL target_CR, method
+```
+
+Any DR0–DR15 is selectable; DR0 supplies zero. Capture the target GT and DR
+input before CALL changes registers. Retain checked non-wrapping arithmetic,
+method bounds and CALL validation. The magnitude is unsigned, with a separate
+subtract flag, not an 11-bit two's-complement immediate. Its width limits the
+offset, not the effective method selector. The existing direct-immediate form
+retains its 15-bit selector.
+
+## Combined decode separation
+
+| Discriminator | Form |
+|---|---|
+| Bit 18 = 1 | Indexed C-list CALL, implicit CR6 |
+| Bits 18:16 = `001` | Direct CALL with DR-based method selector |
+| Bits 18:15 = `0000` | Existing direct-immediate CALL |
+
+Thus the runtime direct extension does not overlap either previously approved
+form or reduce the target-CR range. Required-zero fields of direct-immediate
+CALL remain required zero; they do not apply to the runtime-direct form.
 
 The previous indexed form (A=0, B=6) has bit 18=0 but nonzero bits 17:15.
-It is not the approved form and is invalid under this encoding's direct-mode
-rule. Do not silently reinterpret old indexed binaries. No migration, rewriting
+Its [18:16] tag is `011`, so it matches none of these forms and remains invalid.
+Do not silently reinterpret old indexed binaries. No migration, rewriting
 or compatibility mode is authorized.
 
 ## Worked example
@@ -78,8 +108,10 @@ simulator/RTL/FPGA conformance.
 
 ## Decision boundary
 
-Genesis explicitly approved this single-word format for Phase 1. The bit
-allocation, mode discriminator and decode rules above are selected.
+Genesis explicitly approved the indexed C-list format and subsequently the
+single-word direct runtime-method extension for Phase 1. Their bit allocations,
+mode discriminators and decode rules above are selected. This closes the
+previous direct-CALL runtime-method encoding gap, not implementation verification.
 Arithmetic field-packing checks do not establish assembler, simulator, RTL or
 exact-build physical conformance; those remain outstanding. No implementation,
 artifact migration, build, upload, flashing or GitHub push is authorized.

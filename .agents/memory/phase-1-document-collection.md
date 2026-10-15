@@ -689,14 +689,16 @@ semantics. Simulator pre-scan behavior is not a hardware requirement.
 
 Never propose multiword instructions for this review. Indexed CALL must reclaim
 zero/fixed fields within one 32-bit word. Genesis approved the revised indexed
-C-list CALL layout for Phase 1; direct CALL's runtime-method indexing remains
-a separate gap.
+C-list CALL layout and subsequent direct-CALL runtime-method extension for
+Phase 1; the previously recorded direct-method encoding gap is resolved.
 
 **Why:** The user explicitly rejected the multiword alternative and requested
 a better single-word encoding using the existing unused fields, then explicitly
-approved the resulting proposal for Phase 1.
+approved the resulting proposal and then its single-word direct-CALL extension
+for Phase 1.
 
 **How to apply:** Keep IDX1 as historical evidence, not an option to revive.
 Distinguish approved encoding from implemented/verified hardware. Do not reopen
 its allocation or silently reinterpret old indexed binaries. Preserve the
-direct-CALL indexing gap; no implementation or migration was authorized.
+direct-immediate form alongside both new forms; no implementation or migration
+was authorized.
