@@ -41,15 +41,15 @@ implementation plans, review evidence and referenced reading material.
 There are no symbolic links to documents outside the folder. Reading links
 resolve inside this collection, so it can be copied independently.
 
-`manifest.json` retains the original 45-document inventory and source paths.
-`package-index.json` records the copied files and their source fingerprints
+There is no active collection manifest. The checker inspects actual files
+and reading links directly. `package-index.json` is historical copy provenance
+only, not an authoritative current inventory. It records source fingerprints
 before link rewriting. The original audit snapshot and repository originals
 remain untouched; local navigation changes are not changes to historical claims.
 
 Use this folder for the Phase 1 checkpoint. Subsequent Phase 1 decision edits
 must update these local documents explicitly; they no longer follow changes to
-repository originals automatically. Do not rerun the initial packager over
-later local decisions.
+repository originals automatically.
 
 See [unavailable historical sources](UNAVAILABLE-SOURCES.md) for the one missing
 referenced PDF. Its absence is disclosed, not silently replaced with another file.
@@ -139,10 +139,10 @@ historical editions and original review snapshot remain unchanged.
 
 ## Maintaining this folder
 
-Add related Phase 1 documents to the appropriate section, add their source and
-collection path to `manifest.json`, and create a relative symbolic link.
-Do not copy a specification into a second independently maintained master.
-Keep manifests alongside their frozen review editions.
+Add related Phase 1 documents as local files in the appropriate section and
+link them from this README. Do not create symlinks or a replacement inventory
+manifest. Historical review metadata stays alongside its frozen review editions;
+it does not govern current membership, Namespace contents or hardware readiness.
 
 Check the collection with:
 

@@ -1,65 +1,36 @@
 #!/usr/bin/env python3
-"""Check the single-source Phase 1 collection without modifying originals."""
-import json
-import os
-import re
+"""Check actual Phase 1 files and links, without an inventory manifest."""
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
-from package_phase_1_documents import links
+from phase_1_document_links import links
+
+
+def check(folder):
+    folder = Path(folder).resolve()
+    assert (folder / "README.md").is_file(), "Missing collection entry point"
+    assert (folder / "01-isa/instruction-set.md").is_file(), "Missing Master ISA"
+    count = checked = 0
+    for file in folder.rglob("*"):
+        assert not file.is_symlink(), f"Non-portable symlink: {file}"
+        if not file.is_file():
+            continue
+        count += 1
+        if file.suffix.lower() not in (".md", ".html", ".htm"):
+            continue
+        for _, href in links(file.read_text()):
+            parsed = urlsplit(href.strip("<>"))
+            if parsed.scheme or parsed.netloc or not parsed.path:
+                continue
+            target = (file.parent / unquote(parsed.path)).resolve()
+            assert target.is_relative_to(folder), f"Link escapes package: {file}: {href}"
+            assert target.is_file(), f"Missing link target: {file}: {href}"
+            checked += 1
+    return count, checked
 
 
 def main():
-    root = Path(__file__).resolve().parents[1]
-    folder = root / "docs" / "phase-1"
-    manifest = json.loads((folder / "manifest.json").read_text())
-    entries = manifest["documents"]
-    assert entries[0] == [manifest["entrypoint"], "docs/instruction-set.md"]
-    if manifest.get("storage") == "local-copies":
-        paths = set()
-        records = json.loads((folder / "package-index.json").read_text())
-        for record in records:
-            name = record["path"]
-            assert name not in paths, f"Duplicate packaged path: {name}"
-            paths.add(name)
-            assert (folder / name).is_file(), f"Missing packaged file: {name}"
-        assert {name for name, _ in entries} <= paths
-        checked = 0
-        for file in folder.rglob("*"):
-            assert not file.is_symlink(), f"Non-portable symlink: {file}"
-            if not file.is_file() or file.suffix.lower() not in (".md", ".html", ".htm"):
-                continue
-            for _, href in links(file.read_text()):
-                parsed = urlsplit(href.strip("<>"))
-                if parsed.scheme or parsed.netloc or not parsed.path:
-                    continue
-                target = (file.parent / unquote(parsed.path)).resolve()
-                assert target.is_relative_to(folder), f"Link escapes package: {file}: {href}"
-                assert target.is_file(), f"Missing link target: {file}: {href}"
-                checked += 1
-        print(f"PASS Phase 1: {len(paths)} local files, {checked} local links, no symlinks or escaping links")
-        return
-    names, sources = set(), set()
-    for name, source in entries:
-        assert name not in names, f"Duplicate collection path: {name}"
-        assert source not in sources, f"Duplicate source: {source}"
-        names.add(name)
-        sources.add(source)
-        link, target = folder / name, root / source
-        assert link.is_symlink(), f"Expected a single-source link: {link}"
-        assert not os.path.isabs(os.readlink(link)), f"Non-portable link: {link}"
-        assert target.is_file(), f"Missing source: {source}"
-        assert link.resolve() == target.resolve(), f"Wrong source: {link}"
-        assert link.read_bytes() == target.read_bytes(), f"Content differs: {link}"
-    actual = {str(p.relative_to(folder)) for p in folder.rglob("*") if p.is_symlink()}
-    assert actual == names, f"Uncatalogued links: {actual ^ names}"
-    readme = (folder / "README.md").read_text()
-    linked_sources = set()
-    for href in re.findall(r"\]\(([^)]+)\)", readme):
-        target = (folder / href.split("#", 1)[0]).resolve()
-        assert target.is_file(), f"Broken index link: {href}"
-        linked_sources.add(target)
-    assert { (root / s).resolve() for s in sources } <= linked_sources, "Index omits a source"
-    print(f"PASS Phase 1: {len(entries)} single-source files, ISA first, all index links valid")
+    count, checked = check(Path(__file__).resolve().parents[1] / "docs/phase-1")
+    print(f"PASS Phase 1: {count} actual files, {checked} local links, no symlinks or escaping links")
 
 
 if __name__ == "__main__":

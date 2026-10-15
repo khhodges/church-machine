@@ -16,6 +16,9 @@ Phase 1 so nothing depends on documents outside that folder.
 repository originals no longer update it automatically. Keep originals and
 audit evidence intact, record copy provenance, and disclose unavailable source
 material rather than substituting unrelated documents or claiming completeness.
+The user also explicitly removed the active Phase 1 document manifest. Validate
+actual files and local links, not an alternative inventory; retained historical
+copy/review metadata is evidence only and must not become a replacement authority.
 
 Apply explicit approvals and routine FPGA engineering choices made under the
 user's delegated discretion when reconciling active specifications; distinguish
