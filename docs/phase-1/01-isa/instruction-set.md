@@ -8,7 +8,7 @@
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
 - [Uniform indexed operands](#uniform-indexed-operands)
-- [SWITCH: isolated-register LOAD](#switch-isolated-register-load)
+- [SWITCH: combined Namespace/Thread handoff](#switch-isolated-register-load)
 - [Retired opcodes and reference forms](#retired-opcodes-and-directindirect-reference-forms)
 - [Historical evidence and inventory](../05-review-history/instruction-set-history.md)
 - [Legacy section links](#historical-section-links)
@@ -19,6 +19,15 @@ This is the **master ISA document**. Its requirements take precedence over
 `isa_reference.md`, `isa_encoding.md`, the `isa-indexed-*` proposals, derived
 PDFs and implementation descriptions. Those documents support this master;
 assembler, simulator or hardware behavior does not override it.
+
+**Namespace authority:** The Namespace Table alone determines membership,
+slots and descriptors. A manifest cannot allocate, select or override its
+contents. Referenced LUMP bytes and validation evidence remain required;
+they are not competing inventories.
+
+**Current work authorization:** See the [Phase 1 entry point](../README.md#current-work).
+Statements below that an individual approval did not authorize implementation
+describe that decision's original scope, not the current work authorization.
 
 The previously approved retirement of **ELOADCALL (opcode 8)** and
 **XLOADLAMBDA (opcode 9)** remains in force. Descriptions of those encodings
@@ -832,6 +841,8 @@ Watchdog memory-backed capture authority is also settled: use the validated
 Thread-save path, without an unrestricted RAM-write bypass. Its implementation
 and verification remain outstanding, not a new authority decision.
 
+<a id="approved-call-encodings"></a>
+
 **Indexed C-list CALL encoding — Genesis approved for Phase 1:** Use one
 32-bit word, implicit CR6, and the following fields:
 
@@ -976,15 +987,12 @@ the approved Thread-context versus operand-permission fault mapping.
 
 This is distinct from validation of the executable Enter GT in a saved
 continuation frame. Do not transfer that frame's E-permission requirement to
-the permissionless Thread GT supplied to CHANGE. The proposed M-gated hidden
-IRQ return is also a separate operation, not an added prerequisite for general
-programmatic CHANGE.
+the permissionless Thread GT supplied to CHANGE.
 
-Loading a GT into CR12–CR14 with SWITCH and activating its Thread with CHANGE
-are distinct operations. The Namespace-targeting `SWITCH CR15` defined below
-is the explicit exception: its outgoing save and incoming activation are part
-of that single instruction. `CHANGE CR13` is a programmatic use of the GT in
-CR13; it must not be interpreted as installing an interrupt-handler GT into CR13.
+In Phase 1, CHANGE activates the supplied Thread into CR12. SWITCH performs
+outgoing Thread save, Namespace load into CR15 and incoming Thread activation
+into CR12 as one instruction. CR13 is reserved and untouched; executed
+CHANGE CR13 faults INVALID_OP. Earlier isolated-register/IRQ forms are historical.
 
 ### Boot exception
 
@@ -1273,7 +1281,10 @@ rebinding is part of this contract. Invalid authority or geometry hard-faults.
 This is the new architectural layout, not an in-place migration of saved
 Namespace images, catalogs, resident LUMPs, or deployment approvals.
 
-## SWITCH: isolated-register LOAD and Namespace handoff
+<a id="switch-isolated-register-load"></a>
+<a id="switch-isolated-register-load-and-namespace-handoff"></a>
+
+## SWITCH: combined Namespace and Thread handoff
 
 **Approved Phase 1 semantics:** CHANGE is THREADSAVE → THREADLOAD. SWITCH is
 the same halves with LOAD NAMESPACE(CR15) inserted between them. Ordinary CHANGE

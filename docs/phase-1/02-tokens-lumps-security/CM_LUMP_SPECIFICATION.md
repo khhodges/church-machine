@@ -262,6 +262,12 @@ recompilation into the `0xAB` content format (see Freespace Content and Self-Def
 
 ## NS Slot Assignment — Four Categories
 
+**Legacy catalog-storage profile only.** The subsection below, including
+Variant Group, records old manifest conventions. It does not govern Phase 1.
+The Namespace Table alone owns membership, slots and descriptors. Automatic
+IDE-assisted lazy loading is deferred. Keep LUMP byte/format validation;
+do not use this legacy catalog to override the table.
+
 From Release 1.1 the manifest.json schema formally distinguishes four categories
 of lump by how they receive a Namespace (NS) slot.
 

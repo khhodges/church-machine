@@ -12,11 +12,9 @@ starting geometry, slot 2 reset/handoff, UART 8, Mint 9, nstab 14, pkverify 15,
 and half the FPGA memory. CR13 stays NULL and untouched. CHANGE saves/loads
 a Thread; SWITCH inserts the Namespace load between the same halves.
 
-The execution watchdog is one elapsed second except IDE Debug/Trace; only a
-successful CHANGE/SWITCH renews it, **not instruction retirement or CALL/RETURN**.
-Arm at execution start after reset; leaving exempt modes starts a fresh second;
-expiry wins at equality. The later retirement-renewal watchdog description is
-superseded for Phase 1, not a second active watchdog policy.
+For watchdog duration, controls and renewal, use the
+[Master ISA watchdog contract](instruction-set.md#execution-and-watchdog).
+Older fixed-duration or retirement-renewal descriptions below are historical.
 
 No GC in Phase 1. Hardware never increments generations. One IDE managing
 several CMs is required; direct CM-to-CM and multiple IDEs are deferred. Older

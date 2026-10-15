@@ -6,6 +6,16 @@ description: User-requested ISA-first organization and single-source preservatio
 Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
+Keep the active Phase 1 reading path short: Master ISA plus hardware acceptance;
+put expanded rationale, old plans and proposals in linked reference/history.
+
+**Why:** The user explicitly requested less text, KISS and quicker understanding
+when approving the consistency audit's simplifications.
+
+**How to apply:** Remove duplicated normative summaries rather than multiplying
+overrides. Preserve approved details and historical evidence, but do not make
+readers reconcile old and new rules to understand current hardware requirements.
+
 The user superseded the symlink/single-source collection design: Phase 1 must
 contain real local copies and internal reading links so it can stand alone.
 

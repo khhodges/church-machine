@@ -13,11 +13,11 @@
 
 > **EVIDENCE BOUNDARY:** This draft mixes normative design and implementation
 > audit notes. “Unforgeability” is not a cryptographic guarantee: shipped
-> `integrity32` is public, linear, and unkeyed. Current source and executable
-> tests outrank design claims in this document.
+> `integrity32` is public, linear, and unkeyed. Source and tests demonstrate
+> implementation behavior, not authority over the approved Master ISA.
 
-*Supersedes the GT sections of `golden-tokens.md` v2.0, `abstract-gt.md` v1.0,
-and the GT description in `cloomc-foundation.md` §2.*
+*Historical draft supersession claim only:* this draft proposed replacing
+GT descriptions in earlier documents. It does not supersede the Phase 1 ISA.
 
 ---
 
@@ -27,8 +27,8 @@ Every field below carries a **source tag** naming where the claim comes from:
 
 | Tag | Meaning |
 |---|---|
-| **[SIM]** | `createGT()` / `parseGT()` in `simulator.js` — executable, therefore authoritative for behaviour |
-| **[HDL]** | `ctmm_cap_amaranth/` — executable, therefore authoritative for silicon |
+| **[SIM]** | Observed simulator behavior, not normative ISA authority |
+| **[HDL]** | Hardware source behavior; physical conformance requires separate evidence |
 | **[GT]** | `golden-tokens.md` v2.0 |
 | **[AB]** | `abstract-gt.md` v1.0 |
 | **[FND]** | `cloomc-foundation.md` v1.2 |

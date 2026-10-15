@@ -1,5 +1,18 @@
 # Phase 1 folder consistency audit
 
+## Correction status
+
+The user approved KISS simplification. Findings 1–7 have been addressed:
+authority claims corrected, obsolete active CHANGE/SWITCH text replaced,
+watchdog overview linked to the master, manifest-based allocation labelled
+legacy, hardware acceptance separated from software delivery, authorization
+centralized in the README, and the primary reading path reduced to two documents.
+The old release plan, expanded reading index and CALL approval record remain
+available as references/history. The missing historical PDF remains disclosed.
+
+The findings below describe the **pre-correction audit**; their line numbers
+refer to that version. They are retained as evidence, not new unresolved choices.
+
 ## Verdict and scope
 
 **The folder is navigable but is not yet a clean, contradiction-free hardware
@@ -155,5 +168,6 @@ self-contained and maintain local copies explicitly.
 4. Recheck links and targeted contract contradictions. Report executed hardware
    evidence separately; a clean document audit is not RTL or FPGA acceptance.
 
-These are proposals. This audit did not alter architecture, reconcile the
-identified passages, change RTL, build a bitstream or program hardware.
+The original audit proposed these changes; the correction status above records
+the subsequent approved document cleanup. No architecture, RTL, bitstream or
+physical hardware was changed by that cleanup.

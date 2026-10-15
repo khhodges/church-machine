@@ -13,10 +13,8 @@
 > whose location/control is TBD; hardware never increments generation.
 > integrity32 remains ROL32(W0,7) XOR ROL32(W1 & 0x3FFFFFFF,13) XOR 0xDEADBEEF.
 
-Authoritative implementation source: `hardware/layouts.py`
-This document is the single canonical description of every wire-level format used
-by the Church Machine and the IDE. Where any other document conflicts with this
-one, this document takes precedence.
+Implementation reference: `hardware/layouts.py`. This document describes an
+older format profile. Neither it nor the implementation overrides the Master ISA.
 
 ★ marks every field changed from v1.x
 
