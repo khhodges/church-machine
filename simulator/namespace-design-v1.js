@@ -123,7 +123,7 @@
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
         saveButton.textContent='Bind Namespace Design';
-        saveButton.title='Currently saves the design only. Runtime GT binding and binding windows are not implemented yet.';
+        saveButton.title='Save this design and show fresh C-list binding results. Does not activate or change a running image.';
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
         host.querySelector('#nsSaveLayoutNote').textContent=state.error ||
@@ -311,7 +311,16 @@
                 state.error='IDE node was not saved. Namespace design save stopped; your edits are retained.';
                 return;
             }
-            accept(await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)}));
+            const result = await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)});
+            accept(result);
+            if (result.bindingReport && root.NamespaceBindingWindows) {
+                root.NamespaceBindingWindows.show(result.bindingReport);
+                if (result.bindingReport.status !== 'complete') {
+                    state.error='Design saved. Binding is blocked; see the C-list windows for the exact reasons. No runtime image was changed.';
+                }
+            } else {
+                state.error='Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.';
+            }
         }
         catch(e) { state.error=e.message+
             ' Check the IDE node status above: its save is separate and may already have completed. '+

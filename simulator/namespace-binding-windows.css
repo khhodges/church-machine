@@ -1,0 +1,23 @@
+.nsbw-layer{position:fixed;inset:0;pointer-events:none;z-index:9000;overflow:auto}
+.nsbw-bar{position:fixed;right:8px;bottom:8px;pointer-events:auto;display:flex;gap:6px;align-items:center;background:#1e2430;color:#d6dde8;border:1px solid #3a4558;border-radius:4px;padding:4px 8px;font:12px/1.3 system-ui,sans-serif;z-index:100000;max-width:calc(100vw - 16px);flex-wrap:wrap}
+.nsbw-bar strong{color:#f0c674}
+.nsbw-bar code{font-family:ui-monospace,Consolas,monospace;color:#8fbcbb}
+.nsbw-btn{background:#2b3444;color:#d6dde8;border:1px solid #475369;border-radius:3px;padding:2px 8px;font:inherit;cursor:pointer}
+.nsbw-btn:hover,.nsbw-btn:focus-visible{background:#36435a;outline:1px solid #6aa0d8}
+.nsbw-win{position:absolute;pointer-events:auto;width:min(560px,calc(100vw - 24px));max-height:min(60vh,calc(100vh - 80px));display:flex;flex-direction:column;background:#161b24;color:#d6dde8;border:1px solid #3a4558;border-radius:4px;box-shadow:0 6px 18px rgba(0,0,0,.5);font:12px/1.35 system-ui,sans-serif}
+.nsbw-win.nsbw-front{border-color:#6aa0d8}
+.nsbw-win:focus-visible{outline:2px solid #6aa0d8}
+.nsbw-title{display:flex;align-items:center;gap:6px;padding:4px 6px;background:#232b39;border-bottom:1px solid #3a4558;cursor:move;touch-action:none;user-select:none;border-radius:4px 4px 0 0}
+.nsbw-front .nsbw-title{background:#2a3a52}
+.nsbw-title h2{flex:1;min-width:0;margin:0;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nsbw-badge{font-size:10px;padding:0 5px;border-radius:3px;text-transform:uppercase}
+.nsbw-bound{background:#24412e;color:#a3d9a5}
+.nsbw-blocked{background:#4a2326;color:#f0a0a0}
+.nsbw-body{overflow:auto;padding:6px}
+.nsbw-reason{color:#f0a0a0;margin:0 0 6px}
+.nsbw-meta{color:#8a96aa;margin:0 0 6px}
+.nsbw-table{border-collapse:collapse;width:100%;font-family:ui-monospace,Consolas,monospace;font-size:11px}
+.nsbw-table th,.nsbw-table td{border-bottom:1px solid #2a3240;padding:2px 4px;text-align:left;vertical-align:top}
+.nsbw-table th{color:#8a96aa;font-weight:normal;position:sticky;top:-6px;background:#161b24}
+.nsbw-table tr.nsbw-row-blocked td{color:#f0a0a0}
+.nsbw-unres{color:#e0a060;font-style:italic}

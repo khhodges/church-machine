@@ -256,6 +256,8 @@ class DesignStore:
             # All validation precedes the atomic save. Projection is advisory;
             # missing unfinished implementations do not prohibit design saves.
             response = self.response(document)
+            from server.namespace_binding_report import binding_report
+            response["bindingReport"] = binding_report(document, self.lumps, response["fingerprint"])
             fd, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".namespace-design-")
             try:
                 with os.fdopen(fd, "w") as out:
