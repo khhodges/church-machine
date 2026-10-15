@@ -1066,6 +1066,31 @@ checks apply to the resulting access or target. Arithmetic overflow, underflow
 and out-of-range indices must not wrap into a permitted access. Reject before
 an unauthorized read, write or control transfer.
 
+### Indexed arithmetic implementation direction
+
+**Selected under delegated simplest-FPGA-design discretion:** Share one widened
+index add/subtract datapath per core across the approved indexed forms.
+Sequence calculations internally where needed rather than duplicating arithmetic
+for simultaneous operands. Capture all required operand values before an
+instruction changes registers, including overlapping source/destination/index
+registers. Indexed CALL computes its row and method separately from those
+captured inputs; subsequent internal steps must not reread changed registers.
+
+Retain sufficient intermediate width through offset calculation, word-to-byte
+scaling and address addition to detect overflow/underflow before narrowing.
+Prove widths against the input ranges; do not discard carry/sign bits and then
+apply bounds to the truncated value. Each instruction retains its own units,
+type/permission/bounds checks and flag effects. A negative BRANCH displacement
+is allowed when its final target is valid; a negative memory index is not.
+Index arithmetic must not independently commit arithmetic flags.
+
+This is shared implementation machinery, not a unified operand encoding or
+validation policy. All approved one-word formats and observable instruction
+semantics remain unchanged. Additional internal cycles do not authorize
+extension words, interruptible partial retirement, or watchdog suspension.
+Actual resource use, cycle counts and timing require implementation evidence;
+no synthesis improvement or RTL conformance is claimed.
+
 ### Compact indexed LOAD/SAVE operand
 
 The selected LOAD/SAVE encoding keeps one 32-bit instruction and reduces the

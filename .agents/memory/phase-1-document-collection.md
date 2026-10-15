@@ -46,6 +46,16 @@ its write edge must prove completion. Never invent a latency bound from a tied
 done signal. If bounded completion cannot be established, keep recovery writes
 blocked rather than claim a successful save.
 
+Prefer shared checked indexing arithmetic with internal sequencing over
+duplicated parallel index units, while preserving all approved ISA semantics.
+
+**Why:** The user delegated routine FPGA choices in favor of the simplest
+design; sharing arithmetic is the selected direction, not a measured resource win.
+
+**How to apply:** Capture operands before register mutation and preserve wide
+intermediates until validation. Do not unify instruction-specific bounds/flags,
+add extension words, or pause the watchdog to accommodate internal cycles.
+
 **Why:** The user explicitly requested one place for the related documents after
 the Master ISA reconciliation. Scattered review editions had made their status
 and relationships difficult to follow.
