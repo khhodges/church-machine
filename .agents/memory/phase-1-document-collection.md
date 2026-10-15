@@ -6,6 +6,15 @@ description: User-requested ISA-first organization and single-source preservatio
 Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
+Phase 1 Namespace design is entirely RESIDENT; no Lazy placements.
+
+**Why:** The user explicitly corrected the proposed Lazy restoration of slots 16
+and 17: “everything in phase 1 is RESIDENT.”
+
+**How to apply:** Apply Resident intent to Phase 1 LUMP placements, including
+unfinished named entries. Residency intent does not supply missing artifact
+bytes or authorize installation. Keep hardware I/O descriptor semantics intact.
+
 Keep the active Phase 1 reading path short: Master ISA plus hardware acceptance;
 keep expanded rationale, old plans and proposals outside the active folder.
 
