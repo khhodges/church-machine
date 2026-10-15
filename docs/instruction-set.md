@@ -302,6 +302,14 @@ must complete strictly before its deadline. Stalls do not extend the interval.
 No automatic IRQ, CR13 action, maintenance exemption or hardware timer ABI is
 introduced by this policy; exact target timing/capture needs implementation evidence.
 
+**Watchdog exemption across reset — approved:** Hardware reset preserves the
+existing Debug/Trace exemption rather than clearing it. An active exemption
+therefore remains active across reset; reset does not create an exemption
+when none was active. The MMIO abstraction remains in control. Leaving both
+exempt modes starts a fresh one-second interval under the existing rule.
+This is reset retention, not a selected power-on initialization value or a
+promise of persistence across power loss or FPGA reconfiguration.
+
 **Watchdog MMIO authority — approved:** The watchdog register must exist as a
 Genesis-provisioned MMIO GT; the MMIO abstraction is in charge. Do not replace
 this capability-mediated control with an IDE-only hardware-control restriction.

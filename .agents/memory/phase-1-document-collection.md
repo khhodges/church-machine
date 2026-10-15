@@ -102,6 +102,8 @@ including self-transfers and helper-Thread transfers; renewal is not restricted
 to scheduler handoffs.
 When normal execution resumes with neither IDE Debug nor IDE Trace active,
 start a fresh second rather than restoring a partially spent interval.
+Hardware reset preserves the existing Debug/Trace exemption; it does not clear
+an active exemption or create one when none was active.
 
 **Why:** The user selected bounded turns and explicitly fixed “ONE second to
 Hard Fault unless in IDE debug or IDE Trace mode.” They then explicitly selected
@@ -111,11 +113,15 @@ They approved arming when execution starts after reset (including boot, except
 in the exempt IDE modes), elapsed-time rather than instruction-count timing,
 and expiry winning at exactly one second. A transfer must complete strictly
 before the deadline to renew it.
+The user subsequently selected preserving the exemption across hardware reset,
+not the offered clear-on-reset recommendation.
 
 **How to apply:** Preserve the duration, exceptions and transfer-based renewal.
 Do not introduce scheduler-only renewal, or claim this guarantees useful progress
 or return to a scheduler. Preserve fresh-second mode exit; broader maintenance
 exemptions must not be inferred. CR13 remains untouched.
+Reset retention does not select a power-on value or promise persistence through
+power loss or FPGA reconfiguration. The MMIO abstraction remains in control.
 
 The watchdog register must exist as a Genesis-provisioned MMIO GT; the MMIO
 abstraction is in charge, not an IDE-only hardware control.
