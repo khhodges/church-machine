@@ -259,6 +259,13 @@ and Destroy still require valid, operation/target-authorized PassKeys. Setup
 mechanics, authorization representation and protected delivery remain software
 TBD; the outline below does not implement the bootstrap procedure.
 
+**Onward sharing — approved:** Require explicit Genesis authorization before a
+holder shares its GT/proof pair onward. Possession alone grants no delegation
+rights. Unauthorized attempts must hard-fault. Recipient identification,
+detection and enforcement remain software TBD. This requirement is not an
+implemented copy detector, does not make reusable proofs uncopyable and selects
+no new ISA mechanism.
+
 ```text
 # Mint responsibility; exact callable interface TBD.
 Mint_create_and_share_passkey(request):
@@ -274,7 +281,8 @@ Mint_create_and_share_passkey(request):
 
 Any Namespace access requiring NSRW-GT remains confined to Mint's same-scope,
 single-slot LAMBDA. This decision does not settle the proof-generation mechanism,
-credential storage, revocation, replay, onward sharing or bootstrap mechanics.
+credential storage, revocation, replay, onward-sharing enforcement or bootstrap
+mechanics.
 It does not equate the passkey-GT with NSRW-GT or grant the recipient table RW.
 
 ```text

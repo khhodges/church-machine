@@ -454,6 +454,13 @@ revoked or otherwise invalid credentials hard-fault. This does not provide
 one-time-use replay protection or select proof storage, transfer, ABI or
 concrete revocation mechanics.
 
+**PassKey onward sharing — approved:** A holder may share its GT/proof pair
+onward only with explicit Genesis authorization. Possession of a valid pair
+does not confer delegation rights. Unauthorized onward-sharing attempts must
+hard-fault. Recipient identification, detection and enforcement remain software
+TBD; this policy does not by itself prevent copying a reusable proof or establish
+that arbitrary copying is currently detectable. No new ISA mechanism is selected.
+
 **PassKey revocation scope — approved:** Revocation invalidates the PassKey
 GT/proof pair, not object GTs previously issued under its authority. No automatic
 cascading revocation is required or implied. Previously issued object GTs

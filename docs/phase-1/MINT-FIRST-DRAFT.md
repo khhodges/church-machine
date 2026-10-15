@@ -148,6 +148,13 @@ first-caller shortcut. Ordinary Create, Replace and Destroy still require valid,
 operation/target-authorized PassKeys. The setup mechanism, authorization
 representation and protected delivery remain software TBD.
 
+**Onward sharing — approved:** A holder may share its GT/proof pair onward only
+with explicit Genesis authorization. Possession alone grants no delegation
+rights. Unauthorized onward-sharing attempts must hard-fault. Recipient
+identification, detection and enforcement remain software TBD; a policy alone
+does not prevent copying a reusable proof or prove arbitrary copying detectable.
+No new ISA mechanism is selected by this requirement.
+
 **Approved:** Mint uses a **same-scope LAMBDA** as the only code referencing
 `NSRW-GT`, accessing **one Namespace slot at a time**. Surrounding Mint code and
 pkverify do not reference that capability. Route table reads and writes requiring

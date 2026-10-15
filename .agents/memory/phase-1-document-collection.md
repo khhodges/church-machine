@@ -551,3 +551,15 @@ circular dependency on an already-issued PassKey.
 **How to apply:** Ordinary Create, Replace and Destroy retain PassKey checks.
 Keep setup mechanics, authorization representation and protected delivery
 software TBD; do not infer NSRW-GT delegation or unrestricted later issuance.
+
+Onward sharing of a PassKey GT/proof pair requires explicit Genesis
+authorization; possession alone grants no delegation rights. Unauthorized
+attempts must hard-fault.
+
+**Why:** The user approved the authorization restriction and explicitly added
+“Hard Fault when attempted”.
+
+**How to apply:** Preserve the hard-fault requirement, while keeping recipient
+identification, detection and enforcement software TBD. Do not claim that policy
+alone makes reusable proofs uncopyable or that arbitrary copying is detectable;
+no new ISA mechanism has been approved.
