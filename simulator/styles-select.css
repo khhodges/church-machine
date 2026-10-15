@@ -6,7 +6,8 @@
  * selects. Width/layout (width, max-width, flex, margin) is NOT touched,
  * so each select keeps its own sizing. Native arrow is preserved.
  */
-body select {
+body select,
+#namespaceIdeNodeSave {
     color: #e7e7f2 !important;
     background-color: #1a1a2a !important;
     background-image: none;
@@ -23,11 +24,13 @@ body select optgroup {
     color: #e7e7f2;
     background-color: #1a1a2a;
 }
-body select:focus-visible {
+body select:focus-visible,
+#namespaceIdeNodeSave:focus-visible {
     outline: 2px solid #daa520 !important;
     outline-offset: 1px;
 }
-body select:disabled {
+body select:disabled,
+#namespaceIdeNodeSave:disabled {
     opacity: .55;
     cursor: not-allowed;
 }

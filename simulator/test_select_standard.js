@@ -8,4 +8,7 @@ assert(!/body select\s*\{[^}]*max-width/.test(css), 'shared rule must not trunca
 assert(/styles-select\.css\?v=/.test(html), 'index.html must link styles-select.css');
 assert(html.indexOf('styles-select.css') > html.indexOf('styles-tools.css'), 'must load after other sheets');
 assert(/\.programming-target select \{ max-width:185px/.test(html), 'Target keeps its max-width');
+assert(/body select,\s*#namespaceIdeNodeSave\s*\{/.test(css), 'Save IDE node must share the Target control styling');
+assert(/#namespaceIdeNodeSave:focus-visible/.test(css), 'Save IDE node must retain keyboard focus styling');
+assert(/#namespaceIdeNodeSave:disabled/.test(css), 'Save IDE node must retain disabled styling');
 console.log('select standard: ok');
