@@ -46,6 +46,28 @@ hardware readiness.
 - This objective does not authorize builds, flashing, saved-artifact migration,
   or changes to the ISA.
 
+## Additional CM-specific objectives
+
+These supplement, rather than alter or renumber, the supplied workbook.
+All are **Not run in this review**. An existing focused demonstration is not
+a pass for the complete objective. See the
+[CM comparison](CM-W7-explainer.md#7-what-cm-adds-to-the-comparison) for rationale.
+
+| ID | Distinction to demonstrate | Acceptance objective |
+|---|---|---|
+| CM-A | Defined shared tuples per Thread | Multiple authorized methods read/update one defined record across calls and returns; other records are unchanged; another Thread gains no implicit access; stale allocation references are rejected. |
+| CM-B | Protected continuation versus heap data | Authorized heap operations cannot modify protected frames or ownership metadata; a defined self-capture preserves execution ownership and records the specified continuation without CHANGE. Callable capture remains gated on its contract. |
+| CM-C | Retained checkpoints and rollback | Verify one-shot restore, copied checkpoint identity, reset invalidation/retention, and fail-closed interruption. Restore only the declared data scope and never historical ownership/consumption metadata. Gated on checkpoint implementation. |
+| CM-D | Capability-controlled MMIO | Test authorized device access, absent/insufficient authority, invalid bounds and malformed register writes. Rejected operations produce no unauthorized device effect; heap rollback does not replay MMIO. Separate emulator evidence from physical-device evidence. |
+| CM-E | Thread execution ownership | Test distinct-target exclusion, continuous self-target ownership, pause/step preservation, and all indicator writers. Verify saved NIA cannot supply ownership. Gated on running-bit approval and implementation. |
+| CM-F | Hardware watchdog containment | With exemption explicitly disabled, test documented elapsed-time expiry during loops/deep calls and accepted-write completion before protected capture. Test exemption authority separately; do not substitute a caller-return oracle for the specified hard fault. |
+| CM-G | IDE/runtime tuple agreement | Round-trip JSON through the same tuple layout used by callable methods; preserve omitted fields; reject stale confirmations and invalid edits without partial writes or protected-state changes. |
+| CM-H | Exact artifact/build attribution | Attach the actual LUMP/configuration and implementation identities to results; hardware claims identify the tested bitstream and board. Mark differences from simulator-only coverage. |
+
+These objectives establish positive CM properties. They do not require inventing
+a failing W7 baseline or asserting that W7/S48 cannot implement similar
+facilities. A claim of superiority requires a separately justified comparison.
+
 ## Evidence and pass criteria
 
 For each executable objective, record:

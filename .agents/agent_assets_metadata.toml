@@ -1051,28 +1051,28 @@ content_type = "text/markdown"
 id = "Tgi0GFeO07egybEx8r81P"
 uri = "file://docs/phase-1/CM-W7-explainer.md"
 type = "text"
-title = "CM and W7 — Revised Review Explainer"
-description = "Qualified security claims, checkpoint-specific one-shot semantics, and explicit implementation evidence limits."
+title = "CM / W7 — Expanded Architectural Comparison"
+description = "Thread-local shared tuples, protected continuations, proposed checkpoints and rollback, capability-controlled MMIO, watchdog containment, and evidence boundaries."
 logical_id = "dd6896c7-870c-421d-8f11-f929f9093ad1"
-content_hash = "sha256:1da066e008f2b9e228c39e852dec2841e3170026e359b116b10b8fe70ef5f3c6"
-size = 8551
-mtime_ms = 1792172446396
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/dd6896c7-870c-421d-8f11-f929f9093ad1/53b8d6e2-a2fc-4638-9784-2961f56225e1"
-storage_version_token = "1792172463435982"
+content_hash = "sha256:66a6ed2c970f948a2b2b7b3aa5ea8d2d6b9d97bcb477922868c1c81c1caba07a"
+size = 14548
+mtime_ms = 1792180387916
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/dd6896c7-870c-421d-8f11-f929f9093ad1/a01ed047-cd47-42c8-8ffa-b44397ded6cb"
+storage_version_token = "1792180414031021"
 content_type = "text/markdown"
 
 [[outputs]]
 id = "T3FFXpjMf_Ib6JZXcZJcN"
 uri = "file://docs/phase-1/W7-plus-plus-test-objectives.md"
 type = "text"
-title = "Phase 1 — W7++ Test Objectives"
-description = "Scope, evidence requirements, and reconciliation notes for the 15 supplied objectives."
+title = "W7++ — Expanded Test Objectives"
+description = "Eight additional CM-specific acceptance objectives, clearly distinguished from verified results."
 logical_id = "d8102926-d598-45c2-99d8-37ce45446b17"
-content_hash = "sha256:13311009aa923c2a28565b7cae24d4e8c7b465b76f3d804ff582ff3f4abc853c"
-size = 5095
-mtime_ms = 1792180030626
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d8102926-d598-45c2-99d8-37ce45446b17/81bc4144-5673-4980-a543-fe84246d6129"
-storage_version_token = "1792180058984845"
+content_hash = "sha256:10a5587531b5ae9ba0175a94fedf03758b9342d379caa77df831a7a8dbd6f7f3"
+size = 7853
+mtime_ms = 1792180397876
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d8102926-d598-45c2-99d8-37ce45446b17/cd29f238-54d2-4796-8a65-cd7f216cbe9d"
+storage_version_token = "1792180414763276"
 content_type = "text/markdown"
 
 [[outputs]]

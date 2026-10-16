@@ -158,6 +158,110 @@ historical state. Shared checks are desirable where practical, but one literal
 function or hardware path is not required. Equivalent enforcement and absence
 of bypasses must be demonstrated.
 
+## 7. What CM adds to the comparison
+
+The strongest distinction is not simply "hardware rather than software."
+CM makes Thread storage, continuation state, capability checks, device access,
+and failure handling explicit parts of a machine contract that can be tested
+at instruction and memory boundaries.
+
+These are positive CM design commitments. They do not establish that W7 or
+Scheme 48 cannot provide analogous services through a runtime or extension.
+Comparative claims about a particular W7/S48 implementation still need a
+specified version, configuration, and evidence.
+
+### Defined shared tuple memory per Thread
+
+**Phase 1 scope; concrete record demonstration available.** A Thread provides
+an authorized heap in which successive methods can share defined tuple records.
+"Shared" means shared by authorized processing within that Thread, not a
+global heap automatically accessible to other Threads.
+
+The telephony example keeps caller identity, telephone number, routing,
+endpoint, conditions, and call state together. Methods update the same record
+as processing progresses; a return from one method does not by itself end
+the record's lifetime. Each format specifies fields, types, bounds, and layout.
+Allocation ownership and stale-reference handling remain explicit obligations.
+
+The CM distinction is a defined relationship between tuple storage, Thread
+lifetime, and machine-enforced heap authority—not a claim that Scheme lacks
+records or mutable shared data. The proposed Thread interface generalizes the
+example; it is not yet evidence that every generic tuple operation is complete.
+
+### Protected continuation separate from application data
+
+**Architectural structure; service contract still under review.** The protected
+continuation frame and the live Thread indicator are distinct from ordinary
+heap tuples. Amobea/Thread methods are intended to encapsulate capture and
+restore while machine permissions enforce the boundary.
+
+The Thread structure supports continuation saving without requiring a Thread
+switch. The callable save contract must define its capture boundary and resume
+point; a method name does not itself provide protected-state write authority.
+This gives the comparison concrete objects and access boundaries to inspect,
+rather than treating a continuation as an unrestricted dump of writable memory.
+
+### Checkpoints and rollback with a defined lifetime
+
+**Proposed/reviewed, not delivered hardware behavior.** A checkpoint retains a
+particular continuation; rollback explicitly requests restoration. Neither is
+identical to ordinary CALL/RETURN or CHANGE.
+
+The proposed contract adds authorized capture/restore, one-shot consumption,
+copy/replay resistance, and reset-lifetime rules. The selected data-restoration
+scope must be stated separately from execution restoration. IDE-reserved space
+is a possible retention location, not protection by itself.
+
+The distinction is the explicit lifecycle and failure contract. It does not
+claim that continuation mechanisms inherently lack discipline elsewhere, or
+that CM rollback reverses external device effects.
+
+### Capability-controlled MMIO
+
+**Architectural rule; exact device provisioning and qualification require
+evidence.** Physical device operations are part of CM's authority model:
+knowing an MMIO address is not sufficient authority to access it. A permitted
+operation must use the applicable capability and satisfy the relevant access
+checks and device-register contract.
+
+Phase 1's watchdog is a concrete example: its control word is governed by a
+Genesis-provisioned MMIO GT, not granted automatically to every Thread.
+Phase 1 Mint exclusion of MMIO creation does not remove that platform object.
+Device-side effects must not occur from rejected accesses, and rollback must
+not automatically replay recorded MMIO writes as though they were heap data.
+
+This extends the comparison beyond language-level objects to authority over
+physical I/O. It is not a claim that W7/S48 cannot wrap devices securely; CM's
+specific access path and device behavior must be demonstrated.
+
+### Additional machine-level distinctions
+
+- **Execution ownership — proposed extension:** the running bit separates
+  active Thread ownership from debugger pause and from checkpoint consumption.
+  Self-target CHANGE remains valid. This is a concrete exclusion contract,
+  not merely an IDE state flag.
+- **Watchdog containment — specified hardware contract:** elapsed-time expiry
+  and controlled context capture can be tested independently of a callee
+  voluntarily returning. Phase 1 starts with an authorized debug exemption,
+  so bounded-expiry claims require the watchdog to be enabled. A watchdog fault
+  is not automatically a successful return to the caller.
+- **Namespace identity and generation checks — architectural rules:** accesses
+  resolve through explicit capability identity and destination validation.
+  Revocation/reuse claims must account for finite generation fields and
+  retained copies; constant-time checks alone do not prove indefinite replay
+  resistance.
+- **IDE/runtime agreement — demonstration plus Phase 1 scope:** JSON inspection
+  and partial updates use an explicit tuple schema, while callable examples
+  operate on the same record layout. The IDE is a review and editing tool,
+  not an alternate source of machine authority.
+- **Artifact-to-hardware evidence — qualification objective:** the LUMP,
+  Namespace configuration, simulator result, generated RTL, and tested
+  bitstream must be identified precisely. Reproducibility supports the claim;
+  it does not eliminate toolchain or silicon trust.
+
+The [W7++ test objectives](W7-plus-plus-test-objectives.md) translate these
+distinctions into additional CM-specific acceptance cases.
+
 ## Conclusion
 
 CM proposes explicit machine-enforced rules for continuation ownership,
