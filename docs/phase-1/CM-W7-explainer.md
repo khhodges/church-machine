@@ -66,7 +66,10 @@ active. It preserves the existing self-target `CHANGE` behavior: save and resume
 the newly captured continuation while continuously holding ownership.
 
 **Open:** physical bit placement and the complete ownership-commit protocol.
-The current packed Thread indicator has no spare bit. A bit alone also does
+The live Thread indicator reserves bits 13–27; the saved continuation frame
+uses those positions for NIA. The earlier claim that the live indicator was
+full confused these formats. Allocating a reserved live bit requires coordinated
+validator/writer changes and must not alter saved-frame NIA. A bit alone does
 not establish a consistent snapshot: capture ordering and exclusion of
 conflicting writers must be demonstrated.
 

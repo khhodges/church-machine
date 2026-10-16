@@ -3,16 +3,15 @@ name: Protected Thread indicator
 description: Normative packing and save/restore semantics for machine-protected Thread word +17.
 ---
 
-Thread word +17 is a machine-protected indicator with `FLAGS[31:28]`,
-`NIA[27:13]`, `SZ[12]`, and `STO[11:0]`. It is outside the ordinary heap;
-CR5 begins at +18.
+Do not conflate the live protected Thread indicator with a packed saved frame.
+The earlier memory incorrectly assigned saved-frame NIA to the live indicator,
+leading to the false claim that no running bit could fit without repacking.
 
-**Why:** The indicator must preserve condition flags and distinguish whether
-the current top frame includes an E-GT, without exposing this state through
-software heap authority.
+**Why:** The two words have similar packing but different semantics. Current
+shared layout and Amaranth reserve the live word's middle bits while saved
+frames use those positions for NIA.
 
-**How to apply:** A push stores the prior indicator fields in the frame word,
-then installs the new frame's SZ and decremented STO in +17. RETURN restores
-the prior fields. CHANGE refreshes NIA and FLAGS when saving and restores them
-when loading. A machine reboot starts with the empty-stack indicator even when
-BRAM retains an older runtime value.
+**How to apply:** Check both representations before proposing layout changes.
+Live ownership metadata must never be restored from historical NIA bits.
+The proposed running-bit allocation still needs approval and coordinated
+writer/validator changes; finding reserved space is not proof of implementation.

@@ -100,19 +100,22 @@ has the bit clear; an active Thread has it set. Capture of the current Thread's
 own continuation without `CHANGE` leaves it set. An ordinary `RETURN` must not
 restore an old ownership value from a saved frame.
 
-**Placement remains TBD.** The currently defined protected packed indicator at
-Thread word `+17` is already full:
+**Placement remains TBD.** Inspection of the shared Thread layout and Amaranth
+distinguishes the live protected indicator at `+17` from the saved frame:
 
 | Bits | Existing field |
 |---|---|
 | 31–28 | Flags |
-| 27–13 | NIA |
+| 27–13 | Reserved zero in the live indicator; NIA in the saved frame |
 | 12 | Frame size indicator |
 | 11–0 | Stack offset |
 
-Putting the running bit in this word requires an explicitly reviewed repacking
-and corresponding range/format changes; no spare bit may be assumed. Another
-protected location is an alternative to review, not an approved extra word.
+The earlier assertion that this live word was full conflated the two formats.
+Bit 13 of the live indicator is a candidate for running ownership without
+moving the heap or reducing NIA/stack ranges. Assignment remains subject to
+approval: current validators reject nonzero reserved bits and current writers
+clear them. All writers and validators must be updated together. Saved-frame
+bit 13 remains part of NIA; it must never be copied into running ownership.
 The running bit is live ownership metadata, not rollback-restorable history.
 
 ### 4.2 CHANGE details
