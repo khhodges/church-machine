@@ -1980,6 +1980,8 @@ function _renderSavedLumpWordUsage(panel, savedWords) {
 }
 
 function _enterSavedLumpEditorMode(compiledDisasm, lumpName, lump, lookupToken, inspection, savedWords) {
+    var candidateMetadata = document.getElementById('compiledLumpMetadata');
+    if (candidateMetadata) candidateMetadata.style.display = 'none';
     window._faultNavigationBinary = savedWords
         ? { token: lookupToken, words: Array.from(savedWords),
             hardfaultMap: lump && lump.hardfault_map,
@@ -2304,6 +2306,9 @@ function _showCompiledCandidateBesideSource(words, details) {
             word.toString(16).padStart(8, '0').toUpperCase() +
             (decoded ? '  ' + decoded : ''));
     }
+    var instructionLines = lines.filter(line => line.startsWith('['));
+    var auditLines = lines.filter(line => !line.startsWith('['));
+    lines = [];
     // Interpret only the authenticated binary, never the mutable editor or
     // browser capability metadata. Name-only edits can change this region
     // while leaving the instruction words and numeric C-list unchanged.
@@ -2332,11 +2337,16 @@ function _showCompiledCandidateBesideSource(words, details) {
             if (!api || typeof api !== 'object' || Array.isArray(api)) {
                 throw new Error('definition is not a JSON object');
             }
-            if (Array.isArray(api.capabilities)) candidateCapabilities = api.capabilities;
+            var expandedApi = api;
+            if (api.methods && !Array.isArray(api.methods)) {
+                if (!window.LumpApiCodec) throw new Error('Compact API decoder unavailable');
+                expandedApi = window.LumpApiCodec.expand(api, binary);
+            }
+            if (Array.isArray(expandedApi.capabilities)) candidateCapabilities = expandedApi.capabilities;
             lines.push('; Frame/API words ' + frameStart + '–' +
                 (frameStart + apiWords) + '; ' + apiLength + ' JSON bytes.',
                 '; Decoded metadata is inspection evidence, not saved-identity approval.',
-                JSON.stringify(api, null, 2));
+                JSON.stringify(expandedApi, null, 2));
         } catch (error) {
             lines.push('; Cannot decode embedded definition: ' + error.message);
         }
@@ -2366,7 +2376,12 @@ function _showCompiledCandidateBesideSource(words, details) {
     if (window._savedLumpEditorMode && !window._compiledCandidateEditorMode && text) {
         window._savedLumpDisassemblyBeforeCandidate = text.textContent;
     }
-    if (text) text.textContent = lines.join('\n');
+    if (text) text.textContent = instructionLines.join('\n');
+    var metadataText = document.getElementById('compiledLumpMetadataText');
+    if (metadataText) metadataText.textContent = lines.join('\n');
+    var metadataDetails = document.getElementById('compiledLumpMetadata');
+    if (metadataDetails) metadataDetails.style.display = '';
+    window._compiledCandidateAuditText = auditLines.join('\n');
     if (panel) {
         panel.setAttribute('aria-label', 'Unsaved authenticated compile candidate');
         panel.style.display = 'flex';

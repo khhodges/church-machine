@@ -24,6 +24,7 @@ const dom = new JSDOM(`<!doctype html><body><div id="editor">
     <section id="savedLumpDisassemblyPanel" style="display:none">
       <div id="disassemblyPresentationStatus"></div>
       <pre id="savedLumpDisassembly"></pre>
+      <details id="compiledLumpMetadata"><pre id="compiledLumpMetadataText"></pre></details>
     </section>
     <div class="console-panel"><div id="asmErrorPanel" style="display:none"></div></div>
   </div>
@@ -32,6 +33,7 @@ const stylesheet = dom.window.document.createElement('style');
 stylesheet.textContent = fs.readFileSync(path.join(__dirname, 'styles-toolbar.css'), 'utf8');
 dom.window.document.head.appendChild(stylesheet);
 const source = fs.readFileSync(path.join(__dirname, 'app-lumps.js'), 'utf8');
+dom.window.LumpApiCodec = require('./lump-api-codec');
 const context = vm.createContext({
     window: dom.window,
     document: dom.window.document,
@@ -55,7 +57,8 @@ assert.equal(vm.runInContext(
 const panel = dom.window.document.getElementById('savedLumpDisassemblyPanel');
 const text = dom.window.document.getElementById('savedLumpDisassembly').textContent;
 assert.equal(panel.style.display, 'flex', 'successful CLOOMC compile shows candidate');
-assert.match(text, /UNSAVED COMPILE CANDIDATE/, 'candidate is distinct from saved binary');
+assert.match(dom.window._compiledCandidateAuditText, /UNSAVED COMPILE CANDIDATE/, 'candidate is distinct from saved binary');
+assert.doesNotMatch(text, /Reference verification|Embedded definition|UNSAVED/);
 assert.match(text, /\[0000\].*F8000C00/i, 'actual authenticated header is rendered');
 assert.match(text, /\[0001\].*00000002.*DISPATCH #1: legacy entry value 2/i,
     'actual authenticated dispatch prefix is rendered');
@@ -111,7 +114,7 @@ console.log('CLOOMC candidate presentation tests passed');
 const { spawnSync } = require('child_process');
 context.TextDecoder = TextDecoder;
 function compileNamedCandidate(name) {
-    const draft = `abstraction DeclaredCandidate {\ncapabilities {\n SELF E\n ${name} E\n}\nmethod Run {\n LOAD CR0, ${name}\n RETURN\n}\n}`;
+    const draft = `abstraction test.DeclaredCandidate {\ncapabilities {\n SELF E\n test.${name} E\n}\nmethod Run {\n LOAD CR0, test.${name}\n RETURN\n}\n}`;
     const processResult = spawnSync(process.execPath,
         [path.join(__dirname, '..', 'server', 'compile_worker.js')], {
             input: JSON.stringify({source: draft, language: 'auto', tier: 2}),
@@ -130,32 +133,32 @@ assert.deepEqual(firstNamed.slice(-2), secondNamed.slice(-2));
 assert.notDeepEqual(firstNamed, secondNamed);
 context._showCompiledCandidateBesideSource(firstNamed,
     {abstraction: 'RunAbstraction', methodCount: 1, inferredName: true});
-assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
-    /"name": "FirstTarget"/);
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
+    /"name": "test.FirstTarget"/);
 context._showCompiledCandidateBesideSource(secondNamed,
     {abstraction: 'RunAbstraction', methodCount: 1, inferredName: true});
-const namedText = dom.window.document.getElementById('savedLumpDisassembly').textContent;
-assert.match(namedText, /"name": "SecondTarget"/);
+const namedText = dom.window.document.getElementById('compiledLumpMetadataText').textContent;
+assert.match(namedText, /"name": "test.SecondTarget"/);
 assert.doesNotMatch(namedText, /FirstTarget/);
 assert.doesNotMatch(namedText, /label was inferred/);
 assert.match(namedText, /zero placeholders/);
 const clistText = namedText.slice(namedText.indexOf('; C-list (exact authenticated words)'));
 assert.match(clistText, /C-list\[0\] "SELF"\s+—\s+0x00000000/);
-assert.match(clistText, /C-list\[1\] "SecondTarget"\s+—\s+0x00000000/);
+assert.match(clistText, /C-list\[1\] "test.SecondTarget"\s+—\s+0x00000000/);
 assert.doesNotMatch(clistText, /inspect the embedded names above/);
 const boundWords = secondNamed.slice();
 boundWords[boundWords.length - 1] = 0x4a00000a;
 context._showCompiledCandidateBesideSource(boundWords, {});
-assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
-    /C-list\[1\] "SecondTarget"\s+—\s+0x4A00000A \(encoded word; binding not verified here\)/);
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
+    /C-list\[1\] "test.SecondTarget"\s+—\s+0x4A00000A \(encoded word; binding not verified here\)/);
 const malformed = secondNamed.slice();
 malformed[codeEnd] = 0xABFFFFFF;
 context._showCompiledCandidateBesideSource(malformed, {});
-assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
     /Cannot decode embedded definition/);
-assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+assert.match(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
     /C-list\[1\] \(PetName unavailable in candidate bytes\)/);
-assert.doesNotMatch(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+assert.doesNotMatch(dom.window.document.getElementById('compiledLumpMetadataText').textContent,
     /SecondTarget/, 'never reuse names from a previous candidate');
 assert.equal(dom.window.document.getElementById('asmEditor').value,
     'method Run() { return(1) }', 'inspection preserves the programmer draft');
@@ -164,7 +167,7 @@ const beforeReport = JSON.stringify(secondNamed);
 context._showCompiledCandidateBesideSource(secondNamed, {
     referenceReport: 'Reference verification:\n  Row 1 <img src=x>: SYMBOLIC — valid declared PetName; its target need not exist yet.',
 });
-assert.match(dom.window.document.getElementById('savedLumpDisassembly').textContent,
+assert.match(dom.window._compiledCandidateAuditText,
     /Row 1 <img src=x>: SYMBOLIC/);
 assert.equal(dom.window.document.getElementById('savedLumpDisassembly').querySelector('img'), null);
 assert.equal(JSON.stringify(secondNamed), beforeReport, 'report rendering never changes words');

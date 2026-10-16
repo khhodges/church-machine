@@ -36,3 +36,17 @@ def test_raw_callable_rejected_at_compile(client, isolated_lumps):
         "; Abstraction: test.Raw\ncapabilities {\nSELF E\n}\nBRANCH stash\nstash:\nRETURN"}).get_json()
     assert not result["ok"], result
     assert "explicit method declarations" in str(result)
+
+
+@pytest.mark.parametrize("tail", [
+    "method reveal() (\nDREAD DR1, CR5, #9\nRETURN }\n}",
+    "WORD 0\n}",
+    "}\nUNRECOGNIZED",
+    "method reveal() {\nRETURN",
+])
+def test_partial_parse_never_returns_authenticated_candidate(client, isolated_lumps, tail):
+    source = "abstraction test.Partial {\ncapabilities { SELF E }\nmethod stash() {\nRETURN\n}\n" + tail
+    result = client.post("/api/compile", json={"language": "javascript", "source": source}).get_json()
+    assert not result["ok"], result
+    assert not result.get("compiler_record"), result
+    assert not result.get("words"), result

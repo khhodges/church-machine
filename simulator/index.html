@@ -1114,7 +1114,11 @@
               <section id="savedLumpDisassemblyPanel" class="saved-lump-disassembly-panel" style="display:none;" role="tabpanel" aria-labelledby="codeTabDisassembly" aria-label="Complete saved LUMP workspace">
                                   <div id="disassemblyPresentationStatus" class="disassembly-presentation-status" role="status"></div>
                  <pre id="savedLumpDisassembly" tabindex="0" aria-readonly="true"></pre>
-                 <details id="savedLumpBuildDetails" class="disassembly-build-details" ontoggle="if (this.open) document.getElementById('savedLumpBuildDetailsText').textContent = document.getElementById('editorConsole').textContent || 'No build diagnostics for this session.'">
+                 <details id="compiledLumpMetadata" class="disassembly-build-details" style="display:none;">
+                     <summary>API &amp; C-list</summary>
+                     <pre id="compiledLumpMetadataText" tabindex="0"></pre>
+                 </details>
+                 <details id="savedLumpBuildDetails" class="disassembly-build-details" ontoggle="if (this.open) document.getElementById('savedLumpBuildDetailsText').textContent = (window._compiledCandidateEditorMode ? window._compiledCandidateAuditText || '' : '') + '\n' + (document.getElementById('editorConsole').textContent || 'No build diagnostics for this session.')">
                      <summary>Build &amp; audit details</summary>
                      <pre id="savedLumpBuildDetailsText" tabindex="0"></pre>
                  </details>
@@ -3589,7 +3593,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="repl.js"></script>
     <script src="hp35.js"></script>
     <script async src="history.js"></script>
-    <script src="cloomc_compiler.js?v=sha256-428d24d1a7c6"></script>
+    <script src="cloomc_compiler.js?v=sha256-0076fb9b99ef"></script>
 
     <script async src="abacus.js"></script>
     <script async src="sliderule.js"></script>
@@ -3633,7 +3637,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump-public-api.js?v=sha256-28c8dd805571"></script>
     <script src="lump-variant-inspector.js?v=sha256-cfcc2aeff918"></script>
     <script src="hardfault-map.js?v=sha256-ee3348e16ca2"></script>
-    <script src="app-lumps.js?v=20261016-source-language"></script>
+    <script src="app-lumps.js?v=sha256-6610927b7784"></script>
     <script src="app-absdetail.js?v=sha256-eb101a18d476"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->

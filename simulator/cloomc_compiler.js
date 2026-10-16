@@ -1696,9 +1696,53 @@ class CLOOMCCompiler {
         return { name: text, kind: 'value' };
     }
 
+    static _callableLexicalText(source, maskStrings = false) {
+        let out = '', quote = '', block = false, line = false, escaped = false;
+        let lineStart = true;
+        for (let i = 0; i < source.length; i++) {
+            const c = source[i], next = source[i + 1];
+            if (c === '\n') { out += c; line = false; lineStart = true; continue; }
+            if (line) { out += ' '; continue; }
+            if (block) {
+                if (c === '*' && next === '/') { out += '  '; i++; block = false; }
+                else out += ' ';
+                continue;
+            }
+            if (quote) {
+                out += maskStrings ? ' ' : c;
+                if (!escaped && c === quote) quote = '';
+                if (!escaped && c === '\\') escaped = true;
+                else escaped = false;
+                continue;
+            }
+            if (c === '/' && next === '*') { out += '  '; i++; block = true; continue; }
+            const prefix = c === ';' ? source.slice(source.lastIndexOf('\n', i - 1) + 1, i).trim() : '';
+            if ((c === '/' && next === '/') || (c === ';' &&
+                    (lineStart || /^[A-Z][A-Z0-9]*(?:\s|$)/.test(prefix)))) {
+                out += ' '; line = true; continue;
+            }
+            if (c === '"' || c === "'") quote = c;
+            out += maskStrings && quote ? ' ' : c;
+            if (!/\s/.test(c)) lineStart = false;
+        }
+        return {text: out, unterminated: block || !!quote};
+    }
+
     _parseAbstraction(source, errors) {
         const result = { name: '', capabilities: [], methods: [] };
-        const lines = source.split('\n');
+        const lexical = CLOOMCCompiler._callableLexicalText(source);
+        const structural = CLOOMCCompiler._callableLexicalText(source, true);
+        const stack = [];
+        let sourceLine = 1;
+        for (const ch of structural.text) {
+            if (ch === '\n') sourceLine++;
+            if (ch === '{') stack.push(sourceLine);
+            if (ch === '}' && stack.pop() === undefined)
+                errors.push({line: sourceLine, message: 'Unexpected closing brace.'});
+        }
+        for (const line of stack) errors.push({line, message: 'Unclosed block: expected a closing brace.'});
+        if (lexical.unterminated) errors.push({line: sourceLine, message: 'Unterminated comment or string.'});
+        const lines = lexical.text.split('\n');
         let i = 0;
 
         while (i < lines.length) {
@@ -1707,16 +1751,27 @@ class CLOOMCCompiler {
 
             const absMatch = line.match(/^abstraction\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\{/i);
             if (absMatch) {
+                if (line.slice(absMatch[0].length).trim())
+                    errors.push({line: i + 1, message: 'Put abstraction contents on the following lines; trailing declaration text is not permitted.'});
                 result.name = absMatch[1];
                 i++;
                 i = this._parseAbstractionBody(lines, i, result, errors);
+                for (; i < lines.length; i++)
+                    if (lines[i].trim()) errors.push({line: i + 1, message: 'Unexpected source after the abstraction.'});
                 break;
             }
+            errors.push({line: i + 1, message: 'Unexpected source before the abstraction declaration.'});
             i++;
         }
 
         if (!result.name) {
             errors.push({ line: 0, message: 'No abstraction declaration found. Expected: abstraction Name { ... }' });
+        }
+        const methodNames = new Set();
+        for (const method of result.methods) {
+            if (methodNames.has(method.name))
+                errors.push({line: method.startLine + 1, message: `Duplicate method declaration: ${method.name}.`});
+            methodNames.add(method.name);
         }
         return result;
     }
@@ -1786,6 +1841,8 @@ class CLOOMCCompiler {
             // method Name [RAW ISA] { 0xHEX ... }  (inline ISA words)
             const rawIsaMatch = cleanLine.match(/^method\s+(\w+)\s*(?:\([^)]*\))?\s*\[RAW ISA\]\s*\{/);
             if (rawIsaMatch) {
+                if (cleanLine.slice(rawIsaMatch[0].length).trim())
+                    errors.push({line: i + 1, message: 'Place RAW ISA words on following lines.'});
                 const _rawIsaSrcStart = _commentBlockStart >= 0 ? _commentBlockStart : i;
                 _commentBlockStart = -1;
                 const rawWords = [];
@@ -1795,7 +1852,8 @@ class CLOOMCCompiler {
                     if (t === '}') { i++; break; }
                     if (t && !t.startsWith('//')) {
                         for (const tok of t.split(/\s+/)) {
-                            if (/^0x[0-9a-fA-F]+$/.test(tok)) rawWords.push(parseInt(tok, 16) >>> 0);
+                            if (/^0x[0-9a-fA-F]{1,8}$/.test(tok)) rawWords.push(parseInt(tok, 16) >>> 0);
+                            else errors.push({line: i + 1, message: `Invalid RAW ISA word: ${tok}.`});
                         }
                     }
                     i++;
@@ -1822,7 +1880,7 @@ class CLOOMCCompiler {
                 let braceDepth = 1;
                 if (_mInline) {
                     let _d = braceDepth;
-                    for (const ch of _mInline) { if (ch === '{') _d++; else if (ch === '}') _d--; }
+                    for (const ch of CLOOMCCompiler._callableLexicalText(_mInline, true).text) { if (ch === '{') _d++; else if (ch === '}') _d--; }
                     if (_d <= 0) {
                         const _ci = _mInline.lastIndexOf('}');
                         const _bt = _mInline.slice(0, _ci).trim();
@@ -1848,7 +1906,7 @@ class CLOOMCCompiler {
                         i++;
                         continue;
                     }
-                    for (const ch of trimmed) {
+                    for (const ch of CLOOMCCompiler._callableLexicalText(trimmed, true).text) {
                         if (ch === '{') braceDepth++;
                         else if (ch === '}') braceDepth--;
                     }
@@ -1880,7 +1938,7 @@ class CLOOMCCompiler {
                 let braceDepth = 1;
                 if (_klInline) {
                     let _d = braceDepth;
-                    for (const ch of _klInline) { if (ch === '{') _d++; else if (ch === '}') _d--; }
+                    for (const ch of CLOOMCCompiler._callableLexicalText(_klInline, true).text) { if (ch === '{') _d++; else if (ch === '}') _d--; }
                     if (_d <= 0) {
                         const _ci = _klInline.lastIndexOf('}');
                         const _bt = _klInline.slice(0, _ci).trim();
@@ -1906,7 +1964,7 @@ class CLOOMCCompiler {
                         i++;
                         continue;
                     }
-                    for (const ch of trimmed) {
+                    for (const ch of CLOOMCCompiler._callableLexicalText(trimmed, true).text) {
                         if (ch === '{') braceDepth++;
                         else if (ch === '}') braceDepth--;
                     }
@@ -1924,6 +1982,9 @@ class CLOOMCCompiler {
             }
 
             _commentBlockStart = -1;
+            errors.push({line: i + 1, message: /^method\b/.test(cleanLine)
+                ? 'Malformed method declaration: expected method Name(...) { ... }.'
+                : 'Unexpected source outside a method. Instructions and WORD data cannot be silently placed here; declare a supported method/data layout.'});
             i++;
         }
         return i;

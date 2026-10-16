@@ -59,7 +59,6 @@ const wrapped = lines.slice();
 wrapped[0] = 'abstraction ide.Caller {';
 wrapped[1] = 'capabilities { SELF E, ide.SelfTest E, ide.WukongCallHome E }';
 wrapped[2] = 'method Start() {';
-wrapped.push('}', '}');
 check(new Compiler().compile(wrapped.join('\n'), []), 'native');
 
 // Server worker path.
