@@ -17,6 +17,39 @@
     const encoder = new TextEncoder();
     const decoder = new TextDecoder('utf-8', {fatal: true});
     const names = schema.fields.map(f => f.name);
+    // Ephemeral software ownership, never serialized into a Thread or LUMP.
+    const owners = new WeakMap();
+    const observed = new WeakSet();
+    let nextId = 1;
+    function ownership(sim, target) {
+        if (!observed.has(sim) && typeof sim.on === 'function') {
+            observed.add(sim);
+            sim.on('threadReset', ({slot}) => {
+                const state = owners.get(sim);
+                if (state) for (const [base, thread] of state.threads)
+                    if (thread.slot === slot) state.threads.delete(base);
+            });
+            sim.on('programLoaded', ({addr, length}) => {
+                const state = owners.get(sim);
+                if (state) for (const [base, thread] of state.threads)
+                    if (addr < thread.end && addr + length > base) state.threads.delete(base);
+            });
+        }
+        let state = owners.get(sim);
+        const generation = sim._controlFlowDiagnosticResetGeneration;
+        if (!state || state.memory !== sim.memory || state.generation !== generation) {
+            state = {memory: sim.memory, generation, threads: new Map()};
+            owners.set(sim, state);
+        }
+        const gt = sim.parseGT(sim.cr[12].word0);
+        const key = [gt.index, gt.gt_seq, target.threadBase, sim.cr[5].word1,
+            sim.cr[5].word2, sim.memory[target.threadBase]].join(':');
+        const previous = state.threads.get(target.threadBase);
+        if (!previous || previous.key !== key)
+            state.threads.set(target.threadBase, {key, slot: gt.index,
+                end: sim.cr[5].word1 + target.heapWords, pool: null, records: new Map()});
+        return state.threads.get(target.threadBase);
+    }
     function object(value) {
         if (!value || typeof value !== 'object' || Array.isArray(value))
             throw new Error('Expected a JSON object.');
@@ -101,34 +134,92 @@
         if (address + schema.words > sim.memory.length) throw new Error('Heap exceeds simulator memory.');
         const target = {threadBase, address, offset, words: schema.words, heapWords: layout.heapWords};
         preflight(sim, target, 'R');
-        const current = Array.from(sim.memory.slice(address, address + schema.words));
-        target.recognized = current.some(w => w !== 0);
-        if (target.recognized) decode(current);
+        const allocation = ownership(sim, target).records.get(offset);
+        target.allocationId = allocation ? allocation.id : null;
+        target.recognized = !!allocation &&
+            sim.memory.slice(address, address + schema.words).some(w => w !== 0);
         return target;
+    }
+    function ownedTarget(sim, offset) {
+        const target = validateTarget(sim, offset);
+        if (!target.allocationId)
+            throw new Error('No allocation at this offset. Reserve a pool and allocate a record first. Nothing changed.');
+        return target;
+    }
+    function allocations(sim) {
+        const target = validateTarget(sim, 0);
+        const state = ownership(sim, target);
+        return {pool: state.pool && {...state.pool},
+            records: Array.from(state.records.values(), r => ({...r})).sort((a,b) => a.offset-b.offset)};
+    }
+    function reservePool(sim, offset, words) {
+        const target = validateTarget(sim, offset);
+        const state = ownership(sim, target);
+        if (state.pool) throw new Error('A pool is already reserved for this Thread; it cannot be moved during this lifetime.');
+        if (!Number.isInteger(words) || words < schema.words || offset + words > target.heapWords)
+            throw new Error('Pool must contain at least 58 words and fit in the Thread heap.');
+        // Reservation is explicit programmer ownership, not inferred from zeros.
+        preflight(sim, {...target, words}, 'W');
+        state.pool = {offset, words, id: nextId++};
+        return allocations(sim);
+    }
+    function allocate(sim, offset) {
+        const base = validateTarget(sim, 0);
+        const state = ownership(sim, base), pool = state.pool;
+        if (!pool) throw new Error('Reserve an exclusive demo pool first. Zero words are not proof of ownership.');
+        const free = off => !Array.from(state.records.values()).some(r =>
+            off < r.offset + schema.words && off + schema.words > r.offset);
+        if (offset === undefined) {
+            for (let off = pool.offset; off + schema.words <= pool.offset + pool.words; off += schema.words) {
+                if (free(off)) {
+                    const t = validateTarget(sim, off);
+                    if (!sim.memory.slice(t.address, t.address + schema.words).some(w => w !== 0)) {
+                        offset = off; break;
+                    }
+                }
+            }
+            if (offset === undefined) throw new Error('Pool exhausted or blocked by nonzero data. Release a record or choose a free offset; nothing changed.');
+        }
+        const target = validateTarget(sim, offset);
+        if (offset < pool.offset || offset + schema.words > pool.offset + pool.words)
+            throw new Error('Allocation must fit inside the reserved pool.');
+        if (!free(offset)) throw new Error('Allocation collision: this range overlaps an owned record.');
+        if (sim.memory.slice(target.address, target.address + schema.words).some(w => w !== 0))
+            throw new Error('Allocation blocked by nonzero data; nothing changed.');
+        preflight(sim, target, 'W');
+        const record = {id: nextId++, offset, words: schema.words};
+        state.records.set(offset, record);
+        return {...record};
+    }
+    function release(sim, offset) {
+        const target = ownedTarget(sim, offset);
+        preflight(sim, target, 'W');
+        sim.memory.fill(0, target.address, target.address + schema.words);
+        ownership(sim, target).records.delete(offset);
     }
     function preflight(sim, target, permission) {
         if (!sim.parseGT(sim.cr[5].word0).permissions[permission])
             throw new Error('Heap ' + permission + ' access denied: CR5 lacks permission.');
-        for (let i = 0; i < schema.words; i++) {
+        for (let i = 0; i < target.words; i++) {
             const check = sim.mLoad(sim.cr[5].word0, permission, 5, target.address + i,
                 {base: sim.cr[5].word1, upperBound: sim.cr[5].word1 + sim.cr[5].word2}, true);
             if (!check.ok) throw new Error('Heap ' + permission + ' access denied: ' + check.message);
         }
     }
     function read(sim, offset) {
-        const target = validateTarget(sim, offset);
+        const target = ownedTarget(sim, offset);
         preflight(sim, target, 'R');
         return decode(Array.from(sim.memory.slice(target.address, target.address + schema.words)));
     }
     function commit(sim, target, words) {
         // No await or callbacks between final preflight and publication. All
-        // validation completes before the first write; no runtime sidecars.
+        // validation completes before the first write.
         preflight(sim, target, 'W');
         for (let i = 0; i < words.length; i++) sim.memory[target.address + i] = words[i];
         return decode(words);
     }
     function importRecord(sim, offset, input, options = {}) {
-        const target = validateTarget(sim, offset);
+        const target = ownedTarget(sim, offset);
         const staged = encode(input);
         preflight(sim, target, 'R');
         const oldWords = Array.from(sim.memory.slice(target.address, target.address + schema.words));
@@ -147,7 +238,7 @@
             throw new Error('Only record fields may be updated; invalid field: ' + key);
         const old = read(sim, offset);
         const staged = encode({...old, ...patch}, (old.revision + 1) >>> 0);
-        return commit(sim, validateTarget(sim, offset), staged);
+        return commit(sim, ownedTarget(sim, offset), staged);
     }
     function source(offset = 0) {
         if (!Number.isInteger(offset) || offset < 0 || offset + schema.words > 1024)
@@ -156,7 +247,7 @@
         const method = (name, lines) => methods.push('method ' + name + '() {\n    ' + lines.join('\n    ') + '\n}');
         const revision = ['DREAD DR2, CR5, #' + (offset + 3),
             'IADD DR2, DR2, #1', 'DWRITE DR2, CR5, #' + (offset + 3)];
-        // Initialize explicitly reserves this region; it is never called by the IDE.
+        // Allocate this region before Initialize; it is never called by the IDE.
         const init = ['IADD DR1, DR0, #0'];
         for (let i = 0; i < schema.words; i++) init.push('DWRITE DR1, CR5, #' + (offset + i));
         for (const [i, value] of [schema.magic, 1, schema.words, 1].entries())
@@ -176,7 +267,8 @@
                     'DREAD DR1, CR5, #' + (offset + field.offset + 1 + i), 'RETURN']);
         }
         return '; Thread heap CallRecord v1 — demonstration ABI, not an ISA extension.\n' +
-            '; Reserve heap words ' + offset + '..' + (offset + schema.words - 1) + ' exclusively before Initialize/import.\n' +
+            '; Allocate heap words ' + offset + '..' + (offset + schema.words - 1) + ' exclusively before Initialize/import.\n' +
+            '; These fixed-offset methods do not check software allocation ownership. Stop using them before release.\n' +
             '; Initialize clears the record. Do not call it after importing your data.\n' +
             '; CR5 is the existing Thread heap; no additional GT is required.\n' +
             '; Methods share the active Thread, not private per-abstraction storage.\n' +
@@ -185,7 +277,7 @@
             '; JSON/text updates are IDE operations; numeric state/conditions updates are callable.\n' +
             'abstraction ide.CallRecord {\ncapabilities { SELF E }\n' + methods.join('\n\n') + '\n}\n';
     }
-    const api = {schema, sample, encode, decode, validateTarget, read, importRecord, updateRecord,
+    const api = {schema, sample, encode, decode, validateTarget, reservePool, allocate, release, allocations, read, importRecord, updateRecord,
         exportJson: (sim, offset) => JSON.stringify(read(sim, offset), null, 2), source};
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.ThreadHeapRecord = api;

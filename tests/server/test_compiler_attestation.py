@@ -152,7 +152,14 @@ def test_real_compile_finalize_save_and_boot_flow_rejects_tampering(
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(tmp_path))
     monkeypatch.setattr(
         app_module, "LUMPS_MANIFEST_PATH", str(tmp_path / "manifest.json"))
-    source = "; @abstraction test.CompilerRouteFixture\nIADD DR1, DR0, #42\nRETURN\n"
+    source = """abstraction test.CompilerRouteFixture {
+capabilities { SELF E }
+method Run() {
+IADD DR1, DR0, #42
+RETURN
+}
+}
+"""
 
     with app_module.app.test_client() as client:
         compiled_response = client.post("/api/compile", json={

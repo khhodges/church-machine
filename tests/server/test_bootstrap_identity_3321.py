@@ -569,7 +569,14 @@ def isolated_bootstrap_repository(tmp_path, monkeypatch):
 
 def _artifact_save_payload(client):
     """Compile/finalize an artifact without borrowing a resident's authority."""
-    source = "; @abstraction test.BootstrapPublicationFixture\nIADD DR1, DR0, #42\nRETURN\n"
+    source = """abstraction test.BootstrapPublicationFixture {
+capabilities { SELF E }
+method Run() {
+IADD DR1, DR0, #42
+RETURN
+}
+}
+"""
     response = client.post("/api/compile", json={
         "source": source, "language": "assembly"})
     assert response.status_code == 200 and response.json["ok"], response.json

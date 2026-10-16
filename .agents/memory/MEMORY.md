@@ -157,3 +157,4 @@
 - [Alternative IDE prototype](alternative-ide-prototype.md) — include Thread/Namespace authoring; separate URL and demo state, with no live artifact or hardware changes.
 - [Phase 1 review decisions](phase-1-document-collection.md) — guided scope decisions; two Namespaces on one FPGA for networking tests belong to Phase 2.
 - [Thread designer scope](thread-designer-tuple-scope.md) — include Tuple Store and rollback design; use Alice's save rejection as a diagnostic and storage acceptance example.
+- [Thread call-record ownership](thread-call-record-ownership.md) — zero contents are not ownership; cooperative allocation must not imply new CR5 protection or revocation.

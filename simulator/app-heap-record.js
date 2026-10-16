@@ -50,13 +50,15 @@ window.getThreadHeapRecordContext = function () {
             cr12: words(crOf(sim, 12)).map(String).join(':'),
             cr5: words(crOf(sim, 5)).map(String).join(':'),
             mem: sim.memory,
+            allocation: api().validateTarget(sim, offset).allocationId,
+            pool: JSON.stringify(api().allocations(sim)),
             content: Array.from(sim.memory.slice(sim.cr[5].word1 + offset,
                 sim.cr[5].word1 + offset + api().schema.words)).join(','),
             sim: sim, offset: offset
         };
     }
     function sameTarget(a, b) {
-        return a && b && a.sim === b.sim && a.mem === b.mem && a.cr12 === b.cr12 && a.cr5 === b.cr5 && a.offset === b.offset && a.content === b.content;
+        return a && b && a.sim === b.sim && a.mem === b.mem && a.cr12 === b.cr12 && a.cr5 === b.cr5 && a.offset === b.offset && a.content === b.content && a.allocation === b.allocation && a.pool === b.pool;
     }
     function hex(s) { return s; }
 
@@ -91,6 +93,59 @@ window.getThreadHeapRecordContext = function () {
         setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
     }
     function clearConfirm() { pending = null; q('#thrConfirm').hidden = true; }
+    function showAllocations() {
+        var box = q('#thrAllocations');
+        box.textContent = '';
+        try {
+            var state = api().allocations(ctx());
+            box.appendChild(el('div', {text: state.pool
+                ? 'Reserved pool: ' + state.pool.offset + '..' + (state.pool.offset + state.pool.words - 1) + '. Allocated: ' + state.records.length
+                : 'No pool reserved. Declare an exclusive region before allocating.'}));
+            state.records.forEach(function (r) {
+                box.appendChild(el('button', {type: 'button', cls: 'thr-btn',
+                    text: 'Record #' + r.id + ': ' + r.offset + '..' + (r.offset + r.words - 1),
+                    onclick: function () { clearConfirm(); unbind(); q('#thrOffset').value = r.offset; onRead(); }}));
+            });
+        } catch (e) { box.textContent = e.message; }
+    }
+    function onReserve() {
+        clearConfirm();
+        try {
+            var off = getOffset(), size = Number(q('#thrPoolWords').value), sim = ctx();
+            var snap = identity(sim, off);
+            askConfirm('Reserve heap words ' + off + '..' + (off + size - 1) +
+                ' exclusively for this demo. Confirm that no other software owns or uses this range, even if it is zero. Reservation changes no memory.', false, function () {
+                var current = ctx();
+                if (!sameTarget(snap, identity(current, off))) throw new Error('Thread or allocations changed. Review again; nothing changed.');
+                api().reservePool(current, off, size);
+                showAllocations(); status('Pool reserved. Allocate a record next.', 'ok');
+            });
+            q('#thrConfirmGo').textContent = 'Confirm exclusive reservation';
+        } catch (e) { fail(e); }
+    }
+    function onAllocate(automatic) {
+        clearConfirm();
+        try {
+            var r = api().allocate(ctx(), automatic ? undefined : getOffset());
+            q('#thrOffset').value = r.offset;
+            unbind(); showAllocations();
+            status('Allocated record #' + r.id + ' at offset ' + r.offset + '. Import JSON or run Initialize before reading.', 'ok');
+        } catch (e) { fail(e); }
+    }
+    function onRelease() {
+        clearConfirm();
+        try {
+            var off = getOffset(), snap = identity(ctx(), off);
+            if (!snap.allocation) throw new Error('No allocation at this offset. Nothing changed.');
+            askConfirm('Release record at offset ' + off + '? This erases its 58 words. Stop using any compiled methods for this offset before release; they cannot detect reuse.', true, function () {
+                var current = ctx();
+                if (!sameTarget(snap, identity(current, off))) throw new Error('Thread, allocation, or contents changed. Review again; nothing changed.');
+                api().release(current, off);
+                unbind(); showAllocations(); status('Record erased and released. Its range can be allocated again.', 'ok');
+            });
+            q('#thrConfirmGo').textContent = 'Confirm erase and release';
+        } catch (e) { fail(e); }
+    }
 
     function askConfirm(text, danger, run) {
         pending = run;
@@ -118,12 +173,13 @@ window.getThreadHeapRecordContext = function () {
         try {
             var off = getOffset(), obj = parseBox(), A = api(), sim = ctx();
             var v = A.validateTarget(sim, off) || {};
+            if (!v.allocationId) throw new Error('Allocate a record at this offset before importing.');
             var snap = identity(sim, off);
             var n = A.schema.words;
             var recognized = !!(v.recognized || v.existing || v.state === 'recognized');
             var text = recognized
                 ? 'A recognized ' + A.schema.name + ' record already exists at words ' + off + '..' + (off + n - 1) + ' (CR12 ' + snap.cr12 + '). Replacing it overwrites all ' + n + ' words in this Thread heap. This is a separate, explicit replacement.'
-                : 'Initial import reserves ' + n + ' words at heap offset ' + off + '..' + (off + n - 1) + ' of the active Thread (CR12 ' + snap.cr12 + ', CR5 ' + snap.cr5 + '). Unknown nonzero words will block the import.';
+                : 'Initialize the allocated ' + n + ' words at heap offset ' + off + '..' + (off + n - 1) + ' of the active Thread (CR12 ' + snap.cr12 + ', CR5 ' + snap.cr5 + '). Unknown nonzero words will block the import.';
             askConfirm(text, recognized, function () {
                 var sim2 = ctx();
                 if (!sameTarget(snap, identity(sim2, off))) throw new Error('Active Thread or memory changed since review. Nothing written; review again.');
@@ -214,6 +270,16 @@ window.getThreadHeapRecordContext = function () {
                         el('input', { id: 'thrOffset', type: 'number', min: '0', step: '1', value: '0', oninput: function () { clearConfirm(); if (bound) unbind(); } }),
                         el('span', { id: 'thrSpan', text: 'Occupies ' + S.words + ' words' })
                     ]),
+                    el('div', { cls: 'thr-row' }, [
+                        el('label', {for: 'thrPoolWords', text: 'Pool words'}),
+                        el('input', {id: 'thrPoolWords', type: 'number', min: '58', step: '1', value: '116', oninput: clearConfirm}),
+                        el('button', {cls: 'thr-btn', type: 'button', text: 'Reserve pool at offset…', onclick: onReserve}),
+                        el('button', {cls: 'thr-btn', type: 'button', text: 'Allocate next', onclick: function () { onAllocate(true); }}),
+                        el('button', {cls: 'thr-btn', type: 'button', text: 'Allocate at offset', onclick: function () { onAllocate(false); }}),
+                        el('button', {cls: 'thr-btn danger', type: 'button', text: 'Release…', onclick: onRelease}),
+                        el('button', {cls: 'thr-btn', type: 'button', text: 'Refresh allocations', onclick: showAllocations})
+                    ]),
+                    el('div', {id: 'thrAllocations', cls: 'thr-note', 'aria-live': 'polite'}),
                     el('label', { for: 'thrJson', text: 'Record JSON' }),
                     el('textarea', { id: 'thrJson', spellcheck: 'false' }),
                     el('div', { cls: 'thr-row' }, [
@@ -267,6 +333,7 @@ window.getThreadHeapRecordContext = function () {
         dlg = back;
         q('#thrJson').value = sample;
         showBinding();
+        showAllocations();
     }
 
     function close() {
