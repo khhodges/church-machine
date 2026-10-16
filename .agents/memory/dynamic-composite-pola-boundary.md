@@ -11,6 +11,8 @@ POLA persistence does not apply to dynamic changes. Dynamic reads and writes are
 
 Data words may reside within a code region and be read through an RX capability covering that region; do not require a separate data object or new data-block syntax merely because declarations lie outside methods.
 
-**Why:** The user explicitly corrected the proposed separation: “the data in a code block could be accessed as part of a RX capability.”
+This RX-based embedded-data case is read-only. Do not present it as the storage solution for mutable shared state such as a stash/reveal value; that requires writable storage and appropriate RW authority.
+
+**Why:** The user explicitly corrected the proposed separation: “the data in a code block could be accessed as part of a RX capability,” then clarified: “It only works for Read Only data.”
 
 **How to apply:** Preserve embedded data in code layout and resolve its addresses consistently with dispatch placement. Reading uses R; writing still requires W over the addressed words. Do not infer write authority from RX or confuse a parser limitation with an architectural prohibition.
