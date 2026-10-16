@@ -32,3 +32,9 @@ Use **Transaction** (initially written “Trasaction”, subsequently “transac
 **Why:** The user supplied this product vocabulary and person-centered interpretation explicitly.
 
 **How to apply:** Explain cooperating abstractions and shared tuples in terms of a Trasaction's task. Keep existing capabilities as the authority foundation and Dijkstra messages for communication with isolated Threads. The term does not itself promise database atomicity, rollback of external effects, or privacy from an external service receiving an authorized message.
+
+The augmented Thread designer prototype is restricted to Phase 1 tuple storage and Amobea.
+
+**Why:** The user explicitly narrowed the requested design view to these concepts.
+
+**How to apply:** Keep it isolated from the live IDE and preserve the prior prototype. Do not expand the view into hardware programming, Namespace building, or real external integrations. Unresolved rollback behavior is design-only.

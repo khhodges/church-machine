@@ -29,7 +29,6 @@
 - [C-list resolution pitfalls](clist-resolution-index.md) — Namespace-slot migration, CR-versus-row index confusion, and manifest-gated IRQ lazy loading.
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
-- [Thread base address zero](thread-base-address-zero.md) — a non-null CR12 may point to word 0; use an explicit missing-capability sentinel, never a base truthiness check
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
 - [Hardware release evidence](hardware-release-index.md) — serialized builds, source fingerprints, fresh staging, complete bundles, and historical authority.
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
@@ -74,7 +73,7 @@
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
-- [Thread private ABI and authority](normative-thread-private-abi.md) — private-frame geometry, protected indicator, runtime ownership, and continuation rules.
+- [Thread rules and Amobea design](normative-thread-private-abi.md) — geometry, ownership, root frames, placement, tuple allocation, and Transaction prototype scope.
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
 - [CALL E-GT identity flow](call-egt-identity-flow.md) — CALL resolves source/callee E-GTs directly; RETURN frames must carry normalized caller E authority, never transient CR6 L authority
@@ -120,7 +119,6 @@
 - [CapabilityTest Namespace slot](capabilitytest-namespace-slot.md) — CapabilityTest stays at NS[10]; UART_DEV stays at NS[2] with hardware address/limit semantics
 - [Church GT petname boundary](church-gt-petname-boundary.md) — resolve every CR-held GT to a petname; leave Turing data registers numeric and unnamed
 - [Retired fused instruction cutover](retired-fused-instruction-cutover.md) — manual source correction, hard compile errors, and only three boot-loaded LUMPs
-- [Thread root-frame invariant](thread-root-frame-invariant.md) — every fresh Thread image carries the canonical poison-root frame; direct runs activate it rather than creating one
 - [Executed-artifact freshness warning](executed-artifact-freshness-warning.md) — bootable is not current; always expose committed-vs-latest LUMP mismatches before simulation
 - [Trusted compiler and uploaded LUMPs](lump-trust-paths.md) — local compiler output is authoritative; unknown uploads stay inert through admission; placement is explicit and fail-closed
 - [Golden Token integrity layers](golden-token-integrity-layers.md) — seals prove authenticity, sideband ECC protects stored bits, and runtime checks enforce authority; never alter the 32-bit GT format
@@ -144,7 +142,6 @@
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
 - [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
-- [Thread LUMP placement](thread-lump-placement.md) — Threads are LUMPs, not special-address reservations; saved descriptors control generic placement.
 - [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
@@ -156,5 +153,3 @@
 - [Authenticated compact API admission](authenticated-compact-api-admission.md) — expand embedded rows from exact bytes; recover source PetNames only from matching signed compiler rows.
 - [Alternative IDE prototype](alternative-ide-prototype.md) — include Thread/Namespace authoring; separate URL and demo state, with no live artifact or hardware changes.
 - [Phase 1 review decisions](phase-1-document-collection.md) — guided scope decisions; two Namespaces on one FPGA for networking tests belong to Phase 2.
-- [Thread designer scope](thread-designer-tuple-scope.md) — include Tuple Store and rollback design; use Alice's save rejection as a diagnostic and storage acceptance example.
-- [Thread call-record ownership](thread-call-record-ownership.md) — zero contents are not ownership; cooperative allocation must not imply new CR5 protection or revocation.

@@ -12,3 +12,8 @@ Thread suspension identity belongs only to the canonical two-word CHURCH return 
 Related durable constraints:
 - [Protected Thread indicator](protected-thread-indicator.md) — protected packing and save/restore ownership.
 - [Thread object runtime authority](thread-object-runtime-authority.md) — single context authority, lifecycle labels, and continuation semantics.
+- [Thread base address zero](thread-base-address-zero.md) — zero is a valid base, not missing authority.
+- [Thread root frame](thread-root-frame-invariant.md) — fresh Threads require the canonical poison root.
+- [Thread LUMP placement](thread-lump-placement.md) — saved descriptors control placement, not special-address reservations.
+- [Thread designer and Amobea scope](thread-designer-tuple-scope.md) — Transaction vocabulary, shared tuples, capability boundaries, and isolated prototypes.
+- [Call-record ownership](thread-call-record-ownership.md) — explicit cooperative reservation, not inferred ownership or new capability revocation.
