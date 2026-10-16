@@ -35,3 +35,16 @@ not authorization to change the ISA or create a production-wide heap standard.
 **How to apply:** Keep JSON conversion at the IDE boundary for this phase,
 preserve omitted fields on updates, validate before writes, and keep live heap
 mutations separate from saved LUMPs and hardware programming.
+
+The user proposed a named Thread `Heap` reference, analogous to `Self`, exposing
+`Heap.Save` and other heap methods, with the Heap abstraction serving as the
+“Amoeba” for every Thread. Treat this as the architectural direction under
+discussion; the revised CR0 bootstrap call is explicitly TBD.
+
+**Why:** The user wants a common Thread heap abstraction rather than independent
+application-specific storage machinery.
+
+**How to apply:** Distinguish callable method authority from Thread heap data
+authority. Define binding and method contracts before implementation; do not
+infer approval to change CR0, bootstrap, persistence, or the ISA from this
+discussion.
