@@ -1018,3 +1018,17 @@ mtime_ms = 1791986499939
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1931870d-e068-416a-b51d-13091e086ede/d2bcfc5e-2ba8-4326-8741-c716b1f4d3f6"
 storage_version_token = "1791986541486101"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "9epLv2Gih4-Tm9NMx3oNg"
+uri = "file://Amobea-V1.md"
+type = "text"
+title = "Amobea V1 — Thread Abstraction"
+description = "Review outline covering Thread services, continuation capture without CHANGE, proposed rollback, IDE-reserved space, and CR0 bootstrap questions."
+logical_id = "772db26c-5b4f-464a-88f0-21cfdbad017c"
+content_hash = "sha256:d8939831744f12b66be02b958d266823d267b0fe42ce0fffce196c011eb6d185"
+size = 8475
+mtime_ms = 1792162277083
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/772db26c-5b4f-464a-88f0-21cfdbad017c/a27b541a-aa72-4126-9d5b-8c3bb10270f0"
+storage_version_token = "1792162289249307"
+content_type = "text/markdown"
