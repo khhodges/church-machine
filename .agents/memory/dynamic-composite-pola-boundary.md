@@ -18,3 +18,9 @@ This RX-based embedded-data case is read-only. Do not present it as the storage 
 **How to apply:** Preserve embedded data in code layout and resolve its addresses consistently with dispatch placement. Reading uses R; writing still requires W over the addressed words. Do not infer write authority from RX or confuse a parser limitation with an architectural prohibition.
 
 **Why (heap alternative):** The user rejected the claim that this example necessarily needs another RW data GT, suggesting the heap as a tuple store instead. This is an architectural option to investigate, not confirmation that the current heap implementation preserves such state across calls.
+
+The user's motivating telephony example is a complete call record starting with caller name and telephone number, then routing selection, endpoint, and conditions as processing proceeds.
+
+**Why:** This illustrates shared record state spanning methods, rather than independent storage per method or a new GT for every field.
+
+**How to apply:** Use this example when discussing heap tuple records; keep record lifetime and access authority explicit without assuming a specific allocation scheme or one Thread per call has been approved.
