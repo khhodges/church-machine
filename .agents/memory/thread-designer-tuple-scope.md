@@ -14,3 +14,9 @@ Clarify privacy across abstractions, Threads, Namespaces, and Church Machines be
 **Why:** The user explicitly requested clarification of privacy rules at all these levels after discussing the tuple-store extension.
 
 **How to apply:** Separate containment, authority, lifetime, and administrative/debug access. Present unresolved policy as proposed, not as an existing hardware guarantee.
+
+Namespace encapsulation supplies the enclosing Thread privacy boundary; Thread tuples do not themselves supply abstraction-to-abstraction privacy within that Thread.
+
+**Why:** The user explicitly distinguished Namespace-guaranteed Thread privacy from tuple storage, which does not create the same encapsulation.
+
+**How to apply:** Describe privacy relative to the boundary: Namespace-external versus within-Thread access. Do not imply that tuple naming, typing, or allocation creates an independent security boundary, or that Namespace encapsulation makes every Thread private from all peers within its Namespace. Keep architectural guarantees distinct from implementation qualification.
