@@ -57,7 +57,7 @@
                 {profile:value, active:true});
         }
         try { root.localStorage.setItem(profileKey, value); }
-        catch (_) { state.error = 'Browser storage is unavailable; this layout choice cannot survive a restart.'; }
+        catch (_) { /* Storage restrictions must not prevent loading the selected design. */ }
         const legacy = document.getElementById('bootCapacityPanel');
         if (legacy) legacy.hidden = state.active;
         root.updateNamespace();
@@ -341,7 +341,12 @@
     }
     root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity};
     if(typeof document!=='undefined') {
-        if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',render);
-        else render();
+        const initialize = () => {
+            const capacity = document.getElementById('bootCapacityPanel');
+            if (capacity) capacity.hidden = state.active;
+            render();
+        };
+        if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',initialize);
+        else initialize();
     }
 })(typeof window!=='undefined'?window:globalThis);
