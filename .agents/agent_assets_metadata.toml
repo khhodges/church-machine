@@ -1046,3 +1046,17 @@ mtime_ms = 1792165673532
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cc62ecaa-d40c-4865-a06a-140cc66716d7/6dd92236-cc89-4317-84f3-be69ded86c3e"
 storage_version_token = "1792165688887001"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Tgi0GFeO07egybEx8r81P"
+uri = "file://docs/phase-1/CM-W7-explainer.md"
+type = "text"
+title = "CM and W7 — Revised Review Explainer"
+description = "Qualified security claims, checkpoint-specific one-shot semantics, and explicit implementation evidence limits."
+logical_id = "dd6896c7-870c-421d-8f11-f929f9093ad1"
+content_hash = "sha256:1da066e008f2b9e228c39e852dec2841e3170026e359b116b10b8fe70ef5f3c6"
+size = 8551
+mtime_ms = 1792172446396
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/dd6896c7-870c-421d-8f11-f929f9093ad1/53b8d6e2-a2fc-4638-9784-2961f56225e1"
+storage_version_token = "1792172463435982"
+content_type = "text/markdown"

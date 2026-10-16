@@ -13,6 +13,8 @@
   CR0 bootstrap binding still TBD.
 - **[Call-record demonstration](thread-heap-call-record.md)** — local reference
   copy of the initial tuple format and IDE demonstration.
+- **[W7-oriented CM explainer](CM-W7-explainer.md)** — revised review of
+  continuation and capability concerns, with explicit evidence limits.
 
 These review documents define software scope, not completed implementation,
 hardware qualification, or authorization to change bootstrap.
