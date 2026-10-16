@@ -26,3 +26,9 @@ Do not introduce tuple-specific security capabilities, ACLs, or a parallel priva
 **Why:** The user corrected the proposed tuple-privacy direction: capabilities are the bedrock; do not reinvent them for tuples.
 
 **How to apply:** Tuple services handle structure, allocation, bounds, and lifetime, not a new security policy. The designer should direct isolation requirements to Thread separation and existing capability-authorized messaging. Do not invent message protocol details or claim this direction proves implementation readiness.
+
+Use the user's term **Trasaction** for shared Thread activity. Model a private Namespace as an extension of an individual for private, secure tasks, with examples such as “Phone Mum”, “Make supper”, and “Ask Claude.ai”.
+
+**Why:** The user supplied this product vocabulary and person-centered interpretation explicitly.
+
+**How to apply:** Explain cooperating abstractions and shared tuples in terms of a Trasaction's task. Keep existing capabilities as the authority foundation and Dijkstra messages for communication with isolated Threads. The term does not itself promise database atomicity, rollback of external effects, or privacy from an external service receiving an authorized message.
