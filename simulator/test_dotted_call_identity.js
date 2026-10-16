@@ -11,11 +11,14 @@ const PLACEHOLDER = 0xF7000000;
 // Active editor C-list, not a capabilities block in this source.
 const slots = {SELF: 0, 'ide.SelfTest': 1, 'ide.WukongCallHome': 2};
 const lines = Array(109).fill('; original editor line');
-lines[0] = '; Abstraction: ide.Caller';
+lines[0] = 'abstraction ide.Caller {';
+lines[1] = 'capabilities { SELF E, ide.SelfTest E, ide.WukongCallHome E }';
+lines[2] = 'method Run() {';
 lines[105] = 'Start:';
 lines[106] = 'CALL ide.SelfTest';
 lines[107] = 'CALL ide.WukongCallHome';
 lines[108] = 'BRANCH Start';
+lines.push('}', '}');
 const source = lines.join('\n');
 const expected = [[107, 'ide.SelfTest', 1], [108, 'ide.WukongCallHome', 2]];
 
@@ -40,7 +43,7 @@ check(new Compiler().compileAssembly(source, [], {clistSlots: slots,
 
 // Object.method keeps the complete spelling; no method table is consulted.
 const methodResult = new Compiler().compileAssembly(
-    '; Abstraction: ide.Caller\nCALL ide.SelfTest.Run\nCALL ide.SelfTest.Missing', [], {clistSlots: slots});
+    'abstraction ide.Caller {\ncapabilities { SELF E, ide.SelfTest E }\nmethod Run() {\nCALL ide.SelfTest.Run\nCALL ide.SelfTest.Missing\n}\n}', [], {clistSlots: slots});
 assert.deepEqual(methodResult.errors, []);
 assert.deepEqual(methodResult.warnings, []);
 assert.deepEqual(methodResult.methods[0].symbolicCalls.map(c => [c.full_name, c.row]),
@@ -48,8 +51,8 @@ assert.deepEqual(methodResult.methods[0].symbolicCalls.map(c => [c.full_name, c.
 
 // Metadata removal must retain blank lines and original source coordinates.
 const withDirective = lines.slice();
-withDirective[1] = '@target IoT';
-withDirective[2] = '';
+withDirective[3] = '@target IoT';
+withDirective[4] = '';
 check(new Compiler().compile(withDirective.join('\n'), [], {clistSlots: slots}), 'directive');
 
 const wrapped = lines.slice();

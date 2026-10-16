@@ -276,6 +276,21 @@ function assembleAndLoad(options) {
 
     const con = document.getElementById('editorConsole');
 
+    // Callable artifacts must use the compiler-owned method/interface snapshot,
+    // not the raw assembler's code-only registry and hand-built dispatch table.
+    if (/^\s*abstraction\s+[A-Za-z_][\w.]*/m.test(source)) {
+        return compileAndBuild({ ..._assembleOptions, source });
+    }
+    const callableAssembly = /^\s*;\s*(?:Abstraction:|@abstraction)\s+\S+/im.test(source) ||
+        /^\s*(?:SELF|__SELF__)\s+E\s*[,;]?\s*$/im.test(source);
+    if (callableAssembly && !(window.ChurchIDX1IDE && window.ChurchIDX1IDE.requiresProfile(source))) {
+        const message = 'Callable LUMPs require explicit method declarations. Use abstraction pet.Name { capabilities { SELF E } method Run() { ... } }. Labels and comments are not declarations. Remove the hand-written dispatch table; the compiler generates it.';
+        if (con) con.textContent = 'Compile failed: ' + message;
+        switchCodeTab('console');
+        if (typeof _showAsmErrors === 'function') _showAsmErrors([{line: 1, message}]);
+        showNextSteps('error');
+        return {ok: false, kind: 'assembly', error: message, errors: [{line: 1, message}]};
+    }
     const isHighLevel = cloomcCompiler && (
         cloomcCompiler._detectPetName(source) ||
         cloomcCompiler._detectEnglish(source) ||

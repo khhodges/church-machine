@@ -18,8 +18,8 @@ const { lumpDecodeContentFrameApi } = require('./lump-content-frame.js');
 const PLACEHOLDER = 0xF7000000;
 const NATIVE = 'abstraction ide.Probe {\n capabilities {\n  SELF E\n  ide.SelfTest E\n  ide.WukongCallHome E\n }\n' +
     ' method Run() {\n  CALL ide.SelfTest.Run\n  CALL ide.WukongCallHome.Run\n }\n}';
-const ASM = '; Abstraction: ide.Probe\ncapabilities {\n SELF E,\n ide.SelfTest E,\n ide.WukongCallHome E\n}\n' +
-    'CALLEQ ide.SelfTest.Run\nCALL ide.WukongCallHome\nRETURN';
+const ASM = 'abstraction ide.Probe {\ncapabilities {\n SELF E,\n ide.SelfTest E,\n ide.WukongCallHome E\n}\nmethod Run() {\n' +
+    'CALLEQ ide.SelfTest.Run\nCALL ide.WukongCallHome\nRETURN\n}\n}';
 
 function artifact(src) {
     const r = new CLOOMCCompiler().compile(src, []);
@@ -148,8 +148,8 @@ function run(words, steps) {
 // 4c. Explicit "CALL obj, Method" and named LOAD->CALL defer identically,
 //     without destination method information; numeric CR calls unchanged.
 {
-    const src = '; Abstraction: ide.Probe\ncapabilities {\n SELF E,\n ide.Target E\n}\n' +
-        'CALL ide.Target, Run\nLOAD CR3, ide.Target\nCALL ide.Target.Run\nCALLNE ide.Target, Stop\nCALL CR3, 2\nRETURN';
+    const src = 'abstraction ide.Probe {\ncapabilities {\n SELF E,\n ide.Target E\n}\nmethod Run() {\n' +
+        'CALL ide.Target, Run\nLOAD CR3, ide.Target\nCALL ide.Target.Run\nCALLNE ide.Target, Stop\nCALL CR3, 2\nRETURN\n}\n}';
     const r = new CLOOMCCompiler().compile(src, []);
     assert.deepStrictEqual(r.errors, []);
     assert.deepStrictEqual(r.warnings || [], []);
@@ -180,7 +180,7 @@ function run(words, steps) {
     assert.throws(() => guard.validate(patched), /placeholder/);
     const plan = JSON.parse(JSON.stringify(native.api.symbolic_binding)); plan.calls[0].row = 2;
     assert.throws(() => guard.validate(native.words, { planContract: plan }), /differs/);
-    const plain = artifact('; Abstraction: ide.Plain\ncapabilities {\n SELF E\n}\nRETURN').words;
+    const plain = artifact('abstraction ide.Plain {\ncapabilities {\n SELF E\n}\nmethod Run() {\nRETURN\n}\n}').words;
     assert.strictEqual(guard.validate(plain).symbolic, false);
     assert.throws(() => guard.validate(plain, { planContract: plan }), /absent/);
 }

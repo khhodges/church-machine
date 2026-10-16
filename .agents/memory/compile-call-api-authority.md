@@ -19,6 +19,17 @@ linking loader, retaining symbolic evidence in compiler output. Never guess
 a numeric selector or suppress errors while emitting guessed executable bytes.
 Local source syntax and structural validation remain compiler responsibilities.
 
+Callable code LUMPs require explicit declarations of their own methods; labels
+and comments do not constitute an interface. The compiler generates the dispatch
+table, and must reject missing declarations during compilation rather than Format LUMP.
+This does not require destination method APIs or apply to data/Thread/Namespace artifacts.
+
+**Why:** The user approved this simpler rule after raw assembly compiled successfully
+but failed packaging because its own method declarations were absent.
+
+**How to apply:** Preserve compiler-owned method metadata through format/save.
+Never synthesize an implicit public `run` method for undeclared callable assembly.
+
 An unresolved binding is a HardFault only when referenced during execution.
 Its presence alone must not block loading or starting execution.
 

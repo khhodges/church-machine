@@ -473,6 +473,10 @@ class CLOOMCCompiler {
             }
         }
         // All frontends share the same object identity rule, including MMIO.
+        if (!(result.methods || []).length && !result.errors.length) {
+            result.errors.push({line: 1, message:
+                'Callable LUMPs require explicit method declarations: method Run() { ... }. No implicit method or dispatch table was generated.'});
+        }
         result.errors.push(...ChurchAssembler.objectNameErrors(result, source));
         return result;
     }
@@ -1288,6 +1292,16 @@ class CLOOMCCompiler {
     }
 
     compileAssembly(source, capabilities, options) {
+        // Callable assembly uses the existing explicit method grammar. Compile
+        // the bodies normally; the LUMP builder owns the single dispatch table.
+        if (/^\s*abstraction\s+[A-Za-z_][\w.]*/m.test(source)) {
+            const compiled = this.compile(source, capabilities || [], options);
+            compiled.language = 'assembly';
+            if (!(compiled.methods || []).length && !(compiled.errors || []).length)
+                compiled.errors.push({line: 1, message:
+                    'Callable LUMPs require explicit method declarations: method Run() { ... }. Labels and comments do not declare methods.'});
+            return compiled;
+        }
         const declaration = source.match(/^\s*;\s*(?:Abstraction:|@abstraction)\s+([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*$/im);
         if (!declaration) return {
             abstractionName: '', language: 'assembly', methods: [], capabilities: [],
@@ -1405,12 +1419,11 @@ class CLOOMCCompiler {
         return {
             abstractionName: absName,
             language: 'assembly',
-            methods: [{ name: 'run', code: words, sourceLines: source, lineNums: asmLineNums,
-                ...((result.symbolicCalls || []).length && { symbolicCalls: result.symbolicCalls.map(c => ({
-                    addr: c.word_offset, full_name: c.full_name, row: c.row,
-                    source_line: c.source_line, condition: c.condition })) }) }],
+            methods: [],
             capabilities: caps,
-            errors: [],
+            errors: [{line: 1, message:
+                'Callable LUMPs require explicit method declarations. Use abstraction ' + absName +
+                ' { capabilities { SELF E } method Run() { ... } }. Move instructions into declared methods and remove the hand-written dispatch table; the compiler generates it. Labels and comments are not method declarations.'}],
             warnings: result.warnings || [],
             lineNums: asmLineNums,
             profile: (typeof detectProfile === 'function') ? detectProfile([{ code: words }]) : 'IoT',
