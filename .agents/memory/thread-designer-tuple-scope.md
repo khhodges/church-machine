@@ -20,3 +20,9 @@ Namespace encapsulation supplies the enclosing Thread privacy boundary; Thread t
 **Why:** The user explicitly distinguished Namespace-guaranteed Thread privacy from tuple storage, which does not create the same encapsulation.
 
 **How to apply:** Describe privacy relative to the boundary: Namespace-external versus within-Thread access. Do not imply that tuple naming, typing, or allocation creates an independent security boundary, or that Namespace encapsulation makes every Thread private from all peers within its Namespace. Keep architectural guarantees distinct from implementation qualification.
+
+Do not introduce tuple-specific security capabilities, ACLs, or a parallel privacy mechanism. When state requires isolation from other abstractions sharing a Thread, require a separate Thread and communication through Dijkstra messages, governed by existing capabilities.
+
+**Why:** The user corrected the proposed tuple-privacy direction: capabilities are the bedrock; do not reinvent them for tuples.
+
+**How to apply:** Tuple services handle structure, allocation, bounds, and lifetime, not a new security policy. The designer should direct isolation requirements to Thread separation and existing capability-authorized messaging. Do not invent message protocol details or claim this direction proves implementation readiness.
