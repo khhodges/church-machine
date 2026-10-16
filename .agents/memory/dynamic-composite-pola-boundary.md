@@ -75,3 +75,17 @@ a possible later extension to the telephony example.
 **How to apply:** Keep tuple storage and IDE support in that scope while
 distinguishing scope approval from implementation evidence. Rollback contracts
 and CR0 bootstrap binding remain TBD.
+
+The user requires the Amobea review to consider a machine-maintained
+is-it-running bit in the Thread data structure, checked and set by `CHANGE`;
+the packed stack word was suggested as a possible location, not a settled
+bit assignment.
+
+**Why:** Thread activation ownership must be explicit when adding continuation
+capture and rollback. Running-state exclusion and checkpoint replay prevention
+are separate requirements.
+
+**How to apply:** Review protected placement and every activation/save path
+before assigning a bit. Preserve the approved self-target CHANGE behavior
+unless explicitly revised. Do not equate an IDE pause with relinquishing
+Thread ownership or treat a running flag as a checkpoint-consumed flag.
