@@ -52,3 +52,16 @@ discussion.
 
 `Thread.Rollback` and IDE-reserved snapshot space remain proposals, not an
 approved implementation or a defined snapshot/resume contract.
+
+The user clarified that the Thread already has a data structure capable of
+saving machine continuation state without using `CHANGE`.
+
+**Why:** Capturing continuation state is distinct from switching execution to
+another Thread; it must not be described as requiring a new IDE-only snapshot
+format or a Thread switch.
+
+**How to apply:** Base proposed Thread checkpoint/rollback services on the
+existing continuation structure. Reserved space may retain a saved version;
+the exact capture/resume method contract remains to be defined. Do not infer
+that a single `SAVE` instruction captures all state without checking its ISA
+contract.
