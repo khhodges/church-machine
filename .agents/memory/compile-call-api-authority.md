@@ -19,6 +19,16 @@ linking loader, retaining symbolic evidence in compiler output. Never guess
 a numeric selector or suppress errors while emitting guessed executable bytes.
 Local source syntax and structural validation remain compiler responsibilities.
 
+An unresolved binding is a HardFault only when referenced during execution.
+Its presence alone must not block loading or starting execution.
+
+**Why:** The user rejected the agent's proposed all-bindings-resolved execution
+gate. Unused unresolved references are valid.
+
+**How to apply:** Keep unresolved references explicit through compile, save,
+binding and load; fault on actual execution-time reference, never guess a
+target or silently rebind from Run, Step or Walk.
+
 CALL diagnostics and lowering must share object/method interpretation, using
 the active or finalized C-list. Missing API evidence must never turn a full
 dot-name into a shorter object name. Source metadata removal must preserve

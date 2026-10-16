@@ -13,11 +13,25 @@ trigger rebinding or change the established bindings.
 controls must preserve them, then moved the binding action to the renamed
 Bind Namespace Design control instead of automatic load-time binding.
 
-**How to apply:** Validate fresh destination bindings before execution and show
+**How to apply:** Validate each resolved destination binding and show
 one movable, staggered overlapping inspection window per C-list, all together.
 Show actual binding results, not inferred labels. Namespace edits during execution
 must not silently relink the session. Binding reports alone are not executable
 image activation or hardware certification.
+
+Unresolved bindings do not block compilation, saving, loading, or starting
+execution. Only an executing instruction that references an unresolved binding
+causes a HardFault; unused unresolved entries do not fault. Binding reports
+may expose unresolved entries without imposing an all-resolved execution gate.
+Run, Step and Walk still must not rebind.
+
+**Why:** The user explicitly corrected the agent's proposed execution gate:
+“An unresolved binding is a HardFault at execution time only is referenced.”
+
+**How to apply:** Preserve unresolved references without fabricated authority.
+Validate successful resolutions individually and test both an unused unresolved
+entry and an executed reference to it. This does not waive structural,
+integrity, or authorization checks.
 
 Canonical portable LUMPs must contain symbolic Self and unresolved dependency
 rows. Local slots, sequences, and GTs are permitted only in a destination copy
@@ -29,8 +43,9 @@ carry an already-materialized GT, lets compiling-machine authority leak into a
 transferable artifact and bypasses destination policy.
 
 **How to apply:** Validate unresolved rows before legacy c-list validation,
-derive candidates from verified bytes plus live Namespace records, bind on a
-private copy, and commit only after every relocation succeeds. Catalog/API
+derive candidates from verified bytes plus live Namespace records, and bind on a
+private copy. Unresolved entries remain unresolved and fault only if referenced
+during execution; do not require every relocation to succeed. Catalog/API
 projections must preserve explicit grants, type, and authorization fail-closed.
 
 The compiler must not populate destination Golden Tokens. The linking loader
