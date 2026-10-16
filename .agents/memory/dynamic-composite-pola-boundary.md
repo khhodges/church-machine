@@ -65,3 +65,13 @@ existing continuation structure. Reserved space may retain a saved version;
 the exact capture/resume method contract remains to be defined. Do not infer
 that a single `SAVE` instruction captures all state without checking its ISA
 contract.
+
+The user explicitly included tuple storage and its IDE support in Phase 1
+and requested the Amobea review outline in the Phase 1 collection.
+
+**Why:** Thread tuple services are part of the Phase 1 review scope, not merely
+a possible later extension to the telephony example.
+
+**How to apply:** Keep tuple storage and IDE support in that scope while
+distinguishing scope approval from implementation evidence. Rollback contracts
+and CR0 bootstrap binding remain TBD.

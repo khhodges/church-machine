@@ -1,8 +1,9 @@
 # Amobea V1 — Thread Abstraction
 
 **Status:** Outline for review, not an implementation specification.  
-**Scope:** A common Thread service abstraction, including heap records and
-continuation-state services. CR0 bootstrap binding remains TBD.
+**Scope:** Phase 1 Thread-local tuple storage and IDE support, within a common
+Thread service abstraction that also considers continuation-state services.
+CR0 bootstrap binding and rollback contracts remain TBD.
 
 ## 1. Purpose
 
@@ -136,6 +137,63 @@ initial demonstration. A runtime JSON parser is not required by this outline.
 
 See [Thread heap call-record demonstration](docs/thread-heap-call-record.md)
 for the original record format and demonstration interface.
+
+### 6.1 Phase 1 tuple storage
+
+Phase 1 includes typed tuple/record storage in the current Thread's authorized
+heap. The telephony record is the first example, not the only permitted tuple
+shape. This section defines review scope, not a claim of completed delivery.
+
+- **Definition:** Each tuple format specifies its fields, types, lengths,
+  version, and word extent. The existing call record is the initial concrete
+  format; a general tuple-definition syntax remains to be agreed.
+- **Ownership:** Explicitly reserve or allocate bounded storage for each tuple.
+  Multiple tuples must not overlap each other, continuation frames, or any
+  separately reserved checkpoint space.
+- **Operations:** Create, read, update selected fields, and release tuples
+  through Thread services. Final method names and argument/result conventions
+  remain subject to review.
+- **Identity:** Use a defined Thread-local tuple reference. Its representation
+  and reuse rules must prevent a stale reference from modifying a later
+  allocation; a tuple reference does not itself grant new capability authority.
+- **Lifetime:** Preserve records across ordinary calls and returns on the same
+  Thread. Define reset, Thread replacement, and release behavior explicitly.
+- **Validation:** Reject invalid types, oversized fields, out-of-bounds access,
+  and unauthorized access before altering a record. Partial updates retain
+  omitted fields.
+
+### 6.2 Phase 1 IDE support
+
+The IDE should provide:
+
+1. A view of the selected Thread's tuple definitions, allocated records, and
+   reserved/available heap space.
+2. Explicit create/reserve and release actions, with the target Thread and
+   affected storage shown before destructive changes.
+3. Record inspection and JSON import/export, plus partial field updates that
+   preserve omitted fields. JSON conversion remains at the IDE boundary.
+4. Validation of the complete proposed edit before publication. Changes to
+   the Thread, allocation, or record after review invalidate a pending edit.
+5. Paused-simulator editing for the initial demonstration; opening a view or
+   selecting a file must not write memory.
+6. Callable example source and visible field layouts, so IDE and runtime
+   operations can be reviewed against the same tuple definition.
+
+IDE tuple editing does not implicitly save a LUMP, alter an editor draft,
+persist runtime state, program hardware, or capture a continuation.
+
+### 6.3 Phase 1 acceptance evidence
+
+Demonstrate multiple non-overlapping tuples, allocation exhaustion and safe
+release/reuse; read/write agreement between callable methods and the IDE;
+JSON round-tripping and omitted-field preservation; rejection without partial
+writes; persistence across calls/returns; and invalidation after Thread reset
+or replacement. Confirm that another Thread does not silently acquire access.
+
+The existing call-record demonstration is a starting point. Generic tuple
+support and the common `Thread` binding require their own implementation
+evidence. Continuation rollback and the revised CR0 bootstrap sequence remain
+separate review items, not features claimed by tuple-storage acceptance.
 
 ## 7. Bootstrap and CR0 — TBD
 

@@ -6,6 +6,17 @@
 2. **[Hardware acceptance](04-release/isa-to-fpga-alignment-plan.md)** — how to prove them.
 3. **[RTL source snapshot](02-rtl/README.md)** — reference copy of the current implementation and focused tests; not a qualified bitstream.
 
+## Software review scope
+
+- **[Amobea V1 — Thread abstraction](Amobea-V1.md)** — Phase 1 tuple storage
+  and IDE support; continuation capture without `CHANGE`, with rollback and
+  CR0 bootstrap binding still TBD.
+- **[Call-record demonstration](thread-heap-call-record.md)** — local reference
+  copy of the initial tuple format and IDE demonstration.
+
+These review documents define software scope, not completed implementation,
+hardware qualification, or authorization to change bootstrap.
+
 ## Authority
 
 | Question | Answer comes from |
