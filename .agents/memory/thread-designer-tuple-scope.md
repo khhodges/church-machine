@@ -27,7 +27,7 @@ Do not introduce tuple-specific security capabilities, ACLs, or a parallel priva
 
 **How to apply:** Tuple services handle structure, allocation, bounds, and lifetime, not a new security policy. The designer should direct isolation requirements to Thread separation and existing capability-authorized messaging. Do not invent message protocol details or claim this direction proves implementation readiness.
 
-Use the user's term **Trasaction** for shared Thread activity. Model a private Namespace as an extension of an individual for private, secure tasks, with examples such as “Phone Mum”, “Make supper”, and “Ask Claude.ai”.
+Use **Transaction** (initially written “Trasaction”, subsequently “transaction” by the user) for shared Thread activity. Model a private Namespace as an extension of an individual for private, secure tasks, with examples such as “Phone Mum”, “Make supper”, and “Ask Claude.ai”. The user requests this abstraction as part of Amobea and a Phase 1 demonstration objective.
 
 **Why:** The user supplied this product vocabulary and person-centered interpretation explicitly.
 

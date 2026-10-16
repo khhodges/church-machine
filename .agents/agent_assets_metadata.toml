@@ -1037,14 +1037,14 @@ content_type = "text/markdown"
 id = "g6WPbY4FZYTwB0t1DGaKY"
 uri = "file://docs/phase-1/Amobea-V1.md"
 type = "text"
-title = "Amobea V1 — Bit-13 Acceptance Checklist"
-description = "Updated §4.4 covering live/saved transforms, complete writer audit, ownership actions, and format-aware validation."
+title = "Amobea V1 — Transaction demonstration objectives"
+description = "Section 6.4 defines Transaction, five human-task demonstrations, capability boundaries, and Phase 1 acceptance criteria."
 logical_id = "cc62ecaa-d40c-4865-a06a-140cc66716d7"
-content_hash = "sha256:f9ddbaff62b31a97d7af36f60063e072fab225a5464c9d850323fbb2c6a3a3e9"
-size = 23836
-mtime_ms = 1792173962157
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cc62ecaa-d40c-4865-a06a-140cc66716d7/bb7f6146-3b3c-48b6-8612-8eafa6756818"
-storage_version_token = "1792173977683508"
+content_hash = "sha256:5db20ad6dbe9be2004b3722cb0f25d76f170df8fdad454e4ee3fa7e30fb6314c"
+size = 32073
+mtime_ms = 1792186739675
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cc62ecaa-d40c-4865-a06a-140cc66716d7/0b38e3ba-e8fd-4df9-baa5-fe64f13d8253"
+storage_version_token = "1792186757677918"
 content_type = "text/markdown"
 
 [[outputs]]

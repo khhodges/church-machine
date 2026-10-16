@@ -395,6 +395,116 @@ support and the common `Thread` binding require their own implementation
 evidence. Continuation rollback and the revised CR0 bootstrap sequence remain
 separate review items, not features claimed by tuple-storage acceptance.
 
+### 6.4 Transaction abstraction — Phase 1 demonstration objective
+
+**Definition:** A Transaction is a purposeful human task carried out by
+cooperating abstractions within one Thread, using shared tuples and existing
+capabilities. Amobea supplies the Thread services supporting that activity.
+The private Namespace is an extension of the individual: the enclosing
+environment for their private tasks, not an automatic grant to every service.
+“Transaction” is the spelling used here for the earlier “Trasaction” concept.
+
+This is a software demonstration objective, not a new ISA object, security
+primitive, or claim of database-style atomicity. No implementation pass is
+claimed by this definition.
+
+#### Authority and isolation
+
+- Capabilities remain the sole access-authority foundation. Tuple schemas,
+  names, allocation handles, and Transaction identifiers grant no new authority.
+- Tuples organize the cooperating Thread's shared working state; they do not
+  create abstraction-private compartments or introduce tuple ACLs.
+- Namespace encapsulation supplies the enclosing privacy boundary. It does
+  not imply mutual privacy for all objects or Threads within that Namespace.
+- If state must be isolated from cooperating code in this Thread, use a
+  separate Thread and Dijkstra messages under existing capability rules.
+  Thread separation must be accompanied by the appropriate existing grants;
+  a new Thread name alone does not revoke authority already held.
+- Message payloads explicitly select what is disclosed. External services
+  receive that payload, not implicit access to the individual's Namespace.
+  A Transaction identifier is for correlation, never authorization.
+- Checkpoint storage and capture/restore use the existing authority model and
+  the separately reviewed continuation contract, not tuple-specific privileges.
+
+#### Proposed service contract
+
+The following are semantic operations for review, not frozen method names,
+register assignments, or implemented APIs:
+
+| Operation | Meaning |
+|---|---|
+| Begin | Establish the task's purpose, owning Thread, input tuples, and declared existing capability requirements; allocate bounded working records without minting new authority. |
+| Read / Update | Cooperating methods inspect or update shared tuples through Thread services; validate the complete update before writing and preserve omitted fields. |
+| Request / Receive | Communicate with an isolated Thread through Dijkstra messages; correlate request/result and apply only the intended response to the task. Exact messaging ABI requires a referenced, agreed contract. |
+| Complete | Record the result and release explicitly disposable working allocations; retain only outputs whose lifetime has been specified. This is not an atomic external commit. |
+| Cancel / Fail | Record the actual outcome and performed external effects; release safe disposable allocations. Do not silently retry, undo device effects, or hide a machine fault. |
+| Checkpoint / Restore | Optional, gated operations using the Amobea continuation contract. State the retained data scope, authority, validity, and one-shot consumption rules. |
+
+Proposed task statuses are prepared, active, waiting for a reply, completed,
+cancelled, and failed. These are application progress, not machine ownership
+bits: waiting or IDE pause does not by itself release Thread ownership.
+Fault/reset disposition and late/duplicate message handling need explicit
+contracts before execution tests can pass.
+
+#### Five representative human Transactions
+
+These are selected for breadth of demonstration, not a statistical ranking of
+human activity. The first three preserve the motivating examples.
+
+| ID | Human task | Shared tuple state | Isolated/message interaction | Observable demonstration result |
+|---|---|---|---|---|
+| TX-1 | Phone Mum — communicate | Selected contact, number, connection request, call state, outcome | Contact/telephone services receive only the fields needed for the authorized operation | Lookup, request, and returned call state agree across cooperating methods; denied authority produces no call request. |
+| TX-2 | Make supper — sustain daily life | Recipe, servings, ingredients, ordered steps, timer state | Pantry/timer services; appliance control only with separately granted device authority | Recipe selection and preparation update the same records without changing unrelated tuples; cancellation does not claim to reverse cooking. |
+| TX-3 | Ask Claude.ai — learn or solve a problem | Question, explicitly selected context, request identity, answer | Isolated assistant gateway receives the reviewed request payload only | Response is associated with the right question; unselected private context is absent from the outbound payload. |
+| TX-4 | Buy groceries — obtain necessities | Shopping list, quantities, quoted prices, spending limit, order status | Shop/payment services are isolated; real purchase requires separate authorization | Review and simulated order result agree; insufficient authority or an unapproved amount produces no purchase request. |
+| TX-5 | Arrange an appointment — coordinate time and care | Purpose, candidate times, selected slot, disclosed details, confirmation | Calendar/provider services exchange only the selected availability and details | The chosen slot and returned confirmation match; unrelated calendar details are not disclosed. |
+
+#### Phase 1 demonstration and acceptance
+
+**All TX objectives are not run as defined here.** Existing call-record tests
+are supporting evidence only, not passes for these complete human activities.
+
+Start with TX-1 as the vertical demonstration, then exercise the same contract
+with TX-2 through TX-5. Use an all-resident, simulator-only fixture with
+synthetic contacts, messages, orders, and appointments. External services and
+devices are explicitly labelled test doubles: no real phone calls, purchases,
+appliance commands, personal-data disclosure, or Claude.ai connection is
+authorized by this objective. No two-Namespace networking scope is added.
+
+For each task, demonstrate:
+
+1. The Thread designer shows purpose, tuple schemas/allocations, existing
+   capabilities, isolated peer Threads, and Dijkstra message connections.
+2. At least two cooperating methods share the same tuple across CALL/RETURN;
+   multiple allocations do not overlap and release/reuse rejects stale handles
+   under the allocator's lifetime contract, without claiming new GT revocation.
+3. Inspection and JSON partial updates agree with runtime values. Invalid
+   edits are rejected without partial writes; omitted fields remain unchanged.
+4. A capability-denied operation faults/rejects under the existing contract
+   before an unauthorized effect. Separate-Thread isolation is exercised
+   through real message semantics, not substituted direct shared-memory access.
+5. Requests disclose only their declared payload; replies cannot silently
+   update another Transaction. Specify and test late/duplicate reply behavior.
+6. Completion, cancellation, exhaustion, and failure expose the true outcome,
+   preserve unrelated records, and follow declared allocation lifetimes.
+7. Invalid source or layout produces an in-IDE diagnostic with source context
+   and a correction path, preserving the draft and prior saved LUMP. Alice's
+   rejection is the regression example; never silently convert private state
+   into a shared tuple.
+
+For checkpoint/rollback, the designer must show the intended retained state
+and whether the operation is available. Execution acceptance remains **blocked**
+until the capture/resume, consumption, reset, and data-scope contracts are
+settled and implemented. Then test restoration of exactly that scope,
+duplicate-restore rejection, and no automatic replay or undo of external
+effects. A design-only checkpoint view is not a rollback pass.
+
+Record exact source/LUMP and simulator identities, inputs, expected and actual
+outcomes, and the message boundary used. Missing messaging implementation is a
+blocker, not permission to replace isolation with host-only simulated calls.
+Hardware evidence is separate. This objective authorizes no bootstrap change,
+saved-artifact migration, vendor build, or flashing.
+
 ## 7. Bootstrap and CR0 — TBD
 
 A revised CR0 call during bootstrap may establish or enter the Thread service

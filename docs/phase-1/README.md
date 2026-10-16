@@ -13,6 +13,9 @@
   CR0 bootstrap binding still TBD.
 - **[Call-record demonstration](thread-heap-call-record.md)** — local reference
   copy of the initial tuple format and IDE demonstration.
+- **[Amobea Transaction objectives](Amobea-V1.md#64-transaction-abstraction--phase-1-demonstration-objective)** —
+  five human tasks sharing Thread tuples, with capability-authorized Dijkstra
+  messaging for isolation; proposed demonstration contract, not passed tests.
 - **[W7-oriented CM explainer](CM-W7-explainer.md)** — revised review of
   continuation and capability concerns, with explicit evidence limits.
 

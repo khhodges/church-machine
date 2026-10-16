@@ -70,6 +70,12 @@ facilities. A claim of superiority requires a separately justified comparison.
 
 ## Evidence and pass criteria
 
+The [Amobea Transaction objectives](Amobea-V1.md#64-transaction-abstraction--phase-1-demonstration-objective)
+provide five human-task demonstrations (TX-1–TX-5) for shared tuples,
+capability boundaries, Dijkstra messaging, IDE diagnostics, and the separately
+gated checkpoint/rollback contract. All are not run as defined; they supplement,
+not replace, the workbook and CM-A–CM-H objectives.
+
 For each executable objective, record:
 
 1. The current contract and invariant, implementation revision, and test inputs.
