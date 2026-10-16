@@ -48,7 +48,8 @@ assert.throws(()=>R.importRecord(occupied,0,R.sample(),{replace:true}),/valid ve
 assert.equal(occupied.memory[occupied.cr[5].word1],55);
 
 // Execute the generated method bodies using real ISA handlers and real heap
-// capabilities. RETURN itself uses the separately-tested protected call frame.
+// capabilities. Full CALL/RETURN and CHANGE coverage runs below in the
+// isolated step-driven frame fixture.
 const result = new Compiler().compile(R.source(10),[]);
 assert.deepStrictEqual(result.errors,[]);
 function body(name, value) {
@@ -179,3 +180,5 @@ assert.match(q('#thrStatus').textContent, /changed/);
 assert.throws(() => R.read(uiSim,0), /valid version/);
 dom.window.close();
 console.log('PASS dialog reserve, allocate, import, list, cancel, release, and stale reuse confirmation');
+
+require('./test_thread_heap_record_frames');

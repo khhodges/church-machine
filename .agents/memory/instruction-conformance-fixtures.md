@@ -2,6 +2,16 @@
 name: Instruction conformance fixtures
 description: Keep independent instruction oracles separate from boot and simulator setup behavior.
 ---
+Treat older instruction-driven test fixtures as historical examples, not as
+encoding authority when building new integration tests.
+
+**Why:** Some Thread fixtures predate compact LOAD indexes and single-register
+CHANGE. Reusing their encodings can load SELF and recurse or reject switching,
+making a fixture bug look like a protected-frame regression.
+
+**How to apply:** Check the current assembler/decoder contract before borrowing
+fixture instructions, and log bounded retirement history on failures.
+
 Instruction conformance fixtures must leave the core's three-retirement boot
 microcode window before issuing ordinary LOAD/SAVE, and capture simulator
 fault state before host recovery.
