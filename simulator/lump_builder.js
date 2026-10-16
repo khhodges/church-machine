@@ -153,6 +153,11 @@ function buildLump(result, opts) {
     for (let i = 0; i < cc; i++) {
         words[clistStart + i] = 0;
     }
+    // church.symbolic-lump-binding/v1 canonical C-list: SELF placeholder,
+    // external rows zero. Destination GTs exist only in bound derivatives.
+    if (cc > 0 && methods.some(m => !m.aliasOf && m.symbolicCalls && m.symbolicCalls.length)) {
+        words[clistStart] = 0xFEED5E1F;
+    }
 
     return { words, header, cw, cc, lumpSize, clistStart };
 }
@@ -240,6 +245,8 @@ function buildApiDefinition(result, words) {
                 .filter(key => typeof cap[key] === 'string').map(key => [key, cap[key]])),
         })),
     };
+    const symbolic = buildSymbolicBinding(result);
+    if (symbolic) api.symbolic_binding = symbolic;
     methods.forEach((m, i) => {
         if (m.visibility === 'private') return;
         const branchOffset = words && (1 + i) < words.length ? (words[1 + i] & 0x7FFF) : 0;
@@ -284,6 +291,43 @@ function buildApiDefinition(result, words) {
         });
     });
     return api;
+}
+
+/**
+ * Symbolic CALL relocations (church.symbolic-lump-binding/v1). Method-relative
+ * addresses are translated with buildLump's layout to absolute LUMP word
+ * offsets. Each site holds the INVALID_OP placeholder 0xF7000000 in the bytes.
+ */
+const SYMBOLIC_SCHEMA = 'church.symbolic-lump-binding/v1';
+function buildSymbolicBinding(result) {
+    const methods = result.methods || [];
+    let offset = methods.length;
+    const calls = [];
+    for (const m of methods) {
+        if (m.aliasOf) continue;
+        for (const c of m.symbolicCalls || []) {
+            const word = (m.code || [])[c.addr];
+            if ((word >>> 0) !== (((0x1E << 27) | ((c.condition & 15) << 23)) >>> 0))
+                throw new Error(`symbolic CALL ${c.full_name} does not address its placeholder word`);
+            calls.push({ word_offset: 1 + offset + c.addr, full_name: c.full_name, row: c.row,
+                source_line: Number.isInteger(c.source_line) ? c.source_line : null,
+                condition: c.condition & 15 });
+        }
+        offset += (m.code || []).length;
+    }
+    if (!calls.length) return null;
+    const caps = result.capabilities || [];
+    return {
+        schema: SYMBOLIC_SCHEMA,
+        owner: result.abstractionName || '',
+        dependencies: caps.map((cap, row) => {
+            const self = row === 0;
+            return { name: self ? 'SELF' : String(cap.canonical_leaf || cap.name),
+                rights: self ? ['E'] : (Array.isArray(cap.rights) ? cap.rights.slice() : []),
+                relocation_row: row, symbolic_self: self };
+        }),
+        calls,
+    };
 }
 
 /** UTF-8 string → array of big-endian packed words (zero-padded). */
@@ -366,5 +410,5 @@ function embedSelfDefinition(words, api, source, tier, sourceLanguage) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { buildLump, embedSelfDefinition, buildApiDefinition, stripComments };
+    module.exports = { buildSymbolicBinding, SYMBOLIC_SCHEMA, buildLump, embedSelfDefinition, buildApiDefinition, stripComments };
 }

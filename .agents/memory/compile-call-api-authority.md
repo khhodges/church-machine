@@ -29,6 +29,17 @@ gate. Unused unresolved references are valid.
 binding and load; fault on actual execution-time reference, never guess a
 target or silently rebind from Run, Step or Walk.
 
+Symbolic CALL sites must preserve their execution condition while unresolved.
+An untaken conditional reference must not fault. Binding modifies only private
+destination copies; original names and relocation evidence remain covered by
+the saved artifact's integrity.
+
+**Why:** Making every unresolved placeholder unconditional violates the user's
+“only if referenced” rule even when unused entries correctly remain harmless.
+
+**How to apply:** Test both true and false conditions, actual approved save,
+and replay of an existing binding without invoking the resolver again.
+
 CALL diagnostics and lowering must share object/method interpretation, using
 the active or finalized C-list. Missing API evidence must never turn a full
 dot-name into a shorter object name. Source metadata removal must preserve

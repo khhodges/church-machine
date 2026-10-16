@@ -13432,6 +13432,15 @@ def save_lump():
     _SELF_CAPABILITY_PLACEHOLDER = 0xFEED5E1F
     _validated_declared_caps = []
     _portable_binding_raw = metadata.get("portable_binding", metadata.get("portableBinding"))
+    # Symbolic linkage is intrinsic signed content, never browser sidecar authority.
+    from server.symbolic_binding import embedded as _embedded_symbolic_binding
+    try:
+        _embedded_symbolic = _embedded_symbolic_binding(_sl_words)
+    except (ValueError, TypeError, KeyError) as exc:
+        return jsonify(error=f"Invalid symbolic LUMP: {exc}", committed=False), 422
+    if _embedded_symbolic is not None:
+        _portable_binding_raw = _embedded_symbolic
+        metadata = dict(metadata, portable_binding=_embedded_symbolic)
     _portable_binding = None
     if _portable_binding_raw is not None:
         try:
@@ -14593,12 +14602,14 @@ def save_lump():
     _issue_n_save  = _issue_number
     _number_save   = _compute_number(_dot_name_save, lump_bytes)
     if _portable_binding is not None:
-        if _portable_binding["owner"] != f"{_dot_name_save}#{_issue_n_save}":
+        _expected_owner = (_dot_name_save if _portable_binding.get("schema") ==
+                           "church.symbolic-lump-binding/v1" else f"{_dot_name_save}#{_issue_n_save}")
+        if _portable_binding["owner"] != _expected_owner:
             return jsonify({"error": "Portable binding validation failed: owner must match "
                                      "the saved canonical dot_name and issue_n.",
                             "portable_binding_validation_failed": True}), 422
         # Portable N is the issued canonical identity, not the old pet-name seal.
-        _identity_string = _portable_binding["owner"]
+        _identity_string = f"{_dot_name_save}#{_issue_n_save}"
         _identity_hash = _hl_id.sha256(_identity_string.encode("utf-8")).hexdigest()
 
     # ── Security: strict allowlist + realpath containment ─────────────────────
@@ -22004,8 +22015,15 @@ def api_compile():
             from server.ide_leaf_policy import validate as _validate_leaf_ownership
             result["leaf_ownership"] = _validate_leaf_ownership(
                 _reference_api.get("capabilities") or [])
-            result["verified_references"] = verify_pinned_references(
-                _reference_api.get("capabilities") or [], LUMPS_DIR)
+            from server.symbolic_binding import embedded as _compile_symbolic_binding
+            _symbolic_contract = _compile_symbolic_binding(_compile_words)
+            if _symbolic_contract is not None:
+                result["portable_binding"] = _symbolic_contract
+                result["binding_status"] = "unresolved"
+                result["verified_references"] = []
+            else:
+                result["verified_references"] = verify_pinned_references(
+                    _reference_api.get("capabilities") or [], LUMPS_DIR)
         except (OSError, ValueError, TypeError, subprocess.SubprocessError) as exc:
             return jsonify({
                 "ok": False, "error": f"Reference verification failed: {exc}",

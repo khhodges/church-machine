@@ -520,6 +520,55 @@ class ChurchAssembler {
     // Returns { slot, key } so callers can retain the canonical spelling used
     // by the source maps.  The old _resolveNSName API below still returns only
     // the numeric value for existing register/immediate callers.
+    // Static dot-name CALL sites become symbolic relocations. The canonical
+    // word is the permanent INVALID_OP placeholder; destination binding alone
+    // may patch it to a real CALL. No API, method table or selector is consulted.
+    static get SYMBOLIC_CALL_PLACEHOLDER() { return 0xF7000000; }
+    _declaredRowFor(name) {
+        for (const map of [this._capBlockSlots, this._localClistSlots]) {
+            const key = ChurchAssembler._nameKey(map, name);
+            if (key !== null && Number.isInteger(map[key])) return map[key];
+        }
+        return null;
+    }
+    // Longest declared dot-prefix of a static object reference, or null.
+    _symbolicRowFor(name) {
+        const pieces = String(name || '').split('.');
+        for (let n = pieces.length; n >= 1; n--) {
+            const row = this._declaredRowFor(pieces.slice(0, n).join('.'));
+            if (row !== null) return row;
+        }
+        return null;
+    }
+    // Static dot-name CALL forms only: CALL obj[.method] and CALL obj, Method.
+    // Register operands and numeric selectors keep their existing encoding.
+    _symbolicCallSite(parts, lineNum, addr, cond) {
+        if (parts.length !== 2 && parts.length !== 3) return null;
+        const token = parts[1];
+        if (!/^[A-Za-z_][\w-]*(?:\.[\w-]+)+$/.test(token)) return null;
+        if (this._crAliases[token] !== undefined) return null;
+        const method = parts[2];
+        if (method !== undefined && !/^[A-Za-z_][\w-]*$/.test(method)) return null;
+        if (method !== undefined && /^(?:CR|DR)\d+$/i.test(method)) return null;
+        const row = this._symbolicRowFor(token);
+        if (row === null) return null;
+        if (!Number.isInteger(row) || row < 1 || row > 31) {
+            this.errors.push({ line: lineNum, ...this._tokenCols(this._currentLineText, token),
+                message: `CALL ${token} resolves to declared C-list row ${row}; symbolic CALL rows must be 1-31.` });
+            return null;
+        }
+        if (!this._symbolicCalls) this._symbolicCalls = [];
+        const fullName = method === undefined ? token : `${token}.${method}`;
+        this._symbolicCalls.push({ word_offset: addr, full_name: fullName, row,
+            source_line: lineNum, condition: cond & 15 });
+        // Existing WORD opcode with zero operand: INVALID_OP when executed,
+        // skipped by the ordinary condition check when its condition is false.
+        return ChurchAssembler.symbolicCallPlaceholder(cond);
+    }
+    static symbolicCallPlaceholder(cond) {
+        return (((0x1E << 27) | ((cond & 15) << 23)) >>> 0);
+    }
+
     _resolveCListName(token) {
         if (!token) return null;
         const name = token.replace(/,/g, '').trim();
@@ -770,6 +819,7 @@ class ChurchAssembler {
         this.capabilities = [];   // names declared in capabilities { } header (if present)
         this._hasCapBlock = false; // true when any capabilities { } block is present in source
         this._reportedMissingCaps = new Set();
+        this._symbolicCalls = [];
         const _seenCapNames = new Set(); // duplicate-name guard for capabilities { } block
         // Reset to shared conventions — local .pet directives for this lump are
         // re-collected by _parsePetDirectives below and shadow these.
@@ -972,6 +1022,14 @@ class ChurchAssembler {
             // row and method validation happen before execution. Keep explicit
             // LOAD bindings authoritative for calls through a named CR alias.
             {
+                // Static dot-name CALLs against a declared C-list row stay
+                // symbolic; _assembleLine emits the INVALID_OP placeholder.
+                const _symbolicCall = line.match(/^CALL(?:EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE|AL|NV|HS|LO)?\s+([A-Za-z_][\w-]*(?:\.[\w-]+)+)(?:\s*,\s*([A-Za-z_][\w-]*))?\s*$/i);
+                if (_symbolicCall && this._symbolicRowFor(_symbolicCall[1]) !== null) {
+                    instructions.push({ line, lineNum: lineNum + 1,
+                        comment: `${line} \u2192 symbolic relocation (INVALID_OP until bound)` });
+                    continue;
+                }
                 const _indexedCall = line.match(
                     /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:(?:,|\.)\s*([A-Za-z_][\w]*))?\s*$/i);
                 if (_indexedCall) {
@@ -1433,6 +1491,7 @@ class ChurchAssembler {
         const namedSlots = this.capabilities.map((_, i) => i);
         return { words, errors: this.errors, warnings: this.warnings, labels: this.labels,
                  capabilities: this.capabilities.slice(), namedSlots,
+                 symbolicCalls: (this._symbolicCalls || []).map(c => Object.assign({}, c)),
                  wordComments, lineNums: lineNums.slice() };
     }
 
@@ -1905,6 +1964,10 @@ class ChurchAssembler {
             return null;
         }
 
+        if (opcode === 2) {
+            const symbolic = this._symbolicCallSite(parts, lineNum, addr, cond);
+            if (symbolic !== null) return symbolic;
+        }
         let crDst = 0, crSrc = 0, imm = 0;
 
         switch (opcode) {

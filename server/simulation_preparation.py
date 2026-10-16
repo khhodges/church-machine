@@ -60,7 +60,8 @@ def artifact_bindings(rows, directory):
             contract = validate_portable_binding(approval["portable_binding"], words[0] & 255)
             if {dep["relocation_row"] for dep in contract["dependencies"]} != set(range(words[0] & 255)):
                 raise ValueError("Portable relocation rows must cover the exact c-list")
-            if (approval.get("filename") != filename or contract["owner"] != f"{dot}#{issue}"
+            expected_owner = dot if contract.get("schema") == "church.symbolic-lump-binding/v1" else f"{dot}#{issue}"
+            if (approval.get("filename") != filename or contract["owner"] != expected_owner
                     or approval.get("dot_name") != dot or approval.get("issue_n") != issue
                     or compute_number(dot, raw) != number):
                 raise ValueError("Portable artifact approval identity differs from selected bytes")
@@ -87,6 +88,8 @@ def _localize_portable(raw, binding, rows, bindings, directory):
     """Materialize only a private derivative; retain source N/T/hash separately."""
     from server.portable_binding import mint_gt, verify_candidate
     contract = binding["portableBinding"]
+    if contract.get("schema") == "church.symbolic-lump-binding/v1":
+        return _localize_symbolic(raw, binding, rows, bindings, directory)
     words = _validate_body(
         raw, executable=True, label=f"NS[{binding['slot']}] {binding['filename']}")
     owner = next(row for row in rows if row["slot"] == binding["slot"])
@@ -116,6 +119,65 @@ def _localize_portable(raw, binding, rows, bindings, directory):
         words[start + dep["relocation_row"]] = mint_gt(
             sequence, target["slot"], dep["rights"], dep["capability_type"])
     return struct.pack(f">{len(words)}I", *words), words[start]
+
+
+def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=False):
+    from server.symbolic_binding import bind, embedded_api
+    words = _validate_body(raw)
+    snapshot_key = digest({"source": binding["binaryHash"], "slot": binding["slot"],
+        "destinations": sorted([
+            {"slot": b["slot"], "hash": b["binaryHash"], "filename": b["filename"],
+             "seq": next(r.get("seq") for r in rows if r["slot"] == b["slot"])}
+            for b in bindings], key=lambda x: x["slot"])})
+    snapshot = Path(directory) / ".symbolic-bindings" / (snapshot_key + ".json")
+    if not bind_now:
+        if not snapshot.exists():
+            # No binding action has occurred: preserve the unresolved program.
+            # SELF alone is destination-local identity, not target resolution.
+            from server.portable_binding import mint_gt
+            owner = next(r for r in rows if r["slot"] == binding["slot"])
+            result = list(words)
+            result[len(result) - (result[0] & 255)] = mint_gt(owner["seq"], owner["slot"], ["E"], 1)
+            return struct.pack(f">{len(result)}I", *result), result[len(result) - (result[0] & 255)]
+        record = json.loads(snapshot.read_text())
+        data = bytes.fromhex(record["bytes"])
+        if record.get("key") != snapshot_key or hashlib.sha256(data).hexdigest() != record.get("hash"):
+            raise ValueError("Saved binding snapshot failed integrity validation; bind again")
+        result = _validate_body(data)
+        binding["symbolicReport"] = record["report"]
+        return data, result[len(result) - (result[0] & 255)]
+    targets = []
+    for candidate in bindings:
+        identity = parse_canonical_filename(candidate["filename"])
+        if identity is None:
+            continue
+        data = (Path(directory) / candidate["filename"]).read_bytes()
+        if hashlib.sha256(data).hexdigest() != candidate["binaryHash"]:
+            raise ValueError("Selected target changed during binding")
+        target_words = _validate_body(data)
+        target = next(row for row in rows if row["slot"] == candidate["slot"])
+        api = embedded_api(target_words)
+        # This destination descriptor grants executable Inform authority only;
+        # never invent writable/private storage grants from an object's name.
+        targets.append({**target, "name": identity[0], "rights": ["E"],
+                        "methods": api.get("methods", [])})
+    owner = next(row for row in targets if row["slot"] == binding["slot"])
+    result, report = bind(words, binding["portableBinding"], owner, targets)
+    binding["symbolicReport"] = report
+    data = struct.pack(f">{len(result)}I", *result)
+    snapshot.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(dir=snapshot.parent, prefix=".binding-")
+    try:
+        with os.fdopen(fd, "w") as out:
+            json.dump({"key": snapshot_key, "hash": hashlib.sha256(data).hexdigest(),
+                       "bytes": data.hex(), "report": report}, out)
+            out.flush()
+            os.fsync(out.fileno())
+        os.replace(temporary, snapshot)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+    return data, result[len(result) - (result[0] & 255)]
 
 
 def _static_clist_index(word):

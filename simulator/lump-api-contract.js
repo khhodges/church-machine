@@ -52,7 +52,7 @@
         if (!Number.isInteger(header.cw) || header.cw < 1 || header.cw > 8191 ||
             !Number.isInteger(header.cc) || header.cc < 1 || header.cc > 255)
             fail('invalid code/C-list extent');
-        keys(api, ['name','methods','imports'], ['name','methods'], 'root');
+        keys(api, ['name','methods','imports','symbolic_binding'], ['name','methods'], 'root');
         if (typeof api.name !== 'string' || !NAME.test(api.name)) fail('invalid abstraction name');
         if (!object(api.methods)) fail('methods must be a name-keyed object, not a legacy array');
         const selectors = new Set();
@@ -122,7 +122,38 @@
                 next = rows.get(key);
             }
         }
+        if (own(api, 'symbolic_binding')) symbolic(api.symbolic_binding, header, api.name);
         return api;
+    }
+    // Symbolic CALL relocations are integrity-covered declarations only.
+    function symbolic(b, header, owner) {
+        keys(b, ['schema','owner','dependencies','calls'], ['schema','owner','dependencies','calls'], 'symbolic_binding');
+        if (b.schema !== 'church.symbolic-lump-binding/v1') fail('symbolic_binding: unsupported schema');
+        if (b.owner !== owner) fail('symbolic_binding: owner differs from abstraction name');
+        if (!Array.isArray(b.dependencies) || b.dependencies.length !== header.cc)
+            fail('symbolic_binding: dependencies must cover the exact C-list');
+        b.dependencies.forEach((d, row) => {
+            keys(d, ['name','rights','relocation_row','symbolic_self'], ['name','rights','relocation_row','symbolic_self'], 'symbolic dependency');
+            if (d.relocation_row !== row || d.symbolic_self !== (row === 0)) fail('symbolic_binding: invalid relocation row');
+            if (row === 0 ? d.name !== 'SELF' : (typeof d.name !== 'string' || !NAME.test(d.name)))
+                fail('symbolic_binding: invalid dependency name');
+            if (!Array.isArray(d.rights) || new Set(d.rights).size !== d.rights.length ||
+                d.rights.some(r => !'RWXLSE'.includes(r) || r.length !== 1) ||
+                (d.rights.some(r => 'RWX'.includes(r)) && d.rights.some(r => 'LSE'.includes(r))))
+                fail('symbolic_binding: invalid rights');
+        });
+        if (!Array.isArray(b.calls) || !b.calls.length) fail('symbolic_binding: omit empty call list');
+        const offsets = new Set();
+        for (const c of b.calls) {
+            keys(c, ['word_offset','full_name','row','source_line','condition'], ['word_offset','full_name','row','source_line','condition'], 'symbolic call');
+            if (!Number.isInteger(c.word_offset) || c.word_offset < 1 || c.word_offset > header.cw || offsets.has(c.word_offset))
+                fail('symbolic_binding: call offset outside code extent or duplicated');
+            offsets.add(c.word_offset);
+            if (typeof c.full_name !== 'string' || !NAME.test(c.full_name)) fail('symbolic_binding: invalid full_name');
+            if (!Number.isInteger(c.row) || c.row < 1 || c.row >= header.cc || c.row > 31) fail('symbolic_binding: invalid call row');
+            if (!(c.source_line === null || (Number.isInteger(c.source_line) && c.source_line > 0))) fail('symbolic_binding: invalid source_line');
+            if (!Number.isInteger(c.condition) || c.condition < 0 || c.condition > 15) fail('symbolic_binding: invalid condition');
+        }
     }
     function sort(value) {
         if (!object(value)) return value;

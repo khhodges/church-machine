@@ -54,7 +54,7 @@
         else closeAll();
     }
     function makeWin(list,i){
-        var id='nsbw-'+i, st=list&&list.status==='bound'?'bound':'blocked';
+        var id='nsbw-'+i, anyOpen=list&&Array.isArray(list.calls)&&list.calls.some(function(c){return c&&c.status!=='bound';}), st=list&&['bound','unresolved','partial'].includes(list.status)?list.status:'blocked'; if(st==='bound'&&anyOpen) st='partial';
         var w=el('div','nsbw-win'); w.setAttribute('role','dialog'); w.setAttribute('aria-modal','false');
         w.setAttribute('aria-labelledby',id+'-t'); w.tabIndex=-1;
         var t=el('div','nsbw-title'); var h=el('h2',null,'C-list slot '+(list.slot==null?'?':list.slot)+' — '+(list.name||list.filename||'(unnamed)'));
@@ -71,7 +71,7 @@
             ['#','Name','Previous GT','','New GT','Target slot','Permissions','Status / error'].forEach(function(s){hr.appendChild(el('th',null,s));});
             var th=el('thead');th.appendChild(hr);tb.appendChild(th);var bd=el('tbody');
             rows.forEach(function(r){
-                var tr=el('tr',r.status==='bound'?'':'nsbw-row-blocked');
+                var tr=el('tr',r.status==='bound'?'':r.status==='unresolved'?'nsbw-row-unresolved':'nsbw-row-blocked');
                 tr.appendChild(el('td',null,r.index==null?'':r.index));
                 tr.appendChild(el('td',null,r.name||''));
                 tr.appendChild(gtCell(r.previousGT,'none'));
@@ -83,6 +83,25 @@
                 bd.appendChild(tr);
             });
             tb.appendChild(bd);b.appendChild(tb);
+        }
+        // Symbolic CALL sites: exact original references and their outcome.
+        var calls=Array.isArray(list.calls)?list.calls:[];
+        if(calls.length){
+            b.appendChild(el('p','nsbw-meta','Symbolic CALL sites (unresolved sites stay INVALID_OP and fault only if executed)'));
+            var ct=el('table','nsbw-table'), ch=el('tr');
+            ['Word','Reference','Row','Resolved as','Selector','Status / reason'].forEach(function(s){ch.appendChild(el('th',null,s));});
+            var cth=el('thead');cth.appendChild(ch);ct.appendChild(cth);var cb=el('tbody');
+            calls.forEach(function(c){
+                var tr=el('tr',c.status==='bound'?'':c.status==='unresolved'?'nsbw-row-unresolved':'nsbw-row-blocked');
+                tr.appendChild(el('td',null,c.word_offset==null?'':'+'+c.word_offset));
+                tr.appendChild(el('td',null,c.full_name||''));
+                tr.appendChild(el('td',null,c.row==null?'':c.row));
+                tr.appendChild(el('td',null,c.object?(c.object+(c.method?' · '+c.method:' · default entry')):'—'));
+                tr.appendChild(el('td',null,c.methodSelector==null?'—':c.methodSelector));
+                tr.appendChild(el('td',null,(c.status||'unresolved')+(c.reason?': '+c.reason:'')));
+                cb.appendChild(tr);
+            });
+            ct.appendChild(cb);b.appendChild(ct);
         }
         w.appendChild(b);
         w.addEventListener('pointerdown',function(){front(w);});
@@ -100,7 +119,7 @@
         layer=el('div','nsbw-layer'); layer.setAttribute('aria-label','Namespace binding results');
         bar=el('div','nsbw-bar'); bar.setAttribute('role','region'); bar.setAttribute('aria-label','Binding results controls');
         bar.appendChild(el('strong',null,'Design binding results — not activated'));
-        bar.appendChild(el('span',null,'Status: '+(report.status==='complete'?'complete':'blocked')+(report.installed?'':' · not installed')));
+        bar.appendChild(el('span',null,'Status: '+(['complete','partial','unresolved'].includes(report.status)?report.status:'blocked')+(report.installed?'':' · not installed')));
         var fp=el('code',null,shortFp(report.fingerprint)); fp.title=String(report.fingerprint||''); bar.appendChild(fp);
         var c=el('button','nsbw-btn','Cascade'); c.type='button'; c.addEventListener('click',cascade);
         var a=el('button','nsbw-btn','Close all'); a.type='button'; a.addEventListener('click',closeAll);

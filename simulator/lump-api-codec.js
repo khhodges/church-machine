@@ -12,6 +12,7 @@
         if (!api || !Array.isArray(api.methods) || !Array.isArray(api.capabilities))
             throw new Error('Cannot compile compact API without method and capability declarations');
         const out = {name:api.name, methods:{}};
+        if (api.symbolic_binding) out.symbolic_binding = clone(api.symbolic_binding);
         for (const method of api.methods) {
             if (method.outputs && method.outputs.length)
                 throw new Error('Additional method outputs require an explicit compact mapping');
@@ -105,6 +106,7 @@
                 : {name,register:spec.register,kind:'capability',secure_type:spec.type,rights:[...spec.rights]});
         }
         return {name:api.name, capabilities,
+            ...(api.symbolic_binding ? {symbolic_binding:clone(api.symbolic_binding)} : {}),
             methods:Object.entries(api.methods).map(([name, method]) => ({
                 name,index:method.selector,branchOffset:words[1 + method.selector] & 0x7fff,
                 inputs:parameters(method.inputs),

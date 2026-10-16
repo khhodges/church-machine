@@ -1071,6 +1071,17 @@ function _validateCompiledCandidateClist(words, clistStart, resolvedCaps, compil
     if (caps.length > 0 && !_isCompilerSelfCapability(caps[0])) {
         errors.push('C-list fault: row 0 must be SELF.');
     }
+    // Symbolic artifacts keep canonical unresolved rows; the guard verifies
+    // them from the exact bytes. Destination resolution belongs to Bind.
+    if (typeof window !== 'undefined' && window.SymbolicLumpGuard) {
+        try {
+            const symbolic = window.SymbolicLumpGuard.validate(binary, { capabilities: caps });
+            if (symbolic.symbolic) return { ok: errors.length === 0, errors, symbolic: true };
+        } catch (error) {
+            errors.push(error.message);
+            return { ok: false, errors };
+        }
+    }
     if (typeof CapabilityTokens === 'undefined' ||
             typeof CapabilityTokens.validateClist !== 'function') {
         errors.push('C-list security validator is unavailable.');
@@ -2373,6 +2384,13 @@ async function compileAndBuild(options) {
             dot_name:       _portableOwner.replace(/#[1-9][0-9]*$/, ''),
             portable_binding: _portableBinding,
             portable_status: _portableStatus,
+            // Read only from the exact integrity-covered bytes being saved.
+            // The server re-derives it; this is never an independent sidecar.
+            ...(() => {
+                const guard = window.SymbolicLumpGuard;
+                const checked = guard ? guard.validate(lumpWordsArray) : { symbolic: false };
+                return checked.symbolic ? { symbolic_binding: checked.contract } : {};
+            })(),
             portable_mode: result.portableMode || 'legacy',
             token:          _compiledToken || undefined,
         }
@@ -2910,7 +2928,10 @@ function loadCLOOMCIntoSim() {
         for (const w of (m.code || [])) words.push(w);
     }
 
-    lastAssembledNamedSlots = (result.namedSlots && result.namedSlots.length > 0)
+    // Symbolic-binding artifacts are never resolved at runtime: unresolved
+    // rows fault (NULL_CAP / INVALID_OP) instead of lazily relinking.
+    const _hasSymbolicCalls = methods.some(m => m.symbolicCalls && m.symbolicCalls.length);
+    lastAssembledNamedSlots = (!_hasSymbolicCalls && result.namedSlots && result.namedSlots.length > 0)
         ? result.namedSlots.slice() : null;
     lastMethodTableSize     = methodTableSize;
     _defaultProgramLoaded   = true;

@@ -3000,6 +3000,11 @@ class ChurchSimulator {
                 }
                 const api = ChurchSimulator._embeddedApiView(new TextDecoder().decode(bytes),
                     this.memory.slice(base, base + header.lumpSize));
+                if (api.symbolic_binding && api.symbolic_binding.schema === 'church.symbolic-lump-binding/v1') {
+                    this.fault('NULL_CAP',
+                        `${instruction}: referenced unresolved symbolic C-list row ${row}; runtime binding is disabled.`);
+                    return null;
+                }
                 if (!Array.isArray(api.capabilities) || api.capabilities.length !== header.cc) {
                     throw new Error('embedded API C-list geometry differs');
                 }
@@ -12854,6 +12859,10 @@ class ChurchSimulator {
                 this.fault('INVALID_OP', `Opcode ${d.opcode} is unassigned (reserved gap 26–29) in v2.0 ISA`);
                 return null;
             case 0x1E:
+                if (((d.raw >>> 0) & 0x7FFFFF) === 0) {
+                    this.fault('INVALID_OP', `HardFault: executed an unresolved symbolic CALL placeholder 0x${(d.raw >>> 0).toString(16).toUpperCase()} (or a zero WORD constant).`+' Bind Namespace Design to resolve it; Run/Step/Walk never rebind.');
+                    return null;
+                }
                 this.fault('INVALID_OP', `WORD (opcode 0x1E) is an inline data constant and cannot be executed — check your RETURN placement`);
                 return null;
             default:

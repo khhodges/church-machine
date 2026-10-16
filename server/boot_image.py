@@ -671,6 +671,21 @@ def localize_portable_lump_body(lump_words, portable_binding, candidates):
     contract = validate_portable_binding(portable_binding, cc)
     validate_unresolved_clist(contract, lump_words)
     output = list(lump_words[:size])
+    if contract.get("schema") == "church.symbolic-lump-binding/v1":
+        # Image construction is not a Bind action. Keep unresolved references
+        # as fault sites and materialize only the artifact's own destination.
+        matches = [value for key, value in candidates.items()
+                   if key.rsplit("#", 1)[0] == contract["owner"]]
+        if len(matches) != 1:
+            raise ValueError("Symbolic SELF needs one exact destination")
+        candidate = matches[0]
+        if bytes(candidate.get("lump_bytes") or b"") != struct.pack(f">{len(lump_words)}I", *lump_words):
+            raise ValueError("Symbolic SELF destination bytes differ")
+        slot, seq = candidate.get("ns_slot"), candidate.get("sequence")
+        if type(slot) is not int or not 0 <= slot <= 65535 or type(seq) is not int or not 0 <= seq <= 511:
+            raise ValueError("Symbolic SELF destination is invalid")
+        output[size - cc] = mint_gt(seq, slot, ["E"], 1)
+        return output
     for dep in contract["dependencies"]:
         candidate = candidates.get(dep["N"]) if isinstance(candidates, dict) else None
         if dep["symbolic_self"] and candidate is None:

@@ -61,7 +61,7 @@ def binding_report(document, directory, fingerprint):
                 raise ValueError("No authenticated dot-name relocation contract. Existing GTs were not reused; recompile with portable binding evidence.")
             for dep in binding["portableBinding"]["dependencies"]:
                 item["rows"][dep["relocation_row"]].update(
-                    name=dep["N"], permissions="".join(dep["rights"]))
+                    name=dep.get("N") or dep.get("name"), permissions="".join(dep["rights"]))
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
             item["reason"] = str(exc)
 
@@ -71,8 +71,14 @@ def binding_report(document, directory, fingerprint):
         if item.get("reason") or not binding:
             continue
         try:
-            localized, _ = _localize_portable(
-                bodies[item["slot"]], binding, rows, candidates, directory)
+            symbolic = binding["portableBinding"].get("schema") == "church.symbolic-lump-binding/v1"
+            if symbolic:
+                from server.simulation_preparation import _localize_symbolic
+                localized, _ = _localize_symbolic(
+                    bodies[item["slot"]], binding, rows, candidates, directory, bind_now=True)
+            else:
+                localized, _ = _localize_portable(
+                    bodies[item["slot"]], binding, rows, candidates, directory)
             words = _validate_body(localized)
             cc = words[0] & 255
             for row in item["rows"]:
@@ -80,8 +86,16 @@ def binding_report(document, directory, fingerprint):
                 row.update(newGT=gt, targetSlot=gt & 65535, status="bound")
             item.update(status="bound", derivativeHash=hashlib.sha256(localized).hexdigest(),
                         reason="Freshly bound for this design only; not activated.")
+            if symbolic:
+                report = binding["symbolicReport"]
+                for row, resolved in zip(item["rows"], report["rows"]):
+                    row.update(resolved)
+                item.update(status=report["status"], calls=report["calls"],
+                            reason="Binding snapshot saved; unresolved references HardFault only if executed. Not activated.")
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
             item["reason"] = str(exc)
-    return dict(fingerprint=fingerprint, status="complete" if lists and all(
-        item["status"] == "bound" for item in lists) else "blocked",
+    status = ("complete" if lists and all(item["status"] == "bound" for item in lists)
+              else "unresolved" if lists and all(item["status"] in ("bound", "unresolved") for item in lists)
+              else "blocked")
+    return dict(fingerprint=fingerprint, status=status,
         installed=False, lists=lists)

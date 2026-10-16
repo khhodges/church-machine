@@ -281,6 +281,12 @@ class CLOOMCCompiler {
             }
             match = code.match(/^CALL\s+([^,\s]+)(?:\s*,\s*([^,\s]+))?/i);
             if (!match) continue;
+            if (/^[A-Za-z_][\w-]*(?:\.[\w-]+)+$/.test(match[1]) &&
+                    (!match[2] || /^[A-Za-z_][\w-]*$/.test(match[2])) &&
+                    typeof callAssembler._symbolicRowFor === 'function' &&
+                    callAssembler._symbolicRowFor(match[1]) !== null) {
+                continue; // Symbolic relocation: the linking loader owns resolution.
+            }
             const call = ChurchAssembler.parseCallTarget(match[1], match[2],
                 name => callAssembler._resolveCListName(name) !== null);
             if (call) inspect(i + 1, call.petName, call.method, call.sourceToken);
@@ -572,7 +578,7 @@ class CLOOMCCompiler {
                 if (result.errors.length > 0) {
                     errors.push(...result.errors);
                 } else {
-                    methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public', crossMethodRefs: result.crossMethodRefs, ...(method.isMain && { isMain: true }), ...(method.sourceLines && { sourceLines: method.sourceLines }) });
+                    methods.push({ name: method.name, code: result.code, params: method.params || [], visibility: method.visibility || 'public', crossMethodRefs: result.crossMethodRefs, ...(result.symbolicCalls && result.symbolicCalls.length && { symbolicCalls: result.symbolicCalls }), ...(method.isMain && { isMain: true }), ...(method.sourceLines && { sourceLines: method.sourceLines }) });
                     manifest.push({ name: method.name, mapping: result.manifest });
                 }
             }
@@ -1399,7 +1405,10 @@ class CLOOMCCompiler {
         return {
             abstractionName: absName,
             language: 'assembly',
-            methods: [{ name: 'run', code: words, sourceLines: source, lineNums: asmLineNums }],
+            methods: [{ name: 'run', code: words, sourceLines: source, lineNums: asmLineNums,
+                ...((result.symbolicCalls || []).length && { symbolicCalls: result.symbolicCalls.map(c => ({
+                    addr: c.word_offset, full_name: c.full_name, row: c.row,
+                    source_line: c.source_line, condition: c.condition })) }) }],
             capabilities: caps,
             errors: [],
             warnings: result.warnings || [],
@@ -1930,6 +1939,7 @@ class CLOOMCCompiler {
         this._crLocals = {};
         this._crAlloc = { next: 7 };
         this._crCompileMethod = method;
+        method._symbolicCalls = [];
 
         // Expose warning context so _allocTemp can emit a diagnostic on exhaustion.
         const warnings = [];
@@ -2043,7 +2053,10 @@ class CLOOMCCompiler {
 
         const crossMethodRefs = this._crossMethodRefs;
         this._crossMethodRefs = null;
-        return { code, errors, warnings, manifest, crossMethodRefs };
+        return { code, errors, warnings, manifest, crossMethodRefs,
+            symbolicCalls: (method._symbolicCalls || []).map(c => ({
+                addr: c.addr, full_name: c.full_name, row: c.row,
+                source_line: c.source_line, condition: c.condition })) };
     }
 
     _allocTemp(locals) {
@@ -2455,6 +2468,12 @@ class CLOOMCCompiler {
                 return;
             }
             manifest.push({ src: stmt.lineNum, addr: code.length, desc: text });
+            const base = code.length;
+            for (const call of asmResult.symbolicCalls || []) {
+                if (!method) break;
+                (method._symbolicCalls ||= []).push(Object.assign({}, call, {
+                    addr: base + call.word_offset, source_line: stmt.lineNum }));
+            }
             for (const word of asmResult.words || []) code.push(word);
             return;
         }

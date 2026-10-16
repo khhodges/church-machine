@@ -54,6 +54,9 @@ def validate_portable_binding(binding, cc=None):
     This is intentionally independent of a live Namespace.  A zero/pending
     c-list row is valid here: it is localized only during installation.
     """
+    if isinstance(binding, dict) and binding.get("schema") == "church.symbolic-lump-binding/v1":
+        from server.symbolic_binding import validate
+        return validate(binding, cc)
     if not isinstance(binding, dict) or binding.get("schema") != SCHEMA:
         raise ValueError("portable_binding must use church.portable-lump-binding/v1")
     dot, issue = _name(binding.get("owner"))
@@ -115,6 +118,11 @@ def validate_portable_binding(binding, cc=None):
 
 def validate_unresolved_clist(contract, lump_words):
     """Require the canonical, destination-independent on-disk c-list form."""
+    if contract.get("schema") == "church.symbolic-lump-binding/v1":
+        from server.symbolic_binding import embedded, validate
+        if embedded(lump_words) != validate(contract, lump_words[0] & 255, lump_words):
+            raise ValueError("Symbolic contract differs from integrity-covered bytes")
+        return
     if not lump_words:
         raise ValueError("portable LUMP body is empty")
     header = int(lump_words[0]) & 0xffffffff

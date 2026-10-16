@@ -16773,6 +16773,22 @@ async function _refreshNamespaceAuthorityAfterLumpSave() {
     }
 }
 
+// Retain the intrinsic symbolic contract from the exact final bytes. A plan
+// value is accepted only when identical; the server re-derives it regardless.
+function _applySymbolicSaveContract(metadata, words, plan) {
+    const guard = window.SymbolicLumpGuard;
+    if (!guard) {
+        if (plan && plan.symbolic_binding) throw new Error('Symbolic LUMP guard is unavailable');
+        return null;
+    }
+    const result = guard.validate(words, { planContract: plan && (plan.symbolic_binding ||
+        (plan.portable_binding && plan.portable_binding.schema === 'church.symbolic-lump-binding/v1'
+            ? plan.portable_binding : null)) || null });
+    if (result.symbolic) metadata.symbolic_binding = result.contract;
+    else delete metadata.symbolic_binding;
+    return result.symbolic ? result.contract : null;
+}
+
 function _validateFinalLumpSaveBinary(words, capabilities, plan) {
     if (!Array.isArray(words) || words.length < 2) {
         throw new Error('authoritative save plan returned no complete LUMP binary');
@@ -16793,6 +16809,23 @@ function _validateFinalLumpSaveBinary(words, capabilities, plan) {
     }
     const caps = Array.isArray(capabilities) ? capabilities : [];
     const start = lumpSize - cc;
+    // church.symbolic-lump-binding/v1: the exact bytes state the contract.
+    // Canonical SELF marker and zero external rows are required, not resolved.
+    if (window.SymbolicLumpGuard) {
+        const symbolic = window.SymbolicLumpGuard.validate(words, {
+            planContract: plan && (plan.symbolic_binding ||
+                (plan.portable_binding && plan.portable_binding.schema === 'church.symbolic-lump-binding/v1'
+                    ? plan.portable_binding : null)) || null,
+            capabilities: caps.length === cc ? caps : null,
+        });
+        if (symbolic.symbolic) {
+            if (plan && plan.portable_binding && plan.portable_binding.schema !== 'church.symbolic-lump-binding/v1')
+                throw new Error('Save plan mixes pinned portable and symbolic contracts');
+            return true;
+        }
+    } else if (plan && plan.symbolic_binding) {
+        throw new Error('Symbolic LUMP guard is unavailable; reload the IDE before saving');
+    }
     if (plan && plan.portable_binding) {
         // This is retained artifact form, not permission to execute. The
         // server-authored, digest-checked plan owns its portable contract;
@@ -17353,6 +17386,7 @@ async function confirmSaveToNamespace() {
             }
             if (_saveApproval.plan.portable_binding)
                 _svPayload.metadata.portable_binding = _saveApproval.plan.portable_binding;
+            _applySymbolicSaveContract(_svPayload.metadata, _svPayload.binary, _saveApproval.plan);
             _svPayload.metadata.approval_intent = _saveApproval.intent.intent;
             _svPayload.metadata.save_plan_id = _saveApproval.plan.plan_id;
             if (_saveApproval.plan.compiler_record) {
@@ -17522,6 +17556,7 @@ async function confirmSaveToNamespace() {
                 }
                 if (plan.portable_binding)
                     rebuilt.metadata.portable_binding = plan.portable_binding;
+                _applySymbolicSaveContract(rebuilt.metadata, rebuilt.binary, plan);
                 if (rebuilt.metadata.isa_profile === 'IDX1')
                     await window.ChurchIDX1IDE.applySavedPlan(rebuilt.metadata, plan);
                 const intent = await window._requestLumpApprovalIntent(

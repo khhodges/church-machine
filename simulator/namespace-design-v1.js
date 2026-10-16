@@ -315,7 +315,10 @@
             accept(result);
             if (result.bindingReport && root.NamespaceBindingWindows) {
                 root.NamespaceBindingWindows.show(result.bindingReport);
-                if (result.bindingReport.status !== 'complete') {
+                const st=result.bindingReport.status;
+                if (st==='partial' || st==='unresolved') {
+                    state.error='Design saved. Some references remain unresolved; they fault only if executed. See the C-list windows. No running session was changed.';
+                } else if (st !== 'complete') {
                     state.error='Design saved. Binding is blocked; see the C-list windows for the exact reasons. No runtime image was changed.';
                 }
             } else {

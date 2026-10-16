@@ -21,3 +21,6 @@
 .nsbw-table th{color:#8a96aa;font-weight:normal;position:sticky;top:-6px;background:#161b24}
 .nsbw-table tr.nsbw-row-blocked td{color:#f0a0a0}
 .nsbw-unres{color:#e0a060;font-style:italic}
+
+.nsbw-unresolved,.nsbw-partial{background:#3d3420;color:#e8c987}
+.nsbw-table tr.nsbw-row-unresolved td{color:#e8c987}
