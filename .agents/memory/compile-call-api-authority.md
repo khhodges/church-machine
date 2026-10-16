@@ -30,6 +30,17 @@ but failed packaging because its own method declarations were absent.
 **How to apply:** Preserve compiler-owned method metadata through format/save.
 Never synthesize an implicit public `run` method for undeclared callable assembly.
 
+Requiring at least one parsed method is not sufficient: callable compilation
+must account for all non-comment source and reject malformed declarations,
+unconsumed executable text, and unclosed scopes before issuing a candidate.
+
+**Why:** A malformed second method was silently omitted while the first method
+satisfied the new declaration check. Successful signed reproduction of compiler
+output cannot independently establish that the compiler consumed the whole source.
+
+**How to apply:** Include negative syntax and partial-parse tests alongside valid
+multi-method save/reload tests; never equate compiler authentication with semantic completeness.
+
 An unresolved binding is a HardFault only when referenced during execution.
 Its presence alone must not block loading or starting execution.
 
