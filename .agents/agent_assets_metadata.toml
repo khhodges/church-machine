@@ -1037,14 +1037,14 @@ content_type = "text/markdown"
 id = "g6WPbY4FZYTwB0t1DGaKY"
 uri = "file://docs/phase-1/Amobea-V1.md"
 type = "text"
-title = "Amobea V1 — CHANGE and Thread Ownership Review"
-description = "Updated Phase 1 outline with running-state requirements, detailed CHANGE handoff, self-target behavior, and one-shot checkpoint review."
+title = "Amobea V1 — Bit-13 Acceptance Checklist"
+description = "Updated §4.4 covering live/saved transforms, complete writer audit, ownership actions, and format-aware validation."
 logical_id = "cc62ecaa-d40c-4865-a06a-140cc66716d7"
-content_hash = "sha256:1636ae58d28cd6f864e5026b4f7e084094c912c4f43d83d06606e2a012419038"
-size = 20179
-mtime_ms = 1792165673532
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cc62ecaa-d40c-4865-a06a-140cc66716d7/6dd92236-cc89-4317-84f3-be69ded86c3e"
-storage_version_token = "1792165688887001"
+content_hash = "sha256:f9ddbaff62b31a97d7af36f60063e072fab225a5464c9d850323fbb2c6a3a3e9"
+size = 23836
+mtime_ms = 1792173962157
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cc62ecaa-d40c-4865-a06a-140cc66716d7/bb7f6146-3b3c-48b6-8612-8eafa6756818"
+storage_version_token = "1792173977683508"
 content_type = "text/markdown"
 
 [[outputs]]

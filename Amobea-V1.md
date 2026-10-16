@@ -196,6 +196,61 @@ Prove there is no conflicting activation, premature release, or execution
 with partially restored state. Bit packing must round-trip all existing fields
 without truncation once the physical layout is selected.
 
+#### Bit-13 acceptance checklist
+
+This checklist applies to the proposed assignment of live-indicator bit 13.
+It does not itself approve the assignment or claim implementation evidence.
+
+1. **Specify both formats and transforms.** The live indicator at Thread `+17`
+   and the saved continuation frame on the protected stack are distinct memory
+   words. They share bit positions, not a physical location.
+   - On save, construct the frame from the defined stack metadata, flags, and
+     complete 15-bit NIA. Do not copy live ownership into the frame.
+   - On restore, extract all 15 NIA bits unchanged. Construct the live indicator
+     separately, obtaining ownership from the controlled transition rather
+     than from the historical frame.
+   - Saved-frame bit 13 is NIA bit 0. Test odd and even resume addresses:
+     clearing that bit as if it were ownership would corrupt legitimate NIA.
+
+2. **Enumerate every live-indicator writer.** Audit Amaranth, simulator, and
+   initialization/image writers, identifying the intended ownership action for
+   every path that writes `+17`. Do not simply change every write to preserve
+   the bit: some transitions must establish or release ownership.
+
+   | Writer/path | Required ownership action |
+   |---|---|
+   | Ordinary CALL / RETURN | Preserve current live ownership |
+   | Self-target CHANGE | Preserve continuously; no dormant interval |
+   | Distinct-target CHANGE / SWITCH | Release outgoing and acquire incoming under the commit protocol |
+   | Bootstrap | Establish initial ownership under reset admission rules |
+   | Self capture without CHANGE | Preserve |
+   | Checkpoint restoration | Apply the controlled restore ownership contract; never import ownership from checkpoint bytes |
+   | Fault/watchdog/reset/replacement | Follow the explicitly defined recovery rule; unresolved cases block qualification |
+   | Dormant-image construction | Initialize dormant state; image bytes must not independently claim active ownership |
+
+   Match this writer inventory to the activation-path inventory. Include any
+   additional discovered writer before claiming completeness. For each path,
+   test both the expected bit update and rejection/fault behavior; ordinary
+   writes must not silently clear ownership.
+
+3. **Use format-aware validation.** The proposed live format allows ownership
+   at bit 13 and requires bits 14–27 to remain zero. The saved frame uses all
+   bits 13–27 for NIA, subject to the existing resume checks. These validators
+   differ across the entire field, not "exactly one bit." Use separate
+   validators or an explicit format parameter; never loosen a shared mask
+   without distinguishing the word being validated.
+   - Test both live ownership values in their appropriate contexts.
+   - Reject each nonzero live reserved bit in 14–27.
+   - Verify saved-frame NIA round trips, including odd/even values and boundary
+     values. A correctly encoded NIA must still pass executable-range and
+     authority checks before execution.
+   - Confirm CALL/RETURN and capture/restore neither derive ownership from NIA
+     nor alter NIA because of ownership.
+
+Record the coordinated shared-layout, simulator, and Amaranth results before
+presenting regenerated Verilog as implementing this contract. Generated output
+alone is not qualification evidence.
+
 ## 5. Rollback and IDE-reserved space
 
 `Thread.Rollback` is a proposed Thread service. IDE-reserved space could retain
