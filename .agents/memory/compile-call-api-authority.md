@@ -7,6 +7,20 @@ Compile-time CALL checking distinguishes absence of proof from proof of absence.
 
 Static registries and sidecar metadata may help encode names but are not API authority. API proof must come from the embedded API of the exact selected token/revision; a token or revision mismatch is treated as unavailable, never as proof that programmer source is wrong.
 
+CALL diagnostics and lowering must share object/method interpretation, using
+the active or finalized C-list. Missing API evidence must never turn a full
+dot-name into a shorter object name. Source metadata removal must preserve
+editor line breaks rather than adjusting diagnostic numbers afterward.
+
+**Why:** The user reported `CALL ide.SelfTest` and `CALL ide.WukongCallHome`
+both being diagnosed as calls to `ide`, and requested a shared-parser fix
+rather than warning suppression. Independent header parsing missed active
+C-list names and comments.
+
+**How to apply:** Test exact object identity and original source coordinates
+through both browser compilation and the server worker, including missing
+and mismatched API evidence.
+
 Verified embedded method conventions must remain request-local throughout
 frontend selection and nested native assembly.
 

@@ -217,13 +217,11 @@ class CLOOMCCompiler {
 
         // Exact dotted capability names win over Abstraction.Method splitting,
         // matching ChurchAssembler's CALL parser.
-        const declaredCaps = new Set();
-        const capMatch = String(source || '').match(/capabilities\s*\{([\s\S]*?)\}/i);
-        if (capMatch) {
-            for (const item of capMatch[1].split(',')) {
-                const name = item.trim().split(/\s+/)[0];
-                if (name && !/^NULL$/i.test(name)) declaredCaps.add(name.toUpperCase());
-            }
+        const callAssembler = opts.callAssembler || new ChurchAssembler();
+        if (!opts.callAssembler) {
+            if (opts.clistSlots) callAssembler.setLocalClistSlots(opts.clistSlots);
+            callAssembler._capBlockSlots = callAssembler._parseCapBlockSlots(
+                String(source || '').split('\n'));
         }
 
         const lines = String(source || '').split('\n');
@@ -283,17 +281,9 @@ class CLOOMCCompiler {
             }
             match = code.match(/^CALL\s+([^,\s]+)(?:\s*,\s*([^,\s]+))?/i);
             if (!match) continue;
-            let petName = match[1];
-            let method = match[2] || null;
-            const indexedPet = petName.match(/^CR6\[([A-Za-z_][\w.]*)\]$/i);
-            if (indexedPet) petName = indexedPet[1];
-            else if (/^CR\d+$/i.test(petName)) continue;
-            if (!method && petName.includes('.') && !declaredCaps.has(petName.toUpperCase())) {
-                const dot = petName.lastIndexOf('.');
-                method = petName.slice(dot + 1);
-                petName = petName.slice(0, dot);
-            }
-            inspect(i + 1, petName, method, match[1]);
+            const call = ChurchAssembler.parseCallTarget(match[1], match[2],
+                name => callAssembler._resolveCListName(name) !== null);
+            if (call) inspect(i + 1, call.petName, call.method, call.sourceToken);
         }
         return { warnings, errors };
     }
@@ -322,7 +312,8 @@ class CLOOMCCompiler {
         // supported frontends.  Strip them before handing the source to a
         // frontend parser so the grammar is identical for JS, English, Lambda,
         // Haskell, Symbolic, and PetName.
-        const cleanSource = source.replace(/^\s*@(target\s+(?:IoT|Full)|portable|legacy)\s*$/gim, '');
+        const cleanSource = source.replace(/^[^\S\n]*@(target[^\S\n]+(?:IoT|Full)|portable|legacy)[^\S\n]*$/gim,
+            directive => ' '.repeat(directive.length));
         const previousReserveSelfRow = this._reserveCompilerSelfRow;
         const previousMethodConventions = this.methodConventions;
         // Exact selected-binary APIs are compile-request context. Install their
@@ -363,7 +354,13 @@ class CLOOMCCompiler {
             this.methodConventions = previousMethodConventions;
         }
         if (result.language !== 'assembly') {
-            const callApiDiagnostics = this._callApiDiagnostics(cleanSource, compileOptions);
+            // Native statements use the finalized frontend C-list, not a
+            // second, partial interpretation of the capabilities header.
+            const callApiDiagnostics = this._callApiDiagnostics(cleanSource,
+                Object.assign({}, compileOptions, {
+                    clistSlots: Object.fromEntries((result.capabilities || [])
+                        .map((cap, row) => [cap.name, row]))
+                }));
             result.warnings = (result.warnings || []).concat(callApiDiagnostics.warnings);
             const authoritativeLines = new Set(callApiDiagnostics.errors.map(error => error.line));
             result.errors = (result.errors || []).filter(error =>
@@ -1338,7 +1335,8 @@ class CLOOMCCompiler {
         }
 
         const result = asm.assemble(source);
-        const callApiDiagnostics = this._callApiDiagnostics(source, options);
+        const callApiDiagnostics = this._callApiDiagnostics(source,
+            Object.assign({}, options, { callAssembler: asm }));
         result.warnings = (result.warnings || []).concat(callApiDiagnostics.warnings);
         const authoritativeLines = new Set(callApiDiagnostics.errors.map(error => error.line));
         result.errors = (result.errors || []).filter(error =>

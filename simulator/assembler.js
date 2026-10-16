@@ -204,6 +204,21 @@
 // =============================================================================
 
 class ChurchAssembler {
+    // Dots belong to object identities. Legacy Object.Method shorthand is
+    // recognized only against a known object prefix, never by punctuation alone.
+    static parseCallTarget(token, method, knowsName) {
+        const indexed = String(token).match(/^CR6\[([A-Za-z_][\w.]*)\]$/i);
+        const name = indexed ? indexed[1] : String(token);
+        if (/^(?:CR|DR)\d+$/i.test(name)) return null;
+        if (indexed || method || knowsName(name)) {
+            return { petName: name, method: method || null, sourceToken: token };
+        }
+        const dot = name.lastIndexOf('.');
+        if (dot > 0 && knowsName(name.slice(0, dot))) {
+            return { petName: name.slice(0, dot), method: name.slice(dot + 1), sourceToken: token };
+        }
+        return { petName: name, method: null, sourceToken: token };
+    }
     constructor(methodConventions = {}) {
         // Merge class-level shared conventions first, then any caller-supplied
         // overrides.  This means all three instantiation sites (compile path,
@@ -961,25 +976,13 @@ class ChurchAssembler {
                     /^CALL\s+CR6\s*\[\s*([A-Za-z_][\w.]*)\s*\]\s*(?:(?:,|\.)\s*([A-Za-z_][\w]*))?\s*$/i);
                 if (_indexedCall) {
                     const _indexedName = _indexedCall[1];
-                    const _indexedDot = _indexedName.indexOf('.');
-                    const _indexedBase = _indexedDot >= 0
-                        ? _indexedName.slice(0, _indexedDot)
-                        : _indexedName;
-                    const _indexedMethod = _indexedCall[2] ||
-                        (_indexedDot >= 0 ? _indexedName.slice(_indexedDot + 1) : '');
-                    const _indexedCap = this._resolveCListName(_indexedName);
-                    const _indexedBaseCap = this._resolveCListName(_indexedBase);
-                    const _indexedExactDotted = _indexedCap !== null && _indexedDot >= 0;
-                    const _indexedHasMethodSyntax = Boolean(_indexedMethod) &&
-                        !_indexedExactDotted;
-                    const _indexedCanLower = _indexedCap !== null &&
-                        ((!_indexedMethod && !_indexedDot) ||
-                         (_indexedExactDotted && !_indexedCall[2]) ||
-                         (_indexedBaseCap !== null && _indexedHasMethodSyntax));
-                    if (_indexedCanLower) {
-                        const _indexedLoadName = _indexedExactDotted
-                            ? _indexedName
-                            : _indexedBase;
+                    const _indexedParsed = ChurchAssembler.parseCallTarget(
+                        `CR6[${_indexedName}]`, _indexedCall[2],
+                        name => this._resolveCListName(name) !== null);
+                    const _indexedMethod = _indexedParsed.method;
+                    const _indexedHasMethodSyntax = Boolean(_indexedMethod);
+                    if (this._resolveCListName(_indexedParsed.petName) !== null) {
+                        const _indexedLoadName = _indexedParsed.petName;
                         this._checkCapDeclared(_indexedLoadName, lineNum + 1);
                         instructions.push({
                             line: _indexedHasMethodSyntax
@@ -993,29 +996,18 @@ class ChurchAssembler {
                 }
 
                 const _namedCall = line.match(/^CALL\s+([A-Za-z_][\w.]*)(?:\s*,\s*([A-Za-z_][\w]*))?\s*$/i);
-                const _namedCallBase = _namedCall
-                    ? _namedCall[1].split('.')[0]
-                    : '';
+                const _parsedCall = _namedCall && ChurchAssembler.parseCallTarget(
+                    _namedCall[1], _namedCall[2],
+                    name => this._resolveCListName(name) !== null || _pass1LoadedNames.has(name));
+                const _namedCallBase = _parsedCall ? _parsedCall.petName : '';
                 if (_namedCall &&
                         !/^CR(?:1[0-5]|[0-9])$/i.test(_namedCall[1]) &&
                         !_pass1LoadedNames.has(_namedCall[1]) &&
                         !_pass1LoadedNames.has(_namedCallBase)) {
-                    const _callToken = _namedCall[1];
-                    const _dot = _callToken.indexOf('.');
-                    const _baseName = _dot >= 0 ? _callToken.slice(0, _dot) : _callToken;
-                    const _methodName = _namedCall[2] ||
-                        (_dot >= 0 ? _callToken.slice(_dot + 1) : '');
-                    const _exactCap = this._resolveCListName(_callToken);
-                    const _baseCap = this._resolveCListName(_baseName);
-                    const _isExactDottedCap = _exactCap !== null && _dot >= 0;
-                    const _hasMethodSyntax = Boolean(_methodName) &&
-                        !_isExactDottedCap;
-                    const _canLower = (_exactCap !== null &&
-                        ((_dot < 0 && !_methodName) ||
-                         (_isExactDottedCap && !_namedCall[2]))) ||
-                        (_baseCap !== null && _hasMethodSyntax);
-                    if (_canLower) {
-                        const _loadName = _isExactDottedCap ? _callToken : _baseName;
+                    const _methodName = _parsedCall.method;
+                    const _hasMethodSyntax = Boolean(_methodName);
+                    if (this._resolveCListName(_parsedCall.petName) !== null) {
+                        const _loadName = _parsedCall.petName;
                         this._checkCapDeclared(_loadName, lineNum + 1);
                         instructions.push({
                             line: _hasMethodSyntax
@@ -2096,9 +2088,17 @@ class ChurchAssembler {
                     break;
                 }
                 if (!parts[2] && rawDotTok.includes('.')) {
-                    const dotIdx = rawDotTok.indexOf('.');
-                    const dotAbsName = rawDotTok.slice(0, dotIdx);
-                    const dotMethodRaw = rawDotTok.slice(dotIdx + 1);
+                    const parsed = ChurchAssembler.parseCallTarget(rawDotTok, null,
+                        name => this._resolveCListName(name) !== null ||
+                            ChurchAssembler._nameKey(this.nsLoaded, name) !== null);
+                    if (!parsed.method) {
+                        this.errors.push({ line: lineNum,
+                            ...this._tokenCols(this._currentLineText, rawDotTok),
+                            message: `Cannot resolve CALL object "${parsed.petName}". Declare its full name in the C-list; dots do not imply a method.` });
+                        break;
+                    }
+                    const dotAbsName = parsed.petName;
+                    const dotMethodRaw = parsed.method;
                     // Detect function-call style: "CALL Tunnel.Connect(Mum)" — parens are not
                     // valid CLOOMC syntax.  Strip the suffix, identify the bare method name,
                     // and emit a targeted error rather than falling through to _parseCR.
