@@ -36,15 +36,19 @@ not authorization to change the ISA or create a production-wide heap standard.
 preserve omitted fields on updates, validate before writes, and keep live heap
 mutations separate from saved LUMPs and hardware programming.
 
-The user proposed a named Thread `Heap` reference, analogous to `Self`, exposing
-`Heap.Save` and other heap methods, with the Heap abstraction serving as the
-“Amoeba” for every Thread. Treat this as the architectural direction under
-discussion; the revised CR0 bootstrap call is explicitly TBD.
+The user prefers `Thread` over `Heap` for the named reference analogous to
+`Self` (their example is `Thread.Rollback`). The abstraction is intended as the
+“Amoeba” for every Thread, encompassing heap operations and potentially broader
+Thread services. The revised CR0 bootstrap call is explicitly TBD.
 
-**Why:** The user wants a common Thread heap abstraction rather than independent
-application-specific storage machinery.
+**Why:** The user wants a common Thread abstraction rather than independent
+application-specific storage machinery, and suggested rollback using
+IDE-reserved space as an example of its broader scope.
 
 **How to apply:** Distinguish callable method authority from Thread heap data
 authority. Define binding and method contracts before implementation; do not
 infer approval to change CR0, bootstrap, persistence, or the ISA from this
 discussion.
+
+`Thread.Rollback` and IDE-reserved snapshot space remain proposals, not an
+approved implementation or a defined snapshot/resume contract.
