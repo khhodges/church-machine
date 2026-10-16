@@ -89,3 +89,13 @@ are separate requirements.
 before assigning a bit. Preserve the approved self-target CHANGE behavior
 unless explicitly revised. Do not equate an IDE pause with relinquishing
 Thread ownership or treat a running flag as a checkpoint-consumed flag.
+
+The user designated the supplied CTMM/W7 threat-test plan as the Phase 1
+“W7++” test objective.
+
+**Why:** This is an explicit acceptance objective, not approval of every
+mechanism or evidence label asserted by the supplied workbook.
+
+**How to apply:** Reconcile objectives against current contracts and resident
+Phase 1 scope; preserve not-run versus verified status and do not infer
+authorization to implement, build, or flash from the objective designation.

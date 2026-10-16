@@ -19,6 +19,13 @@
 These review documents define software scope, not completed implementation,
 hardware qualification, or authorization to change bootstrap.
 
+## W7++ test objective
+
+- **[W7++ scope and evidence requirements](W7-plus-plus-test-objectives.md)**
+  — Phase 1 objective, with current-contract reconciliation and scope gates.
+- **[Original threat-test workbook](CTMM_W7_Threat_Test_Plan.xlsx)** — preserved
+  input: 15 objectives, all marked Not run at receipt; no test-pass claim.
+
 ## Authority
 
 | Question | Answer comes from |

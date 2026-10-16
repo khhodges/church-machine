@@ -1060,3 +1060,31 @@ mtime_ms = 1792172446396
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/dd6896c7-870c-421d-8f11-f929f9093ad1/53b8d6e2-a2fc-4638-9784-2961f56225e1"
 storage_version_token = "1792172463435982"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "T3FFXpjMf_Ib6JZXcZJcN"
+uri = "file://docs/phase-1/W7-plus-plus-test-objectives.md"
+type = "text"
+title = "Phase 1 — W7++ Test Objectives"
+description = "Scope, evidence requirements, and reconciliation notes for the 15 supplied objectives."
+logical_id = "d8102926-d598-45c2-99d8-37ce45446b17"
+content_hash = "sha256:13311009aa923c2a28565b7cae24d4e8c7b465b76f3d804ff582ff3f4abc853c"
+size = 5095
+mtime_ms = 1792180030626
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d8102926-d598-45c2-99d8-37ce45446b17/81bc4144-5673-4980-a543-fe84246d6129"
+storage_version_token = "1792180058984845"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "g_tgiD7aKLQhEPSau-YzP"
+uri = "file://docs/phase-1/CTMM_W7_Threat_Test_Plan.xlsx"
+type = "table"
+title = "W7++ Threat-Test Workbook"
+description = "Unchanged copy of the supplied workbook; all 15 objectives are marked Not run."
+logical_id = "d39713d1-b9c8-4bee-9c41-0d032e8da1a6"
+content_hash = "sha256:eb82ab1f5801c3a2585da6cb1adf899d945f6bddb453fc2057810c9a3dac3800"
+size = 16033
+mtime_ms = 1792180002874
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/c5985511-3493-45b1-8543-2e92ef0b7e1b"
+storage_version_token = "1792180059728672"
+content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
