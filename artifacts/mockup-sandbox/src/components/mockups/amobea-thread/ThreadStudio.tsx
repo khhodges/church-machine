@@ -1,14 +1,19 @@
 import { useRef, useState } from 'react';
-import { ArrowDown, ArrowRight, Boxes, Check, ChevronRight, CircleHelp, Code2, Database, FileCode2, Layers3, LockKeyhole, MessageSquare, Phone, Plus, RotateCcw, Save, ShieldCheck, ShoppingBasket, SlidersHorizontal, Sparkles, Utensils, CalendarDays } from 'lucide-react';
+import { ArrowDown, ArrowRight, Boxes, Check, ChevronRight, CircleHelp, Code2, Database, FileCode2, Layers3, LockKeyhole, MessageSquare, Phone, Plus, RotateCcw, Save, ShieldCheck, ShoppingBasket, SlidersHorizontal, Sparkles, Utensils, CalendarDays, Trash2 } from 'lucide-react';
 import { ThreadDesignPage } from './_shared/DesignPages';
 import { initialThreadDraft, type ThreadDraft } from './_shared/model';
-import { initialTuples, nextOffset, RECORD_WORDS, statuses, transactions, validateValues, type DemoTuple, type Values } from './_shared/tuples';
+import { initialTuples, nextOffset, RECORD_WORDS, statuses, transactions, type DemoTuple, type Field, type Values } from './_shared/tuples';
 import './_group.css';
 import './_studio.css';
 import './ThreadStudio.css';
 
 type Tab = 'tuples' | 'thread' | 'messages' | 'checkpoint' | 'diagnostic';
 type Edit = { fields: Values; json: string };
+type StudioTransaction = {
+  name: string; purpose: string; schema: string; methods: string; peer: string;
+  authority: string; fields: Field[]; values: Values; payload: string[];
+  excluded: string; result: string;
+};
 const icons = [Phone, Utensils, Sparkles, ShoppingBasket, CalendarDays];
 const tabs: { id: Tab; label: string; icon: typeof Database }[] = [
   { id: 'tuples', label: 'Tuple storage', icon: Database },
@@ -18,9 +23,30 @@ const tabs: { id: Tab; label: string; icon: typeof Database }[] = [
   { id: 'diagnostic', label: 'Source diagnostic', icon: Code2 },
 ];
 
+function validateRecord(transaction: StudioTransaction, value: unknown): string[] {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return ['Use a JSON object with named schema fields, not an array or null.'];
+  const record = value as Values;
+  const errors = Object.keys(record).filter(key => !transaction.fields.some(field => field.key === key))
+    .map(key => `Unknown field “${key}”. Use the keys shown in the schema.`);
+  for (const field of transaction.fields) {
+    const entry = record[field.key];
+    if (field.type === 'text' && (typeof entry !== 'string' || !entry.trim() || new TextEncoder().encode(entry).length > 32)) {
+      errors.push(`${field.label}: enter 1–32 UTF-8 bytes to fit its 8-word illustrative slot.`);
+    }
+    if (field.type === 'number' && (typeof entry !== 'number' || !Number.isInteger(entry) || entry < 0 || entry > 2147483647)) {
+      errors.push(`${field.label}: use a whole number from 0 to 2,147,483,647.`);
+    }
+    if (field.type === 'status' && !statuses.includes(String(entry))) errors.push(`${field.label}: choose a listed application status.`);
+  }
+  return errors;
+}
+
 export function ThreadStudio() {
   const [draft, setDraft] = useState(initialThreadDraft);
   const [tuples, setTuples] = useState(initialTuples);
+  const [transactionList, setTransactionList] = useState<StudioTransaction[]>(() => transactions.map(item => ({
+    ...item, fields: [...item.fields], values: { ...item.values }, payload: [...item.payload],
+  })));
   const [tx, setTx] = useState(0);
   const [selectedId, setSelectedId] = useState(1);
   const [tab, setTab] = useState<Tab>('tuples');
@@ -37,9 +63,13 @@ export function ThreadStudio() {
   const [payloadReview, setPayloadReview] = useState(false);
   const [scope, setScope] = useState({ tuples: true, frame: true, authority: true });
   const [scopeReview, setScopeReview] = useState(false);
+  const [newTransactionOpen, setNewTransactionOpen] = useState(false);
+  const [newTransactionName, setNewTransactionName] = useState('');
+  const [newTransactionPurpose, setNewTransactionPurpose] = useState('');
+  const [deleteTransactionConfirm, setDeleteTransactionConfirm] = useState(false);
   const serial = useRef(6);
   const savedDesign = useRef<unknown>(null);
-  const transaction = transactions[tx];
+  const transaction = transactionList[tx];
   const visibleTuples = tuples.filter(t => t.tx === tx);
   const selected = visibleTuples.find(t => t.id === selectedId);
   const edit = selected ? edits[selected.id] || { fields: selected.values, json: '{\n  "status": "active"\n}' } : null;
@@ -64,10 +94,10 @@ export function ThreadStudio() {
     const issues = [
       !draft.name.trim() ? 'Give the Thread a name in Thread definition.' : '',
       ...draft.capabilities.filter(c => !c.target.trim()).map(c => `Assign a target to c${c.register} in Thread definition.`),
-      ...tuples.flatMap(t => validateValues(t.tx, t.values)),
+      ...tuples.flatMap(t => transactionList[t.tx] ? validateRecord(transactionList[t.tx], t.values) : ['A tuple refers to a missing Transaction.']),
     ].filter(Boolean);
     if (issues.length) { setErrors(issues); setNotice('Design not saved. Resolve the validation below.'); return; }
-    savedDesign.current = structuredClone({ draft, tuples, edits, payloadKeys, scope });
+    savedDesign.current = structuredClone({ draft, transactionList, tuples, edits, payloadKeys, scope });
     setSaved(true); setErrors([]); setNotice('Design retained in session memory, including editing drafts. Unapplied record edits remain unapplied. Reloading discards this session.');
   };
   const changeEdit = (patch: Partial<Edit>) => {
@@ -84,7 +114,7 @@ export function ThreadStudio() {
         if (!patch || typeof patch !== 'object' || Array.isArray(patch)) throw new Error('Use a JSON object, for example {"status":"active"}.');
         values = { ...selected.values, ...patch };
       } else values = { ...edit.fields };
-      const issues = validateValues(tx, values);
+      const issues = validateRecord(transaction, values);
       if (issues.length) { setErrors(issues); setReview(null); return; }
       setErrors([]); setReview({ id: selected.id, values });
     } catch (error) { setReview(null); setErrors([error instanceof SyntaxError ? 'JSON could not be read. Use double-quoted keys and values; remove trailing commas. No record was changed.' : String((error as Error).message)]); }
@@ -111,16 +141,68 @@ export function ThreadStudio() {
     dirty(); setNotice(`Released disposable tuple #${id}. Its handle is retired; no capability revocation is implied.`);
   };
   const resetDemo = () => {
-    setDraft(initialThreadDraft()); setTuples(initialTuples()); setTx(0); setSelectedId(1); setEdits({}); setReview(null);
+    setDraft(initialThreadDraft()); setTuples(initialTuples()); setTransactionList(transactions.map(item => ({ ...item, fields: [...item.fields], values: { ...item.values }, payload: [...item.payload] }))); setTx(0); setSelectedId(1); setEdits({}); setReview(null);
     setErrors([]); setRelease(null); setAllocation(false); setReset(false); setPayloadKeys({}); setPayloadReview(false);
-    setScope({ tuples: true, frame: true, authority: true }); setScopeReview(false); savedDesign.current = null;
+    setScope({ tuples: true, frame: true, authority: true }); setScopeReview(false); setNewTransactionOpen(false); setDeleteTransactionConfirm(false); setNewTransactionName(''); setNewTransactionPurpose(''); savedDesign.current = null;
     dirty(); setNotice('Synthetic demo reset. All session edits and the saved design were discarded.');
+  };
+  const addTransaction = () => {
+    const name = newTransactionName.trim();
+    const purpose = newTransactionPurpose.trim();
+    if (!name || !purpose) { setNotice('Enter a Transaction name and purpose before creating it.'); return; }
+    if (transactionList.some(item => item.name.toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      setNotice('Transaction names must be unique. Choose a different name.');
+      return;
+    }
+    const created: StudioTransaction = {
+      name, purpose, schema: `${name.replace(/[^a-zA-Z0-9]/g, '') || 'Task'}Record`,
+      methods: 'Task.prepare → Task.review', peer: 'Peer.Thread',
+      authority: 'Existing capability grant required',
+      fields: [
+        { key: 'task', label: 'Task', type: 'text', words: 8 },
+        { key: 'details', label: 'Details', type: 'text', words: 8 },
+        { key: 'attempts', label: 'Attempts', type: 'number', words: 1 },
+        { key: 'status', label: 'Task state', type: 'status', words: 1 },
+      ],
+      values: { task: 'New task', details: 'Synthetic details', attempts: 0, status: 'prepared' },
+      payload: ['task'], excluded: 'Unselected context and all other Transactions',
+      result: 'A reviewed result only; no external action is executed.',
+    };
+    const index = transactionList.length;
+    setTransactionList(prev => [...prev, created]);
+    setTx(index); setSelectedId(-1); setTab('tuples'); setNewTransactionOpen(false);
+    setNewTransactionName(''); setNewTransactionPurpose(''); setDeleteTransactionConfirm(false);
+    setErrors([]); dirty(); setNotice(`Added “${name}” as a synthetic Transaction. Reserve its first tuple when ready.`);
+  };
+  const deleteTransaction = () => {
+    if (transactionList.length <= 1) { setNotice('Keep at least one Transaction in the workspace.'); setDeleteTransactionConfirm(false); return; }
+    const retired = tuples.filter(tuple => tuple.tx === tx);
+    const nextTuples = tuples.filter(tuple => tuple.tx !== tx).map(tuple => tuple.tx > tx ? { ...tuple, tx: tuple.tx - 1 } : tuple);
+    const nextIndex = Math.max(0, tx - 1);
+    const nextSelected = nextTuples.find(tuple => tuple.tx === nextIndex)?.id ?? -1;
+    setTransactionList(prev => prev.filter((_, index) => index !== tx));
+    setTuples(nextTuples); setTx(nextIndex); setSelectedId(nextSelected);
+    setEdits(prev => { const next = { ...prev }; retired.forEach(tuple => delete next[tuple.id]); return next; });
+    setPayloadKeys(prev => {
+      const next: Record<number, string[]> = {};
+      Object.entries(prev).forEach(([index, fields]) => {
+        const numericIndex = Number(index);
+        if (numericIndex < tx) next[numericIndex] = fields;
+        if (numericIndex > tx) next[numericIndex - 1] = fields;
+      });
+      return next;
+    });
+    setDeleteTransactionConfirm(false); setReview(null); setErrors([]); dirty();
+    setNotice(`Deleted “${transaction.name}” and its ${retired.length} synthetic allocation${retired.length === 1 ? '' : 's'}. Other Transactions were retained.`);
   };
   return <div className="church-next cm-studio">
     <header className="cm-top"><div className="cm-brand"><span className="cm-logo">λ</span><span className="cm-brand-name">CHURCH MACHINE</span></div><span className="cm-top-divider"/><span className="cm-product">AMOBEA / THREAD STUDIO</span><div className="cm-top-meta"><span>PERSONAL WORKBENCH</span><span className="cm-build-badge"><span/>PHASE 1 · DESIGN ONLY</span></div></header>
     <div className="cm-workspace">
       <aside className="cm-rail" aria-label="Transaction examples"><div className="cn-eyebrow">Personal Transactions</div>
-        {transactions.map((item, index) => { const Icon = icons[index]; return <button key={item.name} className={`cm-transaction ${tx === index ? 'active' : ''}`} aria-pressed={tx === index} onClick={() => navigateTx(index)}><Icon size={17}/><span><strong>{item.name}</strong><small>TX-{index + 1} · {tuples.filter(t=>t.tx===index).length} allocation{tuples.filter(t=>t.tx===index).length!==1?'s':''}</small></span>{tx===index && <ChevronRight size={13} style={{marginLeft:'auto'}}/>}</button>; })}
+        {transactionList.map((item, index) => { const Icon = icons[index] ?? Database; return <div className="cm-transaction-row" key={`${item.name}-${index}`}><button key={item.name} className={`cm-transaction ${tx === index ? 'active' : ''}`} aria-pressed={tx === index} onClick={() => navigateTx(index)}><Icon size={17}/><span><strong>{item.name}</strong><small>TX-{index + 1} · {tuples.filter(t=>t.tx===index).length} allocation{tuples.filter(t=>t.tx===index).length!==1?'s':''}</small></span>{tx===index && <ChevronRight size={13} style={{marginLeft:'auto'}}/>}</button>{tx===index && <button className="cm-delete-transaction" aria-label={`Delete ${item.name}`} title={`Delete ${item.name}`} onClick={()=>{setDeleteTransactionConfirm(true);setNewTransactionOpen(false);}}><Trash2 size={13}/></button>}</div>; })}
+        <button className="cm-new-transaction" onClick={()=>{setNewTransactionOpen(value=>!value);setDeleteTransactionConfirm(false);}}><Plus size={14}/> New Transaction</button>
+        {newTransactionOpen && <form className="cm-transaction-form" onSubmit={event=>{event.preventDefault();addTransaction();}}><label>Transaction name<input autoFocus maxLength={36} value={newTransactionName} onChange={event=>setNewTransactionName(event.target.value)} placeholder="e.g. Plan a trip"/></label><label>Purpose<input maxLength={96} value={newTransactionPurpose} onChange={event=>setNewTransactionPurpose(event.target.value)} placeholder="What should this help with?"/></label><button type="submit" className="cn-btn primary">Create Transaction</button></form>}
+        {deleteTransactionConfirm && <div className="cm-delete-confirm" role="alert"><strong>Delete {transaction.name}?</strong><p>This removes its synthetic tuple data and local edit drafts. Other Transactions stay intact.</p><div><button onClick={deleteTransaction}>Delete</button><button onClick={()=>setDeleteTransactionConfirm(false)}>Keep</button></div></div>}
         <div className="cm-rail-note"><LockKeyhole size={17}/><strong>Your Namespace is the enclosing private environment.</strong>It is not a blanket grant to external services. Capabilities are the foundation of access authority.<div className="cn-rule"/><span className="cn-mono" style={{fontSize:10}}>ALL DATA IS SYNTHETIC</span><br/>No simulator or live services.</div>
       </aside>
       <main className="cm-main">
