@@ -5,6 +5,7 @@ import { initialThreadDraft, type ThreadDraft } from './_shared/model';
 import { initialTuples, nextOffset, RECORD_WORDS, statuses, transactions, validateValues, type DemoTuple, type Values } from './_shared/tuples';
 import './_group.css';
 import './_studio.css';
+import './ThreadStudio.css';
 
 type Tab = 'tuples' | 'thread' | 'messages' | 'checkpoint' | 'diagnostic';
 type Edit = { fields: Values; json: string };
@@ -116,7 +117,7 @@ export function ThreadStudio() {
     dirty(); setNotice('Synthetic demo reset. All session edits and the saved design were discarded.');
   };
   return <div className="church-next cm-studio">
-    <header className="cm-top"><div className="cm-brand"><span className="cm-logo"><Boxes size={21}/></span>Church Machine</div><span className="cn-muted">/</span><span>Thread studio</span><div className="cm-top-meta"><span>Personal workbench / Amobea</span><span className="cn-badge"><span style={{width:5,height:5,borderRadius:5,background:'var(--copper)'}}/> PHASE 1 · DESIGN ONLY</span></div></header>
+    <header className="cm-top"><div className="cm-brand"><span className="cm-logo">λ</span><span className="cm-brand-name">CHURCH MACHINE</span></div><span className="cm-top-divider"/><span className="cm-product">AMOBEA / THREAD STUDIO</span><div className="cm-top-meta"><span>PERSONAL WORKBENCH</span><span className="cm-build-badge"><span/>PHASE 1 · DESIGN ONLY</span></div></header>
     <div className="cm-workspace">
       <aside className="cm-rail" aria-label="Transaction examples"><div className="cn-eyebrow">Personal Transactions</div>
         {transactions.map((item, index) => { const Icon = icons[index]; return <button key={item.name} className={`cm-transaction ${tx === index ? 'active' : ''}`} aria-pressed={tx === index} onClick={() => navigateTx(index)}><Icon size={17}/><span><strong>{item.name}</strong><small>TX-{index + 1} · {tuples.filter(t=>t.tx===index).length} allocation{tuples.filter(t=>t.tx===index).length!==1?'s':''}</small></span>{tx===index && <ChevronRight size={13} style={{marginLeft:'auto'}}/>}</button>; })}
@@ -128,7 +129,7 @@ export function ThreadStudio() {
         <div className="cm-authority"><ShieldCheck size={18}/><div><strong>Shared does not mean private.</strong> Cooperating methods use the same Thread tuples. A schema, name or Transaction ID grants no authority.<br/><span>For isolation: a separate Thread + existing capability grants + Dijkstra messages. No tuple ACLs.</span></div></div>
         <section className="cm-summary" aria-label="Storage summary"><div><span className="cn-eyebrow">Owning Thread</span><strong>{draft.name || 'Unnamed Thread'}</strong><small>{transaction.methods} · proposed cooperation, not executed</small></div><div><span className="cn-eyebrow">Fixture allocation</span><strong>{used} <span style={{fontSize:11,color:'var(--muted)'}}>/ {budget} words</span></strong><div className="cm-meter"><span style={{width:`${used/budget*100}%`}}/></div><small>{tuples.length} records · {budget-used} words unallocated</small></div><div><span className="cn-eyebrow">Task progress</span><strong style={{fontSize:13}}>{visibleTuples[0]?.values.status || 'No working records'}</strong><small>Application status ≠ running ownership</small></div></section>
         <nav className="cm-tabs" aria-label="Design views">{tabs.map(t => <button key={t.id} className={tab===t.id?'active':''} aria-current={tab===t.id?'page':undefined} onClick={()=>{setTab(t.id);setErrors([]);setReview(null);}}><t.icon size={14}/>{t.label}{t.id==='diagnostic' && <span className="cn-status warn">1</span>}</button>)}</nav>
-        {notice && <div className="cn-toast" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={()=>setNotice('')}>×</button></div>}
+        {notice && <div className="cn-toast" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={()=>setNotice('')}>Dismiss</button></div>}
         {errors.length>0 && <div className="cm-error" role="alert"><strong>No changes applied.</strong>{errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
         <div className="cm-content" key={tab}>
         {tab==='tuples' && <div className="cm-grid">
