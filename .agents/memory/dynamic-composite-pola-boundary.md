@@ -24,3 +24,14 @@ The user's motivating telephony example is a complete call record starting with 
 **Why:** This illustrates shared record state spanning methods, rather than independent storage per method or a new GT for every field.
 
 **How to apply:** Use this example when discussing heap tuple records; keep record lifetime and access authority explicit without assuming a specific allocation scheme or one Thread per call has been approved.
+
+For the initial telephony demonstration, the user approved callable heap-record
+operations plus IDE-side JSON import/export/partial update, with refinement later.
+
+**Why:** Demonstrating the runtime record must not first require a full JSON
+parser on the Church Machine. This is a software demonstration convention,
+not authorization to change the ISA or create a production-wide heap standard.
+
+**How to apply:** Keep JSON conversion at the IDE boundary for this phase,
+preserve omitted fields on updates, validate before writes, and keep live heap
+mutations separate from saved LUMPs and hardware programming.

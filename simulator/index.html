@@ -108,6 +108,7 @@
     <link rel="stylesheet" href="styles-toolbar.css?v=sha256-d570f4c2fa59">
     <link rel="stylesheet" href="styles-editor.css?v=sha256-b8ca7a206aa7">
     <link rel="stylesheet" href="styles-dashboard.css?v=20260830-thread-heap-formula1">
+    <link rel="stylesheet" href="styles-heap-record.css?v=1">
     <link rel="stylesheet" href="styles-lumps.css?v=sha256-7fdc6656ded7">
     <link rel="stylesheet" href="styles-gatelog.css?v=sha256-4c4361f1c960">
     <link rel="stylesheet" href="styles-fault.css?v=sha256-9e328a519f73">
@@ -911,6 +912,7 @@
                                 <button class="ham-item" onclick="showCreateNamespace();closeEditorActions()" data-tooltip="Create Namespace — Reserve a namespace slot for your abstraction">Create Namespace</button>
                                 <button class="ham-item" onclick="compileAndCreateAbstraction();closeEditorActions()" data-tooltip="Create Abstraction — Compile and create via Navana.Abstraction.Add">Create Abstraction</button>
                                 <button class="ham-item" onclick="auditLumpOnly();closeEditorActions()" data-tooltip="Audit LUMP — Compile and run structural consistency checks without downloading or saving">Audit LUMP</button>
+                                <button class="ham-item" onclick="openThreadHeapRecord();closeEditorActions()" data-tooltip="Thread heap call record — JSON import, export, update and callable example">Thread heap record</button>
                                 <button class="ham-item" onclick="exportLumpAsPatch();closeEditorActions()" style="color:#66bb6a;" data-tooltip="Export Lump as Patch — Load a pre-built .lump file and convert to a .patch file for FPGA flashing">Lump → Patch ↓</button>
                                 <button class="ham-item" id="btnHamInstructions" onclick="(function(){var ed=document.getElementById('asmEditor');if(ed&&window.AsmInstructionPicker){ed.focus();window.AsmInstructionPicker.show(ed);}})();closeEditorActions()" style="color:#c4b5fd;" data-tooltip="Instructions — Browse and insert assembly instructions">Instructions</button>
                                 <button class="ham-item" id="btnHamCList" onclick="showEditorCListPopup(event);closeEditorActions()" style="color:#7dd3fc;" data-tooltip="C-List — Browse capability names and insert into editor">C-List</button>
@@ -951,6 +953,9 @@
                          <button type="button" class="btn btn-sm editor-build-btn editor-save-lump-btn" id="btnToolbarSaveLump"
                                  onclick="document.getElementById('btnHamSaveLump').click()"
                                  data-tooltip="Save LUMP — Review the current candidate or build a frozen source snapshot">Save LUMP</button>
+                        <button type="button" class="btn btn-sm editor-build-btn" id="btnThreadHeapRecord"
+                                onclick="openThreadHeapRecord()"
+                                data-tooltip="Thread heap call record — JSON import, export, update and callable example">Heap record</button>
                         <div id="editorViewSwitcherPanel" class="editor-view-switcher-panel" role="region"
                              aria-labelledby="editorViewSwitcherToggle" hidden>
                             <div class="editor-view-switcher-heading">
@@ -3582,7 +3587,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="idx1-execution-envelope.js?v=sha256-d1b769677eb3"></script>
     <script src="idx1-memory.js?v=sha256-fc8ce715b2ad"></script>
     <script src="idx1-runtime.js?v=sha256-bf5ac02c55f9"></script>
-    <script src="simulator.js?v=sha256-c54a8866b389"></script>
+    <script src="simulator.js?v=sha256-a2aa4dce0033"></script>
     <script src="namespace-runtime-view.js?v=sha256-5b2eb46866dc"></script>
     <script src="namespace-runtime-core.js?v=sha256-be429f0b0bab"></script>
     <script src="capability_tokens.js?v=sha256-010ebc0eaf32"></script>
@@ -3650,6 +3655,8 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-run.js?v=sha256-6fcadb20f4e5"></script>
     <script src="app-simulation-preparation.js?v=20261015-image-identity"></script>
     <script src="app-actions.js?v=sha256-60e0deaed7c2"></script>
+    <script src="thread-heap-record.js?v=1"></script>
+    <script src="app-heap-record.js?v=1"></script>
     <script src="app-build-approval.js?v=sha256-aedc3d2e78b3"></script>
     <script src="app-source-library.js?v=sha256-f0acb36b8999"></script>
     <script src="app-editor-view-switcher.js?v=sha256-0890f98dcbf5"></script>

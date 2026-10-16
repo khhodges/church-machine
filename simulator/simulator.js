@@ -4440,7 +4440,7 @@ class ChurchSimulator {
         return { ok: true };
     }
 
-    mLoad(gt32, requiredPerm, srcCRIdx, absoluteAddress, rangeOverride) {
+    mLoad(gt32, requiredPerm, srcCRIdx, absoluteAddress, rangeOverride, inspection = false) {
         // Gate 0: early NULL type-field check — gt_type=0b00 → NULL_CAP before any NS lookup.
         // Catches corrupted tokens (e.g. gt_type flipped 0b01→0b00) that are not all-zeros
         // and would otherwise pass the old word0===0 guard and slip through to NS[slot_id].
@@ -4527,8 +4527,8 @@ class ChurchSimulator {
             stepCtx: this._currentInstrLabel || null,
         };
         if (rangeInfo) auditEntry.checks.range = rangeInfo;
-        this.auditLog.push(auditEntry);
-        this.lastCapability = {
+        if (!inspection) this.auditLog.push(auditEntry);
+        if (!inspection) this.lastCapability = {
             op: requiredPerm,
             label: auditEntry.label,
             perms: parsed.permissions,
@@ -4551,7 +4551,7 @@ class ChurchSimulator {
             const rLimit = rangeInfo.limit;
             return { ok: false, fault: 'RANGE', message: `address ${absoluteAddress} outside valid range [${rBase}..${rLimit}]` };
         }
-        this.markLive(parsed.index);
+        if (!inspection) this.markLive(parsed.index);
         return { ok: true, parsed, entry, index: parsed.index };
     }
 
