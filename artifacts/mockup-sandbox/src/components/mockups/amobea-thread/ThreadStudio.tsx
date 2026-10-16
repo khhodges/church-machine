@@ -67,6 +67,7 @@ export function ThreadStudio() {
   const [newTransactionName, setNewTransactionName] = useState('');
   const [newTransactionPurpose, setNewTransactionPurpose] = useState('');
   const [deleteTransactionConfirm, setDeleteTransactionConfirm] = useState(false);
+  const [showBeginnerGuide, setShowBeginnerGuide] = useState(true);
   const serial = useRef(6);
   const savedDesign = useRef<unknown>(null);
   const transaction = transactionList[tx];
@@ -207,7 +208,16 @@ export function ThreadStudio() {
       </aside>
       <main className="cm-main">
         <div className="cm-title"><div><div className="cn-eyebrow">Workspace / Amobea / TX-{tx+1}</div><h1>{transaction.name}</h1></div><div className="cn-actions"><span className={`cn-status ${saved?'':'warn'}`}>{saved?'Saved · session only':'Unsaved design'}</span><button className="cn-btn primary" onClick={save}><Save size={14}/>Save design</button></div></div>
-        <p className="cm-subtitle">{transaction.purpose} <span className="cn-muted">One Thread, shared working state.</span></p>
+        <p className="cm-subtitle">{transaction.purpose} <span className="cn-muted">A Thread is the workspace where this task keeps its shared working state.</span></p>
+        {showBeginnerGuide ? <section className="cm-beginner-guide" aria-labelledby="cm-beginner-title">
+          <div className="cm-guide-heading"><div><span className="cm-guide-kicker">FIRST TIME HERE? START WITH THIS EXAMPLE</span><h2 id="cm-beginner-title">Try it in three steps. No programming needed.</h2></div><button className="cm-guide-hide" onClick={()=>setShowBeginnerGuide(false)}>Hide guide</button></div>
+          <ol className="cm-guide-steps">
+            <li><span className="cm-guide-number">1</span><div><strong>Choose a task</strong><p>Pick an everyday example from the left, such as Phone Mum. “Transaction” means a task here, not a money transfer.</p></div></li>
+            <li><span className="cm-guide-number">2</span><div><strong>Change a detail</strong><p>Edit one field below. Press <b>Review update</b>, check the preview, then choose <b>Apply validated update</b>.</p></div></li>
+            <li><span className="cm-guide-number">3</span><div><strong>Keep your design</strong><p>Press <b>Save design</b> at the top. It lasts only until you reload or close this preview.</p></div></li>
+          </ol>
+          <div className="cm-guide-foot"><span><b>Tuple</b> = one task record</span><span><b>Reserve tuple</b> = add another example record</span><span><b>Thread</b> = the workspace for shared task state</span><span>Nothing is sent to a phone or outside service.</span></div>
+        </section> : <button className="cm-guide-reopen" onClick={()=>setShowBeginnerGuide(true)}><CircleHelp size={13}/>How do I use this?</button>}
         <div className="cm-authority"><ShieldCheck size={18}/><div><strong>Shared does not mean private.</strong> Cooperating methods use the same Thread tuples. A schema, name or Transaction ID grants no authority.<br/><span>For isolation: a separate Thread + existing capability grants + Dijkstra messages. No tuple ACLs.</span></div></div>
         <section className="cm-summary" aria-label="Storage summary"><div><span className="cn-eyebrow">Owning Thread</span><strong>{draft.name || 'Unnamed Thread'}</strong><small>{transaction.methods} · proposed cooperation, not executed</small></div><div><span className="cn-eyebrow">Fixture allocation</span><strong>{used} <span style={{fontSize:11,color:'var(--muted)'}}>/ {budget} words</span></strong><div className="cm-meter"><span style={{width:`${used/budget*100}%`}}/></div><small>{tuples.length} records · {budget-used} words unallocated</small></div><div><span className="cn-eyebrow">Task progress</span><strong style={{fontSize:13}}>{visibleTuples[0]?.values.status || 'No working records'}</strong><small>Application status ≠ running ownership</small></div></section>
         <nav className="cm-tabs" aria-label="Design views">{tabs.map(t => <button key={t.id} className={tab===t.id?'active':''} aria-current={tab===t.id?'page':undefined} onClick={()=>{setTab(t.id);setErrors([]);setReview(null);}}><t.icon size={14}/>{t.label}{t.id==='diagnostic' && <span className="cn-status warn">1</span>}</button>)}</nav>
