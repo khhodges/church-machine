@@ -151,6 +151,7 @@
             con.textContent = message;
             con.scrollTop = 0;
         }
+        if (typeof switchCodeTab === 'function') switchCodeTab('console');
         return { ok: false, action, error: message };
     }
     function operationBusy(action) {
@@ -171,7 +172,14 @@
             ' No LUMP was saved. Keep your draft, then retry Save LUMP after fixing this issue.';
         if (typeof appendOutput === 'function') appendOutput(message, 'error');
         const con = document.getElementById('editorConsole');
-        if (con) con.textContent = message;
+        if (con) {
+            const diagnostics = Array.isArray(result && result.errors)
+                ? result.errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n')
+                : '';
+            con.textContent = (diagnostics || con.textContent || '') + '\n\n' + message;
+            con.scrollTop = 0;
+        }
+        if (typeof switchCodeTab === 'function') switchCodeTab('console');
         window.alert(message);
         return Object.assign({}, result, { ok: false, error: message, reported: true });
     }
@@ -189,6 +197,20 @@
                 })
                 : { ok: false, error: 'The compiler entry point is unavailable.' }
         );
+        if (result && result.ok === false) {
+            const errors = Array.isArray(result.errors) && result.errors.length
+                ? result.errors : [{line: null, message: result.error || 'Compilation failed. No new candidate was produced.'}];
+            const con = document.getElementById('editorConsole');
+            if (con) {
+                con.textContent = 'Compile failed — no new candidate produced:\n' +
+                    errors.map(e => `Line ${e.line || '?'}: ${e.message}`).join('\n') +
+                    (result.detail ? '\n' + result.detail : '');
+                con.scrollTop = 0;
+            }
+            if (typeof _showAsmErrors === 'function')
+                _showAsmErrors(errors, 'Compile failed — code not applied');
+            if (typeof switchCodeTab === 'function') switchCodeTab('console');
+        }
         refresh();
         return result;
     }

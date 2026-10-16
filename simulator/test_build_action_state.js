@@ -46,6 +46,7 @@ const context = {
     runSimGo() { runCalls++; },
     _setPendingSimLoad() { pendingInstalls++; },
     window: {
+        alert() {},
         confirm: () => { nativeConfirmCalls++; return true; },
         ExecutionIdentity: { begin() { identityBegins++; } },
         TargetState: { authorize() { return { ok: true }; } },

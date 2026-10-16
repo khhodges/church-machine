@@ -477,7 +477,10 @@ class CLOOMCCompiler {
             result.errors.push({line: 1, message:
                 'Callable LUMPs require explicit method declarations: method Run() { ... }. No implicit method or dispatch table was generated.'});
         }
-        result.errors.push(...ChurchAssembler.objectNameErrors(result, source));
+        // A failed parse has not yet established compiler-owned SELF. Do not
+        // diagnose that unfinished intermediate capability list as authored data.
+        if (!result.source_parse_failed)
+            result.errors.push(...ChurchAssembler.objectNameErrors(result, source));
         return result;
     }
 
@@ -547,7 +550,8 @@ class CLOOMCCompiler {
         // source in a generated RunAbstraction/MyAbstraction declaration.
         const parsed = this._parseAbstraction(source, errors);
         if (errors.length > 0) {
-            return { methods: [], errors, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
+            errors.sort((a, b) => (a.line || 0) - (b.line || 0));
+            return { methods: [], errors, source_parse_failed: true, manifest: [], abstractionName: parsed.name || '', capabilities: parsed.capabilities || [], language: 'javascript' };
         }
         const previousNativeCapabilityPredicates = this._activeNativeCapabilityPredicates;
         this._activeNativeCapabilityPredicates =
