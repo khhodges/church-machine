@@ -1,11 +1,23 @@
 ---
 name: Compile CALL API authority
-description: Unknown exact target APIs warn; authoritative missing methods error.
+description: Dot-name compilation is independent of destination API availability; the linking loader owns resolution.
 ---
 
-Compile-time CALL checking distinguishes absence of proof from proof of absence. A statically named CALL whose exact selected or pinned LUMP binary API is unavailable emits a non-blocking warning with its source line and pet name. A method absent from an available matching embedded API remains an error. Dynamic register calls and unused C-list data or I/O rows are not diagnosed as invalid methods.
+The compiler needs the declared dot-name to form the LUMP; the linking loader
+does the rest. Preserve unresolved references rather than requiring destination
+APIs or method conventions at compilation. Missing destination evidence is a
+linking concern, not a reason to reject LUMP formation.
 
-Static registries and sidecar metadata may help encode names but are not API authority. API proof must come from the embedded API of the exact selected token/revision; a token or revision mismatch is treated as unavailable, never as proof that programmer source is wrong.
+**Why:** On 2026-10-16 the user explicitly corrected the agent: “The dot.name is
+all the compiler needs to do to form the LUMP the linking loader does the rest.”
+This supersedes the earlier policy of compile-time destination API warnings
+and method validation. It is an architectural requirement, not a claim that
+the current implementation already satisfies it.
+
+**How to apply:** Move destination-dependent resolution and validation to the
+linking loader, retaining symbolic evidence in compiler output. Never guess
+a numeric selector or suppress errors while emitting guessed executable bytes.
+Local source syntax and structural validation remain compiler responsibilities.
 
 CALL diagnostics and lowering must share object/method interpretation, using
 the active or finalized C-list. Missing API evidence must never turn a full
@@ -21,8 +33,8 @@ C-list names and comments.
 through both browser compilation and the server worker, including missing
 and mismatched API evidence.
 
-Verified embedded method conventions must remain request-local throughout
-frontend selection and nested native assembly.
+Any legacy path still using embedded method conventions must keep them
+request-local until migrated to the linking-loader boundary above.
 
 **Why:** A regression using globally seeded test conventions can pass while
 the live worker drops exact API metadata. Static Run/Main aliases can also
