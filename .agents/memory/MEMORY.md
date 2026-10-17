@@ -1,4 +1,5 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
 - [Wide-screen touch refresh](wide-touch-refresh.md) — suppress pull-to-refresh in the wide-screen IDE while retaining normal touch scrolling.
 - [Hardware CHANGE fetch addresses](hardware-change-fetch-address.md) — use actual imem_addr and absolute saved NIAs; completion alone does not prove executable activation.
 - [ISA review decisions](isa-review-index.md) — scope, pre-release compatibility, encoding checks, cooperative scheduling and save-first fault recovery.
