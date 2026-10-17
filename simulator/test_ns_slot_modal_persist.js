@@ -307,9 +307,10 @@ async function testPlacementAction() {
                 _nsTableSave: async () => { saves++; return true; }
             },
             document: { getElementById: key => elements[key] || null },
-            sim: { defineSymbolicAbstraction: (...args) => {
+            sim: {},
+            _nsStageDesignPlacement: (...args) => {
                 submitted = args; return { slot: args[1] };
-            } },
+            },
             _setNsDirty: () => {}, updateNamespace: () => {},
         };
         vm.createContext(sandbox);

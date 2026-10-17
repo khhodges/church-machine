@@ -1,10 +1,24 @@
 """Regression checks for the primary Church Machine IDE publish target."""
 
 from pathlib import Path
+import json
 import tomllib
 
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_root_publish_uses_matching_npm_lock_and_explicit_artifact_directory():
+    """The root npm install must not be followed by an unrelated pnpm lock."""
+    package = json.loads((ROOT / "package.json").read_text())
+    locked = json.loads((ROOT / "package-lock.json").read_text())["packages"][""]
+    for section in ("dependencies", "devDependencies", "optionalDependencies"):
+        assert package.get(section, {}) == locked.get(section, {}), section
+    deployment = tomllib.loads((ROOT / ".replit").read_text())["deployment"]
+    build = " ".join(deployment["build"])
+    assert "npm ci" in build
+    assert "npm --prefix artifacts/church-machine-ide-introduction run build:production" in build
+    assert "pnpm" not in build
 
 
 def test_introduction_artifact_cannot_replace_production_root():

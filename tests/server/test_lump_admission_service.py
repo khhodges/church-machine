@@ -10,9 +10,10 @@ from server.lump_admission_service import (
     NavanaService,
     admit,
     derive_capability_targets,
-    validate_active_manifest_selections,
+    validate_namespace_artifact_selections,
 )
 from server.lump_approvals import read_approvals
+from server.namespace_authority import namespace_fingerprint
 
 
 def _portable_lump():
@@ -26,7 +27,7 @@ def _authorization(raw):
     return {"grants": ["E"], "capabilities": derive_capability_targets(raw)}
 
 
-def test_archived_only_namespace_selector_is_rejected_before_state_changes(
+def test_changed_namespace_bytes_are_rejected_before_state_changes(
         tmp_path):
     digest = "a" * 64
     rows = [{
@@ -34,37 +35,61 @@ def test_archived_only_namespace_selector_is_rejected_before_state_changes(
         "filename": "Example_v1.lump",
         "binary_hash": digest,
     }]
-    manifest = [{
-        "token": digest[:8],
-        "filename": "Example_v1.lump",
-        "binary_hash": digest,
-        "archived": True,
-    }]
     (tmp_path / "Example_v1.lump").write_bytes(b"archived")
     committed = tmp_path / "ns-state.json"
     original = {"revision": 7, "abstractions": []}
     committed.write_text(json.dumps(original))
 
-    with pytest.raises(AdmissionError, match="exactly one active manifest row"):
-        validate_active_manifest_selections(rows, manifest, str(tmp_path))
+    with pytest.raises(AdmissionError, match="differs from the approved bytes"):
+        validate_namespace_artifact_selections(rows, str(tmp_path))
 
     assert json.loads(committed.read_text()) == original
 
 
-def test_duplicate_active_namespace_selectors_are_rejected(tmp_path):
+@pytest.mark.parametrize("catalog", [[], [{"archived": True}], [{}, {}]])
+def test_catalog_status_cannot_veto_exact_namespace_selection(tmp_path, catalog):
     raw = b"active"
     digest = hashlib.sha256(raw).hexdigest()
     filename = "Example.1.12345678.lump"
     (tmp_path / filename).write_bytes(raw)
     row = {"slot": 14, "filename": filename, "binary_hash": digest}
-    active = {"token": digest[:8], "filename": filename}
+    manifest = [{"token": digest[:8], "filename": filename, **entry}
+                for entry in catalog]
+    (tmp_path / "manifest.json").write_text(json.dumps(manifest))
+    validate_namespace_artifact_selections([row], str(tmp_path))
+    assert json.loads((tmp_path / "manifest.json").read_text()) == manifest
 
-    with pytest.raises(AdmissionError, match="exactly one active manifest row"):
-        validate_active_manifest_selections(
-            [row], [active, dict(active)], str(tmp_path))
+
+def test_pending_bytes_are_authoritative_before_publication(tmp_path):
+    raw = b"new approved bytes"
+    row = {"slot": 14, "filename": "pending.lump",
+           "binary_hash": hashlib.sha256(raw).hexdigest()}
+    (tmp_path / row["filename"]).write_bytes(b"old bytes")
+    validate_namespace_artifact_selections(
+        [row], str(tmp_path), {row["filename"]: raw})
+    with pytest.raises(AdmissionError, match="differs from the approved bytes"):
+        validate_namespace_artifact_selections(
+            [row], str(tmp_path), {row["filename"]: b"wrong"})
+    assert (tmp_path / row["filename"]).read_bytes() == b"old bytes"
 
 
-def test_real_admission_atomically_publishes_derivative_and_evidence(tmp_path):
+def test_missing_selected_bytes_are_not_replaced_from_catalog(tmp_path):
+    with pytest.raises(AdmissionError, match="cannot be read"):
+        validate_namespace_artifact_selections(
+            [{"slot": 14, "filename": "missing.lump", "binary_hash": "a" * 64}],
+            str(tmp_path))
+
+
+@pytest.mark.parametrize("filename", ["../outside.lump", ".", "..", "a\\b", "a\0b"])
+def test_selected_filename_must_be_local(tmp_path, filename):
+    with pytest.raises(AdmissionError, match="exact LUMP filename"):
+        validate_namespace_artifact_selections(
+            [{"slot": 14, "filename": filename, "binary_hash": "a" * 64}],
+            str(tmp_path))
+
+
+@pytest.mark.parametrize("catalog", [[], [{"archived": True}], [{}, {}]])
+def test_real_admission_atomically_publishes_derivative_and_evidence(tmp_path, catalog):
     raw = _portable_lump()
     token = hashlib.sha256(raw).hexdigest()[:8]
     quarantine = tmp_path / "quarantine"
@@ -72,9 +97,17 @@ def test_real_admission_atomically_publishes_derivative_and_evidence(tmp_path):
     quarantine_path = quarantine / f"{token}.lump"
     quarantine_path.write_bytes(raw)
     manifest_path = tmp_path / "manifest.json"
-    manifest_path.write_text("[]")
+    selected_raw = _portable_lump()
+    selected_filename = "PreviouslyApproved.lump"
+    selected_hash = hashlib.sha256(selected_raw).hexdigest()
+    (tmp_path / selected_filename).write_bytes(selected_raw)
+    prior_rows = [{"slot": 15, "filename": selected_filename,
+                   "binary_hash": selected_hash, "resident": False}]
+    manifest_path.write_text(json.dumps([
+        {"filename": selected_filename, "token": "previous", **entry}
+        for entry in catalog]))
     state_path = tmp_path / "ns-state.json"
-    state_path.write_text(json.dumps({"revision": 0, "abstractions": []}))
+    state_path.write_text(json.dumps({"revision": 0, "abstractions": prior_rows}))
 
     result = admit(
         quarantine_path=str(quarantine_path),
@@ -93,6 +126,7 @@ def test_real_admission_atomically_publishes_derivative_and_evidence(tmp_path):
         requested=["E"],
         granted=["E"],
         lock=threading.RLock(),
+        expected_namespace_fingerprint=namespace_fingerprint(prior_rows),
     )
 
     derivative = (tmp_path / result["filename"]).read_bytes()
@@ -110,6 +144,7 @@ def test_real_admission_atomically_publishes_derivative_and_evidence(tmp_path):
     assert manifest[-1]["token"] == derivative_hash[:8]
     assert manifest[-1]["filename"] == result["filename"]
     state = json.loads(state_path.read_text())
+    assert next(entry for entry in state["abstractions"] if entry["slot"] == 15) == prior_rows[0]
     row = next(entry for entry in state["abstractions"]
                if entry["slot"] == 14)
     assert row["binary_hash"] == derivative_hash
@@ -201,6 +236,8 @@ def test_interrupted_publication_recovers_at_every_replace_boundary(tmp_path):
                 granted=["E"],
                 lock=threading.RLock(),
                 navana=service,
+                expected_namespace_fingerprint=namespace_fingerprint(
+                    json.loads(state_path.read_text())["abstractions"]),
             )
         except SystemExit:
             pass
@@ -254,6 +291,8 @@ def test_repeat_admission_uses_immutable_destination_local_derivatives(tmp_path)
             requested=["E"],
             granted=["E"],
             lock=threading.RLock(),
+            expected_namespace_fingerprint=namespace_fingerprint(
+                json.loads(state_path.read_text())["abstractions"]),
         )
 
     first = admit_to(14)
@@ -297,20 +336,7 @@ def test_boot_resident_admission_builds_an_image(tmp_path):
     root = tmp_path / "lumps"
     repository_root = Path(__file__).resolve().parents[2]
     shutil.copytree(repository_root / "server" / "lumps", root)
-    # Admission intentionally retains the stricter catalog-publication gate.
-    # Make this private fixture internally current instead of inheriting stale
-    # archived flags from the repository's catalog-history test data.
     state_fixture = json.loads((root / "ns-state.json").read_text())
-    manifest_fixture = json.loads((root / "manifest.json").read_text())
-    for binding in state_fixture.get("abstractions", []):
-        filename = binding.get("filename") if isinstance(binding, dict) else None
-        matches = [
-            row for row in manifest_fixture
-            if isinstance(row, dict) and row.get("filename") == filename
-        ]
-        if filename and len(matches) == 1:
-            matches[0].pop("archived", None)
-    (root / "manifest.json").write_text(json.dumps(manifest_fixture))
     raw = _portable_lump()
     portable_token = hashlib.sha256(raw).hexdigest()[:8]
     quarantine = root / "quarantine"
@@ -335,8 +361,9 @@ def test_boot_resident_admission_builds_an_image(tmp_path):
         requested=["E"],
         granted=["E"],
         lock=threading.RLock(),
+        expected_namespace_fingerprint=namespace_fingerprint(state_fixture["abstractions"]),
     )
-    assert result["token"] == "4a01000f"
+    assert result["mint_egt"] == "4a01000f"
     state = json.loads((root / "ns-state.json").read_text())
     row = next(entry for entry in state["abstractions"]
                if entry["slot"] == 15)

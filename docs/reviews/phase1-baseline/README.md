@@ -1,5 +1,9 @@
 # Phase 1 baseline audit — 17 October 2026
 
+Subsequent implementation and fresh results are recorded separately in
+[Namespace authority progress](namespace-authority-progress.md). Historical
+baseline observations below are preserved, not overwritten as if freshly run.
+
 ## Scope and evidence boundary
 
 Authorized: baseline inspection and failure classification, with **no saved

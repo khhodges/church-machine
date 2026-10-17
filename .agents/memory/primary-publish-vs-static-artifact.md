@@ -22,3 +22,15 @@ instead of Flask.
 **How to apply:** When the shared development domain diverges from the main
 workflow, check which managed artifact owns `/`; preserve that artifact's base
 path and forward non-artifact routes to the primary service.
+
+Do not infer that the root is a pnpm workspace from a nested artifact's
+`catalog:` declarations or an old pnpm lockfile. Publishing must use one
+consistent root dependency installation and lockfile.
+
+**Why:** The workspace configuration had disappeared while the publish command
+still combined npm installation with a frozen pnpm install. Root dependency
+additions then blocked publishing before the artifact build even began.
+
+**How to apply:** Verify the actual root package-manager setup first. Build the
+Introduction artifact from its explicit directory using the installed root
+toolchain; retain reproducible lockfile checks rather than disabling them.

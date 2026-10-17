@@ -135,6 +135,13 @@ The Boot.Abstr lump is only 64 words (≈ 45 usable code words after header and 
 
 ### Consistency Gate
 
+Genesis-approved Namespace rows are authoritative for selected artifacts,
+placement and boot selection. Catalog/manifest rules below govern library
+bookkeeping only: a missing, archived or duplicate catalog row must not veto
+independently verified Namespace-selected bytes. Seals are implementation
+metadata, not a second approval workflow. Simplify affected paths rather than
+adding competing state or catalog-repair requirements.
+
 All lump-related changes are gated by `tests/lump/test_lump_consistency.py`.
 Run before every merge touching a `.lump` binary, `manifest.json`, or any
 sidecar `<token>.json`. 11 rules — R1 through R11 — cover magic, file size,
