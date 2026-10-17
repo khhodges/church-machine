@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def live_hashes():
-    files = [ROOT / "server/boot-config.json"]
+    files = [ROOT / "server/boot-config.json", ROOT / "server/ide-hierarchy.json"]
     for name in ("server/lumps", "server/build-snapshots", "hardware/build"):
         files.extend(p for p in (ROOT / name).rglob("*") if p.is_file())
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -23,8 +23,9 @@ def live_hashes():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("endpoints", "browser"))
-    parser.add_argument("--remaining", action="store_true",
-                        help="Browser follow-up: only boot and incomplete-design acceptance")
+    parser.add_argument("--profile", choices=("legacy", "phase1"), default="legacy")
+    parser.add_argument("--remaining", nargs="?", const="boot", choices=("boot", "profiles"),
+                        help="Browser follow-up: boot segment, or Phase 1 profile checks only")
     args = parser.parse_args()
     before = live_hashes()
     try:
@@ -35,6 +36,14 @@ def main():
                 shutil.copytree(ROOT / "server" / name, directory / name)
             for name in ("boot-config.json", "church_machine.db"):
                 shutil.copy2(ROOT / "server" / name, directory / name)
+            if args.profile == "phase1":
+                design = directory / "lumps/design-drafts/phase1.json"
+                if not design.exists():
+                    # Ignored runtime drafts need not exist in a clean checkout.
+                    # Use the frozen approved snapshot, never current catalog picks.
+                    design.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(ROOT / "tests/fixtures/phase1_namespace_target.json", design)
+                    print("No saved Phase 1 draft: using frozen approved acceptance fixture", flush=True)
             env = dict(os.environ,
                        CHURCH_NAMESPACE_SAVE_ACCEPTANCE="1",
                        REPORT_TOKEN="namespace-acceptance-test-only",
@@ -49,17 +58,27 @@ def main():
             if port == 5000:
                 raise RuntimeError("Refusing live development port")
             env["E2E_PORT"] = str(port)
+            target = ("namespace_phase1_acceptance" if args.profile == "phase1"
+                      else "namespace_save_acceptance")
             # Playwright's existing config rejects existing-server reuse when
             # isolated mode is set and passes all four paths to its web server.
             command = (["python3", "-m", "pytest",
-                        "tests/server/test_namespace_save_acceptance.py", "-q", "--tb=short"]
+                        f"tests/server/test_{target}.py", "-q", "--tb=short"]
                        if args.mode == "endpoints" else
                        ["npx", "playwright", "test",
-                        "tests/e2e/namespace_save_acceptance.spec.js"])
+                        f"tests/e2e/{target}.spec.js"])
             if args.remaining:
                 if args.mode != "browser":
                     raise ValueError("--remaining applies only to browser acceptance")
-                command.extend(["--grep", "Namespace boot selection and incomplete design"])
+                if args.profile == "legacy":
+                    if args.remaining != "boot":
+                        raise ValueError("profiles follow-up requires --profile phase1")
+                    command.extend(["--grep", "Namespace boot selection and incomplete design"])
+                else:
+                    # Only the unexecuted profile/boot segment, on the approved
+                    # private snapshot; not a repeat of the completed edit journey.
+                    env["CHURCH_PHASE1_ACCEPTANCE_REMAINING"] = args.remaining
+                    design.write_text((ROOT / "tests/fixtures/phase1_namespace_target.json").read_text())
             subprocess.run(command, cwd=ROOT, env=env, check=True)
     finally:
         after = live_hashes()

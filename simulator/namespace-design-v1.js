@@ -49,6 +49,8 @@
             if (select) select.value = state.active ? state.profile : 'legacy';
             return;
         }
+        const placement = document.getElementById('namespaceDesignDialog');
+        if (placement) placement.remove();
         drafts[state.profile] = {...state};
         state.active = value !== 'legacy';
         if (state.active && value !== state.profile) {
@@ -257,8 +259,17 @@
         const policy=overlay.querySelector('#nsDraftPolicy'), picker=overlay.querySelector('#nsDraftLump');
         policy.value=state.profile==='phase1'?'Resident':original?original.policy:'Lazy';
         let selected=original && original.selection;
+        // A catalog refresh must never disguise or replace the exact placement.
+        if(selected) {
+            const option=document.createElement('option');
+            option.value='retained';
+            option.textContent='Keep selected revision '+selected.revision+' — '+selected.filename;
+            picker.appendChild(option);
+            picker.value='retained';
+        }
         let records=[];
         picker.onchange=()=>{
+            if(picker.value==='retained') { selected=original.selection; return; }
             const record=records[Number(picker.value)];
             selected=picker.value===''?null:record ? {
                 filename:record.filename, binaryHash:record.binary_hash || record.binaryHash,

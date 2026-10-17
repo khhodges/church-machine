@@ -72,7 +72,8 @@ def seed(legacy):
 def phase1_seed():
     document = seed({})
     document.update(format=PHASE1_FORMAT, slotCount=256)
-    for slot, name in [(9, "ide.Mint"), (14, "nstab"), (15, "pkverify")]:
+    for slot, name in [(9, "ide.Mint"), (14, "nstab"), (15, "pkverify"),
+                       (16, "ide.Alice"), (17, "ide.Mallory")]:
         document["rows"].append(dict(slot=slot, name=name, kind="lump",
                                      policy="Resident", sequence=0))
     document["rows"].sort(key=lambda row: row["slot"])

@@ -20,6 +20,8 @@ def test_phase1_table_and_members(tmp_path):
     rows = {r["slot"]: r for r in p["rows"]}
     assert rows[1]["limit"] == 1023
     assert rows[2]["location"] == 1024
+    assert len(rows) == 17
+    assert [rows[i]["name"] for i in (16, 17)] == ["ide.Alice", "ide.Mallory"]
     assert [rows[i]["name"] for i in (9, 14, 15)] == ["ide.Mint", "nstab", "pkverify"]
     assert not p["activationAllowed"] and not p["buildReady"]
     assert all(rows[i]["location"] is None for i in (9, 14, 15))
@@ -109,9 +111,8 @@ def test_phase1_rejects_lazy_and_recovers_named_slots(tmp_path):
     response = store.read()
     document = response["document"]
     assert all(r["policy"] == "Resident" for r in document["rows"] if r["kind"] == "lump")
-    for slot, name in [(16, "ide.Alace"), (17, "ide.Mallory")]:
-        document["rows"].append(dict(slot=slot, name=name, kind="lump",
-                                    policy="Resident", sequence=0))
+    assert [r["name"] for r in document["rows"] if r["slot"] in (16, 17)] == [
+        "ide.Alice", "ide.Mallory"]
     store.save(dict(fingerprint=response["fingerprint"], document=document))
     reopened = DesignStore(tmp_path / "phase1.json", tmp_path, live, phase1=True).read()
     assert reopened["persisted"]
@@ -138,7 +139,8 @@ def test_http_phase1_review_save_reload_and_single_use(design_http, existing):
     assert response.json["persisted"] is True
     assert response.json["document"] == payload["document"]
     assert response.json["fingerprint"] != payload["fingerprint"]
-    assert client.get(design_url("phase1")).json == response.json
+    assert client.get(design_url("phase1")).json == {
+        key: value for key, value in response.json.items() if key != "bindingReport"}
     assert json.loads(paths["phase1"].read_bytes()) == payload["document"]
     after = design_snapshot(paths)
     assert after["ascending"] == before["ascending"]
@@ -187,7 +189,8 @@ def design_payload(client, profile="phase1"):
     assert response.status_code == 200, response.json
     payload = {key: response.json[key] for key in ("document", "fingerprint")}
     payload["document"]["rows"].append(dict(
-        slot=30, name="ide.Proposed", kind="lump", policy="Lazy", sequence=0))
+        slot=30, name="ide.Proposed", kind="lump",
+        policy="Resident" if profile == "phase1" else "Lazy", sequence=0))
     return payload
 
 def design_url(profile):

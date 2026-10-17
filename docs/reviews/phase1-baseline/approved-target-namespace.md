@@ -42,10 +42,14 @@ must implement that target without a second user approval of bookkeeping.
 ## Acceptance boundary
 
 The earlier IDE-03 browser acceptance used the historical saved-Namespace
-profile. Preserve those passing results as historical evidence, but **IDE-03 is
-Needs verification for this approved Phase 1 target**. Its acceptance criterion
-is unchanged; the required target profile is now explicit. SPEC-01 remains
-Complete: the original checklist therefore has **1 Complete out of 104**.
+profile. At target confirmation, IDE-03 was reset to Needs verification and the
+original checklist had 1 Complete out of 104. Those historical results remain
+valid for their profile, but were not used to close this target.
+
+The subsequent [Phase 1 persistence acceptance](phase1-save-reload-acceptance.md)
+now closes **IDE-03 for this approved target**, using its unchanged criterion.
+Only SPEC-01 and IDE-03 are Complete in the original checklist:
+**2 Complete out of 104**. This is not executable-image qualification.
 
 No installation, simulator activation, build, flash, live migration or artifact
 replacement is authorized by this design confirmation. The historical

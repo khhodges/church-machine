@@ -5,9 +5,13 @@
 Genesis has now confirmed the [pictured Phase 1 Namespace](approved-target-namespace.md).
 The earlier IDE-03 closure below applies only to the historical saved-Namespace
 profile. Its results remain valid for that profile but do not close Phase 1
-target acceptance. IDE-03 is now **Needs verification**, and the original
-checklist has **1 Complete out of 104**. This supersedes the earlier completion
-counts in this historical progress record; no prior test result is discarded.
+target acceptance. IDE-03 was reset to **Needs verification**, with **1 Complete
+out of 104**, when that target was confirmed.
+
+Fresh [Phase 1 save/reload acceptance](phase1-save-reload-acceptance.md) now
+closes IDE-03 against the confirmed profile and unchanged criterion. The original
+checklist is **2 Complete out of 104** (SPEC-01 and IDE-03). The historical
+results below are preserved, not reclassified as Phase 1 evidence.
 
 ## Delivered
 
