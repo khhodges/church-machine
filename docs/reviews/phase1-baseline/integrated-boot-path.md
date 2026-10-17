@@ -74,3 +74,26 @@ branches. Their protected-context, Lambda and result-delivery interfaces remain
 proposals requiring implementation approval. nstab denotes the restricted table
 RW view, not an independent callable service. Existing Alice/Mallory lab code
 does not by itself authorize provisioning them in this approved Namespace.
+
+## Approved candidate naming and subsequent compilation
+
+On 2026-10-17 the user explicitly approved `ide.*` candidate identities,
+unchanged slots/display labels, and isolated implementation of the protected
+Mint interfaces. This supersedes the implementation-approval blocker above;
+it does not establish working Mint, allow live replacement, or authorize
+hardware changes.
+
+The preparation script now retains both the recovered original source and the
+qualified candidate source with separate hashes. Only identifier declarations
+and dependency tokens change. Selected SelfTest also needs its omitted outer
+abstraction/SELF declaration restored around its existing method body.
+
+All three selected sources now compile successfully into **unapproved**
+`ide.SelfTest`, `ide.WukongCallHome` and `ide.CapabilityTest` candidates.
+Tests verify the exact input hashes, compiler-owned SELF, qualified dependency
+names, executable methods and unchanged original bytes/profile. These outputs
+are not signed admission records, localized executable images, or replacements
+for the approved selections.
+
+Protected Mint runtime implementation, private credential provisioning, complete
+linking and the integrated 17-entry runtime acceptance remain outstanding.

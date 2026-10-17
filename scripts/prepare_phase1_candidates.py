@@ -2,6 +2,7 @@
 """Recover exact selected sources and compile inert candidates; never publish."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 import sys
@@ -11,6 +12,40 @@ import zlib
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from server.compile_api import run_compile
+
+
+# Explicitly approved candidate identity mapping. No changes to display names,
+# slots or immutable selected inputs. Aliases are recovered from source roles.
+IDENTITIES = {name: "ide." + name for name in (
+    "SelfTest", "WukongCallHome", "CapabilityTest", "LED_DEV", "UART_DEV",
+    "BTN_DEV", "TIMER_DEV", "M_BIT_DEV", "Boot.Thread", "Boot.NS",
+    "Thread.2", "Thread.3", "nstab", "pkverify")}
+IDENTITIES.update(LED0="ide.LED_DEV", UART_TX="ide.UART_DEV")
+
+
+def qualify_source(source, name):
+    """Change identifier tokens only, preserving comments and instruction flow."""
+    canonical = IDENTITIES.get(name, name)
+    lines = []
+    for line in source.splitlines(keepends=True):
+        code, marker, comment = line.partition(";")
+        code = re.sub(r"[A-Za-z_][A-Za-z_0-9.]*",
+                      lambda m: IDENTITIES.get(m[0], m[0]), code)
+        # The compiler also reads explicit identity annotations from comments.
+        if marker:
+            comment = re.sub(r"(@abstraction\s+|Abstraction:\s*)([A-Za-z_][\w.]*)",
+                             lambda m: m[1] + IDENTITIES.get(m[2], m[2]), comment)
+        lines.append(code + marker + comment)
+    result = "".join(lines)
+    # Selected SelfTest embeds a method body but omits its outer declaration.
+    # Restore only the approved identity and compiler-owned SELF declaration;
+    # the method instructions remain unchanged.
+    if name == "SelfTest" and re.search(r"(?m)^\s*method\s+", result) and not re.search(
+            r"(?m)^\s*abstraction\s+", result):
+        result = f"abstraction {canonical} {{\ncapabilities {{ SELF E }}\n" + result + "\n}\n"
+    if not re.search(r"(?m)^\s*abstraction\s+|@abstraction|Abstraction:", result):
+        result = f"; @abstraction {canonical}\n" + result
+    return result
 
 
 def recover(raw, expected_hash):
@@ -80,6 +115,10 @@ def prepare():
                          sourceSha256=hashlib.sha256(source.encode()).hexdigest())
             source_path = output / f"slot-{row['slot']}.source"
             source_path.write_text(source)
+            source = qualify_source(source, row["name"])
+            (output / f"slot-{row['slot']}.candidate.source").write_text(source)
+            entry["canonicalName"] = IDENTITIES.get(row["name"], row["name"])
+            entry["candidateSourceSha256"] = hashlib.sha256(source.encode()).hexdigest()
             language = api.get("language") or "assembly"
             compiled = run_compile({"source": source, "language": language, "tier": 2})
             if not compiled.get("ok"):

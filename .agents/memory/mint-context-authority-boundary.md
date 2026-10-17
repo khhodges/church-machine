@@ -3,8 +3,23 @@ name: Mint context authority boundary
 description: Keep synthetic context evidence distinct from granting Mint access to protected Thread state.
 ---
 
-Genesis authorized proposing the minimal missing Mint machine interfaces for
-review, not implementing them. The proposal is in
+**2026-10-17 superseding approval:** The user explicitly approved implementation
+of the proposed protected Mint interfaces in the isolated simulator, with no
+live installation or hardware changes. New candidates use `ide.*` identities
+while retaining approved slots and display labels.
+
+**Why:** The approval form separately asked about canonical names and protected
+Mint implementation; both were approved. This supersedes the historical
+design-only restriction below, not the safety obligations.
+
+**How to apply:** Implement and verify isolated M1/M2/M3 semantics, including
+G4 exclusion and fault containment. Do not infer live publication, FPGA changes,
+new credential recipients, or successful runtime acceptance from this approval.
+Unspecified encodings and protected continuation packing still need deliberate
+ISA reconciliation; approval is not permission to bypass enforcement.
+
+Historical scope: Genesis authorized proposing the minimal missing interfaces
+for review, not implementing them. The proposal is in
 `docs/reviews/mint-phase1/minimal-machine-interfaces.md`.
 
 **Why:** The request for complete simulator code exposed unresolved caller

@@ -1,8 +1,12 @@
 # Minimal Mint machine interfaces — proposal for review
 
-**Status: PROPOSED. Permission was given to design these interfaces, not to
-implement or activate them.** This document selects recommended semantics for
-review; it does not amend the Master ISA or supersede approved Mint policy.
+**Status: APPROVED FOR ISOLATED SIMULATOR IMPLEMENTATION, 2026-10-17.**
+The user explicitly approved the protected interfaces and `ide.*` candidate
+identities, retaining slots and display labels. Live installation and hardware
+changes are excluded. This approval does not establish operational acceptance
+or remove any exclusion, authority or containment obligation below. Unspecified
+encodings and protected continuation packing remain engineering reconciliation
+items; existing instruction meanings must not be silently repurposed.
 
 ## Goal and limits
 
@@ -16,7 +20,7 @@ ide.Mint, Owner 0. An arbitrary Alice/test-caller grant must not be fabricated.
 Alice/Mallory receive only explicitly authorized capabilities and requests.
 The first credential's Replace/Destroy target sets remain empty.
 
-Three proposed changes are necessary. They are not implemented today:
+Three changes are necessary. Their complete runtime implementation is pending:
 
 | ID | Proposed change | Architectural consequence |
 |---|---|---|
@@ -24,7 +28,7 @@ Three proposed changes are necessary. They are not implemented today:
 | M2 | Linked same-artifact Lambda entry and protected continuation | Resolves the open entry/return contract; changes inconsistent current execution behavior |
 | M3 | Private result C-list with narrowly bounded RW alias | New explicit capability-manufacturing grant to trusted Mint |
 
-All three require approval. Instruction encodings are deliberately not assigned
+All three now have isolated implementation approval. Instruction encodings are deliberately not assigned
 in this review: an implementation must allocate/check encodings against the
 actual assembler/decoder before emitting executable bytes. No published
 instruction is silently repurposed, and existing image profiles remain distinct.
@@ -146,9 +150,10 @@ payload. This post-write confirmation is separate from the old-word precondition
 
 **Investigation update:** [isolated M3 probes](result-containment.md) demonstrate
 spatial checks but not legal provisioning, publication-bound writes or
-fault/reset confidentiality. They also reproduce a non-CR6 L-only LOAD blocker
-at the current header R-read check. The semantics below remain proposed;
-neither a test-installed CR6 view nor a passing component probe approves them.
+fault/reset confidentiality. The historical non-CR6 L-only LOAD blocker was
+subsequently corrected. The semantics below have isolated implementation
+approval, but neither a test-installed CR6 view nor a passing component probe
+qualifies them.
 
 **Highest-review privilege:** M3 creates authority bits. It needs explicit
 review beyond M1's identity and M2's entry/continuation rules.
@@ -256,8 +261,8 @@ match again without exclusion; G4 remains open.
 
 The [Genesis review](../../../attached_assets/Pasted-This-is-the-right-next-document-and-it-s-well-construct_1792259460983.txt)
 endorses the proposal's direction and requests the four refinements above.
-It is **not implementation approval**. The implementation-approval question
-received no affirmative answer.
+That review was **not implementation approval**. The later explicit approval
+recorded at the top of this document now authorizes isolated implementation.
 
 M1 links to G2 (requester), G3 (all-context live use) and depends on G4
 (whole-update exclusion); M2/M3 address the two G1 mechanisms. None of these
@@ -266,9 +271,9 @@ stronger enforcement invariant, not an authority grant inferred from the review.
 
 ## What approval would and would not mean
 
-Approval would permit implementation of these semantics in isolated simulator,
+The subsequent approval permits implementation of these semantics in isolated simulator,
 compiler/linker and provisioning paths, with explicit tests for the privileged
-boundary. It would not certify existing code, install replacements into the
+boundary. It does not certify existing code, install replacements into the
 saved Namespace, activate a live image, publish new ISA encodings without
 consistency checks, or authorize hardware builds/programming.
 
