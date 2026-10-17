@@ -17,20 +17,21 @@
         refresh();
     }
     async function getBinaries(scenario) {
-        // Only exact active, validated saved artifacts: never accept a replacement
+        // Only exact pinned, validated saved artifacts (even if later archived):
+        // never accept a replacement
         // by token or a browser-generated/mock binary.
-        const response = await fetch('/api/lumps/list', {cache: 'no-store'});
+        const response = await fetch('/api/lumps/list?include_archived=1', {cache: 'no-store'});
         if (!response.ok) throw new Error(`Saved LUMP catalogue: HTTP ${response.status}`);
         const rows = await response.json();
         if (!Array.isArray(rows)) throw new Error('Invalid saved LUMP catalogue');
         const result = {};
         for (const name of ['ide.Alice', 'ide.Mallory']) {
-            const pinned = scenario?.startsWith('tuple-') ? AliceMalloryTupleLab.savedFixtures[name] : null;
-            const matches = rows.filter(row => row.abstraction === name && !row.archived &&
-                (!pinned || row.filename === pinned));
+            const pinned = AliceMalloryLab.savedFixtures[name];
+            const matches = rows.filter(row => row.abstraction === name && row.filename === pinned);
             if (matches.length !== 1 || !matches[0].binary_valid ||
-                !/^[a-f0-9]{8}$/i.test(matches[0].token) || !matches[0].filename)
-                throw new Error(`Expected exactly one valid active ${name} saved binary`);
+                !/^[a-f0-9]{8}$/i.test(matches[0].token) ||
+                matches[0].binary_hash !== AliceMalloryThreadFixture.savedHashes[name])
+                throw new Error(`Expected exact valid saved fixture ${pinned}`);
             const row = matches[0];
             const wordsResponse = await fetch('/api/lump/' + row.token +
                 '/words?exact_filename=' + encodeURIComponent(row.filename), {cache: 'no-store'});
@@ -39,6 +40,18 @@
             if (!Array.isArray(record.words) || !record.words.length ||
                 record.validation_errors?.length || record.binary_hash !== row.binary_hash)
                 throw new Error(`${name} saved binary integrity mismatch`);
+            const bytes = new ArrayBuffer(record.words.length * 4);
+            const view = new DataView(bytes);
+            record.words.forEach((word, index) => {
+                if (!Number.isInteger(word) || word < 0 || word > 0xffffffff)
+                    throw new Error(`${name} invalid saved word`);
+                view.setUint32(index * 4, word, false);
+            });
+            const digest = await crypto.subtle.digest('SHA-256', bytes);
+            const hash = Array.from(new Uint8Array(digest),
+                value => value.toString(16).padStart(2, '0')).join('');
+            if (hash !== AliceMalloryThreadFixture.savedHashes[name])
+                throw new Error(`${name} pinned binary integrity mismatch`);
             result[name] = record.words;
         }
         return result;
@@ -59,7 +72,8 @@
             ? sim.decodeInstruction(sim.memory[address]) : null;
         const label = slot === 32 ? 'fixture manager' : slot === 33 ? 'fixture Alice driver'
             : slot === 34 ? 'fixture Mallory driver'
-            : roles.find(role => role.slot === slot)?.abstraction || `NS[${slot}]`;
+            : (roles.find(role => role.slot === slot)
+                ? `${roles.find(role => role.slot === slot).abstraction} (RAM fixture)` : `NS[${slot}]`);
         el('execution').textContent = `Executing Thread NS[${sim._currentThreadSlot}] (${sim._currentThreadSlot === 1 ? 'Boot.Thread' : sim._currentThreadSlot === 11 ? 'Thread.2' : 'Thread.3'})\n` +
             `Executable ${label} NS[${slot}]; PC ${sim.pc}; attempted ${state.attempts}/${state.limit}\n` +
             (next ? `Next @${hex(address)}: ${hex(next.raw)} opcode=${next.opcode} condition=${next.cond} CRdst=${next.crDst} CRsrc=${next.crSrc} imm=${next.imm}`
@@ -107,7 +121,8 @@
                 return option;
             }));
             setStatus(AliceMalloryLab.outcome(state) +
-                ' Canonical boot completed in isolation; driver entry prepared (no editor/Namespace write).');
+                ' Canonical boot completed in isolation; suspended driver entry prepared. ' +
+                'Pinned historical LOADs adapted only in newly minted RAM fixtures (no saved-file/editor/Namespace write).');
         } catch (err) {
             clearState();
             setStatus(`Load failed: ${err.message}`, true);

@@ -3,7 +3,8 @@
 // Instruction-driven Boot.Thread -> Thread.2 -> Alice.Stash/Reveal -> Boot.Thread.
 // Only fixture driver LUMPs are new; the saved Alice/Mallory binaries are untouched.
 const assert = require('assert');
-const {createAliceMalloryThreadFixture, installThreadDriver} =
+const {createAliceMalloryThreadFixture, installThreadDriver, threadGT,
+    prepareThreadContinuation, bindManagerTargets} =
     require('./test_alice_mallory_thread_setup.js');
 
 const {sim, threadSlots, bodies, roles, nextBase} =
@@ -13,7 +14,7 @@ const secret = 0x2A7;
 const instruction = (opcode, dst, src, imm, cond = AL) =>
     sim.encodeInstruction(opcode, cond, dst, src, imm);
 const iadd = (dst, value) => instruction(21, dst, 0, 0x4000 | value);
-const change = (dst, slot, cond = AL) => instruction(4, dst, 15, slot, cond);
+const change = (register, cond = AL) => instruction(4, register, register, 0, cond);
 
 const installDriver = (slot, base, code, label, caps) =>
     installThreadDriver(sim, slot, base, code, label, caps);
@@ -38,7 +39,7 @@ assert.strictEqual(sim.memory[malloryBody.base + malloryBody.layout.capsStart + 
 
 const manager = installDriver(32, nextBase, [
     iadd(1, 101),
-    change(14, threadSlots[1]),
+    change(2),
     iadd(2, 303),
 ], 'Boot.Thread manager');
 // Alice's RETURN mask is zero: it scrubs working CR1, rather than restoring
@@ -49,20 +50,18 @@ const alice = installDriver(33, nextBase + 64, [
     iadd(2, 202),
     iadd(1, secret),
     instruction(2, 1, 0, 1), // CALL CR1, Alice.Stash
-    instruction(0, 1, 6, 1), // LOAD CR1, CR6, 1 (real E GT from driver c-list)
+    instruction(0, 1, 6, 1 << 4), // compact literal row 1, not DR1
     iadd(1, 0),             // clear the Stash argument before Reveal
     instruction(2, 1, 0, 2), // CALL CR1, Alice.Reveal
     instruction(22, 3, 1, 0x4000 | secret), // ISUB DR3, DR1, #secret
-    change(15, threadSlots[0], 0), // CHANGEEQ only on actual Reveal success
+    instruction(0, 2, 6, 2 << 4), // RETURN scrubbed CR2; reload declared manager GT
+    change(2, 0), // CHANGEEQ only on actual Reveal success
     iadd(2, 999), // fail-closed continuation if the guarded CHANGE did not run
-], 'Alice-context driver', [aliceRole.gt]);
-assert.strictEqual(sim.memory[alice.base + 63], aliceRole.gt,
+], 'Alice-context driver', [aliceRole.gt, threadGT(sim, threadSlots[0])]);
+assert.strictEqual(sim.memory[alice.base + 62], aliceRole.gt,
     'driver c-list row 1 retains the authentic Alice E GT');
 
-sim.memory[aliceBody.base + aliceBody.layout.capsStart] = alice.gt;
-assert(sim._formatThreadRootSentinel(
-    aliceBody.base, aliceBody.layout, alice.gt, {image: true}),
-'Alice context has a canonical driver CHURCH root');
+prepareThreadContinuation(sim, aliceBody, alice);
 assert.strictEqual(sim._readThreadResumeFrame(
     aliceBody.base, aliceBody.layout, aliceBody.slot).parsed.index, alice.slot);
 
@@ -70,6 +69,7 @@ const managerEntry = sim.readNSEntry(manager.slot);
 sim._writeCR(0, manager.gt, managerEntry);
 sim._installLumpHeaderContext(sim.parseGT(manager.gt), manager.slot,
     managerEntry, manager.header);
+bindManagerTargets(sim, threadSlots);
 sim.pc = 0;
 const managerCR1 = {...sim.cr[1]};
 const managerCR14 = {...sim.cr[14]};
@@ -84,7 +84,7 @@ const expected = [
     [11, aliceRole, 2, 0], [11, aliceRole, 3, 17], [11, aliceRole, 4, 3],
     [11, alice, 3, 0], [11, alice, 4, 21], [11, alice, 5, 2],
     [11, aliceRole, 5, 0], [11, aliceRole, 6, 16], [11, aliceRole, 7, 3],
-    [11, alice, 6, 22], [11, alice, 7, 4],
+    [11, alice, 6, 22], [11, alice, 7, 0], [11, alice, 8, 4],
     [1, manager, 2, 21],
 ].map(([owner, resident, pc, opcode]) =>
     ({owner, pc, physicalPC: resident.base + 1 + pc, opcode}));
@@ -97,6 +97,7 @@ for (let i = 0; i < expected.length; i++) {
         `instruction ${i + 1} must retire via sim.step`);
     assert.strictEqual(sim.faultLog.length, 0,
         `instruction ${i + 1} fault: ${sim.faultLog.at(-1)?.message}`);
+    assert.strictEqual(sim.lastStepEvidence.outcome, 'retired');
     retired.push({owner, pc, physicalPC: result.physicalPC,
         opcode: result.instr.opcode});
     if (i === 7) {
@@ -117,6 +118,11 @@ for (let i = 0; i < expected.length; i++) {
         assert.strictEqual(sim.flags.Z, true, 'CHANGEEQ guard tests actual success');
     }
     if (i === 15) {
+        assert.strictEqual(sim.cr[2].word0, threadGT(sim, threadSlots[0]),
+            'post-RETURN LOAD recovers only the declared manager target');
+        assert.strictEqual(sim.flags.Z, true, 'LOAD preserves the guarded comparison');
+    }
+    if (i === 16) {
         assert.strictEqual(sim._currentThreadSlot, threadSlots[0],
             'guarded CHANGE returned to Boot.Thread');
         assert.strictEqual(sim.memory[aliceBody.base + aliceBody.layout.drStart + 1],
@@ -143,13 +149,13 @@ assert.strictEqual(sim.memory[aliceBody.base + aliceBody.layout.drStart + 3],
     0, 'Thread.2 private comparison result saved');
 assert.strictEqual(sim.memory[aliceBody.base + aliceBody.layout.capsStart + 1],
     0, 'Reveal RETURN scrubs Thread.2 CR1; E GT remains only in its declared c-list');
-assert.strictEqual(sim.memory[alice.base + 63], aliceRole.gt,
+assert.strictEqual(sim.memory[alice.base + 62], aliceRole.gt,
     'driver c-list still retains the authentic Alice E authority for a later reload');
 const aliceResume = sim._readThreadResumeFrame(
     aliceBody.base, aliceBody.layout, aliceBody.slot);
 assert.strictEqual(aliceResume.parsed.index, alice.slot,
     'Thread.2 suspended frame names its driver');
-assert.strictEqual(aliceResume.frame.returnPC, 8,
+assert.strictEqual(aliceResume.frame.returnPC, 9,
     'Thread.2 frame saves instruction following guarded CHANGE');
 assert.deepStrictEqual(sim.memory.slice(aliceRole.base + 1, aliceRole.base + 9),
     aliceCodeBefore, 'saved Alice executable instructions unchanged');

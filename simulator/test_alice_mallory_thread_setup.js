@@ -1,8 +1,8 @@
 'use strict';
 
 // Isolated setup-only fixture. No CHANGE, CALL, Step, or user workload runs.
-// The two CHURCH root frames are retained from canonical boot: until separate
-// driver code is installed, they still enter the default boot abstraction.
+// Setup retains poison roots. Executable scenarios explicitly prepare a
+// suspended continuation above the root; CHANGE never starts a poison root.
 const inNode = typeof module !== 'undefined' && !!module.exports;
 const assert = inNode ? require('assert') : (() => {
     const check = (condition, message) => {
@@ -29,6 +29,56 @@ const ROOT = inNode ? path.resolve(__dirname, '..') : null;
 const manifest = inNode ? JSON.parse(fs.readFileSync(
     path.join(ROOT, 'server/lumps/manifest.json'), 'utf8')) : null;
 const hex = word => `0x${(word >>> 0).toString(16).padStart(8, '0')}`;
+// Exact historical inputs, never "latest" or the first matching catalog row.
+const savedFixtures = Object.freeze({
+    'ide.Alice': 'ide.Alice.1.1eec355e.lump',
+    'ide.Mallory': 'ide.Mallory.1.0ca567b5.lump',
+});
+const savedHashes = Object.freeze({
+    'ide.Alice': '5f929d16f484e2e8b154d7ab5060c24d77d4e8e12b53febc25722ef69e2d69b1',
+    'ide.Mallory': 'a220c45f71efffa1ef401a99343967964ab402786b3236688f161d297f07427f',
+});
+
+function threadGT(sim, slot) {
+    const entry = sim.readNSEntry(slot);
+    assert(entry, `Missing fixture Thread ${slot}`);
+    return sim.createGT(sim.parseNSWord1(entry.word1_limit).gtSeq, slot, {}, 1);
+}
+
+function prepareThreadContinuation(sim, body, resident) {
+    const {base, layout, slot} = body;
+    // Preserve the boot-created poison root, including its Enter companion.
+    const root = sim._readThreadResumeFrame(base, layout, slot);
+    assert(root && root.frame.returnPC === 0x7FFF, 'Expected fresh poison root');
+    const sto = root.frame.savedSTO - 2;
+    sim.memory[base + layout.capsStart] = resident.gt;
+    sim.memory[base + sto - 1] = resident.gt;
+    sim.memory[base + sto] = sim._packFrameWordRaw(0, 1, sto);
+    sim.memory[base + layout.protectedStoOffset] =
+        sim._packProtectedIndicator(sto - 2, 1, {}, 0);
+    const resume = sim._readThreadResumeFrame(base, layout, slot, null, false);
+    assert(resume && resume.parsed.index === resident.slot &&
+        resume.frame.returnPC === 0 && resume.frame.savedSTO === sto,
+    'Prepared continuation must resume driver PC 0 above the retained root');
+}
+
+function bindManagerTargets(sim, threadSlots) {
+    for (const [register, slot] of [[2, threadSlots[1]], [3, threadSlots[2]]])
+        sim._writeCR(register, threadGT(sim, slot), sim.readNSEntry(slot));
+}
+
+function adaptHistoricalCode(name, words) {
+    // These immutable pre-compact LOADs meant literal rows. Correct only the
+    // disposable fixture copy BEFORE minting its distinct executable identity.
+    // No decoder compatibility mode, saved-file repair, or live-state writes.
+    const patches = name === 'ide.Alice' ? [[3, 0x070b0001, 0x070b0010],
+        [6, 0x070b0001, 0x070b0010]] : [[2, 0x070b0002, 0x070b0020]];
+    for (const [offset, original, current] of patches) {
+        assert.strictEqual(words[offset], original, `${name} historical LOAD mismatch`);
+        words[offset] = current;
+    }
+    return patches;
+}
 
 // Fixture-only executable resident; the saved role LUMPs remain untouched.
 function installThreadDriver(sim, slot, base, code, label, extraCapabilities = []) {
@@ -75,9 +125,12 @@ function binaryFor(name, binaries) {
         return words.slice();
     }
     assert(inNode, `${name} requires saved binary words`);
-    const records = manifest.filter(item => item.abstraction === name && !item.archived);
-    assert.strictEqual(records.length, 1, `expected exactly one saved ${name} binary`);
+    const records = manifest.filter(item => item.abstraction === name &&
+        item.filename === savedFixtures[name]);
+    assert.strictEqual(records.length, 1, `expected exact saved fixture ${savedFixtures[name]}`);
     const raw = fs.readFileSync(path.join(ROOT, 'server/lumps', records[0].filename));
+    assert.strictEqual(require('crypto').createHash('sha256').update(raw).digest('hex'),
+        savedHashes[name], `${name} pinned binary integrity mismatch`);
     assert.strictEqual(raw.length % 4, 0, `${name} must have complete words`);
     return Array.from({length: raw.length / 4}, (_, i) => raw.readUInt32BE(i * 4));
 }
@@ -129,6 +182,8 @@ for (const left of bodies) {
 let nextBase = Math.max(...bodies.map(({base, layout}) => base + layout.lumpSize));
 for (const role of roles) {
     const words = binaryFor(role.abstraction, binaries);
+    role.filename = savedFixtures[role.abstraction];
+    role.codeAdaptations = adaptHistoricalCode(role.abstraction, words);
     const hdr = sim.parseLumpHeader(words[0]);
     assert(hdr.valid && hdr.typ === 0 && hdr.cw > 0 && hdr.cc >= 2 &&
         words.length === hdr.lumpSize, `${role.abstraction} saved executable is invalid`);
@@ -204,14 +259,16 @@ if (verbose) {
     console.log('[PASS] Boot.Thread remains manager; private Thread homes, ' +
         'nonoverlapping bodies, resolved E capabilities and root frames validated.');
     console.log('[NOT RUN] No CHANGE or method call. Dedicated Alice/Mallory drivers ' +
-        'and manager return/report channels are not installed; root frames still enter boot code.');
+        'and manager return/report channels are not installed; poison roots cannot resume.');
 }
 return {sim, threadSlots, bodies, roles, nextBase};
 }
 
 if (inNode) {
     if (require.main === module) createAliceMalloryThreadFixture(true);
-    module.exports = {createAliceMalloryThreadFixture, installThreadDriver};
+    module.exports = {createAliceMalloryThreadFixture, installThreadDriver,
+        savedFixtures, savedHashes, threadGT, prepareThreadContinuation, bindManagerTargets};
 } else {
-    window.AliceMalloryThreadFixture = {createAliceMalloryThreadFixture, installThreadDriver};
+    window.AliceMalloryThreadFixture = {createAliceMalloryThreadFixture, installThreadDriver,
+        savedFixtures, savedHashes, threadGT, prepareThreadContinuation, bindManagerTargets};
 }

@@ -4,7 +4,7 @@
 // The only new executables are fixture-local driver LUMPs; saved Alice/Mallory,
 // canonical boot residents, Namespace bootstrap, and assembler policy are untouched.
 const assert = require('assert');
-const {createAliceMalloryThreadFixture} =
+const {createAliceMalloryThreadFixture, threadGT, prepareThreadContinuation, bindManagerTargets} =
     require('./test_alice_mallory_thread_setup.js');
 const ChurchSimulator = require('./simulator.js');
 
@@ -16,7 +16,7 @@ const aliceDriverSlot = 33;
 const instruction = (opcode, dst, src, imm) =>
     sim.encodeInstruction(opcode, AL, dst, src, imm);
 const iadd = (dst, value) => instruction(21, dst, 0, 0x4000 | value);
-const change = (dst, slot) => instruction(4, dst, 15, slot);
+const change = register => instruction(4, register, register, 0);
 
 function installDriver(slot, base, code, label) {
     assert(!sim.readNSEntry(slot), `${label} slot must be unused`);
@@ -52,12 +52,12 @@ function installDriver(slot, base, code, label) {
 // its next instruction so the restored manager can write DR2=303.
 const manager = installDriver(managerSlot, nextBase, [
     iadd(1, 101),
-    change(14, threadSlots[1]),
+    change(2),
     iadd(2, 303),
 ], 'Boot.Thread manager');
 const alice = installDriver(aliceDriverSlot, nextBase + 64, [
     iadd(1, 202),
-    change(15, threadSlots[0]),
+    change(2),
     iadd(2, 404), // Valid continuation if Alice is resumed in a later round.
 ], 'Alice-context driver');
 assert.strictEqual(sim.dr[0], 0, 'manager DR0 is zero');
@@ -73,13 +73,15 @@ const malloryBefore = sim.memory.slice(
     malloryBody.base, malloryBody.base + malloryBody.layout.lumpSize);
 assert.strictEqual(sim.memory[aliceCR1], roles[0].gt, 'Alice CR1 retains Alice E');
 assert.strictEqual(sim.memory[malloryCR1], roles[1].gt, 'Mallory CR1 retains Mallory E');
-sim.memory[aliceCR0] = alice.gt;
-const aliceRoot = sim._formatThreadRootSentinel(
-    aliceBody.base, aliceBody.layout, alice.gt, {image: true});
-assert(aliceRoot, 'Alice context has a canonical driver CHURCH root');
+const poisonRoot = sim.memory.slice(aliceBody.base + aliceBody.layout.stackEnd - 1,
+    aliceBody.base + aliceBody.layout.stackEnd + 1);
+prepareThreadContinuation(sim, aliceBody, alice);
+sim.memory[aliceCR0 + 2] = threadGT(sim, threadSlots[0]);
 assert.strictEqual(sim._readThreadResumeFrame(
     aliceBody.base, aliceBody.layout, aliceBody.slot).parsed.index, alice.slot,
-'Alice root Enter identity names its driver, not the saved Alice binary');
+'Alice suspended Enter identity names its driver, not the saved Alice binary');
+assert.deepStrictEqual(sim.memory.slice(aliceBody.base + aliceBody.layout.stackEnd - 1,
+    aliceBody.base + aliceBody.layout.stackEnd + 1), poisonRoot, 'poison root retained');
 
 // Canonical boot already owns the live manager banks. Install its fixture
 // executable through the existing header/CR helpers, never by swapping banks.
@@ -87,6 +89,7 @@ const managerEntry = sim.readNSEntry(manager.slot);
 sim._writeCR(0, manager.gt, managerEntry);
 sim._installLumpHeaderContext(sim.parseGT(manager.gt), manager.slot,
     managerEntry, manager.header);
+bindManagerTargets(sim, threadSlots);
 sim.pc = 0; // Fixture driver begins at its own first instruction, not boot's NIA.
 assert.strictEqual(sim.cr[14].word0 & 0xFFFF, manager.slot,
     'live manager CR14 names its fixture driver');
@@ -104,6 +107,7 @@ for (let i = 0; i < 5; i++) {
         `instruction ${i + 1} must retire via sim.step`);
     assert.strictEqual(sim.faultLog.length, 0,
         `instruction ${i + 1} fault: ${sim.faultLog.at(-1)?.message}`);
+    assert.strictEqual(sim.lastStepEvidence.outcome, 'retired');
     retired.push({owner, pc, physicalPC: result.physicalPC,
         opcode: result.instr.opcode, dst: result.instr.crDst,
         target: result.instr.imm});
@@ -126,9 +130,9 @@ for (let i = 0; i < 5; i++) {
 }
 const expected = [
     {owner: 1, pc: 0, physicalPC: manager.base + 1, opcode: 21, dst: 1, target: 0x4065},
-    {owner: 1, pc: 1, physicalPC: manager.base + 2, opcode: 4, dst: 14, target: 11},
+    {owner: 1, pc: 1, physicalPC: manager.base + 2, opcode: 4, dst: 2, target: 0},
     {owner: 11, pc: 0, physicalPC: alice.base + 1, opcode: 21, dst: 1, target: 0x40CA},
-    {owner: 11, pc: 1, physicalPC: alice.base + 2, opcode: 4, dst: 15, target: 1},
+    {owner: 11, pc: 1, physicalPC: alice.base + 2, opcode: 4, dst: 2, target: 0},
     {owner: 1, pc: 2, physicalPC: manager.base + 3, opcode: 21, dst: 2, target: 0x412F},
 ];
 console.log('[ROUNDTRIP] retired ' + JSON.stringify(retired));
@@ -172,12 +176,12 @@ assert.deepStrictEqual(sim.flags, pendingFlags, 'manual switch preserves private
 
 // Direct callers supply the same pending NIA; the execution boundary alone
 // supplies a following NIA for an instruction that has retired.
-const direct = {crDst: 14, crSrc: 15, imm: threadSlots[1], mnemonic: 'CHANGE'};
+const direct = {crDst: 2, crSrc: 2, imm: 0, mnemonic: 'CHANGE'};
 assert(sim._execChange(direct, sim.pc), 'direct switch succeeds');
 assert.strictEqual(sim._readThreadResumeFrame(
     bodies[0].base, bodies[0].layout, threadSlots[0]).frame.returnPC, 2,
 'direct switch saves the pending PC unchanged');
-assert(sim._execChange({...direct, imm: threadSlots[0]}, sim.pc),
+assert(sim._execChange(direct, sim.pc),
     'direct return succeeds');
 assert.strictEqual(sim.pc, 2, 'direct return restores pending PC');
 
@@ -202,7 +206,7 @@ sim.halted = false; // The expected fault latches HALT; the next fixture is inde
 // A failed condition skips CHANGE without entering its handoff path.
 const skipDriver = installDriver(34, nextBase + 128, [
     iadd(1, 1),
-    sim.encodeInstruction(4, 0, 14, 15, threadSlots[1]), // CHANGEEQ
+    sim.encodeInstruction(4, 0, 2, 2, 0), // CHANGEEQ
     iadd(2, 1),
 ], 'conditional-skip driver');
 const skipEntry = sim.readNSEntry(skipDriver.slot);

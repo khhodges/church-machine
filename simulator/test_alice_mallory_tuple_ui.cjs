@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const {createHash} = require('node:crypto');
+const {createHash, webcrypto} = require('node:crypto');
 const elements = new Map();
 function el(id) {
     if (!elements.has(id)) elements.set(id, {
@@ -15,16 +15,19 @@ function el(id) {
 }
 const rows = JSON.parse(fs.readFileSync(path.join(__dirname, '../server/lumps/manifest.json')));
 const context = {console, TextEncoder, TextDecoder, URLSearchParams, Uint32Array,
+    ArrayBuffer, crypto:webcrypto,
     document:{getElementById:el, createElement:() => ({})},
     location:{search:'?scenario=tuple-mallory'},
     bootConfig:{step1:{totalNamespaceWords:16384,namespaceLumpWords:64,threadLumpWords:512,threadCount:3}},
     fetch:async url => {
         const hash = raw => createHash('sha256').update(raw).digest('hex');
-        if (url === '/api/lumps/list') return {ok:true, json:async () => rows.map(row =>
+        const parsed = new URL(url, 'https://example.test');
+        if (parsed.pathname === '/api/lumps/list') return {ok:true, json:async () =>
+            rows.filter(row => row.archived !== true ||
+                parsed.searchParams.get('include_archived') === '1').map(row =>
             Object.values(context.AliceMalloryTupleLab.savedFixtures).includes(row.filename)
                 ? {...row, binary_valid:true, binary_hash:hash(fs.readFileSync(path.join(__dirname,'../server/lumps',row.filename)))}
                 : row)};
-        const parsed = new URL(url, 'https://example.test');
         assert(parsed.pathname.startsWith('/api/lump/'), 'read-only binary endpoint');
         const filename = parsed.searchParams.get('exact_filename');
         assert(Object.values(context.AliceMalloryTupleLab.savedFixtures).includes(filename));

@@ -3,7 +3,8 @@
 // Instruction-driven Boot.Thread -> Thread.2 Alice.Stash -> Boot.Thread ->
 // Thread.3 Mallory.Steal. Stop at the first fault; do not recover or reboot.
 const assert = require('assert');
-const {createAliceMalloryThreadFixture, installThreadDriver} =
+const {createAliceMalloryThreadFixture, installThreadDriver, threadGT,
+    prepareThreadContinuation, bindManagerTargets} =
     require('./test_alice_mallory_thread_setup.js');
 
 const {sim, threadSlots, bodies, roles, nextBase} =
@@ -14,7 +15,7 @@ const secret = 0x2A7;
 const instruction = (opcode, dst, src, imm) =>
     sim.encodeInstruction(opcode, 0xE, dst, src, imm);
 const iadd = (dst, value) => instruction(21, dst, 0, 0x4000 | value);
-const change = (dst, slot) => instruction(4, dst, 15, slot);
+const change = register => instruction(4, register, register, 0);
 const driver = (slot, offset, code, label, caps = []) =>
     installThreadDriver(sim, slot, nextBase + offset, code, label, caps);
 
@@ -22,25 +23,24 @@ assert.notStrictEqual(sim.memory[aliceRole.base + 9], secret,
     'Alice private word must not already equal the fixture secret');
 const manager = driver(32, 0, [
     iadd(2, 101),
-    change(14, threadSlots[1]),
-    change(14, threadSlots[2]),
+    change(2),
+    change(3),
     iadd(2, 999), // never execute after Mallory's fault
 ], 'Boot.Thread manager');
 const alice = driver(33, 64, [
     iadd(1, secret),
     instruction(2, 1, 0, 1), // CALL CR1, real Alice.Stash
-    change(15, threadSlots[0]),
-], 'Alice-context driver');
+    instruction(0, 2, 6, 1 << 4), // reload declared manager target after RETURN
+    change(2),
+    iadd(2, 999), // valid suspended continuation, never executed in this test
+], 'Alice-context driver', [threadGT(sim, threadSlots[0])]);
 const mallory = driver(34, 128, [
     instruction(2, 1, 0, 1), // CALL CR1, real Mallory.Steal
     iadd(2, 999), // never execute after Mallory's fault
 ], 'Mallory-context driver');
 
 for (const [body, resident] of [[aliceBody, alice], [malloryBody, mallory]]) {
-    sim.memory[body.base + body.layout.capsStart] = resident.gt;
-    assert(sim._formatThreadRootSentinel(
-        body.base, body.layout, resident.gt, {image: true}),
-    'dedicated driver must have a canonical CHURCH root');
+    prepareThreadContinuation(sim, body, resident);
     assert.strictEqual(sim._readThreadResumeFrame(
         body.base, body.layout, body.slot).parsed.index, resident.slot);
 }
@@ -75,6 +75,7 @@ const managerEntry = sim.readNSEntry(manager.slot);
 sim._writeCR(0, manager.gt, managerEntry);
 sim._installLumpHeaderContext(sim.parseGT(manager.gt), manager.slot,
     managerEntry, manager.header);
+bindManagerTargets(sim, threadSlots);
 sim.pc = 0;
 assert.strictEqual(sim._currentThreadSlot, managerBody.slot);
 
@@ -87,7 +88,8 @@ const expected = [
     [aliceBody.slot, aliceRole, 2, 0],
     [aliceBody.slot, aliceRole, 3, 17],
     [aliceBody.slot, aliceRole, 4, 3],
-    [aliceBody.slot, alice, 2, 4],
+    [aliceBody.slot, alice, 2, 0],
+    [aliceBody.slot, alice, 3, 4],
     [managerBody.slot, manager, 2, 4],
     [malloryBody.slot, mallory, 0, 2],
 ].map(([owner, resident, pc, opcode]) =>
@@ -108,7 +110,7 @@ for (let i = 0; i < expected.length; i++) {
         assert.strictEqual(sim.memory[aliceRole.base + 9], secret,
             'real Alice.Stash DWRITE seeded private resident word');
     }
-    if (i === 7) {
+    if (i === 8) {
         assert.strictEqual(sim._currentThreadSlot, managerBody.slot);
         secretBeforeMallory = sim.memory[aliceRole.base + 9];
         assert.strictEqual(secretBeforeMallory, secret);
@@ -129,8 +131,8 @@ assert.strictEqual(fault.threadSlot, malloryBody.slot);
 assert.strictEqual(fault.pc, 1);
 assert.strictEqual(fault.physicalPC, malloryRole.base + 2);
 assert.strictEqual(fault.faultRawWord, sim.memory[malloryRole.base + 2],
-    'fault log captures the exact saved Mallory LOAD word');
-assert.match(fault.rawDiagnosticReason, /LOAD: c-list has no capability at row 2 \(declared rows: 0–1\)/);
+    'fault log captures the exact fixture Mallory LOAD word');
+assert.match(fault.rawDiagnosticReason, /LOAD: c-list index 2 is out of bounds/);
 assert.strictEqual(evidence.outcome, 'fault');
 assert.strictEqual(evidence.fault.type, 'NO_CAPABILITY');
 assert.strictEqual(evidence.pre.artifact.slot, malloryRole.slot);
@@ -140,7 +142,9 @@ assert.strictEqual(evidence.instruction.raw, fault.faultRawWord);
 assert.strictEqual(evidence.instruction.decoded.opcode, 0, 'issuing instruction is LOAD');
 assert.strictEqual(evidence.instruction.decoded.crDst, 1);
 assert.strictEqual(evidence.instruction.decoded.crSrc, 6);
-assert.strictEqual(evidence.instruction.decoded.imm, 2);
+assert.strictEqual(evidence.instruction.decoded.indexRegister, 0);
+assert.strictEqual(evidence.instruction.decoded.indexMagnitude, 2);
+assert.strictEqual(evidence.instruction.raw, 0x070b0020);
 assert.strictEqual(sim.stepCount, stepsBeforeFault + 1,
     'only the failing LOAD was attempted after the last retirement');
 assert.strictEqual(sim.executionStats.successful, successesBeforeFault,

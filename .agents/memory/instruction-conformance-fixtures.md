@@ -56,6 +56,19 @@ minimum debug metadata omitted aliased output ports from runtime lookup.
 **How to apply:** Keep independent generated execution fail-closed on missing
 ports, and bound compilation separately from instruction completion.
 
+Historical Alice/Mallory lab inputs must remain pinned and immutable. If their
+pre-compact literal LOADs need current encodings, adapt only disposable RAM
+copies before minting new fixture identities, and label the evidence accordingly.
+
+**Why:** Those saved words now decode as register-indexed LOADs. Successful
+execution of an adapted lab fixture is not proof that the historical binary
+can execute unchanged, and catalog "latest" selection can silently test a
+different program.
+
+**How to apply:** Keep exact-file/hash checks, prove saved input preservation,
+and use real retirement/fault evidence for the derived lab residents. Never
+install a decoder compatibility exception or publish corrected historical files.
+
 Do not port fused-instruction recovery tests by changing only the opcode.
 Separate declared-capability resolution, scheduler suspension, and retirement
 rejection into distinct cases.
