@@ -1,5 +1,33 @@
 # ide.Mint — Forge_GT_At_Slot contract draft
 
+## Current review entry point — 2026-10-17
+
+The **[Mint Phase 1 review package](reviews/mint-phase1/README.md)** publishes the
+complete approved Q01–Q55 record (including all three Q18 answers), effective
+service contract, proposed ABI/work packages, security analysis and evidence gates.
+Its [supersession index](reviews/mint-phase1/supersessions.md) identifies which
+software TBDs and earlier proposals below have been resolved. This is a design
+package, not an operational Mint service or authorization to install/program it.
+
+In particular, the PassKey layout/Owner rules are now selected; the canonical
+names are **ide.PkVerify** and **ide.NSTab**. The first credential belongs only
+to ide.Mint (Owner ID 0, B=0, sequential 25-bit ID), creates four supported types
+only in Boot, and has **no Replace or Destroy targets**. Direct replacement is
+same-slot/+1 with current-version-510 refusal and a separate block. Reclamation
+zeroes the entire old block before free; live return dependencies are protected.
+All five methods share admission; Lambda readback checks all four actual words.
+**Q54** supplies atomic durable issuance/consumption/counter state, preserving
+issued credentials across boot without burn-first loss or resumed calls.
+
+The [active Master ISA](phase-1/01-isa/instruction-set.md) remains hardware
+authority. Older “unapproved,” “TBD,” rejection-return and recovery language
+below describes its dated record, not an override of the newer selections.
+Unresolved mechanisms remain genuine release gates; neither approval nor a
+source draft proves runtime security. Historical prose is retained below;
+links to moved historical documents have been repaired.
+
+## Historical contract record
+
 Date: 2026-10-11  
 Status: **Approved Phase 1 requirements below; unresolved software mechanisms
 remain TBD. Not an operational service or implementation approval.**
@@ -7,10 +35,10 @@ remain TBD. Not an operational service or implementation approval.**
 ## Current Phase 1 contract — reconciled 2026-10-14
 
 This section supersedes conflicting prescriptions in the earlier draft retained
-below. Authority: [Master ISA](instruction-set.md#approved-phase-1-contract) and
-[Genesis resolution log](phase-1/REVIEW-2026-10-14.md). The
-[service draft](phase-1/MINT-FIRST-DRAFT.md) and
-[CLOOMC review sources](phase-1/source-drafts/README.md) expose remaining TBDs,
+below. Authority: [Master ISA](phase-1/01-isa/instruction-set.md#approved-phase-1-contract) and
+[Genesis resolution log](archive/phase-1-expanded-collection/REVIEW-2026-10-14.md). The
+[service draft](archive/phase-1-expanded-collection/MINT-FIRST-DRAFT.md) and
+[CLOOMC review sources](archive/phase-1-expanded-collection/source-drafts/README.md) expose remaining TBDs,
 not executable implementations.
 
 - Provide working ide.Mint (NS[9], E), nstab (NS[14], RW) and pkverify
@@ -115,7 +143,7 @@ not executable implementations.
   field assignments remain unapproved. The Owner is an abstraction hierarchy
   with an A-GT-id, proposed as four bits for Phase 1 at [30:27]; retain B as Bind
   and [24:0] as Owner-defined, not a required generation/ID split. See the
-  [format draft](phase-1/MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
+   [format draft](archive/phase-1-expanded-collection/MINT-CODE-DRAFT.md#abstract-passkey-format--unapproved-draft).
 - **Initial PassKey issuance — approved:** A separate Genesis-authorized setup
   procedure has Mint create the initial GT/separate-128-bit-proof pairs for
   explicitly approved recipients and permissions. No unauthenticated first-caller
