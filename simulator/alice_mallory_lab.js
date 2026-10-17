@@ -14,9 +14,12 @@
         roundtrip: {label: 'Thread.2 roundtrip', limit: 5},
         alice: {label: 'Alice Stash → Reveal', limit: 17},
         mallory: {label: 'Mallory denied capability', limit: 11},
+        'tuple-alice': {label: 'Tuple: Alice owns and reads', limit: 7},
+        'tuple-mallory': {label: 'Tuple: Mallory containment', limit: 8},
     });
     function createScenario(name, binaries) {
         if (!Object.prototype.hasOwnProperty.call(scenarios, name)) throw new Error('Unknown lab scenario');
+        if (name.startsWith('tuple-')) return tupleLab().createScenario(name, binaries);
         const state = fixture.createAliceMalloryThreadFixture(false, binaries);
         const {sim, threadSlots, bodies, roles, nextBase} = state;
         const instruction = (op, dst, src, imm, cond = 14) =>
@@ -86,6 +89,7 @@
                 bodies[2].base + bodies[2].layout.lumpSize)};
     }
     function outcome(state) {
+        if (state.scenario.startsWith('tuple-')) return tupleLab().outcome(state);
         const {sim, scenario, attempts, limit, bodies, roles} = state;
         if (scenario === 'setup') return 'Setup validated; no workload executed.';
         if (attempts < limit) return `In progress: ${attempts}/${limit} attempts`;
@@ -113,6 +117,7 @@
         return 'PASS: Alice Stash/Reveal retired; Thread.2 DR1=0x2a7; manager DR2=303.';
     }
     function step(state) {
+        if (state.scenario.startsWith('tuple-')) return tupleLab().step(state);
         if (state.attempts >= state.limit) return outcome(state);
         const sim = state.sim;
         const owner = sim._currentThreadSlot;
@@ -134,6 +139,10 @@
             throw new Error(`Unexpected instruction outcome at attempt ${state.attempts}: ` +
                 `${evidence?.outcome || 'no evidence'} ${sim.faultLog.at(-1)?.message || ''}`);
         return outcome(state);
+    }
+    function tupleLab() {
+        return typeof module !== 'undefined' && module.exports
+            ? require('./alice_mallory_tuple_lab') : globalThis.AliceMalloryTupleLab;
     }
     return {scenarios, createScenario, step, outcome};
 });

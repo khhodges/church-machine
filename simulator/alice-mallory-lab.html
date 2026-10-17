@@ -23,6 +23,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0c1020;padding:12px;b
 <option value="roundtrip">Thread.2 roundtrip</option>
 <option value="alice">Alice Stash → Reveal</option>
 <option value="mallory">Mallory denied capability</option>
+<option value="tuple-alice">Tuple: Alice writes and reads her record</option>
+<option value="tuple-mallory">Tuple: Mallory denied Alice’s record</option>
 </select>
 <button id="load">Load isolated test</button>
 <button id="step" disabled>Step instruction</button>
@@ -30,6 +32,14 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0c1020;padding:12px;b
 <button id="reset" disabled>Reset loaded test</button>
 <p id="status" role="status">Choose a test and load it. Saved Alice/Mallory binaries are fetched read-only.</p>
 </section>
+<section><h2>Tuple containment evidence</h2>
+<p>The tuple tests use the existing 58-word Thread heap record, not the designer’s illustrative 18-word layout.
+Alice and Mallory run in separate Threads. Alice uses her CR5 heap; Mallory’s test driver has no grant to Alice’s heap.
+The allocator reserves fixture storage; real DWRITE/DREAD instructions exercise Alice’s access.
+Mallory attempts DREAD through an empty capability register and faults without retiring the read. No tuple ACL or new security mechanism is introduced.
+The tuple regression uses explicitly pinned baseline Alice/Mallory fixtures, not the latest editor revisions.
+This is a bounded simulator regression, not a proof for every attack, FPGA validation, or a Dijkstra messaging test.</p>
+<pre id="tuple-evidence">Choose a tuple test to collect evidence.</pre></section>
 <section><h2>Current execution</h2><pre id="execution">No test loaded.</pre></section>
 <section><h2>Thread inspection</h2><label for="thread">Inspect:</label><select id="thread" disabled></select>
 <pre id="registers">No test loaded.</pre></section>
@@ -40,6 +50,8 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0c1020;padding:12px;b
 <script src="thread_design.js"></script>
 <script src="simulator.js"></script>
 <script src="test_alice_mallory_thread_setup.js"></script>
+<script src="thread-heap-record.js"></script>
+<script src="alice_mallory_tuple_lab.js"></script>
 <script src="alice_mallory_lab.js"></script>
 <script src="alice_mallory_lab_ui.js"></script>
 </body></html>

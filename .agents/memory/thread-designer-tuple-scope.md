@@ -44,3 +44,9 @@ The Individual-facing Amobea view and augmented Thread designer are approved for
 **Why:** The user explicitly approved additive IDE integration after reviewing the distinction between the Individual's everyday-task interface and the technical Thread designer.
 
 **How to apply:** Preserve existing IDE views and functionality. Add the new entry points alongside them; do not replace technical tools with the simplified Individual interface. Approval to integrate the views does not authorize external service execution or resolve the Phase 1 runtime contracts.
+
+Use tuple storage for the Alice/Mallory containment demonstration, with existing capability enforcement as the evidence boundary.
+
+**Why:** The user explicitly requested the tuple option for this containment test. Older Alice/Mallory fixtures can outlive the ISA they encoded; fixture names alone do not establish current execution compatibility.
+
+**How to apply:** Validate actual instruction retirement and first-fault evidence under the current simulator contracts. Separate fixture setup, complete-record integrity checks, simulator results, and hardware acceptance; never represent an isolated denial test as proof against every attack.

@@ -25,6 +25,7 @@ function App() {
       <a href="/simulator/" target="_blank" rel="noopener noreferrer">Open main IDE ↗</a>
       <button onClick={() => navigate('individual')} aria-pressed={view === 'individual'}>Individual view</button>
       <button onClick={() => navigate('thread')} aria-pressed={view === 'thread'}>Thread Studio</button>
+      <a href="/simulator/alice-mallory-lab.html?scenario=tuple-mallory" target="_blank" rel="noopener noreferrer">Alice / Mallory tuple test ↗</a>
       <span>Phase 1 demo · temporary data · no live operations</span>
     </nav>
     <div onClick={event => {

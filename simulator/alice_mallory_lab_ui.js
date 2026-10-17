@@ -13,9 +13,10 @@
         el('execution').textContent = 'No test loaded.';
         el('registers').textContent = 'No test loaded.';
         el('trace').textContent = 'No instructions attempted.';
+        el('tuple-evidence').textContent = 'Choose a tuple test to collect evidence.';
         refresh();
     }
-    async function getBinaries() {
+    async function getBinaries(scenario) {
         // Only exact active, validated saved artifacts: never accept a replacement
         // by token or a browser-generated/mock binary.
         const response = await fetch('/api/lumps/list', {cache: 'no-store'});
@@ -24,7 +25,9 @@
         if (!Array.isArray(rows)) throw new Error('Invalid saved LUMP catalogue');
         const result = {};
         for (const name of ['ide.Alice', 'ide.Mallory']) {
-            const matches = rows.filter(row => row.abstraction === name && !row.archived);
+            const pinned = scenario?.startsWith('tuple-') ? AliceMalloryTupleLab.savedFixtures[name] : null;
+            const matches = rows.filter(row => row.abstraction === name && !row.archived &&
+                (!pinned || row.filename === pinned));
             if (matches.length !== 1 || !matches[0].binary_valid ||
                 !/^[a-f0-9]{8}$/i.test(matches[0].token) || !matches[0].filename)
                 throw new Error(`Expected exactly one valid active ${name} saved binary`);
@@ -73,6 +76,15 @@
             Array.from({length: 16}, (_, i) => `CR${i} ${cap(i)}    DR${i} ${hex(data(i))}`).join('\n') +
             `\nAlice private resident word: ${hex(sim.memory[roles[0].base + 9])}`;
         const evidence = sim.lastStepEvidence;
+        el('tuple-evidence').textContent = state.scenario.startsWith('tuple-')
+            ? (state.tupleAddress === null ? 'Alice has not entered her Thread yet.' :
+                `Alice heap tuple: ${ThreadHeapRecord.schema.words} words at ${hex(state.tupleAddress)}\n` +
+                `Conditions word: ${sim.memory[state.tupleAddress + 5]}\n` +
+                `Full-record unchanged since Alice returned: ${state.tupleBeforeAttack
+                    ? state.tupleBeforeAttack.every((word, i) => word === sim.memory[state.tupleAddress + i])
+                    : 'not yet measured'}\n` +
+                'Raw inspection is test-harness observation, not authority granted to Mallory.')
+            : 'Choose a tuple test to collect evidence.';
         el('trace').textContent = state.retired.map((r, i) =>
             `${i + 1}. Thread NS[${r.owner}] PC ${r.pc} @${hex(r.physicalPC)} opcode ${r.opcode}: ${r.outcome}`).join('\n') +
             (evidence?.outcome === 'fault' ? `\nFAULT: ${evidence.fault?.type} Thread NS[${evidence.pre?.threadSlot ?? sim._currentThreadSlot}] ` +
@@ -86,7 +98,7 @@
         clearState();
         setStatus('Loading saved binaries and preparing isolated RAM…');
         try {
-            const binaries = await getBinaries();
+            const binaries = await getBinaries(name);
             state = AliceMalloryLab.createScenario(name, binaries);
             el('thread').replaceChildren(...state.bodies.map((body, index) => {
                 const option = document.createElement('option');
@@ -128,4 +140,8 @@
         setStatus('Selection changed. Load isolated test to begin.');
     });
     el('thread').addEventListener('change', refresh);
+    const requested = typeof URLSearchParams === 'function'
+        ? new URLSearchParams(globalThis.location?.search || '').get('scenario') : null;
+    if (requested && Object.prototype.hasOwnProperty.call(AliceMalloryLab.scenarios, requested))
+        el('scenario').value = requested;
 })();
