@@ -296,6 +296,8 @@ def main():
     assert len(check["Completeness"].tables) == 1
     assert len(check["Completeness"].data_validations.dataValidation) == 2
     candidate.replace(PATH)
+    from refresh_phase1_progress import refresh
+    refresh(PATH)
     print(f"Validated {len(rows)} tracker rows; all three original sheet cells/formulas/styles unchanged.")
     print("Sheets:", ", ".join(check.sheetnames))
 

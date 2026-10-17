@@ -84,6 +84,8 @@ def main():
     assert len(current) == len(prior) + 9
     assert check["Baseline audit"].max_row == 10
     candidate.replace(BOOK)
+    from refresh_phase1_progress import refresh
+    refresh(BOOK)
     print(f"Validated {len(current)} tracker rows; original sheets and {len(prior)} prior statuses preserved.")
 
 

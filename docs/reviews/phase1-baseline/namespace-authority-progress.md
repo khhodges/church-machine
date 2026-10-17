@@ -325,3 +325,56 @@ python -m pytest tests/server/test_lump_admission_service.py \
 These tests construct private inputs and require no live-state repair, hardware
 build, upload, flash or device command. This is generator regression evidence,
 not integrated browser acceptance or closure of the broader Phase 1 requirements.
+
+## Combined post-merge verification — 17 October 2026
+
+Fresh verification of the merged generator and independent image fixtures:
+
+```text
+bash scripts/run_test_suite_isolated.sh <private-temp-directory> \
+  namespace-merge-verification \
+  "CHURCH_TEST_ISOLATED_MODE=1 CHURCH_LUMPS_DIR=<private-temp-directory>/lumps \
+   python -m pytest tests/server/test_lump_admission_service.py \
+   tests/server/test_namespace_allocation.py tests/simulation/test_preparation.py \
+   tests/server/test_namespace_sole_authority_repair.py -q --tb=short -ra"
+
+190 passed, 2 failed in 45.60s
+```
+
+The first three files contribute **128 passes**; the independent image suite
+contributes **62 passes and 2 failures**. No skipped or expected-failure cases
+were reported. The noncompact-placement tests have no xfail markers: the exact
+boot location and resident bodies at words 1024 and 7872 are checked, as is the
+empty former compact destination. Matching Step-2 placements, full allocation
+bounds, Thread placement, rejection paths and private simulation preparation
+are covered by the passing cases.
+
+The two failures are the parent-config and explicit-config variants of
+`test_reviewed_migration_tool_recreates_image_state_and_provenance`.
+The historical fixture supplies CapabilityTest at NS[2] with device-space
+location `0x40000014`. The migration copies that row to NS[10] without establishing
+an approved resident RAM location. The corrected generator rejects allocation
+`[0x40000014, 0x40000054)` as outside RAM/reserved-table bounds. This is a migration
+compatibility issue exposed by the combined changes, not permission to restore
+implicit compaction or weaken the bounds check.
+
+Next correction: establish an explicit reviewed resident destination in the
+historical migration path, distinguish invalid historical-state rejection from
+successful migration fixtures, and prove atomic no-mutation behavior on failure.
+Do not select or rewrite a live destination merely to make the test pass.
+
+The JavaScript Add/Save payload harness takes private JSON on stdin and is
+exercised through the passing server tests, not as a standalone empty-input
+command. A direct empty-input invocation is invalid and is not counted as a
+product regression.
+
+All **1,289** inventoried live LUMP/build/configuration files retained their
+hashes; no files were added or removed from that inventory. No application
+implementation was changed by this verification, and no hardware operation was
+performed.
+
+**Phase 1 accounting:** IDE-03 stays Complete. SIM-03 and REL-03 gain verified
+generator evidence but remain Needs verification; the original checklist still
+has **2 Complete out of 104** (SPEC-01 and IDE-03). The remaining migration
+failure prevents describing the combined image suite as fully green. No new
+hardware, ISA, seal or image-refresh acceptance is claimed.
