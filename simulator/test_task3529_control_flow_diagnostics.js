@@ -87,6 +87,13 @@ function protectedFixture() {
     sim.sto = rootSTO;
     sim.pc = 1;
     sim.bootComplete = true;
+    // A base of zero is a real protected Thread, not the legacy lump-only
+    // adapter. Its caller must already hold E; CR6.M grants LOAD, not Enter.
+    assert.strictEqual(sim._activeThreadBase(), 0);
+    assert.strictEqual(sim.cr[6].word0, callerE);
+    assert.strictEqual(sim.cr[6].word0 & 0x70000000, 0x40000000);
+    assert.strictEqual(sim.cr[6].m, 1);
+    assert(sim.mLoad(sim.cr[6].word0, 'E', 6).ok);
     return {sim, callerE, calleeE: callee.gt, layout, rootAddress};
 }
 
@@ -112,21 +119,37 @@ function protectedFixture() {
 // failed poison-root RETURN remains in the diagnostic ring across reset.
 {
     const {sim, callerE, calleeE, layout, rootAddress} = protectedFixture();
+    const rootIndicator = sim.memory[layout.protectedStoOffset] >>> 0;
+    const rootFrame = sim.memory[rootAddress] >>> 0;
     sim.cr[0] = descriptor(calleeE, 768);
     assert(sim._execCall({crDst: 0, imm: 0}), sim.output);
     const callEvents = sim.getControlFlowDiagnostics().events
         .filter(event => event.kind === 'CALL').slice(-2);
+    assert.deepStrictEqual(callEvents.map(event => event.phase), ['pre', 'post']);
+    assert.strictEqual(callEvents[1].detail.ok, true);
     assert.strictEqual(callEvents[0].protectedThread.indicatorAddress, layout.protectedStoOffset);
+    assert.strictEqual(callEvents[0].protectedThread.indicatorWord, rootIndicator);
+    assert.strictEqual(callEvents[0].protectedThread.companionAddress, rootAddress - 1);
+    assert.strictEqual(callEvents[0].protectedThread.companionWord, callerE);
     assert.strictEqual(callEvents[0].protectedThread.frameAddress, rootAddress);
     assert.strictEqual(callEvents[0].protectedThread.frameWord,
         sim._packFrameWordRaw(0x7FFF, 1, rootAddress));
     assert.strictEqual(callEvents[0].protectedThread.decodedFrame.nia, 0x7FFF);
+    assert.strictEqual(callEvents[1].protectedThread.indicatorWord,
+        sim.memory[layout.protectedStoOffset] >>> 0);
+    assert.strictEqual(callEvents[1].protectedThread.companionAddress, rootAddress - 3);
     assert.strictEqual(callEvents[1].protectedThread.companionWord, callerE);
+    assert.strictEqual(callEvents[1].protectedThread.frameAddress, rootAddress - 2);
+    assert.strictEqual(callEvents[1].protectedThread.frameWord,
+        sim.memory[rootAddress - 2] >>> 0);
     assert.strictEqual(callEvents[1].protectedThread.decodedFrame.nia, 2);
     assert(sim._execReturn({imm: 0}), sim.output);
     assert.strictEqual(sim.cr[6].word0, callerE);
     assert.strictEqual(sim.cr[6].m, 1);
     assert.strictEqual(sim.pc, 2);
+    const returnedIndicator = sim.memory[layout.protectedStoOffset] >>> 0;
+    assert.strictEqual(returnedIndicator & 0x1FFF, rootIndicator & 0x1FFF,
+        'successful RETURN restores root STO/SZ; other live context bits may change');
     let rootFault;
     sim.on('fault', event => { rootFault = event; });
     assert.strictEqual(sim._execReturn({imm: 0}), null);
@@ -134,11 +157,21 @@ function protectedFixture() {
     assert.strictEqual(sim.memory[rootAddress - 1], callerE);
     assert.strictEqual(sim.memory[rootAddress],
         sim._packFrameWordRaw(0x7FFF, 1, rootAddress));
-    const failedSequence = sim.getControlFlowDiagnostics().events.at(-1).sequence;
+    const failedEvents = sim.getControlFlowDiagnostics().events.slice(-2);
+    assert.deepStrictEqual(failedEvents.map(event => `${event.kind}:${event.phase}`),
+        ['RETURN:pre', 'RETURN:post']);
+    assert.strictEqual(failedEvents[1].detail.ok, false);
+    for (const event of failedEvents) {
+        assert.strictEqual(event.protectedThread.indicatorWord, returnedIndicator);
+        assert.strictEqual(event.protectedThread.companionWord, callerE);
+        assert.strictEqual(event.protectedThread.frameWord, rootFrame);
+        assert.strictEqual(event.protectedThread.decodedFrame.nia, 0x7FFF);
+    }
+    const failedEvent = failedEvents[1];
     sim.reset('protected-fixture-reset');
-    assert(sim.getControlFlowDiagnostics().events.some(event =>
-        event.sequence === failedSequence &&
-        event.kind === 'RETURN' && event.detail.ok === false));
+    assert.deepStrictEqual(sim.getControlFlowDiagnostics().events.find(event =>
+        event.sequence === failedEvent.sequence), failedEvent,
+        'reset must preserve the complete failed RETURN evidence, not just its sequence');
 }
 
 // Saved PC zero is ordinary data, not the root poison marker.
