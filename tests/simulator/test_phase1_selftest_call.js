@@ -1,0 +1,43 @@
+'use strict';
+const assert = require('assert/strict');
+const fs = require('fs');
+const path = require('path');
+const { inspect, probe } = require('../../scripts/probe_phase1_selftest');
+const root = path.resolve(__dirname, '../..');
+const pin = require('../../docs/reviews/phase1-baseline/selftest-api-identity-evidence.json');
+const bytes = fs.readFileSync(path.join(root, 'server/lumps', pin.selectedRow.selection.filename));
+// Hash mismatch must stop inspection, never switch to a current catalog artifact.
+const changed = Buffer.from(bytes);
+changed[4] ^= 1;
+assert.throws(() => inspect(changed, pin), /frozen hash differs/);
+assert.throws(() => inspect(bytes.subarray(0, 100), pin), /frozen hash differs/);
+const result = probe();
+assert.equal(result.identity.nameMatches, false);
+assert.equal(result.identity.declaredMethods, 0);
+assert.deepEqual(result.entryWords, ['fa87d001', '00000002', 'af084000', '070b0000']);
+assert.equal(result.statusExits.length, 84, '81 numbered tests include three additional guards');
+assert.equal(result.natural.steps, 332);
+assert.equal(result.natural.statusWrites.length, 1);
+assert.equal(result.natural.statusWrites[0].pre.word, 499);
+assert.equal(result.natural.tail.at(-1).pre.word, 500);
+assert.equal(result.natural.dispatch.post.slot, 6);
+assert.equal(result.natural.dispatch.post.word, 2);
+assert.equal(result.invalidMethod.returned, false);
+assert.equal(result.invalidMethod.fault.preRecovery.dr1, 0);
+assert.equal(result.invalidMethod.termination, 'FAULT', 'zero status at fault is not success');
+assert.equal(result.failures.length, 84);
+for (const run of result.failures) {
+    assert.equal(run.guard.nextWord, run.branchWord + 1);
+    assert.equal(run.failureWrite.word, run.branchWord + 1);
+    assert.equal(run.return.word, run.branchWord + 2);
+    assert.equal(run.return.dr1Before, run.status);
+    assert.equal(run.return.dr1After, run.status);
+    assert.equal(run.return.raw, '1f000000');
+    assert.equal(run.return.callerSlot, 60);
+    assert.equal(run.return.callerPC, 1);
+}
+assert.equal(result.conclusion.executionQualified, false);
+assert.equal(result.conclusion.rtlQualified, false);
+assert.equal(result.conclusion.boardQualified, false);
+assert.ok(result.protectedFilesUnchanged);
+console.log('Phase 1 selected SelfTest: method-1 return, 84 failure guards, invalid-method rejection, immutable inputs verified; NOT startup/RTL/board qualification.');

@@ -26,3 +26,9 @@ SelfTest runtime fixtures must exercise numbered CALL and an actual return to th
 **Why:** The prior runtime harness accepted arbitrary faults with DR1 zero as a continuation and blocked all execution behind source freshness. Neither result established what the selected executable actually did.
 
 **How to apply:** Preserve and validate selected bytes and their destination generation in an isolated fixture; report setup, dispatch, and body execution separately. Keep the strict freshness guard active, and do not promote simulator format support into a claim about deployed RTL.
+
+Inject diagnostic failure controls by exact guard location, not only by test number; one numbered test may have several independently returning failure guards.
+
+**Why:** A status-number sweep can force the first guard repeatedly and leave later guards for that same result code untested.
+
+**How to apply:** Derive each guard/write/return triple from the frozen executable. Record flags before the status write, attempted and retained writes, and the actual caller continuation. Compare stack restoration against protected Thread state, not a synthetic boot helper's potentially stale host mirror.

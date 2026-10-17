@@ -1,0 +1,8911 @@
+{
+  "schema": "phase1-selftest-call-evidence/v1",
+  "selectedRow": {
+    "slot": 6,
+    "name": "SelfTest",
+    "kind": "lump",
+    "policy": "Resident",
+    "sequence": 0,
+    "selection": {
+      "filename": "SelfTest.1.8b19abd7.lump",
+      "binaryHash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "token": "4a000006",
+      "revision": 98
+    },
+    "boot": false
+  },
+  "binarySha256": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+  "target": "ChurchSimulator only",
+  "scope": "Synthetic in-memory Thread and caller, not the approved Phase 1 startup image",
+  "identity": {
+    "api": {
+      "name": "RunAbstraction",
+      "language": "assembly",
+      "returnConvention": {
+        "register": "DR0",
+        "description": "return value"
+      },
+      "methods": [],
+      "capabilities": [
+        {
+          "name": "SELF",
+          "rights": [
+            "E"
+          ],
+          "grants": [
+            "E"
+          ]
+        }
+      ]
+    },
+    "nameMatches": false,
+    "declaredMethods": 0
+  },
+  "entryWords": [
+    "fa87d001",
+    "00000002",
+    "af084000",
+    "070b0000"
+  ],
+  "statusExits": [
+    {
+      "status": 1,
+      "branchWord": 35,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 38,
+      "statusWord": 36,
+      "statusHex": "af084001",
+      "returnWord": 37
+    },
+    {
+      "status": 2,
+      "branchWord": 39,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 42,
+      "statusWord": 40,
+      "statusHex": "af084002",
+      "returnWord": 41
+    },
+    {
+      "status": 3,
+      "branchWord": 43,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 46,
+      "statusWord": 44,
+      "statusHex": "af084003",
+      "returnWord": 45
+    },
+    {
+      "status": 4,
+      "branchWord": 47,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 50,
+      "statusWord": 48,
+      "statusHex": "af084004",
+      "returnWord": 49
+    },
+    {
+      "status": 5,
+      "branchWord": 51,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 54,
+      "statusWord": 52,
+      "statusHex": "af084005",
+      "returnWord": 53
+    },
+    {
+      "status": 6,
+      "branchWord": 55,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 58,
+      "statusWord": 56,
+      "statusHex": "af084006",
+      "returnWord": 57
+    },
+    {
+      "status": 7,
+      "branchWord": 59,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 62,
+      "statusWord": 60,
+      "statusHex": "af084007",
+      "returnWord": 61
+    },
+    {
+      "status": 8,
+      "branchWord": 63,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 66,
+      "statusWord": 64,
+      "statusHex": "af084008",
+      "returnWord": 65
+    },
+    {
+      "status": 9,
+      "branchWord": 67,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 70,
+      "statusWord": 68,
+      "statusHex": "af084009",
+      "returnWord": 69
+    },
+    {
+      "status": 10,
+      "branchWord": 71,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 74,
+      "statusWord": 72,
+      "statusHex": "af08400a",
+      "returnWord": 73
+    },
+    {
+      "status": 11,
+      "branchWord": 75,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 78,
+      "statusWord": 76,
+      "statusHex": "af08400b",
+      "returnWord": 77
+    },
+    {
+      "status": 12,
+      "branchWord": 79,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 82,
+      "statusWord": 80,
+      "statusHex": "af08400c",
+      "returnWord": 81
+    },
+    {
+      "status": 13,
+      "branchWord": 83,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 86,
+      "statusWord": 84,
+      "statusHex": "af08400d",
+      "returnWord": 85
+    },
+    {
+      "status": 14,
+      "branchWord": 87,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 90,
+      "statusWord": 88,
+      "statusHex": "af08400e",
+      "returnWord": 89
+    },
+    {
+      "status": 15,
+      "branchWord": 91,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 94,
+      "statusWord": 92,
+      "statusHex": "af08400f",
+      "returnWord": 93
+    },
+    {
+      "status": 16,
+      "branchWord": 97,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 100,
+      "statusWord": 98,
+      "statusHex": "af084010",
+      "returnWord": 99
+    },
+    {
+      "status": 17,
+      "branchWord": 105,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 108,
+      "statusWord": 106,
+      "statusHex": "af084011",
+      "returnWord": 107
+    },
+    {
+      "status": 17,
+      "branchWord": 109,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 112,
+      "statusWord": 110,
+      "statusHex": "af084011",
+      "returnWord": 111
+    },
+    {
+      "status": 18,
+      "branchWord": 118,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 121,
+      "statusWord": 119,
+      "statusHex": "af084012",
+      "returnWord": 120
+    },
+    {
+      "status": 19,
+      "branchWord": 125,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 128,
+      "statusWord": 126,
+      "statusHex": "af084013",
+      "returnWord": 127
+    },
+    {
+      "status": 20,
+      "branchWord": 131,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 134,
+      "statusWord": 132,
+      "statusHex": "af084014",
+      "returnWord": 133
+    },
+    {
+      "status": 21,
+      "branchWord": 141,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 144,
+      "statusWord": 142,
+      "statusHex": "af084015",
+      "returnWord": 143
+    },
+    {
+      "status": 22,
+      "branchWord": 147,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 150,
+      "statusWord": 148,
+      "statusHex": "af084016",
+      "returnWord": 149
+    },
+    {
+      "status": 23,
+      "branchWord": 155,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 158,
+      "statusWord": 156,
+      "statusHex": "af084017",
+      "returnWord": 157
+    },
+    {
+      "status": 24,
+      "branchWord": 161,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 164,
+      "statusWord": 162,
+      "statusHex": "af084018",
+      "returnWord": 163
+    },
+    {
+      "status": 25,
+      "branchWord": 170,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 173,
+      "statusWord": 171,
+      "statusHex": "af084019",
+      "returnWord": 172
+    },
+    {
+      "status": 26,
+      "branchWord": 178,
+      "branchHex": "ba000003",
+      "condition": 4,
+      "passTargetWord": 181,
+      "statusWord": 179,
+      "statusHex": "af08401a",
+      "returnWord": 180
+    },
+    {
+      "status": 27,
+      "branchWord": 183,
+      "branchHex": "b9800003",
+      "condition": 3,
+      "passTargetWord": 186,
+      "statusWord": 184,
+      "statusHex": "af08401b",
+      "returnWord": 185
+    },
+    {
+      "status": 28,
+      "branchWord": 189,
+      "branchHex": "b9000003",
+      "condition": 2,
+      "passTargetWord": 192,
+      "statusWord": 190,
+      "statusHex": "af08401c",
+      "returnWord": 191
+    },
+    {
+      "status": 29,
+      "branchWord": 195,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 198,
+      "statusWord": 196,
+      "statusHex": "af08401d",
+      "returnWord": 197
+    },
+    {
+      "status": 30,
+      "branchWord": 201,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 204,
+      "statusWord": 202,
+      "statusHex": "af08401e",
+      "returnWord": 203
+    },
+    {
+      "status": 31,
+      "branchWord": 208,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 211,
+      "statusWord": 209,
+      "statusHex": "af08401f",
+      "returnWord": 210
+    },
+    {
+      "status": 32,
+      "branchWord": 215,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 218,
+      "statusWord": 216,
+      "statusHex": "af084020",
+      "returnWord": 217
+    },
+    {
+      "status": 33,
+      "branchWord": 222,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 225,
+      "statusWord": 223,
+      "statusHex": "af084021",
+      "returnWord": 224
+    },
+    {
+      "status": 34,
+      "branchWord": 229,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 232,
+      "statusWord": 230,
+      "statusHex": "af084022",
+      "returnWord": 231
+    },
+    {
+      "status": 34,
+      "branchWord": 232,
+      "branchHex": "b9000003",
+      "condition": 2,
+      "passTargetWord": 235,
+      "statusWord": 233,
+      "statusHex": "af084022",
+      "returnWord": 234
+    },
+    {
+      "status": 35,
+      "branchWord": 238,
+      "branchHex": "ba000003",
+      "condition": 4,
+      "passTargetWord": 241,
+      "statusWord": 239,
+      "statusHex": "af084023",
+      "returnWord": 240
+    },
+    {
+      "status": 36,
+      "branchWord": 245,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 248,
+      "statusWord": 246,
+      "statusHex": "af084024",
+      "returnWord": 247
+    },
+    {
+      "status": 37,
+      "branchWord": 252,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 255,
+      "statusWord": 253,
+      "statusHex": "af084025",
+      "returnWord": 254
+    },
+    {
+      "status": 38,
+      "branchWord": 259,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 262,
+      "statusWord": 260,
+      "statusHex": "af084026",
+      "returnWord": 261
+    },
+    {
+      "status": 39,
+      "branchWord": 265,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 268,
+      "statusWord": 266,
+      "statusHex": "af084027",
+      "returnWord": 267
+    },
+    {
+      "status": 39,
+      "branchWord": 268,
+      "branchHex": "b9000003",
+      "condition": 2,
+      "passTargetWord": 271,
+      "statusWord": 269,
+      "statusHex": "af084027",
+      "returnWord": 270
+    },
+    {
+      "status": 40,
+      "branchWord": 276,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 279,
+      "statusWord": 277,
+      "statusHex": "af084028",
+      "returnWord": 278
+    },
+    {
+      "status": 41,
+      "branchWord": 283,
+      "branchHex": "ba800003",
+      "condition": 5,
+      "passTargetWord": 286,
+      "statusWord": 284,
+      "statusHex": "af084029",
+      "returnWord": 285
+    },
+    {
+      "status": 42,
+      "branchWord": 290,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 293,
+      "statusWord": 291,
+      "statusHex": "af08402a",
+      "returnWord": 292
+    },
+    {
+      "status": 43,
+      "branchWord": 296,
+      "branchHex": "b9800003",
+      "condition": 3,
+      "passTargetWord": 299,
+      "statusWord": 297,
+      "statusHex": "af08402b",
+      "returnWord": 298
+    },
+    {
+      "status": 44,
+      "branchWord": 302,
+      "branchHex": "b9000003",
+      "condition": 2,
+      "passTargetWord": 305,
+      "statusWord": 303,
+      "statusHex": "af08402c",
+      "returnWord": 304
+    },
+    {
+      "status": 45,
+      "branchWord": 309,
+      "branchHex": "ba000003",
+      "condition": 4,
+      "passTargetWord": 312,
+      "statusWord": 310,
+      "statusHex": "af08402d",
+      "returnWord": 311
+    },
+    {
+      "status": 46,
+      "branchWord": 313,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 316,
+      "statusWord": 314,
+      "statusHex": "af08402e",
+      "returnWord": 315
+    },
+    {
+      "status": 47,
+      "branchWord": 319,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 322,
+      "statusWord": 320,
+      "statusHex": "af08402f",
+      "returnWord": 321
+    },
+    {
+      "status": 48,
+      "branchWord": 325,
+      "branchHex": "b9000003",
+      "condition": 2,
+      "passTargetWord": 328,
+      "statusWord": 326,
+      "statusHex": "af084030",
+      "returnWord": 327
+    },
+    {
+      "status": 49,
+      "branchWord": 330,
+      "branchHex": "b9800003",
+      "condition": 3,
+      "passTargetWord": 333,
+      "statusWord": 331,
+      "statusHex": "af084031",
+      "returnWord": 332
+    },
+    {
+      "status": 50,
+      "branchWord": 335,
+      "branchHex": "ba000003",
+      "condition": 4,
+      "passTargetWord": 338,
+      "statusWord": 336,
+      "statusHex": "af084032",
+      "returnWord": 337
+    },
+    {
+      "status": 51,
+      "branchWord": 341,
+      "branchHex": "ba800003",
+      "condition": 5,
+      "passTargetWord": 344,
+      "statusWord": 342,
+      "statusHex": "af084033",
+      "returnWord": 343
+    },
+    {
+      "status": 52,
+      "branchWord": 347,
+      "branchHex": "bd000003",
+      "condition": 10,
+      "passTargetWord": 350,
+      "statusWord": 348,
+      "statusHex": "af084034",
+      "returnWord": 349
+    },
+    {
+      "status": 53,
+      "branchWord": 355,
+      "branchHex": "bd800003",
+      "condition": 11,
+      "passTargetWord": 358,
+      "statusWord": 356,
+      "statusHex": "af084035",
+      "returnWord": 357
+    },
+    {
+      "status": 54,
+      "branchWord": 361,
+      "branchHex": "be000003",
+      "condition": 12,
+      "passTargetWord": 364,
+      "statusWord": 362,
+      "statusHex": "af084036",
+      "returnWord": 363
+    },
+    {
+      "status": 55,
+      "branchWord": 367,
+      "branchHex": "be800003",
+      "condition": 13,
+      "passTargetWord": 370,
+      "statusWord": 368,
+      "statusHex": "af084037",
+      "returnWord": 369
+    },
+    {
+      "status": 56,
+      "branchWord": 373,
+      "branchHex": "bc000003",
+      "condition": 8,
+      "passTargetWord": 376,
+      "statusWord": 374,
+      "statusHex": "af084038",
+      "returnWord": 375
+    },
+    {
+      "status": 57,
+      "branchWord": 378,
+      "branchHex": "bc800003",
+      "condition": 9,
+      "passTargetWord": 381,
+      "statusWord": 379,
+      "statusHex": "af084039",
+      "returnWord": 380
+    },
+    {
+      "status": 58,
+      "branchWord": 387,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 390,
+      "statusWord": 388,
+      "statusHex": "af08403a",
+      "returnWord": 389
+    },
+    {
+      "status": 59,
+      "branchWord": 394,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 397,
+      "statusWord": 395,
+      "statusHex": "af08403b",
+      "returnWord": 396
+    },
+    {
+      "status": 60,
+      "branchWord": 402,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 405,
+      "statusWord": 403,
+      "statusHex": "af08403c",
+      "returnWord": 404
+    },
+    {
+      "status": 61,
+      "branchWord": 410,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 413,
+      "statusWord": 411,
+      "statusHex": "af08403d",
+      "returnWord": 412
+    },
+    {
+      "status": 62,
+      "branchWord": 419,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 422,
+      "statusWord": 420,
+      "statusHex": "af08403e",
+      "returnWord": 421
+    },
+    {
+      "status": 63,
+      "branchWord": 423,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 426,
+      "statusWord": 424,
+      "statusHex": "af08403f",
+      "returnWord": 425
+    },
+    {
+      "status": 64,
+      "branchWord": 427,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 430,
+      "statusWord": 428,
+      "statusHex": "af084040",
+      "returnWord": 429
+    },
+    {
+      "status": 65,
+      "branchWord": 431,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 434,
+      "statusWord": 432,
+      "statusHex": "af084041",
+      "returnWord": 433
+    },
+    {
+      "status": 66,
+      "branchWord": 435,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 438,
+      "statusWord": 436,
+      "statusHex": "af084042",
+      "returnWord": 437
+    },
+    {
+      "status": 67,
+      "branchWord": 439,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 442,
+      "statusWord": 440,
+      "statusHex": "af084043",
+      "returnWord": 441
+    },
+    {
+      "status": 68,
+      "branchWord": 443,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 446,
+      "statusWord": 444,
+      "statusHex": "af084044",
+      "returnWord": 445
+    },
+    {
+      "status": 69,
+      "branchWord": 447,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 450,
+      "statusWord": 448,
+      "statusHex": "af084045",
+      "returnWord": 449
+    },
+    {
+      "status": 70,
+      "branchWord": 451,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 454,
+      "statusWord": 452,
+      "statusHex": "af084046",
+      "returnWord": 453
+    },
+    {
+      "status": 71,
+      "branchWord": 455,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 458,
+      "statusWord": 456,
+      "statusHex": "af084047",
+      "returnWord": 457
+    },
+    {
+      "status": 72,
+      "branchWord": 459,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 462,
+      "statusWord": 460,
+      "statusHex": "af084048",
+      "returnWord": 461
+    },
+    {
+      "status": 73,
+      "branchWord": 463,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 466,
+      "statusWord": 464,
+      "statusHex": "af084049",
+      "returnWord": 465
+    },
+    {
+      "status": 74,
+      "branchWord": 468,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 471,
+      "statusWord": 469,
+      "statusHex": "af08404a",
+      "returnWord": 470
+    },
+    {
+      "status": 75,
+      "branchWord": 472,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 475,
+      "statusWord": 473,
+      "statusHex": "af08404b",
+      "returnWord": 474
+    },
+    {
+      "status": 76,
+      "branchWord": 476,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 479,
+      "statusWord": 477,
+      "statusHex": "af08404c",
+      "returnWord": 478
+    },
+    {
+      "status": 77,
+      "branchWord": 480,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 483,
+      "statusWord": 481,
+      "statusHex": "af08404d",
+      "returnWord": 482
+    },
+    {
+      "status": 78,
+      "branchWord": 484,
+      "branchHex": "b8800003",
+      "condition": 1,
+      "passTargetWord": 487,
+      "statusWord": 485,
+      "statusHex": "af08404e",
+      "returnWord": 486
+    },
+    {
+      "status": 79,
+      "branchWord": 488,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 491,
+      "statusWord": 489,
+      "statusHex": "af08404f",
+      "returnWord": 490
+    },
+    {
+      "status": 80,
+      "branchWord": 492,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 495,
+      "statusWord": 493,
+      "statusHex": "af084050",
+      "returnWord": 494
+    },
+    {
+      "status": 81,
+      "branchWord": 496,
+      "branchHex": "b8000003",
+      "condition": 0,
+      "passTargetWord": 499,
+      "statusWord": 497,
+      "statusHex": "af084051",
+      "returnWord": 498
+    }
+  ],
+  "natural": {
+    "method": 1,
+    "forcedStatus": null,
+    "forcedBranchWord": null,
+    "callerSlot": 60,
+    "calleeSlot": 6,
+    "callerCallHex": "17000001",
+    "protectedCallerSTO": 241,
+    "dispatch": {
+      "step": 0,
+      "pre": {
+        "slot": 60,
+        "pc": 0,
+        "word": 1,
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr0": 0,
+        "dr1": 0,
+        "cr0": "4a000006",
+        "cr1": "00000000",
+        "sto": 243
+      },
+      "raw": "17000001",
+      "flagsAtExecute": {
+        "N": false,
+        "Z": false,
+        "C": false,
+        "V": false
+      },
+      "writes": [
+        {
+          "register": 0,
+          "attempted": 0,
+          "before": 0,
+          "stored": 0,
+          "discarded": false
+        }
+      ],
+      "post": {
+        "slot": 6,
+        "pc": 1,
+        "word": 2,
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr0": 0,
+        "dr1": 0,
+        "cr0": "4a000006",
+        "cr1": "00000000",
+        "sto": 239
+      },
+      "skipped": false
+    },
+    "branches": [
+      {
+        "status": 1,
+        "word": 35,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 38
+      },
+      {
+        "status": 2,
+        "word": 39,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 42
+      },
+      {
+        "status": 3,
+        "word": 43,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 46
+      },
+      {
+        "status": 4,
+        "word": 47,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 50
+      },
+      {
+        "status": 5,
+        "word": 51,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 54
+      },
+      {
+        "status": 6,
+        "word": 55,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 58
+      },
+      {
+        "status": 7,
+        "word": 59,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 62
+      },
+      {
+        "status": 8,
+        "word": 63,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 66
+      },
+      {
+        "status": 9,
+        "word": 67,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 70
+      },
+      {
+        "status": 10,
+        "word": 71,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 74
+      },
+      {
+        "status": 11,
+        "word": 75,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 78
+      },
+      {
+        "status": 12,
+        "word": 79,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 82
+      },
+      {
+        "status": 13,
+        "word": 83,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 86
+      },
+      {
+        "status": 14,
+        "word": 87,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 90
+      },
+      {
+        "status": 15,
+        "word": 91,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 94
+      },
+      {
+        "status": 16,
+        "word": 97,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 100
+      },
+      {
+        "status": 17,
+        "word": 105,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 108
+      },
+      {
+        "status": 17,
+        "word": 109,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 112
+      },
+      {
+        "status": 18,
+        "word": 118,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 121
+      },
+      {
+        "status": 19,
+        "word": 125,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 128
+      },
+      {
+        "status": 20,
+        "word": 131,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 134
+      },
+      {
+        "status": 21,
+        "word": 141,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 144
+      },
+      {
+        "status": 22,
+        "word": 147,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 150
+      },
+      {
+        "status": 23,
+        "word": 155,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 158
+      },
+      {
+        "status": 24,
+        "word": 161,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 164
+      },
+      {
+        "status": 25,
+        "word": 170,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 173
+      },
+      {
+        "status": 26,
+        "word": 178,
+        "raw": "ba000003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 181
+      },
+      {
+        "status": 27,
+        "word": 183,
+        "raw": "b9800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 186
+      },
+      {
+        "status": 28,
+        "word": 189,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 192
+      },
+      {
+        "status": 29,
+        "word": 195,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 198
+      },
+      {
+        "status": 30,
+        "word": 201,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 204
+      },
+      {
+        "status": 31,
+        "word": 208,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 211
+      },
+      {
+        "status": 32,
+        "word": 215,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 218
+      },
+      {
+        "status": 33,
+        "word": 222,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 225
+      },
+      {
+        "status": 34,
+        "word": 229,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 232
+      },
+      {
+        "status": 34,
+        "word": 232,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 235
+      },
+      {
+        "status": 35,
+        "word": 238,
+        "raw": "ba000003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 241
+      },
+      {
+        "status": 36,
+        "word": 245,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 248
+      },
+      {
+        "status": 37,
+        "word": 252,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 255
+      },
+      {
+        "status": 38,
+        "word": 259,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 262
+      },
+      {
+        "status": 39,
+        "word": 265,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 268
+      },
+      {
+        "status": 39,
+        "word": 268,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 271
+      },
+      {
+        "status": 40,
+        "word": 276,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 279
+      },
+      {
+        "status": 41,
+        "word": 283,
+        "raw": "ba800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 286
+      },
+      {
+        "status": 42,
+        "word": 290,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 293
+      },
+      {
+        "status": 43,
+        "word": 296,
+        "raw": "b9800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 299
+      },
+      {
+        "status": 44,
+        "word": 302,
+        "raw": "b9000003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 305
+      },
+      {
+        "status": 45,
+        "word": 309,
+        "raw": "ba000003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 312
+      },
+      {
+        "status": 46,
+        "word": 313,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 316
+      },
+      {
+        "status": 47,
+        "word": 319,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 322
+      },
+      {
+        "status": 48,
+        "word": 325,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 328
+      },
+      {
+        "status": 49,
+        "word": 330,
+        "raw": "b9800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 333
+      },
+      {
+        "status": 50,
+        "word": 335,
+        "raw": "ba000003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 338
+      },
+      {
+        "status": 51,
+        "word": 341,
+        "raw": "ba800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 344
+      },
+      {
+        "status": 52,
+        "word": 347,
+        "raw": "bd000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 350
+      },
+      {
+        "status": 53,
+        "word": 355,
+        "raw": "bd800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 358
+      },
+      {
+        "status": 54,
+        "word": 361,
+        "raw": "be000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 364
+      },
+      {
+        "status": 55,
+        "word": 367,
+        "raw": "be800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 370
+      },
+      {
+        "status": 56,
+        "word": 373,
+        "raw": "bc000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 376
+      },
+      {
+        "status": 57,
+        "word": 378,
+        "raw": "bc800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 381
+      },
+      {
+        "status": 58,
+        "word": 387,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 390
+      },
+      {
+        "status": 59,
+        "word": 394,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 397
+      },
+      {
+        "status": 60,
+        "word": 402,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 405
+      },
+      {
+        "status": 61,
+        "word": 410,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 413
+      },
+      {
+        "status": 62,
+        "word": 419,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 422
+      },
+      {
+        "status": 63,
+        "word": 423,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 426
+      },
+      {
+        "status": 64,
+        "word": 427,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 430
+      },
+      {
+        "status": 65,
+        "word": 431,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 434
+      },
+      {
+        "status": 66,
+        "word": 435,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 438
+      },
+      {
+        "status": 67,
+        "word": 439,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 442
+      },
+      {
+        "status": 68,
+        "word": 443,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 446
+      },
+      {
+        "status": 69,
+        "word": 447,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 450
+      },
+      {
+        "status": 70,
+        "word": 451,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 454
+      },
+      {
+        "status": 71,
+        "word": 455,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 458
+      },
+      {
+        "status": 72,
+        "word": 459,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 462
+      },
+      {
+        "status": 73,
+        "word": 463,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 466
+      },
+      {
+        "status": 74,
+        "word": 468,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 471
+      },
+      {
+        "status": 75,
+        "word": 472,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 475
+      },
+      {
+        "status": 76,
+        "word": 476,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 479
+      },
+      {
+        "status": 77,
+        "word": 480,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 483
+      },
+      {
+        "status": 78,
+        "word": 484,
+        "raw": "b8800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 487
+      },
+      {
+        "status": 79,
+        "word": 488,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 491
+      },
+      {
+        "status": 80,
+        "word": 492,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 495
+      },
+      {
+        "status": 81,
+        "word": 496,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": true,
+        "nextWord": 499
+      }
+    ],
+    "statusWrites": [
+      {
+        "step": 330,
+        "pre": {
+          "slot": 6,
+          "pc": 498,
+          "word": 499,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "raw": "af084000",
+        "flagsAtExecute": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "post": {
+          "slot": 6,
+          "pc": 499,
+          "word": 500,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "skipped": false
+      }
+    ],
+    "fault": null,
+    "returned": true,
+    "tail": [
+      {
+        "step": 328,
+        "pre": {
+          "slot": 6,
+          "pc": 494,
+          "word": 495,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "raw": "37080000",
+        "flagsAtExecute": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "writes": [
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "post": {
+          "slot": 6,
+          "pc": 495,
+          "word": 496,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "skipped": false
+      },
+      {
+        "step": 329,
+        "pre": {
+          "slot": 6,
+          "pc": 495,
+          "word": 496,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "raw": "b8000003",
+        "flagsAtExecute": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "writes": [
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "post": {
+          "slot": 6,
+          "pc": 498,
+          "word": 499,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "skipped": false
+      },
+      {
+        "step": 330,
+        "pre": {
+          "slot": 6,
+          "pc": 498,
+          "word": 499,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "raw": "af084000",
+        "flagsAtExecute": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "post": {
+          "slot": 6,
+          "pc": 499,
+          "word": 500,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "skipped": false
+      },
+      {
+        "step": 331,
+        "pre": {
+          "slot": 6,
+          "pc": 499,
+          "word": 500,
+          "flags": {
+            "N": false,
+            "Z": true,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "4a000006",
+          "sto": 239
+        },
+        "raw": "1f000000",
+        "flagsAtExecute": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "writes": [
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 4,
+            "attempted": 0,
+            "before": 100,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 5,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 6,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 7,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 8,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 9,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 10,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 11,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 12,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 13,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 14,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 15,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "post": {
+          "slot": 60,
+          "pc": 1,
+          "word": 2,
+          "flags": {
+            "N": false,
+            "Z": false,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "00000000",
+          "cr1": "00000000",
+          "sto": 241
+        },
+        "skipped": false
+      }
+    ],
+    "steps": 332,
+    "final": {
+      "slot": 60,
+      "pc": 1,
+      "word": 2,
+      "flags": {
+        "N": false,
+        "Z": false,
+        "C": false,
+        "V": false
+      },
+      "dr0": 0,
+      "dr1": 0,
+      "cr0": "00000000",
+      "cr1": "00000000",
+      "sto": 241
+    },
+    "frameRestored": true,
+    "termination": "RETURN"
+  },
+  "invalidMethod": {
+    "method": 2,
+    "forcedStatus": null,
+    "forcedBranchWord": null,
+    "callerSlot": 60,
+    "calleeSlot": 6,
+    "callerCallHex": "17000002",
+    "protectedCallerSTO": 241,
+    "dispatch": {
+      "step": 0,
+      "pre": {
+        "slot": 60,
+        "pc": 0,
+        "word": 1,
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr0": 0,
+        "dr1": 0,
+        "cr0": "4a000006",
+        "cr1": "00000000",
+        "sto": 243
+      },
+      "raw": "17000002",
+      "flagsAtExecute": {
+        "N": false,
+        "Z": false,
+        "C": false,
+        "V": false
+      },
+      "writes": [],
+      "post": {
+        "slot": 6,
+        "pc": 0,
+        "word": 1,
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr0": 0,
+        "dr1": 0,
+        "cr0": "4a000006",
+        "cr1": "00000000",
+        "sto": 239
+      },
+      "skipped": false
+    },
+    "branches": [],
+    "statusWrites": [],
+    "fault": {
+      "type": "INVALID_OP",
+      "message": "CALL CR0: method index 2 entry 0xaf084000 is neither a BRANCH nor a valid legacy code offset",
+      "preRecovery": {
+        "slot": 6,
+        "pc": 0,
+        "word": 1,
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr0": 0,
+        "dr1": 0,
+        "cr0": "4a000006",
+        "cr1": "00000000",
+        "sto": 239
+      }
+    },
+    "returned": false,
+    "tail": [
+      {
+        "step": 0,
+        "pre": {
+          "slot": 60,
+          "pc": 0,
+          "word": 1,
+          "flags": {
+            "N": false,
+            "Z": false,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "00000000",
+          "sto": 243
+        },
+        "raw": "17000002",
+        "flagsAtExecute": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "writes": [],
+        "post": {
+          "slot": 6,
+          "pc": 0,
+          "word": 1,
+          "flags": {
+            "N": false,
+            "Z": false,
+            "C": false,
+            "V": false
+          },
+          "dr0": 0,
+          "dr1": 0,
+          "cr0": "4a000006",
+          "cr1": "00000000",
+          "sto": 239
+        },
+        "skipped": false
+      }
+    ],
+    "steps": 1,
+    "final": {
+      "slot": 6,
+      "pc": 0,
+      "word": 1,
+      "flags": {
+        "N": false,
+        "Z": false,
+        "C": false,
+        "V": false
+      },
+      "dr0": 0,
+      "dr1": 0,
+      "cr0": "4a000006",
+      "cr1": "00000000",
+      "sto": 239
+    },
+    "frameRestored": false,
+    "termination": "FAULT"
+  },
+  "failures": [
+    {
+      "status": 1,
+      "branchWord": 35,
+      "steps": 37,
+      "injection": {
+        "branchWord": 35,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 1,
+        "word": 35,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 36
+      },
+      "failureWrite": {
+        "word": 36,
+        "raw": "af084001",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 1,
+            "before": 0,
+            "stored": 1,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 1
+      },
+      "return": {
+        "word": 37,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 1,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 1,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 2,
+      "branchWord": 39,
+      "steps": 39,
+      "injection": {
+        "branchWord": 39,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 2,
+        "word": 39,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 40
+      },
+      "failureWrite": {
+        "word": 40,
+        "raw": "af084002",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 2,
+            "before": 0,
+            "stored": 2,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 2
+      },
+      "return": {
+        "word": 41,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 2,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 2,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 3,
+      "branchWord": 43,
+      "steps": 41,
+      "injection": {
+        "branchWord": 43,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 3,
+        "word": 43,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 44
+      },
+      "failureWrite": {
+        "word": 44,
+        "raw": "af084003",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 3,
+            "before": 0,
+            "stored": 3,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 3
+      },
+      "return": {
+        "word": 45,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 3,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 3,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 4,
+      "branchWord": 47,
+      "steps": 43,
+      "injection": {
+        "branchWord": 47,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 4,
+        "word": 47,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 48
+      },
+      "failureWrite": {
+        "word": 48,
+        "raw": "af084004",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 4,
+            "before": 0,
+            "stored": 4,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 4
+      },
+      "return": {
+        "word": 49,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 4,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 4,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 5,
+      "branchWord": 51,
+      "steps": 45,
+      "injection": {
+        "branchWord": 51,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 5,
+        "word": 51,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 52
+      },
+      "failureWrite": {
+        "word": 52,
+        "raw": "af084005",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 5,
+            "before": 0,
+            "stored": 5,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 5
+      },
+      "return": {
+        "word": 53,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 5,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 5,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 6,
+      "branchWord": 55,
+      "steps": 47,
+      "injection": {
+        "branchWord": 55,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 6,
+        "word": 55,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 56
+      },
+      "failureWrite": {
+        "word": 56,
+        "raw": "af084006",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 6,
+            "before": 0,
+            "stored": 6,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 6
+      },
+      "return": {
+        "word": 57,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 6,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 6,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 7,
+      "branchWord": 59,
+      "steps": 49,
+      "injection": {
+        "branchWord": 59,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 7,
+        "word": 59,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 60
+      },
+      "failureWrite": {
+        "word": 60,
+        "raw": "af084007",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 7,
+            "before": 0,
+            "stored": 7,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 7
+      },
+      "return": {
+        "word": 61,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 7,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 7,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 8,
+      "branchWord": 63,
+      "steps": 51,
+      "injection": {
+        "branchWord": 63,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 8,
+        "word": 63,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 64
+      },
+      "failureWrite": {
+        "word": 64,
+        "raw": "af084008",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 8,
+            "before": 0,
+            "stored": 8,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 8
+      },
+      "return": {
+        "word": 65,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 8,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 8,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 9,
+      "branchWord": 67,
+      "steps": 53,
+      "injection": {
+        "branchWord": 67,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 9,
+        "word": 67,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 68
+      },
+      "failureWrite": {
+        "word": 68,
+        "raw": "af084009",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 9,
+            "before": 0,
+            "stored": 9,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 9
+      },
+      "return": {
+        "word": 69,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 9,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 9,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 10,
+      "branchWord": 71,
+      "steps": 55,
+      "injection": {
+        "branchWord": 71,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 10,
+        "word": 71,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 72
+      },
+      "failureWrite": {
+        "word": 72,
+        "raw": "af08400a",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 10,
+            "before": 0,
+            "stored": 10,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 10
+      },
+      "return": {
+        "word": 73,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 10,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 10,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 11,
+      "branchWord": 75,
+      "steps": 57,
+      "injection": {
+        "branchWord": 75,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 11,
+        "word": 75,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 76
+      },
+      "failureWrite": {
+        "word": 76,
+        "raw": "af08400b",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 11,
+            "before": 0,
+            "stored": 11,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 11
+      },
+      "return": {
+        "word": 77,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 11,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 11,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 12,
+      "branchWord": 79,
+      "steps": 59,
+      "injection": {
+        "branchWord": 79,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 12,
+        "word": 79,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 80
+      },
+      "failureWrite": {
+        "word": 80,
+        "raw": "af08400c",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 12,
+            "before": 0,
+            "stored": 12,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 12
+      },
+      "return": {
+        "word": 81,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 12,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 12,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 13,
+      "branchWord": 83,
+      "steps": 61,
+      "injection": {
+        "branchWord": 83,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 13,
+        "word": 83,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 84
+      },
+      "failureWrite": {
+        "word": 84,
+        "raw": "af08400d",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 13,
+            "before": 0,
+            "stored": 13,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 13
+      },
+      "return": {
+        "word": 85,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 13,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 13,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 14,
+      "branchWord": 87,
+      "steps": 63,
+      "injection": {
+        "branchWord": 87,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 14,
+        "word": 87,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 88
+      },
+      "failureWrite": {
+        "word": 88,
+        "raw": "af08400e",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 14,
+            "before": 0,
+            "stored": 14,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 14
+      },
+      "return": {
+        "word": 89,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 14,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 14,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 15,
+      "branchWord": 91,
+      "steps": 65,
+      "injection": {
+        "branchWord": 91,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 15,
+        "word": 91,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 92
+      },
+      "failureWrite": {
+        "word": 92,
+        "raw": "af08400f",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 15,
+            "before": 0,
+            "stored": 15,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 15
+      },
+      "return": {
+        "word": 93,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 15,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 15,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 16,
+      "branchWord": 97,
+      "steps": 69,
+      "injection": {
+        "branchWord": 97,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 16,
+        "word": 97,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 98
+      },
+      "failureWrite": {
+        "word": 98,
+        "raw": "af084010",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 16,
+            "before": 0,
+            "stored": 16,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 16
+      },
+      "return": {
+        "word": 99,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 16,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 16,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 17,
+      "branchWord": 105,
+      "steps": 75,
+      "injection": {
+        "branchWord": 105,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 17,
+        "word": 105,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 106
+      },
+      "failureWrite": {
+        "word": 106,
+        "raw": "af084011",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 5,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 17,
+            "before": 5,
+            "stored": 17,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 17
+      },
+      "return": {
+        "word": 107,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 17,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 17,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 17,
+      "branchWord": 109,
+      "steps": 77,
+      "injection": {
+        "branchWord": 109,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 17,
+        "word": 109,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 110
+      },
+      "failureWrite": {
+        "word": 110,
+        "raw": "af084011",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 5,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 17,
+            "before": 5,
+            "stored": 17,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 17
+      },
+      "return": {
+        "word": 111,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 17,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 17,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 18,
+      "branchWord": 118,
+      "steps": 84,
+      "injection": {
+        "branchWord": 118,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 18,
+        "word": 118,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 119
+      },
+      "failureWrite": {
+        "word": 119,
+        "raw": "af084012",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 100,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 18,
+            "before": 100,
+            "stored": 18,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 18
+      },
+      "return": {
+        "word": 120,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 18,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 18,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 19,
+      "branchWord": 125,
+      "steps": 89,
+      "injection": {
+        "branchWord": 125,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 19,
+        "word": 125,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 126
+      },
+      "failureWrite": {
+        "word": 126,
+        "raw": "af084013",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 42,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 19,
+            "before": 42,
+            "stored": 19,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 19
+      },
+      "return": {
+        "word": 127,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 19,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 19,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 20,
+      "branchWord": 131,
+      "steps": 93,
+      "injection": {
+        "branchWord": 131,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 20,
+        "word": 131,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 132
+      },
+      "failureWrite": {
+        "word": 132,
+        "raw": "af084014",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 7,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 20,
+            "before": 7,
+            "stored": 20,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 20
+      },
+      "return": {
+        "word": 133,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 20,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 20,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 21,
+      "branchWord": 141,
+      "steps": 101,
+      "injection": {
+        "branchWord": 141,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 21,
+        "word": 141,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 142
+      },
+      "failureWrite": {
+        "word": 142,
+        "raw": "af084015",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 37,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 21,
+            "before": 37,
+            "stored": 21,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 21
+      },
+      "return": {
+        "word": 143,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 21,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 21,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 22,
+      "branchWord": 147,
+      "steps": 105,
+      "injection": {
+        "branchWord": 147,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 22,
+        "word": 147,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 148
+      },
+      "failureWrite": {
+        "word": 148,
+        "raw": "af084016",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 22,
+            "before": 0,
+            "stored": 22,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 22
+      },
+      "return": {
+        "word": 149,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 22,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 22,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 23,
+      "branchWord": 155,
+      "steps": 111,
+      "injection": {
+        "branchWord": 155,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 23,
+        "word": 155,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 156
+      },
+      "failureWrite": {
+        "word": 156,
+        "raw": "af084017",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 100,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 23,
+            "before": 100,
+            "stored": 23,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 23
+      },
+      "return": {
+        "word": 157,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 23,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 23,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 24,
+      "branchWord": 161,
+      "steps": 115,
+      "injection": {
+        "branchWord": 161,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 24,
+        "word": 161,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 162
+      },
+      "failureWrite": {
+        "word": 162,
+        "raw": "af084018",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 99,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 24,
+            "before": 99,
+            "stored": 24,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 24
+      },
+      "return": {
+        "word": 163,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 24,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 24,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 25,
+      "branchWord": 170,
+      "steps": 122,
+      "injection": {
+        "branchWord": 170,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 25,
+        "word": 170,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 171
+      },
+      "failureWrite": {
+        "word": 171,
+        "raw": "af084019",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 10,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 25,
+            "before": 10,
+            "stored": 25,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 25
+      },
+      "return": {
+        "word": 172,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 25,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 25,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 26,
+      "branchWord": 178,
+      "steps": 128,
+      "injection": {
+        "branchWord": 178,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 26,
+        "word": 178,
+        "raw": "ba000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 179
+      },
+      "failureWrite": {
+        "word": 179,
+        "raw": "af08401a",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 3,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 26,
+            "before": 3,
+            "stored": 26,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 26
+      },
+      "return": {
+        "word": 180,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 26,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 26,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 27,
+      "branchWord": 183,
+      "steps": 131,
+      "injection": {
+        "branchWord": 183,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 27,
+        "word": 183,
+        "raw": "b9800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 184
+      },
+      "failureWrite": {
+        "word": 184,
+        "raw": "af08401b",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 27,
+            "before": 0,
+            "stored": 27,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 27
+      },
+      "return": {
+        "word": 185,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 27,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 27,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 28,
+      "branchWord": 189,
+      "steps": 135,
+      "injection": {
+        "branchWord": 189,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 28,
+        "word": 189,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 190
+      },
+      "failureWrite": {
+        "word": 190,
+        "raw": "af08401c",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 5,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 28,
+            "before": 5,
+            "stored": 28,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 28
+      },
+      "return": {
+        "word": 191,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 28,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 28,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 29,
+      "branchWord": 195,
+      "steps": 139,
+      "injection": {
+        "branchWord": 195,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 29,
+        "word": 195,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 196
+      },
+      "failureWrite": {
+        "word": 196,
+        "raw": "af08401d",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 200,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 29,
+            "before": 200,
+            "stored": 29,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 29
+      },
+      "return": {
+        "word": 197,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 29,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 29,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 30,
+      "branchWord": 201,
+      "steps": 143,
+      "injection": {
+        "branchWord": 201,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 30,
+        "word": 201,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 202
+      },
+      "failureWrite": {
+        "word": 202,
+        "raw": "af08401e",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 50,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 30,
+            "before": 50,
+            "stored": 30,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 30
+      },
+      "return": {
+        "word": 203,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 30,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 30,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 31,
+      "branchWord": 208,
+      "steps": 148,
+      "injection": {
+        "branchWord": 208,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 31,
+        "word": 208,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 209
+      },
+      "failureWrite": {
+        "word": 209,
+        "raw": "af08401f",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 7,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 31,
+            "before": 7,
+            "stored": 31,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 31
+      },
+      "return": {
+        "word": 210,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 31,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 31,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 32,
+      "branchWord": 215,
+      "steps": 153,
+      "injection": {
+        "branchWord": 215,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 32,
+        "word": 215,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 216
+      },
+      "failureWrite": {
+        "word": 216,
+        "raw": "af084020",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 6,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 32,
+            "before": 6,
+            "stored": 32,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 32
+      },
+      "return": {
+        "word": 217,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 32,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 32,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 33,
+      "branchWord": 222,
+      "steps": 158,
+      "injection": {
+        "branchWord": 222,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 33,
+        "word": 222,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 223
+      },
+      "failureWrite": {
+        "word": 223,
+        "raw": "af084021",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 1,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 33,
+            "before": 1,
+            "stored": 33,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 33
+      },
+      "return": {
+        "word": 224,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 33,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 33,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 34,
+      "branchWord": 229,
+      "steps": 163,
+      "injection": {
+        "branchWord": 229,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 34,
+        "word": 229,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 230
+      },
+      "failureWrite": {
+        "word": 230,
+        "raw": "af084022",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 2147483648,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 34,
+            "before": 2147483648,
+            "stored": 34,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 34
+      },
+      "return": {
+        "word": 231,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 34,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 34,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 34,
+      "branchWord": 232,
+      "steps": 164,
+      "injection": {
+        "branchWord": 232,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 34,
+        "word": 232,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 233
+      },
+      "failureWrite": {
+        "word": 233,
+        "raw": "af084022",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 2147483648,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 34,
+            "before": 2147483648,
+            "stored": 34,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 34
+      },
+      "return": {
+        "word": 234,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 34,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 34,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 35,
+      "branchWord": 238,
+      "steps": 168,
+      "injection": {
+        "branchWord": 238,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 35,
+        "word": 238,
+        "raw": "ba000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 239
+      },
+      "failureWrite": {
+        "word": 239,
+        "raw": "af084023",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 1,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 35,
+            "before": 1,
+            "stored": 35,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 35
+      },
+      "return": {
+        "word": 240,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 35,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 35,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 36,
+      "branchWord": 245,
+      "steps": 173,
+      "injection": {
+        "branchWord": 245,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 36,
+        "word": 245,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 246
+      },
+      "failureWrite": {
+        "word": 246,
+        "raw": "af084024",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 15,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 36,
+            "before": 15,
+            "stored": 36,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 36
+      },
+      "return": {
+        "word": 247,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 36,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 36,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 37,
+      "branchWord": 252,
+      "steps": 178,
+      "injection": {
+        "branchWord": 252,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 37,
+        "word": 252,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 253
+      },
+      "failureWrite": {
+        "word": 253,
+        "raw": "af084025",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 240,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 37,
+            "before": 240,
+            "stored": 37,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 37
+      },
+      "return": {
+        "word": 254,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 37,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 37,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 38,
+      "branchWord": 259,
+      "steps": 183,
+      "injection": {
+        "branchWord": 259,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 38,
+        "word": 259,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 260
+      },
+      "failureWrite": {
+        "word": 260,
+        "raw": "af084026",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 8,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 38,
+            "before": 8,
+            "stored": 38,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 38
+      },
+      "return": {
+        "word": 261,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 38,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 38,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 39,
+      "branchWord": 265,
+      "steps": 187,
+      "injection": {
+        "branchWord": 265,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 39,
+        "word": 265,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 266
+      },
+      "failureWrite": {
+        "word": 266,
+        "raw": "af084027",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 1,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 39,
+            "before": 1,
+            "stored": 39,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 39
+      },
+      "return": {
+        "word": 267,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 39,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 39,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 39,
+      "branchWord": 268,
+      "steps": 188,
+      "injection": {
+        "branchWord": 268,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 39,
+        "word": 268,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 269
+      },
+      "failureWrite": {
+        "word": 269,
+        "raw": "af084027",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 1,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 39,
+            "before": 1,
+            "stored": 39,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 39
+      },
+      "return": {
+        "word": 270,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 39,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 39,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 40,
+      "branchWord": 276,
+      "steps": 194,
+      "injection": {
+        "branchWord": 276,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 40,
+        "word": 276,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 277
+      },
+      "failureWrite": {
+        "word": 277,
+        "raw": "af084028",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 2048,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 40,
+            "before": 2048,
+            "stored": 40,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 40
+      },
+      "return": {
+        "word": 278,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 40,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 40,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 41,
+      "branchWord": 283,
+      "steps": 199,
+      "injection": {
+        "branchWord": 283,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 41,
+        "word": 283,
+        "raw": "ba800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 284
+      },
+      "failureWrite": {
+        "word": 284,
+        "raw": "af084029",
+        "flagsBefore": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 2147483648,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 41,
+            "before": 2147483648,
+            "stored": 41,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 41
+      },
+      "return": {
+        "word": 285,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 41,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 41,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 42,
+      "branchWord": 290,
+      "steps": 204,
+      "injection": {
+        "branchWord": 290,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 42,
+        "word": 290,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 291
+      },
+      "failureWrite": {
+        "word": 291,
+        "raw": "af08402a",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 4294967295,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 42,
+            "before": 4294967295,
+            "stored": 42,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 42
+      },
+      "return": {
+        "word": 292,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 42,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 42,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 43,
+      "branchWord": 296,
+      "steps": 208,
+      "injection": {
+        "branchWord": 296,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 43,
+        "word": 296,
+        "raw": "b9800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 297
+      },
+      "failureWrite": {
+        "word": 297,
+        "raw": "af08402b",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "dr1Before": 4294967294,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 43,
+            "before": 4294967294,
+            "stored": 43,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 43
+      },
+      "return": {
+        "word": 298,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 43,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 43,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 44,
+      "branchWord": 302,
+      "steps": 212,
+      "injection": {
+        "branchWord": 302,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 44,
+        "word": 302,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 303
+      },
+      "failureWrite": {
+        "word": 303,
+        "raw": "af08402c",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 4294967295,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 44,
+            "before": 4294967295,
+            "stored": 44,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 44
+      },
+      "return": {
+        "word": 304,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 44,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 44,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 45,
+      "branchWord": 309,
+      "steps": 217,
+      "injection": {
+        "branchWord": 309,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 45,
+        "word": 309,
+        "raw": "ba000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 310
+      },
+      "failureWrite": {
+        "word": 310,
+        "raw": "af08402d",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 2147483648,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 45,
+            "before": 2147483648,
+            "stored": 45,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 45
+      },
+      "return": {
+        "word": 311,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 45,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 45,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 46,
+      "branchWord": 313,
+      "steps": 219,
+      "injection": {
+        "branchWord": 313,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 46,
+        "word": 313,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 314
+      },
+      "failureWrite": {
+        "word": 314,
+        "raw": "af08402e",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 46,
+            "before": 0,
+            "stored": 46,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 46
+      },
+      "return": {
+        "word": 315,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 46,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 46,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 47,
+      "branchWord": 319,
+      "steps": 223,
+      "injection": {
+        "branchWord": 319,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 47,
+        "word": 319,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 320
+      },
+      "failureWrite": {
+        "word": 320,
+        "raw": "af08402f",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 1,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 47,
+            "before": 1,
+            "stored": 47,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 47
+      },
+      "return": {
+        "word": 321,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 47,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 47,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 48,
+      "branchWord": 325,
+      "steps": 227,
+      "injection": {
+        "branchWord": 325,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 48,
+        "word": 325,
+        "raw": "b9000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 326
+      },
+      "failureWrite": {
+        "word": 326,
+        "raw": "af084030",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 5,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 48,
+            "before": 5,
+            "stored": 48,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 48
+      },
+      "return": {
+        "word": 327,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 48,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 48,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 49,
+      "branchWord": 330,
+      "steps": 230,
+      "injection": {
+        "branchWord": 330,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 49,
+        "word": 330,
+        "raw": "b9800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 331
+      },
+      "failureWrite": {
+        "word": 331,
+        "raw": "af084031",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 49,
+            "before": 0,
+            "stored": 49,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 49
+      },
+      "return": {
+        "word": 332,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 49,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 49,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 50,
+      "branchWord": 335,
+      "steps": 233,
+      "injection": {
+        "branchWord": 335,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 50,
+        "word": 335,
+        "raw": "ba000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 336
+      },
+      "failureWrite": {
+        "word": 336,
+        "raw": "af084032",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 50,
+            "before": 0,
+            "stored": 50,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 50
+      },
+      "return": {
+        "word": 337,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 50,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 50,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 51,
+      "branchWord": 341,
+      "steps": 237,
+      "injection": {
+        "branchWord": 341,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 51,
+        "word": 341,
+        "raw": "ba800003",
+        "flags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 342
+      },
+      "failureWrite": {
+        "word": 342,
+        "raw": "af084033",
+        "flagsBefore": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 1,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 51,
+            "before": 1,
+            "stored": 51,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 51
+      },
+      "return": {
+        "word": 343,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 51,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 51,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 52,
+      "branchWord": 347,
+      "steps": 241,
+      "injection": {
+        "branchWord": 347,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": true
+        }
+      },
+      "guard": {
+        "status": 52,
+        "word": 347,
+        "raw": "bd000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": true
+        },
+        "taken": false,
+        "nextWord": 348
+      },
+      "failureWrite": {
+        "word": 348,
+        "raw": "af084034",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": true
+        },
+        "dr1Before": 10,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 52,
+            "before": 10,
+            "stored": 52,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 52
+      },
+      "return": {
+        "word": 349,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 52,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 52,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 53,
+      "branchWord": 355,
+      "steps": 247,
+      "injection": {
+        "branchWord": 355,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 53,
+        "word": 355,
+        "raw": "bd800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 356
+      },
+      "failureWrite": {
+        "word": 356,
+        "raw": "af084035",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 3,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 53,
+            "before": 3,
+            "stored": 53,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 53
+      },
+      "return": {
+        "word": 357,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 53,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 53,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 54,
+      "branchWord": 361,
+      "steps": 251,
+      "injection": {
+        "branchWord": 361,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": true
+        }
+      },
+      "guard": {
+        "status": 54,
+        "word": 361,
+        "raw": "be000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": true
+        },
+        "taken": false,
+        "nextWord": 362
+      },
+      "failureWrite": {
+        "word": 362,
+        "raw": "af084036",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": true
+        },
+        "dr1Before": 10,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 54,
+            "before": 10,
+            "stored": 54,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 54
+      },
+      "return": {
+        "word": 363,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 54,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 54,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 55,
+      "branchWord": 367,
+      "steps": 255,
+      "injection": {
+        "branchWord": 367,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 55,
+        "word": 367,
+        "raw": "be800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 368
+      },
+      "failureWrite": {
+        "word": 368,
+        "raw": "af084037",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 5,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 55,
+            "before": 5,
+            "stored": 55,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 55
+      },
+      "return": {
+        "word": 369,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 55,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 55,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 56,
+      "branchWord": 373,
+      "steps": 259,
+      "injection": {
+        "branchWord": 373,
+        "originalFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 56,
+        "word": 373,
+        "raw": "bc000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 374
+      },
+      "failureWrite": {
+        "word": 374,
+        "raw": "af084038",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 8,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 56,
+            "before": 8,
+            "stored": 56,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 56
+      },
+      "return": {
+        "word": 375,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 56,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 56,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 57,
+      "branchWord": 378,
+      "steps": 262,
+      "injection": {
+        "branchWord": 378,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 57,
+        "word": 378,
+        "raw": "bc800003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 379
+      },
+      "failureWrite": {
+        "word": 379,
+        "raw": "af084039",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": true,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 57,
+            "before": 0,
+            "stored": 57,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 57
+      },
+      "return": {
+        "word": 380,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 57,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 57,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 58,
+      "branchWord": 387,
+      "steps": 269,
+      "injection": {
+        "branchWord": 387,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 58,
+        "word": 387,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 388
+      },
+      "failureWrite": {
+        "word": 388,
+        "raw": "af08403a",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 43981,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 58,
+            "before": 43981,
+            "stored": 58,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 58
+      },
+      "return": {
+        "word": 389,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 58,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 58,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 59,
+      "branchWord": 394,
+      "steps": 274,
+      "injection": {
+        "branchWord": 394,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 59,
+        "word": 394,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 395
+      },
+      "failureWrite": {
+        "word": 395,
+        "raw": "af08403b",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 171,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 59,
+            "before": 171,
+            "stored": 59,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 59
+      },
+      "return": {
+        "word": 396,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 59,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 59,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 60,
+      "branchWord": 402,
+      "steps": 280,
+      "injection": {
+        "branchWord": 402,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 60,
+        "word": 402,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 403
+      },
+      "failureWrite": {
+        "word": 403,
+        "raw": "af08403c",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 171,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 60,
+            "before": 171,
+            "stored": 60,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 60
+      },
+      "return": {
+        "word": 404,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 60,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 60,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 61,
+      "branchWord": 410,
+      "steps": 286,
+      "injection": {
+        "branchWord": 410,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 61,
+        "word": 410,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 411
+      },
+      "failureWrite": {
+        "word": 411,
+        "raw": "af08403d",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 171,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 61,
+            "before": 171,
+            "stored": 61,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 61
+      },
+      "return": {
+        "word": 412,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 61,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 61,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 62,
+      "branchWord": 419,
+      "steps": 293,
+      "injection": {
+        "branchWord": 419,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": true,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 62,
+        "word": 419,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 420
+      },
+      "failureWrite": {
+        "word": 420,
+        "raw": "af08403e",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 62,
+            "before": 0,
+            "stored": 62,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 62
+      },
+      "return": {
+        "word": 421,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 62,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 62,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 63,
+      "branchWord": 423,
+      "steps": 295,
+      "injection": {
+        "branchWord": 423,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 63,
+        "word": 423,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 424
+      },
+      "failureWrite": {
+        "word": 424,
+        "raw": "af08403f",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 63,
+            "before": 0,
+            "stored": 63,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 63
+      },
+      "return": {
+        "word": 425,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 63,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 63,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 64,
+      "branchWord": 427,
+      "steps": 297,
+      "injection": {
+        "branchWord": 427,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 64,
+        "word": 427,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 428
+      },
+      "failureWrite": {
+        "word": 428,
+        "raw": "af084040",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 64,
+            "before": 0,
+            "stored": 64,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 64
+      },
+      "return": {
+        "word": 429,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 64,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 64,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 65,
+      "branchWord": 431,
+      "steps": 299,
+      "injection": {
+        "branchWord": 431,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 65,
+        "word": 431,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 432
+      },
+      "failureWrite": {
+        "word": 432,
+        "raw": "af084041",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 65,
+            "before": 0,
+            "stored": 65,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 65
+      },
+      "return": {
+        "word": 433,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 65,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 65,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 66,
+      "branchWord": 435,
+      "steps": 301,
+      "injection": {
+        "branchWord": 435,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 66,
+        "word": 435,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 436
+      },
+      "failureWrite": {
+        "word": 436,
+        "raw": "af084042",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 66,
+            "before": 0,
+            "stored": 66,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 66
+      },
+      "return": {
+        "word": 437,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 66,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 66,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 67,
+      "branchWord": 439,
+      "steps": 303,
+      "injection": {
+        "branchWord": 439,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 67,
+        "word": 439,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 440
+      },
+      "failureWrite": {
+        "word": 440,
+        "raw": "af084043",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 67,
+            "before": 0,
+            "stored": 67,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 67
+      },
+      "return": {
+        "word": 441,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 67,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 67,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 68,
+      "branchWord": 443,
+      "steps": 305,
+      "injection": {
+        "branchWord": 443,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 68,
+        "word": 443,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 444
+      },
+      "failureWrite": {
+        "word": 444,
+        "raw": "af084044",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 68,
+            "before": 0,
+            "stored": 68,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 68
+      },
+      "return": {
+        "word": 445,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 68,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 68,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 69,
+      "branchWord": 447,
+      "steps": 307,
+      "injection": {
+        "branchWord": 447,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 69,
+        "word": 447,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 448
+      },
+      "failureWrite": {
+        "word": 448,
+        "raw": "af084045",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 69,
+            "before": 0,
+            "stored": 69,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 69
+      },
+      "return": {
+        "word": 449,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 69,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 69,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 70,
+      "branchWord": 451,
+      "steps": 309,
+      "injection": {
+        "branchWord": 451,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 70,
+        "word": 451,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 452
+      },
+      "failureWrite": {
+        "word": 452,
+        "raw": "af084046",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 70,
+            "before": 0,
+            "stored": 70,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 70
+      },
+      "return": {
+        "word": 453,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 70,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 70,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 71,
+      "branchWord": 455,
+      "steps": 311,
+      "injection": {
+        "branchWord": 455,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 71,
+        "word": 455,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 456
+      },
+      "failureWrite": {
+        "word": 456,
+        "raw": "af084047",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 71,
+            "before": 0,
+            "stored": 71,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 71
+      },
+      "return": {
+        "word": 457,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 71,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 71,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 72,
+      "branchWord": 459,
+      "steps": 313,
+      "injection": {
+        "branchWord": 459,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 72,
+        "word": 459,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 460
+      },
+      "failureWrite": {
+        "word": 460,
+        "raw": "af084048",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 72,
+            "before": 0,
+            "stored": 72,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 72
+      },
+      "return": {
+        "word": 461,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 72,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 72,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 73,
+      "branchWord": 463,
+      "steps": 315,
+      "injection": {
+        "branchWord": 463,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 73,
+        "word": 463,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 464
+      },
+      "failureWrite": {
+        "word": 464,
+        "raw": "af084049",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 73,
+            "before": 0,
+            "stored": 73,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 73
+      },
+      "return": {
+        "word": 465,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 73,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 73,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 74,
+      "branchWord": 468,
+      "steps": 318,
+      "injection": {
+        "branchWord": 468,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 74,
+        "word": 468,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 469
+      },
+      "failureWrite": {
+        "word": 469,
+        "raw": "af08404a",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 74,
+            "before": 0,
+            "stored": 74,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 74
+      },
+      "return": {
+        "word": 470,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 74,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 74,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 75,
+      "branchWord": 472,
+      "steps": 320,
+      "injection": {
+        "branchWord": 472,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 75,
+        "word": 472,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 473
+      },
+      "failureWrite": {
+        "word": 473,
+        "raw": "af08404b",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 75,
+            "before": 0,
+            "stored": 75,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 75
+      },
+      "return": {
+        "word": 474,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 75,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 75,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 76,
+      "branchWord": 476,
+      "steps": 322,
+      "injection": {
+        "branchWord": 476,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 76,
+        "word": 476,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 477
+      },
+      "failureWrite": {
+        "word": 477,
+        "raw": "af08404c",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 76,
+            "before": 0,
+            "stored": 76,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 76
+      },
+      "return": {
+        "word": 478,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 76,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 76,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 77,
+      "branchWord": 480,
+      "steps": 324,
+      "injection": {
+        "branchWord": 480,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 77,
+        "word": 480,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 481
+      },
+      "failureWrite": {
+        "word": 481,
+        "raw": "af08404d",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 77,
+            "before": 0,
+            "stored": 77,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 77
+      },
+      "return": {
+        "word": 482,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 77,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 77,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 78,
+      "branchWord": 484,
+      "steps": 326,
+      "injection": {
+        "branchWord": 484,
+        "originalFlags": {
+          "N": true,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 78,
+        "word": 484,
+        "raw": "b8800003",
+        "flags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 485
+      },
+      "failureWrite": {
+        "word": 485,
+        "raw": "af08404e",
+        "flagsBefore": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 78,
+            "before": 0,
+            "stored": 78,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 78
+      },
+      "return": {
+        "word": 486,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 78,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 78,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 79,
+      "branchWord": 488,
+      "steps": 328,
+      "injection": {
+        "branchWord": 488,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 79,
+        "word": 488,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 489
+      },
+      "failureWrite": {
+        "word": 489,
+        "raw": "af08404f",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 79,
+            "before": 0,
+            "stored": 79,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 79
+      },
+      "return": {
+        "word": 490,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 79,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 79,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 80,
+      "branchWord": 492,
+      "steps": 330,
+      "injection": {
+        "branchWord": 492,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 80,
+        "word": 492,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 493
+      },
+      "failureWrite": {
+        "word": 493,
+        "raw": "af084050",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 80,
+            "before": 0,
+            "stored": 80,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 80
+      },
+      "return": {
+        "word": 494,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 80,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 80,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    },
+    {
+      "status": 81,
+      "branchWord": 496,
+      "steps": 332,
+      "injection": {
+        "branchWord": 496,
+        "originalFlags": {
+          "N": false,
+          "Z": true,
+          "C": false,
+          "V": false
+        },
+        "forcedFlags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        }
+      },
+      "guard": {
+        "status": 81,
+        "word": 496,
+        "raw": "b8000003",
+        "flags": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "taken": false,
+        "nextWord": 497
+      },
+      "failureWrite": {
+        "word": 497,
+        "raw": "af084051",
+        "flagsBefore": {
+          "N": false,
+          "Z": false,
+          "C": false,
+          "V": false
+        },
+        "dr1Before": 0,
+        "writes": [
+          {
+            "register": 1,
+            "attempted": 81,
+            "before": 0,
+            "stored": 81,
+            "discarded": false
+          },
+          {
+            "register": 0,
+            "attempted": 0,
+            "before": 0,
+            "stored": 0,
+            "discarded": false
+          }
+        ],
+        "dr0After": 0,
+        "dr1After": 81
+      },
+      "return": {
+        "word": 498,
+        "raw": "1f000000",
+        "dr0Before": 0,
+        "dr1Before": 81,
+        "callerSlot": 60,
+        "callerPC": 1,
+        "dr0After": 0,
+        "dr1After": 81,
+        "stoAfter": 241
+      },
+      "termination": "RETURN",
+      "frameRestored": true
+    }
+  ],
+  "conclusion": {
+    "method1Compatible": true,
+    "naturalDiagnosticPass": true,
+    "failureStatusControlsPassed": 84,
+    "executionQualified": false,
+    "rtlQualified": false,
+    "boardQualified": false,
+    "admissionTested": false,
+    "liveActivation": false,
+    "approvedSelfTestSlot": 6,
+    "approvedBootSlot": 10
+  },
+  "fingerprints": {
+    "docs/reviews/phase1-baseline/selftest-api-identity-evidence.json": "e36442877b55d1dff6549bef19d5e7c8610e43932c233b52d54515313d5ea903",
+    "scripts/probe_phase1_selftest.js": "7bfd0bfaf99c402f52424c1d18cee6b2edc18974f9bfca5fb8bbbefec867f6d3",
+    "simulator/abstract_gt_manager.js": "9e6ab7a3af7b721d54ebe4395a77b2f6c81d4a5833b010ccc2240dabc7369d84",
+    "simulator/abstractions.js": "bb1d4424f27163ed163d432582b38881e557ae49e6d80ecb33881d7759fe7da4",
+    "simulator/architecture_contracts.js": "f6a72a239d201d138d162ed197c25596a5fb833f19d05b798a0b4900650d486f",
+    "simulator/bank_lump_binding.js": "6f194e11f00655d666ad3f2c4eb22067ed7c5aaf26c513bd6e41a14c18df2b08",
+    "simulator/bank_lump_identity.js": "f211d602a4a38eac335f5c84d53b83b458967d2adf2bb5623ec165df28743277",
+    "simulator/idx1-execution-envelope.js": "d1b769677eb3de5a6af542cd399f9d8ecdbaa42c687807dd7f2ea699bee88a97",
+    "simulator/idx1-memory.js": "fc8ce715b2ad6b24bae335ef06c74f6bcafe07e98d59eaf20e8798872900930d",
+    "simulator/idx1-runtime.js": "bf5ac02c55f9a261278d31cbfc297f37214ced002056c1ef71bbbeb2c302f69d",
+    "simulator/idx1.js": "d93902c88cab42a9a88665168eaabd22fab9203b36d5db55aaa0a913568ac275",
+    "simulator/simulator.js": "a2aa4dce0033b77a31096ce8737778c4341ce10c165d28cb99b278fead312594",
+    "simulator/system_abstractions.js": "fb67cd0784117055e9ca1186860f87b681211c2b23e33da8754bc3acdef19957",
+    "simulator/thread_design.js": "6c9b749e878a6ba79565c19093619d5ce1ca53f50f9310c66bf566c5e55d3e60"
+  },
+  "protectedFileCount": 1214,
+  "protectedInventorySha256": "d63a006a031a94b68ff69873debd7cef85437b93f966adaa4b8407aafb912854",
+  "protectedFilesUnchanged": true
+}

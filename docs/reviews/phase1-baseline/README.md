@@ -4,6 +4,12 @@ Subsequent implementation and fresh results are recorded separately in
 [Namespace authority progress](namespace-authority-progress.md). Historical
 baseline observations below are preserved, not overwritten as if freshly run.
 
+Fresh **BASE-07 / RES-SelfTest / SIM-05** evidence is recorded in
+[selected SelfTest CALL verification](selftest-call-verification.md):
+the frozen legacy method-1 entry works in an isolated current simulator, and
+all 84 forced failure guards return their nonzero DR1 result. The API identity
+defect remains; this does not qualify the approved startup image, RTL or board.
+
 ## Scope and evidence boundary
 
 Authorized: baseline inspection and failure classification, with **no saved
