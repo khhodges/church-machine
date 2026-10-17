@@ -85,6 +85,30 @@ Acceptance requires:
   these must not be conflated with unexpected faults in normal operation.
 
 Prioritize missing functionality, GT binding and integrated execution defects.
+
+#### Mint must operate dynamically
+
+Genesis explicitly clarified: “Mint should function of dynamic slot/GT create
+etc.” The 17 approved entries are the initial working set, not a permanent cap
+on occupied slots. Mint at slot 9 must provide actual runtime allocation,
+registration and GT issuance through its defined interfaces.
+
+The integrated workload must demonstrate a real caller requesting creation,
+an eligible free slot being assigned without overwriting the initial set,
+the object being initialized and registered through the Mint-controlled path,
+and the resulting GT being returned in the declared capability register and
+used successfully by that caller. Check backing storage, descriptor identity,
+rights, bounds and binding sequence, not just a host-language return object.
+Include repeated allocation, exhaustion and rejected-request behavior without
+partial publication. Where the approved lifecycle supports slot reuse, verify
+retained sequence and immutable identity rules rather than inventing revocation
+or silently retargeting an existing capability.
+
+Preinstalled test objects, precomputed result GTs, direct test-helper Namespace
+writes and unconditional success responses do not establish operational Mint.
+This is a functional acceptance requirement, not evidence that Mint already
+works or approval to introduce an unspecified protected authority interface.
+
 Historical migration, additional persistence edge cases and hardware/RTL work
 are secondary unless they are a direct dependency of this simulator objective.
 Keep the CTMM requirement links, but report operational coverage out of 17

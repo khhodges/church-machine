@@ -31,3 +31,15 @@ Threads and simulated I/O as well as callable objects, report per-slot behavior
 and zero unexpected faults, and keep intentional protection-rejection tests
 separate. Do not suppress faults, substitute success stubs, or widen authority
 to satisfy the metric. Defer unrelated historical migration and hardware work.
+
+Mint must perform dynamic slot creation/registration and GT issuance during the
+integrated run. The 17 entries are the initial set, not a permanent occupancy cap.
+
+**Why:** Genesis explicitly clarified that Mint should function for “dynamic
+slot/GT create etc.” Static Namespace population is not the intended acceptance.
+
+**How to apply:** Exercise a real caller's create/register → returned CR-held GT
+→ authorized use sequence, preserving the initial slots. Verify allocation and
+error cleanup through the actual Mint path, not host-side fixture insertion.
+Keep existing identity/lifecycle rules and protected-interface authority limits;
+this requirement does not authorize invented privilege or bypassed validation.
