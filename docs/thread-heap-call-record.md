@@ -7,8 +7,12 @@ is created. It is Thread-local, not private to the Alice abstraction.
 
 ## IDE demonstration
 
-Open Code → **Heap record** (also under Actions → Thread heap record). The dialog never replaces the
-editor or saves a LUMP. Its source panel provides a downloadable
+Open **Builder → Thread Lump — Design Page → Thread heap record**.
+This is the active, paused software simulator Thread's canonical CR5 heap,
+not the saved/build Thread design on that page. Opening is read-only: it does
+not prepare/enter a Thread, change targets, reserve a pool, allocate/import
+records, save a design, build a LUMP, replace editor source, or access hardware.
+The action is not in the Code toolbar or Actions menu. Its source panel provides a downloadable
 `ide.CallRecord` example specialized to the selected heap offset.
 
 Enter/prepare a software Thread and pause execution first. Set the heap offset

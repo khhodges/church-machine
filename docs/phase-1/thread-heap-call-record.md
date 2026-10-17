@@ -11,6 +11,13 @@ is created. It is Thread-local, not private to the Alice abstraction.
 
 ## IDE demonstration
 
+> Current-navigation correction (2026-10-17): use **Builder → Thread Lump —
+> Design Page → Thread heap record**, not the Code controls mentioned in the
+> historical paragraph below. The dialog still uses the active, paused software
+> simulator Thread's canonical CR5 heap, not the saved/build design. Opening is
+> read-only and does not prepare a Thread or change targets. The captured
+> demonstration text below is retained as historical reference.
+
 Open Code → **Heap record** (also under Actions → Thread heap record). The dialog never replaces the
 editor or saves a LUMP. Its source panel provides a downloadable
 `ide.CallRecord` example specialized to the selected heap offset.

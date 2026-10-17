@@ -1693,6 +1693,15 @@
             '<div class="le-design-hero-title">' + esc(title) + '</div>' +
             '<div class="le-design-hero-board">QMTECH Wukong \u00b7 Artix-7 XC7A100T</div>' +
             '<p class="le-design-hero-blurb">' + esc(blurb) + '</p>' +
+            (kind === 'thread' ?
+                '<button type="button" class="thr-btn" id="btnThreadHeapRecord" ' +
+                    'aria-haspopup="dialog" aria-describedby="threadHeapRecordContext" ' +
+                    'onclick="openThreadHeapRecord(this)">Thread heap record</button>' +
+                '<p class="le-design-hero-blurb" id="threadHeapRecordContext">' +
+                    'Uses the active, paused software simulator Thread\u2019s canonical CR5 heap, ' +
+                    'not the saved/build design being edited here. Opening is read-only: ' +
+                    'it does not prepare a Thread, change targets, reserve or allocate records, ' +
+                    'save or build a LUMP, change source, or access hardware.</p>' : '') +
         '</div>';
     }
 

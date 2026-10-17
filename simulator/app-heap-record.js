@@ -14,7 +14,7 @@ window.getThreadHeapRecordContext = function () {
 (function () {
     'use strict';
     var MAX_FILE = 16384;
-    var dlg = null, lastFocus = null, bound = null, pending = null;
+    var dlg = null, lastFocus = null, lastFocusId = null, bound = null, pending = null;
 
     function el(tag, attrs, kids) {
         var n = document.createElement(tag);
@@ -257,7 +257,13 @@ window.getThreadHeapRecordContext = function () {
         try { sample = JSON.stringify(A.sample(), null, 2); } catch (e) { sample = '{}'; }
         var firstField = (Array.isArray(S.fields) ? (S.fields[0] || {}).name : Object.keys(S.fields || {})[0]) || 'field';
         var states = Array.isArray(S.states) ? S.states.join(', ') : Object.keys(S.states || {}).join(', ');
-        var back = el('div', { cls: 'thr-backdrop', onmousedown: function (e) { if (e.target === back) close(); } });
+        var back = el('div', { cls: 'thr-backdrop', onmousedown: function (e) {
+            if (e.target === back) {
+                // Do not let the default mousedown focus move undo restoration.
+                e.preventDefault();
+                close();
+            }
+        } });
         var d = el('div', { cls: 'thr-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'thrTitle' }, [
             el('div', { cls: 'thr-head' }, [
                 el('h2', { id: 'thrTitle', text: 'Thread heap call record' }),
@@ -308,7 +314,7 @@ window.getThreadHeapRecordContext = function () {
                 ]),
                 el('div', { cls: 'thr-col' }, [
                     el('div', { cls: 'thr-note' }, ['Schema ', el('b', { text: S.name + ' v' + S.version }), ' - ' + S.words + ' words. States: ' + (states || 'n/a') + '.']),
-                    el('div', { cls: 'thr-note warn', text: 'Requires the active software simulator to be paused. The record lives in the live Thread heap: thread-local lifetime, not Alice-private, no GTs imported, no hardware writes. Initial import cannot overwrite unknown nonzero words; replacing a recognized record needs its own confirmation.' }),
+                    el('div', { cls: 'thr-note warn', text: 'Uses the active, paused software simulator Thread’s canonical CR5 heap, not the saved/build Thread design. Opening does not prepare a Thread or change targets. The record has thread-local lifetime, is not Alice-private, imports no GTs and makes no hardware writes. Initial import cannot overwrite unknown nonzero words; replacing a recognized record needs its own confirmation.' }),
                     el('div', { cls: 'thr-note' }, ['Partial update example (omitted fields unchanged):', el('pre', { cls: 'thr-pre', text: '{ "' + firstField + '": ... }' })]),
                     fieldTable(S),
                     el('div', { cls: 'thr-row' }, [
@@ -322,7 +328,7 @@ window.getThreadHeapRecordContext = function () {
         ]);
         back.appendChild(d);
         back.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') { e.preventDefault(); close(); }
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
             else if (e.key === 'Tab') {
                 var f = Array.prototype.filter.call(d.querySelectorAll('button,input,textarea,[tabindex]'), function (n) { return !n.disabled && n.offsetParent !== null; });
                 if (!f.length) return;
@@ -339,12 +345,17 @@ window.getThreadHeapRecordContext = function () {
     function close() {
         if (!dlg) return;
         dlg.remove(); dlg = null; pending = null; bound = null;
-        if (lastFocus && lastFocus.focus) lastFocus.focus();
+        // The design page can replace its trigger during an async/settings
+        // render. Resolve that current element instead of focusing a stale node.
+        var focus = (lastFocusId && document.getElementById(lastFocusId)) || lastFocus;
+        lastFocus = null; lastFocusId = null;
+        if (focus && focus.isConnected && focus.focus) focus.focus();
     }
 
-    window.openThreadHeapRecord = function () {
+    window.openThreadHeapRecord = function (trigger) {
         if (dlg) { q('#thrOffset').focus(); return; }
-        lastFocus = document.activeElement;
+        lastFocus = trigger || document.activeElement;
+        lastFocusId = lastFocus && lastFocus.id;
         try { build(); } catch (e) { alert('Cannot open Thread heap record: ' + e.message); return; }
         document.body.appendChild(dlg);
         q('#thrOffset').focus();
