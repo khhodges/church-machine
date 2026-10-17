@@ -54,8 +54,9 @@ assert(indexSource.includes('id="breakOnBootLoadCR15Chk"') &&
     'Step Settings exposes the enabled boot breakpoint');
 
 function extractFunction(source, name) {
-    const start = source.indexOf(`function ${name}(`);
-    assert(start >= 0, `${name} exists`);
+    const match = new RegExp(`(?:async )?function ${name}\\(`).exec(source);
+    assert(match, `${name} exists`);
+    const start = match.index;
     const brace = source.indexOf('{', start);
     let depth = 0;
     for (let index = brace; index < source.length; index++) {
@@ -69,12 +70,14 @@ function extractFunction(source, name) {
 
 // Isolated pending-program Step fixture: instantBoot's false return at B:00 is
 // a pause, so the breakpoint report survives and is never relabelled "halted".
-{
+(async () => {
     const editorConsole = { textContent: '[BP] Breakpoint at B:00', className: '' };
     let instantBootCalls = 0;
     const context = {
         window: {
             TargetState: { authorize: () => ({ok: true}) },
+            // Synthetic committed/fresh execution state; no real image is loaded.
+            SimulationPreparation: { checkExecutionFreshness: async () => true },
             LumpRegistry: null,
             _lastCLOOMCResult: null,
         },
@@ -85,6 +88,7 @@ function extractFunction(source, name) {
             },
         },
         _pendingSimLoad: {},
+        _idx1AdmissionInFlight: false,
         _requireCommittedImageForExecution: () => true,
         instantBoot: () => {
             instantBootCalls++;
@@ -99,7 +103,8 @@ function extractFunction(source, name) {
         _bootAuditAccum: [],
         console,
     };
-    vm.runInNewContext(`${extractFunction(runSource, 'stepSim')}; stepSim();`, context);
+    vm.runInNewContext(extractFunction(runSource, 'stepSim'), context);
+    await context.stepSim();
     assert.strictEqual(instantBootCalls, 1);
     assert.match(editorConsole.textContent, /paused before execution/);
     assert.doesNotMatch(editorConsole.textContent, /failed|halted/);
@@ -110,11 +115,10 @@ function extractFunction(source, name) {
         instantBootCalls++;
         return false;
     };
-    context.stepSim();
+    await context.stepSim();
     assert.strictEqual(instantBootCalls, 2);
     assert.strictEqual(
         editorConsole.textContent,
         'Auto-boot failed — machine halted during boot sequence');
-}
-
-console.log('boot LOAD CR15 breakpoint regressions passed');
+    console.log('boot LOAD CR15 breakpoint regressions passed');
+})().catch(error => { console.error(error); process.exitCode = 1; });

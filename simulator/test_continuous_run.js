@@ -40,6 +40,9 @@ function harness(stored, storageDenied = false) {
         sim, pipelineViz: null, runBatchSize: 500, simBreakpoints: new Set(),
         simUniversalBreakpoints: new Set(), _faultFreeInstrTotal: 0,
         _simRunHash: null, _threadRunOutcomes: outcomes,
+        // Scheduler-only fixture: admission is idle and the execution image is approved.
+        _idx1AdmissionInFlight: false,
+        _requireCommittedImageForExecution: () => true,
         _bootLoadCR15BreakpointBeforeNextInstruction: () => false,
     };
     for (const name of ['_autoLoadDefaultProgram', '_showStopBtn', 'switchView', 'openCRDetail',
