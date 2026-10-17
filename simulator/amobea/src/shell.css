@@ -1,0 +1,8 @@
+html, body { margin: 0; background: #111120; color: #e7e6f0; }
+[hidden] { display: none !important; }
+.am-ide-nav { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:10px 18px; border-bottom:1px solid #302f4b; font:12px monospace; }
+.am-ide-nav a { color:#fbbf24; }
+.am-ide-nav button { background:#171727; color:#e7e6f0; border:1px solid #302f4b; padding:8px; cursor:pointer; }
+.am-ide-nav button[aria-pressed=true] { color:#fbbf24; border-color:#fbbf24; }
+.am-ide-nav span { color:#a2a3b8; }
+.am-ide-nav :focus-visible { outline:2px solid #fbbf24; outline-offset:3px; }
