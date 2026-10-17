@@ -201,6 +201,21 @@ function configWithScriptOnlySuites(scriptOnlySuites) {
 }
 
 // ---------------------------------------------------------------------------
+// T9 — hardware faults and frozen incidents must share the isolated runner.
+// The wiring guard never launches the real suites (or recurses into sync tests).
+// ---------------------------------------------------------------------------
+{
+    const result = cp.spawnSync('python3', [
+        path.join(__dirname, 'test_wukong_hw_fault_workflow_wiring.py'),
+    ], { cwd: ROOT, encoding: 'utf8' });
+    check('T9: hardware-fault workflow includes frozen incidents without recursion or duplicates',
+        result.status === 0);
+    if (result.status !== 0) {
+        console.error(result.error || result.stderr || result.stdout);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 console.log('');
