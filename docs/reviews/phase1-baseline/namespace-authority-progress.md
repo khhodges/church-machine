@@ -18,11 +18,11 @@ to intercept the current draft-placement boundary rather than the retired
 simulator mutation call. Developer guidance now distinguishes catalog
 bookkeeping from approved Namespace authority.
 
-## Historical verification — before fixture repair
+## Historical verification — before fixture repair and acceptance continuation
 
 This initial result is retained as historical evidence, not the current status.
-The final focused result below is **55 passed, 2 xfailed**; the original missing
-NS[1] allocation fixture failure is resolved.
+The resident-admission focused result below is **55 passed, 2 xfailed**; the
+original missing NS[1] allocation fixture failure is resolved.
 
 - `python -m pytest tests/server/test_lump_admission_service.py -q --tb=short`
   — **17 passed, 1 failed**. Passing cases cover real admission with missing,
@@ -55,19 +55,123 @@ can include process-environment content.
 
 | Item | Progress | Closure |
 |---|---|---|
-| IDE-03 | Removed an admission veto; modal, boot-marker and single-save JavaScript checks pass. | Still needs isolated server save/reload and integrated browser evidence for resident and boot selections. |
+| IDE-03 | Complete: isolated endpoint and browser acceptance demonstrated exact save/reload, resident and boot selections; see continuation below. | Original criterion met: no silent layout or artifact-identity changes. |
 | IDE-04 | Missing/changed artifact diagnostics are specific and actionable. | Executed-artifact freshness and integrated UI evidence remain. |
 | SEAL-02 | Exact-byte selection check retained without catalog authority. | No claim of full seal-field, replay or destination-identity coverage. |
 | REL-03 | R26 and ADD-modal checks now pass. | Other regression groups remain open. |
 | BASE-02 | Admission and R26 no longer require active catalog rows. | Remaining consumer coverage must be established before broad closure. |
 
-**Zero of the original 104 requirements is newly marked Complete.** This
-delivers the first implementation portion, not the entire six-step plan.
+The earlier implementation newly closed **zero** requirements. The acceptance
+continuation below closes **IDE-03 only** in the original 104-row checklist;
+it does not close the other rows or the entire six-step plan.
 
 All 1,246 previously inventoried saved/build files retained their hashes after
 the tests and server restart. No hardware command, build, upload, flash or
 saved-artifact replacement was performed.
 
+## IDE-03 acceptance continuation
+
+The extracted-route fixtures now supply the production staging-copy and
+allocation dependencies, structurally valid private LUMP bytes, complete
+allocation geometry, private approval/index files, and the current writer
+signature. The client assertion distinguishes the read-only upgrade check from
+the single protected save. The refresh test compares retained body bytes at
+their explicitly compacted address; ordinary Save still must leave the image
+unchanged. These are test repairs, not changes to runtime integrity checks.
+
+- `python -m pytest tests/server/test_namespace_table_save.py tests/server/test_namespace_single_review.py -q --tb=short`
+  — **35 passed**.
+- `python3 scripts/run_namespace_save_acceptance.py endpoints`
+  — **4 passed**, exercising the actual Flask application with no route stubs:
+  exact save/reload, Lazy→Resident choices, boot-marker selection and reload,
+  incomplete design saving, cancellation/replay rejection, and stale-tab
+  protection. Selected catalog rows are removed in the private fixture;
+  filename/hash-bound selections remain valid. Assertions compare complete
+  saved rows, not only names or policy flags.
+- `node simulator/test_namespace_boot_authority.js`,
+  `node simulator/test_namespace_single_save.js`, and
+  `node simulator/test_ns_slot_modal_persist.js` — passed (ADD-modal: **36/36**).
+
+The acceptance runner copies the complete boot configuration, LUMP library,
+build snapshots and SQLite database into a fresh temporary directory. Explicit
+isolated mode disables external startup services. Browser runs choose a
+non-live port and forbid existing-server reuse. The protected boot control uses
+a synthetic test-only credential; production authorization is not disabled.
+All **1,280** inventoried live Namespace/LUMP/image/build/configuration files
+remain byte-identical after endpoint acceptance.
+
+The first browser attempt reached the separately persisted ascending-design
+editor and stopped on an editor-specific cancellation assertion. It is **not**
+saved-Namespace acceptance evidence. The test now selects the visible
+“Previous saved design / committed-image controls” profile explicitly. That
+profile is the existing `ns-state.json` save/reload boundary covered by IDE-03;
+ascending-v1 candidate approval and hardware installation remain separate.
+
+The saved-Namespace browser continuation then passed cancellation/reload,
+Lazy save/reload, stale-tab rejection and restoration to Resident, including
+complete-row and protected-file hash comparisons. The existing upgrade chooser
+is handled explicitly with **zero upgrades selected**, even when newer library
+revisions are offered. An initial test-helper assumption that Save immediately
+opens the protected confirmation was corrected without suppressing that chooser.
+
+This continuation exposed a real boot-click mismatch: the Namespace stores
+`lump_version` (or `issue_n`), while the artifact chooser expects `revision`.
+The UI now adapts the exact selected Namespace row to that chooser contract;
+missing or duplicate catalog rows cannot replace or veto it. The server still
+validates the requested revision, filename, token, approved bytes and Namespace
+fingerprint. No integrity check or approval workflow changed.
+
+The boot-authority regression now exercises the actual click plus real chooser
+for each supported saved-version field, absent/misleading catalogs, and missing
+selection rejection. The final browser follow-up was restricted to the
+fixed boot-selection boundary and incomplete-design save/reload; the already
+passing resident/cancellation/stale-tab journey was not repeated.
+
+### Final closure evidence
+
+- The original saved-Namespace browser journey passed cancellation/reload,
+  Resident→Lazy save/reload, stale-tab rejection and restoration to Resident,
+  with complete saved-row comparisons and byte-identical protected files. It
+  stopped at the subsequently repaired boot chooser boundary; this is recorded
+  as passing portions of a failed journey, **not** a full green suite result.
+- `node simulator/test_namespace_boot_authority.js` — passed after the
+  boot-click repair, including actual chooser integration and catalog-independent
+  exact selection.
+- `python3 scripts/run_namespace_save_acceptance.py browser --remaining`
+  — **1 passed, 22.6 s**. The same tester verified only the repaired boot flow
+  and previously untested incomplete-design flow on a fresh isolated server.
+  Boot marker and design save each used the existing **428 review → 200 commit**
+  sequence. Both persisted exactly after reload. No API responses were mocked.
+- Screenshot: the browser spec writes
+  `test-results/namespace_save_acceptance--40957-complete-design-save-reload-chromium/namespace-save-reload.png`.
+  This is local generated evidence; the checked-in runner/spec reproduce it.
+- The runner again verified all **1,280** live files byte-identical. Private
+  assertions also preserved all selected LUMP files, library/index data, images,
+  boot configuration, and unchanged row layout/identity during these operations.
+
+**IDE-03 is Complete.** The original workbook row's closure criterion is
+unchanged: “Verify save/reload, resident selection and boot entry without silent
+layout/identity changes.” Only its status and evidence were updated. This is
+acceptance of saved Namespace configuration, not executable-image regeneration,
+ascending-v1 approval, simulation activation, hardware qualification or flashing.
+
+For a future full replay, run the endpoint command above followed by
+`python3 scripts/run_namespace_save_acceptance.py browser`. The browser spec is
+split at the boot boundary so a targeted follow-up never needs to repeat the
+already verified resident/cancellation/stale-tab checks.
+
+The browser spec is opt-in via the dedicated runner. Ordinary Playwright
+discovery skips it rather than failing or writing shared state; explicitly
+requested acceptance still rejects missing or live writable paths. Completion
+validation also restored the pre-existing always-on VM deployment requirement
+after a conflicting incoming configuration selected Autoscale. No deployment
+was performed.
+
+Completion-fix checks: `tests/server/test_primary_publish_config.py` **3 passed**;
+the standard npm Playwright entry point discovers both acceptance cases without
+error. A no-server execution skips both when not requested; explicit opt-in
+without isolated paths is rejected, and valid isolated opt-in discovers both.
+No additional browser acceptance pass or destructive full-suite run was needed.
 ## Separate open generator defect — not fixture success
 
 `test_boot_generator_preserves_noncompact_admitted_location` exposes a genuine
@@ -93,7 +197,6 @@ explicitly describes only the layout where these agree. It is not evidence that
 arbitrary admitted placements survive generation. Correcting that generator
 behavior is separate work; no allocation gate, ISA, profile, live state, hardware
 build or device action was changed for this test repair.
-
 
 ## Resident-admission follow-up — deterministic private inputs
 

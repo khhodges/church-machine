@@ -355,7 +355,7 @@ def test_clear_protected_assignment_never_issues_review(isolated, slot):
     assert snapshot(paths) == before
 
 
-def test_clear_save_reload_refresh_preserves_library_and_retained_ranges(isolated):
+def test_clear_save_reload_refresh_preserves_library_and_compacts_retained_body(isolated):
     from server.namespace_image_refresh import RefreshStore, reconstruct
     app, _, state, paths, scope = isolated
     cfg = {"step1": {"totalNamespaceWords": 8192, "nsSlotsMax": 64,
@@ -393,5 +393,13 @@ def test_clear_save_reload_refresh_preserves_library_and_retained_ranges(isolate
     words = struct.unpack("<8192I", image.read_bytes())
     assert words[8192-9*4:8192-8*4] == (0, 0, 0, 0)
     assert words[1280:1344] == (0,) * 64
-    assert image.read_bytes()[1024*4:1088*4] == old_image[1024*4:1088*4]
+    # Refresh explicitly compacts; Save above did not. Compare the retained
+    # body's bytes at its newly published descriptor, not its old address.
+    saved_target = next(row for row in json.loads(state.read_text())["abstractions"]
+                        if row["slot"] == 6)
+    location = int(str(saved_target["location"]), 0)
+    assert location == words[8192 - 7 * 4]
+    assert image.read_bytes()[location*4:(location+64)*4] == old_image[1024*4:1088*4]
+    for key in ("filename", "binary_hash", "token", "seq", "boot"):
+        assert saved_target[key] == rows[2][key]
     assert all(hashlib.sha256(p.read_bytes()).hexdigest() == digest for p, digest in protected.items())

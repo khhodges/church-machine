@@ -21,6 +21,11 @@ from server.change_confirmation import (
     install, describe_namespace_save, describe_boot_config_change,
     resolve_saved_lump_versions,
 )
+from server.boot_image import copy_selected_image_inputs
+
+
+ENTRY_BYTES = struct.pack(">64I", (31 << 27) | (1 << 10) | 1,
+                          0x18000000, *([0] * 61), 0x12345678)
 
 
 @pytest.fixture
@@ -31,6 +36,7 @@ def isolated(tmp_path, monkeypatch):
     root = Path(__file__).parents[2]
     tree = ast.parse((root / "server/app.py").read_text())
     names = {"boot_image_save_ns", "_stage_namespace_save_image",
+             "_check_namespace_allocation",
              "_validate_symbolic_namespace_image",
              "_validate_new_namespace_resident_bytes",
              "_describe_protected_change", "_optional_report_token_check"}
@@ -41,26 +47,38 @@ def isolated(tmp_path, monkeypatch):
     app.secret_key = "isolated-test"
     lumps = tmp_path / "lumps"
     lumps.mkdir()
-    row = dict(slot=0, name="Demo.Entry", filename="entry.lump", token="12345678",
+    row = dict(slot=6, name="Demo.Entry", filename="entry.lump", token="12345678",
+               type="Inform", location="0x00000200", limit="0x00001", seq=0,
+               binary_hash=hashlib.sha256(ENTRY_BYTES).hexdigest(),
                boot=True, resident=True, boot_resident=True, load_policy="Resident")
     paths = {name: lumps / filename for name, filename in {
         "NS_STATE_PATH": "ns-state.json", "LUMPS_MANIFEST_PATH": "manifest.json",
         "BOOT_IMAGE_PATH": "boot-image.bin", "BOOT_CONFIG_PATH": "config.json",
         "BOOT_IMAGE_PROVENANCE_PATH": "boot-image.provenance.json",
     }.items()}
-    config = {"step1": {"totalNamespaceWords": 8}, "step2": {"lumps": []}}
+    config = {"targetBoard": "wukong-xc7a100t",
+              "step1": {"totalNamespaceWords": 8192, "namespaceLumpWords": 64,
+                        "nsSlotsMax": 64, "threadCount": 1,
+                        "threadLumpWords": 256, "threadStackWords": 32},
+              "step2": {"lumps": []}}
     paths["NS_STATE_PATH"].write_text(json.dumps({"abstractions": [row]}))
     paths["LUMPS_MANIFEST_PATH"].write_text(json.dumps([
         dict(row, abstraction="Demo.Entry", lump_version=7)]))
     paths["BOOT_CONFIG_PATH"].write_text(json.dumps(config))
-    (lumps / "entry.lump").write_bytes(b"immutable synthetic saved revision")
-    image = struct.pack("<8I", 0, 0, 0, 0, 16, 64, 123, 0x12345678)
+    (lumps / "entry.lump").write_bytes(ENTRY_BYTES)
+    # Real staging copies the selected bytes plus both private index files.
+    (lumps / "approvals.json").write_text(json.dumps({"approvals": {}}))
+    words = [0] * 8192
+    words[8192 - 7 * 4:8192 - 6 * 4] = [512, 1, 123, 0x12345678]
+    words[512:576] = struct.unpack(">64I", ENTRY_BYTES)
+    image = struct.pack("<8192I", *words)
     calls = []
     def validate(*args, **kwargs):
         calls.append("validate")
     def generate(cfg, directory, **kwargs):
         assert Path(directory) != lumps
         calls.append("generate")
+        assert (Path(directory) / "entry.lump").read_bytes() == ENTRY_BYTES
         # Prove private writes cannot reach the saved revision.
         (Path(directory) / "entry.lump").write_bytes(b"private-only")
         return image
@@ -80,7 +98,7 @@ def isolated(tmp_path, monkeypatch):
         _validate_symbolic_namespace_entries=validate,
         _validate_namespace_publication=validate,
         _validate_active_namespace_lumps=validate,
-        _validate_namespace_boot_marker=lambda rows: 0,
+        _validate_namespace_boot_marker=lambda rows: 6,
         _validated_boot_config_candidate=lambda candidate, **kw: (candidate, None),
         _read_saved_boot_config=lambda **kw: (config, None),
         _load_existing_boot_config_unchecked=lambda: config,
@@ -88,7 +106,7 @@ def isolated(tmp_path, monkeypatch):
         _couple_selftest_next_to_selected_target=lambda data, *a, **kw: data,
         _namespace_commit_guard=nullcontext,
         _lump_history_transition_lock=lambda *a: nullcontext(),
-        _write_ns_state=lambda rows: paths["NS_STATE_PATH"].write_text(
+        _write_ns_state=lambda rows, **kw: paths["NS_STATE_PATH"].write_text(
             json.dumps({"abstractions": rows})),
         _atomic_write_json=lambda path, data: Path(path).write_text(json.dumps(data)),
         _write_boot_image_bytes=write_image, _load_boot_ns_lump=lambda: None,
@@ -96,8 +114,9 @@ def isolated(tmp_path, monkeypatch):
         _describe_boot_config_change=describe_boot_config_change,
         _resolve_saved_lump_versions=resolve_saved_lump_versions,
         _boot_image_gen=SimpleNamespace(
+            copy_selected_image_inputs=copy_selected_image_inputs,
             generate_boot_image=generate, validate_boot_image=validate,
-            read_boot_entry_info=lambda data: {"entry_slot": 0}, _MMIO_SLOT_SPECS={}),
+            read_boot_entry_info=lambda data: {"entry_slot": 6}, _MMIO_SLOT_SPECS={}),
         **{key: str(value) for key, value in paths.items()},
     )
     exec(compile(ast.Module(body=nodes, type_ignores=[]), "<isolated routes>", "exec"), scope)
@@ -166,7 +185,7 @@ def test_one_review_preflights_then_commits_every_component(isolated, generated)
     assert committed.status_code == 200, committed.json
     assert paths["BOOT_IMAGE_PATH"].read_bytes() == image
     assert paths["BOOT_IMAGE_PROVENANCE_PATH"].read_text() == "new provenance"
-    assert (paths["NS_STATE_PATH"].parent / "entry.lump").read_bytes() == b"immutable synthetic saved revision"
+    assert (paths["NS_STATE_PATH"].parent / "entry.lump").read_bytes() == ENTRY_BYTES
     assert client.post("/api/boot-image/save-ns", json=payload, headers=headers).status_code == 409
 
 
@@ -254,7 +273,10 @@ def test_client_saves_table_without_build_dependencies():
     assert "_ensureNamespaceBuildConfig" not in save
     assert "fetch('/api/boot-image/generate'" not in save
     assert "fetch('/api/boot-config'" not in save
-    assert len(re.findall(r"method:\s*'POST'", save)) == 1
+    # The upgrade check is read-only; the single protected mutation remains
+    # save-table. Count endpoints, not all POSTs (which includes the check).
+    assert re.findall(r"fetch\('([^']+)'", save) == [
+        "/api/namespace/review-upgrades", "/api/namespace/save-table"]
     assert "boot_config: stagedBuildConfig" not in save
     assert "/api/namespace/save-table" in save
 

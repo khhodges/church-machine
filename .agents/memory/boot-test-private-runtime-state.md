@@ -87,3 +87,16 @@ it must not be compensated by weakening profile validation.
 synthetic approvals together. Use an incomplete parent as a sentinel when
 testing the explicit override. Compare full selected bodies and placements;
 compact-only success does not establish that noncompact placement is preserved.
+
+Browser acceptance of saved Namespace controls must explicitly choose that
+profile, rather than assuming the default Namespace view is the installed-state
+editor.
+
+**Why:** The ascending design editor has similar rows and policy controls but a
+different persistence boundary. A test can click plausible controls while
+exercising the wrong document and incorrectly infer a save failure.
+
+**How to apply:** Select the intended profile through its visible selector and
+assert both the active profile and the endpoint receiving the mutation. Use a
+synthetic credential scoped to the isolated process for protected controls;
+never expose the workspace credential or disable authorization for acceptance.

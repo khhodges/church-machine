@@ -36,18 +36,22 @@ const markerSource = [
     'let _namespaceBootMarkerInFlight = null;',
     "let _preparedArtifactSelection = { selection: { slot: 10, revision: 7 }, artifact: { token: 'selected-token', filename: 'Selected.lump' } };",
     extract(abstractions, '_namespaceResponseError'),
+    extract(abstractions, '_bootEntryMessage'),
     extract(abstractions, '_namespaceStateForMutation'),
     extract(abstractions, '_applyNamespaceBootProjection'),
     extract(abstractions, '_commitNamespaceBootMarker'),
 ].join('\n');
 
-async function runMarker(fetchImpl, initialState) {
+async function runMarker(fetchImpl, initialState, click = false, catalog = []) {
     const calls = [];
     const context = {
         window: {
             _nsState: initialState,
             BuildApprovalView: { _authHeaders: () => ({}) },
+            TargetState: { authorize: () => ({ ok: true }) },
+            LumpAdmission: require('./lump_admission'),
         },
+        _lumpsCache: catalog,
         localStorage: {
             getItem: key => key === 'bootEntrySlot' ? '2' : null,
             setItem: () => { throw new Error('boot slot must not use browser storage'); },
@@ -65,14 +69,50 @@ async function runMarker(fetchImpl, initialState) {
         renderAbstractions: () => {},
         Number, String, Object, Error, JSON, Promise,
     };
+    const source = click ? markerSource + '\n_preparedArtifactSelection = null;\n' +
+        extract(abstractions, 'selectArtifactForPreparation') + '\n' +
+        extract(abstractions, 'setBootEntrySlot') : markerSource;
     vm.runInNewContext(
-        `${markerSource}\nresult = _commitNamespaceBootMarker(10);\n` +
+        `${source}\nresult = ${click ? 'setBootEntrySlot' : '_commitNamespaceBootMarker'}(10);\n` +
         'result.then(() => { observedSlot = bootEntrySlot; }).catch(() => {});',
         context);
     return { value: context.result, context, calls };
 }
 
 async function main() {
+    // Exercise the actual click-to-chooser boundary, not only the transport
+    // helper with an already normalized prepared selection.
+    for (const versionField of ['revision', 'lump_version', 'issue_n']) {
+        const selected = {
+            name: 'Selected', slot: 10, token: 'selected-token',
+            filename: 'Selected.lump', binary_hash: 'a'.repeat(64),
+            [versionField]: 7,
+        };
+        for (const catalog of [[], [
+            { ...selected, revision: 99, archived: true },
+            { ...selected, revision: 100 },
+        ]]) {
+            const click = await runMarker(async (url, options) => {
+                assert.strictEqual(url, '/api/namespace/boot-marker');
+                assert.deepStrictEqual(JSON.parse(options.body), {
+                    slot: 10, revision: 7, token: selected.token,
+                    filename: selected.filename, namespaceFingerprint: 'exact-row',
+                });
+                return { ok: true, status: 200, json: async () => ({
+                    ok: true, slot: 10, namespaceFingerprint: 'committed',
+                }) };
+            }, { abstractions: [selected], savedAbstractions: [selected],
+                namespaceFingerprint: 'exact-row' }, true, catalog);
+            assert.strictEqual(await click.value, true);
+            assert.strictEqual(click.calls.length, 1);
+        }
+    }
+    const missing = await runMarker(() => {
+        throw new Error('Missing exact selection must not reach the server');
+    }, { abstractions: [], namespaceFingerprint: 'empty' }, true);
+    assert.strictEqual(await missing.value, false);
+    assert.strictEqual(missing.calls.length, 0);
+
     const initial = {
         namespaceFingerprint: 'fp-old',
         abstractions: [

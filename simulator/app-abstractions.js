@@ -928,13 +928,11 @@ async function setBootEntrySlot(idx, ev) {
             (row.lump_version != null ? row.lump_version : row.issue_n));
         const token = row && (row.token || row.cache_token);
         const filename = row && row.filename;
-        const revisions = (typeof _lumpsCache !== 'undefined' &&
-            Array.isArray(_lumpsCache) ? _lumpsCache : []).filter(function(candidate) {
-                return candidate && String(candidate.token || candidate.cache_token || '').toLowerCase() ===
-                    String(token || '').toLowerCase() &&
-                    String(candidate.filename || '') === String(filename || '');
-            });
-        if (!revisions.length && row && token && filename) revisions.push(row);
+        // The Namespace row owns this exact choice, even when the library
+        // index omits it or contains duplicate history. Adapt its saved-version
+        // field to the chooser's revision contract without changing identity.
+        const revisions = row && token && filename
+            ? [Object.assign({}, row, { revision: revision })] : [];
         selectArtifactForPreparation({
             revision: revision,
             slot: requestedSlot,
