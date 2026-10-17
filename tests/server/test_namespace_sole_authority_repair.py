@@ -1,13 +1,14 @@
 """Focused Namespace sole-image-plan repair checks.
 
-These tests deliberately operate on temporary copies of the checked-in
-artifacts.  No test mutates the repository's live Namespace state or image.
+Every input is constructed privately, including geometry, selected artifacts,
+approvals and history. No test reads or mutates the programmer's saved library.
 """
 
 import hashlib
+import builtins
+import io
 import json
 import os
-import shutil
 import base64
 import subprocess
 import struct
@@ -16,18 +17,99 @@ from pathlib import Path
 import pytest
 
 from server import boot_image
+from namespace_image_test_support import artifact, create_namespace_inputs
 
 
 ROOT = Path(__file__).resolve().parents[2]
-LUMPS = ROOT / "server" / "lumps"
-CONFIG_PATH = ROOT / "server" / "boot-config.json"
 
 
-def _copy_fixture(tmp_path):
+@pytest.fixture(autouse=True, params=["parent-config", "explicit-config"])
+def private_inputs(tmp_path, monkeypatch, request):
+    # Fail at the first accidental dependency, including paths inherited from
+    # the suite runner. Merely making a private copy is not deterministic.
+    forbidden = [
+        ROOT / "server" / "lumps", ROOT / "server" / "boot-config.json",
+    ]
+    for key in ("CHURCH_TEST_LUMPS_DIR", "CHURCH_TEST_BOOT_CONFIG_PATH"):
+        if os.environ.get(key):
+            forbidden.append(Path(os.environ[key]).resolve())
+
+    def guard(original):
+        def checked(path, *args, **kwargs):
+            if isinstance(path, (str, bytes, os.PathLike)):
+                resolved = Path(os.fsdecode(path)).resolve()
+                assert not any(resolved == banned or banned in resolved.parents
+                               for banned in forbidden), (
+                    f"test tried to access mutable external input: {resolved}")
+            return original(path, *args, **kwargs)
+        return checked
+
+    for module, name in ((builtins, "open"), (io, "open"),
+                         (os, "scandir"), (os, "listdir")):
+        monkeypatch.setattr(module, name, guard(getattr(module, name)))
+    config = {"targetBoard": "wukong-xc7a100t", "bootEntrySlot": 10, "step1": {
+        "totalNamespaceWords": 8192, "namespaceLumpWords": 8192,
+        "nsSlotsMax": 64, "threadLumpWords": 256,
+        "threadStackWords": 32, "threadCount": 1,
+    }}
+    parent = tmp_path / "boot-config.json"
+    config_path = parent if request.param == "parent-config" else tmp_path / "private-config.json"
+    parent.write_text("{}")  # explicit routing must not succeed via this sentinel
+    config_path.write_text(json.dumps(config))
     lumps = tmp_path / "lumps"
-    shutil.copytree(LUMPS, lumps)
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    return lumps, config
+    monkeypatch.setenv("CHURCH_TEST_ISOLATED_MODE", "1")
+    monkeypatch.setenv("CHURCH_TEST_LUMPS_DIR", str(lumps))
+    # The optional trace-symbol import has a separate factory-input route.
+    monkeypatch.setenv("CHURCH_LUMPS_DIR", str(lumps))
+    monkeypatch.setenv("CHURCH_TEST_BOOT_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("CHURCH_TEST_BUILD_SNAPSHOTS_DIR", str(tmp_path / "snapshots"))
+    monkeypatch.setenv("CHURCH_TEST_DB_PATH", str(tmp_path / "test.db"))
+    monkeypatch.setenv("REPORT_TOKEN", "namespace-fixture-report-token")
+    create_namespace_inputs(lumps, config)
+    from server import app as app_module
+
+    for attr, path in {
+        "LUMPS_DIR": lumps, "LUMPS_MANIFEST_PATH": lumps / "manifest.json",
+        "NS_STATE_PATH": lumps / "ns-state.json",
+        "BOOT_IMAGE_PATH": lumps / "boot-image.bin",
+        "BOOT_IMAGE_PROVENANCE_PATH": lumps / "boot-image.provenance.json",
+        "BOOT_CONFIG_PATH": config_path,
+        "BOOT_CONFIG_LEGACY_PATH": tmp_path / "no-legacy.json",
+    }.items():
+        monkeypatch.setattr(app_module, attr, str(path))
+    monkeypatch.setitem(app_module.app.config, "TESTING", True)
+    monkeypatch.setattr(app_module, "_BOOT_NS_META", {})
+    # App import requires all isolated overrides; admission also supports
+    # parent discovery. Exercise that route after safe startup.
+    if request.param == "parent-config":
+        monkeypatch.delenv("CHURCH_TEST_BOOT_CONFIG_PATH")
+
+
+def _private_fixture(tmp_path):
+    """Return freshly constructed private inputs (never copy a live directory)."""
+    path = os.environ.get("CHURCH_TEST_BOOT_CONFIG_PATH") or tmp_path / "boot-config.json"
+    return tmp_path / "lumps", json.loads(Path(path).read_text())
+
+
+def test_private_inputs_are_reproducible_and_preserve_config_routing(tmp_path):
+    from server import app as app_module
+    from server.lump_admission_service import _check_admission_allocation
+
+    lumps, config = _private_fixture(tmp_path)
+    # This is the real allocation gate's configuration discovery, rather than
+    # just passing our geometry directly to the generator.
+    _check_admission_allocation(
+        str(lumps / "ns-state.json"), _state(lumps)["abstractions"],
+        str(lumps), {})
+    assert json.loads(Path(app_module.BOOT_CONFIG_PATH).read_text()) == config
+    explicit = os.environ.get("CHURCH_TEST_BOOT_CONFIG_PATH")
+    if explicit:
+        assert Path(explicit) == Path(app_module.BOOT_CONFIG_PATH)
+        assert json.loads((tmp_path / "boot-config.json").read_text()) == {}
+    other = tmp_path / "independent-inputs"
+    create_namespace_inputs(other, config)
+    for path in other.iterdir():
+        assert path.read_bytes() == (lumps / path.name).read_bytes(), path.name
 
 
 def _state(lumps):
@@ -48,13 +130,13 @@ def _set_marker(state, slot):
 def _endpoint_fixture(tmp_path, monkeypatch):
     from server import app as app_module
 
-    lumps, config = _copy_fixture(tmp_path)
+    lumps, config = _private_fixture(tmp_path)
     paths = {
         "state": lumps / "ns-state.json",
         "manifest": lumps / "manifest.json",
         "image": lumps / "boot-image.bin",
         "provenance": lumps / "boot-image.provenance.json",
-        "config": tmp_path / "boot-config.json",
+        "config": Path(app_module.BOOT_CONFIG_PATH),
     }
     paths["config"].write_text(json.dumps(config), encoding="utf-8")
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(lumps))
@@ -66,7 +148,6 @@ def _endpoint_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(paths["config"]))
     monkeypatch.setattr(
         app_module, "BOOT_CONFIG_LEGACY_PATH", str(tmp_path / "no-legacy.json"))
-    app_module.app.config["TESTING"] = True
     state = _state(lumps)
     image = boot_image.generate_boot_image(config, str(lumps))
     payload = {
@@ -84,15 +165,45 @@ def _report_headers():
     return {"Authorization": f"Bearer {token}"} if token else {}
 
 
-def _reviewed_save(client, payload):
+def _reviewed_save(client, payload, *, path="/api/boot-image/save-ns"):
+    from server import app as app_module
+
+    paths = [Path(getattr(app_module, attr)) for attr in (
+        "NS_STATE_PATH", "LUMPS_MANIFEST_PATH", "BOOT_IMAGE_PATH",
+        "BOOT_IMAGE_PROVENANCE_PATH", "BOOT_CONFIG_PATH",
+    )]
+    before = {path: path.read_bytes() for path in paths}
     response = client.post(
-        "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+        path, json=payload, headers=_report_headers())
     if response.status_code == 428:
+        assert response.json["error"] == "change_confirmation_required", response.json
+        assert response.json["committed"] is False
+        assert {path: path.read_bytes() for path in paths} == before
         headers = {**_report_headers(),
                    "X-Change-Confirmation": response.json["change_confirmation"]["id"]}
         response = client.post(
-            "/api/boot-image/save-ns", json=payload, headers=headers)
+            path, json=payload, headers=headers)
     return response
+
+
+def _reviewed_table_save(client, payload):
+    """Replace the JS transport stub's review with a real server review."""
+    payload = json.loads(json.dumps(payload))
+    review = client.post("/api/namespace/review-upgrades", json={
+        "namespaceFingerprint": payload["namespaceFingerprint"],
+        "ns_state": {"abstractions": payload["upgradeReview"]["draft"]},
+    }, headers=_report_headers())
+    assert review.status_code == 200, review.json
+    assert review.json["upgrades"] == []
+    payload["upgradeReview"]["reviewFingerprint"] = review.json["reviewFingerprint"]
+    return _reviewed_save(client, payload, path="/api/namespace/save-table")
+
+
+def _assert_preflight_rejected(response, reason):
+    assert response.status_code == 409, response.json
+    assert response.json["error"] == "change_preflight_failed", response.json
+    assert response.json["committed"] is False
+    assert reason.lower() in response.json["message"].lower(), response.json
 
 
 @pytest.mark.parametrize("status", ["unresolved", "invalid", "missing"])
@@ -211,9 +322,12 @@ def test_actual_browser_add_save_preflight_commit_reload_alice_slot14(
     assert design["selection"]["status"] == status
     assert design["symbolic"] is True
     before = (paths["manifest"].read_bytes(), raw)
+    before_image = paths["image"].read_bytes()
     with app_module.app.test_client() as client:
-        response = _reviewed_save(client, payload)
+        response = _reviewed_table_save(client, payload)
         assert response.status_code == 200, response.get_data(as_text=True)
+        assert response.json["imageRebuilt"] is False
+        assert paths["image"].read_bytes() == before_image
         refreshed = client.get("/api/boot-image/ns-state")
     assert refreshed.status_code == 200
     saved = next(row for row in refreshed.json["abstractions"]
@@ -259,12 +373,18 @@ def test_rejected_existing_browser_executable_keeps_choice_until_explicit_recove
     assert kept["selection"]["binaryHash"] == record["binary_hash"]
     before = {name: path.read_bytes() for name, path in paths.items()}
     with app_module.app.test_client() as client:
+        # Browser table saves no longer claim to admit executable bytes.
+        # Explicit image preparation must still reject this unapproved row.
+        image_payload = {
+            **executable, "data_b64": initial["data_b64"],
+            "boot_config": initial["boot_config"],
+        }
         failed = client.post(
-            "/api/boot-image/save-ns", json=executable, headers=_report_headers())
+            "/api/boot-image/save-ns", json=image_payload, headers=_report_headers())
         assert failed.status_code == 409
         assert "exact hash-bound approval required" in str(failed.json)
         assert {name: path.read_bytes() for name, path in paths.items()} == before
-        succeeded = _reviewed_save(client, design)
+        succeeded = _reviewed_table_save(client, design)
         assert succeeded.status_code == 200, succeeded.get_data(as_text=True)
         refreshed = client.get("/api/boot-image/ns-state")
     assert refreshed.status_code == 200
@@ -340,8 +460,7 @@ def test_save_ns_endpoint_uses_exact_namespace_binary_not_stale_catalog(
     assert regenerated == base64.b64decode(payload["data_b64"])
 
     with app_module.app.test_client() as client:
-        response = client.post(
-            "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+        response = _reviewed_save(client, payload)
 
     assert response.status_code == 200, response.get_data(as_text=True)
     committed = _state(lumps)
@@ -397,8 +516,12 @@ def test_save_ns_endpoint_integrity_failures_publish_no_mutation(
         response = client.post(
             "/api/boot-image/save-ns", json=payload, headers=_report_headers())
 
-    assert response.status_code == 409, response.get_data(as_text=True)
-    assert response.get_json()["dataChanged"] is False
+    reason = {
+        "missing": "No such file", "hash": "hash",
+        "corrupt": "binary length", "approval": "approval",
+        "token-only": "filename", "cache-token-only": "filename",
+    }[failure]
+    _assert_preflight_rejected(response, reason)
     assert {name: path.read_bytes() for name, path in paths.items()} == before
 
 
@@ -435,8 +558,7 @@ def test_save_ns_endpoint_accepts_attested_nonbootstrap_resident(
     approvals_path.write_text(json.dumps(envelope), encoding="utf-8")
 
     with app_module.app.test_client() as client:
-        response = client.post(
-            "/api/boot-image/save-ns", json=payload, headers=_report_headers())
+        response = _reviewed_save(client, payload)
 
     assert response.status_code == 200, response.get_data(as_text=True)
 
@@ -452,15 +574,14 @@ def test_save_ns_endpoint_stale_cas_publishes_no_mutation(
         response = client.post(
             "/api/boot-image/save-ns", json=payload, headers=_report_headers())
 
-    assert response.status_code == 409
-    assert response.get_json()["refreshRequired"] is True
-    assert response.get_json()["dataChanged"] is False
+    _assert_preflight_rejected(response, "Namespace changed")
+    assert "reload" in response.json["message"].lower()
     assert {name: path.read_bytes() for name, path in paths.items()} == before
 
 
 def test_alternate_eligible_target_is_authoritative_and_stale_explicit_slot_rejected(
         tmp_path):
-    lumps, config = _copy_fixture(tmp_path)
+    lumps, config = _private_fixture(tmp_path)
     state = _state(lumps)
     _set_marker(state, 7)  # WukongCallHome is an approved resident executable.
     _write_state(lumps, state)
@@ -475,7 +596,7 @@ def test_alternate_eligible_target_is_authoritative_and_stale_explicit_slot_reje
 
 
 def test_duplicate_marker_fails_closed_without_image_generation(tmp_path):
-    lumps, config = _copy_fixture(tmp_path)
+    lumps, config = _private_fixture(tmp_path)
     state = _state(lumps)
     next(row for row in state["abstractions"] if row["slot"] == 7)["boot"] = True
     before = (lumps / "boot-image.bin").read_bytes()
@@ -487,7 +608,7 @@ def test_duplicate_marker_fails_closed_without_image_generation(tmp_path):
 
 
 def test_mmio_marker_is_rejected_only_by_physical_image_projection(tmp_path):
-    lumps, config = _copy_fixture(tmp_path)
+    lumps, config = _private_fixture(tmp_path)
     state = _state(lumps)
     _set_marker(state, 2)  # UART_DEV remains a valid MMIO descriptor, not code.
     _write_state(lumps, state)
@@ -499,8 +620,8 @@ def test_mmio_marker_is_rejected_only_by_physical_image_projection(tmp_path):
         boot_image.generate_boot_image(config, str(lumps), boot_entry_slot=2)
 
 
-def test_generator_rejects_competing_step2_artifact_and_policy_authority(tmp_path):
-    lumps, config = _copy_fixture(tmp_path)
+def test_generator_rejects_competing_step2_and_ignores_legacy_profile(tmp_path):
+    lumps, config = _private_fixture(tmp_path)
     conflicting = json.loads(json.dumps(config))
     conflicting["step2"] = {
         "lumps": [{
@@ -515,16 +636,17 @@ def test_generator_rejects_competing_step2_artifact_and_policy_authority(tmp_pat
 
     conflicting.pop("step2")
     conflicting["residentProfile"] = "core"
-    with pytest.raises(ValueError, match="residentProfile"):
-        boot_image.generate_boot_image(conflicting, str(lumps))
+    # Legacy profile metadata is no longer an authority over Namespace rows.
+    assert boot_image.generate_boot_image(conflicting, str(lumps)) == (
+        boot_image.generate_boot_image(config, str(lumps)))
 
 
-def test_committed_migration_descriptor_binary_config_and_provenance_parity():
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
-    state = json.loads((LUMPS / "ns-state.json").read_text(encoding="utf-8"))
-    image = (LUMPS / "boot-image.bin").read_bytes()
+def test_private_image_descriptor_binary_config_and_provenance_parity(tmp_path):
+    lumps, config = _private_fixture(tmp_path)
+    state = _state(lumps)
+    image = (lumps / "boot-image.bin").read_bytes()
     provenance = json.loads(
-        (LUMPS / "boot-image.provenance.json").read_text(encoding="utf-8"))
+        (lumps / "boot-image.provenance.json").read_text(encoding="utf-8"))
 
     marker = boot_image.namespace_boot_marker_slot(state["abstractions"])
     info = boot_image.read_boot_entry_info(image)
@@ -545,48 +667,52 @@ def test_committed_migration_descriptor_binary_config_and_provenance_parity():
                if row["name"] == "CapabilityTest")
     assert cap["slot"] == 10
     assert cap["token"] == "4a00000a"
-    assert cap["filename"] == "CapabilityTest.2.e794a764.lump"
+    _, current, _ = artifact("CapabilityTest", 10, continuation=7, issue=3)
+    assert cap["filename"] == current["filename"]
 
     image_digest = hashlib.sha256(image).hexdigest()
     assert provenance["origin"] == "generated"
     assert provenance["image_sha256"] == image_digest
     assert provenance["source_sha256"]["ns_state"] == hashlib.sha256(
-        (LUMPS / "ns-state.json").read_bytes()).hexdigest()
+        (lumps / "ns-state.json").read_bytes()).hexdigest()
     assert provenance["source_sha256"]["manifest"] == hashlib.sha256(
-        (LUMPS / "manifest.json").read_bytes()).hexdigest()
+        (lumps / "manifest.json").read_bytes()).hexdigest()
     cap_binding = next(row for row in provenance["resident_bindings"]
                        if row["slot"] == 10)
     assert cap_binding["filename"] == cap["filename"]
     assert cap_binding["token"] == cap["token"]
     assert cap_binding["artifact_sha256"] == hashlib.sha256(
-        (LUMPS / cap["filename"]).read_bytes()).hexdigest()
+        (lumps / cap["filename"]).read_bytes()).hexdigest()
 
 
-def test_capabilitytest_migration_uses_exact_approved_current_artifact():
-    approvals = json.loads((LUMPS / "approvals.json").read_text(encoding="utf-8"))[
+def test_capabilitytest_history_uses_exact_approved_current_artifact(tmp_path):
+    lumps, _ = _private_fixture(tmp_path)
+    _, expected_current, _ = artifact("CapabilityTest", 10, continuation=7, issue=3)
+    historical_raw, expected_historical, _ = artifact(
+        "CapabilityTest", 2, continuation=7, issue=2)
+    approvals = json.loads((lumps / "approvals.json").read_text(encoding="utf-8"))[
         "approvals"]
-    manifest = json.loads((LUMPS / "manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads((lumps / "manifest.json").read_text(encoding="utf-8"))
     current = next(row for row in manifest
-                   if row.get("filename") == "CapabilityTest.2.e794a764.lump")
+                    if row.get("filename") == expected_current["filename"])
     historical = next(row for row in manifest
-                      if row.get("filename") == "CapabilityTest.2.6fd9df21.lump")
+                       if row.get("filename") == expected_historical["filename"])
     current_hash = hashlib.sha256(
-        (LUMPS / current["filename"]).read_bytes()).hexdigest()
+        (lumps / current["filename"]).read_bytes()).hexdigest()
     historical_hash = hashlib.sha256(
-        (LUMPS / historical["filename"]).read_bytes()).hexdigest()
+        (lumps / historical["filename"]).read_bytes()).hexdigest()
     assert current["token"] == "4a00000a"
     assert approvals[current_hash]["bootstrap_t"] == "4a00000a"
     assert historical["token"] == "4a000002"
     assert approvals[historical_hash]["bootstrap_t"] == "4a000002"
     # The old artifact remains immutable historical evidence; only the exact
     # approved current artifact is bound into the repaired NS[10] row.
-    state = json.loads((LUMPS / "ns-state.json").read_text(encoding="utf-8"))
+    state = _state(lumps)
     cap = next(row for row in state["abstractions"]
                if row["name"] == "CapabilityTest")
     assert cap["filename"] == current["filename"]
     assert cap["token"] == current["token"]
-    assert historical_hash == (
-        "1ec3fd949e040d4ea851f8d93f1bd54230679f2e8b7fca07e6d586c4335d475c")
+    assert historical_hash == hashlib.sha256(historical_raw).hexdigest()
 
 
 def test_boot_marker_endpoint_is_atomic_and_accepts_eligible_alternate(tmp_path,
@@ -595,25 +721,27 @@ def test_boot_marker_endpoint_is_atomic_and_accepts_eligible_alternate(tmp_path,
     # are redirected to a temporary artifact directory.
     from server import app as app_module
 
-    lumps, _ = _copy_fixture(tmp_path)
+    lumps, _ = _private_fixture(tmp_path)
     state_path = lumps / "ns-state.json"
     image_path = lumps / "boot-image.bin"
     before_image = image_path.read_bytes()
     monkeypatch.setattr(app_module, "LUMPS_DIR", str(lumps))
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(state_path))
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(image_path))
-    app_module.app.config["TESTING"] = True
     headers = {}
     if os.environ.get("REPORT_TOKEN"):
         headers["Authorization"] = f"Bearer {os.environ['REPORT_TOKEN']}"
     fingerprint = app_module._namespace_state_fingerprint(
         _state(lumps)["abstractions"])
+    selected = next(row for row in _state(lumps)["abstractions"] if row["slot"] == 7)
+    payload = {
+        "slot": 7, "namespaceFingerprint": fingerprint,
+        "revision": selected["issue_n"], "token": selected["token"],
+        "filename": selected["filename"],
+    }
 
     with app_module.app.test_client() as client:
-        response = client.post(
-            "/api/namespace/boot-marker",
-            json={"slot": 7, "namespaceFingerprint": fingerprint},
-            headers=headers)
+        response = _reviewed_save(client, payload, path="/api/namespace/boot-marker")
         assert response.status_code == 200, response.get_data(as_text=True)
         updated = json.loads(state_path.read_text(encoding="utf-8"))
         assert [row["slot"] for row in updated["abstractions"] if row.get("boot")] == [7]
@@ -624,10 +752,7 @@ def test_boot_marker_endpoint_is_atomic_and_accepts_eligible_alternate(tmp_path,
         updated["abstractions"][0]["boot"] = True
         duplicate_bytes = json.dumps(updated, indent=2).encode()
         state_path.write_bytes(duplicate_bytes)
-        response = client.post(
-            "/api/namespace/boot-marker",
-            json={"slot": 7, "namespaceFingerprint": fingerprint},
-            headers=headers)
+        response = _reviewed_save(client, payload, path="/api/namespace/boot-marker")
         assert response.status_code == 409
         assert state_path.read_bytes() == duplicate_bytes
 
@@ -636,11 +761,11 @@ def test_save_ns_commits_submitted_alternate_marker_and_rejects_stale_tab(
         tmp_path, monkeypatch):
     from server import app as app_module
 
-    lumps, config = _copy_fixture(tmp_path)
+    lumps, config = _private_fixture(tmp_path)
     state_path = lumps / "ns-state.json"
     image_path = lumps / "boot-image.bin"
     provenance_path = lumps / "boot-image.provenance.json"
-    config_path = tmp_path / "boot-config.json"
+    config_path = Path(app_module.BOOT_CONFIG_PATH)
     config_path.write_text(json.dumps(config), encoding="utf-8")
     state = _state(lumps)
     expected = app_module._namespace_state_fingerprint(state["abstractions"])
@@ -657,7 +782,6 @@ def test_save_ns_commits_submitted_alternate_marker_and_rejects_stale_tab(
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(image_path))
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PROVENANCE_PATH", str(provenance_path))
     monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(config_path))
-    app_module.app.config["TESTING"] = True
     headers = {}
     if os.environ.get("REPORT_TOKEN"):
         headers["Authorization"] = f"Bearer {os.environ['REPORT_TOKEN']}"
@@ -669,8 +793,7 @@ def test_save_ns_commits_submitted_alternate_marker_and_rejects_stale_tab(
     }
 
     with app_module.app.test_client() as client:
-        response = client.post("/api/boot-image/save-ns", json=payload,
-                               headers=headers)
+        response = _reviewed_save(client, payload)
         assert response.status_code == 200, response.get_data(as_text=True)
         committed = _state(lumps)
         assert [row["slot"] for row in committed["abstractions"]
@@ -683,16 +806,36 @@ def test_save_ns_commits_submitted_alternate_marker_and_rejects_stale_tab(
         stale_payload = dict(payload)
         stale_payload["ns_state"] = {"abstractions": committed["abstractions"]}
         stale_payload["data_b64"] = base64.b64encode(image_path.read_bytes()).decode()
+        before_stale = {path: path.read_bytes() for path in (
+            state_path, image_path, provenance_path, config_path)}
         response = client.post("/api/boot-image/save-ns", json=stale_payload,
                                headers=headers)
-        assert response.status_code == 409
-        assert response.get_json()["dataChanged"] is False
+        _assert_preflight_rejected(response, "Namespace changed")
+        assert {path: path.read_bytes() for path in before_stale} == before_stale
 
 
-def test_reviewed_migration_tool_recreates_image_state_and_provenance(tmp_path):
+def test_reviewed_migration_tool_recreates_image_state_and_provenance(
+        tmp_path, monkeypatch):
     from scripts import migrate_bootstrap_residents as migration
 
-    lumps, config = _copy_fixture(tmp_path)
+    lumps, config = _private_fixture(tmp_path)
+    historical_raw, historical, _ = artifact(
+        "CapabilityTest", 2, continuation=7, issue=2)
+    _, current, _ = artifact("CapabilityTest", 10, continuation=7, issue=3)
+    # Only the reviewed identities are fixture data. All migration digest,
+    # approval, profile, graph and atomic-publication checks remain real.
+    for attr, record, slot in (
+        ("SOURCE_CAPABILITY", historical, 2), ("CURRENT_CAPABILITY", current, 10),
+    ):
+        monkeypatch.setattr(migration, attr, {
+            "slot": slot, "filename": record["filename"], "token": record["token"],
+            "sha256": record["binary_hash"],
+        })
+    manifest_path = lumps / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    next(row for row in manifest
+         if row["filename"] == historical["filename"]).pop("archived")
+    manifest_path.write_text(json.dumps(manifest))
     config["bootEntrySlot"] = 2
     (tmp_path / "boot-config.json").write_text(
         json.dumps(config), encoding="utf-8")
@@ -712,7 +855,8 @@ def test_reviewed_migration_tool_recreates_image_state_and_provenance(tmp_path):
         "seq": 0,
         "seal": "0xDEADF4CF",
         "token": "4a000002",
-        "filename": "CapabilityTest.2.6fd9df21.lump",
+        "filename": historical["filename"],
+        "binary_hash": historical["binary_hash"],
         "issue_n": 2,
         "lump_version": 27,
         "resident": True,
@@ -733,24 +877,22 @@ def test_reviewed_migration_tool_recreates_image_state_and_provenance(tmp_path):
     provenance = json.loads(
         (lumps / "boot-image.provenance.json").read_text(encoding="utf-8"))
     assert cap["slot"] == 10 and cap["token"] == "4a00000a"
-    assert cap["filename"] == "CapabilityTest.2.e794a764.lump"
+    assert cap["filename"] == current["filename"]
     assert cap["boot"] is True and uart["slot"] == 2
     assert boot_image.read_boot_entry_info(image)["entry_slot"] == 10
     assert provenance["image_sha256"] == hashlib.sha256(image).hexdigest()
     assert provenance["source_sha256"]["ns_state"] == hashlib.sha256(
         (lumps / "ns-state.json").read_bytes()).hexdigest()
-    assert (lumps / "CapabilityTest.2.6fd9df21.lump").read_bytes() == (
-        LUMPS / "CapabilityTest.2.6fd9df21.lump").read_bytes()
+    assert (lumps / historical["filename"]).read_bytes() == historical_raw
 
 
 def test_legacy_or_missing_state_does_not_abort_image_metadata_startup(
         tmp_path, monkeypatch):
     from server import app as app_module
 
-    image_path = tmp_path / "boot-image.bin"
-    shutil.copyfile(LUMPS / "boot-image.bin", image_path)
-    config_path = tmp_path / "boot-config.json"
-    shutil.copyfile(CONFIG_PATH, config_path)
+    lumps, _ = _private_fixture(tmp_path)
+    image_path = lumps / "boot-image.bin"
+    config_path = Path(app_module.BOOT_CONFIG_PATH)
     monkeypatch.setattr(app_module, "BOOT_IMAGE_PATH", str(image_path))
     monkeypatch.setattr(app_module, "BOOT_CONFIG_PATH", str(config_path))
     monkeypatch.setattr(app_module, "NS_STATE_PATH", str(tmp_path / "missing.json"))

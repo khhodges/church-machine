@@ -100,3 +100,15 @@ exercising the wrong document and incorrectly infer a save failure.
 assert both the active profile and the endpoint receiving the mutation. Use a
 synthetic credential scoped to the isolated process for protected controls;
 never expose the workspace credential or disable authorization for acceptance.
+
+Web-server isolation must include indirect factory-reference imports, even
+when a test never requests hardware operations.
+
+**Why:** The trace-symbol startup import can read the factory Namespace through
+a separate input route from the HTTP server's test routing. A private HTTP
+library alone therefore did not make Namespace endpoint tests independent of
+the programmer's library.
+
+**How to apply:** Route both inputs to the synthetic approved library before
+importing the server. Guard file reads as well as writes against live and
+inherited runner paths; retain real approval and image validation.

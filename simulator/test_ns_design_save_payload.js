@@ -125,7 +125,7 @@ vm.runInContext(part('async function _nsAddPlacementConfirm()', 'async function 
 vm.runInContext(part('async function _nsHashImmutableWords(', 'function _nsMatchingApproval('), ctx);
 vm.runInContext(part('function _nsTableAddConfirm()', '// ── NS table: Clear slot'), ctx);
 vm.runInContext(part('async function _nsKeepPendingAsPlacement(', '// ── NS table: Clear slot'), ctx);
-vm.runInContext(part('function _nsTableRowsForSave(state)', '// ── NS label click'), ctx);
+vm.runInContext(part('function _nsDraftSequence(', '// ── NS label click'), ctx);
 (async () => {
     if (input.pending) {
         await windowState._nsTableSave(elements.nsSaveBtn);
@@ -154,11 +154,12 @@ vm.runInContext(part('function _nsTableRowsForSave(state)', '// ── NS label 
         }
     }
     await vm.runInContext('_nsAddPlacementConfirm()', ctx);
-    if (!payload) throw new Error('Actual Add/Save handlers did not submit a candidate');
+    if (!payload) throw new Error('Actual Add/Save handlers did not submit a candidate: ' +
+        (elements._nsAddError.textContent || windowState._nsTableSaveError || 'no diagnostic'));
     const selectedRow = payload.ns_state.abstractions.find(row => row.slot === 14);
     if (!selectedRow || selectedRow.symbolic !== true ||
             selectedRow.selection.status !== selected.status ||
-            selectedRow.location !== '0x00000000' ||
+            Number(selectedRow.location) !== 0 ||
             !original.equals(Buffer.from(sim.memory.buffer, 0, sim.NS_TABLE_BASE * 4))) {
         throw new Error('Add modified resident bytes or submitted an executable row');
     }
