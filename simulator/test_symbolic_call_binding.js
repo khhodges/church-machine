@@ -34,6 +34,15 @@ function artifact(src) {
 // 1. Compile with missing targets/API: both frontends, placeholder words, metadata.
 const native = artifact(NATIVE);
 const asm = artifact(ASM);
+// LOAD-only dependencies require the same integrity-covered linker contract,
+// even though there are no CALL relocations.
+{
+    const loadOnly = artifact('abstraction ide.LoadOnly {\ncapabilities { SELF E, ide.UART_DEV RW }\n' +
+        'method Run() {\nLOAD CR1, ide.UART_DEV\nRETURN\n}\n}');
+    assert.deepStrictEqual(loadOnly.api.symbolic_binding.calls, []);
+    assert.strictEqual(loadOnly.api.symbolic_binding.dependencies[1].name, 'ide.UART_DEV');
+    assert.strictEqual(guard.validate(loadOnly.words).symbolic, true);
+}
 for (const [label, a, expect] of [
     ['native', native, [['ide.SelfTest.Run', 1, 14], ['ide.WukongCallHome.Run', 2, 14]]],
     ['assembly', asm, [['ide.SelfTest.Run', 1, 0], ['ide.WukongCallHome', 2, 14]]]]) {

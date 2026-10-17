@@ -9034,7 +9034,8 @@ class ChurchSimulator {
     _execSwitch(d) {
         // SWITCH is LOAD's isolated-register form.  The destination M value is
         // sampled before any source access and is the sole extra authority.
-        // Source M is deliberately irrelevant and SWITCH never elevates M.
+        // SWITCH never elevates M. CR6's CALL-established L authority is
+        // checked by mLoad, just like an ordinary C-list LOAD.
         if (d.crDst < 12 || d.crDst > 15) {
             this.fault('INVALID_OP',
                 `SWITCH: destination CR${d.crDst} is not isolated (must be CR12–CR15)`);
@@ -9065,14 +9066,15 @@ class ChurchSimulator {
             return null;
         }
         // SWITCH is a special LOAD, not an exemption from the C-list authority
-        // check.  LOAD's historical CR6 fast path does not require L because it
-        // is used for ordinary capability materialisation; an isolated reload
-        // must require the CR6 L capability exactly as hardware mLoad does.
+        // check. CALL retains an E-only GT in CR6 and supplies L through
+        // CR6.M; checking the token's L bit alone incorrectly rejects that
+        // established view. Do not mint an LE token to work around it.
         if (d.crSrc === 6) {
             const sourceGT = this.cr[6].word0 >>> 0;
-            const sourceParsed = this.parseGT(sourceGT);
-            if (ChurchSimulator.isNullGT(sourceGT) || sourceParsed.malformed ||
-                    !sourceParsed.permissions.L) {
+            const callClist = this.cr[6].m === 1 &&
+                this.parseGT(sourceGT).permissions.E === 1;
+            const sourceCheck = this.mLoad(sourceGT, callClist ? null : 'L', 6);
+            if (!sourceCheck.ok) {
                 this.fault('PERM_L',
                     'SWITCH: CR6 requires a valid L capability for an isolated reload');
                 return null;
@@ -10223,6 +10225,8 @@ class ChurchSimulator {
 
     // ─────────────────────────────────────────────────────────────────────────
 
+    _mmioDeviceSlot(index) { return index; }
+
     _execDread(d) {
         const drIdx = d.crDst;
         const dataGT = this.cr[d.crSrc].word0;
@@ -10270,7 +10274,7 @@ class ChurchSimulator {
             }
         }
         if (IDX1_RUNTIME) IDX1_RUNTIME.preflightDRWrite(this, drIdx);
-        const devNsIdx = check.index;
+        const devNsIdx = this._mmioDeviceSlot(check.index);
         let value;
         if (ARCH_MMIO_SLOTS.has(devNsIdx)) {
             if (devNsIdx === ARCH_BOOT.minimalSlots.LED_DEV ||
@@ -10402,7 +10406,7 @@ class ChurchSimulator {
         }
 
         // Route device writes to simulated hardware peripherals
-        const devNsIdx = check.index;
+        const devNsIdx = this._mmioDeviceSlot(check.index);
         if (this._executionAttempt) this._executionAttempt.effects.push({
             kind: 'data-write', address: absAddr, offset,
             capability: d.crSrc, value: value >>> 0,

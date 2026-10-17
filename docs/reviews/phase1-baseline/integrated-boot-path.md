@@ -97,3 +97,18 @@ for the approved selections.
 
 Protected Mint runtime implementation, private credential provisioning, complete
 linking and the integrated 17-entry runtime acceptance remain outstanding.
+
+## Qualified isolated linking and runtime follow-through
+
+See [qualified-runtime.md](qualified-runtime.md) and its
+[exact identity summary](qualified-runtime-evidence.json). The authenticated
+private pipeline now links the three candidates to the approved ascending
+256-slot layout, preserving device/Thread slots and exact sequences.
+
+The naming-only source stops at its genuine SWITCH fault. A separately
+identified, explicitly corrected private CapabilityTest source completes three
+6,000-step runs through SelfTest, WukongCallHome, UART/LED/M-bit I/O and saved
+Thread continuations with no faults. This is not acceptance of the uncorrected
+candidate or all 17 entries. Five unfinished entries, Thread.3 activation and
+button/timer data behavior remain explicitly unqualified. No live artifact,
+saved Namespace or hardware was replaced.

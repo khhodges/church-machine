@@ -47,7 +47,7 @@
         const size = 64 << ((header >>> 23) & 15);
         if (contract.schema !== SCHEMA || size !== binary.length || cc < 1 ||
                 !Array.isArray(contract.dependencies) || contract.dependencies.length !== cc ||
-                !Array.isArray(contract.calls) || !contract.calls.length)
+                !Array.isArray(contract.calls))
             throw new Error('Symbolic LUMP contract geometry is invalid');
         const start = size - cc;
         if (binary[start] !== SELF_MARKER)

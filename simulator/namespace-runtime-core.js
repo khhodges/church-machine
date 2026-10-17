@@ -78,6 +78,23 @@ class NamespaceRuntimeCore extends Simulator {
         return {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
     }
     namespaceGeometry() { return view.geometry(this.memory, this.cr[15]); }
+    _mmioDeviceSlot(index) {
+        if (!this._namespaceRuntimeReady) return super._mmioDeviceSlot(index);
+        // Device routing follows the verified descriptor's hardware address,
+        // not historical Namespace slot numbers (UART is slot 8 in Phase 1).
+        // mLoad has already enforced the actual GT's rights/sequence/bounds.
+        const contracts = typeof ChurchArchitectureContracts !== 'undefined'
+            ? ChurchArchitectureContracts : require('./architecture_contracts');
+        const entry = this.readNSEntry(index);
+        if (!entry) return -1;
+        const limit = this.parseNSWord1(entry.word1_limit).limit;
+        for (const [name, device] of Object.entries(contracts.boot.devices)) {
+            if (entry.word0_location === device.address && limit < device.words) {
+                return contracts.boot.minimalSlots[name];
+            }
+        }
+        return -1; // RAM/unknown devices must not inherit a legacy slot alias.
+    }
     startEntryThread() {
         if (this._liveThreadOwned || this.halted) {
             throw new Error('Entry activation requires a fresh, non-faulted Namespace runtime');
@@ -131,6 +148,9 @@ class NamespaceRuntimeCore extends Simulator {
                 }
                 return {ok: false, fault: 'BOUNDS', message: error};
             }
+        } else if (this._mmioDeviceSlot(result.index) === -1 || args[1] === 'E') {
+            return {ok: false, fault: 'BOUNDS',
+                message: 'External descriptor is not a supported simulated device with bounded data authority'};
         }
         return result;
     }
@@ -174,7 +194,9 @@ class NamespaceRuntimeCore extends Simulator {
         }
         if (this.cr[15].m !== 1) return reject('PERM_L', 'CR15.M was not set at acceptance');
         const source = this.cr[d.crSrc];
-        const sourceCheck = this.mLoad(source.word0, 'L', d.crSrc);
+        const callClist = d.crSrc === 6 && source.m === 1 &&
+            this.parseGT(source.word0).permissions.E === 1;
+        const sourceCheck = this.mLoad(source.word0, callClist ? null : 'L', d.crSrc);
         if (!sourceCheck.ok) return reject(sourceCheck.fault, sourceCheck.message);
         const sourceBase = sourceCheck.entry.word0_location;
         const header = this.parseLumpHeader(this.memory[sourceBase]);

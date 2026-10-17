@@ -43,3 +43,15 @@ slot/GT create etc.” Static Namespace population is not the intended acceptanc
 error cleanup through the actual Mint path, not host-side fixture insertion.
 Keep existing identity/lifecycle rules and protected-interface authority limits;
 this requirement does not authorize invented privilege or bypassed validation.
+
+Naming-only qualification and runtime source correction are different evidence.
+Preserve both outcomes when a pinned workload needs instruction changes.
+
+**Why:** Successful recompilation/admission did not establish runtime correctness:
+the selected workload cleared its C-list access before SWITCH and named a Thread
+where a Namespace root was required. A corrected private run must not be
+misrepresented as success of the unchanged selected source or live adoption.
+
+**How to apply:** Record explicit source diffs, new hashes and a separate replay;
+never patch PCs/registers, widen GT grants, suppress faults or replace selected
+source silently. Keep partial identity access distinct from operational coverage.

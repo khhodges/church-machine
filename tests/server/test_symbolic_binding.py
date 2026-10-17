@@ -79,3 +79,30 @@ def test_real_compiler_emits_integrity_covered_symbolic_contract():
     assert contract["owner"] == "ide.Caller"
     assert contract["calls"][0]["full_name"] == "ide.Target.Run"
     assert result["words"][contract["calls"][0]["word_offset"]] == FAULT
+
+
+@pytest.mark.parametrize("target_type,expected", [("Thread", "bound"), ("Namespace", "bound"),
+                                                 ("Device", "unresolved"), ("Inform", "unresolved")])
+def test_zero_rights_are_structural_identity_not_an_invented_grant(target_type, expected):
+    words, contract, owner, target = fixture()
+    contract["calls"] = []
+    contract["dependencies"][1]["rights"] = []
+    target.update(type=target_type, rights=[])
+    linked, report = bind(words, contract, owner, [owner, target])
+    assert report["status"] == expected
+    assert linked[-1] == (0x02030011 if expected == "bound" else 0)
+    assert words[-1] == 0
+
+
+def test_device_linking_does_not_widen_requested_rights():
+    words, contract, owner, target = fixture()
+    contract["calls"] = []
+    contract["dependencies"][1]["rights"] = ["R"]
+    target.update(type="Device", rights=["R", "W"])
+    linked, report = bind(words, contract, owner, [owner, target])
+    assert report["status"] == "bound"
+    assert linked[-1] == 0x12030011
+    contract["dependencies"][1]["rights"] = ["R", "W"]
+    target["rights"] = ["R"]
+    linked, report = bind(words, contract, owner, [owner, target])
+    assert report["status"] == "unresolved" and linked[-1] == 0

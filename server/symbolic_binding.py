@@ -32,7 +32,10 @@ def validate(contract, cc=None, words=None):
             raise ValueError("Symbolic SELF must occupy row zero only")
         if not self_row and not NAME.fullmatch(str(dep.get("name", ""))):
             raise ValueError("Dependency requires its full declared dot-name")
-        dep["rights"] = _rights(dep.get("rights"))
+        # A zero-permission Inform GT can identify a Thread/Namespace without
+        # granting data or execution access. Preserve that declaration exactly;
+        # destination binding below restricts it to structural objects.
+        dep["rights"] = [] if dep.get("rights") == [] and not self_row else _rights(dep.get("rights"))
         if self_row and dep["rights"] != ["E"]:
             raise ValueError("SELF requires E only")
     sites = set()
@@ -111,7 +114,8 @@ def bind(words, contract, owner, targets):
         row = dep["relocation_row"]
         matches = [owner] if dep["symbolic_self"] else [
             t for t in targets if t["name"] == dep["name"] and
-            set(dep["rights"]).issubset(set(t.get("rights", [])))]
+            set(dep["rights"]).issubset(set(t.get("rights", []))) and
+            (dep["rights"] or t.get("type") in ("Thread", "Namespace"))]
         if len(matches) == 1:
             target = selected[row] = matches[0]
             result[start + row] = gt(target, dep["rights"])

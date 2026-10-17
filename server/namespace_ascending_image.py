@@ -281,8 +281,10 @@ def build_fresh_thread_lump(*, allocation_words, stack_words, entry_slot,
     resume_sto = root_sto - 2
     words[boot.THREAD_STO_OFFSET] = (1 << 12) | resume_sto
     words[layout["caps_start"]] = entry_gt
-    words[resume_sto - 1] = entry_gt
-    words[resume_sto] = (1 << 12) | root_sto
+    # STO is the next free stack word. CHANGE reads its two-word resume
+    # frame at STO+1/STO+2, just as CALL/RETURN do.
+    words[resume_sto + 1] = entry_gt
+    words[resume_sto + 2] = (1 << 12) | root_sto
     words[root_sto + 1] = entry_gt
     words[root_sto + 2] = (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
     return struct.pack(f">{size}I", *words)

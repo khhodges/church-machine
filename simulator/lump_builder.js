@@ -155,7 +155,7 @@ function buildLump(result, opts) {
     }
     // church.symbolic-lump-binding/v1 canonical C-list: SELF placeholder,
     // external rows zero. Destination GTs exist only in bound derivatives.
-    if (cc > 0 && methods.some(m => !m.aliasOf && m.symbolicCalls && m.symbolicCalls.length)) {
+    if (cc > 0 && buildSymbolicBinding(result)) {
         words[clistStart] = 0xFEED5E1F;
     }
 
@@ -315,8 +315,14 @@ function buildSymbolicBinding(result) {
         }
         offset += (m.code || []).length;
     }
-    if (!calls.length) return null;
     const caps = result.capabilities || [];
+    // LOAD-only programs still need authenticated name relocations. A named
+    // CALL is not a prerequisite for a destination-independent C-list.
+    const nameOnly = caps.length > 1 && caps.slice(1).every(cap =>
+        /^[A-Za-z_][\w-]*(?:\.[\w-]+)+$/.test(String(cap.canonical_leaf || cap.name)) &&
+        !cap.N && !cap.identity_string && !cap.T && !cap.token &&
+        !cap.binary_hash && !cap.identity_hash);
+    if (!calls.length && !nameOnly) return null;
     return {
         schema: SYMBOLIC_SCHEMA,
         owner: result.abstractionName || '',

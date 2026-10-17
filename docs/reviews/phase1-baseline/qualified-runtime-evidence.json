@@ -1,0 +1,79 @@
+{
+  "schema": "phase1-qualified-runtime-summary/v1",
+  "profileSha256": "73f2eb89290f525d4d83cc0020d424e3dfa51b9bd55d80e847fdb4c3f156d582",
+  "installed": false,
+  "hardwareTouched": false,
+  "full17EntryAcceptance": false,
+  "capacityWords": 16384,
+  "slotCount": 256,
+  "usedWords": 16128,
+  "unimplementedSlots": [9, 14, 15, 16, 17],
+  "identityOnlyWorkloadSlots": [4, 5, 12],
+  "operationalInstructionOrDeviceSlots": [2, 3, 6, 7, 8, 10, 11, 13],
+  "namingOnly": {
+    "imageSha256": "28125fbced98c7ddc6fd623e2d5924f3210aa631ae4434c3f999a323b7bcc930",
+    "repetitions": 3,
+    "attemptedStepsPerRun": 20,
+    "retiredInstructionsPerRun": 19,
+    "fault": {"type": "PERM_L", "codeSlot": 10, "threadSlot": 2, "logicalPC": 19},
+    "selfTestReturns": 0,
+    "executionEvidenceSha256": "4d4b799ed4177febe998caf0c616f8b8b3f0bd63e443ebe1e078b86585434d92"
+  },
+  "explicitRuntimeCorrections": {
+    "imageSha256": "af2e173a553ce3c73d3d07f6d9916fccea3b35b8a09bc11eae534c1265af2f9e",
+    "repetitions": 3,
+    "stepsPerRun": 6000,
+    "unexpectedFaultsPerRun": 0,
+    "selfTestReturnsPerRun": 14,
+    "selfTestReturnStatuses": [0],
+    "distinctSelfTestGuards": 84,
+    "passingGuardsPerRun": 1176,
+    "failedGuardsPerRun": 0,
+    "uartWritesPerRun": 149,
+    "uartReadsPerRun": 149,
+    "uartPrefix": "CM:WUKONG\r\n",
+    "ledWritesPerRun": 14,
+    "mBitWritesPerRun": 29,
+    "executionEvidenceSha256": "2df91e00b23b63106386015d03c70da81c71ab67a84aa3caee7e488eeed924ee"
+  },
+  "artifacts": [
+    {
+      "slot": 6,
+      "name": "ide.SelfTest",
+      "filename": "ide.SelfTest.1.2ba261fb.lump",
+      "candidateSha256": "1ef025fbc5ccb941afc63a55ada6616e64fd5796f9f7ac48980dde93fe9a4633",
+      "localizedSha256": "2bef03830739c32c37ffe4e09dae3347db9473ea5fc037a3b318766d15a0c8fa",
+      "location": 1280,
+      "words": 8192
+    },
+    {
+      "slot": 7,
+      "name": "ide.WukongCallHome",
+      "filename": "ide.WukongCallHome.1.f7bb2327.lump",
+      "candidateSha256": "7039411861e120b3167fb8f71978dbfd7f6963e8a5e4d7ba460f508d8bf62f74",
+      "localizedSha256": "4b448e1c3616dd2e75b29a4cec470b2c72a0bb2babf74daf64905bc0a01ed493",
+      "location": 9472,
+      "words": 4096
+    },
+    {
+      "slot": 10,
+      "name": "ide.CapabilityTest",
+      "mode": "naming-only",
+      "filename": "ide.CapabilityTest.1.7b5d4ada.lump",
+      "candidateSha256": "9a4518eba266b292bd478e427bc6ccb3344ff513ba8d119b1c98c8ee75fc6c76",
+      "localizedSha256": "b0b18a462c5f53e0764f7634de6c0b92e6b76b8771f6cbd9d73bd48a23cf7be4",
+      "location": 13568,
+      "words": 2048
+    },
+    {
+      "slot": 10,
+      "name": "ide.CapabilityTest",
+      "mode": "explicit-runtime-corrections",
+      "filename": "ide.CapabilityTest.1.63993758.lump",
+      "candidateSha256": "354727a4ccecd399862ebbd8e570747204e3ad7e007bb002eda6cfc715ee830f",
+      "localizedSha256": "fb3eec1b7e23f875c408aec8deddf5ecc42cc50c3e3ea86638018817b6757973",
+      "location": 13568,
+      "words": 2048
+    }
+  ]
+}

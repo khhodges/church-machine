@@ -142,7 +142,7 @@
                 (d.rights.some(r => 'RWX'.includes(r)) && d.rights.some(r => 'LSE'.includes(r))))
                 fail('symbolic_binding: invalid rights');
         });
-        if (!Array.isArray(b.calls) || !b.calls.length) fail('symbolic_binding: omit empty call list');
+        if (!Array.isArray(b.calls)) fail('symbolic_binding: calls must be an array');
         const offsets = new Set();
         for (const c of b.calls) {
             keys(c, ['word_offset','full_name','row','source_line','condition'], ['word_offset','full_name','row','source_line','condition'], 'symbolic call');
