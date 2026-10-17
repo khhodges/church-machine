@@ -1,5 +1,6 @@
 'use strict';
 
+async function main() {
 // Round-robin Thread regression: the UI operation must use the generated
 // Namespace order, wrap exactly once, preserve private state, and fail before
 // mutating the current context when a target descriptor is invalid.
@@ -11,31 +12,31 @@ global.window = { bootConfig: { step1: {
 } } };
 const ChurchSimulator = require('./simulator.js');
 const ThreadDesign = require('./thread_design.js');
-// Regenerate the exact three-Thread image inputs used by the IDE. This catches
-// a later boot-resident catalog embedding pass overwriting Thread#2/#3 without
-// depending on the workspace-only, ignored boot-image.bin file.
+// Regenerate a private three-Thread image through the real image generator.
+// Saved user selections are neither fixture inputs nor repair targets.
 const fs = require('fs');
+const path = require('path');
 const { spawnSync } = require('child_process');
 global.window.bootConfig.step1 = {
     totalNamespaceWords: 16384, namespaceLumpWords: 64,
     threadLumpWords: 512, threadCount: 3,
 };
 const committed = new ChurchSimulator();
-const generated = spawnSync('python', ['-c', [
-    'import json, sys',
-    'from server.boot_image import generate_boot_image',
-    'cfg=json.load(open("server/boot-config.json"))',
-    'cfg["step1"].update({"totalNamespaceWords":16384,"namespaceLumpWords":64,"threadLumpWords":512,"threadCount":3})',
-    'sys.stdout.buffer.write(generate_boot_image(cfg, "server/lumps"))',
-].join(';')], { cwd: process.cwd(), encoding: null });
-assert.strictEqual(generated.status, 0,
-    `committed image inputs must regenerate: ${String(generated.stderr || '')}`);
-const image = generated.stdout.buffer.slice(
-    generated.stdout.byteOffset,
-    generated.stdout.byteOffset + generated.stdout.byteLength);
+function generateFixtureImage(args = []) {
+    const generated = spawnSync('python3', [
+        path.join(__dirname, '../tests/boot/round_robin_image_fixture.py'),
+        ...args,
+    ], { cwd: path.join(__dirname, '..'), encoding: null, timeout: 30000 });
+    assert.strictEqual(generated.status, 0,
+        `isolated image inputs must regenerate: ${generated.error || ''} ${String(generated.stderr || '')}`);
+    return generated.stdout.buffer.slice(
+        generated.stdout.byteOffset,
+        generated.stdout.byteOffset + generated.stdout.byteLength);
+}
+const image = generateFixtureImage();
 
-function establishBootedThreadFixture(sim, label) {
-    assert.strictEqual(sim.loadBootImage(image), true,
+function establishBootedThreadFixture(sim, label, fixtureImage = image) {
+    assert.strictEqual(sim.loadBootImage(fixtureImage), true,
         `${label} image must load: ${sim.lastBootImageError || 'unknown error'}`);
     let bootSafety = 0;
     while (!sim.bootComplete && !sim.halted && bootSafety++ < 32) {
@@ -187,7 +188,7 @@ assert.strictEqual(selectedStep.physicalPC, firstEntry.word0_location + 1,
 for (let i = 0; i < 16; i++) {
     committed.dr[i] = (0xD4004000 + i) >>> 0;
 }
-committed.pc = 2; // valid inside the selected CapabilityTest, not a historical longer LUMP
+committed.pc = 2; // valid inside the selected synthetic entry body
 committed.flags = {N: true, Z: false, C: true, V: false};
 committed.sto = entryLayouts[1].stackEnd - 4;
 const suspendedThread2 = {
@@ -311,6 +312,77 @@ assert.strictEqual(committed.cr[2].word0, capabilityPrivate.cr2);
 assert.strictEqual(committed.pc, capabilityPrivate.pc);
 assert.deepStrictEqual(committed.flags, capabilityPrivate.flags);
 assert.strictEqual(committed.sto, capabilityPrivate.sto);
+
+// Retire a real CALL and instruction-driven CHANGE while its caller frame is
+// live, visit both other Threads, then RETURN to the exact caller continuation.
+// The selected fixture bytes contain this program; no code is patched in RAM.
+const flow = makeBootedThreadFixture('CALL/CHANGE/RETURN fixture');
+flow.fault = (type, message) => assert.fail(`${type}: ${message}`);
+// Boot teardown clears all M bits. Enter the ordinary scheduler path before
+// testing c-list access; never manufacture M elevation in the test.
+for (const slot of [11, 12, 1]) assert.strictEqual(flow.selectConfiguredThread(slot).slot, slot);
+assert.strictEqual(flow.parseGT(flow.cr[14].word0).index, 220);
+flow.pc = 8; // dedicated method inside the selected synthetic caller
+flow.dr[3] = 100;
+flow.dr[4] = 200;
+flow.flags = {N: false, Z: true, C: true, V: false};
+const callerSTO = flow.sto;
+const callerFlags = {...flow.flags};
+const controlEvents = [];
+function retireFlow() {
+    const result = flow.step();
+    assert(result && result.instr && !result.skipped && !flow.halted,
+        'continuity probe must retire a real instruction without faults');
+    if ([2, 3, 4].includes(result.instr.opcode)) controlEvents.push(result.instr.opcode);
+    return result.instr.opcode;
+}
+function checkFlowContext(slot) {
+    const entry = flow.readNSEntry(slot);
+    const header = flow.parseLumpHeader(flow.memory[entry.word0_location]);
+    const gt = flow.createGT(flow.parseNSWord1(entry.word1_limit).gtSeq, slot, {E: 1}, 1);
+    assert.strictEqual(flow.cr[6].word0, gt, 'boundary preserves exact E-only CR6 GT');
+    assert.strictEqual(flow.cr[6].m, 1, 'boundary rearms CR6.M');
+    assert.strictEqual(flow.cr[6].word1,
+        entry.word0_location + header.lumpSize - header.cc);
+    assert.strictEqual(flow.cr[14].word1, entry.word0_location);
+}
+assert.strictEqual(retireFlow(), 0, 'caller loads its declared callee from CR6');
+assert.strictEqual(flow.parseGT(flow.cr[1].word0).index, 221);
+assert(!flow.nsHandlers[221], 'continuity callee must execute code, not a native handler');
+const callerE = flow.cr[6].word0;
+assert.strictEqual(retireFlow(), 2);
+checkFlowContext(221);
+assert.strictEqual(flow.sto, callerSTO - 2, 'CALL pushes one protected two-word frame');
+const callSTO = flow.sto;
+const threadBase = flow.cr[12].word1;
+const callerFrame = flow.memory.slice(threadBase + callSTO + 1, threadBase + callSTO + 3);
+assert.strictEqual(callerFrame[0], callerE, 'protected frame retains caller E identity');
+for (let budget = 5; flow._currentThreadSlot === 1 && budget > 0; budget--) retireFlow();
+assert.strictEqual(flow._currentThreadSlot, 11, 'decoded CHANGE enters Thread.2');
+assert.deepStrictEqual(controlEvents, [2, 4], 'CALL precedes the actual CHANGE instruction');
+const suspendedFlowRow = flow.threadStatusRows().find(row => row.slot === 1);
+assert.strictEqual(suspendedFlowRow.nia, 11, 'CHANGE saves the following RETURN as NIA');
+assert.strictEqual(flow.selectConfiguredThread(12).slot, 12);
+assert.strictEqual(flow.selectConfiguredThread(1).slot, 1);
+assert.strictEqual(flow.pc, 11, 'switch-back resumes the callee, not the boot target');
+assert.strictEqual(flow.dr[3], 101, 'callee data survives all three Thread contexts');
+assert.strictEqual(flow.dr[4], 200, 'caller continuation has not executed early');
+assert.strictEqual(flow.sto, callSTO);
+assert.deepStrictEqual(flow.flags, suspendedFlowRow.indicatorFlags);
+assert.deepStrictEqual(
+    flow.memory.slice(threadBase + callSTO + 1, threadBase + callSTO + 3), callerFrame,
+    'CHANGE preserves the outstanding CALL frame byte-for-byte');
+checkFlowContext(221);
+assert.strictEqual(retireFlow(), 3);
+checkFlowContext(220);
+assert.strictEqual(flow.pc, 10, 'RETURN reaches the instruction following caller CALL');
+assert.strictEqual(flow.sto, callerSTO, 'RETURN restores the caller protected STO');
+assert.deepStrictEqual(flow.flags, callerFlags, 'RETURN restores caller condition flags');
+assert.strictEqual(retireFlow(), 21);
+assert.strictEqual(flow.dr[4], 201, 'caller continuation actually executes once');
+assert.deepStrictEqual(controlEvents, [2, 4, 3]);
+assert.deepStrictEqual(flow.faultLog, [], 'context continuity requires zero faults');
+console.log('PASS retired CALL → CHANGE → RETURN across three Threads (E-only CR6/M)');
 
 // Switching saved images is a memory-image operation, not a boot-phase
 // operation. It must work while the loaded image is stopped before boot.
@@ -617,7 +689,10 @@ assert(malformed.faultLog.length > 0,
 function functionSource(source, name) {
     const functionStart = source.indexOf(`function ${name}(`);
     const methodStart = source.search(new RegExp(`\\n\\s*${name}\\([^)]*\\) \\{`));
-    const start = functionStart >= 0 ? functionStart : methodStart;
+    const start = functionStart >= 0
+        ? (source.slice(functionStart - 6, functionStart) === 'async '
+            ? functionStart - 6 : functionStart)
+        : methodStart;
     assert(start >= 0, `${name} must exist in app-run.js`);
     const brace = source.indexOf('{', start);
     let depth = 0;
@@ -632,8 +707,21 @@ const appRunSource = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
 const simulatorSource = fs.readFileSync(__dirname + '/simulator.js', 'utf8');
 const advanceSource = functionSource(simulatorSource, 'advanceConfiguredThread');
 const selectSource = functionSource(simulatorSource, 'selectConfiguredThread');
-assert(selectSource.includes("crDst: 14, crSrc: 15, imm: target, mnemonic: 'CHANGE'"),
-    'exact manual selection invokes the decoded CHANGE descriptor shape');
+const selectionProbe = makeBootedThreadFixture('selection-path fixture');
+const activateChangeThread = selectionProbe._activateChangeThread;
+let selectedActivation;
+selectionProbe._activateChangeThread = function(gt, descriptor, pc) {
+    selectedActivation = {gt, descriptor, pc};
+    return activateChangeThread.call(this, gt, descriptor, pc);
+};
+const selectionPC = selectionProbe.pc;
+assert.strictEqual(selectionProbe.selectConfiguredThread(11).slot, 11);
+assert.strictEqual(selectionProbe.parseGT(selectedActivation.gt).index, 11,
+    'manual selection passes the exact target Thread GT to CHANGE activation');
+assert.deepStrictEqual(selectedActivation.descriptor, {crDst: 12, mnemonic: 'CHANGE'},
+    'manual selection activates the CR12 Thread context, not the retired CR14 selector');
+assert.strictEqual(selectedActivation.pc, selectionPC,
+    'manual selection saves the current continuation without advancing it');
 assert(!/\b(scheduler|saveOutgoing|deferEntryFault)\s*:/.test(selectSource),
     'exact manual selection carries no alternate save/defer semantics');
 assert(advanceSource.includes('this.selectConfiguredThread('),
@@ -644,6 +732,8 @@ const indexSource = fs.readFileSync(__dirname + '/index.html', 'utf8');
 assert(!indexSource.includes('nextThreadBtn') && !indexSource.includes('Next Thread'),
     'rendered toolbar no longer contains the Next Thread button');
 const uiSim = makeBootedThreadFixture('UI fixture');
+// Browser activation owns this metadata; the core image loader alone does not.
+uiSim.simulationConfiguration = {id: 'isolated-thread-regression'};
 const uiBootBase = uiSim.readNSEntry(1).word0_location;
 const uiBootLayout = uiSim._threadLayoutAtBase(uiBootBase);
 const uiBootEntryGT = uiSim.memory[uiBootBase + uiBootLayout.capsStart] >>> 0;
@@ -676,8 +766,9 @@ assert.strictEqual(capabilityTestRows[0].gtPetName, 'CapabilityTest',
     'active Thread card distinguishes the executing CapabilityTest identity');
 assert.strictEqual(capabilityTestRows[0].physicalAddress, 0x0D0D,
     'CapabilityTest base 0x0D00 + header + relative NIA 0x000C is 0x0D0D');
-assert.strictEqual(capabilityTestRows[1].physicalAddress, 0x0D01,
-    'a dormant initial continuation identifies the first executable word');
+assert.strictEqual(capabilityTestRows[1].physicalAddress,
+    uiSim.readNSEntry(uiSim.parseGT(entryWords[1]).index).word0_location + 1,
+    'a dormant continuation uses its saved descriptor, not the live CR14 override');
 assert.strictEqual(initialThreadRows[1].nia, 0,
     'never-selected secondary Threads expose their initial continuation NIA');
 assert(initialThreadRows.every(row => row.gtPetName && row.gtPetName !== 'Invalid GT'),
@@ -691,7 +782,10 @@ const consoleEl = { textContent: '', scrollTop: 0, scrollHeight: 0 };
 let dashboardUpdates = 0;
 let openedCR = null;
 const uiContext = {
-    window: {}, // deliberately has no window.sim
+    window: { // deliberately has no window.sim
+        SimulationPreparation: {async checkExecutionFreshness() { return true; }},
+        TargetState: {authorize() { return {ok: true}; }},
+    },
     sim: uiSim,
     document: {
         getElementById(id) {
@@ -747,7 +841,7 @@ vm.runInContext([
     functionSource(appRunSource, 'finishWalk'),
     functionSource(appRunSource, 'walkToggle'),
 ].join('\n'), uiContext);
-vm.runInContext('walkToggle();', uiContext);
+await vm.runInContext('walkToggle();', uiContext);
 assert.strictEqual(uiSim.walkActive, true,
     'Walk start holds the simulator Thread-switch lock');
 assert.strictEqual(uiSim.running, false,
@@ -776,7 +870,7 @@ assert.deepStrictEqual({
 }, walkContextBefore,
     'the UI guard rejects a between-ticks switch without mutating its Thread context');
 
-vm.runInContext('walkToggle();', uiContext);
+await vm.runInContext('walkToggle();', uiContext);
 assert.strictEqual(uiSim.walkActive, false,
     'Walk stop releases the simulator Thread-switch lock');
 
@@ -807,11 +901,19 @@ uiSim.halted = true;
 assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'halted',
     'selected live Thread reports HALT without relabeling suspended peers');
 const resetLifecycle = uiSim.resetThreadToBaseline(1);
-assert.strictEqual(resetLifecycle.ok, true, 'selected halted Thread resets from its immutable baseline');
-assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'running',
-    'reset clears HALT and restores live running ownership');
-assert.strictEqual(status.textContent, 'Thread.1 · 1/3 · running',
-    'toolbar status follows the restored boot Thread');
+assert.strictEqual(resetLifecycle.ok, false,
+    'factory Boot.Thread baseline requires boot CALL, not ordinary resume');
+assert.strictEqual(uiSim.threadStatusRows()[0].lifecycleStatus, 'halted',
+    'rejected root reset preserves the halted live context');
+assert.strictEqual(uiSim.selectConfiguredThread(11).slot, 11);
+uiSim.halted = true;
+assert.strictEqual(uiSim.resetThreadToBaseline(11).ok, true,
+    'selected secondary Thread resets from its executable immutable baseline');
+assert.strictEqual(uiSim.threadStatusRows()[1].lifecycleStatus, 'running',
+    'secondary reset clears HALT and restores live running ownership');
+uiContext.updateThreadControl();
+assert.strictEqual(status.textContent, 'Thread.2 · 2/3 · running',
+    'toolbar status follows the restored secondary Thread');
 assert.strictEqual(dashboardUpdates - dashboardUpdatesBeforeThreadClicks, 3,
     'each row selection refreshes the Thread strip and dashboard');
 
@@ -857,9 +959,8 @@ global.window.bootConfig.step1 = {
     totalNamespaceWords: 32768, namespaceLumpWords: 1024,
     threadLumpWords: 256, threadCount: 10,
 };
-const maxThreads = new ChurchSimulator();
-maxThreads.bootComplete = false; // canonical boot rule: no reset-bank save
-maxThreads._currentThreadSlot = 1;
+const maxThreads = establishBootedThreadFixture(new ChurchSimulator(),
+    'maximum Thread fixture', generateFixtureImage(['--max-threads']));
 const maxSlots = maxThreads.configuredThreadSlots();
 assert.strictEqual(maxSlots.length, 10, 'maximum configuration exposes Thread.1 through Thread.10');
 assert.strictEqual(maxThreads.threadStatusRows(10).length, 10,
@@ -994,13 +1095,19 @@ nonElevated.cr[0] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
 nonElevated.flags = {N: true, Z: false, C: true, V: false};
 const flagsBeforeRejectedSwitch = {...nonElevated.flags};
 const rejectedChange = nonElevated._execChange({
-    crDst: 12, crSrc: 0, imm: 1, mnemonic: 'CHANGE',
+    crDst: 0, crSrc: 0, imm: 0, mnemonic: 'CHANGE',
 });
 assert.strictEqual(rejectedChange, null,
-    'non-elevated CHANGE CR12 returns an architecture fault instead of throwing');
+    'non-elevated CHANGE CR0 returns an architecture fault instead of throwing');
 assert(nonElevated.faultLog.length > 0 &&
-       nonElevated.faultLog[nonElevated.faultLog.length - 1].type === 'NULL_CAP',
-    'non-elevated CHANGE CR12 records an architecture fault');
+       nonElevated.faultLog[nonElevated.faultLog.length - 1].type === 'TYPE',
+    'non-elevated CHANGE CR0 rejects a null input as a non-Inform Thread GT');
 assert.deepStrictEqual(nonElevated.flags, flagsBeforeRejectedSwitch,
     'failed isolated context switch preserves the retained machine FLAGS');
 console.log('PASS round-robin Thread switching');
+}
+
+main().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+});

@@ -127,3 +127,16 @@ the programmer's library.
 **How to apply:** Route both inputs to the synthetic approved library before
 importing the server. Guard file reads as well as writes against live and
 inherited runner paths; retain real approval and image validation.
+
+Control-flow image fixtures must select their own exact executable bodies and
+placements, not regenerate against the programmer's current Namespace. Keep
+conflicting saved selections as separate rejection tests with no-write guards.
+
+**Why:** Growing a synthetic Thread can make an otherwise unrelated saved
+resident overlap it, stopping the regression before any control-flow evidence.
+Factory placeholders also do not necessarily contain resumable continuations.
+
+**How to apply:** Construct authenticated disposable inputs for each tested
+geometry, boot before saving a live context, and prove retired CALL/CHANGE/RETURN
+with protected-frame and caller-continuation assertions. Use a non-handler
+callee so a native service dispatch cannot masquerade as a real CALL frame.
