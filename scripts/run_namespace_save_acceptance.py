@@ -67,6 +67,8 @@ def main():
                        if args.mode == "endpoints" else
                        ["npx", "playwright", "test",
                         f"tests/e2e/{target}.spec.js"])
+            if args.mode == "endpoints" and args.profile == "phase1":
+                command.append("tests/server/test_namespace_phase1_save_atomicity.py")
             if args.remaining:
                 if args.mode != "browser":
                     raise ValueError("--remaining applies only to browser acceptance")
