@@ -182,3 +182,4 @@ dom.window.close();
 console.log('PASS dialog reserve, allocate, import, list, cancel, release, and stale reuse confirmation');
 
 require('./test_thread_heap_record_frames');
+require('./test_thread_heap_record_authority');
