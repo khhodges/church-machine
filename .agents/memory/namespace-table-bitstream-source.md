@@ -8,6 +8,18 @@ The Namespace Table is the sole authoritative source of LUMPs and their metadata
 The user reaffirmed this specifically for Phase 1 when rejecting manifests as
 competing sources of truth.
 
+This applies to failure classification as well as runtime code: an audit must
+not recommend catalog repair or artifact reselection merely because an approved
+Namespace selection lacks an active manifest row.
+
+**Why:** Genesis corrected an audit that treated this as a selection problem
+despite matching selected-file hashes. The test's second authority requirement,
+not the approved selection, is the defect to investigate.
+
+**How to apply:** Preserve observed catalog differences as facts, but classify
+catalog vetoes against Namespace authority. Continue validating selected bytes,
+identity, allocation and binding; hash agreement alone is not full qualification.
+
 **Why:** The user considers the Phase 1 Namespace Table the replacement for
 manifest-based Namespace authority, not one more inventory to reconcile.
 

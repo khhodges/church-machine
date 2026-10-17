@@ -34,7 +34,7 @@ installed image contents.
 | ID | Area | Classification / confidence | Observation | Next action | Tracker links |
 |---|---|---|---|---|---|
 | BASE-01 | Assembler/compiler | Confirmed dependency-initialization failure; not an ISA verdict | Existing assembler workflow throws `TypeError: ChurchAssembler is not a constructor` at compiler line 220. Fresh in-memory probe reproduces it with global assembler undefined; injecting the real constructor removes this exception (the sample still has one compile diagnostic). | Establish explicit Node/compiler dependency setup and regression coverage; rerun isolated assembler suite before interpreting encoding failures. Do not weaken retired-opcode diagnostics. | SIM-01; REL-03 |
-| BASE-02 | Selected resident identity | Confirmed saved-configuration/catalog mismatch | Selected SelfTest has one active matching row; selected WukongCallHome and CapabilityTest have zero. All three selected binary hashes match their files. One existing LUMP-consistency test reports this class of failure. | Review exact selected artifact versus intended revision and manifest history; propose an explicit approved reconciliation. Do not silently select latest, rewrite history or regenerate images. | RES-SelfTest; RES-WukongCallHome; RES-CapabilityTest; IDE-03 |
+| BASE-02 | Namespace authority | Test imposes a competing manifest-authority requirement | Selected SelfTest has one active matching catalog row; selected WukongCallHome and CapabilityTest have zero. All three selected binary hashes match their files. Genesis confirms the approved Namespace list is authoritative; missing active catalog rows do not invalidate these selections. Hash agreement alone is not full execution qualification. | Correct the test's requirement for an active manifest row and inspect consumers for equivalent catalog vetoes. Validate exact Namespace-selected bytes, identity, permissions, allocation and binding directly. A library/history index may locate files but cannot override approval. No catalog repair or reselection is required merely to satisfy this test. | RES-SelfTest; RES-WukongCallHome; RES-CapabilityTest; IDE-03 |
 | BASE-03 | LUMP GT validator | Legacy-oracle conflict; affected binary validity not established | Four reported R22 failures use `_gt_word0_violation`, which declares bit 26 spare and rejects it. The test itself notes Abstract GT encodings use bits 26:25=11. The four reported cases are 04b2913d, 3b057bbb, Ethernet.1.b169bba4 and Ethernet.1.fc72b0e3. | Classify each rejected word by approved type and permissions; replace the obsolete blanket rule only under the current contract. Do not declare all four artifacts valid just because the old rule is wrong. | SIM-01; SEAL-02; REL-03 |
 | BASE-04 | Boot-image agreement | Shared generator/fixture contract failure; root cause provisional | All 18 reported failures stop at `mandatory NS slot 2 is zeroed`; 8 other cases passed. Tests build synthetic Boot.Abstr fixtures in temporary directories; generator still requires legacy slots (0,1,2,3,4,5,6,10). Agreement is not reached in these failed cases. | Trace fixture selection, generation policy and validator mode in an isolated copy. Reconcile approved slot-2 entry versus legacy device/profile semantics; do not remove validation merely to pass tests. | SIM-03; H10; H11; H12 |
 | BASE-05 | RTL boot/control | Unresolved fixture/implementation/oracle failures | Existing run: 8 failed, 46 passed. Failures cover SWITCH outcomes, delayed-fault issuer attribution, nested CALL/RETURN and saved-PC validation. No fresh RTL simulation was performed. | Capture instruction words and pre-fault state, verify approved fixture encodings, then replay minimal isolated cases. Keep implementation defects possible until evidence excludes them. | SIM-02; SIM-03; H05; H09; H18 |
@@ -66,14 +66,22 @@ project totals (the full runner can repeat the same suites):
 2. Reconcile the R22 oracle and synthetic boot fixture contract with the
    approved ISA. Do not weaken capability or boot checks to get green results.
 3. Diagnose the eight RTL failures using exact instruction/fault evidence.
-4. Present the selected resident/catalog mismatch and SelfTest entry-format
-   question for explicit artifact-selection decisions.
+4. Remove competing manifest-authority requirements from validation under the
+   existing Namespace-authority rule; preserve approved selections and actual
+   integrity checks. Separately investigate the SelfTest entry-format question
+   before proposing any artifact replacement.
 5. Only after the intended inputs are frozen, regenerate and qualify outputs
    with separately authorized build and physical-board work.
 
 Mint G1–G8, seal storage and the remaining ISA oracle gaps are still open.
 This audit does not grant new protected interfaces or architectural authority.
 It does not establish that the three-abstraction startup path conforms.
+
+**Genesis authority clarification:** The initial audit incorrectly proposed
+reconciling approved Namespace selections with manifest history. The observed
+catalog discrepancy is real, but an active catalog row is not a second approval
+requirement. BASE-02 now records the test/consumer authority defect, not a
+request to change Genesis's selection. Raw observations remain unchanged.
 
 ## Tracker maintenance
 
