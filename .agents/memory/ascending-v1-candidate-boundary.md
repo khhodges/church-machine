@@ -3,6 +3,19 @@ name: Ascending-v1 candidate boundary
 description: Keep new-format Namespace review and approval separate from Header V2 publication and activation.
 ---
 
+Genesis explicitly confirmed the pictured Phase 1 256-slot design as the target
+for implementation and verification on 2026-10-17. The reviewed slot map and
+scope are in `docs/reviews/phase1-baseline/approved-target-namespace.md`.
+
+**Why:** Historical saved-Namespace tests had been used to mark IDE-03 Complete,
+but they did not exercise the intended Phase 1 design. This was a target mismatch,
+not a reason to migrate the approved design back to the old layout.
+
+**How to apply:** Tie acceptance to the pictured Phase 1 profile (metadata 0,
+self 1, entry Thread 2, UART 8, selected CapabilityTest boot 10; all Resident).
+Keep old-profile evidence historical, and keep internal seals subordinate to
+approved UI intent. Design confirmation is not installation or hardware consent.
+
 Ascending-v1 image review may create only a separate, exact-hash-bound
 profile-approval record. That record is not a historical LUMP approval and
 never authorizes installation, simulator activation, or hardware programming.

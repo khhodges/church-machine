@@ -1,5 +1,14 @@
 # Namespace authority implementation — 17 October 2026
 
+## Current acceptance target
+
+Genesis has now confirmed the [pictured Phase 1 Namespace](approved-target-namespace.md).
+The earlier IDE-03 closure below applies only to the historical saved-Namespace
+profile. Its results remain valid for that profile but do not close Phase 1
+target acceptance. IDE-03 is now **Needs verification**, and the original
+checklist has **1 Complete out of 104**. This supersedes the earlier completion
+counts in this historical progress record; no prior test result is discarded.
+
 ## Delivered
 
 Removed the active-manifest-row prerequisite from LUMP admission. The shared
