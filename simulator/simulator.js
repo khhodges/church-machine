@@ -6913,6 +6913,9 @@ class ChurchSimulator {
         if (!d) return null;
         const clistGT = this.cr[d.crSrc].word0;
         const _loadOldGT = this.cr[d.crDst].word0 >>> 0;  // captured for LOAD_SHADOW before any _writeCR
+        // LOAD's metadata and row accesses share L authority. Register M
+        // permits the operation without rewriting the GT (notably E-only CR6).
+        const loadPerm = this.cr[d.crSrc].m === 1 ? null : 'L';
         if (clistGT === 0) {
             this.fault('NULL_CAP', `LOAD: CR${d.crSrc} is NULL`);
             return null;
@@ -6924,7 +6927,7 @@ class ChurchSimulator {
             clistSize = this._clistCountForCR(6);
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
-            const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `LOAD CR${d.crSrc} lump-hdr`);
+            const hdrRead = this._capRead(d.crSrc, lumpBase, loadPerm, `LOAD CR${d.crSrc} lump-hdr`);
             if (!hdrRead.ok) { this.fault(hdrRead.fault, hdrRead.message); return null; }
             const hdr = this.parseLumpHeader(hdrRead.value);
             clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;
@@ -6941,7 +6944,8 @@ class ChurchSimulator {
                 `LOAD: c-list has no capability at row ${d.imm} (declared rows: 0–${Math.max(0, clistSize - 1)})`);
             return null;
         }
-        const check = this.mLoad(clistGT, (d.crSrc === 6 || !this.bootComplete) ? null : 'L', d.crSrc, absAddr, clistRange);
+        // Preserve the pre-existing bootstrap row-access allowance separately.
+        const check = this.mLoad(clistGT, !this.bootComplete ? null : loadPerm, d.crSrc, absAddr, clistRange);
         if (!check.ok) {
             this.fault(check.fault, `LOAD: CR${d.crSrc}: ${check.message}`);
             return null;

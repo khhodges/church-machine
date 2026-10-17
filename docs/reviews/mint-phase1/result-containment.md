@@ -1,5 +1,27 @@
 # M3 result delivery — bounded feasibility and containment investigation
 
+## Subsequent LOAD correction
+
+The ordinary non-CR6 L-only header access defect described in the historical
+investigation below is now corrected. LOAD resolves both header metadata and
+the indexed capability using L authority, without requiring R. CR6 keeps its
+E-only GT; its register M bit supplies elevated LOAD authority, rather than an
+unconditional exemption based on register number. Ordinary identity, source
+generation, integrity and range checks remain in place.
+
+The updated isolated probe has **24 passing checks**, including assembled
+LOAD → DWRITE through an ordinary L-only source, successful use of the returned
+capability, denial of data reads through that L view, E-only CR6 with M set/
+cleared, and unchanged source GTs. The original failure characterization was
+replaced by a positive regression; the other containment probes remain.
+
+This fixes one delivery prerequisite only. It does not implement M1–M3, authorize
+result manufacture, resolve target-generation-at-LOAD policy, establish G4
+exclusion, or close the fault/diagnostic containment findings. The original
+source hashes below remain historical, not fingerprints of this corrected code.
+
+## Historical investigation
+
 **2026-10-17 · Isolated JS component evidence, not operational Mint acceptance.**
 
 This assesses [M3](minimal-machine-interfaces.md#m3--private-gt-result-delivery-using-ordinary-load)

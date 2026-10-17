@@ -110,8 +110,20 @@ test('private RW/L views confer no X permission; stale source view cannot write'
     rejected(s, () => store(s, 123), 'VERSION');
 });
 
-test('non-CR6 L-only LOAD fails header R check; R-only fails L; mixed is invalid', () => {
-    for (const [rights, type] of [['L', 'PERMISSION'], ['R', 'PERMISSION']]) {
+test('non-CR6 L-only LOAD delivers usable authority without granting R', () => {
+    const s = fixture(), result = gt(s, SLOT.object, 'RW');
+    const source = {...s.cr[8]};
+    assert.ok(store(s, result));
+    assert.ok(load(s));
+    assert.equal(s.cr[1].word0, result);
+    assert.deepEqual(s.cr[8], source);
+    assert.ok(store(s, 0xaabbccdd, 1));
+    assert.equal(s.memory[OBJECT], 0xaabbccdd);
+    rejected(s, () => read(s, 8, 0), 'PERMISSION');
+});
+
+test('non-CR6 R-only and E-only LOAD fail L; mixed is invalid', () => {
+    for (const [rights, type] of [['E', 'PERMISSION'], ['R', 'PERMISSION']]) {
         const s = fixture();
         assert.ok(store(s, gt(s, SLOT.object, 'RW')));
         install(s, 8, SLOT.list, rights);
@@ -120,6 +132,74 @@ test('non-CR6 L-only LOAD fails header R check; R-only fails L; mixed is invalid
     const s = fixture();
     s.cr[8].word0 |= 0x20000000; // raw malformed R+L, NOT a provisioning option
     rejected(s, () => load(s), 'DOMAIN_PURITY');
+});
+
+test('CR6 E-only LOAD requires its register M bit and preserves its GT', () => {
+    for (const m of [0, 1]) {
+        const s = fixture(), result = gt(s, SLOT.object, 'RW');
+        assert.ok(store(s, result));
+        scopeForProbe(s);
+        s.cr[6].word0 = gt(s, SLOT.list, 'E');
+        s.cr[6].m = m;
+        const source = {...s.cr[6]};
+        if (m) {
+            assert.ok(load(s, 6));
+            assert.equal(s.cr[1].word0, result);
+        } else {
+            rejected(s, () => load(s, 6), 'PERMISSION');
+        }
+        assert.deepEqual(s.cr[6], source);
+    }
+});
+
+test('L-only LOAD retains source generation, seal, header and row bounds checks', () => {
+    for (const failure of ['generation', 'seal', 'header', 'row', 'null', 'mixed']) {
+        const s = fixture();
+        assert.ok(store(s, gt(s, SLOT.object, 'RW')));
+        if (failure === 'generation') s.cr[8].word0 = gt(s, SLOT.list, 'L', 1);
+        if (failure === 'seal') {
+            const e = s.readNSEntry(SLOT.list);
+            // Alter physical W2 without recomputing integrity.
+            s.memory[s._nsSlotBase(SLOT.list) + 2] ^= 1;
+            assert.notEqual(s.readNSEntry(SLOT.list).word2_seals, e.word2_seals);
+        }
+        if (failure === 'header') s.cr[8].word1 = BASE - 1;
+        if (failure === 'null') s.memory[CELL] = 0;
+        if (failure === 'mixed') s.memory[CELL] = (gt(s, SLOT.object, 'RW') | 0x08000000) >>> 0;
+        const fault = {generation:'VERSION', seal:'SEAL', header:'RANGE',
+            row:'NO_CAPABILITY', null:'NULL_CAP', mixed:'DOMAIN_PURITY'}[failure];
+        rejected(s, () => load(s, 8, failure === 'row' ? 2 : 1), fault);
+        assert.equal(s.cr[1].word0, 0);
+    }
+});
+
+test('assembled LOAD then DWRITE retire using an ordinary L-only source', () => {
+    const Assembler = require('../../simulator/assembler.js');
+    const compiled = new Assembler().assemble('LOAD CR1, CR8, #1\nDWRITE DR2, CR1, #0');
+    assert.deepEqual(compiled.errors, []);
+    const s = fixture(), result = gt(s, SLOT.object, 'RW'), codeBase = 0x4000;
+    s.withNamespaceWrite('TEST PRIVILEGE: private instruction fixture', () =>
+        s.writeNSEntry(45, codeBase, 63, 0, 0, 1, 0, 0, 0));
+    install(s, 14, 45, 'X');
+    s.memory[codeBase] = 0xf8000800; // cw=2, cc=0
+    s.pc = 0;
+    const fetch = s._fetchInstruction();
+    assert.ok(fetch.ok);
+    s.memory.set(compiled.words, fetch.addr);
+    s.memory[CELL] = result; // fixture input, not a result-register shortcut
+    s.dr[2] = 0x1234abcd;
+    s.halted = false;
+    const source = {...s.cr[8]};
+    const first = s.step();
+    assert.ok(first);
+    assert.equal(first.instr.opcode, 0);
+    assert.equal(s.cr[1].word0, result);
+    const second = s.step();
+    assert.ok(second);
+    assert.equal(second.instr.opcode, 17);
+    assert.equal(s.memory[OBJECT], 0x1234abcd);
+    assert.deepEqual(s.cr[8], source);
+    assert.equal(s.faultLog.length, 0);
 });
 
 test('CR6 test scope LOAD materializes B=0 result; no invocation/publication needed', () => {

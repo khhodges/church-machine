@@ -1,16 +1,9 @@
-// sim_load_through_l_perm_cr6.js — Confirm LOAD through an L-perm CR6 never
-// produces a PERMISSION fault.
-//
-// Background:
-//   CALL delivers an L-perm GT (perm[0]=L, perm[2:0]=0b001) to CR6 — the
-//   c-list root register.  The LOAD instruction fetches capabilities from the
-//   c-list via mLoad.  The mLoad permission gate is intentionally bypassed for
-//   CR6 (simulator.js _execLoad line: `d.crSrc === 6 ? null : 'L'`), so no
-//   E-perm check fires regardless of what perm the CR6 GT carries.
-//
-//   Without this guard an L-perm CR6 (the normal post-CALL state) would cause
-//   every subsequent LOAD from the c-list to fault with PERMISSION, making the
-//   abstraction completely uncallable.
+// Legacy L-permitted CR6 fixture coverage: L itself authorizes these LOADs.
+// These synthetic fixtures do not define the architectural post-CALL contract:
+// CR6 retains an E-only GT and its register M bit permits L without GT mutation.
+// E-only/M-set success and E-only/M-clear rejection are independently covered
+// in tests/mint_phase1/result_containment_probe.js. Register number alone is
+// not permission to skip the gate.
 //
 // GT word layout (v2.0):
 //   [31]    = b_flag
