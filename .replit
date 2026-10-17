@@ -223,6 +223,10 @@ args = "attested-compiler-admission-tests"
 task = "workflow.run"
 args = "compact-lump-api-contract-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "method-dispatch-gate-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -1136,17 +1140,6 @@ task = "shell.exec"
 args = "python -m pytest tests/server/test_primary_publish_config.py -v"
 
 [[workflows.workflow]]
-name = "wukong-release-bundle"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 scripts/check_method_dispatch_release.py --verify-bundle && python3 -m pytest scripts/test_wukong_build_provenance.py -q"
-
-[[workflows.workflow]]
 name = "wukong-health-strip-church-only-tests"
 author = "agent"
 
@@ -1192,15 +1185,6 @@ outputType = "console"
 isValidation = true
 
 [[workflows.workflow]]
-name = "method-dispatch-rtl-release"
-author = "agent"
-[workflows.workflow.metadata]
-isValidation = true
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python3 -m pytest scripts/test_method_dispatch_release.py -q && python3 scripts/check_method_dispatch_release.py"
-
-[[workflows.workflow]]
 name = "boot-change-validation"
 author = "agent"
 
@@ -1221,3 +1205,14 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_lump_api_contract.js && node simulator/test_lump_api_codec.js && node simulator/test_canonical_api_browser_compile.js"
+
+[[workflows.workflow]]
+name = "method-dispatch-gate-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3 -m pytest scripts/test_method_dispatch_release.py scripts/test_wukong_build_provenance.py -q"
+
+[workflows.workflow.metadata]
+isValidation = true

@@ -186,3 +186,113 @@ assert(retired.some(r => r.slot === record.slot && r.sto === initialSTO - 4),
 assert.deepStrictEqual(sim.memory.slice(record.base, record.base + record.header.lumpSize),
     recordCode, 'shared generated executable remains immutable');
 console.log('PASS generated CallRecord: nested CALL/RETURN, suspended frames, DR1, CR5, and Thread isolation');
+
+// Exercise the generated getters, not the host-side record decoder. A real
+// caller runs LOAD/CALL for every length and word, with DR1 sampled only after
+// RETURN has restored its continuation.
+const textFields = R.schema.fields.filter(f => f.type === 'utf8');
+const readers = textFields.map(field => {
+    const title = field.name[0].toUpperCase() + field.name.slice(1);
+    return {field, names: ['Read' + title + 'Length',
+        ...Array.from({length: field.capacity / 4}, (_, i) => 'Read' + title + 'Word' + i)]};
+});
+const readerNames = readers.flatMap(r => r.names);
+assert.deepStrictEqual(readerNames.slice().sort(), compiled.methods
+    .map(m => m.name).filter(n => /(?:Length|Word\d+)$/.test(n)).sort(),
+    'the caller must cover every generated UTF-8 getter');
+const textCaller = install(34, [
+    ...readerNames.flatMap(name => [load(1), call(name)]),
+    ins(21, 4, 1, 0x4000), // Valid final RETURN destination; stop before executing it.
+], [record.gt]);
+
+const fixtures = [
+    {
+        label: 'maximum byte lengths and distinct words',
+        callerName: 'abc😀' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01234',
+        telephoneNumber: '+0012345678901234567890123456789',
+        routingSelection: 'abc東' + 'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        endpoint: 'abcé' + '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvw',
+    },
+    {
+        label: 'multibyte characters split across words and one padding byte',
+        callerName: 'abc😀',
+        telephoneNumber: '+000123',
+        routingSelection: 'abc東Z',
+        endpoint: 'abcéXY',
+    },
+    {
+        label: 'two padding bytes and leading zeros without plus',
+        callerName: 'abc東',
+        telephoneNumber: '000012',
+        routingSelection: 'abcéZ',
+        endpoint: 'ab😀',
+    },
+    {
+        label: 'three padding bytes',
+        callerName: 'abcé',
+        telephoneNumber: '+0000',
+        routingSelection: 'a😀',
+        endpoint: 'ab東',
+    },
+    {label: 'empty fields clear every previously populated word',
+        callerName: '', telephoneNumber: '', routingSelection: '', endpoint: ''},
+];
+const secondThreadBeforeReaders = sim.memory.slice(second.base, second.base + second.layout.lumpSize);
+const readerStart = retired.length;
+const utf8 = new TextDecoder('utf-8', {fatal: true});
+for (const [fixtureIndex, fixture] of fixtures.entries()) {
+    const {label, ...fields} = fixture;
+    const importedJson = JSON.stringify({...R.sample(), ...fields});
+    const imported = JSON.parse(importedJson);
+    R.importRecord(sim, offset, imported, {replace: true});
+    const heapBefore = sim.memory.slice(firstHeap.word1, firstHeap.word1 + firstHeap.word2 + 1);
+    const callerEntry = sim.readNSEntry(textCaller.slot);
+    sim._writeCR(0, textCaller.gt, callerEntry);
+    sim._installLumpHeaderContext(sim.parseGT(textCaller.gt), textCaller.slot, callerEntry, textCaller.header);
+    sim.pc = 0;
+    let returnPC = 0;
+    function returnedWord(name) {
+        const start = retired.length;
+        // A stale DR1 cannot accidentally pass even for an all-zero getter.
+        sim.dr[1] = 0xdeadbeef;
+        returnPC += 2;
+        until(textCaller, returnPC, slots[0]);
+        const instructions = retired.slice(start);
+        assert.strictEqual(instructions.filter(r => r.opcode === 2).length, 1, name + ' CALL');
+        assert.strictEqual(instructions.filter(r => r.opcode === 3).length, 1, name + ' RETURN');
+        assert(instructions.some(r => r.slot === record.slot && r.sto === initialSTO - 2),
+            name + ' executes inside the generated callee');
+        assert.strictEqual(sim.sto, initialSTO, name + ' restores caller frame');
+        assert.strictEqual(sim.parseGT(sim.cr[6].word0).index, textCaller.slot, name + ' restores caller c-list');
+        return sim.dr[1] >>> 0;
+    }
+    for (const {field, names} of readers) {
+        const context = label + ': ' + field.name;
+        const expected = Buffer.from(imported[field.name], 'utf8');
+        if (fixtureIndex === 0) assert.strictEqual(expected.length, field.capacity, context + ' at capacity');
+        if (fixtureIndex >= 1 && fixtureIndex <= 3)
+            assert.strictEqual(expected.length % 4, 4 - fixtureIndex, context + ' partial word');
+        const length = returnedWord(names[0]);
+        assert.strictEqual(length, expected.length, context + ' returned byte length');
+        const returned = Buffer.alloc(field.capacity);
+        names.slice(1).forEach((name, i) => returned.writeUInt32BE(returnedWord(name), i * 4));
+        const paddedExpected = Buffer.alloc(field.capacity);
+        expected.copy(paddedExpected);
+        assert.deepStrictEqual(returned, paddedExpected, context + ' exact words and all zero padding');
+        assert.strictEqual(utf8.decode(returned.subarray(0, length)), imported[field.name],
+            context + ' reconstructed from returned DR1 words');
+    }
+    assert.deepStrictEqual(sim.memory.slice(firstHeap.word1, firstHeap.word1 + firstHeap.word2 + 1),
+        heapBefore, label + ': readers do not write the heap');
+}
+const textRetired = retired.slice(readerStart);
+for (const opcode of [2, 3])
+    assert.strictEqual(textRetired.filter(r => r.opcode === opcode).length,
+        fixtures.length * readerNames.length, 'every text getter must CALL and RETURN for every fixture');
+assert.deepStrictEqual(sim.memory.slice(second.base, second.base + second.layout.lumpSize),
+    secondThreadBeforeReaders, 'text readers leave the second Thread untouched');
+assert.deepStrictEqual(sim.memory.slice(untouched.base, untouched.base + untouched.layout.lumpSize),
+    untouchedWords, 'text readers leave the third Thread untouched');
+assert.deepStrictEqual(sim.memory.slice(record.base, record.base + record.header.lumpSize),
+    recordCode, 'text readers leave the shared generated executable immutable');
+console.log(`PASS generated CallRecord UTF-8: ${readerNames.length} getters × ${fixtures.length} JSON fixtures through CALL/RETURN`);

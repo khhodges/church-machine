@@ -220,13 +220,23 @@ def test_release_registration():
     runner = (gate.ROOT / "scripts/run-all-tests.sh").read_text()
     config = json.loads((gate.ROOT / "scripts/test-workflow-config.json").read_text())
     assert 'ALL_GROUPS["release"]="wukong-release-bundle"' in runner
-    assert "method-dispatch-rtl|wukong-release-bundle|method-dispatch-rtl-release|method-dispatch-gate-tests) continue" in runner
+    assert "method-dispatch-rtl|wukong-release-bundle|method-dispatch-rtl-release) continue" in runner
     assert "method-dispatch-rtl" in config["scriptOnlySuites"]
-    assert "method-dispatch-gate-tests" in config["scriptOnlySuites"]
-    assert "check_method_dispatch_release.py --verify-bundle" in (gate.ROOT / ".replit").read_text()
+    assert "method-dispatch-rtl-release" in config["scriptOnlySuites"]
+    assert "wukong-release-bundle" in config["scriptOnlySuites"]
+    assert "method-dispatch-gate-tests" not in config["scriptOnlySuites"]
+    assert "check_method_dispatch_release.py --verify-bundle" in runner
     workflows = tomllib.loads((gate.ROOT / ".replit").read_text())["workflows"]["workflow"]
     parent = next(w for w in workflows if w["name"] == "all-tests")
-    assert not any(t.get("args") == "wukong-release-bundle" for t in parent["tasks"])
+    replay_suites = {"method-dispatch-rtl", "method-dispatch-rtl-release", "wukong-release-bundle"}
+    assert not any(t.get("args") in replay_suites for t in parent["tasks"])
+    validations = [w for w in workflows if w.get("metadata", {}).get("isValidation")]
+    assert not any("check_method_dispatch_release.py" in str(t.get("args", ""))
+                   for w in validations for t in w["tasks"])
+    checks = next(w for w in validations if w["name"] == "method-dispatch-gate-tests")
+    command = checks["tasks"][0]["args"]
+    assert "scripts/test_method_dispatch_release.py" in command
+    assert "scripts/test_wukong_build_provenance.py" in command
 
 
 def test_failure_preserves_replay_inputs():

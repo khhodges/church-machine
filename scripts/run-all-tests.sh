@@ -150,7 +150,7 @@ register_suite "method-dispatch-rtl" \
     'python3 scripts/check_method_dispatch_release.py'
 
 register_suite "method-dispatch-gate-tests" \
-    'python3 -m pytest scripts/test_method_dispatch_release.py -q'
+    'python3 -m pytest scripts/test_method_dispatch_release.py scripts/test_wukong_build_provenance.py -q'
 
 register_suite "method-dispatch-rtl-release" \
     'python3 -m pytest scripts/test_method_dispatch_release.py -q && python3 scripts/check_method_dispatch_release.py'
@@ -629,7 +629,7 @@ if [ "${#REQUESTED_SUITES[@]}" -eq 0 ]; then
     # Release replays require explicit selection (or --group release).
     for _idx in "${!ALL_SUITE_NAMES[@]}"; do
         case "${ALL_SUITE_NAMES[$_idx]}" in
-            method-dispatch-rtl|wukong-release-bundle|method-dispatch-rtl-release|method-dispatch-gate-tests) continue ;;
+            method-dispatch-rtl|wukong-release-bundle|method-dispatch-rtl-release) continue ;;
         esac
         SUITE_NAMES+=("${ALL_SUITE_NAMES[$_idx]}")
         SUITE_CMDS+=("${ALL_SUITE_CMDS[$_idx]}")
