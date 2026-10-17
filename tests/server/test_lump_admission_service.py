@@ -504,23 +504,143 @@ def test_boot_resident_admission_builds_an_image(resident_inputs, catalog_status
     assert _private_files(root.parent) == before_image
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError,
-    reason="Known generator defect: noncompact admitted placement is repacked; "
-           "see namespace-authority-progress.md (resident-admission follow-up).",
-)
-def test_boot_generator_preserves_noncompact_admitted_location(resident_inputs):
-    """Expose the real generator defect separately, never adjust the saved row."""
-    from server.boot_image import generate_boot_image, read_namespace_header_info
+@pytest.mark.parametrize("location", [1024, 7872])
+@pytest.mark.parametrize("step2_size", [None, 64, 1])
+def test_boot_generator_preserves_noncompact_admitted_location(
+        resident_inputs, location, step2_size):
+    """Preserve every approved body, including holes and reverse physical order."""
+    from server.boot_image import (
+        generate_boot_image, read_namespace_header_info, validate_boot_image,
+    )
+
+    root, config_path = resident_inputs
+    _admit_resident(root, location=location)
+    state = json.loads((root / "ns-state.json").read_text())
+    selected = next(row for row in state["abstractions"] if row.get("boot") is True)
+    config = json.loads(config_path.read_text())
+    if step2_size is not None:
+        config["step2"] = {"lumps": [{
+            "nsSlot": selected["slot"], "resident": True,
+            "physAddr": location, "lumpSize": step2_size,
+        }]}
+        config_path.write_text(json.dumps(config))
+    before = _private_files(root.parent)
+    image = generate_boot_image(config, str(root), require_entry_resident=True)
+    validate_boot_image(image)  # Hardware profile, not simulation-only validation.
+    header = read_namespace_header_info(image)
+    assert header["boot_entry_word"] == selected["location"] == location
+    assert header["boot_entry_slot"] == selected["slot"]
+    words = struct.unpack(f"<{len(image) // 4}I", image)
+    for resident in (row for row in state["abstractions"] if row.get("filename")):
+        raw = (root / resident["filename"]).read_bytes()
+        expected = struct.unpack(f">{len(raw) // 4}I", raw)
+        base = len(words) - (resident["slot"] + 1) * 4
+        assert words[base] == resident["location"]
+        assert words[resident["location"]:resident["location"] + len(expected)] == expected
+        assert words[base + 3] == int(resident["token"], 16) == expected[-1]
+    assert words[336:400] == (0,) * 64  # No copy at the old compact destination.
+    assert _private_files(root.parent) == before
+
+
+@pytest.mark.parametrize("damage", ["none", "mismatched-step2", "overlap"])
+def test_boot_generator_step2_resident_in_gap(resident_inputs, damage):
+    """A repeated Step-2 placement below SelfTest is not a competing claim."""
+    from server.boot_image import generate_boot_image
+
+    root, config_path = resident_inputs
+    _admit_resident(root)
+    state_path = root / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    selected = next(row for row in state["abstractions"] if row["slot"] == 15)
+    selected["location"] = 384 if damage == "overlap" else 336
+    state_path.write_text(json.dumps(state))
+    config = json.loads(config_path.read_text())
+    config["step2"] = {"lumps": [{
+        "nsSlot": 15, "resident": True, "lumpSize": 1,
+        "physAddr": 1024 if damage == "mismatched-step2" else selected["location"],
+    }]}
+    config_path.write_text(json.dumps(config))
+    before = _private_files(root.parent)
+    if damage == "none":
+        image = generate_boot_image(config, str(root), require_entry_resident=True)
+        words = struct.unpack(f"<{len(image) // 4}I", image)
+        assert words[-16 * 4] == 336
+        raw = (root / selected["filename"]).read_bytes()
+        assert words[336:400] == struct.unpack(">64I", raw)
+    else:
+        match = ("disagrees with Namespace state" if damage == "mismatched-step2"
+                 else r"overlaps NS\[15\]")
+        with pytest.raises(ValueError, match=match):
+            generate_boot_image(config, str(root), require_entry_resident=True)
+    assert _private_files(root.parent) == before
+
+
+@pytest.mark.parametrize("location,match", [
+    (256, r"overlaps NS\[1\]"),
+    (300, r"overlaps NS\[10\]"),
+    (384, r"overlaps NS\[15\]"),  # SelfTest is claimed after the uploaded body.
+    (0, r"reserved header/table"),
+    (7904, r"reserved header/table"),
+    (8192, r"exceeds image bounds"),
+    (-1, r"nonnegative word address"),
+    (True, r"nonnegative word address"),
+    ("invalid", r"nonnegative word address"),
+    (None, r"no saved Namespace location"),
+])
+def test_boot_generator_rejects_invalid_saved_placement(resident_inputs, location, match):
+    """Generation independently rejects damaged layouts without repairing inputs."""
+    from server.boot_image import generate_boot_image
 
     root, config_path = resident_inputs
     _admit_resident(root, location=1024)
-    state = json.loads((root / "ns-state.json").read_text())
-    selected = next(row for row in state["abstractions"] if row.get("boot") is True)
-    image = generate_boot_image(json.loads(config_path.read_text()), str(root),
-                                require_entry_resident=True)
-    # Current generator emits 336 despite admission approving word 1024.
-    assert read_namespace_header_info(image)["boot_entry_word"] == selected["location"]
+    state_path = root / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    selected = next(row for row in state["abstractions"] if row["slot"] == 15)
+    if location is None:
+        selected.pop("location")
+    else:
+        selected["location"] = location
+    state_path.write_text(json.dumps(state))
+    before = _private_files(root.parent)
+    with pytest.raises(ValueError, match=match):
+        generate_boot_image(json.loads(config_path.read_text()), str(root),
+                            require_entry_resident=True)
+    assert _private_files(root.parent) == before
+
+
+@pytest.mark.parametrize("secondary_location", [None, 1536, 1056])
+def test_boot_generator_keeps_threads_clear_of_noncompact_residents(
+        resident_inputs, secondary_location):
+    from server.boot_image import generate_boot_image
+
+    root, config_path = resident_inputs
+    _admit_resident(root, location=1024)
+    state_path = root / "ns-state.json"
+    state = json.loads(state_path.read_text())
+    next(row for row in state["abstractions"] if row["slot"] == 1)["location"] = 512
+    if secondary_location is not None:
+        state["abstractions"].append({
+            "slot": 11, "name": "Thread.2", "type": "Thread",
+            "location": secondary_location, "seq": 0,
+        })
+    state_path.write_text(json.dumps(state))
+    config = json.loads(config_path.read_text())
+    config["step1"]["threadCount"] = 2
+    config_path.write_text(json.dumps(config))
+    before = _private_files(root.parent)
+    if secondary_location == 1056:
+        with pytest.raises(ValueError, match=r"NS\[11\].*overlaps NS\[15\]"):
+            generate_boot_image(config, str(root), require_entry_resident=True)
+    else:
+        image = generate_boot_image(config, str(root), require_entry_resident=True)
+        words = struct.unpack(f"<{len(image) // 4}I", image)
+        assert words[-2 * 4] == 512
+        assert words[-12 * 4] == (
+            secondary_location if secondary_location is not None else 1088)
+        raw = (root / next(row["filename"] for row in state["abstractions"]
+                          if row["slot"] == 15)).read_bytes()
+        assert words[1024:1088] == struct.unpack(">64I", raw)
+    assert _private_files(root.parent) == before
 
 
 @pytest.mark.parametrize("damage,match", [

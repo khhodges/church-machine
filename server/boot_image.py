@@ -2564,12 +2564,12 @@ def generate_simulation_image(cfg, lumps_dir, boot_entry_slot=None):
     from server.simulation_preparation import validate_simulation_executable
     return _generate_boot_image(
         cfg, lumps_dir, boot_entry_slot, True, validate_simulation_executable,
-        honor_namespace_layout=True)
+        simulation_only=True)
 
 
 def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                          require_entry_resident, executable_validator,
-                         honor_namespace_layout=False):
+                         simulation_only=False):
     """Produce the binary boot image bytes for the given config dict.
 
     `cfg` must already be Step-1 valid (target board + step1 fields).
@@ -2936,7 +2936,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
             {"R": 0, "W": 0, "X": 0, "L": 0, "S": 0, "E": 1},
             False,
         )
-    if honor_namespace_layout:
+    if simulation_only:
         # Historical catalog defaults are hardware conveniences, not saved
         # Namespace allocations. Absent services/devices must neither claim
         # RAM nor acquire descriptors/capabilities in a private simulation.
@@ -3075,13 +3075,20 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     clist_gts = []
     running_offset = NAMESPACE_HEADER_V2_WORDS
     locations = {}                              # idx -> location word
-    _simulation_ranges = [(0, NAMESPACE_HEADER_V2_WORDS, 0)]
+    _resident_ranges = [(0, NAMESPACE_HEADER_V2_WORDS, 0)]
 
     def _namespace_location(slot, fallback):
-        if not honor_namespace_layout:
-            return fallback
+        # Saved placement is authoritative for both hardware and simulation.
+        # Profile/admission differences must never opt into implicit compaction.
         row = _state_by_slot.get(slot, {})
         if "location" not in row:
+            # Private simulation can stage unplaced drafts for later review;
+            # publication must not invent placement for an approved artifact.
+            if not simulation_only and (
+                    slot == _selftest_slot or slot in _boot_resident_bodies):
+                raise ValueError(
+                    f"NS[{slot}] selected resident has no saved Namespace location; "
+                    "assign its exact placement before generating an image")
             return fallback
         value = row["location"]
         try:
@@ -3092,20 +3099,22 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
             raise ValueError(f"NS[{slot}] saved Namespace location must be a nonnegative word address")
         return location
 
-    def _claim_simulation_range(slot, location, size):
-        if not honor_namespace_layout:
-            return
+    def _claim_resident_range(slot, location, size):
         end = location + size
         if location < NAMESPACE_HEADER_V2_WORDS or end > _metadata_start:
             raise ValueError(
                 f"NS[{slot}] saved Namespace allocation [0x{location:X},0x{end:X}) "
                 "overlaps the reserved header/table or exceeds image bounds; review Namespace placement")
-        for start, stop, other in _simulation_ranges:
+        for start, stop, other in _resident_ranges:
+            # A compatibility Step-2 row can repeat the exact allocation
+            # already established from this slot's authoritative artifact.
+            if slot == other and location == start and end == stop:
+                return
             if location < stop and end > start:
                 raise ValueError(
                     f"NS[{slot}] saved Namespace allocation [0x{location:X},0x{end:X}) "
                     f"overlaps NS[{other}] [0x{start:X},0x{stop:X}); review Namespace placement")
-        _simulation_ranges.append((location, end, slot))
+        _resident_ranges.append((location, end, slot))
     for i, entry in enumerate(catalog):
         my_size  = slot_sizes.get(i, SLOT_SIZE)
         assigned = _state_by_slot.get(i)
@@ -3151,14 +3160,12 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                 loc = override
             elif not bitstream_only:
                 loc = running_offset
-                running_offset += my_size
             else:
                 loc = 0   # placeholder; NS entry not written (bitstream fills it)
             if not bitstream_only:
                 loc = _namespace_location(i, loc)
-                _claim_simulation_range(i, loc, my_size)
-                if honor_namespace_layout:
-                    running_offset = max(running_offset, loc + my_size)
+                _claim_resident_range(i, loc, my_size)
+                running_offset = max(running_offset, loc + my_size)
         locations[i] = loc
 
         # Slot 0: limit covers the NS TABLE region (NS_TABLE_RESERVE words).
@@ -3188,10 +3195,9 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         clist_gts.append(create_gt(retained_sequence, i, perms, 1))
 
     # SelfTest is not a catalog-position body.  Its authoritative Namespace
-    # state selects both its slot and the exact approved allocation, so place
-    # it in the same running resident pool as other executable bodies.
+    # state selects its slot, exact approved allocation and body location.
     _selftest_loc = _namespace_location(_selftest_slot, running_offset)
-    _claim_simulation_range(_selftest_slot, _selftest_loc, actual_abstr_size)
+    _claim_resident_range(_selftest_slot, _selftest_loc, actual_abstr_size)
     _selftest_end = _selftest_loc + actual_abstr_size
     if _selftest_end > _metadata_start:
         raise ValueError(
@@ -3204,7 +3210,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         (actual_abstr_size - 1) & 0x1FFFF, 0, 0, 1, _selftest_sequence, 0,
         trusted_cache_tokens.get(_selftest_slot, 0))
     locations[_selftest_slot] = _selftest_loc
-    running_offset = max(running_offset, _selftest_end) if honor_namespace_layout else _selftest_end
+    running_offset = max(running_offset, _selftest_end)
 
     # Count only non-null catalog entries: the highest non-null slot index + 1.
     # All 11 catalog entries are non-null (slots 0–10). This must match simulator.js nsCount.
@@ -3219,7 +3225,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
     extra_thread_locs = []
     for _ordinal, _thread_slot in enumerate(_generated_thread_slots, start=2):
         _thread_loc = _namespace_location(_thread_slot, running_offset)
-        _claim_simulation_range(_thread_slot, _thread_loc, thread_size)
+        _claim_resident_range(_thread_slot, _thread_loc, thread_size)
         _thread_end = _thread_loc + thread_size
         # Keep all resident bodies below the three metadata sentinel words.
         if _thread_end > _metadata_start:
@@ -3232,29 +3238,28 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
             )
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _thread_slot, _thread_loc,
                        (thread_size - 1) & 0x1FFFF, 0, 0, 1,
-                       retained_sequences.get(_thread_slot, 0) if honor_namespace_layout else 0, 0, 0)
+                       retained_sequences.get(_thread_slot, 0) if simulation_only else 0, 0, 0)
         locations[_thread_slot] = _thread_loc
         extra_thread_locs.append(_thread_loc)
-        running_offset = max(running_offset, _thread_end) if honor_namespace_layout else _thread_end
+        running_offset = max(running_offset, _thread_end)
         ns_count = max(ns_count, _thread_slot + 1)
 
-    # The catalog loop has reserved RAM for all fixed catalog bodies and the
-    # generated-thread loop has reserved every configured Thread body.  A
-    # Step-2 body is written later, so reject an overlap before it can corrupt
-    # a Thread header or its CR0 boot-entry capability.
-    _protected_end = running_offset
+    # Step-2 is a compatibility view of the same saved allocations, not a
+    # second resident pool. Check actual intervals, allowing an exact repeat
+    # for the same slot and leaving unallocated gaps available. Never use the
+    # high-water address as a proxy for occupied memory.
     for _e2 in step2_lumps:
         if not (isinstance(_e2, dict) and bool(_e2.get("resident"))):
             continue
+        _e2_slot = _e2.get("nsSlot")
         _e2_phys = _e2.get("physAddr")
-        _e2_size = _e2.get("lumpSize") or SLOT_SIZE
+        # The validated body allocation remains authoritative even when an
+        # older client's lumpSize is shorter than the artifact.
+        _e2_size = _boot_resident_allocations.get(
+            _e2_slot, _e2.get("lumpSize") or SLOT_SIZE)
         if (isinstance(_e2_phys, int) and isinstance(_e2_size, int)
-                and _e2_size > 0 and _e2_phys < _protected_end
-                and _e2_phys + _e2_size > 0):
-            raise ValueError(
-                f"generate_boot_image: resident Step-2 lump at "
-                f"physAddr {_e2_phys} overlaps the fixed boot and generated "
-                f"Thread region (0..{_protected_end - 1})")
+                and _e2_size > 0):
+            _claim_resident_range(_e2_slot, _e2_phys, _e2_size)
 
     # ----- Step 2 augmentation: NS entries for extended slots (≥8) ------
     # The 11-slot hardware catalog loop above creates NS entries for
@@ -3771,7 +3776,7 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
 
     # Pre-flight sanity check: catch a zeroed mandatory NS slot now rather
     # than waiting for the simulator to fault at runtime.
-    validate_boot_image(image, total, simulation_only=honor_namespace_layout)
+    validate_boot_image(image, total, simulation_only=simulation_only)
 
     return image
 

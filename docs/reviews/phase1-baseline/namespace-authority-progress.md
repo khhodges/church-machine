@@ -18,11 +18,47 @@ to intercept the current draft-placement boundary rather than the retired
 simulator mutation call. Developer guidance now distinguishes catalog
 bookkeeping from approved Namespace authority.
 
+
 ## Historical verification — before fixture repair and acceptance continuation
 
 This initial result is retained as historical evidence, not the current status.
-The resident-admission focused result below is **55 passed, 2 xfailed**; the
-original missing NS[1] allocation fixture failure is resolved.
+The fixture-repair result below was **55 passed, 2 xfailed**; the original missing
+NS[1] allocation fixture failure was resolved. The generator correction and
+current focused results are recorded at the end of this document.
+
+- `python -m pytest tests/server/test_lump_admission_service.py -q --tb=short`
+  — **17 passed, 1 failed**. Passing cases cover real admission with missing,
+  archived and duplicate catalog rows; preservation of existing selections;
+  changed/missing files; pending bytes; invalid filenames; interrupted
+  publication; and immutable destination-local derivatives.
+- Failure at that time: `test_boot_resident_admission_builds_an_image` could not
+  establish NS[1] allocation in its copied fixture. The fixture copies the LUMP
+  directory without the parent boot configuration required by admission.
+  No runtime allocation check was weakened to accommodate it.
+- `python -m pytest tests/lump/test_lump_consistency.py -q -k live_namespace --tb=short`
+  — **1 passed**, 1417 deselected. This reads the real selected bytes without
+  modifying them; it is not a full LUMP-suite result.
+- `node simulator/test_ns_slot_modal_persist.js` — **36 passed**.
+- `node simulator/test_namespace_boot_authority.js` — passed.
+- `node simulator/test_namespace_single_save.js` — passed.
+- IDE workflow restarted and serving HTTP 200; homepage screenshot loads.
+  This is not a browser save/reload acceptance test.
+
+An earlier broader diagnostic run of the admission, table-save, single-review,
+sole-authority, plan and image-refresh files produced **91 passed, 46 failed**.
+That result is retained as incomplete diagnostic evidence, not release
+qualification. Some tests stopped because their explicit isolated-server mode
+was absent; other extracted-route fixtures omit current dependencies, and
+additional image/layout failures remain unresolved. No full suite was restarted.
+Raw diagnostic logs are not attached because pytest assertion representations
+can include process-environment content.
+
+## Historical verification — before fixture repair and acceptance continuation
+
+This initial result is retained as historical evidence, not the current status.
+The fixture-repair result below was **55 passed, 2 xfailed**; the original missing
+NS[1] allocation fixture failure was resolved. The generator correction and
+current focused results are recorded at the end of this document.
 
 - `python -m pytest tests/server/test_lump_admission_service.py -q --tb=short`
   — **17 passed, 1 failed**. Passing cases cover real admission with missing,
@@ -172,7 +208,7 @@ the standard npm Playwright entry point discovers both acceptance cases without
 error. A no-server execution skips both when not requested; explicit opt-in
 without isolated paths is rejected, and valid isolated opt-in discovers both.
 No additional browser acceptance pass or destructive full-suite run was needed.
-## Separate open generator defect — not fixture success
+## Historical generator defect — corrected below
 
 `test_boot_generator_preserves_noncompact_admitted_location` exposes a genuine
 runtime discrepancy with otherwise identical, valid private inputs: admission
@@ -198,7 +234,7 @@ arbitrary admitted placements survive generation. Correcting that generator
 behavior is separate work; no allocation gate, ISA, profile, live state, hardware
 build or device action was changed for this test repair.
 
-## Resident-admission follow-up — deterministic private inputs
+## Historical fixture repair — deterministic private inputs
 
 The incomplete directory-copy fixture in
 `tests/server/test_lump_admission_service.py` has been replaced with a private
@@ -239,3 +275,53 @@ python -m pytest tests/server/test_lump_admission_service.py \
   tests/server/test_namespace_allocation.py -q --tb=short -rx
 55 passed, 2 xfailed
 ```
+
+## Generator correction — approved placement preserved
+
+Hardware/publication generation now uses saved Namespace locations for resident
+bodies, SelfTest and generated Threads, independently of simulator profile
+selection. The simulator-only flag still selects the same admission/profile
+behavior; it no longer decides whether saved physical addresses are honored.
+Hardware generation rejects a selected artifact with no saved location rather
+than inventing one. Private simulation retains its existing ability to stage
+unplaced drafts for review.
+
+Every RAM allocation is checked for overlap and header/table bounds before body
+writes. Allocation sizes still come from validated artifact headers or configured
+Thread geometry, not shortened capability limits. Generated Threads without a
+saved location follow the highest allocated end, even when SelfTest is located
+below a noncompact resident. Invalid saved placements fail explicitly; generation
+does not rewrite Namespace rows, approvals, artifact bytes or configuration.
+Explicit Refresh Image compaction is outside this correction.
+
+The strict xfail markers have been removed. Both parent-config and explicit-config
+fixtures now prove:
+
+- UploadedBoot remains at word **1024**, or **7872** immediately below the table,
+  in both the boot header and Namespace descriptor.
+- Every selected resident body matches its approved file word-for-word; the old
+  compact destination remains empty.
+- Thread/resident collisions, header/table overlap, out-of-RAM placement, and
+  missing/malformed addresses fail without persisted changes.
+- Saved noncompact root and secondary Thread locations are preserved. An
+  unplaced generated secondary Thread follows the resident high-water address;
+  a colliding secondary Thread fails rather than overwriting approved bytes.
+- Matching Step-2 compatibility rows are accepted for the same allocation,
+  including placements below another body's high-water address. Conflicting
+  addresses and real overlaps still fail; a short Step-2 size cannot shrink
+  the artifact's reserved allocation.
+- The existing private simulator preparation tests still pass without changing
+  their draft-placement behavior.
+
+Current focused verification:
+
+```text
+python -m pytest tests/server/test_lump_admission_service.py \
+  tests/server/test_namespace_allocation.py tests/simulation/test_preparation.py \
+  -q --tb=short
+128 passed
+```
+
+These tests construct private inputs and require no live-state repair, hardware
+build, upload, flash or device command. This is generator regression evidence,
+not integrated browser acceptance or closure of the broader Phase 1 requirements.

@@ -16,7 +16,9 @@ Do not fix this by retroactively trusting unbound historical state at freeze.
 
 Treat physical layout normalization separately from artifact selection. Preserve
 the submitted image for ordinary unchanged saves; do not bypass validation to
-avoid a rebuild when no valid image is available.
+avoid a rebuild when no valid image is available. Ordinary boot generation must
+preserve approved resident body addresses or fail explicitly, not silently
+compact them.
 
 **Why:** An unchanged selection can require different locations and limits when
 projected through current build settings and artifact allocations. Its descriptor
@@ -25,7 +27,17 @@ filename, token, slot, sequence, or boot target.
 
 **How to apply:** Explain regeneration before Save and test consecutive unchanged
 saves in private runtime state. Compare artifact identity and descriptor layout
-separately, then assert byte stability after normalization.
+separately. Keep address preservation independent of simulator-only profile
+validation; enabling it must not weaken hardware admission.
+
+Step-2 compatibility rows repeat Namespace allocations, not competing copies.
+Check occupied intervals rather than treating the high-water address as occupied.
+
+**Why:** Noncompact preservation raises that address above valid gaps and even
+above the resident repeated by Step-2, causing false overlap failures.
+
+**How to apply:** Accept exact same-slot claims while checking full artifact
+allocations against other slots, regardless of a client's shorter size hint.
 
 Refresh Image explicitly compacts RAM-backed LUMPs in ascending assigned slot order after the Namespace header, leaving free space before the high-address table. Ordinary Save is still not compaction.
 
