@@ -36,7 +36,7 @@ async function fixture(expression = 'DR11', source = null, rights = { R: 1 }, op
     const ns = sim.readNSEntry(slot);
     sim.cr[14] = { word0: sim.createGT(1, slot, { X: 1 }, 1),
         word1: base, word2: ns.word1_limit, word3: 0, m: 0 };
-    sim.cr[6] = { word0: sim.createGT(1, slot, { L: 1 }, 1),
+    sim.cr[6] = { word0: sim.createGT(1, slot, { E: 1 }, 1),
         word1: base + 61, word2: ns.word1_limit, word3: 0, m: 1 };
     // Use the simulator's freshly constructed canonical Thread, never a user
     // Thread snapshot or fabricated host-side CALL context.
@@ -56,6 +56,20 @@ async function main() {
     assert.equal(f.sim.pc, 2);
     assert.equal(f.sim.stepCount, 1);
     assert.equal(f.sim.step().opName, 'HALT');
+    assert.equal(f.sim.cr[6].word0, f.sim.createGT(1, f.slot, { E: 1 }, 1),
+        'IDX1 LOAD preserves E identity');
+    const noM = await fixture();
+    noM.sim.cr[6].m = 0;
+    noM.sim.fault = (type) => { noM.fault = type; };
+    assert.equal(noM.sim.step(), null);
+    assert.equal(noM.fault, 'PERMISSION', 'IDX1 E-only CR6 requires M for LOAD');
+    assert.equal(noM.sim.cr[1].word0, 0);
+    const legacyL = await fixture();
+    // Explicit legacy L-authorized fixture: L itself permits LOAD without M.
+    legacyL.sim.cr[6].word0 = legacyL.sim.createGT(1, legacyL.slot, { L: 1 }, 1);
+    legacyL.sim.cr[6].m = 0;
+    assert(legacyL.sim.step());
+    assert.equal(legacyL.sim.cr[1].word0, legacyL.selected);
     assert.throws(() => { f.sim.memory[f.base + 1] = 0; }, { code: 'IDX1_READ_ONLY' });
     const interior = await fixture();
     interior.sim.pc = 1;
@@ -149,7 +163,7 @@ async function main() {
     const callerEntry = cross.sim.readNSEntry(callerSlot);
     cross.sim.cr[14] = { word0: cross.sim.createGT(1, callerSlot, { X: 1 }, 1),
         word1: callerBase, word2: callerEntry.word1_limit, word3: 0, m: 0 };
-    cross.sim.cr[6] = { word0: cross.sim.createGT(1, callerSlot, { L: 1 }, 1),
+    cross.sim.cr[6] = { word0: cross.sim.createGT(1, callerSlot, { E: 1 }, 1),
         word1: callerBase + 63, word2: callerEntry.word1_limit, word3: 0, m: 1 };
     const calleeEntry = cross.sim.readNSEntry(cross.slot);
     cross.sim.cr[3] = { word0: cross.sim.createGT(1, cross.slot, { E: 1 }, 1),
@@ -162,6 +176,8 @@ async function main() {
     assert.equal(cross.sim.pc, 1);
     assert.equal(cross.sim.parseGT(cross.sim.cr[14].word0).index, callerSlot);
     assert.equal(cross.sim.cr[6].word1, callerBase + 63);
+    assert.equal(cross.sim.cr[6].word0, cross.sim.createGT(1, callerSlot, { E: 1 }, 1));
+    assert.equal(cross.sim.cr[6].m, 1, 'RETURN from IDX1 retains caller E+M');
     console.log('IDX1 real simulator LOAD, exact arithmetic and entry/mutation gate tests passed');
 }
 module.exports = { fixture };

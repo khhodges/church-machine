@@ -63,13 +63,13 @@ function makeSim() {
 
     const codeGT = sim.createGT(0, CODE_SLOT, {R: 1, X: 1}, 1);
     sim.cr[14] = { word0: codeGT, word1: CODE_BASE, word2: 63, word3: 0, m: 0 };
-    const clistGT = sim.createGT(0, CODE_SLOT, {L: 1}, 1);
+    const clistGT = sim.createGT(0, CODE_SLOT, {E: 1}, 1);
     sim.cr[6] = {
         word0: clistGT,
         word1: CODE_BASE + 63,
         word2: sim.packNSWord1(63, 0, 0, 0, 1),
         word3: 0,
-        m: 0,
+        m: 1,
     };
     sim.memory[CODE_BASE + 63] = sim.createGT(0, LED_SLOT, {R: 1, W: 1}, 1);
     // Dormant Thread identity is the canonical downward CHURCH frame:

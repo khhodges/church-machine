@@ -226,10 +226,11 @@ assert.strictEqual(sim.faultLog.at(-1).type, 'STACK_UNDERFLOW',
         'RETURN popped an unrelated diagnostic shadow entry');
     const noSnapshotCR6 = noSnapshot.parseGT(noSnapshot.cr[6].word0);
     const noSnapshotCR14 = noSnapshot.parseGT(noSnapshot.cr[14].word0);
-    assert.strictEqual(noSnapshotCR6.permissions.L, 1,
-        'no-snapshot RETURN did not reconstruct caller CR6 L');
-    assert.strictEqual(noSnapshotCR6.permissions.E, 0,
-        'no-snapshot RETURN reconstructed caller CR6 with E');
+    assert.strictEqual(noSnapshotCR6.permissions.L, 0,
+        'no-snapshot RETURN must not change E authority into L');
+    assert.strictEqual(noSnapshotCR6.permissions.E, 1,
+        'no-snapshot RETURN did not retain caller CR6 E');
+    assert.strictEqual(noSnapshot.cr[6].m, 1, 'RETURN must rearm CR6.M');
     assert.strictEqual(noSnapshotCR14.permissions.X, 1,
         'no-snapshot RETURN did not reconstruct caller CR14 RX');
     assert.strictEqual(

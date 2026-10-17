@@ -271,6 +271,7 @@ console.log('\n--- PHASE 2: cross-domain round-trip via real _execCall→_execRe
     sim.cr[14] = { word0: callerCR14GT, word1: CALLER_BASE, word2: 63, word3: 0, m: 0 };
 
     // CR6: caller's c-list GT (L).
+    // Legacy L-authorized fixture, retained to test trace adapter compatibility.
     const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);
     sim.cr[6] = { word0: callerCR6GT, word1: CALLER_BASE, word2: 0, word3: 0, m: 0 };
 
@@ -489,7 +490,7 @@ console.log('\n--- PHASE 4: lambda-fast round-trip via real _execLambda→_execR
 // non-lump-header path where `hasLumpHeader = hdr.valid && hdr.cc > 0` is
 // false.  In this branch CR14 is NOT set simultaneously with CR6 from the lump
 // header; instead:
-//   1. CR6 is written (L-only GT).
+//   1. CR6 is written (E-only GT; M grants c-list LOAD access).
 //   2. clistLoc = nsEntry.word0_location (callee lump base).
 //   3. memory[clistLoc] is read as a potential code GT (clist[0]).
 //   4. If that word is an Inform+X GT, CR14 is set to an RX GT derived from it.
@@ -548,6 +549,7 @@ console.log('\n--- PHASE 5: non-lump-header path (cc=0, CR14 from clist[0]) ---'
     sim.cr[14] = { word0: callerCR14GT, word1: CALLER_BASE, word2: 63, word3: 0, m: 0 };
 
     // CR6: caller's c-list GT (L).
+    // Legacy L-authorized fixture, retained to test trace adapter compatibility.
     const callerCR6GT = sim.createGT(0, CALLER_SLOT, {L:1}, 1);
     sim.cr[6] = { word0: callerCR6GT, word1: CALLER_BASE, word2: 0, word3: 0, m: 0 };
 

@@ -7346,7 +7346,7 @@ class ChurchSimulator {
         return { pc: this.pc - 1, instr: d, desc };
     }
 
-    _deriveEnterCompanionGT(callerGT, label = 'CALL') {
+    _deriveEnterCompanionGT(callerGT, label = 'CALL', {allowLegacyView = false} = {}) {
         callerGT = callerGT >>> 0;
         if (!callerGT || ChurchSimulator.isNullGT(callerGT)) {
             return { ok: false, fault: 'NULL_CAP',
@@ -7363,13 +7363,27 @@ class ChurchSimulator {
             return { ok: false, fault: 'TYPE',
                 message: `${label}: caller CR6 must be an Inform capability for Enter companion` };
         }
+        // Real Thread frames must retain authority the caller already holds.
+        // M grants LOAD, not permission to manufacture an Enter capability.
+        const legacyView = allowLegacyView && this._activeThreadBase() === null &&
+            (parsed.permissions.L || parsed.permissions.X);
+        if (!parsed.permissions.E && !legacyView) {
+            return { ok: false, fault: 'PERM_E',
+                message: `${label}: caller CR6 must hold E authority for Enter companion` };
+        }
+        const originalCheck = this.mLoad(callerGT, null, 6);
+        if (!originalCheck.ok) return { ok: false, fault: originalCheck.fault,
+            message: `${label}: caller CR6: ${originalCheck.message}` };
         const entry = this.readNSEntry(parsed.index);
         if (!entry) {
             return { ok: false, fault: 'BOUNDS',
                 message: `${label}: caller CR6 names no Namespace entry for Enter companion` };
         }
-        const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
-        const enterGT = this.createGT(seq, parsed.index, {E: 1}, 1) >>> 0;
+        // Preserve the caller's authority, including its generation. Never
+        // refresh a stale token from the current Namespace entry. L/RX inputs
+        // remain supported for legacy fixture/context adapters only.
+        const enterGT = parsed.permissions.E ? callerGT
+            : this.createGT(parsed.gt_seq, parsed.index, {E: 1, B: parsed.permissions.B}, 1) >>> 0;
         const check = this.mLoad(enterGT, 'E', 14);
         if (!check.ok) return { ok: false, fault: check.fault,
             message: `${label}: caller Enter companion: ${check.message}` };
@@ -7651,8 +7665,7 @@ class ChurchSimulator {
         const rootSentinel = d.bootRootContext === true;
         // Every protected CALL frame carries an Enter E-GT companion.  The
         // boot-root transaction uses the validated source capability itself;
-        // ordinary CALL derives a fresh E-GT from the caller's CR6 identity,
-        // never serializing the caller's L permission word.
+        // ordinary CALL retains the caller's CR6 E identity unchanged.
         let frameCompanionGT;
         if (rootSentinel) {
             frameCompanionGT = sourceGT >>> 0;
@@ -7664,7 +7677,7 @@ class ChurchSimulator {
                 (this._activeThreadBase() === null && this.cr[14] &&
                     this.cr[14].word0);
             const companion = this._deriveEnterCompanionGT(
-                callerGT, 'CALL');
+                callerGT, 'CALL', {allowLegacyView: callThreadBase === null});
             if (!companion.ok) {
                 if (this._activeThreadBase() !== null || callerGT) {
                     this.fault(companion.fault, companion.message);
@@ -7741,13 +7754,11 @@ class ChurchSimulator {
 
         if (hasLumpHeader) {
             const headerContext = this._installLumpHeaderContext(
-                srcParsed, check.index, nsEntry, hdr);
+                srcParsed, check.index, nsEntry, hdr, sourceGT);
             cr14Desc = `, hdr=0x${hdrWord.toString(16).toUpperCase().padStart(8,'0')} → ${headerContext.desc}`;
         } else {
-            // Non-lump-header path: write L-only GT to CR6 + M.
-            // Matches hardware call.py: cr6_adj_gt.perm.eq(0b001) (L = perm[0] in Church domain).
-            const cr6GTnorm = this.createGT(srcParsed.gt_seq, check.index, {R:0,W:0,X:0,L:1,S:0,E:0}, srcParsed.type);
-            this._writeCR(6, cr6GTnorm, nsEntry);
+            // The E identity stays in CR6; M authorizes c-list LOAD access.
+            this._writeCR(6, sourceGT, nsEntry);
             this.cr[6].m = 1;   // M set (CALL always M-elevated; _writeCR uses global mElevation which may be 0 post-boot)
 
             const clistLoc = nsEntry.word0_location;
@@ -7843,16 +7854,18 @@ class ChurchSimulator {
 
     // CALL and Thread CHANGE use the same header-load microcode. A single
     // validated LUMP header establishes the RX code view in CR14 and the
-    // L-only c-list view in CR6 simultaneously.
-    _installLumpHeaderContext(sourceParsed, nsIndex, nsEntry, hdr) {
+    // E-only c-list identity in CR6 simultaneously. CR6.M authorizes LOAD.
+    _installLumpHeaderContext(sourceParsed, nsIndex, nsEntry, hdr, sourceGT = null) {
         const base = nsEntry.word0_location >>> 0;
         const clistStart = hdr.lumpSize - hdr.cc;
         const cr14GT = this.createGT(
             sourceParsed.gt_seq, nsIndex,
             {R:1,W:0,X:1,L:0,S:0,E:0}, 1);
-        const cr6GT = this.createGT(
+        // Preserve the complete validated E word, including object-lock B.
+        // Parsed-only fixture adapters must reproduce all its permission bits.
+        const cr6GT = sourceGT === null ? this.createGT(
             sourceParsed.gt_seq, nsIndex,
-            {R:0,W:0,X:0,L:1,S:0,E:0}, sourceParsed.type);
+            sourceParsed.permissions, sourceParsed.type) : sourceGT >>> 0;
         this.cr[14] = {
             word0: cr14GT,
             word1: base,
@@ -7868,7 +7881,7 @@ class ChurchSimulator {
             m: 1,
         };
         return {
-            desc: `CR14+CR6 simultaneous: CR14(RX M=1,cw=${hdr.cw},lim=0..${hdr.cw - 1}) CR6(L M=1,cc=${hdr.cc},base=0x${(base + clistStart).toString(16).toUpperCase()})`,
+            desc: `CR14+CR6 simultaneous: CR14(RX M=1,cw=${hdr.cw},lim=0..${hdr.cw - 1}) CR6(E M=1,cc=${hdr.cc},base=0x${(base + clistStart).toString(16).toUpperCase()})`,
         };
     }
 
@@ -8203,7 +8216,8 @@ class ChurchSimulator {
                     frame: frameMeta, companion: 0,
                     companionParsed: null, companionCheck: null };
             }
-            const companion = this._deriveEnterCompanionGT(legacyCR6, 'RETURN');
+            const companion = this._deriveEnterCompanionGT(legacyCR6, 'RETURN',
+                {allowLegacyView: !frameMeta.companionGT});
             if (!companion.ok) {
                 this.fault(companion.fault, companion.message);
                 return { ok: false };
@@ -8395,7 +8409,19 @@ class ChurchSimulator {
         // caller-context reconstruction. LAMBDA shares the caller code identity.
         let returnCR6 = null;
         if (protectedFrame.threadBase === null && frame.savedCRs?.[6]) {
+            // Lump-only adapters lack protected Thread RAM. Use the validated
+            // companion identity, not a legacy snapshot's L permission word.
             returnCR6 = {...frame.savedCRs[6], m: 1};
+            if (protectedFrame.companion) {
+                const entry = protectedFrame.companionCheck.entry;
+                const hdr = this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
+                returnCR6.word0 = protectedFrame.companion;
+                if (hdr.valid) {
+                    returnCR6.word1 = (entry.word0_location + hdr.lumpSize - hdr.cc) >>> 0;
+                    returnCR6.word2 = entry.word1_limit >>> 0;
+                    returnCR6.word3 = entry.word2_seals >>> 0;
+                }
+            }
         } else if (protectedFrame.threadBase !== null) {
             const identity = activeFrameSZ === 1
                 ? protectedFrame.companionParsed : this.parseGT(this.cr[14].word0);
@@ -8408,7 +8434,8 @@ class ChurchSimulator {
                 return null;
             }
             returnCR6 = {
-                word0: this.createGT(identity.gt_seq, identity.index, {L: 1}, 1) >>> 0,
+                word0: activeFrameSZ === 1 ? protectedFrame.companion
+                    : this.createGT(identity.gt_seq, identity.index, {E: 1}, 1) >>> 0,
                 word1: (base + hdr.lumpSize - hdr.cc) >>> 0,
                 word2: entry.word1_limit >>> 0,
                 word3: entry.word2_seals >>> 0,
@@ -8450,7 +8477,7 @@ class ChurchSimulator {
             }
         }
         // The protected Enter companion is the caller identity authority.
-        // Reconstruct the normalized L CR6 from its E identity rather than
+        // Reconstruct CR6 with its unchanged E identity rather than
         // trusting a diagnostic snapshot's permission bits.
         if (returnCR6) this.cr[6] = returnCR6;
         // RETURN microcode establishes the caller's c-list as the one
@@ -8870,11 +8897,10 @@ class ChurchSimulator {
             this.fault('BOUNDS', 'CHANGE incoming C-List has invalid geometry');
             return null;
         }
-        const clistGT = this.createGT(resume.parsed.gt_seq, resume.checked.index,
-            {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
+        const clistGT = resume.enterGT;
         // mLoad validates the object identity; its raw Namespace extent is the
         // code view, not the tail-relative C-List view validated above.
-        const clistCheck = this.mLoad(clistGT, 'L', 6);
+        const clistCheck = this.mLoad(clistGT, 'E', 6);
         if (!clistCheck.ok) {
             this.fault(clistCheck.fault, `CHANGE incoming C-List: ${clistCheck.message}`);
             return null;
@@ -8985,7 +9011,7 @@ class ChurchSimulator {
         };
 
         const headerContext = this._installLumpHeaderContext(
-            codeParsed, codeParsed.index, codeEntry, codeHeader);
+            codeParsed, codeParsed.index, codeEntry, codeHeader, resume.enterGT);
         this._currentThreadSlot = targetIdx;
         this._liveThreadOwned = true;
         const frameDesc = `CHURCH frame NIA 0x${resume.frame.returnPC.toString(16).toUpperCase()}`;
@@ -11255,13 +11281,13 @@ class ChurchSimulator {
         if (_activateInstalledContext && this.cr[6]) {
             if (hdr.cc > 0) {
                 const clistBase = installBase + lumpSize - hdr.cc;
-                const cr6GT = this.createGT(existingGtSeq, abstrSlot, {R:0,W:0,X:0,L:1,S:0,E:0}, 1);
+                const cr6GT = this.createGT(existingGtSeq, abstrSlot, {E:1}, 1);
                 this.cr[6] = {
                     word0: cr6GT,
                     word1: clistBase >>> 0,
                     word2: this.memory[nsBase + 1],
                     word3: this.memory[nsBase + 2],
-                    m: 0,
+                    m: 1,
                 };
             } else {
                 this.cr[6] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };

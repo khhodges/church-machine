@@ -159,9 +159,9 @@ assert.strictEqual(committed.cr[6].word1,
     firstEntry.word0_location + firstHeader.lumpSize - firstHeader.cc,
     'CHANGE header microcode reloads CR6 at the LUMP c-list tail');
 assert.deepStrictEqual(
-    {R: cr6Perms.R, W: cr6Perms.W, X: cr6Perms.X, L: cr6Perms.L},
-    {R: 0, W: 0, X: 0, L: 1},
-    'CHANGE header microcode reloads CR6 with L-only permissions');
+    {R: cr6Perms.R, W: cr6Perms.W, X: cr6Perms.X, L: cr6Perms.L, E: cr6Perms.E},
+    {R: 0, W: 0, X: 0, L: 0, E: 1},
+    'CHANGE header microcode retains CR6 E-only identity');
 assert.strictEqual(committed.cr[6].m, 1,
     'CHANGE header microcode installs CR6 with the same M state as CALL');
 assert.strictEqual(committed.cr[6].word2, committed.cr[14].word2,

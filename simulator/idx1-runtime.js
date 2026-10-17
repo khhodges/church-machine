@@ -196,7 +196,7 @@
             fail('PRIV_REG', 'IDX1 source capability is privileged');
         if (packet.opcode === 0 && packet.a >= 12 && !sim.mElevation)
             fail('PRIV_REG', 'IDX1 LOAD destination is privileged');
-        const permission = packet.opcode === 0 ? (packet.b === 6 ? null : 'L') :
+        const permission = packet.opcode === 0 ? (source.m ? null : 'L') :
             packet.opcode === 16 ? (packet.b === 14 ? 'X' : 'R') : 'W';
         const sourceCheck = requireCheck(sim.mLoad(source.word0, permission, packet.b));
         if (sourceCheck.parsed.type !== 1)

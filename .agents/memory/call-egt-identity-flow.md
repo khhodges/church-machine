@@ -22,6 +22,20 @@ permission bits in LOAD, CALL and RETURN work. Never fix ordinary non-CR6
 L-only header access by rewriting CR6's GT or granting mixed R/L rights.
 RETURN frames retain caller E authority, not a fabricated L-only identity.
 
+Preserving E authority also means preserving its generation: never refresh a
+saved or calling token from the current Namespace sequence when constructing
+an Enter companion, including lump-only simulator adapters.
+
+**Why:** A refreshed generation could make stale caller authority appear valid
+and hide the difference between preserving an identity and minting a new one.
+
+The E-only contract preserves the full E word, including B object-lock metadata.
+Protected Thread frames may never convert an L/RX caller token to E; only
+explicit lump-only legacy fixture adapters can support that historical input.
+
+**Why:** M authorizes c-list LOAD, not new Enter authority. Re-encoding only E
+can also silently discard B even when the slot and generation are unchanged.
+
 RETURN has no CR source operand. The encoded register fields are zero/reserved;
 requiring E permission from CR0 (or any decoded CR) aborts before the frame and
 violates the ISA. The saved Enter E-GT is the sole return authority.
