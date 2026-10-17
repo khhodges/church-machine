@@ -22,3 +22,4 @@ urllib3>=2.7.0,<3
 fpdf
 pyserial
 amaranth==0.5.9
+openpyxl

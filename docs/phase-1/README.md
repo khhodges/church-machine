@@ -26,8 +26,11 @@ hardware qualification, or authorization to change bootstrap.
 
 - **[W7++ scope and evidence requirements](W7-plus-plus-test-objectives.md)**
   — Phase 1 objective, with current-contract reconciliation and scope gates.
-- **[Original threat-test workbook](CTMM_W7_Threat_Test_Plan.xlsx)** — preserved
-  input: 15 objectives, all marked Not run at receipt; no test-pass claim.
+- **[CTMM W7 completeness workbook](CTMM_W7_Threat_Test_Plan.xlsx)** — original
+  Threat Map, Summary and Method sheets preserved; added Completeness, Progress
+  and Tracking guide sheets cover IDE gaps, missing functions, seal storage,
+  simulator/ISA compatibility, named abstractions and release qualification.
+  Statuses are evidence-scoped; no new runtime or hardware pass is claimed.
 - **[Wukong one-second throughput tests](W7-plus-plus-test-objectives.md#wukong-one-second-instruction-throughput-tests)** —
   six planned workload/trace examples; estimates, measurement procedure and
   exact-build evidence requirements, not measured performance.

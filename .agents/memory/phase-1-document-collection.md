@@ -875,3 +875,16 @@ runtime indexing and a larger relative offset in one word.
 **How to apply:** A negative displacement is valid; reject invalid target
 addresses, not backward branches. Do not wrap arithmetic, retain the old
 signed-15-bit encoding as current, or silently reinterpret saved binaries.
+
+Use the CTMM W7 workbook for broader Phase 1 completeness tracking, including
+IDE issues, missing functions, seal storage and simulator compatibility with
+the approved ISA, not just the original threat tests.
+
+**Why:** Genesis explicitly requested these concerns and the Phase 1 status
+summary be brought into the spreadsheet to track completeness.
+
+**How to apply:** Preserve original threat-test evidence while tracking
+implementation and qualification separately. Do not equate merged code,
+documentation approval, or unweighted tracker completion with physical FPGA
+or security acceptance. Keep seal authenticity, secret-proof custody, integrity
+checks and storage ECC distinct.

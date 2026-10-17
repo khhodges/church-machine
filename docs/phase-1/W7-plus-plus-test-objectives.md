@@ -2,9 +2,13 @@
 
 **Status:** User-designated test objective; not a passed security assessment.
 
-The [supplied test workbook](CTMM_W7_Threat_Test_Plan.xlsx) is preserved
-unchanged as the W7++ objective input. It contains three sheets: Threat Map,
-Summary, and Method. At receipt, all 15 objectives are marked **Not run**,
+The [supplied test workbook](CTMM_W7_Threat_Test_Plan.xlsx) retains its original
+Threat Map, Summary and Method sheets unchanged as the W7++ objective input.
+Added Completeness, Progress and Tracking guide sheets track broader Phase 1
+delivery, IDE gaps, missing functions, seal storage, simulator/ISA compatibility
+and exact-build evidence. The new Progress sheet is separate from the original
+15-threat Summary; its completion rate is unweighted row closure, not a security
+proof percentage. At receipt, all 15 original objectives are marked **Not run**,
 with no recorded W7 baseline or CTMM execution results.
 
 The workbook's “Ratified,” “Proven,” and closure-category labels are supplied
