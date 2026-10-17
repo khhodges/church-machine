@@ -186,6 +186,21 @@ function configWithScriptOnlySuites(scriptOnlySuites) {
 }
 
 // ---------------------------------------------------------------------------
+// T8 — command parity, not only suite-name parity. This guard only inspects
+// configuration; it must not execute the RETURN suite from inside sync tests.
+// ---------------------------------------------------------------------------
+{
+    const result = cp.spawnSync('python3', [
+        path.join(__dirname, 'test_return_trace_workflow_wiring.py'),
+    ], { cwd: ROOT, encoding: 'utf8' });
+    check('T8: RETURN workflow uses the complete isolated suite without recursion or duplicates',
+        result.status === 0);
+    if (result.status !== 0) {
+        console.error(result.error || result.stderr || result.stdout);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
 console.log('');
