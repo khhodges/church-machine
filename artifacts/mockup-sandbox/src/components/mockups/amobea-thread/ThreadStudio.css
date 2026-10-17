@@ -65,6 +65,19 @@
   font-size: 10px;
   letter-spacing: .045em;
 }
+.cm-studio .cm-individual-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px;
+  color: #fbbf24;
+  border: 1px solid #49402c;
+  border-radius: 3px;
+  font-size: 9px;
+  letter-spacing: .02em;
+  text-decoration: none;
+}
+.cm-studio .cm-individual-link:hover { color: #ffcf4f; background: #201d2b; }
 
 .cm-studio .cm-build-badge {
   display: inline-flex;

@@ -37,4 +37,10 @@ The augmented Thread designer prototype is restricted to Phase 1 tuple storage a
 
 **Why:** The user explicitly narrowed the requested design view to these concepts.
 
-**How to apply:** Keep it isolated from the live IDE and preserve the prior prototype. Do not expand the view into hardware programming, Namespace building, or real external integrations. Unresolved rollback behavior is design-only.
+**How to apply:** Keep prototype work isolated until integrated under the subsequent approval below, and preserve the prior prototype. Do not expand the view into hardware programming, Namespace building, or real external integrations. Unresolved rollback behavior is design-only.
+
+The Individual-facing Amobea view and augmented Thread designer are approved for the IDE as additions, NOT replacements.
+
+**Why:** The user explicitly approved additive IDE integration after reviewing the distinction between the Individual's everyday-task interface and the technical Thread designer.
+
+**How to apply:** Preserve existing IDE views and functionality. Add the new entry points alongside them; do not replace technical tools with the simplified Individual interface. Approval to integrate the views does not authorize external service execution or resolve the Phase 1 runtime contracts.
