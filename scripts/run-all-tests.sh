@@ -244,7 +244,7 @@ register_suite "boot-entry-sync-tests" \
     'node simulator/test_namespace_handoff_target.js && node simulator/test_namespace_design_source_notice.js && node simulator/test_namespace_handoff_probe.js --require-handoff && node simulator/test_namespace_runtime_view.js && node simulator/test_namespace_runtime_browser.js && node simulator/test_boot_entry_sync.js && node simulator/test_boot_fault_register_context.js'
 
 register_suite "three-instruction-boot-tests" \
-    'node tests/simulator/sim_boot_three_instruction.js'
+    'node tests/simulator/sim_boot_three_instruction.js && node tests/boot/test_compact_boot_flow.js'
 
 register_suite "install-boot-entry-cr0-tests" \
     'python -m pytest tests/simulator/test_install_boot_entry_cr0.py -v'

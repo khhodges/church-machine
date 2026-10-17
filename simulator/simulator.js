@@ -3941,6 +3941,10 @@ class ChurchSimulator {
             }
             this.mElevation = false;
             this._resetAllMBits();
+            // CALL established E-only CR6; retain its boundary L authority.
+            // Clearing setup/debugger M state must not revoke the root CALL's
+            // C-list access before the first ordinary instruction.
+            this.cr[6].m = 1;
             this.bootComplete = true;
             this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
             this._liveThreadOwned = true;
@@ -7810,8 +7814,8 @@ class ChurchSimulator {
         if (idx1TargetPC !== null) {
             this.pc = idx1TargetPC;
         } else if (methodIndex === 0) {
-            // Single entry point: word 1 of the lump (lump_base is word-indexed in simulator).
-            this.pc = 1;
+            // Fetch is base + 1 + pc: logical zero enters physical word 1.
+            this.pc = 0;
         } else {
             const lumpBaseWord = nsEntry.word0_location;  // word index of lump_base in memory[]
             if (methodIndex > hdr.cw) {

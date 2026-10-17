@@ -110,6 +110,8 @@ for (const protectedThread of [false, true]) {
         for (const i of [0, 1, 2, 3, 4, 7, 8, 9, 10, 11])
             sim.cr[i] = {word0: callee.gt, word1: callee.base, word2: 2, word3: 3, m: 1};
         const current = sim.cr.map(c => ({...c}));
+        assert.equal(sim.pc, 0, 'selector zero enters the first code word');
+        assert.equal(sim.step().instr.opcode, 23, 'retire the entry branch');
         assert(sim.step());
         checkContext(sim, caller);
         for (const i of [0, 1, 2, 3, 4, 7, 8, 9, 10, 11])
@@ -130,6 +132,7 @@ for (const protectedThread of [false, true]) {
         activate(caller);
         sim.cr[0].word0 = callee.gt;
         assert(sim._execCall({crDst: 0, imm: 0}));
+        assert.equal(sim.step().instr.opcode, 23, 'retire selector-zero entry branch');
         assert(sim.step());
         checkContext(sim, caller);
         if (gate === 'type') {
@@ -232,6 +235,7 @@ for (const protectedThread of [false, true]) {
     assert.equal(frame.companionGT, caller.gt);
     if (protectedThread)
         assert.equal(sim.memory[sim._activeThreadBase() + frame.savedSTO - 1], caller.gt);
+    assert.equal(sim.step().instr.opcode, 23, 'retire selector-zero entry branch');
     assert(sim.step());
     checkContext(sim, caller);
 }

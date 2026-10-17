@@ -2747,60 +2747,13 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
                         and _bscc <= DEMO_CLIST_SIZE and _bsn >= _bssz
                         and (1 + _bscw + _bscc) <= _bssz):
                     actual_abstr_size = _bssz
-                    # Decide whether to strip cc → 0 (triggering LAZY injection
-                    # in _applyPendingSimLoad) or embed cc as-is (POLA-finalized
-                    # lump whose c-list is already correct).
-                    #
-                    # Rule: scan every LOAD/SAVE/ELOADCALL/XLOADLAMBDA word
-                    # (opcodes 0/1/8/9) whose crSrc field is CR6 (= 6).  If the
-                    # slot operand >= _bscc then the stored c-list is incomplete
-                    # (e.g. assembler-generated cc=1 placeholder) and the
-                    # simulator must LAZY-inject the DEMO_CLIST at runtime.
-                    # If ALL slot references are < _bscc the lump was finalized
-                    # by POLA compression and must be embedded with its actual cc
-                    # so LAZY injection does NOT overwrite the POLA c-list with
-                    # the original DEMO_CLIST order (which would corrupt the
-                    # POLA-rewritten slot indices in the code words).
-                    _CLIST_OPS = frozenset((0, 1, 8, 9))  # LOAD SAVE ELOADCALL XLOADLAMBDA
-                    _needs_lazy = (_bscc == 0)             # no c-list → always needs LAZY
-                    if not _needs_lazy:
-                        for _wi in range(1, 1 + _bscw):
-                            if _wi >= _bssz:
-                                break
-                            _ww = _bswords[_wi]
-                            _op     = (_ww >> 27) & 0x1F
-                            _cr_src = (_ww >> 15) & 0xF
-                            # Row lives in bits[4:0]; ELOADCALL/XLOADLAMBDA pack
-                            # methodIdx into bits[11:5], so & 0x7FFF would read the
-                            # method as part of the slot, causing false positives.
-                            _slot   = _ww & 0x1F
-                            if _op in _CLIST_OPS and _cr_src == 6 and _slot >= _bscc:
-                                _needs_lazy = True
-                                break
-                    if executable_validator is not _require_approved_executable_lump:
-                        # Private simulation validates complete capability
-                        # references up front. Never strip immutable c-list
-                        # content to invite a later catalog-driven injection.
-                        _needs_lazy = False
-                    if _needs_lazy:
-                        # Pre-LAZY / stale c-list: strip cc → 0 in the header AND
-                        # zero any c-list words in the tail so the embedded lump is
-                        # fully consistent (cc=0 header + empty tail).  LAZY injection
-                        # will rebuild the full DEMO_CLIST at runtime on first Run.
-                        # Without zeroing the tail, a partially-POLA'd lump would leave
-                        # dead POLA GTs visible in the lump viewer while the header
-                        # claims cc=0 — a confusing and inconsistent display.
-                        _body = list(_bswords[1:_bssz])
-                        if _bscc > 0:
-                            # Positions _bssz-_bscc .. _bssz-1 (0-indexed in full lump)
-                            # map to _bssz-_bscc-1 .. _bssz-2 in _body (offset by 1).
-                            for _ci in range(_bscc):
-                                _body[_bssz - _bscc - 1 + _ci] = 0
-                        abstr_words = [_bswords[0] & ~0xFF] + _body
-                    else:
-                        # POLA-finalized c-list: embed with actual cc so the
-                        # simulator's LAZY guard (clistCount === 0) does not fire.
-                        abstr_words = list(_bswords[:_bssz])
+                    # Approval binds this header and capability layout. Never
+                    # infer a replacement list from instruction operands:
+                    # compact LOAD/SAVE encode DR +/- magnitude, not a low-five-
+                    # bit row. Dynamic indices cannot be resolved here either.
+                    # Preserve the selected bytes; ordinary runtime bounds checks
+                    # reject invalid accesses rather than inviting lazy repair.
+                    abstr_words = list(_bswords[:_bssz])
     except Exception as exc:
         raise ValueError(
             "generate_boot_image: SelfTest executable body could not be "
@@ -3449,14 +3402,9 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         _saved_cc      = abstr_words[0] & 0xFF
         entry_cr_limit = actual_abstr_size - _saved_cc - 1
 
-        # Row 0 is immutable authenticated input.  Approval validation above
-        # already proved it equals the owning descriptor-derived GT; never
-        # repair or normalize a mismatching artifact while building an image.
-        if _saved_cc > 0:
-            _clist_base_m = boot_entry_loc + actual_abstr_size - _saved_cc
-            if 0 < _clist_base_m < total:
-                if _saved_cc > 1 and len(clist_gts) > 1:
-                    mem[_clist_base_m + 1] = clist_gts[1] & 0xFFFFFFFF
+        # The selected C-list is authoritative, including row 1. A boot entry
+        # selects the initial executable; it must not replace a saved capability
+        # with a self-loop or a different continuation.
         write_ns_entry(mem, total, NS_ENTRY_WORDS, _selftest_slot,
                         boot_entry_loc, entry_cr_limit, 0, 0, 1, _selftest_sequence, _saved_cc,
                        _abstr_cache_token)

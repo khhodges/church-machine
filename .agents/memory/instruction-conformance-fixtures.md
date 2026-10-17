@@ -96,6 +96,17 @@ subregion enforcement separate from the bounded cross-Thread regression.
 Synthetic activation probes must provide a complete executable continuation,
 not assume constructor boot completion makes every placeholder resumable.
 
+Boot acceptance must execute the first ordinary instruction and a C-list
+access before any CHANGE; reaching `bootComplete` alone is insufficient.
+
+**Why:** Later Thread activation can hide lost CALL-boundary M authority or a
+skipped first instruction, while a synthetic later entry still passes.
+
+**How to apply:** Exercise the exact generated image through root entry, LOAD,
+CALL, RETURN and caller continuation without manually moving PC or repairing
+registers. Keep exact approved-profile acceptance separate from synthetic
+machine-path evidence.
+
 **Why:** Constructor placeholders and poison roots can let setup finish while
 ordinary CHANGE correctly rejects the missing suspended continuation or C-list
 geometry. Those fixture failures say nothing about an exclusion mechanism.

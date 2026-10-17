@@ -83,7 +83,7 @@ console.log('PASS CALL: E-only identity, both reconstruction paths, dispatch bou
     const callee = {slot: 31, base: 0x300, clistBase: 0x33F};
     for (const [domain, seq] of [[caller, 19], [callee, 27]]) {
         sim.memory[domain.base] = sim.packLumpHeader(0, 3, 1, 0);
-        sim.memory[domain.base + 2] = sim.encodeInstruction(3, 14, 0, 0, 0);
+        sim.memory[domain.base + 1] = sim.encodeInstruction(3, 14, 0, 0, 0);
         sim.withNamespaceWrite('nonzero generation fixture', () =>
             sim.writeNSEntry(domain.slot, domain.base, 63, 0, 0, 1, seq, 1, 0));
         domain.gt = sim.createGT(seq, domain.slot, {E: 1}, 1);

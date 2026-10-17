@@ -185,8 +185,8 @@ assert.strictEqual(sim.faultLog.at(-1).type, 'STACK_UNDERFLOW',
     assert.deepStrictEqual(
         Array.from(nested.memory.slice(nestedLayout.base + 238,
             nestedLayout.base + 244), word => word >>> 0),
-        [nestedGT, nested._packFrameWordRaw(2, 1, 239),
-            nestedGT, nested._packFrameWordRaw(2, 1, 241),
+        [nestedGT, nested._packFrameWordRaw(1, 1, 239),
+            nestedGT, nested._packFrameWordRaw(1, 1, 241),
             nestedGT, nested._packFrameWordRaw(0x7FFF, 1, 243)],
         'nested raw Thread +238..+243 lost a contiguous frame pair');
     assert.strictEqual(nested.callStack.length, 3);
@@ -220,7 +220,7 @@ assert.strictEqual(sim.faultLog.at(-1).type, 'STACK_UNDERFLOW',
     assert(noSnapshot._execReturn({
         opcode: 3, cond: 14, imm: 0, mnemonic: 'RETURN',
     }), 'valid protected RETURN required a JS snapshot');
-    assert.strictEqual(noSnapshot.pc, 2,
+    assert.strictEqual(noSnapshot.pc, 1,
         'mismatched callStack redirected packed return NIA');
     assert.strictEqual(noSnapshot.callStack.length, 1,
         'RETURN popped an unrelated diagnostic shadow entry');

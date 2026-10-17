@@ -677,12 +677,12 @@ outputType = "console"
 name = "three-instruction-boot-tests"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node tests/simulator/sim_boot_three_instruction.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/run-all-tests.sh three-instruction-boot-tests"
 
 [[workflows.workflow]]
 name = "ns-slot-policy-restore-tests"

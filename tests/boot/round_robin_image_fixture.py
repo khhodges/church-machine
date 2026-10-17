@@ -23,7 +23,7 @@ def instruction(opcode, dst=0, src=0, imm=0):
     return (opcode << 27) | (14 << 23) | (dst << 19) | (src << 15) | imm
 
 
-def write_fixture(directory, count=3, thread_words=512, total=16384):
+def write_fixture(directory, count=3, thread_words=512, total=16384, compact_boot=False):
     """Construct exact selected residents and explicit, non-overlapping Threads."""
     cfg = {"step1": {
         "totalNamespaceWords": total, "namespaceLumpWords": 64,
@@ -57,6 +57,12 @@ def write_fixture(directory, count=3, thread_words=512, total=16384):
         # Harmless IADD DR1, DR1, #1 words; all saved test NIAs are executable.
         words = [0] * size
         words[1:17] = [instruction(21, 1, 1, 0x4001)] * 16
+        if slot == 6 and compact_boot:
+            caps.append(bi.create_gt(0, 221, {"E": 1}, 1))
+            words[1:5] = [instruction(0, 1, 6, 1 << 4),
+                          instruction(2, 1, imm=1),
+                          instruction(0, 2, 6, 1 << 4),
+                          instruction(21, 4, 4, 0x4001)]
         if slot == 220:
             caps.append(bi.create_gt(0, 221, {"E": 1}, 1))
             # Separate continuation probe at logical NIA 8.
@@ -72,6 +78,8 @@ def write_fixture(directory, count=3, thread_words=512, total=16384):
                 instruction(4, 2, 2),   # CHANGE CR2; resumes at RETURN
                 instruction(3),
             ]
+            if compact_boot:
+                words[9:11] = [instruction(21, 3, 3, 0x4001), instruction(3)]
         words[0] = bi.pack_lump_header(size.bit_length() - 7, 16, len(caps), 0)
         words[-len(caps):] = caps
         raw = struct.pack(f">{size}I", *words)
@@ -97,7 +105,8 @@ def write_fixture(directory, count=3, thread_words=512, total=16384):
             "name": name, "slot": slot, "seq": 0, "type": "Inform",
             "location": location, "token": f"{gt:08x}",
             "filename": filename, "binary_hash": digest,
-            "resident": True, "load_policy": "Resident", "boot": slot == 220,
+            "resident": True, "load_policy": "Resident",
+            "boot": slot == (6 if compact_boot else 220),
         }
         rows.append(row)
         manifest.append({
@@ -114,7 +123,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix="round-robin-image-") as temp:
         directory = Path(temp)
         cfg = (write_fixture(directory, 10, 256, 32768)
-               if "--max-threads" in sys.argv else write_fixture(directory))
+               if "--max-threads" in sys.argv else
+               write_fixture(directory, compact_boot="--compact-boot" in sys.argv))
         conflict = "--selected-conflict" in sys.argv
         if conflict:
             state_path = directory / "ns-state.json"
