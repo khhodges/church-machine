@@ -147,6 +147,10 @@ proof of emitted equivalent RTL behavior.
 
 ## 3. Internal Lambda and capability materialization — G1
 
+See the [bounded feasibility investigation](context-feasibility.md) for executed
+synthetic component evidence and the separate approval boundaries. W1 remains
+blocked; these results are not implementation approval.
+
 Required sequence: wrapper prepares → internal Lambda reads one slot → wrapper
 authorizes/prepares → internal Lambda rechecks and updates same slot → wrapper
 publishes. Each invocation finishes before the next; no nested Lambda.

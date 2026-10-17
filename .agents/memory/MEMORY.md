@@ -153,3 +153,4 @@
 - [Authenticated compact API admission](authenticated-compact-api-admission.md) — expand embedded rows from exact bytes; recover source PetNames only from matching signed compiler rows.
 - [Alternative IDE prototype](alternative-ide-prototype.md) — include Thread/Namespace authoring; separate URL and demo state, with no live artifact or hardware changes.
 - [Phase 1 review decisions](phase-1-document-collection.md) — guided scope decisions; two Namespaces on one FPGA for networking tests belong to Phase 2.
+- [Mint context authority](mint-context-authority-boundary.md) — synthetic frame evidence grants no service access; approve protected interfaces and Lambda authority before implementation.

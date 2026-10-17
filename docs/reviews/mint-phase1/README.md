@@ -21,6 +21,7 @@ approval, or permission to install, build, upload or flash anything.
 | Which claims have evidence? What are the independent test oracles? | [Verification matrix and fixtures](verification.md) |
 | What still needs a decision or engineering evidence? | [Bounded gate register](open-issues.md) |
 | Which exact source was inspected? | [Symbols, ranges and provenance](sources.md) |
+| Can Mint legally obtain protected caller/live-return evidence today? | [Bounded G1–G3 feasibility and synthetic cross-layer probes](context-feasibility.md) |
 
 Read the [active Master ISA](../../phase-1/01-isa/instruction-set.md) for hardware
 semantics, not the larger root ISA or archived RTL. This package is deliberately
@@ -62,8 +63,10 @@ itself.
 No running service, secret, private store, live catalog, Namespace, image,
 hardware or external publication was accessed or changed for evidence. No
 vendor tools or hardware/control endpoints were used. Runtime and physical
-tests below are designs, not results. Documentation checks are recorded
-separately in the verification document.
+tests in the original verification matrix are designs, not results.
+The later [G1–G3 investigation](context-feasibility.md) adds isolated synthetic
+JS/Amaranth component results, not service or hardware acceptance. Documentation
+checks are recorded separately in the verification document.
 
 ## Reviewer checklist
 

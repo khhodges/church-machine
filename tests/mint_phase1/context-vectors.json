@@ -1,0 +1,26 @@
+{
+  "scope": "Synthetic component evidence only; no authority provisioning or service admission",
+  "thread_header": "0xf900820c",
+  "code_header": "0xf8002001",
+  "initial_sto": 241,
+  "caller_e": "0x4a000002",
+  "mint_e": "0x4a000003",
+  "verifier_e": "0x4a000004",
+  "caller_l": "0x1a000002",
+  "caller_x": "0x42000002",
+  "call_word": "0x17000000",
+  "lambda_word": "0x3f480000",
+  "thread_read_word": "0x870e0110",
+  "return_words": ["0x1f000000", "0x1f000002", "0x1f000fff"],
+  "outer_frame": "0x000050f1",
+  "inner_frame": "0x000070ef",
+  "root_frame": "0x0ffff0f3",
+  "return_cases": [
+    {"name": "valid", "frame": "0x000050f1", "companion": "0x4a000002", "ok": true},
+    {"name": "root", "frame": "0x0ffff0f1", "companion": "0x4a000002", "ok": false},
+    {"name": "missing", "frame": "0x000050f1", "companion": "0x00000000", "ok": false},
+    {"name": "non_enter", "frame": "0x000050f1", "companion": "0x1a000002", "ok": false},
+    {"name": "bad_predecessor", "frame": "0x000050f0", "companion": "0x4a000002", "ok": false},
+    {"name": "stale", "frame": "0x000050f1", "companion": "0x4a010002", "ok": false}
+  ]
+}
