@@ -4,6 +4,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const Simulator = require('./simulator.js');
+const ThreadDesign = require('./thread_design.js');
+const layout = ThreadDesign.layout(256, 32);
+assert.ok(layout.valid);
+const rootAddress = layout.stackEnd;
+const rootSTO = rootAddress - 2;
 const source = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
 function extract(name) {
     const start = source.indexOf(`function ${name}(`);
@@ -12,33 +17,50 @@ function extract(name) {
 }
 function fixture() {
     const s = new Simulator();
-    const header = (cw, cc, n = 0, typ = 0) =>
-        ((31 << 27) | (n << 23) | (cw << 10) | (typ << 8) | cc) >>> 0;
+    s.bootComplete = false;
     s.withNamespaceWrite('synthetic paused RETURN', () => {
         s.writeNSEntry(1, 0, 255, 0, 0, 1, 0, 0, 0);
-        for (let slot = 2; slot <= 4; slot++)
-            s.writeNSEntry(slot, slot * 256, 63, 0, 0, 1, 0, 1, 0);
     });
-    s.memory[0] = header(32, 12, 2, 2);
-    s.cr[12] = {word0: s.createGT(0, 1, {R: 1, W: 1}, 1), word1: 0, word2: 255, word3: 0, m: 0};
+    s.memory.fill(0, 0, 256);
+    s.memory[0] = s.packLumpHeader(2, 32, 12, 2);
+    s.cr[12] = {word0: s.createGT(0, 1, {R: 1, W: 1}, 1), word1: 0,
+        word2: s.readNSEntry(1).word1_limit, word3: 0, m: 0};
     for (let slot = 2; slot <= 4; slot++) {
-        s.memory[slot * 256] = header(8, 1);
-        s.memory[slot * 256 + 2] = 0x1f000000;
+        const base = slot * 256;
+        const words = new Uint32Array(64);
+        words[0] = s.packLumpHeader(0, 8, 1, 0);
+        words.fill(0x1f000000, 1, 9); // RETURN AL
+        words[63] = Simulator.SELF_CAPABILITY_PLACEHOLDER;
+        const hdr = s.parseLumpHeader(words[0]);
+        assert.ok(s.mintStep7Freespace(words, hdr).ok);
+        const minted = s._mintOrdinaryLumpIdentity(words, slot, base,
+            {compilerOwnedSelf: true});
+        assert.ok(minted.ok, minted.message);
+        s.memory.set(minted.words, base);
+        s.withNamespaceWrite('synthetic paused executable', () =>
+            s.writeNSEntry(slot, base, hdr.cw, 0, 0, 1,
+                minted.entry.seq, hdr.cc, minted.entry.cacheToken));
+        assert.ok(s.mLoad(minted.selfGT, 'E', 1).ok);
+        if (slot === 2) {
+            // Install the validated E-only CR6 companion, with M enabling LOAD.
+            s._installLumpHeaderContext(s.parseGT(minted.selfGT), slot,
+                s.readNSEntry(slot), hdr, minted.selfGT);
+        }
     }
-    s.cr[14] = {word0: s.createGT(0, 2, {X: 1}, 1), word1: 512, word2: 63, word3: 0, m: 0};
-    s.cr[6] = {word0: s.createGT(0, 2, {L: 1}, 1), word1: 575, word2: 63, word3: 0, m: 1};
-    s.memory[17] = s._packProtectedIndicator(241, 1, {});
-    s.memory[242] = s.createGT(0, 2, {E: 1}, 1);
-    s.memory[243] = s._packFrameWordRaw(0x7fff, 1, 243);
-    s.sto = 241;
+    s.memory[layout.protectedStoOffset] = s._packProtectedIndicator(rootSTO, 1, {});
+    s.memory[rootAddress - 1] = s.cr[6].word0;
+    s.memory[rootAddress] = s._packFrameWordRaw(0x7fff, 1, rootAddress);
+    s.sto = rootSTO;
     s.pc = 1;
     s.bootComplete = true;
     s._bootImageLoaded = true;
     return s;
 }
 function call(s, slot) {
-    s.cr[0] = {word0: s.createGT(0, slot, {E: 1}, 1), word1: slot * 256, word2: 63, word3: 0, m: 0};
-    assert.ok(s._execCall({crDst: 0, imm: 0}));
+    const entry = s.readNSEntry(slot);
+    s.cr[0] = {word0: s.memory[slot * 256 + 63], word1: slot * 256,
+        word2: entry.word1_limit, word3: entry.word2_seals, m: 0};
+    assert.ok(s._execCall({crDst: 0, imm: 0}), s.output);
     s.pc = 1;
 }
 function harness(s, status = 'stale-image', available = true) {
@@ -55,7 +77,7 @@ function harness(s, status = 'stale-image', available = true) {
         },
         _maybeApplyBootImage: () => {
             events.push('overlay');
-            s.memory[17] = 0x10f1;
+            s.memory[layout.protectedStoOffset] = s._packProtectedIndicator(rootSTO, 1, {});
             status = 'prepared';
         },
         resetSim: () => { events.push('reset'); s.reset(); },
@@ -94,15 +116,16 @@ async function main() {
             c[mode]();
             assert.equal(s.cr[14].word1, 512);
             assert.equal(s.pc, 2);
-            assert.equal(s.memory[17] & 0x1fff, 0x1000 | 241);
+            assert.equal(s.memory[layout.protectedStoOffset] & 0x1fff, 0x1000 | rootSTO);
         }
     }
     for (const pc of [0, 0x7fff]) {
         const s = fixture();
         call(s, 3);
         s.callStack = []; // Diagnostic shadow is not frame authority.
-        s.memory[241] = s._packFrameWordRaw(pc, 1, 241);
-        const before = {cr: structuredClone(s.cr), indicator: s.memory[17], sto: s.sto};
+        s.memory[rootSTO] = s._packFrameWordRaw(pc, 1, rootSTO);
+        const before = {cr: structuredClone(s.cr),
+            indicator: s.memory[layout.protectedStoOffset], sto: s.sto};
         const {c, events} = harness(s);
         c.stepSim();
         assert.deepEqual(events, []);
@@ -114,7 +137,7 @@ async function main() {
             assert.equal(s.halted, true);
             assert.equal(s.faultLog.at(-1).type, 'STACK_UNDERFLOW');
             assert.deepEqual(s.cr, before.cr);
-            assert.equal(s.memory[17], before.indicator);
+            assert.equal(s.memory[layout.protectedStoOffset], before.indicator);
             assert.equal(s.sto, before.sto);
         }
     }
