@@ -4,6 +4,12 @@
 
 ## Evidence status at this review
 
+**Subsequent G4 evidence:** [exclusion investigation](exclusion-evidence.md)
+records 18 isolated simulator cases reproducing marker/ABA/activation gaps.
+It is not service acceptance or V15–V17 closure. Its nine current source
+fingerprints pass; the original review checker now stops on historical source
+drift, as detailed in that report. Original results below remain historical.
+
 | Layer | Status / what was actually established |
 |---|---|
 | Current source inspection | INSPECTED at `931b399166a78ce7c52725da78fa9714481ea456`, per-file hashes recorded; findings are not runtime outcomes |

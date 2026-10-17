@@ -17,6 +17,7 @@ approval, or permission to install, build, upload or flash anything.
 | What would engineers implement, and in what order? | [ABI and work packages](implementation-plan.md) |
 | How can issuance survive interruption without losing pool entries? | [Persistence and provisioning](persistence.md) |
 | What prevents observers seeing half a Namespace entry? | [Exclusion and publication](namespace-update.md) |
+| Does an admission marker exclude writes or Thread activation today? | [G4 source map and isolated ABA evidence](exclusion-evidence.md) — gap reproduced, not gate acceptance |
 | What is trusted, and where can authority or secrets escape? | [Security assurance](security.md) and [project threat model](../../../threat_model.md) |
 | Which claims have evidence? What are the independent test oracles? | [Verification matrix and fixtures](verification.md) |
 | What still needs a decision or engineering evidence? | [Bounded gate register](open-issues.md) |
@@ -72,6 +73,8 @@ checks are recorded separately in the verification document.
 The [M3 component probes](result-containment.md) separately reproduce result
 manufacturing and fault/reset exposure under explicit test privilege; they
 neither provision Mint nor implement the proposed publication-bound permit.
+The [G4 investigation](exclusion-evidence.md) adds isolated simulator write,
+activation and ABA gap regressions; it closes no gate and implements no interlock.
 
 ## Reviewer checklist
 

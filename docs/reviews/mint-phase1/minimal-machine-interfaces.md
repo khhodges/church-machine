@@ -247,6 +247,11 @@ Report exact input/code/image identities and every extra dynamic/private slot.
 These are required tests, not new passing results. Simulator evidence must be
 followed by independent RTL evidence before any hardware claim.
 
+The subsequent [bounded G4 investigation](exclusion-evidence.md) reproduces
+intervening writes, ABA and activation despite an inert admission marker.
+It tests existing paths, not these proposed interfaces. All four old words can
+match again without exclusion; G4 remains open.
+
 ## Review disposition
 
 The [Genesis review](../../../attached_assets/Pasted-This-is-the-right-next-document-and-it-s-well-construct_1792259460983.txt)

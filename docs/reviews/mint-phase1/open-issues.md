@@ -34,6 +34,11 @@ burn-first consumption, interrupted-call replay, no-sharing, resident exclusion,
 same-slot replacement, zeroing timing or all-five-method admission. Those are
 settled; implementation difficulty does not reopen them.
 
+**G4 evidence update:** [simulator source map and negative probes](exclusion-evidence.md)
+reproduce writes and activation during a marked READ-to-COMMIT interval, including
+four-word change-and-restore ABA. G4 remains OPEN; these are gap regressions,
+not an implemented exclusion mechanism or operational Mint acceptance.
+
 ### Administration ABI still needing joint acceptance
 
 The following exact proposal completes the method-call surface without inventing

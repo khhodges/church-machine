@@ -92,3 +92,14 @@ not a test-fixture repair.
 **How to apply:** Distinguish tuple offsets, heap layout, and the owning
 Thread's authorized range in test descriptions. Keep any proposal for narrower
 subregion enforcement separate from the bounded cross-Thread regression.
+
+Synthetic activation probes must provide a complete executable continuation,
+not assume constructor boot completion makes every placeholder resumable.
+
+**Why:** Constructor placeholders and poison roots can let setup finish while
+ordinary CHANGE correctly rejects the missing suspended continuation or C-list
+geometry. Those fixture failures say nothing about an exclusion mechanism.
+
+**How to apply:** Construct disposable canonical code/C-list and suspended-frame
+evidence appropriate to the entry path; keep boot/root admission separate from
+ordinary resumption. Never repair live artifacts or stub admission for a probe.

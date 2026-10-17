@@ -7,6 +7,10 @@ The following is a bounded investigation and proposed acceptance envelope,
 not an installed interlock. This blocks operational Mint, not the independent
 Phase 1 bitstream milestone.
 
+[G4 simulator evidence](exclusion-evidence.md) expands this inventory with
+actual memory/image/Thread paths and isolated marker/ABA probes. Its expected
+negative results reproduce the gap; they do not close G4 or implement M1–M3.
+
 ## What existing mechanisms do and do not establish
 
 `ChurchDWrite` serializes one checked write. `any_unit_busy` inhibits instruction
