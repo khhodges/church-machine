@@ -73,3 +73,17 @@ that an idempotent-save test had assumed were always present.
 **How to apply:** Construct historical geometry explicitly when testing
 normalization; ordinary unchanged-save tests should assert identity, exact
 bytes, and raw-table binding without requiring an initial relocation.
+
+A suite runner's private copy is not a deterministic fixture specification.
+Per-test geometry must also override or clear inherited test-config routing,
+and exercise the parent-config path separately from the explicit override.
+
+**Why:** A runner-level copied configuration can silently satisfy missing
+per-test geometry and make results depend on the programmer's current design.
+An image fixture also needs the existing profile's mandatory objects; reducing
+it must not be compensated by weakening profile validation.
+
+**How to apply:** Construct the complete small private Namespace and exact
+synthetic approvals together. Use an incomplete parent as a sentinel when
+testing the explicit override. Compare full selected bodies and placements;
+compact-only success does not establish that noncompact placement is preserved.

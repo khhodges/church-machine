@@ -327,33 +327,98 @@ def test_repeat_admission_uses_immutable_destination_local_derivatives(tmp_path)
     assert hashlib.sha256(replacement_bytes).hexdigest() == row14["binary_hash"]
 
 
-def test_boot_resident_admission_builds_an_image(tmp_path):
-    import shutil
-    from pathlib import Path
-
-    from server.boot_image import generate_boot_image
+@pytest.fixture(params=["parent-config", "explicit-config"])
+def resident_inputs(tmp_path, monkeypatch, request):
+    """Complete private inputs; neither catalog nor geometry comes from live state."""
+    from server.boot_image import architecture_device_catalog
 
     root = tmp_path / "lumps"
-    repository_root = Path(__file__).resolve().parents[2]
-    shutil.copytree(repository_root / "server" / "lumps", root)
-    state_fixture = json.loads((root / "ns-state.json").read_text())
+    root.mkdir()
+    config = {"step1": {
+        "totalNamespaceWords": 8192, "namespaceLumpWords": 8192,
+        "nsSlotsMax": 64, "threadLumpWords": 256,
+        "threadStackWords": 32, "threadCount": 1,
+    }}
+    config_path = tmp_path / "boot-config.json"
+    config_path.write_text(json.dumps(config))
+    # The suite runner supplies its own copied config. Override it so admission
+    # and generation always consume this test's same deterministic geometry.
+    if request.param == "explicit-config":
+        config_path = tmp_path / "private-config.json"
+        config_path.write_text(json.dumps(config))
+        # An implementation that incorrectly ignores the explicit config must
+        # fail, rather than succeed by using the identical parent config.
+        (tmp_path / "boot-config.json").write_text("{}")
+        monkeypatch.setenv("CHURCH_TEST_BOOT_CONFIG_PATH", str(config_path))
+    else:
+        monkeypatch.delenv("CHURCH_TEST_BOOT_CONFIG_PATH", raising=False)
+    monkeypatch.setenv("CHURCH_TEST_LUMPS_DIR", str(root))
+
+    # Locations below are a compact valid layout for the admission under test:
+    # Thread [16,272), CapabilityTest [272,336), upload [336,400),
+    # SelfTest [400,464). Noncompact generation is tested separately below.
+    # This synthetic bootstrap fixture has exactly one SELF capability. Its
+    # approval binds these bytes, not a rewritten copy of a live compiler LUMP.
     raw = _portable_lump()
+    digest = hashlib.sha256(raw).hexdigest()
+    filename = f"SelfTest.1.{digest[:8]}.lump"
+    (root / filename).write_bytes(raw)
+    rows = [
+        {"slot": 0, "name": "Boot.NS", "type": "Namespace", "location": 0, "seq": 0},
+        {"slot": 1, "name": "Boot.Thread", "type": "Thread", "location": 16, "seq": 0},
+        {"slot": 6, "name": "SelfTest", "type": "Inform", "location": 400,
+         "seq": 0, "filename": filename, "binary_hash": digest, "token": "4a000006",
+         "resident": True, "boot_resident": True, "load_policy": "Resident",
+         "ns_slot_policy": "static", "boot": True},
+    ]
+    # Preserve the current hardware-image profile rather than bypassing its
+    # mandatory devices/CapabilityTest checks with simulation-only validation.
+    for device in architecture_device_catalog().values():
+        rows.append({"slot": device["slot"], "name": device["name"], "type": "Device",
+                     "location": device["address"], "limit": device["limit"], "seq": 0})
+    capability_raw = raw[:-4] + (0x4A00000A).to_bytes(4, "big")
+    capability_hash = hashlib.sha256(capability_raw).hexdigest()
+    capability_filename = f"CapabilityTest.1.{capability_hash[:8]}.lump"
+    (root / capability_filename).write_bytes(capability_raw)
+    rows.append({**rows[2], "slot": 10, "name": "CapabilityTest", "location": 272,
+                 "filename": capability_filename, "binary_hash": capability_hash,
+                 "token": "4a00000a", "boot": False})
+    (root / "ns-state.json").write_text(json.dumps({"revision": 7, "abstractions": rows}))
+    (root / "manifest.json").write_text("[]")
+    (root / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256", "approvals": {
+            digest: {"binary_hash": digest, "filename": filename,
+                     "dot_name": "SelfTest", "issue_n": 1, "token": "4a000006",
+                     "bootstrap_t": "4a000006", "bootstrap_runtime_gt": 0x4A000006},
+            capability_hash: {
+                "binary_hash": capability_hash, "filename": capability_filename,
+                "dot_name": "CapabilityTest", "issue_n": 1, "token": "4a00000a",
+                "bootstrap_t": "4a00000a", "bootstrap_runtime_gt": 0x4A00000A},
+        },
+    }))
     portable_token = hashlib.sha256(raw).hexdigest()[:8]
     quarantine = root / "quarantine"
-    quarantine.mkdir(exist_ok=True)
+    quarantine.mkdir()
     quarantine_path = quarantine / f"{portable_token}.lump"
     quarantine_path.write_bytes(raw)
+    return root, config_path
 
-    result = admit(
-        quarantine_path=str(quarantine_path),
+
+def _admit_resident(root, *, location=336):
+    raw = _portable_lump()
+    digest = hashlib.sha256(raw).hexdigest()
+    rows = json.loads((root / "ns-state.json").read_text())["abstractions"]
+    return admit(
+        quarantine_path=str(root / "quarantine" / f"{digest[:8]}.lump"),
         lumps_dir=str(root),
         state_path=str(root / "ns-state.json"),
         manifest_path=str(root / "manifest.json"),
-        token=portable_token,
-        expected_digest=hashlib.sha256(raw).hexdigest(),
+        token=digest[:8],
+        expected_digest=digest,
         name="UploadedBoot",
         revision=1,
         destination_slot=15,
+        location=location,
         replace=False,
         resident=True,
         boot=True,
@@ -361,8 +426,35 @@ def test_boot_resident_admission_builds_an_image(tmp_path):
         requested=["E"],
         granted=["E"],
         lock=threading.RLock(),
-        expected_namespace_fingerprint=namespace_fingerprint(state_fixture["abstractions"]),
+        expected_namespace_fingerprint=namespace_fingerprint(rows),
     )
+
+
+def _private_files(root):
+    return {str(path.relative_to(root)): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file() and path.name != ".namespace-commit.lock"}
+
+
+@pytest.mark.parametrize("catalog_status", ["missing", "archived", "duplicate"])
+def test_boot_resident_admission_builds_an_image(resident_inputs, catalog_status):
+    from server.boot_image import (
+        generate_boot_image, read_namespace_header_info, validate_boot_image,
+    )
+
+    root, config_path = resident_inputs
+    prior_state = json.loads((root / "ns-state.json").read_text())
+    selected = next(row for row in prior_state["abstractions"] if row["slot"] == 6)
+    catalog_row = {key: selected[key] for key in ("filename", "token", "binary_hash")}
+    catalog = {
+        "missing": [],
+        "archived": [{**catalog_row, "archived": True}],
+        "duplicate": [catalog_row, catalog_row],
+    }[catalog_status]
+    # A dormant missing file must not be consulted either.
+    catalog.append({"filename": "Absent.1.00000000.lump", "token": "00000000"})
+    (root / "manifest.json").write_text(json.dumps(catalog))
+    result = _admit_resident(root)
     assert result["mint_egt"] == "4a01000f"
     state = json.loads((root / "ns-state.json").read_text())
     row = next(entry for entry in state["abstractions"]
@@ -372,8 +464,90 @@ def test_boot_resident_admission_builds_an_image(tmp_path):
     assert row["boot_resident"] is True
     assert row["ns_slot_policy"] == "static"
     assert sum(entry.get("boot") is True for entry in state["abstractions"]) == 1
+    assert state["revision"] == prior_state["revision"] + 1
+    assert json.loads((root / "manifest.json").read_text())[:-1] == catalog
+    assert state["abstractions"][:-1] == [
+        {key: value for key, value in entry.items() if key != "boot"}
+        for entry in prior_state["abstractions"]
+    ]
+    # The freshly admitted body is also selected by exact Namespace bytes,
+    # even when catalog bookkeeping subsequently archives or omits its row.
+    manifest = json.loads((root / "manifest.json").read_text())
+    if catalog_status == "missing":
+        manifest.pop()
+    elif catalog_status == "archived":
+        manifest[-1]["archived"] = True
+    else:
+        manifest.append(dict(manifest[-1]))
+    (root / "manifest.json").write_text(json.dumps(manifest))
+    before_image = _private_files(root.parent)
+    config = json.loads(config_path.read_text())
+    image = generate_boot_image(config, str(root), require_entry_resident=True)
+    assert len(image) == config["step1"]["totalNamespaceWords"] * 4
+    validate_boot_image(image)
+    header = read_namespace_header_info(image)
+    assert header["boot_entry_slot"] == row["slot"]
+    assert header["boot_entry_word"] == row["location"]
+    words = struct.unpack(f"<{len(image) // 4}I", image)
+    approvals = read_approvals(str(root / "approvals.json"))
+    for resident in (entry for entry in state["abstractions"] if entry.get("filename")):
+        raw = (root / resident["filename"]).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        assert digest == resident["binary_hash"]
+        assert approvals[digest]["filename"] == resident["filename"]
+        base = len(words) - (resident["slot"] + 1) * 4
+        location = words[base]
+        assert location == resident["location"]
+        expected_words = struct.unpack(f">{len(raw) // 4}I", raw)
+        assert words[location:location + len(expected_words)] == expected_words
+        assert words[base + 3] == int(resident["token"], 16) == expected_words[-1]
+    assert _private_files(root.parent) == before_image
 
-    config = json.loads(
-        (repository_root / "server" / "boot-config.json").read_text())
-    image = generate_boot_image(config, str(root))
-    assert image
+
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError,
+    reason="Known generator defect: noncompact admitted placement is repacked; "
+           "see namespace-authority-progress.md (resident-admission follow-up).",
+)
+def test_boot_generator_preserves_noncompact_admitted_location(resident_inputs):
+    """Expose the real generator defect separately, never adjust the saved row."""
+    from server.boot_image import generate_boot_image, read_namespace_header_info
+
+    root, config_path = resident_inputs
+    _admit_resident(root, location=1024)
+    state = json.loads((root / "ns-state.json").read_text())
+    selected = next(row for row in state["abstractions"] if row.get("boot") is True)
+    image = generate_boot_image(json.loads(config_path.read_text()), str(root),
+                                require_entry_resident=True)
+    # Current generator emits 336 despite admission approving word 1024.
+    assert read_namespace_header_info(image)["boot_entry_word"] == selected["location"]
+
+
+@pytest.mark.parametrize("damage,match", [
+    ("missing-config", r"NS\[1\] allocation cannot be established"),
+    ("missing-location", r"NS\[15\] allocation cannot be established"),
+    ("thread-overlap", r"overlaps NS\[1\]"),
+    ("resident-overlap", r"overlaps NS\[6\]"),
+    ("header-overlap", r"reserved Namespace header"),
+    ("table-overlap", r"reserved Namespace table"),
+    ("outside-ram", r"exceeds Namespace RAM"),
+])
+def test_invalid_resident_allocation_publishes_nothing(resident_inputs, damage, match):
+    root, config_path = resident_inputs
+    location = {"missing-location": None, "thread-overlap": 256,
+                "resident-overlap": 384, "header-overlap": 0,
+                "table-overlap": 7920, "outside-ram": 8192}.get(damage, 336)
+    if damage == "missing-config":
+        config_path.unlink()
+    if damage == "header-overlap":
+        state_path = root / "ns-state.json"
+        state = json.loads(state_path.read_text())
+        state["abstractions"][1]["location"] = 128
+        state_path.write_text(json.dumps(state))
+    before = _private_files(root.parent)
+    with pytest.raises(AdmissionError, match=match) as error:
+        _admit_resident(root, location=location)
+    assert error.value.status == 409
+    assert _private_files(root.parent) == before
+    assert not (root / NavanaService.JOURNAL_NAME).exists()
+    assert not list(root.glob(".navana-*"))
