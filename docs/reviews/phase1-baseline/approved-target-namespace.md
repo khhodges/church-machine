@@ -58,6 +58,44 @@ an old-profile test fails.
 
 ## Coding work and CTMM tracking
 
+### Primary implementation priority: full 17-slot simulator operation
+
+Genesis subsequently directed the work toward “fault free simulator runs with
+the full set of functional abstractions and GTs covering all 17 Namespace slots.”
+This is the next operational objective, not another persistence-only milestone.
+
+Acceptance requires:
+
+- The approved slot map, Resident policy and CapabilityTest boot selection,
+  including all 17 assigned entries plus slot-0 metadata.
+- Functional implementations for each software abstraction and Thread, and
+  working simulator models for I/O entries. Unfinished design placeholders
+  remain valid design entries but cannot count as functional runtime coverage.
+- Correctly bound GTs for actual dependencies, with the required types,
+  permissions, generations and bounds. Do not grant every caller broad rights,
+  invent privileged interfaces, or bypass validation to produce a clean run.
+- An integrated startup and workload through the real simulator execution path,
+  exercising all entries and checking outputs, Thread transitions, device
+  effects and returned status. Table population or a synthetic caller alone is
+  insufficient evidence.
+- Repeated bounded runs with forward progress and zero unexpected faults,
+  without auto-skipping faults, substituting success stubs or hiding failure
+  status. Record the image/artifact identities and actual coverage/step counts.
+- Separate negative tests for expected protection rejections, including Mallory;
+  these must not be conflated with unexpected faults in normal operation.
+
+Prioritize missing functionality, GT binding and integrated execution defects.
+Historical migration, additional persistence edge cases and hardware/RTL work
+are secondary unless they are a direct dependency of this simulator objective.
+Keep the CTMM requirement links, but report operational coverage out of 17
+separately from checklist completion. No full-set runtime pass is claimed by
+this scope update.
+
+The merged SelfTest probe is useful component evidence, but its synthetic caller
+is not the approved startup workload; its identity/API and real-caller
+integration remain relevant dependencies. Earlier constraints on saved artifact
+replacement, hardware actions and new architectural authority remain in force.
+
 The workbook's Completeness sheet combines implementation requirements and
 verification requirements; it is not an exhaustive coding-task queue.
 
