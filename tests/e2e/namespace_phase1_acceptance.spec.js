@@ -10,7 +10,7 @@ const root = path.resolve(__dirname, '../..');
 const requested = process.env.CHURCH_NAMESPACE_SAVE_ACCEPTANCE === '1';
 test.skip(!requested, 'Use scripts/run_namespace_save_acceptance.py browser --profile phase1');
 const keys = ['CHURCH_TEST_LUMPS_DIR', 'CHURCH_TEST_BOOT_CONFIG_PATH',
-    'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH'];
+    'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH', 'CHURCH_TEST_IDE_HIERARCHY_PATH'];
 if (requested && (process.env.CHURCH_TEST_ISOLATED_MODE !== '1' || keys.some(key =>
     !process.env[key] || !fs.existsSync(process.env[key]) ||
     path.relative(fs.realpathSync(path.join(root, 'server')),

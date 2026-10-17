@@ -9,6 +9,7 @@ const { test, expect } = require('@playwright/test');
 const fixtureKeys = [
     'CHURCH_TEST_LUMPS_DIR', 'CHURCH_TEST_BOOT_CONFIG_PATH',
     'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH',
+    'CHURCH_TEST_IDE_HIERARCHY_PATH',
 ];
 const serverRoot = fs.realpathSync(path.resolve(__dirname, '../../server'));
 if (process.env.CHURCH_TEST_ISOLATED_MODE !== '1' || fixtureKeys.some(key =>

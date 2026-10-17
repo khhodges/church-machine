@@ -7,13 +7,50 @@ import fcntl
 import tempfile
 
 
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ide-hierarchy.json")
+_TOKENS = os.path.join(os.path.dirname(__file__), "..", "simulator", "capability_tokens.js")
+_TEST_CONFIG_KEY = "CHURCH_TEST_IDE_HIERARCHY_PATH"
+
+
+def configuration_path():
+    """Resolve on every access, including when this module was imported earlier.
+
+    Isolated callers without a private hierarchy fail closed, never falling back
+    to project ownership. Non-test callers retain the normal configuration.
+    """
+    raw = os.environ.get(_TEST_CONFIG_KEY, "").strip()
+    isolated = any(os.environ.get(key, "").strip().lower() in {"1", "true", "yes", "on"}
+                   for key in ("CHURCH_TEST_ISOLATED_MODE", "CHURCH_TEST_ISOLATED"))
+    if not raw:
+        if isolated:
+            raise ValueError(f"Isolated IDE hierarchy access requires {_TEST_CONFIG_KEY}; "
+                             "copy the configuration to a private test file first.")
+        return CONFIG_PATH
+    candidate = os.path.realpath(os.path.abspath(raw))
+    server_dir = os.path.realpath(os.path.dirname(__file__))
+    if os.path.commonpath((candidate, server_dir)) == server_dir:
+        raise ValueError(f"{_TEST_CONFIG_KEY} points to project state; refusing test access.")
+    # realpath covers symlinks; samefile also catches hard-linked live files.
+    live = os.path.join(server_dir, "ide-hierarchy.json")
+    if os.path.exists(candidate) and os.path.exists(live) and os.path.samefile(candidate, live):
+        raise ValueError(f"{_TEST_CONFIG_KEY} aliases the real configuration; refusing test access.")
+    if not os.path.isfile(candidate):
+        raise ValueError(f"{_TEST_CONFIG_KEY} must name an existing private configuration file.")
+    lock_path = candidate + ".lock"
+    if os.path.islink(lock_path) or (os.path.exists(lock_path) and
+                                    os.stat(lock_path).st_nlink > 1):
+        raise ValueError(f"{_TEST_CONFIG_KEY} requires a private lock file.")
+    return candidate
+
+
 def save_node(payload):
     """CAS and atomic publication; only exact locally owned aliases move."""
     if not isinstance(payload, dict) or set(payload) != {"node", "expected", "confirmed"}:
         raise ValueError("Expected node, expected configuration and explicit confirmation.")
     if payload["confirmed"] is not True:
         raise ValueError("Confirm the IDE node change before saving.")
-    with open(CONFIG_PATH + ".lock", "a") as lock:
+    config_path = configuration_path()
+    with open(config_path + ".lock", "a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
         previous = configuration()
         if previous != payload["expected"]:
@@ -41,33 +78,30 @@ console.log(JSON.stringify(p.validateHierarchyConfiguration(JSON.parse(s))));});
         filename = None
         try:
             with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8",
-                                             dir=os.path.dirname(CONFIG_PATH), delete=False) as handle:
+                                             dir=os.path.dirname(config_path), delete=False) as handle:
                 filename = handle.name
                 json.dump(candidate, handle, indent=2)
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(filename, CONFIG_PATH)
+            os.replace(filename, config_path)
             filename = None
         finally:
             if filename:
                 os.unlink(filename)
         return candidate
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "ide-hierarchy.json")
-_TOKENS = os.path.join(os.path.dirname(__file__), "..", "simulator", "capability_tokens.js")
-
-
 def configuration():
     """Read the raw endpoint payload; semantic checks belong to the shared JS policy."""
+    config_path = configuration_path()
     try:
-        with open(CONFIG_PATH, encoding="utf-8") as handle:
+        with open(config_path, encoding="utf-8") as handle:
             return json.load(handle)
     except FileNotFoundError:
         return None
     except (OSError, ValueError) as exc:
         raise ValueError(
-            "IDE hierarchy configuration is unreadable. Correct server/ide-hierarchy.json; "
+            f"IDE hierarchy configuration is unreadable. Correct {config_path}; "
             "no leaf ownership was inferred."
         ) from exc
 

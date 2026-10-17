@@ -24,8 +24,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("endpoints", "browser"))
     parser.add_argument("--profile", choices=("legacy", "phase1"), default="legacy")
-    parser.add_argument("--remaining", nargs="?", const="boot", choices=("boot", "profiles"),
-                        help="Browser follow-up: boot segment, or Phase 1 profile checks only")
+    parser.add_argument("--remaining", nargs="?", const="boot", choices=("boot", "profiles", "node"),
+                        help="Browser follow-up: boot segment, Phase 1 profiles, or IDE node only")
     args = parser.parse_args()
     before = live_hashes()
     try:
@@ -36,6 +36,13 @@ def main():
                 shutil.copytree(ROOT / "server" / name, directory / name)
             for name in ("boot-config.json", "church_machine.db"):
                 shutil.copy2(ROOT / "server" / name, directory / name)
+            hierarchy = ROOT / "server/ide-hierarchy.json"
+            if hierarchy.exists():
+                shutil.copy2(hierarchy, directory / "ide-hierarchy.json")
+            else:
+                # Clean checkouts may not have an operator-assigned node.
+                # Explicitly retain that absence in private storage.
+                (directory / "ide-hierarchy.json").write_text("null\n")
             if args.profile == "phase1":
                 design = directory / "lumps/design-drafts/phase1.json"
                 if not design.exists():
@@ -51,6 +58,7 @@ def main():
                        CHURCH_TEST_LUMPS_DIR=str(directory / "lumps"),
                        CHURCH_TEST_BOOT_CONFIG_PATH=str(directory / "boot-config.json"),
                        CHURCH_TEST_BUILD_SNAPSHOTS_DIR=str(directory / "build-snapshots"),
+                       CHURCH_TEST_IDE_HIERARCHY_PATH=str(directory / "ide-hierarchy.json"),
                        CHURCH_TEST_DB_PATH=str(directory / "church_machine.db"))
             with socket.socket() as sock:
                 sock.bind(("127.0.0.1", 0))
@@ -61,18 +69,22 @@ def main():
             target = ("namespace_phase1_acceptance" if args.profile == "phase1"
                       else "namespace_save_acceptance")
             # Playwright's existing config rejects existing-server reuse when
-            # isolated mode is set and passes all four paths to its web server.
+            # isolated mode is set and passes all five paths to its web server.
             command = (["python3", "-m", "pytest",
-                        f"tests/server/test_{target}.py", "-q", "--tb=short"]
+                        f"tests/server/test_{target}.py",
+                        "tests/server/test_namespace_ide_node_acceptance.py", "-q", "--tb=short"]
                        if args.mode == "endpoints" else
                        ["npx", "playwright", "test",
-                        f"tests/e2e/{target}.spec.js"])
+                        f"tests/e2e/{target}.spec.js",
+                        "tests/e2e/namespace_ide_node_acceptance.spec.js"])
             if args.mode == "endpoints" and args.profile == "phase1":
                 command.append("tests/server/test_namespace_phase1_save_atomicity.py")
             if args.remaining:
                 if args.mode != "browser":
                     raise ValueError("--remaining applies only to browser acceptance")
-                if args.profile == "legacy":
+                if args.remaining == "node":
+                    command.extend(["--grep", "IDE node isolated"])
+                elif args.profile == "legacy":
                     if args.remaining != "boot":
                         raise ValueError("profiles follow-up requires --profile phase1")
                     command.extend(["--grep", "Namespace boot selection and incomplete design"])

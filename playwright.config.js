@@ -25,6 +25,7 @@ for (const key of [
     'CHURCH_TEST_BOOT_CONFIG_PATH',
     'CHURCH_TEST_BUILD_SNAPSHOTS_DIR',
     'CHURCH_TEST_DB_PATH',
+    'CHURCH_TEST_IDE_HIERARCHY_PATH',
 ]) {
     if (process.env[key]) webServerEnv[key] = process.env[key];
 }

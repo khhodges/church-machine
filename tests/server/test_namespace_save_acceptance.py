@@ -10,7 +10,8 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 assert os.environ.get("CHURCH_TEST_ISOLATED_MODE") == "1", "Use the isolated runner"
 for key in ("CHURCH_TEST_LUMPS_DIR", "CHURCH_TEST_BOOT_CONFIG_PATH",
-            "CHURCH_TEST_BUILD_SNAPSHOTS_DIR", "CHURCH_TEST_DB_PATH"):
+            "CHURCH_TEST_BUILD_SNAPSHOTS_DIR", "CHURCH_TEST_DB_PATH",
+            "CHURCH_TEST_IDE_HIERARCHY_PATH"):
     path = Path(os.environ[key]).resolve(strict=True)
     assert not path.is_relative_to(ROOT / "server"), "Refusing live writable state"
 

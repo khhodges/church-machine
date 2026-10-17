@@ -697,6 +697,11 @@ if [ "$_RUN_E2E" -eq 1 ]; then
         printf '{}\n' > "$_E2E_ISOLATED_STATE/boot-config.json"
     fi
     mkdir -p "$_E2E_ISOLATED_STATE/build-snapshots"
+    if [ -f server/ide-hierarchy.json ]; then
+        cp -L server/ide-hierarchy.json "$_E2E_ISOLATED_STATE/ide-hierarchy.json"
+    else
+        printf 'null\n' > "$_E2E_ISOLATED_STATE/ide-hierarchy.json"
+    fi
     if [ -d server/build-snapshots ]; then
         cp -a server/build-snapshots/. "$_E2E_ISOLATED_STATE/build-snapshots/"
     fi
@@ -740,6 +745,7 @@ launch_suite() {
                 CHURCH_TEST_BOOT_CONFIG_PATH="$isolated_state/boot-config.json" \
                 CHURCH_TEST_BUILD_SNAPSHOTS_DIR="$isolated_state/build-snapshots" \
                 CHURCH_TEST_DB_PATH="$isolated_state/church_machine.db" \
+                CHURCH_TEST_IDE_HIERARCHY_PATH="$isolated_state/ide-hierarchy.json" \
                 eval "$cmd"
         else
             bash scripts/run_test_suite_isolated.sh "$isolated_state" "$name" "$cmd"

@@ -10,7 +10,7 @@ test.use({ screenshot: 'only-on-failure' });
 const root = path.resolve(__dirname, '../..');
 const serverRoot = fs.realpathSync(path.join(root, 'server'));
 const keys = ['CHURCH_TEST_LUMPS_DIR', 'CHURCH_TEST_BOOT_CONFIG_PATH',
-    'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH'];
+    'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH', 'CHURCH_TEST_IDE_HIERARCHY_PATH'];
 const requested = process.env.CHURCH_NAMESPACE_SAVE_ACCEPTANCE === '1';
 test.skip(!requested, 'Use the dedicated isolated Namespace acceptance runner');
 if (requested && (process.env.CHURCH_TEST_ISOLATED_MODE !== '1' || keys.some(key =>

@@ -6,7 +6,7 @@ const path = require('path');
 const { test, expect } = require('@playwright/test');
 
 const fixturePaths = ['CHURCH_TEST_LUMPS_DIR', 'CHURCH_TEST_BOOT_CONFIG_PATH',
-    'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH'];
+    'CHURCH_TEST_BUILD_SNAPSHOTS_DIR', 'CHURCH_TEST_DB_PATH', 'CHURCH_TEST_IDE_HIERARCHY_PATH'];
 const production = fs.realpathSync(path.resolve(__dirname, '..', '..', 'server'));
 if (!['1', 'true', 'yes', 'on'].includes(String(process.env.CHURCH_TEST_ISOLATED_MODE).toLowerCase()) ||
         fixturePaths.some(key => !process.env[key] || !fs.existsSync(process.env[key]) ||

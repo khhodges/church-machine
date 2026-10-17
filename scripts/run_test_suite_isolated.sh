@@ -24,11 +24,17 @@ if [ -f "$ROOT/server/boot-config.json" ]; then
 else
     printf '{}\n' > "$BOOT_CONFIG"
 fi
+if [ -f "$ROOT/server/ide-hierarchy.json" ]; then
+    cp -L "$ROOT/server/ide-hierarchy.json" "$SANDBOX_DIR/ide-hierarchy.json"
+else
+    printf 'null\n' > "$SANDBOX_DIR/ide-hierarchy.json"
+fi
 
 echo "  [state-isolation] $SUITE_NAME uses private LUMP and boot-config copies"
 (
     cd "$ROOT"
     export CHURCH_TEST_LUMPS_DIR="$LUMPS_DIR"
     export CHURCH_TEST_BOOT_CONFIG_PATH="$BOOT_CONFIG"
+    export CHURCH_TEST_IDE_HIERARCHY_PATH="$SANDBOX_DIR/ide-hierarchy.json"
     eval "$COMMAND"
 )

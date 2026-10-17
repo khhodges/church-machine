@@ -17,6 +17,7 @@ const REQUIRED_FIXTURE_ENV = [
     'CHURCH_TEST_BOOT_CONFIG_PATH',
     'CHURCH_TEST_BUILD_SNAPSHOTS_DIR',
     'CHURCH_TEST_DB_PATH',
+    'CHURCH_TEST_IDE_HIERARCHY_PATH',
 ];
 const missingFixtureEnv = REQUIRED_FIXTURE_ENV.filter(key => !process.env[key]);
 if (missingFixtureEnv.length) {
@@ -37,12 +38,14 @@ const LUMPS_DIR = path.resolve(process.env.CHURCH_TEST_LUMPS_DIR);
 const BOOT_CONFIG_PATH = path.resolve(process.env.CHURCH_TEST_BOOT_CONFIG_PATH);
 const BUILD_SNAPSHOTS_DIR = path.resolve(process.env.CHURCH_TEST_BUILD_SNAPSHOTS_DIR);
 const DB_PATH = path.resolve(process.env.CHURCH_TEST_DB_PATH);
+const IDE_HIERARCHY_PATH = fs.realpathSync(process.env.CHURCH_TEST_IDE_HIERARCHY_PATH);
 const PRODUCTION_ROOT = path.resolve(__dirname, '..', '..', 'server');
 const PRODUCTION_PATHS = [
     [LUMPS_DIR, path.join(PRODUCTION_ROOT, 'lumps'), true],
     [BOOT_CONFIG_PATH, path.join(PRODUCTION_ROOT, 'boot-config.json'), false],
     [BUILD_SNAPSHOTS_DIR, path.join(PRODUCTION_ROOT, 'build-snapshots'), true],
     [DB_PATH, path.join(PRODUCTION_ROOT, 'church_machine.db'), false],
+    [IDE_HIERARCHY_PATH, path.join(PRODUCTION_ROOT, 'ide-hierarchy.json'), false],
 ];
 function isProductionWritablePath(candidate, production, isDirectory) {
     const serverRelative = path.relative(PRODUCTION_ROOT, candidate);

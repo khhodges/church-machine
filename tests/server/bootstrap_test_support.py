@@ -18,11 +18,18 @@ def isolate_application():
     private = Path(tempfile.mkdtemp(prefix="bootstrap-admission-tests-"))
     shutil.copytree(root / "server/lumps", private / "lumps", symlinks=True)
     shutil.copy2(root / "server/boot-config.json", private / "boot-config.json")
+    hierarchy = root / "server/ide-hierarchy.json"
+    if hierarchy.exists():
+        shutil.copy2(hierarchy, private / "ide-hierarchy.json")
+    else:
+        # An unprovisioned checkout has no ownership to copy or infer.
+        (private / "ide-hierarchy.json").write_text("null\n")
     for key, path in {
         "CHURCH_TEST_LUMPS_DIR": private / "lumps",
         "CHURCH_TEST_BOOT_CONFIG_PATH": private / "boot-config.json",
         "CHURCH_TEST_BUILD_SNAPSHOTS_DIR": private / "build-snapshots",
         "CHURCH_TEST_DB_PATH": private / "church_machine.db",
+        "CHURCH_TEST_IDE_HIERARCHY_PATH": private / "ide-hierarchy.json",
     }.items():
         os.environ[key] = str(path)
     os.environ["CHURCH_TEST_ISOLATED_MODE"] = "1"

@@ -26,7 +26,7 @@ def setup(isolated_lumps, monkeypatch):
         "aliases": {"RemoteUART": "global.remote.UART_TX"},
         "definitions": {"global.remote.UART_TX": ["W"]},
     }))
-    monkeypatch.setattr(ide_leaf_policy, "CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("CHURCH_TEST_IDE_HIERARCHY_PATH", str(config_path))
     before = (isolated_lumps / "ns-state.json").read_bytes()
     with app_module.app.test_client() as client:
         yield client, isolated_lumps, config_path
@@ -74,12 +74,12 @@ def test_hierarchy_read_only_route_contract(setup):
     config_path.write_text("{bad")
     response = client.get("/api/ide-hierarchy")
     assert response.status_code == 422 and response.is_json
-    assert "Correct server/ide-hierarchy.json" in response.json["error"]
+    assert f"Correct {config_path}" in response.json["error"]
     assert "no leaf ownership was inferred" in response.json["error"]
     config_path.unlink()
     response = client.get("/api/ide-hierarchy")
-    assert response.status_code == 200 and response.is_json
-    assert response.get_json() is None
+    assert response.status_code == 422 and response.is_json
+    assert "existing private configuration file" in response.get_json()["error"]
     assert not config_path.exists()
     for name, content in before.items():
         if name != config_path.name:
@@ -171,7 +171,9 @@ def test_foreign_and_client_configuration_tampering(setup):
 
 def test_missing_malformed_configuration_and_self(setup):
     client, _, config_path = setup
-    config_path.unlink()
+    # A missing hierarchy is JSON null in an explicitly provisioned private
+    # file. A missing test file itself is an isolation setup failure.
+    config_path.write_text("null")
     _, result = compile_candidate(client, "UART_TX RW")
     assert not result["ok"] and "Configure" in result["error"]
     config_path.write_text('{"node":"bad..path"}')
@@ -259,7 +261,8 @@ def test_hierarchy_get_missing_and_unreadable_contract(setup):
     client, _, config_path = setup
     config_path.unlink()
     response = client.get("/api/ide-hierarchy")
-    assert response.status_code == 200 and response.get_json() is None
+    assert response.status_code == 422
+    assert "existing private configuration file" in response.get_json()["error"]
     config_path.write_text("{broken")
     response = client.get("/api/ide-hierarchy")
     assert response.status_code == 422

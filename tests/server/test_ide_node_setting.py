@@ -16,7 +16,7 @@ def setting(tmp_path, monkeypatch):
         "Thread.2": "kjhh1.Thread2", "Remote": "other.UART"},
         "definitions": {"other.UART": ["W"]}}
     path.write_text(json.dumps(original))
-    monkeypatch.setattr(policy, "CONFIG_PATH", str(path))
+    monkeypatch.setenv("CHURCH_TEST_IDE_HIERARCHY_PATH", str(path))
     app = Flask(__name__)
     tree = ast.parse(Path("server/app.py").read_text())
     route = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "get_ide_hierarchy")

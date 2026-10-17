@@ -15,6 +15,21 @@ Subprocess isolation must also disable external startup services, not just redir
 
 **How to apply:** Use explicit isolated-process mode and private configuration, approval, database, and snapshot storage. Reject production paths and existing-server reuse before allowing browser writes.
 
+IDE hierarchy is part of private test state, including read-only authoring
+checks. Never grant isolated processes a fallback to the operator's ownership
+configuration when a test override is missing.
+
+**Why:** Namespace acceptance originally isolated artifacts and database but
+left node changes able to rewrite project ownership and local aliases.
+
+**How to apply:** Copy hierarchy configuration for test sessions, require an
+explicit private destination, and hash-guard the real file through failures.
+Missing ownership can be represented by JSON null in the private fixture;
+missing private storage is an isolation error, not permission to read live state.
+When tightening an isolation requirement, check shell launchers as well as
+Python fixtures: otherwise unrelated compile journeys can fail merely because
+their launcher still supplies the older set of private inputs.
+
 Bootstrap regression fixtures must not assume that the current user Namespace
 still contains historical draft names at fixed slots. Prefer explicitly
 constructed fixture assignments; when filtering copied drafts, preserve unrelated
