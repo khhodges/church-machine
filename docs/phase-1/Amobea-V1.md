@@ -172,6 +172,16 @@ independent fetch protection and watchdog behavior remain as specified.
 
 ### 4.3 Other paths and capture without CHANGE
 
+Companion review reference (outside this self-contained hardware collection):
+`docs/reviews/mint-phase1/namespace-update.md`, “Producer/observer inventory”.
+Use that shared Mint/Amobea inventory for activation, external control,
+observation and lifecycle coverage. The
+ownership actions below and the bit-13 writer checklist remain Amobea-specific
+obligations, not an independent claim of a complete activation-path list.
+Add newly discovered paths to the shared inventory and assess both ownership
+serialization and Mint G3/G4 exclusion; proof of either invariant alone is
+insufficient for the other.
+
 - **SWITCH:** Its THREADSAVE/Namespace-load/THREADLOAD sequence must obey the
   same ownership discipline across the outgoing and incoming Namespace
   contexts. This outline does not introduce whole-SWITCH rollback on failure.
@@ -203,6 +213,10 @@ without truncation once the physical layout is selected.
 
 This checklist applies to the proposed assignment of live-indicator bit 13.
 It does not itself approve the assignment or claim implementation evidence.
+See also the companion review at
+`docs/reviews/mint-phase1/context-feasibility.md`, “Protected word +17 and running ownership”:
+neither the ownership proposal nor a readable copy of indicator bits grants
+Mint/PkVerify caller-attestation or raw protected-stack access.
 
 1. **Specify both formats and transforms.** The live indicator at Thread `+17`
    and the saved continuation frame on the protected stack are distinct memory

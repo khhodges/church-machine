@@ -110,6 +110,38 @@ revoke plus Forge, not in-place rewriting or an implicit combined retry protocol
 
 ## Mirror/transport proposal (G6)
 
+### Worked interruption: issued in the IDE, board not ready
+
+This is a Q21/Q54 failure-oracle example, **not an executed test or implemented
+recovery service**:
+
+1. An authorized Forge call durably commits credential C, its complete grant
+   and proof, the associated randomness consumption, the advanced ID counter
+   and security revision R in one IDE transaction. C now exists as an issued
+   credential; its randomness entry is not lost.
+2. Delivery of revision R to the protected board registry is interrupted
+   before authenticated exact-state agreement. The board may still hold the
+   old revision or an incomplete mirror. PkVerify must remain disabled and
+   the call must not report normal success or expose the candidate proof to
+   the recipient. It must not report that C was never issued.
+3. A hard boot discards the interrupted execution, not C. Before verification
+   or normal execution is enabled, separately authorized setup must establish
+   the latest trusted IDE state, including any subsequent revocation, and
+   install/confirm that exact state on the board. If C is still active, setup
+   restores the same issued GT/proof pair; it consumes no new ID or random
+   entry. Missing or uncertain current state keeps execution blocked.
+4. Only after confirmed agreement may local PkVerify operate on the restored
+   registry. The old Forge call is not resumed or automatically retried, and
+   its missing success return is not retroactively supplied.
+
+Thus **issued** describes durable authority, while **ready to verify** describes
+the confirmed board working copy. There is no compensating rollback or
+distributed atomic-commit claim. G5/G6 must prove both the durable transition
+and fail-closed board admission, including across reset; this narrative does
+not supply those mechanisms.
+
+### Proposed authenticated envelope
+
 Define a typed authenticated envelope, not a raw UART command or ordinary JSON
 containing plaintext secrets:
 

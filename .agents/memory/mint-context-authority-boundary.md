@@ -29,5 +29,8 @@ assessment of a minimal interlock without approving one.
 documentation refinements: share the Mint/Amobea activation-path inventory,
 clarify protected Thread word +17 ownership/frame access and live/saved rules,
 and explain durable issuance with a stale board mirror. Treat these as review
-requests, not new architectural grants; validate the running-bit premises
-against the current specification before incorporating them.
+requests, not new architectural grants. Genesis authorized incorporating these
+refinements while preserving the decision ledger. Validate running-bit premises
+against the current specification: the live indicator and saved frame are
+distinct physical words, and a review recommendation does not approve bit
+placement or a new protected access interface.

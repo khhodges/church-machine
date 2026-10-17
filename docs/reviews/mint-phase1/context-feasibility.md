@@ -198,6 +198,41 @@ worst-case bounds/watchdog budget, and lifecycle exclusion must be demonstrated.
 No scanner is implemented. A continuously maintained dependency index would
 add more trusted machinery and is not recommended as an unreviewed shortcut.
 
+## Protected word +17 and running ownership
+
+The [Amobea bit-13 proposal](../../phase-1/Amobea-V1.md#bit-13-acceptance-checklist)
+and G2/G3 touch the same protected-context machinery, but do not grant the same
+access or interpret all words as the same format. **Placement remains proposed,
+not approved or implemented by this review.**
+
+| Protected representation | Meaning and access boundary |
+|---|---|
+| Live indicator at Thread `+17` | Flags, frame-size and stack-offset fields; bit 13 is proposed live execution ownership, with bits 14–27 still reserved zero. Machine-controlled lifecycle transitions own its updates; ordinary Mint/PkVerify code receives no raw read/write authority |
+| Saved continuation frame on the protected stack | A distinct physical word, with all bits 13–27 belonging to the 15-bit NIA. Its companion E-GT supplies validated caller identity to existing machine mechanisms, not an automatically available service attestation |
+
+The formats share bit positions, **not a physical location**. Word `+17` is
+not a combined ownership/NIA word to decode opportunistically. On save,
+construct the saved frame from stack metadata, flags and the complete NIA;
+project live ownership out rather than copying the live word. On restore,
+retain every saved NIA bit, including bit 13 (NIA bit 0), and construct the
+live indicator separately from the controlled ownership transition. Never
+clear a saved NIA bit as if it were ownership or restore historical ownership
+from a checkpoint.
+
+Arbitration belongs to the protected machine transition and its admission
+rules, not to two independent software consumers of `+17`. CALL/RETURN must
+preserve live ownership; handoff, bootstrap and fault/reset require their
+specified lifecycle action. G2's proposed attestation and G3's proposed
+non-mutating traversal would consume validated context through separately
+approved protected interfaces, not widened CR5 or a raw Thread capability.
+Neither interface exists merely because these fields exist. Ordinary copies
+of the indicator, frames or E-GT bits cannot authenticate a requester.
+
+G3 traversal/clearance must remain valid through publication against the
+[shared activation and observation inventory](namespace-update.md#producerobserver-inventory).
+Bit packing, coherent traversal and cross-instruction exclusion require
+separate evidence; this clarification closes none of G1–G4.
+
 ## Approval boundary and next evidence
 
 **Approval status: pending; no new authority granted.**

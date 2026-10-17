@@ -70,6 +70,27 @@ checks are recorded separately in the verification document.
 
 ## Reviewer checklist
 
+### Genesis review refinements
+
+The Genesis review endorses the assurance package's policy and evidence
+boundaries, not an operational service or closure of G1–G8. Its three
+documentation refinements are incorporated without changing the decision ledger:
+
+- [Shared Mint/Amobea activation and observation inventory](namespace-update.md#producerobserver-inventory),
+  with separate ownership and publication invariants.
+- [Protected Thread word +17 and saved-frame access/format boundaries](context-feasibility.md#protected-word-17-and-running-ownership),
+  preserving the proposed status of live bit 13 and the absence of a service
+  attestation/traversal authority.
+- [Worked issued-but-board-stale outcome](persistence.md#worked-interruption-issued-in-the-ide-board-not-ready),
+  distinguishing durable issuance from permission to enable local verification.
+
+Priority remains G4's whole-update exclusion and G1's legal Lambda/result path.
+Early assessment of a minimal interlock is a review recommendation, not
+authorization to introduce it. The later synthetic context probes reproduce
+bounded gaps; they do not convert this endorsement into runtime acceptance.
+
+### Review checks
+
 1. Reconstruct the first credential from Q22–Q35/Q40, not Q23 in isolation.
 2. Read all three Q18 rejections and Q54 together.
 3. Check each proposed authority-bearing CR against the access matrix and G1/G2.

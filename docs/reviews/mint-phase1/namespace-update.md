@@ -30,6 +30,14 @@ memory atomicity or protection against raw UART/physical inputs.
 
 ## Producer/observer inventory
 
+This is the shared review inventory for Mint G3/G4 and
+[Amobea execution ownership](../../phase-1/Amobea-V1.md#43-other-paths-and-capture-without-change).
+Amobea's bit-writer checklist specifies ownership actions; this inventory
+specifies the actors and admission/observation paths against which those
+actions and Mint's exclusion interval must be qualified. Neither list is a
+completed proof. A newly discovered path must be added here and assessed by
+both reviews before either claims completeness.
+
 All rows require profile-specific reachability evidence; a disabled producer must
 be shown disabled in the exact build, not removed from the analysis.
 
@@ -39,6 +47,9 @@ be shown disabled in the exact build, not removed from the analysis.
 | Other CPU code, mLoad/ns_gate, CALL/RETURN fetch | `ChurchNSGate` reads four NS words sequentially (S08) | No consumer can cache/use mixed old/new fields or stale eligibility between final check and release |
 | M6 multi-Thread switch | `ChurchWukongXC7A100T.elaborate` M6/configured_thread_count; core `thread_switch_start_sig` (S07/S06) | May be admitted between instructions; prevent switch admission throughout update without permanently disabling multi-Thread behavior |
 | Cooperative CHANGE/SWITCH, nested calls | core execution starts (S06) | Trusted Lambda code contains none in interval; external contexts also excluded |
+| Lambda entry/exit and continuation | G1 [context findings](context-feasibility.md#g1--same-artifact-lambda-and-result-path) | Settle entry/return semantics; account for continuation dependencies and indicator writes. A Lambda latch alone proves neither ownership nor whole-update exclusion |
+| Self capture, external capture and checkpoint restore | Amobea §4.3 and bit-13 checklist; proposed paths, not demonstrated services | Preserve ownership for self capture; serialize authorized external capture/restore with activation and Mint live-use checks. Pause is not release or permission to inspect protected context |
+| Dormant-image construction, context retirement and replacement | Amobea bit-13 writer checklist; G3 lifecycle obligations | Images cannot claim active ownership; creation/retirement cannot invalidate a live-use clearance between check and publication. Include authorized setup as well as runtime paths |
 | IRQ/lazy-load profile paths | core `u_irq_dispatch`, call lazy outputs (S03/S06) | Enumerate actual selected-profile enables and all admission gates; no assumed universal “no IRQ” or automatic lazy loading |
 | UART run/step/halt/reboot/skip/upload | Wukong RX control and upload FSM; bridge `_handle_upload` (S07/S09) | Halt/control transitions cannot expose partial entry or admit conflicting writes; raw serial bypasses host lock |
 | Hardware initialization/reset boot | Wukong init sequencer and boot trigger (S07) | Init normally separated; prove boundary and block later consumers of unconfirmed partial update |
@@ -52,6 +63,21 @@ Snapshots are a real **selected-state** observation path, not evidence of an
 unbounded Namespace dump. NS/data/C-list mappings can alias one physical RAM
 port or address range; privilege by port label is insufficient. Prove physical
 range disjointness for snapshot, private state, table and allocation views.
+
+For every reachable row, the shared evidence record must identify the exact
+profile/build, admission point, protected-state writers/readers, and behavior
+during exclusion, handoff, fault and reset. Include self-target CHANGE
+(continuous ownership), distinct-target CHANGE, cross-Namespace SWITCH, M6,
+bootstrap and UART run/step/halt explicitly. CALL/RETURN preserve ownership;
+IDE pause/step does not release it. For proposed capture/restore paths, record
+the missing implementation rather than silently marking them covered.
+
+Mint's V15–V17 injection evidence and Amobea's ownership evidence must cite
+this same inventory, but prove **different invariants**: no partial Namespace
+publication or stale live-use clearance versus no conflicting Thread ownership.
+Passing one does not establish the other. The Genesis review recommends
+costing the smallest additional interlock early; it does not approve an
+interlock, close G4, or authorize disabling watchdog/reset.
 
 ## Proposed bounded envelope to investigate first
 
