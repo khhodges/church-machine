@@ -4,6 +4,20 @@ description: Programmer declarations, never generated fallback names, must estab
 ---
 Do not manufacture an abstraction name from a method, expression, or display label. Missing declarations require a clear compile error and programmer correction; an explicitly declared name remains valid even if it resembles an old default.
 
+When an approved selection's embedded API genuinely declares a different name,
+retain the diagnostic and selected bytes. Stage a new-artifact correction
+proposal separately; do not relabel the Namespace or patch historical JSON to
+make the warning disappear. A capability row named SELF does not override the
+top-level abstraction declaration.
+
+**Why:** The approved Phase 1 design preserves explicit selections, not whichever
+catalog revision happens to look healthy. Identity investigation is not
+authorization to replace resident software.
+
+**How to apply:** Trace the persisted profile selection by exact filename and
+full hash, distinguishing it from screenshot evidence, seed defaults and the
+installed Namespace. Matching identity alone never qualifies execution.
+
 For the ascending Namespace migration, the user explicitly confirmed local ownership and approved only these Thread aliases: `Thread.2` → `kjhh1.Thread2`, `Thread.3` → `kjhh1.Thread3`, and `Boot.Thread` → `kjhh1.BootThread`. These are compiler permission aliases, not authority to select or install migration artifacts.
 
 **Why:** The user repeatedly rejected retaining automatic `RunAbstraction` naming or merely warning that it was inferred. They want the fallback removed, not presented more clearly. The explicit Thread aliases preserve the separately approved local names without inventing identities.

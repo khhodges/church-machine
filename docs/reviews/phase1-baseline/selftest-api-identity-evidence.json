@@ -1,0 +1,46 @@
+{
+  "schema": "phase1-selftest-api-observation/v1",
+  "observedDate": "2026-10-17",
+  "authority": "docs/reviews/phase1-baseline/approved-target-namespace.md",
+  "selectionSource": "server/lumps/design-drafts/phase1.json",
+  "selectionSourceSha256": "33996122d1b63cc0617cfb4b5a2074c00f0cc223a9930fccf3d071713c12d858",
+  "profile": "phase1-nst-metadata-slot0-v1",
+  "slotCount": 256,
+  "selectedRow": {
+    "slot": 6,
+    "name": "SelfTest",
+    "kind": "lump",
+    "policy": "Resident",
+    "sequence": 0,
+    "selection": {
+      "filename": "SelfTest.1.8b19abd7.lump",
+      "binaryHash": "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de",
+      "token": "4a000006",
+      "revision": 98
+    },
+    "boot": false
+  },
+  "binary": {
+    "bytes": 8192,
+    "words": 2048,
+    "byteOrder": "big-endian",
+    "headerHex": "fa87d001",
+    "cw": 500,
+    "cc": 1,
+    "frameWordOffset": 501,
+    "frameHex": "ab0700be",
+    "apiByteOffset": 2008,
+    "apiByteLength": 190,
+    "apiSha256": "c88f932f4f4781e7cf2441d4e9b5fff2eef5cbb981d6d621e1896f95d8f23948",
+    "apiUtf8": "{\"name\":\"RunAbstraction\",\"language\":\"assembly\",\"returnConvention\":{\"register\":\"DR0\",\"description\":\"return value\"},\"methods\":[],\"capabilities\":[{\"name\":\"SELF\",\"rights\":[\"E\"],\"grants\":[\"E\"]}]}",
+    "nameByteOffset": 2017,
+    "nameByteLength": 14,
+    "selfWordOffset": 2047,
+    "selfHex": "4a000006"
+  },
+  "classification": "selected-bytes-declare-wrong-api-name",
+  "expectedWarning": "SelfTest: Embedded API names RunAbstraction, not SelfTest; identity needs review",
+  "executionQualified": false,
+  "hardwareQualified": false,
+  "selectedBytesChanged": false
+}
