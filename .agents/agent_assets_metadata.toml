@@ -1088,3 +1088,17 @@ mtime_ms = 1792254450882
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/d39713d1-b9c8-4bee-9c41-0d032e8da1a6/d4200ade-4e25-44da-9170-d69350ff9e92"
 storage_version_token = "1792254463074675"
 content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+[[outputs]]
+id = "CzdJzkAUlmptoBOyt_b-o"
+uri = "file://docs/reviews/mint-phase1/minimal-machine-interfaces.md"
+type = "text"
+title = "Mint — minimal machine-interface proposal"
+description = "Three explicit proposals for protected caller context, same-artifact Lambda execution, and lawful GT result delivery. Design only; no implementation or activation."
+logical_id = "8fdfe24e-aabf-4b6b-ad21-310db23e16d5"
+content_hash = "sha256:a42794768c5a55b771c16261b2a1612e73ce82abcf33df7f78279ccddeb12e9e"
+size = 11024
+mtime_ms = 1792258120082
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/8fdfe24e-aabf-4b6b-ad21-310db23e16d5/42227680-a7ee-4bb4-90e2-e5c60ffe7f4a"
+storage_version_token = "1792258161807696"
+content_type = "text/markdown"

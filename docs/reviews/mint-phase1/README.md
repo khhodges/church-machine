@@ -22,6 +22,7 @@ approval, or permission to install, build, upload or flash anything.
 | What still needs a decision or engineering evidence? | [Bounded gate register](open-issues.md) |
 | Which exact source was inspected? | [Symbols, ranges and provenance](sources.md) |
 | Can Mint legally obtain protected caller/live-return evidence today? | [Bounded G1–G3 feasibility and synthetic cross-layer probes](context-feasibility.md) |
+| What minimal machine interfaces are now proposed for review? | [Caller context, private Lambda and GT result delivery](minimal-machine-interfaces.md) — design proposal only; not implementation approval |
 
 Read the [active Master ISA](../../phase-1/01-isa/instruction-set.md) for hardware
 semantics, not the larger root ISA or archived RTL. This package is deliberately

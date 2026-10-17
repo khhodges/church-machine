@@ -3,6 +3,20 @@ name: Mint context authority boundary
 description: Keep synthetic context evidence distinct from granting Mint access to protected Thread state.
 ---
 
+Genesis authorized proposing the minimal missing Mint machine interfaces for
+review, not implementing them. The proposal is in
+`docs/reviews/mint-phase1/minimal-machine-interfaces.md`.
+
+**Why:** The request for complete simulator code exposed unresolved caller
+evidence, private Lambda entry/return and lawful GT-result delivery contracts.
+Genesis explicitly chose “propose the minimal interfaces” after these limits
+were explained.
+
+**How to apply:** Treat the new document as proposed semantics only. Preserve
+the existing no-raw-Thread-access, approved-recipient, fixed-slot and GT-format
+constraints. Obtain implementation approval rather than inferring new
+architectural authority from permission to design.
+
 Mint context work must stop at a demonstrated missing authority path rather
 than granting a raw Thread-read capability, widening the heap, or treating host
 callStack as authenticated evidence.
