@@ -4,6 +4,7 @@ const assert = require('assert');
 
 global.window = {};
 const ChurchSimulator = require('./simulator.js');
+const ThreadDesign = require('./thread_design.js');
 
 const RETURN_AL = ((3 << 27) | (14 << 23)) >>> 0;
 
@@ -42,34 +43,51 @@ function fixture() {
 }
 
 function protectedFixture() {
+    // Disposable RAM only: canonical identities and layout, no saved artifacts.
     const sim = new ChurchSimulator();
     sim.bootComplete = false;
     sim.withNamespaceWrite('synthetic diagnostic Thread', () => {
         sim.writeNSEntry(1, 0, 255, 0, 0, 1, 0, 0, 0);
-        for (let slot = 2; slot <= 3; slot++) {
-            sim.writeNSEntry(slot, slot * 256, 63, 0, 0, 1, 0, 1, 0);
-        }
     });
+    sim.memory.fill(0, 0, 256);
     sim.memory[0] = ((0x1F << 27) | (2 << 23) |
         (32 << 10) | (2 << 8) | 12) >>> 0;
-    sim.memory[512] = ((0x1F << 27) | (8 << 10) | 1) >>> 0;
-    sim.memory[768] = ((0x1F << 27) | (8 << 10) | 1) >>> 0;
-    sim.memory[513] = RETURN_AL;
-    sim.memory[769] = RETURN_AL;
+    const layout = ThreadDesign.layout(256, 32);
+    assert(layout.valid);
+    const rootAddress = layout.stackEnd;
+    const rootSTO = rootAddress - 2;
+    const executables = [2, 3].map(slot => {
+        const base = slot * 256;
+        const words = new Uint32Array(64);
+        words[0] = sim.packLumpHeader(0, 8, 1, 0);
+        words.fill(RETURN_AL, 1, 9);
+        words[63] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+        const hdr = sim.parseLumpHeader(words[0]);
+        assert(sim.mintStep7Freespace(words, hdr).ok);
+        const minted = sim._mintOrdinaryLumpIdentity(words, slot, base,
+            {compilerOwnedSelf: true});
+        assert(minted.ok, minted.message);
+        sim.memory.set(minted.words, base);
+        sim.withNamespaceWrite('synthetic diagnostic executable', () =>
+            sim.writeNSEntry(slot, base, hdr.cw, 0, 0, 1,
+                minted.entry.seq, hdr.cc, minted.entry.cacheToken));
+        assert(sim.mLoad(minted.selfGT, 'E', 1).ok);
+        return {slot, hdr, gt: minted.selfGT};
+    });
+    const [caller, callee] = executables;
     const threadGT = sim.createGT(0, 1, {R:1, W:1}, 1);
-    const callerX = sim.createGT(0, 2, {X:1}, 1);
-    const callerL = sim.createGT(0, 2, {L:1}, 1);
-    const callerE = sim.createGT(0, 2, {E:1}, 1);
+    const callerE = caller.gt;
     sim.cr[12] = descriptor(threadGT, 0);
-    sim.cr[14] = descriptor(callerX, 512);
-    sim.cr[6] = descriptor(callerL, 575);
-    sim.memory[17] = sim._packProtectedIndicator(241, 1, {});
-    sim.memory[242] = callerE;
-    sim.memory[243] = sim._packFrameWordRaw(0x7FFF, 1, 243);
-    sim.sto = 241;
+    sim.cr[12].word2 = sim.readNSEntry(1).word1_limit;
+    sim._installLumpHeaderContext(sim.parseGT(callerE), caller.slot,
+        sim.readNSEntry(caller.slot), caller.hdr, callerE);
+    sim.memory[layout.protectedStoOffset] = sim._packProtectedIndicator(rootSTO, 1, {});
+    sim.memory[rootAddress - 1] = callerE;
+    sim.memory[rootAddress] = sim._packFrameWordRaw(0x7FFF, 1, rootAddress);
+    sim.sto = rootSTO;
     sim.pc = 1;
     sim.bootComplete = true;
-    return {sim, callerE};
+    return {sim, callerE, calleeE: callee.gt, layout, rootAddress};
 }
 
 // Ordinary CALL from logical PC 0 records saved NIA 1, nested RETURNs remain valid.
@@ -93,20 +111,29 @@ function protectedFixture() {
 // Protected Thread evidence uses raw sentinel/companion/frame words, and a
 // failed poison-root RETURN remains in the diagnostic ring across reset.
 {
-    const {sim, callerE} = protectedFixture();
-    sim.cr[0] = descriptor(sim.createGT(0, 3, {E:1}, 1), 768);
-    assert(sim._execCall({crDst: 0, imm: 0}));
+    const {sim, callerE, calleeE, layout, rootAddress} = protectedFixture();
+    sim.cr[0] = descriptor(calleeE, 768);
+    assert(sim._execCall({crDst: 0, imm: 0}), sim.output);
     const callEvents = sim.getControlFlowDiagnostics().events
         .filter(event => event.kind === 'CALL').slice(-2);
-    assert.strictEqual(callEvents[0].protectedThread.indicatorAddress, 17);
-    assert.strictEqual(callEvents[0].protectedThread.frameAddress, 243);
+    assert.strictEqual(callEvents[0].protectedThread.indicatorAddress, layout.protectedStoOffset);
+    assert.strictEqual(callEvents[0].protectedThread.frameAddress, rootAddress);
     assert.strictEqual(callEvents[0].protectedThread.frameWord,
-        sim._packFrameWordRaw(0x7FFF, 1, 243));
+        sim._packFrameWordRaw(0x7FFF, 1, rootAddress));
     assert.strictEqual(callEvents[0].protectedThread.decodedFrame.nia, 0x7FFF);
     assert.strictEqual(callEvents[1].protectedThread.companionWord, callerE);
     assert.strictEqual(callEvents[1].protectedThread.decodedFrame.nia, 2);
-    assert(sim._execReturn({imm: 0}));
+    assert(sim._execReturn({imm: 0}), sim.output);
+    assert.strictEqual(sim.cr[6].word0, callerE);
+    assert.strictEqual(sim.cr[6].m, 1);
+    assert.strictEqual(sim.pc, 2);
+    let rootFault;
+    sim.on('fault', event => { rootFault = event; });
     assert.strictEqual(sim._execReturn({imm: 0}), null);
+    assert.strictEqual(rootFault?.type, 'STACK_UNDERFLOW');
+    assert.strictEqual(sim.memory[rootAddress - 1], callerE);
+    assert.strictEqual(sim.memory[rootAddress],
+        sim._packFrameWordRaw(0x7FFF, 1, rootAddress));
     const failedSequence = sim.getControlFlowDiagnostics().events.at(-1).sequence;
     sim.reset('protected-fixture-reset');
     assert(sim.getControlFlowDiagnostics().events.some(event =>
