@@ -28,6 +28,9 @@ hardware qualification, or authorization to change bootstrap.
   — Phase 1 objective, with current-contract reconciliation and scope gates.
 - **[Original threat-test workbook](CTMM_W7_Threat_Test_Plan.xlsx)** — preserved
   input: 15 objectives, all marked Not run at receipt; no test-pass claim.
+- **[Wukong one-second throughput tests](W7-plus-plus-test-objectives.md#wukong-one-second-instruction-throughput-tests)** —
+  six planned workload/trace examples; estimates, measurement procedure and
+  exact-build evidence requirements, not measured performance.
 
 ## Authority
 

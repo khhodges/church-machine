@@ -68,6 +68,90 @@ These objectives establish positive CM properties. They do not require inventing
 a failing W7 baseline or asserting that W7/S48 cannot implement similar
 facilities. A claim of superiority requires a separately justified comparison.
 
+## Wukong one-second instruction-throughput tests
+
+**Status: planned / NOT RUN.** These performance examples supplement the
+security objectives; they do not change the supplied workbook or constitute
+minimum-performance acceptance thresholds.
+
+“Unrestrained” means continuous execution without IDE stepping, UART trace
+backpressure or external I/O waits. Capability, permission, bounds, fault and
+watchdog enforcement remain intact. All benchmark code/data must use the
+approved all-resident configuration.
+
+### Estimates to test
+
+At the source-default **50 MHz** clock:
+
+```text
+instructions per second = 50,000,000 / average cycles per retired instruction
+```
+
+| ID | Workload example | Planning assumption | Estimated instructions in one second |
+|---|---|---|---|
+| PERF-1 | Register arithmetic and branches, e.g. IADD/ISUB plus loop control | Approximately 2 cycles/instruction | 25 million |
+| PERF-2 | Authorized local DREAD/DWRITE loops, with readback verification | Approximately 4–5 cycles/instruction | 10–12.5 million |
+| PERF-3 | Fixed, declared mix of arithmetic, memory and capability/control instructions | Assumed average 10 cycles/instruction | 5 million |
+| PERF-4 | Capability/control-heavy workload, including legal CALL/RETURN and CHANGE/SWITCH paths | Illustrative average 25–50 cycles/instruction, not a timing claim for each opcode | 1–2 million |
+| PERF-5 | Trace-limited execution with one 12-byte packet per retired instruction | 57,600 baud, 8N1, 120 serial bits/instruction | Approximately 480 maximum |
+| PERF-6 | Trace-limited execution with three 12-byte packets per retired instruction | 57,600 baud, 8N1, 360 serial bits/instruction | Approximately 160 maximum |
+
+The **5 million/second** figure is a provisional mixed-workload planning
+estimate, not a measured Phase 1 result. PERF-1/2 are source-based timing
+estimates; PERF-3/4 are explicit cycle-budget assumptions. Branch overhead,
+capability validation, context size and instruction mix must be measured,
+not hidden in a claimed universal rate. PERF-5/6 are approximate serial
+capacity ceilings before arbitration gaps, snapshots and other UART traffic.
+
+Source basis in the main repository (outside this self-contained collection):
+`hardware/wukong_top.py` supplies the default clock/baud, instruction-fetch
+settling and trace-stall wiring; `hardware/core.py` supplies busy/retirement
+logic; `hardware/dread.py` and `hardware/dwrite.py` supply memory-operation
+states. These references describe inspected source, not the installed
+bitstream. Confirm their configuration against the exact tested build.
+
+### Measurement procedure and acceptance evidence
+
+1. **Identify the target.** Record board, exact bitstream/build identity,
+   actual clock, implementation revision, LUMP hashes, Namespace layout,
+   watchdog configuration, trace mode and UART baud. Freeze the instruction
+   mix and loop body before measurement. Separate simulator, component RTL,
+   integrated RTL and physical-board results.
+2. **Establish correct execution first.** Verify final arithmetic/checksum
+   results, memory readbacks and expected control-flow/context outcomes.
+   PERF-4 uses only approved, legal paths; unresolved semantics or absent
+   provisioning mean **BLOCKED**, not an invented shortcut. Report individual
+   control-operation costs as well as the aggregate workload rate.
+3. **Count committed work on the board.** Use a validated, non-stalling
+   cycle/retirement counter or equivalent approved instrumentation; exclude
+   fault events, bootstrap and setup from successful-retirement counts.
+   At confirmed 50 MHz, a measured interval is 50,000,000 cycles with explicit
+   start/end boundaries. Include loop/control instructions and disclose
+   condition-skipped instructions separately. Browser time, bridge arrival
+   timestamps and simulator execution speed are not board throughput evidence.
+4. **Keep trace modes separate.** PERF-1–4 require demonstrated absence of
+   trace-induced stalls, not just Run mode or a hidden/filtered IDE trace.
+   The inspected top-level stalls while sending trace packets. If no approved
+   untraced profile or counter exists, mark unrestrained measurement **BLOCKED**.
+   Do not silently disable trace, change the bitstream or weaken protection.
+   PERF-5/6 require verified actual event counts per instruction; include
+   loop overhead and report the weighted packet rate if it differs.
+5. **Repeat and report.** After warm-up, collect at least five one-second
+   windows; report successful retirements, elapsed cycles, average CPI,
+   minimum/median/maximum rate, stalls and fault/watchdog status. If watchdog
+   policy prevents a full window, report the shorter interval and any
+   extrapolation explicitly; it is not a completed one-second measurement.
+6. **Apply the right oracle.** A valid result requires correct architectural
+   outcomes, reproducible counts and exact-build attribution. Differences
+   from the estimates require explanation, not automatic pass/fail against
+   an unapproved performance target. Faults or incomplete windows must not
+   be presented as successful full-window samples. Preserve raw evidence
+   without introducing per-instruction UART backpressure into untraced runs.
+
+This addition authorizes test-plan documentation only: no counter/trace RTL
+changes, vendor builds, flashing, live Namespace changes or hardware execution
+are performed or authorized by these examples.
+
 ## Evidence and pass criteria
 
 The [Amobea Transaction objectives](Amobea-V1.md#64-transaction-abstraction--phase-1-demonstration-objective)
