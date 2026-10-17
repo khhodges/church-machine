@@ -80,3 +80,15 @@ path. Expecting the same IRQ after an opcode substitution creates false failures
 **How to apply:** Keep exact destination identity and grant assertions for
 supported loads, no-write assertions for invalid declarations, separate named-slot
 scheduler coverage, and explicit rejection coverage for retired instructions.
+
+Treat Alice/Mallory tuple isolation evidence as cross-Thread containment, not
+proof that every access outside the heap subregion faults.
+
+**Why:** The tuple lab deliberately preserves existing capability rules. An
+out-of-range test must exceed the authority actually enforced; tightening
+Thread-relative authority to the heap alone would be a separate ISA decision,
+not a test-fixture repair.
+
+**How to apply:** Distinguish tuple offsets, heap layout, and the owning
+Thread's authorized range in test descriptions. Keep any proposal for narrower
+subregion enforcement separate from the bounded cross-Thread regression.

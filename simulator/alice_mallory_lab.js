@@ -16,6 +16,11 @@
         mallory: {label: 'Mallory denied capability', limit: 12},
         'tuple-alice': {label: 'Tuple: Alice owns and reads', limit: 7},
         'tuple-mallory': {label: 'Tuple: Mallory containment', limit: 8},
+        'tuple-mallory-own': {label: 'Tuple: Mallory reads own record', limit: 8},
+        'tuple-mallory-foreign-read': {label: 'Tuple: Mallory foreign read', limit: 8},
+        'tuple-mallory-foreign-write': {label: 'Tuple: Mallory foreign write', limit: 8},
+        'tuple-mallory-range-read': {label: 'Tuple: Mallory out-of-range read', limit: 8},
+        'tuple-mallory-range-write': {label: 'Tuple: Mallory out-of-range write', limit: 8},
     });
     function createScenario(name, binaries) {
         if (!Object.prototype.hasOwnProperty.call(scenarios, name)) throw new Error('Unknown lab scenario');

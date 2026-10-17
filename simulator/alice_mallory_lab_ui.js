@@ -97,6 +97,12 @@
                 `Full-record unchanged since Alice returned: ${state.tupleBeforeAttack
                     ? state.tupleBeforeAttack.every((word, i) => word === sim.memory[state.tupleAddress + i])
                     : 'not yet measured'}\n` +
+                (state.malloryTupleAddress !== null ?
+                    `Mallory own heap tuple: ${hex(state.malloryTupleAddress)}; requested offset: ${state.offset}\n` +
+                    `Attempted address: ${hex(state.targetAddress)}; DR4: ${hex(sim.dr[4])}\n` : '') +
+                (state.firstFaultEvidence ?
+                    `First fault: ${state.firstFaultEvidence.fault.type}; ${state.firstFaultEvidence.fault.message}\n` +
+                    `Data registers unchanged: ${state.malloryRegistersBefore.every((word, i) => word === sim.dr[i])}\n` : '') +
                 'Raw inspection is test-harness observation, not authority granted to Mallory.')
             : 'Choose a tuple test to collect evidence.';
         el('trace').textContent = state.retired.map((r, i) =>
@@ -146,7 +152,7 @@
     el('step').addEventListener('click', step);
     el('run').addEventListener('click', () => {
         if (!state) return;
-        // Fixed scenario limit prevents executing recovery, DREAD or unrelated code.
+        // Fixed scenario limit prevents executing recovery or unrelated code.
         while (state && state.attempts < state.limit && !el('status').classList.contains('error')) step();
     });
     el('reset').addEventListener('click', () => state ? load(state.scenario) : undefined);

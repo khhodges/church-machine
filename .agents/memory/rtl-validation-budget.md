@@ -29,3 +29,14 @@ an explicit release run can use the release runner's own long deadline instead.
 **How to apply:** Do not re-enroll the release replay as an automatic validation
 command. Run the release group explicitly when release evidence is required;
 ordinary task validation is not evidence that a full hardware replay passed.
+
+For the Alice/Mallory tuple regression, the user authorized deferring unfinished
+release checks to FPGA qualification if the local timeout cannot be resolved.
+
+**Why:** The simulator deliverable has independent focused evidence; waiting
+for unrelated long release matrices must not be confused with validating it.
+
+**How to apply:** Keep the deferral narrow and explicit. Preserve the release
+checks as outstanding hardware-qualification prerequisites, not passes or
+permanently disabled checks. This is not blanket permission to bypass validation
+on other work.
