@@ -8,13 +8,19 @@ E-GT builds the callee CR6 view, and the latched callee E-GT builds CR14.
 Neither phase may index through the resolved LUMP capability, because its base
 points at the LUMP header rather than a c-list row.
 
-ELOADCALL must accept CR6 as its ordinary source: CR6 is the architectural
-c-list capability. A source-range gate ending at CR5 rejects canonical
-`ELOADCALL CRd, CR6[row], method` instructions before resolution.
+CR6 holds an E-only GT. Its register M-bit permits L access without changing
+that GT. Do not describe CR6 as holding a transient L-only GT or justify access
+by register number alone. ELOADCALL is retired; historical fused-instruction
+behavior is not an active source requirement.
 
-RETURN frames must store the caller identity normalized as a Church E-GT.
-CR6's live word 0 is only a transient L-only c-list view, so copying it raw
-creates a frame that cLoad cannot use to reconstruct the caller.
+**Why:** Genesis explicitly corrected the LOAD explanation: CR6.M permits the
+operation while the E-only GT stays unchanged. Earlier memory describing an
+L-only CR6 token was stale and must not drive a new implementation.
+
+**How to apply:** Preserve E identity and distinguish register M state from GT
+permission bits in LOAD, CALL and RETURN work. Never fix ordinary non-CR6
+L-only header access by rewriting CR6's GT or granting mixed R/L rights.
+RETURN frames retain caller E authority, not a fabricated L-only identity.
 
 RETURN has no CR source operand. The encoded register fields are zero/reserved;
 requiring E permission from CR0 (or any decoded CR) aborts before the frame and

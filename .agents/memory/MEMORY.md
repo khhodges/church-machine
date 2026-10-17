@@ -78,7 +78,7 @@
 - [Thread rules and Amobea design](normative-thread-private-abi.md) — geometry, ownership, root frames, placement, tuple allocation, and Transaction prototype scope.
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
-- [CALL E-GT identity flow](call-egt-identity-flow.md) — CALL resolves source/callee E-GTs directly; RETURN frames must carry normalized caller E authority, never transient CR6 L authority
+- [CALL E-GT identity flow](call-egt-identity-flow.md) — CR6 keeps its E-only GT; CR6.M permits L without token mutation; CALL/RETURN preserve E identity.
 - [Bridge-causal retirement gates](bridge-causal-retirement-gates.md) — UART write→retirement proofs must use bridge-side counters, not server receive order
 - [Board-state acknowledgement correlation](board-state-ack-correlation.md) — state-changing UART acknowledgements need a request nonce, atomic receive, and bounded partial-frame recovery
 - [M-bit I/O object](m-bit-io-object.md) — one Namespace-held 32-bit I/O word; bits 0–15 map CR0.M–CR15.M and full-word writes set/clear all bits
