@@ -17,6 +17,18 @@ the existing no-raw-Thread-access, approved-recipient, fixed-slot and GT-format
 constraints. Obtain implementation approval rather than inferring new
 architectural authority from permission to design.
 
+Synthetic M3 result manufacturing must not justify redirecting Mint's C-list
+scope or provisioning private aliases. Treat publication enforcement and
+observer confidentiality as separate approval/evidence obligations.
+
+**Why:** A test-privileged scope can demonstrate manufacturing without proving
+lawful entry or return. A future exact-value write permit would still not
+protect read aliases, retained Thread homes or previously emitted diagnostics.
+
+**How to apply:** Use the bounded result-containment investigation as evidence
+of gaps, not permission for a CR6 workaround. Preserve its distinction between
+host-observer exposure and an ordinary caller exploit.
+
 Genesis's subsequent design review endorsed the direction but requested explicit
 G4 dependency, READ/COMMIT binding, fault-before-clear containment and stronger
 M3 publication-bound write restrictions. It did not approve implementation.

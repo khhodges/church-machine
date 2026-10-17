@@ -10,6 +10,7 @@
 | Documentation/provenance/arithmetic checks | CHECKED-DOC; commands/results below |
 | Draft/compiler syntax | NOT RUN here; historical draft README reports deliberate compile blockers, not service success |
 | New service JS simulator tests | NOT IMPLEMENTED / NOT RUN |
+| Isolated M3 result component probes | 20 checks PASS; [scope, concrete weaknesses and reproduction](result-containment.md). Synthetic alias/CR6 setup is test privilege, not service acceptance |
 | New service RTL simulation | NOT IMPLEMENTED / NOT RUN |
 | Generated/synthesized RTL | NOT RUN; no vendor build, root generated file not treated as current evidence |
 | Exact release build | NOT RUN; no artifact selected/adopted |

@@ -110,3 +110,14 @@ are **not** authenticators. File hashes here only pin reviewed evidence.
   or continuation of an abandoned call.
 - Legacy tests and source inspection do not prove new service implementation.
   Generated RTL, exact build and physical evidence remain separate release gates.
+
+## Bounded result-path evidence
+
+The [M3 investigation](result-containment.md) exercises real JS capability and
+memory gates with synthetic, explicitly test-privileged private RW/L aliases.
+It separates working spatial checks from absent publication/value enforcement,
+reproduces fault-retained result/home/diagnostic copies and stale reuse after
+return-to-boot, and identifies the non-CR6 L-only LOAD header-read blocker.
+Its passing probes are not service acceptance or proof of legal alias
+provisioning. No one-use permit was implemented; containment before access and
+across observers/reset remains an open requirement.

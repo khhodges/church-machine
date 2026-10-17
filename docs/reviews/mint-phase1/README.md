@@ -23,6 +23,7 @@ approval, or permission to install, build, upload or flash anything.
 | Which exact source was inspected? | [Symbols, ranges and provenance](sources.md) |
 | Can Mint legally obtain protected caller/live-return evidence today? | [Bounded G1–G3 feasibility and synthetic cross-layer probes](context-feasibility.md) |
 | What minimal machine interfaces are now proposed for review? | [Caller context, private Lambda and GT result delivery](minimal-machine-interfaces.md) — design proposal only; not implementation approval |
+| Could a result be forged, observed or reused after a fault? | [M3 isolated containment investigation](result-containment.md) — spatial checks, demonstrated gaps and unqualified reset/observer paths |
 
 Read the [active Master ISA](../../phase-1/01-isa/instruction-set.md) for hardware
 semantics, not the larger root ISA or archived RTL. This package is deliberately
@@ -68,6 +69,9 @@ tests in the original verification matrix are designs, not results.
 The later [G1–G3 investigation](context-feasibility.md) adds isolated synthetic
 JS/Amaranth component results, not service or hardware acceptance. Documentation
 checks are recorded separately in the verification document.
+The [M3 component probes](result-containment.md) separately reproduce result
+manufacturing and fault/reset exposure under explicit test privilege; they
+neither provision Mint nor implement the proposed publication-bound permit.
 
 ## Reviewer checklist
 

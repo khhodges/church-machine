@@ -144,6 +144,12 @@ payload. This post-write confirmation is separate from the old-word precondition
 
 ## M3 — private GT result delivery using ordinary LOAD
 
+**Investigation update:** [isolated M3 probes](result-containment.md) demonstrate
+spatial checks but not legal provisioning, publication-bound writes or
+fault/reset confidentiality. They also reproduce a non-CR6 L-only LOAD blocker
+at the current header R-read check. The semantics below remain proposed;
+neither a test-installed CR6 view nor a passing component probe approves them.
+
 **Highest-review privilege:** M3 creates authority bits. It needs explicit
 review beyond M1's identity and M2's entry/continuation rules.
 

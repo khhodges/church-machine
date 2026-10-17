@@ -12,6 +12,12 @@ and isolated synthetic JS/RTL-component probes. It demonstrates the Lambda
 entry/continuation mismatch and the protected-evidence access gap; it does not
 close these gates or approve a new architectural interface.
 
+The [M3 result investigation](result-containment.md) adds isolated JS evidence
+of bounded spatial checks, unrestricted value/timing under test-provided RW
+authority, a blocked non-CR6 L-only LOAD path, and retained result/diagnostic
+copies after fault/reset. It does not close G1 or qualify confidentiality.
+The publication-bound one-use permit remains an unapproved design requirement.
+
 | Gate | Evidence / problem | Bounded alternatives and recommendation | Decision / closure needed |
 |---|---|---|---|
 | **G1 — Legal Lambda/ABI/results** | S02 Lambda location jump vs inline JS; S03 continuation/frame/keep-mask differences; no demonstrated internal label X or CR result path | Prefer an existing legal same-artifact X binding plus validated private result-cell LOAD. Otherwise specify smallest architectural change; do not fabricate CRs, make a separate service, or enable old fused opcodes | Engineering trace and same-byte cross-layer tests first. Explicit architectural/provisioning approval if new subobject authority, aliases or continuation semantics are required. Accept exact proposed ABI only after this |
