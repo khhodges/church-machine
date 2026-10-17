@@ -49,3 +49,28 @@ is not evidence of integrated operation. No different selections, invented GT
 grants or success stubs were substituted. A complete 17-entry execution remains
 blocked, including Mint's real allocation → issued CR-held GT → authorized use
 path. Saved Namespace state, selected artifacts and hardware were not changed.
+
+## Exact-source recompilation
+
+`python3 scripts/prepare_phase1_candidates.py` recovers source only from the
+hash-matched selected binaries and invokes the current compiler. Each run creates
+an ignored `generated-artifacts/phase1-candidates-*` directory containing recovered
+source, a report and any successful **unapproved** candidates. It neither signs
+new authority nor publishes, selects or installs an artifact.
+
+The initial attempt failed compilation for all three selected executables:
+SelfTest's embedded source has no declared abstraction identity; WukongCallHome
+and CapabilityTest use unqualified identities and capability names that the
+current canonical-dot-name compiler rejects. Their exact source was retained,
+not silently renamed or replaced with catalog source.
+
+This is an additional source-update prerequisite, not evidence that binding
+alone will make the three artifacts executable. The declarations and dependency
+identities must be made explicit before recompilation; candidate revisions then
+need actual linking and execution checks.
+
+The Mint and pkverify source drafts intentionally contain unresolved TODO
+branches. Their protected-context, Lambda and result-delivery interfaces remain
+proposals requiring implementation approval. nstab denotes the restricted table
+RW view, not an independent callable service. Existing Alice/Mallory lab code
+does not by itself authorize provisioning them in this approved Namespace.
