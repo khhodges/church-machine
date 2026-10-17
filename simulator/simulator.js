@@ -7280,7 +7280,10 @@ class ChurchSimulator {
             clistSize = this._clistCountForCR(6);
         } else {
             const lumpBase = this.cr[d.crSrc].word1;
-            const hdrRead = this._capRead(d.crSrc, lumpBase, 'R', `SAVE CR${d.crSrc} lump-hdr`);
+            // Resolving c-list geometry is part of SAVE's S authority, not a
+            // Turing data read. Keep the same S gate as the eventual row write:
+            // requiring R here rejects domain-pure S-only views.
+            const hdrRead = this._capRead(d.crSrc, lumpBase, 'S', `SAVE CR${d.crSrc} lump-hdr`);
             if (!hdrRead.ok) { this.fault(hdrRead.fault, hdrRead.message); return null; }
             const hdr = this.parseLumpHeader(hdrRead.value);
             clistLoc = (hdr.valid && hdr.cc > 0) ? (lumpBase + hdr.lumpSize - hdr.cc) >>> 0 : lumpBase;

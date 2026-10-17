@@ -331,7 +331,7 @@ register_suite "return-cr6-l-perm-tests" \
     'node tests/simulator/sim_return_cr6_l_perm.js'
 
 register_suite "load-through-l-perm-cr6-tests" \
-    'node tests/simulator/sim_load_through_l_perm_cr6.js'
+    'node tests/simulator/sim_load_through_l_perm_cr6.js && node tests/simulator/sim_save_s_only.js'
 
 register_suite "return-cr14-trace-tests" \
     'node simulator/test_return_cr14_trace.js && node simulator/test_execution_control_flow.js && node simulator/test_task3529_control_flow_diagnostics.js && node simulator/test_control_flow_diagnostic_export.js && node simulator/test_boot_load_cr15_breakpoint.js && node simulator/test_paused_execution_boot_gate.js && node simulator/test_continuous_run.js && node simulator/test_eloadcall_flat_entry.js'

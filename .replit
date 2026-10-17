@@ -940,12 +940,12 @@ outputType = "console"
 name = "load-through-l-perm-cr6-tests"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node tests/simulator/sim_load_through_l_perm_cr6.js"
-
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node tests/simulator/sim_load_through_l_perm_cr6.js && node tests/simulator/sim_save_s_only.js"
 
 [[workflows.workflow]]
 name = "return-cr14-trace-tests"
