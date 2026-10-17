@@ -11,9 +11,11 @@ const rootAddress = layout.stackEnd;
 const rootSTO = rootAddress - 2;
 const source = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
 function extract(name) {
-    const start = source.indexOf(`function ${name}(`);
-    assert.ok(start >= 0, name);
-    return source.slice(start, source.indexOf('\n}', start) + 2);
+    const match = new RegExp(`^(?:async )?function ${name}\\(`, 'm').exec(source);
+    assert.ok(match, name);
+    const end = source.indexOf('\n}', match.index);
+    assert.ok(end >= 0, `${name} has a closing brace`);
+    return source.slice(match.index, end + 2);
 }
 function fixture() {
     const s = new Simulator();
@@ -54,23 +56,40 @@ function fixture() {
     s.pc = 1;
     s.bootComplete = true;
     s._bootImageLoaded = true;
+    // Model explicit activation, independently of the repository/cache status.
+    // No saved configuration or image is read by this disposable fixture.
+    s.simulationConfiguration = {id: 'synthetic-paused-return'};
     return s;
 }
 function call(s, slot) {
     const entry = s.readNSEntry(slot);
     s.cr[0] = {word0: s.memory[slot * 256 + 63], word1: slot * 256,
         word2: entry.word1_limit, word3: entry.word2_seals, m: 0};
-    assert.ok(s._execCall({crDst: 0, imm: 0}), s.output);
-    s.pc = 1;
+    const result = s._execCall({crDst: 0, imm: 0});
+    assert.ok(result, s.output);
+    assert.equal(s.halted, false, s.output);
+    assert.equal(s.cr[14].word1, slot * 256);
+    assert.equal(s.pc, 1, 'CALL enters the synthetic RETURN without repairing PC');
 }
 function harness(s, status = 'stale-image', available = true) {
     const events = [];
     const c = {
         sim: s, console, pipelineViz: null, _simRunActive: false,
+        _idx1AdmissionInFlight: false, _pendingPipelineBuffer: null,
+        walkTimer: null,
         _bootImageRefreshInFlight: null, walkRunning: true,
         document: {getElementById: () => null},
         window: {
             TargetState: {authorize: () => ({ok: true})},
+            SimulationPreparation: {
+                // Freshness UX is covered separately; allow this synthetic
+                // active machine to resume, without touching its protected state.
+                checkExecutionFreshness: async () => true,
+                activateSavedImage: async () => {
+                    events.push('activate');
+                    throw new Error('No synthetic saved image is available');
+                },
+            },
             bootImage: available ? {} : null, bootImageAvailable: available,
             BootEntryUI: {get: () => ({status})},
             _refreshCommittedBootImageCache: async () => { events.push('refresh'); },
@@ -82,6 +101,7 @@ function harness(s, status = 'stale-image', available = true) {
         },
         resetSim: () => { events.push('reset'); s.reset(); },
         _blockBootForMissingCommittedImage: op => { events.push('blocked:' + op); return false; },
+        _showBootPreparationBlocked: op => { events.push('blocked:' + op); },
         _applyPendingSimLoad() {}, _breakpointBeforeNextInstruction: () => null,
         _handleExecutionSuspension: () => false,
         updateDashboard() {}, switchView() {}, openCRDetail() {},
@@ -105,15 +125,15 @@ async function main() {
             assert.equal(s.checkBreakpointBeforeExecute(breaks), s._nextPhysicalAddr());
             const {c, events} = harness(s, state, state !== 'missing');
             c._breakpointBeforeNextInstruction = () => s.checkBreakpointBeforeExecute(breaks);
-            c[mode]();
-            await Promise.resolve(); await Promise.resolve();
+            await c[mode]();
             assert.deepEqual(events, [], `${mode}/${state}: paused execution must not refresh/reset`);
             assert.equal(s.pc, 2);
             assert.equal(s.cr[14].word1, 768);
             assert.equal(s.bootComplete, true);
             assert.equal(s._controlFlowDiagnosticResetGeneration, generation);
             s.pc = 1;
-            c[mode]();
+            await c[mode]();
+            assert.deepEqual(events, [], `${mode}/${state}: RETURN must not refresh/reset`);
             assert.equal(s.cr[14].word1, 512);
             assert.equal(s.pc, 2);
             assert.equal(s.memory[layout.protectedStoOffset] & 0x1fff, 0x1000 | rootSTO);
@@ -127,7 +147,7 @@ async function main() {
         const before = {cr: structuredClone(s.cr),
             indicator: s.memory[layout.protectedStoOffset], sto: s.sto};
         const {c, events} = harness(s);
-        c.stepSim();
+        await c.stepSim();
         assert.deepEqual(events, []);
         if (pc === 0) {
             assert.equal(s.pc, 0);
@@ -143,15 +163,18 @@ async function main() {
     }
     {
         const {c, events} = harness(fixture());
-        c.runSimGo();
+        await c.runSimGo();
         assert.deepEqual(events, ['run'], 'Run resumes without image preparation');
     }
     {
-        const s = fixture(); s._bootImageLoaded = false;
+        const s = fixture();
         const {c, events} = harness(s, 'pending', false);
         assert.equal(c._requireCommittedImageForExecution('Step'), true,
-            'live boot completion, not cache/load flags, authorizes resume');
+            'active simulation, not repository/cache status, authorizes resume');
         assert.deepEqual(events, []);
+        s._bootImageLoaded = false;
+        assert.equal(c._requireCommittedImageForExecution('Step'), false,
+            'boot completion alone cannot substitute for an activated image');
         s.bootComplete = false;
         c.window.bootImage = {};
         c.window.bootImageAvailable = true;
@@ -160,21 +183,31 @@ async function main() {
             'an unbooted machine still needs the image loaded');
         s._bootImageLoaded = true;
         assert.equal(c._requireCommittedImageForExecution('Step'), true);
+        s.simulationConfiguration = null;
+        assert.equal(c._requireCommittedImageForExecution('Step'), false,
+            'loaded bytes alone cannot substitute for explicit activation');
+        assert.deepEqual(events, ['blocked:Step', 'blocked:Step', 'blocked:Step']);
     }
     {
         const s = fixture(); s.bootComplete = false;
+        s._bootImageLoaded = false;
+        s.simulationConfiguration = null;
         s.step = () => { throw new Error('missing-image boot executed'); };
+        s._bootStep = () => { throw new Error('missing-image boot executed'); };
         const {c, events} = harness(s, 'pending', false);
-        c.stepSim(); c.runSimGo();
-        assert.deepEqual(events, ['blocked:Step', 'blocked:Run']);
+        await c.stepSim(); await c.runSimGo();
+        assert.deepEqual(events, ['blocked:Step', 'activate', 'blocked:Run']);
     }
     {
         const s = fixture();
         const {c, events} = harness(s);
-        // Explicit reset/boot preparation still refreshes and invokes reset.
-        assert.equal(c._ensureCommittedImageForBoot('explicit reset'), false);
-        await Promise.resolve(); await Promise.resolve();
-        assert.deepEqual(events, ['refresh', 'overlay', 'reset']);
+        // The gate authorizes an explicit reset, but must not perform one or
+        // fetch/overlay repository bytes itself, even when the cache is stale.
+        assert.equal(c._ensureCommittedImageForBoot('explicit reset'), true);
+        assert.deepEqual(events, []);
+        assert.equal(s.bootComplete, true);
+        c.resetSim();
+        assert.deepEqual(events, ['reset']);
         assert.equal(s.bootComplete, false);
     }
     console.log('PASS paused Step/Run/Walk image gate; nested, PC0, root RETURN; boot/reset controls');
