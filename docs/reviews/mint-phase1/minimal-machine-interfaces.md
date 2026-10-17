@@ -45,7 +45,7 @@ These are semantic interface names, not new source instructions or available API
 
 | Operation | Inputs | Machine-owned result and checks |
 |---|---|---|
-| BEGIN | Mint entry selector and the proposed typed CR inputs from implementation-plan.md: credential CR2, proof CR3, request CR4, target CR7, payload CR8 | Acquire one configuration-wide admission interval; validate and capture the outer caller's protected E authority; bind current Thread, exact Mint identity, Namespace, operation and immutable inputs |
+| BEGIN | Mint entry selector and the proposed typed CR inputs from implementation-plan.md: credential CR2, proof CR3, request CR4, target CR7, payload CR8 | Request configuration-wide admission from the unresolved G4 mechanism; once exclusion is established, validate and capture the outer caller's protected E authority; bind current Thread, exact Mint identity, Namespace, operation and immutable inputs |
 | VERIFY_CONTEXT | Only the provisioned PkVerify entry reached from the active Mint invocation | Supply authenticated original recipient/configuration to the verifier from the active context, never from its immediate caller or a supplied integer |
 | CHECK_LIVE_USE | Frozen target in the active context, used only for an otherwise authorized Replace/Destroy | Validate all live/suspended protected return contexts and active objects; record clearance tied to that exact target and interval |
 | FINISH | The active Mint invocation, after confirmed publication and prepared result | Release admission and discard private snapshots/context before ordinary wrapper RETURN; no credential or context survives as a reusable grant |
@@ -55,10 +55,11 @@ No forgeable integer handle, extra public GT type or general Thread-read
 capability is returned. Nested Mint admissions fault; PkVerify consumes the
 existing invocation context without replacing the original caller.
 
-Caller capture happens before nested CALL. BEGIN's descriptor/proof/payload
-snapshots are coherent: competing mutation is excluded during capture, and only
-the private snapshots are subsequently checked or consumed. A matching hash
-alone is not a snapshot or caller authentication.
+Caller capture must happen before nested CALL. BEGIN requires coherent
+descriptor/proof/payload snapshots: G4 must exclude competing mutation during
+capture, and only the private snapshots may subsequently be checked or consumed.
+This specifies a requirement, not an existing coherence mechanism. A matching
+hash alone is not a snapshot or caller authentication.
 
 The verifier still performs actual credential/proof/operation checks against
 its provisioned registry R view, including all four proof words and fixed-work
@@ -72,11 +73,22 @@ Ordinary outstanding GTs do not by themselves mean an object is in use.
 
 ### Admission interval and failure
 
-All five Mint methods share BEGIN/FINISH exclusion. In a simulator, every
-instruction path and asynchronous memory/image/Namespace mutator must honor it;
+All five Mint methods require the same BEGIN/FINISH exclusion interval.
+**M1 specifies that interval but cannot enforce it without G4's whole-update
+exclusion mechanism. Until G4 is supplied and verified, BEGIN/FINISH is only a
+software-visible boundary, not a proven interlock.** A component context test
+must not be reported as operational Mint or G4 acceptance. Operational BEGIN
+must fault before mutation if the required exclusion cannot be established.
+
+In a simulator, every instruction path and asynchronous
+memory/image/Namespace mutator must honor the eventual mechanism;
 protecting only a JavaScript function call is insufficient. Trusted same-Thread
 Mint/PkVerify execution is allowed; unrelated activation or mutation is not.
 Hardware actors are a separate implementation obligation, not qualified here.
+Use the existing [producer/observer inventory](namespace-update.md#producerobserver-inventory),
+including Amobea activation/capture/restore and live-use checks, rather than a
+separate incomplete list. An admission flag or running bit alone proves none
+of that exclusion.
 
 Any validation, overlap, replay, stale configuration or permission failure
 hard-faults. There is no normal rejection return, queue, retry or rollback.
@@ -114,15 +126,37 @@ Lambda re-entry semantics requires separate reconciliation rather than being
 silently bundled into this Mint proposal.
 
 READ and COMMIT are separate non-nested invocations when verifier work is needed
-between them. M1 exclusion and a final recheck keep their shared context valid.
-Actual four-word storage readback is required after writes, not an echoed payload.
+between them. READ captures all four actual old Namespace words into protected
+invocation state, bound to the exact request, Namespace configuration, target
+slot and identity. COMMIT must match that binding and compare all four old words,
+not merely the generation or a plausible descriptor, before any target write.
+It must recheck mutable authority under the still-valid G4 exclusion.
+
+**Exact-word equality is necessary but does not itself detect ABA:** a writer
+can change and restore all four words. G4 must prevent intervening writes and
+activation changes throughout the READ/verifier/COMMIT interval, including the
+gap while Lambda is inactive. If that guarantee is absent, lost or cannot be
+established, COMMIT faults before writing; no ordinary reread supplies it.
+Do not introduce an unapproved history counter as an implicit substitute.
+
+After writes, confirm all four new words from actual storage, not an echoed
+payload. This post-write confirmation is separate from the old-word precondition.
 
 ## M3 — private GT result delivery using ordinary LOAD
+
+**Highest-review privilege:** M3 creates authority bits. It needs explicit
+review beyond M1's identity and M2's entry/continuation rules.
 
 Provision a one-result C-list object privately to Mint, plus a separate,
 word-bounded RW view of its result row. Keep the C-list framing intact.
 The L view and RW view must each satisfy ordinary descriptor/type/bounds checks;
 never issue a mixed-domain RW+L token.
+
+Establish and verify containment of the result object, its aliases and all
+temporary access capabilities **before the first access**. The caller and
+unrelated contexts must be unable to read, execute, map, alias or acquire those
+views, including through diagnostics, snapshots and reset handling. Clearing
+later is hygiene, not the access-control mechanism.
 
 After confirmed Namespace publication, the trusted Lambda writes the newly
 validated GT word through the private RW view. On return, Mint reloads its
@@ -134,6 +168,40 @@ object GT, never either private result view or NSRW.
 CR1 and the private result cell are cleared before admission. An invalid result
 or missing ordinary LOAD authority hard-faults. No DR-to-CR conversion, direct
 host register assignment or general set-B bypass is substituted.
+
+If a fault occurs after the GT write but before LOAD or clearing, the existing
+containment must still deny access. Reentry/reset must not expose the uncleared
+cell or deliver a previous result; trusted reinitialization clears it before
+reuse. There is no continuation of the interrupted call. If containment across
+a relevant reset/observer path is unproven, that path is not qualified.
+
+### Publication-bound write authority — additional proposed enforcement
+
+A bounded RW alias constrains addresses but **does not constrain write timing
+or value**. Auditing trusted Mint code cannot be presented as a machine-enforced
+guarantee that the alias cannot write arbitrary GTs. The required acceptance
+invariant is:
+
+> A non-NULL object-result GT can be written only to the designated result row's
+> GT word, only for the current authorized invocation, and only as delivery of
+> its confirmed Create/Replace publication, with the exact authorized GT value.
+
+Recommended mechanism for review: a machine-owned, single-use result-write
+permit, bound to the invocation, Namespace/configuration, published slot and
+identity, confirmed four-word descriptor, result-cell address and exact result
+GT (including permission/B ceilings). Arm it only after confirmed publication
+under G4; consume it on the accepted result write. The memory write path must
+enforce it for every alias, not only a convenient Mint helper. Reject early,
+duplicate, wrong-address, wrong-value, stale and cross-invocation writes.
+Fault, reset, FINISH or loss of the publication interval destroys the permit.
+
+Only protected initialization/cleanup may write the canonical zero NULL value
+without a publication permit; that does not authorize a different GT or access
+to another word. Ordinary LOAD, type, permission and bounds checks still apply.
+This is **new proposed machine enforcement**, not an ability supplied by the
+existing RW GT. Its implementation/encoding is not approved or proven here.
+ForgePassKey's protected delivery remains subject to G5/G6; this object-result
+permit does not create an alternative credential-issuance path.
 
 This RW/L alias is a real capability-manufacturing privilege. Restrict it to
 the approved Mint code/configuration and audit all writes. Any extra private
@@ -160,6 +228,30 @@ not permission to relabel public slots.
 
 A synthetic helper invocation or prefilled result register is not acceptance.
 Report exact input/code/image identities and every extra dynamic/private slot.
+
+### Review-driven acceptance controls — not yet executed
+
+| Concern | Required evidence |
+|---|---|
+| M1/G4 dependency | Context operations alone cannot qualify exclusion; demonstrate every applicable producer/observer is controlled during the complete interval, or reject operational admission before mutation |
+| M2 READ/COMMIT | Changed old words, changed request/target and loss of exclusion all reject before writing; a deliberate change-and-restore attempt must be prevented by G4, not accepted on equality |
+| M3 containment | Inject faults before/after result write, LOAD and clear; prove the cell and its aliases remain inaccessible to the caller/unrelated contexts across the relevant reset paths |
+| M3 write authority | Early, duplicate, wrong-word, wrong-value and previous-invocation writes fail; exactly one confirmed publication permits exactly its authorized result write; cleanup cannot forge authority |
+
+These are required tests, not new passing results. Simulator evidence must be
+followed by independent RTL evidence before any hardware claim.
+
+## Review disposition
+
+The [Genesis review](../../../attached_assets/Pasted-This-is-the-right-next-document-and-it-s-well-construct_1792259460983.txt)
+endorses the proposal's direction and requests the four refinements above.
+It is **not implementation approval**. The implementation-approval question
+received no affirmative answer.
+
+M1 links to G2 (requester), G3 (all-context live use) and depends on G4
+(whole-update exclusion); M2/M3 address the two G1 mechanisms. None of these
+gates is closed by revised wording. The M3 permit is a proposed response to the
+stronger enforcement invariant, not an authority grant inferred from the review.
 
 ## What approval would and would not mean
 

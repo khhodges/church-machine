@@ -17,6 +17,18 @@ the existing no-raw-Thread-access, approved-recipient, fixed-slot and GT-format
 constraints. Obtain implementation approval rather than inferring new
 architectural authority from permission to design.
 
+Genesis's subsequent design review endorsed the direction but requested explicit
+G4 dependency, READ/COMMIT binding, fault-before-clear containment and stronger
+M3 publication-bound write restrictions. It did not approve implementation.
+
+**Why:** A software admission boundary is not an interlock; even exact old-word
+equality misses change-and-restore ABA; a bounded RW alias constrains address,
+not write timing/value; cleanup cannot protect data before a fault.
+
+**How to apply:** Keep those distinctions in all Mint claims. The revised
+proposal's single-use result-write permit is still proposed new machine
+enforcement, not existing GT behavior or authority granted by this review.
+
 Mint context work must stop at a demonstrated missing authority path rather
 than granting a raw Thread-read capability, widening the heap, or treating host
 callStack as authenticated evidence.
