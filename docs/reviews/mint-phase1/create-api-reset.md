@@ -7,16 +7,17 @@ the current editable source are not this interface.
 ## Logical interface
 
 ```text
-CREATE(initialGT, requestedWords, permissions, passkey) -> newGT
+CREATE(initialGT, sizeAndCase, permissions, passkey) -> newGT
 ```
 
 Passkey is one logical credential: its authorizing GT plus its private
 128-bit proof (four 32-bit words), not the GT alone. The proof is not a second
 credential. Splitting these components across CR2/CR3 is a proposed calling
 convention, not a separately approved requirement.
-The object definition supplies kind, GT type and Domain; Abstract Owner comes
-from its owning abstraction. How that definition is selected is the open
-interface point below, not an assumed hidden lookup.
+The creation case is packed into the power-of-two allocation size, as directed
+by the programmer on 2026-10-18. This supersedes selection by CR4 permissions
+alone. The supplied definition must match the selected case; it still supplies
+the object details. Abstract Owner comes from its owning abstraction.
 
 ## Proposed register assignment
 
@@ -25,7 +26,7 @@ interface point below, not an assumed hidden lookup.
 | CR2 | Authorizing Passkey GT |
 | CR3 | Readable GT for the four-word Passkey proof |
 | CR4 | Object-specific initialization GT |
-| DR2 | Requested allocation size, in 32-bit words |
+| DR2 | Power-of-two allocation size in words, packed with creation case 1–4 |
 | DR3 | Requested permission selection |
 | CR1 | Returned object GT |
 | DR1 | Completion: 1 only after successful completion |
@@ -44,8 +45,8 @@ There is no second generic content buffer or 12-word request record.
 | Abstraction | GT identifying the defining LUMP as binary data | R is sufficient; RW also provides read access |
 | Data | GT identifying the supplied initial data | R or RW |
 
-This revised proposal distinguishes the three input forms above within CREATE,
-not by adding a numeric kind argument. Namespace LS describes access to the
+The packed DR2 case distinguishes these input forms within CREATE,
+without adding another argument. Namespace LS describes access to the
 source C-list; its contained GTs retain their individual permissions and need
 not themselves be LS. Mint reads the source LUMP and writes its new allocation;
 it does not require write permission on the source LUMP.
@@ -55,6 +56,10 @@ the returned GT. Validate the expected source structure, not merely permission
 bits.
 
 ### Individual case review
+
+The case reviews below established initializer and result semantics. The later
+packed-size decision supersedes their original size-only DR2 and inferred
+case-selection descriptions; the consolidated table reflects that decision.
 
 Namespace and Thread cases confirmed individually by the programmer on 2026-10-18:
 
@@ -91,7 +96,7 @@ on 2026-10-18: use an R or RW GT to the supplied initial data in CR4.
 | Item | Namespace | Thread | Abstraction | Data |
 |---|---|---|---|---|
 | CR4 | LS GT to source C-list | E GT to application | R/RW GT to defining LUMP | R/RW GT to initial data |
-| DR2 | Requested Namespace size | Requested Thread size | Requested Abstraction size | Requested Data size |
+| DR2 | Size packed with case 1 | Size packed with case 2 | Size packed with case 3 | Size packed with case 4 |
 | DR3 | NONE | NONE | E, LS or L | RW, R or W |
 | Passkey | Authorizes creation and allocation | Authorizes creation and allocation | Authorizes creation and allocation | Authorizes creation and allocation |
 | Mint action | Populate Namespace slots | Prime with Amoeba | Create from defining LUMP | Copy supplied initial data |
@@ -103,8 +108,8 @@ Mint zero-fills unused destination space. Copying must remain within both the
 established readable source extent and the destination allocation; DR2 does
 not establish readable source extent.
 
-The input-content decision does not yet specify how CREATE distinguishes
-ordinary Data from a defining LUMP when both use R/RW source GTs.
+The packed creation case distinguishes ordinary Data (4) from a defining LUMP
+(3), even though both source GTs provide R/RW access.
 
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by
 starting the supplied application directly. The application's E-GT is not a
@@ -120,8 +125,9 @@ is copied, Mint supplies zero padding; the caller need not make a padded copy.
 ## Allocation and Passkey accounting
 
 1. Validate the Passkey and authority for the operation before protected work.
-2. Round requested allocation up to a power of two, with a 64-word minimum
-   in this redraft.
+2. Use the power-of-two size decoded from DR2, with a 64-word minimum still
+   proposed in this redraft. Round any original size request before packing;
+   never round or charge the packed size-and-case value.
 3. Require the Passkey's remaining memory allowance to cover that allocation.
 4. Charge that same rounded allocation; a positive but insufficient allowance
    is not enough.
@@ -155,20 +161,40 @@ bookkeeping and memory accounting are complete.
 
 ## Inputs intentionally absent
 
-No interface-version constant, numeric object-kind selector, independent GT
+No interface-version constant, separate object-kind argument, independent GT
 type or Domain, caller B flag, numeric Owner, raw Abstract payload, or reserved
 padding words. No new Abstract GT encoding or credential protocol is proposed.
 
-## Open point: definition versus initializer
+## Packed size and creation case
 
-The revised proposal uses a CREATE-specific input convention: capability-list
-LS for Namespace, application E for Thread, and readable defining-LUMP data
-for Abstraction. The E-GT still identifies the application, not an existing
-Thread; this proposed convention is what gives it its CREATE meaning.
+The programmer directed that the exact case 1–4 be packed into the unused
+space in the power-of-two size. No additional parameter or definition record
+is required. The case numbers follow the individual review order:
 
-R/RW alone cannot distinguish a defining LUMP from ordinary Data. Data's
-initialization input is now agreed; its discrimination from Abstraction
-creation remains unresolved, as does the detailed Amoeba handoff ABI.
-Do not silently restore a numeric kind
-selector or invent a definition record to fill these gaps. This is not yet a
-complete executable ABI.
+| Case | Creation |
+|---|---|
+| 1 | Namespace |
+| 2 | Thread |
+| 3 | Abstraction |
+| 4 | Data |
+
+Proposed bit layout (not separately approved):
+
+```text
+DR2   = sizeWords | case
+case  = DR2 & 0b111
+size  = DR2 & ~0b111
+```
+
+Literal cases 1–4 need three bits. This layout requires a power-of-two size of
+at least eight words, so it fits the currently proposed 64-word minimum without
+overlap. It does not independently approve that minimum. For 64 words, DR2 is
+65, 66, 67 or 68 for cases 1, 2, 3 or 4 respectively.
+
+Validate case 1–4 and a supported power-of-two decoded size; reject malformed
+values. Validate the CR4 source for the selected case rather than guessing the
+case from its contents or permissions. Passkey accounting uses decoded size,
+never the packed value.
+
+The detailed Amoeba handoff ABI remains unresolved. Packing resolves case
+selection but does not by itself complete or authorize an executable ABI.

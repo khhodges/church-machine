@@ -25,8 +25,11 @@ The proposed request fields are being reviewed individually. The original
 - **Credential classification:** a credential is one case of Abstract, not a
   separate CREATE kind alongside Abstract. The eight-category proposal below
   is superseded on these points.
-- **Object-kind input: removed.** CREATE uses the kind in the supplied object
-  definition, not a separate caller-supplied kind selector.
+- **Separate object-kind input: removed.** After individual case review, the
+  programmer directed packing the exact creation case 1–4 into the unused
+  bits of the power-of-two size in DR2. This supersedes inference from the
+  initializer alone; the definition must match the selected case. See the
+  reset draft for the proposed bit layout.
 - **GT-type input: removed.** The supplied object definition also determines
   the GT type; the caller does not supply a separate type selector.
 - **Domain input: removed.** For an Inform GT, the supplied definition
@@ -58,6 +61,8 @@ The proposed request fields are being reviewed individually. The original
   Passkey validation before the protected operation. This is an intended
   contract, not evidence that existing method implementations enforce it.
 - **Allocation-size input: retained.** The caller supplies the size separately.
+  The later case review packs case 1–4 into this same argument; accounting
+  uses the decoded size, never the packed value.
   Allocation sizes are always rounded up to a power of two. The Passkey's
   remaining memory count must cover the rounded allocation; that same quantity
   is deducted so the count matches the memory reserved. A merely positive but

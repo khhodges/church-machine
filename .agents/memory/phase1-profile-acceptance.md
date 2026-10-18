@@ -48,14 +48,15 @@ Review its inputs individually with the programmer before fixing the layout.
 assumptions, and obtain its decision before moving to the next input.
 
 CREATE's Namespace case uses an LS GT to a source C-list; under this
-CREATE-specific convention it selects Namespace creation without a kind selector.
+CREATE-specific convention originally selected Namespace creation without a
+separate kind argument; the later packed-size decision below selects the case.
 The contained GTs retain their individual permissions, not uniformly LS.
 
 **Why:** On 2026-10-18 the programmer explicitly confirmed this case, including
 separate allocation size, Passkey memory authority, and a NONE/B=0 result.
 
 **How to apply:** Preserve that case decision without treating it as approval
-of the whole register ABI or a solution for Data-versus-Abstraction selection.
+of the whole register ABI. Apply the later packed-size rule for case selection.
 The public case approval is in the CREATE reset review.
 
 CREATE has no caller-supplied interface-version input.
@@ -75,8 +76,9 @@ categories in the proposed eight-way object-kind selector.
 **How to apply:** Do not retain Outform creation or a separate Credential kind
 from the earlier draft. Do not equate all Abstract cases with credentials.
 
-CREATE derives object kind, GT type, and the Inform GT's DATA/CAPABILITY
-Domain from the supplied object definition; none has a separate caller-supplied selector.
+CREATE has no separate kind, GT-type, or Inform DATA/CAPABILITY Domain argument.
+The later packed-size decision selects the creation case; the supplied definition
+must agree and provides object details.
 
 **Why:** The user selected “No—use the kind in the supplied object definition”
 when reviewing object kind, then “Yes—remove the separate GT-type input”
@@ -85,6 +87,17 @@ when reviewing GT type, and “Yes—remove the separate Domain input.”
 **How to apply:** Remove the redundant kind, GT-type and Domain selectors when
 implementing the reviewed interface. This decision does not settle the remaining inputs or
 authorize a new object-definition format.
+
+CREATE packs the exact creation case 1–4 into the unused bits of its power-of-two
+allocation-size argument: Namespace, Thread, Abstraction, Data in review order.
+
+**Why:** On 2026-10-18 the programmer resolved the R/RW source ambiguity by
+pointing out that the power-of-two size leaves space to pack the case.
+
+**How to apply:** Use the packed case rather than inferring creation kind from
+source permissions or guessing whether bytes look like a LUMP. Do not add a
+separate argument. Decode size before allocation accounting. The low-three-bit
+layout is an engineering proposal, not a separately approved ABI.
 
 Abstract GT Owner is derived from its owning abstraction, not a separate
 caller-supplied numeric input.
@@ -178,7 +191,7 @@ description record.
 
 **How to apply:** Keep source read access separate from returned permissions.
 Do not require writable source LUMPs or caller padding. This approval does not
-settle how ordinary Data is distinguished from a LUMP.
+independently settle case selection; apply the later packed-size decision.
 
 CREATE's Data initialization input is an R or RW GT to supplied initial data
 in CR4, rather than an allocation-only or mandatory-zero-only interface.
@@ -188,10 +201,10 @@ initial data” in the individual Data-case review.
 
 **How to apply:** Preserve readable-source access separately from returned
 RW/R/W permissions. Do not infer readable source extent from requested
-allocation or treat this input approval as resolving Data-versus-LUMP dispatch.
+allocation. The later packed-size decision resolves Data-versus-LUMP selection.
 
-CREATE's Thread case uses CR4 E to select Thread creation under the approved
-CREATE-specific input convention. That GT identifies the application Amoeba
+CREATE's Thread case uses CR4 E for its initializer; the later packed-size
+decision selects Thread creation. That GT identifies the application Amoeba
 will start, not an existing Thread or Amoeba itself.
 
 **Why:** On 2026-10-18 the programmer explicitly confirmed this case, including
@@ -201,8 +214,8 @@ creation without an independent kind argument.
 
 **How to apply:** Preserve this method-specific convention without conflating
 the input application's identity with the new Thread's identity. Do not restore
-a numeric kind selector. The detailed Amoeba handoff and Data-versus-Abstraction
-discrimination remain separate unresolved questions.
+a separate numeric kind argument. Apply the later packed-size decision for
+case selection. The detailed Amoeba handoff remains unresolved.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
