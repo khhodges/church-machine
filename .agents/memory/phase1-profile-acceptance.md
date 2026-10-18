@@ -118,11 +118,13 @@ CREATE's initial-content length is supplied separately by the caller and
 follows power-of-two rounding with a minimum of 64 words.
 
 **Why:** The user retained this input and specified “a number rounded to the
-power rules (64 min).”
+power rules (64 min),” then selected “Mint copies the shorter content and
+zero-fills the remainder” and questioned the need for a buffer.
 
 **How to apply:** Do not derive this input solely from the object definition.
-Keep rounded length distinct from proven source readability; the rule does
-not settle caller-provided padding versus Mint-side zero-filling.
+Mint supplies zero padding; do not require a caller-padded copy or introduce
+a temporary staging buffer merely to implement rounding. Keep rounded
+destination length distinct from the actual readable source extent.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;

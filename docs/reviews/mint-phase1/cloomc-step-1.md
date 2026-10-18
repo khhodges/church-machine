@@ -52,9 +52,10 @@ The proposed request fields are being reviewed individually. The original
   request reserves 64 words and requires/deducts 64 words of allowance.
 - **Initial-content-length input: retained.** The caller supplies the length
   separately, rounded up to a power of two with a minimum of 64 words.
-  This rounded length does not establish how many source words are readable:
-  whether the caller supplies the complete padded buffer or Mint zero-fills
-  shorter content is still under review.
+  **Mint copies shorter initial content and zero-fills the remainder.** The
+  caller need not supply a padded copy, and this contract does not require a
+  temporary buffer. Rounded destination length does not establish readable
+  source length; the actual source extent must be known before copying.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
