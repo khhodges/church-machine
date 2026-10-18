@@ -38,6 +38,15 @@ Do not treat compiler diagnostic counts as separate design blockers or
 assume every mechanism in a proposed interface must be retained. Do not
 bundle unresolved issues into a single implementation approval.
 
+Do not treat CREATE's proposed 12-word CR4 request as an approved interface.
+Review its inputs individually with the programmer before fixing the layout.
+
+**Why:** When asked whether that record was intended, the user answered
+“No—review CREATE’s inputs first” and “One by one take me through them.”
+
+**How to apply:** Explain one proposed input, distinguish requirements from
+assumptions, and obtain its decision before moving to the next input.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.
