@@ -3,6 +3,19 @@ name: Phase 1 Namespace acceptance boundary
 description: Historical Namespace save evidence is not acceptance of the approved Phase 1 design.
 ---
 
+Phase 1 IDE setup means populating the Namespace LUMPs with the implemented
+source so the programmer can select each LUMP in the existing code editor,
+edit it, and recompile it. Do not reinterpret this as a request for a new
+debugger, a limited test panel, or a sealed-runtime UI integration.
+
+**Why:** On 2026-10-18 the user corrected the expanded scope: “all I want tou
+to do is populate the Namespace LUMPS” to connect the code to the Namespace
+and select and recompile each LUMP as they see fit.
+
+**How to apply:** Use the existing Namespace and editor workflow. Distinguish
+editable source/compiler compatibility from runtime acceptance; do not claim
+test-harness-only artifacts are ordinary recompilable IDE LUMPs.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.
