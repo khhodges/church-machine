@@ -15,9 +15,25 @@ JavaScript implementing a specified CPU instruction is normal simulator work.
 JavaScript implementing an Abstraction's allocation, authorization or business
 logic in place of its compiled program is not a CLOOMC implementation.
 
-## 1. Establish the source / machine boundary
+## 1. Define the Lambda Calculus Abstraction, then its implementation boundary
 
-Deliver:
+**The top-level Abstraction definition comes first.** Do not start by
+translating host helpers, listing opcodes or assigning registers.
+
+First deliver:
+
+- The Abstraction as a lambda expression, its formal parameters and body
+  meaning; distinguish a top-level specification from a fully expanded term.
+- The captured environment, explicit arguments and every remaining free name.
+  State which dependencies close the Abstraction; no implicit host services.
+- Application/reduction examples that identify the expected observable result.
+- For a stateful Abstraction, an explicit account of state and effects, such
+  as state-passing semantics. This notation grants no access to raw machine
+  state and does not impose an implementation ABI.
+- Successful and fault outcomes for each operation. Do not imply rollback
+  without defining and implementing it.
+
+Then deliver:
 
 - Named methods, inputs, outputs, state and dependencies.
 - Inventory of host/service helpers, with each responsibility assigned to
@@ -28,8 +44,14 @@ Deliver:
 - Precise interface questions without inventing ISA behavior or capability
   grants. Existing service-specific restrictions are not automatically retained.
 
-**Review:** Is this the intended Abstraction, with programmer-owned runtime
-policy and no hidden service implementation?
+**Review, in order:** Is this the intended Lambda Calculus Abstraction?
+Are its environment, application semantics and effects correct? Does the
+proposed implementation boundary preserve that definition, with
+programmer-owned runtime policy and no hidden service implementation?
+
+The mathematical lambda binder is not the machine `LAMBDA` instruction.
+Source syntax, CALL/RETURN conventions, optional machine LAMBDA use, register
+assignments and LUMP geometry are refinements—not the top-level definition.
 
 Mint's first application: [Step 1 audit](mint-phase1/cloomc-step-1.md).
 
@@ -41,6 +63,8 @@ Abstraction, choose its first useful end-to-end method.
 Deliver:
 
 - Canonical, editable CLOOMC source with explicit method and capability ABI.
+- A mapping from the reviewed lambda bodies, captured bindings and applications
+  to that source; any semantic departure returns to Step 1 for review.
 - Compilation through the ordinary supported compiler, without private
   post-assembly word replacement.
 - Real dependency implementations or a clearly stated blocker.

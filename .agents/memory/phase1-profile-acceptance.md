@@ -27,6 +27,18 @@ check” and a reusable process for turning other Abstractions into CLOOMC LUMPs
 checklist. Start with Mint; do not conflate a helper-backed scenario with
 ordinary compiled source, or expand the work into a replacement debugger.
 
+The top-level Lambda Calculus Abstraction definition must come first in
+Step 1, before the source/machine audit, helper translation or register ABI.
+
+**Why:** The user rejected the initial Step 1 because “The most important top
+level definition as a Lambda Calculus Abstraction must come first. It is
+totally missing.”
+
+**How to apply:** Define the term, captured environment, parameters,
+application semantics, results and state effects for programmer review.
+Derive CLOOMC and LUMP structure from that definition, not from host helpers.
+Distinguish the mathematical lambda binder from the machine LAMBDA instruction.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.

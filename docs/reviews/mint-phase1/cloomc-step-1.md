@@ -1,7 +1,148 @@
 # Mint to real CLOOMC — Step 1 review
 
-Status: source audit completed; awaiting programmer review before Step 2.
+Status: revised Step 1 definition and source audit; awaiting programmer review.
 This is not a compiled Mint, a Namespace installation, or runtime acceptance.
+
+## 1. Mint as a Lambda Calculus Abstraction — definition first
+
+**Proposed top-level definition for review.** This precedes registers, opcodes,
+helper translation and LUMP layout. It states what Mint means; it does not
+claim that the function bodies below have already been implemented.
+
+Mint is an Abstraction whose application selects an operation in its captured
+environment and evaluates that operation on the supplied arguments. Its
+observable result is a returned value and the resulting state, or a hard fault.
+It creates and manages objects and issues/revokes credentials according to
+its programmer-defined runtime policy. It is not a host allocator or an
+instruction that performs those services on behalf of software.
+
+### Lambda expression and application
+
+Use the following top-level lambda specification:
+
+```text
+Mint ≜ λγ. λm.
+    m (λa. λs. CreateBody        γ a s)
+      (λa. λs. ReplaceBody       γ a s)
+      (λa. λs. DestroyBody       γ a s)
+      (λa. λs. ForgePassKeyBody  γ a s)
+      (λa. λs. RevokePassKeyBody γ a s)
+
+ide.Mint ≜ Mint ΓMint
+
+selectCreate ≜ λc. λr. λd. λf. λv. c
+
+(((ide.Mint selectCreate) a) s)
+    →β* CreateBody ΓMint a s
+```
+
+The other four selectors choose the corresponding bound function. These are
+mathematical selectors, not assigned machine selector numbers or instructions.
+`CreateBody` and the other body names are specification abbreviations with the
+contracts below. This is a top-level specification, **not a fully expanded
+closed lambda term**: completing those bodies and accounting for their free
+names is an explicit implementation obligation, not permission to call a host
+oracle.
+
+| Symbol | Meaning |
+|---|---|
+| `γ`, instantiated as `ΓMint` | Mint's captured environment: bindings to its dependencies and accessible storage, supplied by the programmer's configuration—not arbitrary caller replacements. |
+| `m` | The operation being applied. |
+| `a` | That operation's explicit arguments, including supplied capabilities and data. Different operations need different argument records. |
+| `s` | Explicit semantic state used to describe effects across applications. It is not a proposed register, raw-memory argument or authority to access the whole machine. |
+| `s′` | State after evaluation; mutations must be performed by the resulting program through its actual available authority. |
+
+State-passing makes this a functional specification of a stateful service.
+It does not claim the machine copies its Namespace on each application or
+returns private storage to its caller.
+
+### Captured environment, bound arguments and free names
+
+The environment must account for the bindings the body uses:
+
+- **PkVerify:** a callable Abstraction for credential/proof verification;
+  Mint must apply its real implementation, not receive host-generated success.
+- **Namespace table (`nstab`):** the configured table view, not another
+  callable service or a second Namespace.
+- **Allocation and object storage:** the actual metadata and backing storage
+  used by Mint's software allocator.
+- **Credential state and issuance inputs:** registry/revocation state and,
+  for credential creation, the specified source of proof material and
+  authorized administrative input.
+- **Working and result storage:** the explicitly supplied storage used to
+  retain invocation data and construct/deliver results.
+
+These are semantic dependency roles, not newly granted GTs, fixed register
+assignments or permission policies. Their concrete bindings must be made
+explicit in the CLOOMC source/configuration. This list does not presume that
+every binding already exists.
+
+The operation and its request values are bound by application; dependencies
+are bound by the closure. A body may use values passed explicitly by its
+caller; it does not acquire the caller's entire environment implicitly.
+Any further free name must become an explicit parameter, captured dependency
+or a defined source term. JavaScript globals, fixture arrays and host runtime
+objects cannot silently close the Abstraction.
+
+### Meaning of each application
+
+The operation family follows the existing [service contract](service-contract.md).
+The mathematical presentation here is proposed for review; it does not silently
+replace that contract or approve a new ABI.
+
+| Body | Explicit argument roles | Successful observable effect/result |
+|---|---|---|
+| Create | Credential, proof, object request and initialization payload | Select and initialize a new allocation, publish its Namespace entry, return the resulting object capability and updated state. |
+| Replace | Credential, proof, target, replacement request and payload | Replace the authorized target according to the defined generation/lifecycle rules; return the resulting object capability and updated state. |
+| Destroy | Credential, proof, target and destruction request | Invalidate/release the target according to its lifecycle rules; return completion and updated state, not a new object capability. |
+| ForgePassKey | Authorized administrative request and issuance inputs | Create the credential/proof pair and its recorded issuance state; deliver it through the defined recipient path. Exact delivery ABI remains to be established. |
+| RevokePassKey | Authorized administrative request identifying the credential | Record and enforce revocation of that credential; return completion and updated state. |
+
+At specification level, each body has an outcome of the form
+`Success(value, s′)` or `HardFault(s_fault)`. These names describe outcomes,
+not new machine instructions or normal error-return values. Hard fault stops
+the invocation; the definition does **not** assume rollback or unchanged state
+after a partially executed operation. Each body must specify the actual
+failure effects when it is refined.
+
+There are three distinct things here:
+
+1. **Abstraction definition:** what each application means.
+2. **Mint's programmer-authored runtime policy:** what this program checks
+   while evaluating that application.
+3. **Machine instruction semantics:** what the CPU does when an instruction
+   executes.
+
+Neither the lambda definition nor a GT's presence authorizes compiler/loader
+prediction of its meaning. No advance GT-policy gates follow from this model.
+
+### Refinement into CLOOMC and a LUMP
+
+The required order is:
+
+```text
+Lambda Abstraction and application semantics
+    → explicit environment, arguments, state and body definitions
+    → CLOOMC source and dependency interfaces
+    → ordinary compiler output
+    → source-bearing LUMP and Namespace binding
+    → execution / editor round-trip evidence
+```
+
+The lexical `λ` in this definition is not the Church Machine `LAMBDA`
+instruction. A callable Abstraction is not necessarily implemented by one
+`LAMBDA` instruction. Its lowering to CALL/RETURN, any same-scope Lambda use,
+register ABI and layout is a later engineering step that must preserve this
+definition.
+
+The existing [Lambda Calculus reference architecture](../../lambda-calculus-architecture.md)
+provides conceptual background. Its historical instruction examples and
+permission claims are not adopted here as new normative ISA decisions.
+
+**First review question:** Is this the intended Mint Abstraction—its operation
+family, captured environment, arguments, state effects and returned values?
+Only after that is agreed should the implementation audit below guide its
+translation. Helper behavior cannot define Mint by accident.
 
 ## Required outcome
 
@@ -135,8 +276,9 @@ The service algorithm has identifiable software work to translate. The
 helper-backed runs are reference behavior only, not compiled Mint acceptance.
 No helper is promoted to a normal ISA instruction by this audit.
 
-Before Step 2, review the software/machine division and the interface questions
-above. Step 2 must resolve the interfaces it actually uses and produce real
+Before Step 2, review the Lambda Calculus definition first, then the
+software/machine division and interface questions above. Step 2 must refine
+that definition, resolve the interfaces it actually uses and produce real
 Create + verifier source and ordinary compiled execution evidence. Unresolved
 items must be reported precisely, never filled with host-service shortcuts.
 
