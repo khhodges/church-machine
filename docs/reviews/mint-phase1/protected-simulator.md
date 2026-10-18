@@ -149,12 +149,81 @@ Create validates the frozen payload shape/size/hash and type-specific framing.
 For application and LS objects the sole unresolved SELF row must be NULL;
 installation binds it to that allocation's exact GT. Other non-NULL capability
 rows require actual held authority and cannot include private service views.
-Thread payloads require checked geometry and a real poison-root continuation.
+Thread payloads require checked geometry and a validated CHURCH frame chain
+ending at a real poison root. A supplied continuation above that root is
+retained, not constructed by Mint; every Enter GT must already be held by the
+requester and pass ordinary E validation. Frame size, STO, executable bounds,
+root position and capability homes are checked before publication.
 The four-type test checks actual ordinary LOAD/RETURN of the declared E, LS,
 LS and RW rights into CR1. A separate isolation regression checks that legacy
 instances still reject combined LS and the profile still rejects E-containing
-combinations and mixed domains. The complete actual-use scenario uses the
-approved RW Create case.
+combinations and mixed domains. Complete actual-use scenarios cover RW,
+ordinary LS objects and a returned Thread with a valid supplied continuation.
+
+### Returned-object use evidence and standalone Thread activation
+
+**Initialization ownership:** Amobea is intended to initialize all Threads;
+that abstraction is not implemented yet. The disposable test fixture supplies
+an already-initialized, compiled-program context solely as a prerequisite for
+testing the returned capability. It is not an Amobea implementation or evidence
+of the complete Thread-creation lifecycle. Mint validates and copies the
+supplied bytes; it does not take over Thread initialization.
+
+The optional `consumer: true` initializer selects a fixed canonical Mint driver
+that CALLs an ordinary consumer only after Create has returned and admission
+has ended. Before requesting Create, it LOADs the consumer E into CR11 as
+authority for a supplied Thread continuation. Only that driver and its
+additional public E link differ; the service,
+verifier, credential recipient, type grants and B=0 ceiling are unchanged.
+The consumer is independently compiled and has no Mint credential or private
+views. Its instructions check that CR1 is the sole general-register result.
+Execution remains through the frozen facade, with no post-admission host writes
+to CRs, RAM or PCs.
+
+The LS consumer LOADs SELF and a distinct canary, SAVEs an independently
+provisioned B=1 capability to a non-SELF row, and LOADs/compares the changed row.
+This distinguishes destination S authority from source B transfer authority;
+it does not make Mint's returned B=0 capability transferable. Separate cases
+reject copying that result or its loaded SELF, reject copying after B
+attenuation, protect row zero at compilation, and check c-list bounds.
+
+The isolated compiler accepts `TPERM CRd, CRs, #32767` for the simulator's
+already implemented Mode-2 attenuation encoding. It does not change legacy
+assembler syntax, instruction behavior or GT encoding. Compiled consumers
+demonstrate LS→L and LS→S, retained permitted use, denial of the removed
+operation, and rejection of an E expansion without changing the source.
+The facade's `useConfirmed` remains RW-specific; LS success is the consumer's
+checked instruction path reaching HALT without a fault, not that telemetry bit.
+
+The [master CHANGE contract](../../phase-1/01-isa/instruction-set.md#change-one-gt-thread-activation)
+is authoritative: its operand is a permission-free Thread GT, its destination
+is fixed CR12, and it validates and resumes the supplied context in one
+instruction. In the positive test, an explicit program TPERM attenuates the
+returned CR1, then CHANGE alone activates the new Thread. The next instruction
+on the outgoing path is a failure sentinel: a no-op or incomplete handoff
+cannot pass. The new context executes its compiled entry, writes and reads its
+own CR5 heap, LOADs through E-only CR6 using CR6.M, and executes self-CHANGE
+with continuation after that instruction. No extra CALL, initialization
+operation, frame repair or post-admission host mutation is used.
+
+The isolated compiler emits the master fixed-destination CHANGE word
+(`CHANGE CR12` = `0x27060000`); the protected adapter maps it to the existing
+engine without changing legacy assembly or execution. It rejects CR13 and
+reserved fields as INVALID_OP, permissions as THREAD_PERMISSIONS, and invalid
+Thread context as THREAD_CONTEXT. Direct LS CHANGE remains denied; a root-only
+Thread is still not a suspended continuation. Mint does not strip permissions
+or add a continuation to make either case pass.
+
+M authorizes L/S only for the register whose bit is set. It does not grant R/W,
+export B, or bypass protected-range/write interlocks. A loaded E-GT does not
+inherit CR6.M. Thread-LS raw LOAD/SAVE and DREAD/DWRITE remain denied, including
+after attenuation; after activation, CR5 cannot address protected stack words.
+The facade still exposes no raw homes, frames, registers or core.
+
+SWITCH is not part of this same-Namespace Thread-use test. The master specifies
+a standalone combined Namespace/slot-2 handoff, not an extra CR12 reload or a
+required following CHANGE/CALL. These tests do not qualify the inherited
+SWITCH implementation or claim full-profile instruction conformance.
 
 ## Shared producer/observer inventory disposition
 

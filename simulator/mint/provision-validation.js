@@ -11,7 +11,8 @@ function validate(p) {
     need(p.memory.length === 32768 && p.namespaceId?.length === 4 &&
         p.namespaceId.every(v => Number.isInteger(v) && v >= 0 && v <= 0xffffffff),
     'MINT_CONFIGURATION');
-    const s = new Simulator(), canonical = programs();
+    need(p.consumer === undefined || typeof p.consumer === 'boolean', 'MINT_CONFIGURATION');
+    const s = new Simulator(), canonical = programs(p.consumer);
     const entries = new Map();
     for (let slot = 1; slot < 256; slot++) {
         const words = Array.from(p.memory.slice(slot * 4, slot * 4 + 4));
@@ -72,6 +73,7 @@ function validate(p) {
             p.views.frozenRequest, p.views.requesterContext],
         verifier: [gt(15, {E: 1}), p.views.proofSnapshot, p.views.registry],
     };
+    if (p.consumer) expectedRows.mint.push(gt(16, {E: 1}));
     for (const [name, program] of [['mint', canonical.mint], ['verifier', canonical.verifier]]) {
         const r = p.roles[name], e = entries.get(name === 'mint' ? 9 : 15);
         need(r && e && r.slot === (name === 'mint' ? 9 : 15) &&

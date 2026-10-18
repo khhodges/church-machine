@@ -6,7 +6,7 @@ const Thread = require('../../simulator/thread_design');
 const {PROFILE, programs, digest} = require('../../simulator/mint/protected-programs');
 
 function fixture(options = {}) {
-    const s = new Simulator(), code = programs(), memory = new Uint32Array(32768);
+    const s = new Simulator(), code = programs(!!options.consumer), memory = new Uint32Array(32768);
     const namespaceId = [0x4d494e54, 0x424f4f54, 1, 1];
     memory[0] = ((31 << 27) | (2 << 23) | (256 << 10) | (1 << 8)) >>> 0;
     // Only five of the reserved initial 17 entries are needed by this isolated
@@ -48,6 +48,7 @@ function fixture(options = {}) {
         token(24, {R: 1}), token(25, {R: 1}), token(26, {R: 1}),
         token(15, {E: 1}), token(9, {X: 1}), views.nstab, views.resultL, views.resultRW,
         views.proofSnapshot, views.frozenRequest, views.requesterContext];
+    if (options.consumer) mintRows.push(token(16, {E: 1}));
     const verifierRows = [token(15, {E: 1}), views.proofSnapshot, views.registry];
     function install(slot, base, words, program, caps) {
         memory[base] = s.packLumpHeader(Math.log2(words) - 6, program.words.length, caps.length, 0);
@@ -75,7 +76,8 @@ function fixture(options = {}) {
             1, layout.stackEnd - 2);
     memory[1024 + 17] = s._packProtectedIndicator(layout.stackEnd - 4, 1, {}, 0);
     const plan = {
-        profile: PROFILE, memory, namespaceId, roles: {mint, verifier}, views,
+        profile: PROFILE, consumer: !!options.consumer,
+        memory, namespaceId, roles: {mint, verifier}, views,
         root: {word0: token(1), word1: 0, word2: 1023, word3: 0, m: 0},
         threads: [{slot: 2, base: 1024, words: 256}],
         registry: {credential: 0x06000000, owner: 0, recipient: 'ide.Mint',

@@ -6,6 +6,7 @@ const {provision, PROFILE} = require('../../simulator/mint/protected-runtime');
 const {programs, compile, digest} = require('../../simulator/mint/protected-programs');
 const Simulator = require('../../simulator/simulator');
 const Assembler = require('../../simulator/assembler');
+const {useFixture} = require('./protected_use_fixture');
 
 function run(plan, until = state => state.halted) {
     const runtime = provision(plan);
@@ -201,6 +202,243 @@ test('combined LS is isolated; E combinations, mixed domains and legacy parsing 
     }
     for (const type of [0, 2, 3]) {
         assert.throws(() => isolated.createGT(0, 28, {L: 1, S: 1}, type), /single-Church/);
+    }
+});
+
+// A real Mint caller admits the request and returns CR1 first. Only then does
+// it CALL the ordinary consumer; consumers have no private Mint capabilities.
+function consume(type, source, fault = null, options = {}) {
+    const plan = useFixture(type, source, options), before = digest(Array.from(plan.memory));
+    const {runtime, state: returned} = run(plan,
+        state => state.protectedReturns === 4 && state.phase === 'idle');
+    assert.equal(returned.fault, null, JSON.stringify(returned));
+    assert.equal(returned.protectedReturns, 4);
+    assert.equal(returned.halted, false);
+    assert.equal(returned.result, 0x3a00001c, 'one combined LS result, B=0, in slot 28');
+    let state = returned;
+    while (!state.halted) state = runtime.step();
+    assert.equal(state.fault, fault, JSON.stringify(state));
+    assert.equal(state.quarantined, fault !== null);
+    assert.equal(state.admissions, 1);
+    assert.equal(state.publications, 1);
+    assert.equal(state.completedWrites, 4);
+    assert.equal(state.protectedReturns, 4, 'consumer must execute, not return to the driver HALT');
+    assert.equal(state.useConfirmed, false, 'RW-only telemetry is not LS-use evidence');
+    assert.equal(state.result, fault ? 0 : returned.result);
+    assert.deepEqual(runtime.step(), state);
+    assert.deepEqual(runtime.control('snapshot'), state);
+    assert.equal(digest(Array.from(plan.memory)), before, 'no host mutation after admission');
+    return {runtime, state};
+}
+
+test('returned LS supports ordinary LOAD and SAVE with a separately held B=1 source', () => {
+    consume(3, `
+TPERM CR1, LS
+BRANCHNE failed
+TPERM CR2, NULL
+BRANCHNE failed
+LOAD CR4, CR1, #0
+TPERM CR4, EXACT, CR1
+BRANCHNE failed
+LOAD CR2, CR1, #1
+LOAD CR3, CR6, #4
+TPERM CR2, EXACT, CR3
+BRANCHNE failed
+LOAD CR2, CR6, #1
+TPERM CR2, EXACT, CR3
+BRANCHEQ failed
+SAVE CR2, CR1, #1
+LOAD CR3, CR1, #1
+TPERM CR3, EXACT, CR2
+BRANCHNE failed
+LOAD CR4, CR1, #0
+TPERM CR4, EXACT, CR1
+BRANCHNE failed`);
+});
+
+test('returned B=0 LS cannot be copied as a SAVE source, including its loaded SELF', () => {
+    consume(3, 'SAVE CR1, CR1, #1', 'BIND');
+    consume(3, 'LOAD CR2, CR1, #0\nSAVE CR2, CR1, #1', 'BIND');
+    consume(3, 'LOAD CR2, CR6, #1\nTPERM CR2, EB\nBRANCHNE failed\nSAVE CR2, CR1, #1',
+        'BIND');
+});
+
+test('LS SAVE still protects SELF and enforces declared c-list bounds', () => {
+    assert.throws(() => useFixture(3, 'LOAD CR2, CR6, #1\nSAVE CR2, CR1, #0'),
+        /immutable SELF/);
+    consume(3, 'LOAD CR2, CR6, #1\nSAVE CR2, CR1, #2', 'BOUNDS');
+    consume(3, 'LOAD CR2, CR1, #2', 'NO_CAPABILITY');
+});
+
+test('isolated compiler lowers existing TPERM Mode 2 without changing preset or legacy assembly', () => {
+    const source = 'TPERM CR1, CR2, #32767';
+    const word = ((6 << 27) | (14 << 23) | (1 << 19) | (2 << 15) | 0x7fff) >>> 0;
+    assert.deepEqual(compile(source).words, [word]);
+    assert.deepEqual(compile(`MINT BEGIN\n${source}\nMINT FINISH`).words,
+        [((11 << 27) | (14 << 23) | 1) >>> 0, word, ((11 << 27) | (14 << 23) | 8) >>> 0]);
+    assert.deepEqual(compile('TPERM CR1, LS').words, new Assembler().assemble('TPERM CR1, LS').words);
+    assert.notEqual(new Assembler().assemble(source).words[0], word);
+    assert.throws(() => compile('WORD 0'), /Raw WORD/);
+});
+
+test('consumer evidence profile still requires canonical service bytes and unchanged credential grants', () => {
+    for (const mutate of [
+        p => { p.consumer = 'true'; },
+        p => { p.consumer = false; },
+        p => { p.registry.bindCeiling = 1; },
+        p => { p.registry.recipient = 'ide.Alice'; },
+        p => {
+            p.memory[p.roles.mint.base + 2] ^= 1;
+            p.roles.mint.hash = digest(Array.from(p.memory.slice(
+                p.roles.mint.base, p.roles.mint.base + p.roles.mint.words)));
+        },
+    ]) {
+        const p = useFixture(3, 'TPERM CR1, LS\nBRANCHNE failed');
+        mutate(p);
+        assert.throws(() => provision(p), /MINT_/);
+    }
+    consume(3, 'MINT BEGIN', 'MINT_IDENTITY');
+    consume(3, 'LOAD CR0, CR6, #4\nCALL CR0, #0', 'MINT_REQUESTER');
+});
+
+test('LS attenuation retains permitted use, removes the other operation and cannot expand rights', () => {
+    const attenuate = (row, preset) => `
+LOAD CR2, CR6, #${row}
+TPERM CR1, CR2, #32767
+BRANCHNE failed
+TPERM CR1, ${preset}
+BRANCHNE failed`;
+    consume(3, `${attenuate(2, 'L')}\nLOAD CR3, CR1, #1`);
+    consume(3, `${attenuate(2, 'L')}\nLOAD CR2, CR6, #1\nSAVE CR2, CR1, #1`, 'PERMISSION');
+    consume(3, `${attenuate(3, 'S')}\nLOAD CR2, CR6, #1\nSAVE CR2, CR1, #1`);
+    consume(3, `${attenuate(3, 'S')}\nLOAD CR3, CR1, #1`, 'PERMISSION');
+    consume(3, `
+LOAD CR4, CR1, #0
+LOAD CR2, CR6, #1
+TPERM CR1, CR2, #32767
+BRANCHEQ failed
+TPERM CR1, EXACT, CR4
+BRANCHNE failed
+TPERM CR1, LS
+BRANCHNE failed`);
+    consume(3, `${attenuate(2, 'L')}\nSAVE CR1, CR1, #1`, 'BIND');
+});
+
+test('returned Thread-LS never grants raw LOAD/SAVE access to protected capability homes', () => {
+    consume(2, 'LOAD CR2, CR1, #0', 'MINT_PRIVATE');
+    consume(2, 'LOAD CR2, CR6, #1\nSAVE CR2, CR1, #1', 'MINT_PRIVATE');
+    consume(2, 'SAVE CR1, CR1, #1', 'BIND');
+    consume(2, 'LOAD CR2, CR6, #2\nTPERM CR1, CR2, #32767\nBRANCHNE failed\nLOAD CR3, CR1, #0',
+        'MINT_PRIVATE');
+    consume(2, `LOAD CR2, CR6, #3
+TPERM CR1, CR2, #32767
+BRANCHNE failed
+LOAD CR2, CR6, #1
+SAVE CR2, CR1, #1`, 'MINT_PRIVATE');
+});
+
+test('returned Thread-LS cannot read or overwrite DR homes, indicator, frames or CR homes', () => {
+    const layout = require('../../simulator/thread_design').layout(256, 32);
+    for (const offset of [1, 16, 17, layout.stackEnd - 1, layout.stackEnd, layout.capsStart]) {
+        consume(2, `DREAD DR2, CR1, #${offset}`, 'MINT_PRIVATE');
+        consume(2, `DWRITE DR0, CR1, #${offset}`, 'MINT_PRIVATE');
+    }
+});
+
+test('Thread activation remains fail-closed: LS is not CHANGE authority, and a root is not a resume frame', () => {
+    consume(2, 'CHANGE CR1', 'THREAD_PERMISSIONS');
+    // CR2 is NULL after the single-CR1 service return. Mode 2 attenuates the
+    // actual returned GT to permission-free identity without a host CR write.
+    // This satisfies CHANGE's GT rule, but cannot invent a legal continuation.
+    consume(2, `
+TPERM CR2, NULL
+BRANCHNE failed
+TPERM CR1, CR2, #32767
+BRANCHNE failed
+CHANGE CR1`, 'THREAD_CONTEXT');
+});
+
+const changeReturnedThread = `
+TPERM CR2, NULL
+BRANCHNE failed
+TPERM CR1, CR2, #32767
+BRANCHNE failed
+CHANGE CR1
+MINT FAIL`;
+
+test('returned Thread activates by one CHANGE, uses its own heap and CR6, then self-CHANGE resumes once', () => {
+    consume(2, changeReturnedThread, null, {threadSource: `
+IADD DR2, DR0, #73
+DWRITE DR2, CR5, #0
+DREAD DR3, CR5, #0
+MCMP DR2, DR3
+BRANCHNE failed
+LOAD CR4, CR6, #0
+TPERM CR4, E
+BRANCHNE failed
+CHANGE CR12
+DREAD DR3, CR5, #0
+IADD DR2, DR0, #73
+MCMP DR2, DR3
+BRANCHNE failed
+LOAD CR4, CR6, #0
+TPERM CR4, E
+BRANCHNE failed`});
+});
+
+test('CHANGE microcode authority does not expose the active Thread homes or frames to instructions', () => {
+    for (const instruction of ['DREAD DR2, CR12, #17', 'DWRITE DR0, CR12, #17']) {
+        assert.throws(() => useFixture(2, changeReturnedThread, {threadSource: instruction}),
+            /Privilege Zone/);
+    }
+    // Compilable heap access beyond CR5's architectural extent must not read
+    // the active Thread's protected stack, even immediately after CHANGE.
+    consume(2, changeReturnedThread, 'MINT_PRIVATE', {threadSource: 'DREAD DR2, CR5, #225'});
+    consume(2, changeReturnedThread, 'MINT_PRIVATE', {threadSource: 'DWRITE DR0, CR5, #225'});
+    // Restoring CR6.M supplies L without transferring M to a loaded E-GT.
+    consume(2, changeReturnedThread, 'PERMISSION', {
+        threadSource: 'LOAD CR4, CR6, #0\nLOAD CR2, CR4, #0',
+    });
+});
+
+test('CR6 M authorizes L/S only for that register, without export or private-write authority', () => {
+    consume(3, 'LOAD CR2, CR6, #1\nSAVE CR2, CR6, #1', 'MINT_WRITE');
+    consume(3, 'LOAD CR2, CR6, #1\nLOAD CR4, CR6, #0\nSAVE CR2, CR4, #1', 'PERMISSION');
+    consume(3, 'SAVE CR1, CR6, #1', 'BIND');
+    consume(3, 'DREAD DR2, CR6, #0', 'PERMISSION');
+    consume(3, 'DWRITE DR0, CR6, #0', 'PERMISSION');
+});
+
+test('isolated CHANGE uses the master fixed-destination encoding and excludes reserved CR13', () => {
+    assert.deepEqual(compile('CHANGE CR12').words, [0x27060000]);
+    assert.deepEqual(compile('CHANGE CR1').words, [0x27008000]);
+    assert.notEqual(new Assembler().assemble('CHANGE CR12').words[0], 0x27060000);
+    consume(2, 'CHANGE CR13', 'INVALID_OP');
+});
+
+test('Thread payload admission rejects malformed or unheld continuations without repairing them', () => {
+    const s = new Simulator(), layout = require('../../simulator/thread_design').layout(256, 32);
+    const base = 1664;
+    for (const [mutate, fault] of [
+        [p => { p.memory[base + 17] = s._packProtectedIndicator(layout.stackStart - 2, 1, {}, 0); }, 'MINT_THREAD'],
+        [p => { p.memory[base + layout.stackEnd - 2] = s._packFrameWordRaw(0, 0, layout.stackEnd - 2); }, 'MINT_THREAD'],
+        [p => { p.memory[base + layout.stackEnd - 2] = s._packFrameWordRaw(8191, 1, layout.stackEnd - 2); }, 'MINT_THREAD'],
+        [p => { p.memory[base + layout.stackEnd - 2] = s._packFrameWordRaw(0, 1, layout.stackEnd); }, 'MINT_THREAD'],
+        [p => { p.memory[base + layout.stackEnd] = s._packFrameWordRaw(0, 1, layout.stackEnd); }, 'MINT_THREAD'],
+        [p => { p.memory[base + layout.stackEnd - 3] = p.roles.verifier.enter; }, 'MINT_PAYLOAD_CAPABILITY'],
+        [p => { p.memory[base + layout.stackEnd - 3] = s.createGT(0, 16, {E: 1, B: 1}, 1); }, 'MINT_PAYLOAD_CAPABILITY'],
+        [p => { p.memory[base + layout.capsStart + 1] = p.views.registry; }, 'MINT_PAYLOAD_CAPABILITY'],
+    ]) {
+        const p = useFixture(2, changeReturnedThread, {threadSource: 'HALT'});
+        mutate(p);
+        digest(Array.from(p.memory.slice(base, base + 256))).match(/.{8}/g)
+            .forEach((w, i) => { p.memory[1622 + i] = parseInt(w, 16); });
+        const {runtime, state} = run(p);
+        assert.equal(state.fault, fault);
+        assert.equal(state.publications, 0);
+        assert.equal(state.completedWrites, 0);
+        assert.equal(state.result, 0);
+        assert.deepEqual(runtime.step(), state);
     }
 });
 

@@ -4,6 +4,18 @@ description: Prefer first-fault detection and correction over recovery strategie
 ---
 
 KISS is a confirmed standing CM design rule, not a pending review proposal.
+Every instruction must stand alone and execute as the ISA-specified fail-safe
+operation. Do not add implicit CALLs, initialization, preparation APIs, or
+companion instruction requirements to make an instruction work.
+
+**Why:** The user explicitly corrected the Thread-use investigation: “Do not
+assume or add any actions beyond those specified in the ISA” and “Each
+instruction is designed to stand alone and execute as a Fail-Safe operation.”
+
+**How to apply:** Read the master ISA before treating simulator behavior or a
+fixture restriction as architectural authority. Test the specified operation
+and its hard-fault conditions; do not repair missing inputs during execution.
+
 The user directs that faults default to a hard fault rather than initiating
 new recovery strategies.
 

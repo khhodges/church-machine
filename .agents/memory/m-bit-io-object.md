@@ -89,6 +89,19 @@ mLoad error, not an architectural exemption.
 state; do not justify global bounds, permission, or seal bypasses merely
 because execution is booting or performing CALL.
 
+For isolated Mint Thread usability, the user directs the activation
+investigation through CR12 and CR6, SWITCH and CHANGE, with M authorizing L
+and S. Do not treat LS token bits alone as the complete authority model or
+assume a new preparation API is needed before tracing that path.
+
+**Why:** The user explicitly corrected the proposed preparation-API approach
+with “CR12, and CR6, use Switch, Change” and “Mbit to authorize Land S.”
+
+**How to apply:** Check the register-scoped M gates as well as token rights,
+while retaining protected homes/frames, SecurityRegulator custody, and normal
+continuation validation. This direction does not specify an implicit CALL or
+authorize interpreting a poison root as a suspended continuation.
+
 **Why:** Separate target-bound ports incorrectly modeled per-register M state
 as four hidden capabilities and omitted the required hardware object from the
 Namespace table.

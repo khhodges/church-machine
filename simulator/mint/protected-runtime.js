@@ -37,6 +37,7 @@ class ProtectedCore extends combinedLSProfile(Core) {
     fault(code) {
         const st = states.get(this);
         if (!st) return super.fault(code, 'Protected profile initialization failed');
+        if (st.changeValidation) code = 'THREAD_CONTEXT';
         st.poisoned = true;
         st.fault = /^[A-Z_]+$/.test(code) ? code : 'MINT_FAULT';
         st.context = null;
@@ -82,11 +83,20 @@ class ProtectedCore extends combinedLSProfile(Core) {
     _execChange(d, continuation) {
         const st = states.get(this);
         need(!st.context && !st.continuation, 'MINT_ACTIVATION');
-        const slot = this.parseGT(this.cr[d.crDst].word0).index;
+        // Fixed CR12 destination; the B field alone names the input GT.
+        // Keep the historical engine/assembler unchanged outside this profile.
+        need(d.crDst === 0 && d.imm === 0 && d.crSrc !== 13, 'INVALID_OP');
+        const parsed = this.parseGT(this.cr[d.crSrc].word0);
+        need(parsed.type === 1 && !parsed.malformed, 'THREAD_CONTEXT');
+        need(!Object.values(parsed.permissions).some(Boolean), 'THREAD_PERMISSIONS');
+        const slot = parsed.index;
         const entry = this.readNSEntry(slot);
         need(st.plan.threads.some(t => t.slot === slot && t.base === entry?.word0_location),
-            'MINT_THREAD');
-        return machine(this, () => super._execChange(d, continuation));
+            'THREAD_CONTEXT');
+        st.changeValidation = true;
+        try {
+            return machine(this, () => super._execChange({...d, crDst: d.crSrc}, continuation));
+        } finally { st.changeValidation = false; }
     }
     _execSwitch(d) {
         const st = states.get(this);
@@ -123,7 +133,11 @@ class ProtectedCore extends combinedLSProfile(Core) {
                         return {ok: false, fault: 'MINT_PRIVATE'};
                     }
                 }
-                if (perm && ['R', 'W', 'L', 'S'].includes(perm) &&
+                // LOAD uses null for an M-authorized row/header read. That
+                // waives the L bit, not the protected Thread storage boundary.
+                const dataAccess = ['R', 'W', 'L', 'S'].includes(perm) ||
+                    perm === null && address != null && Number.isInteger(cr) && cr <= 11;
+                if (dataAccess &&
                     st.plan.threads.some(t => interval(base, t.base, t.words))) {
                     // Only the architectural heap view can read/write Thread
                     // data. Raw Thread aliases cannot reach homes or frames.
@@ -145,7 +159,10 @@ class ProtectedCore extends combinedLSProfile(Core) {
                 }
             }
         }
-        return super.mLoad(gt, perm, cr, address, range, ...rest);
+        // M authorizes L/S for this register only. It does not grant R/W,
+        // export B, skip the private-range guards above, or mutate the GT.
+        const accessPerm = ['L', 'S'].includes(perm) && this.cr[cr]?.m === 1 ? null : perm;
+        return super.mLoad(gt, accessPerm, cr, address, range, ...rest);
     }
     _execCall(d) {
         const st = states.get(this);

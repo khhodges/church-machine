@@ -3,7 +3,7 @@
 - [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.
 - [Wide-screen touch refresh](wide-touch-refresh.md) — suppress pull-to-refresh in the wide-screen IDE while retaining normal touch scrolling.
 - [Hardware CHANGE fetch addresses](hardware-change-fetch-address.md) — use actual imem_addr and absolute saved NIAs; completion alone does not prove executable activation.
-- [ISA review decisions](isa-review-index.md) — scope, pre-release compatibility, encoding checks, cooperative scheduling and save-first fault recovery.
+- [ISA review decisions](isa-review-index.md) — scope, compatibility, encoding checks, conformance fixtures, instruction commentary and scheduling.
 - [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
 - [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
 - [Compact header grouping](compact-header-grouping.md) — left stack ends at diagnostics; execution controls remain central, with board/settings on the right.
@@ -75,7 +75,7 @@
 - [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [Dynamic state uses ISA protection only](dynamic-composite-pola-boundary.md) — dynamic word changes are not POLA-persisted; type, permission, and bounds checks are the complete access rule
-- [Thread rules and Amobea design](normative-thread-private-abi.md) — geometry, ownership, root frames, placement, tuple allocation, and Transaction prototype scope.
+- [Thread rules and Amobea design](normative-thread-private-abi.md) — geometry, root frames, placement, Amobea initialization ownership, tuple allocation and prototype scope.
 - [Portable LUMP binding boundary](portable-lump-binding-boundary.md) — canonical artifacts carry unresolved N/T/hash locks; only verified destination copies may contain local GTs
 - [Immutable LUMP history transitions](immutable-lump-history-transitions.md) — archive/current/sidecar/manifest commit together under flock; reserve with lexists and revalidate generation
 - [CALL E-GT identity flow](call-egt-identity-flow.md) — CR6 keeps its E-only GT; CR6.M permits L without token mutation; CALL/RETURN preserve E identity.
@@ -140,11 +140,9 @@
 - [Resident installation isolation](resident-install-execution-isolation.md) — background deployments must not splice a new c-list into running code; direct-run activation is explicit
 - [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
 - [RETURN incident evidence](return-incident-evidence.md) — distinguish reset, caller continuation, and trace mislabeling using protected frames and live identity, not post-stop flags
-- [Instruction commentary evidence](instruction-commentary-evidence.md) — static meaning stays symbolic; historical effects need exact immutable occurrence evidence, never live-register recomputation
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
 - [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
-- [Instruction conformance fixtures](instruction-conformance-fixtures.md) — exit the boot microcode window and capture pre-recovery faults before judging ordinary instruction execution.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
 - [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.

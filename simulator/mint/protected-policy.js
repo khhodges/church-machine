@@ -44,14 +44,32 @@ function validatePayload(s, type, payload, size) {
     if (type === 2) {
         const layout = Thread.layout(size, h.cw);
         requireThat(h.typ === 2 && h.cc === 12 && layout.valid, 'MINT_THREAD');
-        // New dormant Threads must have a genuine poison-root frame, not an
-        // arbitrary resume PC or a fabricated running context.
+        // Admit the supplied, validated CHURCH context, not just root-only
+        // images. Ordinary CHANGE needs a continuation above the retained
+        // poison root. Never create, repair or select a frame on its behalf.
         const indicator = s._unpackProtectedIndicator(payload[17]);
-        const frame = s._unpackFrameWord(payload[layout.stackEnd]);
-        const enter = payload[layout.stackEnd - 1];
-        requireThat(indicator.sz === 1 && indicator.sto === layout.stackEnd - 2 &&
-            frame.returnPC === 0x7fff && frame.savedSTO === layout.stackEnd &&
-            frame.sz === 1 && s.mLoad(enter, 'E', 14).ok, 'MINT_THREAD');
+        requireThat(indicator.sz === 1 && indicator.sto >= layout.stackStart - 1 &&
+            indicator.sto <= layout.stackEnd - 2, 'MINT_THREAD');
+        let foundRoot = false;
+        for (let address = indicator.sto + 2; address <= layout.stackEnd; address += 2) {
+            const frame = s._unpackFrameWord(payload[address]);
+            const enter = payload[address - 1];
+            // A payload hash is not an authority grant. Each retained Enter
+            // must already be held by the requester and resolve as ordinary E.
+            validateToken(s, enter);
+            const checked = s.mLoad(enter, 'E', 14);
+            requireThat(checked.ok && frame.sz === 1 && frame.savedSTO === address,
+                'MINT_THREAD');
+            const code = s.parseLumpHeader(s.memory[checked.entry.word0_location]);
+            requireThat(code.valid && code.typ === 0 && code.cw > 0, 'MINT_THREAD');
+            if (frame.returnPC === 0x7fff) {
+                requireThat(address === layout.stackEnd, 'MINT_THREAD');
+                foundRoot = true;
+                break;
+            }
+            requireThat(frame.returnPC < code.cw, 'MINT_THREAD');
+        }
+        requireThat(foundRoot, 'MINT_THREAD');
         for (let i = 0; i < 12; i++) validateToken(s, payload[layout.capsStart + i]);
     } else {
         requireThat(h.typ === 0 && h.cc >= 1 && 1 + h.cw + h.cc <= size, 'MINT_PAYLOAD');
