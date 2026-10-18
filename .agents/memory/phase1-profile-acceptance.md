@@ -61,6 +61,17 @@ are explicit requirements.
 **How to apply:** Put this definition first and retain its scope without
 inventing permission combinations for Threads or Namespaces.
 
+CREATE must issue Abstract GTs and be the entry path to their issuance through
+a hierarchy of Abstractions. Credentials are not the entire Abstract category.
+
+**Why:** The user corrected the definition's omission: CREATE should be the
+entry path to Abstract GTs “as a hierarchy of Abstractions.”
+
+**How to apply:** Include this in the primary definition, not only a request
+table. Distinguish Abstract GTs from Enter GTs for executable Abstractions.
+Do not reduce hierarchical issuance to raw Owner/payload packing or invent
+hierarchy routing/bit encodings without specification.
+
 For Phase 1 (V1.1), Mint's only primary public functions are CREATE and
 DESTROY. REPLACE is outside this phase. Credential creation/destruction
 are cases of these functions, not extra Forge/Revoke public verbs.

@@ -61,17 +61,30 @@ versions; it never increments them.
 
 ### CREATE — primary definition
 
-CREATE returns an **immutable Golden Token** to access a **new digital object**
-with defined usage permission for:
+CREATE returns an **immutable Golden Token**. It is also the **entry path
+for issuing Abstract GTs through a hierarchy of Abstractions**, not merely
+a constructor for raw Owner/payload bits.
 
-- Data Read, Write or Execute use;
-- an Enter-only Abstraction;
-- Load or Save Capability Lists;
-- a Thread; or
-- a Namespace.
+Its results include:
+
+- GTs for new digital objects: Data Read, Write or Execute use, an Enter-only
+  Abstraction, Load or Save Capability Lists, a Thread, or a Namespace;
+- Outform GTs for dependencies; and
+- **Abstract GTs**, with their meaning and lifecycle defined by the responsible
+  Abstraction in the hierarchy. Credentials are one case, not the whole category.
 
 CREATE delivers the GT itself. Allocation, initialization, verification and
 Namespace bookkeeping support that result.
+
+An **Abstract GT** (type `11`) is distinct from an **Enter GT for an executable
+Abstraction**. Issuing the former is a first-class CREATE result; it does not
+require treating that GT as an Inform reference or allocating a Namespace slot
+for each token. An owning Abstraction may still require backing state.
+
+The hierarchy is programmer-defined. Mint's ownership of issuance does not
+give Mint a universal interpretation of every Abstract payload. The hierarchy's
+concrete routing/binding convention remains to be specified; the four-bit Owner
+field alone is not a specification of that convention.
 
 ### DESTROY
 
@@ -141,7 +154,7 @@ DESTROY(targetGT, credential, proof)        → completion
 
 | Operation | Inputs | Successful result and effects |
 |---|---|---|
-| CREATE | Object description; initial content where required; credential and its proof | Create the requested object and deliver its actual GT. Mint assigns any required Namespace slot and version. |
+| CREATE | Creation/issuance request; initial content where required; credential and its proof | Deliver the requested Inform, Outform or Abstract GT. Abstract issuance follows the hierarchy of Abstractions. Mint assigns a Namespace slot/version only where required. |
 | DESTROY | Actual GT identifying the target; credential and its proof | Invalidate/destroy the selected object. If releasing a slot, increment its version before returning the memory object to the free pool. Return completion, not a GT. |
 
 The destination is the Namespace bound to this Mint instance. Neither method
@@ -153,8 +166,10 @@ CREATE does not accept a caller-selected slot or generation. Input GTs and
 the returned GT are actual capability values, not integers used as substitutes
 for capability arguments.
 
-For an Abstract value, CREATE delivers the Owner/payload GT without allocating
-a Namespace entry. For a credential, CREATE includes issuance state and
+For an Abstract GT, CREATE is the entry to the responsible Abstraction's
+issuance path, not unrestricted packing of caller-supplied Owner/payload bits.
+The result is delivered as an actual GT without requiring a Namespace entry
+for the token itself. For a credential, CREATE includes issuance state and
 delivers its associated proof through the configured recipient-delivery
 binding, not through a public scalar result. DESTROY of a credential records
 its invalidation without implicitly destroying objects accessible through it.
@@ -176,8 +191,8 @@ is big-endian. This is a proposed V1.1 record, not a LUMP header.
 | 5 | B | Requested Bind bit, `0` or `1`. |
 | 6 | Allocation words | Required local allocation; zero for Outform/Abstract. |
 | 7 | Payload words | Number of initial-content words at payload offset zero; zero when absent. |
-| 8 | Owner | `0–15` for Abstract; zero for Inform/Outform. |
-| 9 | Abstract value | Low 25 bits for an Abstract value; zero for other kinds. Mint assigns credential IDs. |
+| 8 | Owner | Requested Owner `0–15` for Abstract; zero for Inform/Outform. This value alone is neither authority nor a hierarchy routing specification. |
+| 9 | Abstract payload input | Low 25 bits supplied to the responsible Abstraction's issuance path; zero for other kinds. The responsible Abstraction defines their interpretation and the issued payload, including credential IDs. |
 | 10–11 | Reserved | Zero. |
 
 | Kind | Object | GT type | Payload |
@@ -188,7 +203,7 @@ is big-endian. This is a proposed V1.1 record, not a LUMP header.
 | 4 | Thread | Inform | Complete Thread object. |
 | 5 | Namespace | Inform | Complete Namespace object. |
 | 6 | Dependency | Outform | Four-word Namespace-format Outform descriptor, including its restore identity. |
-| 7 | Abstract value | Abstract | None; Owner/value are in the request. |
+| 7 | Abstract GT | Abstract | Owner/payload input in the request; issuance is through the responsible Abstraction in the hierarchy, not a generic raw-value constructor. |
 | 8 | Credential | Abstract | Credential issuance record in the configured Mint credential format. |
 
 Complete objects use their specified object layouts, not new layouts defined
@@ -200,6 +215,11 @@ Permission fields express the programmer's request. The format does not infer
 a permission set for Threads or Namespaces, predict future GT use, or add
 compiler/loader admission checks. Mint's runtime implementation applies its
 explicit policy and the instructions apply their specified machine checks.
+
+The proposed request record is not yet a complete hierarchy ABI: selecting
+and binding the responsible Abstraction, and carrying any additional
+Abstraction-specific arguments, require explicit specification before
+implementation. No new hierarchy bit encoding is implied here.
 
 DESTROY uses the target capability directly and has no CREATE request or
 payload. The proof is four readable 32-bit words. Credential issuance record
