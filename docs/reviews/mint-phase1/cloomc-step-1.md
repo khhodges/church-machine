@@ -19,7 +19,9 @@ The proposed request fields are being reviewed individually. The original
   Outform is withdrawn from the proposed CREATE object-kind options.
 - **Credential classification:** a credential is one case of Abstract, not a
   separate CREATE kind alongside Abstract. The eight-category proposal below
-  is superseded on these points; the separate object-kind input is still under review.
+  is superseded on these points.
+- **Object-kind input: removed.** CREATE uses the kind in the supplied object
+  definition, not a separate caller-supplied kind selector.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.

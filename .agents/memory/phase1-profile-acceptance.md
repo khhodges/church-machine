@@ -62,9 +62,17 @@ of Abstract, not a separate category alongside Abstract.
 categories in the proposed eight-way object-kind selector.
 
 **How to apply:** Do not retain Outform creation or a separate Credential kind
-from the earlier draft. This correction does not approve a separate object-kind
-input or resolve the remaining input layout. Do not equate all Abstract cases
-with credentials.
+from the earlier draft. Do not equate all Abstract cases with credentials.
+
+CREATE derives the object kind from the supplied object definition; it has no
+separate object-kind input.
+
+**Why:** The user selected “No—use the kind in the supplied object definition”
+when reviewing that proposed input.
+
+**How to apply:** Remove the redundant kind selector when implementing the
+reviewed interface. This decision does not settle the remaining inputs or
+authorize a new object-definition format.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
