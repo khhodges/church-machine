@@ -1130,3 +1130,31 @@ mtime_ms = 1792318873645
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/dfd75857-4f73-4cc0-bcf6-f6f8abc7f893/2ce3c951-78f9-4370-bcb2-958a46fbf5bf"
 storage_version_token = "1792318894002117"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Nx_T7Tugj1JVCrr19vHxx"
+uri = "file://generated-artifacts/mint-phase1-v1.1.pdf"
+type = "pdf"
+title = "Mint — PHASE 1 (V1.1) Definition — PDF"
+description = "Complete definition exported from the intact source document."
+logical_id = "f6363039-622c-43f7-aecc-0262eda9ee2f"
+content_hash = "sha256:c52c66d0f6cef73a19a6af72dfcf12b6e9fa8872d422ddc2771ff4e43cb18029"
+size = 48748
+mtime_ms = 1792323154164
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f6363039-622c-43f7-aecc-0262eda9ee2f/d2705f36-175c-4d09-8ada-328179c6853c"
+storage_version_token = "1792323166868355"
+content_type = "application/pdf"
+
+[[outputs]]
+id = "jyduhqd6S7KwOIJUvco08"
+uri = "file://generated-artifacts/mint-phase1-v1.1.html"
+type = "html"
+title = "Mint — PHASE 1 (V1.1) Definition — HTML"
+description = "Rendered copy checked in the browser; includes all sections and GT bit tables."
+logical_id = "fbcbf44f-9b51-4f4b-a6cc-c76d12d62dea"
+content_hash = "sha256:e784b8591248823abbfab7de5b1e4ff7a88d9a70696e4e16dc5ea3fa43ab4ffa"
+size = 7624
+mtime_ms = 1792323139141
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/fbcbf44f-9b51-4f4b-a6cc-c76d12d62dea/3a4e02b0-c3a8-48e0-8e74-ffa117848144"
+storage_version_token = "1792323167553228"
+content_type = "text/html"
