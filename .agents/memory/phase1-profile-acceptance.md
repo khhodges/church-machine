@@ -111,8 +111,18 @@ The user then specified “always rounded to power of 2.”
 **How to apply:** Do not treat Passkey validation as an unlimited allocation
 grant or accept a positive balance too small to cover the allocation. Use the
 rounded allocation for both the allowance check and deduction so accounting
-matches reserved memory. No minimum block size, new Passkey storage format,
-or fault-recovery policy is chosen by this rule.
+matches reserved memory. No new Passkey storage format or fault-recovery policy
+is chosen by this rule.
+
+CREATE's initial-content length is supplied separately by the caller and
+follows power-of-two rounding with a minimum of 64 words.
+
+**Why:** The user retained this input and specified “a number rounded to the
+power rules (64 min).”
+
+**How to apply:** Do not derive this input solely from the object definition.
+Keep rounded length distinct from proven source readability; the rule does
+not settle caller-provided padding versus Mint-side zero-filling.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;

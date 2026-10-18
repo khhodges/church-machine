@@ -50,6 +50,11 @@ The proposed request fields are being reviewed individually. The original
   is deducted so the count matches the memory reserved. A merely positive but
   insufficient count does not authorize allocation. For example, a 60-word
   request reserves 64 words and requires/deducts 64 words of allowance.
+- **Initial-content-length input: retained.** The caller supplies the length
+  separately, rounded up to a power of two with a minimum of 64 words.
+  This rounded length does not establish how many source words are readable:
+  whether the caller supplies the complete padded buffer or Mint zero-fills
+  shorter content is still under review.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
