@@ -53,7 +53,7 @@ versions; it never increments them.
 - A never-used slot starts at 0.
 - Authorized release advances the generation before freeing.
 - Reallocation uses the retained generation without another increment.
-- Generations never wrap or reset on reuse.
+- For V1.1, generations never wrap or reset on reuse.
 - Direct REPLACE generation policy remains to be defined.
 - Abstract GTs use their Owner/payload lifecycle, not an Inform/Outform version.
 

@@ -1135,14 +1135,14 @@ content_type = "text/markdown"
 id = "Nx_T7Tugj1JVCrr19vHxx"
 uri = "file://generated-artifacts/mint-phase1-v1.1.pdf"
 type = "pdf"
-title = "Mint — PHASE 1 (V1.1) Definition — PDF"
-description = "Complete definition exported from the intact source document."
+title = "Mint — PHASE 1 (V1.1) Definition"
+description = "Updated: “For V1.1, generations never wrap or reset on reuse.”"
 logical_id = "f6363039-622c-43f7-aecc-0262eda9ee2f"
-content_hash = "sha256:c52c66d0f6cef73a19a6af72dfcf12b6e9fa8872d422ddc2771ff4e43cb18029"
-size = 48748
-mtime_ms = 1792323154164
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f6363039-622c-43f7-aecc-0262eda9ee2f/d2705f36-175c-4d09-8ada-328179c6853c"
-storage_version_token = "1792323166868355"
+content_hash = "sha256:7bf9e524e59053c7bfe0439a9425024f01d7c749f23fca7be17292c9f25074ef"
+size = 48758
+mtime_ms = 1792324190928
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f6363039-622c-43f7-aecc-0262eda9ee2f/444aa91e-205b-4191-bc44-a0fc4f611ebf"
+storage_version_token = "1792324197670693"
 content_type = "application/pdf"
 
 [[outputs]]
