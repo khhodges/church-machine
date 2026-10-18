@@ -32,11 +32,12 @@ NULL
 | Field / case | Acknowledged meaning |
 |---|---|
 | B, bit 31 | Bind flag. Included in Mint's issued GT, not an omitted side condition. |
+| Domain, bit 27 (Inform/Outform) | `0` = **DATA**; `1` = **CAPABILITY**. Selects the interpretation of permission bits `[30:28]`. |
 | Type `00` | NULL regardless of the other 30 bits; not just the all-zero word. |
 | Type `01` | Inform: Namespace-referenced object. |
 | Type `10` | Outform: Namespace-referenced dependency for resolution. Local/far is a Namespace-entry property, not an extra GT bit. |
-| Domain `0`, permission bits `[30:28]` | `[X, W, R]`: Execute, Write, Read. |
-| Domain `1`, permission bits `[30:28]` | `[E, S, L]`: Enter, Save, Load. |
+| DATA (`Domain = 0`), permission bits `[30:28]` | `[X, W, R]`: Execute, Write, Read. |
+| CAPABILITY (`Domain = 1`), permission bits `[30:28]` | `[E, S, L]`: Enter, Save, Load. |
 | Inform/Outform version `[24:16]` | The 9-bit Namespace-slot generation, managed by Mint software; hardware checks the specified runtime match and never increments it. |
 | Inform/Outform slot `[15:0]` | The 16-bit Namespace slot reference. |
 | Type `11` | Abstract: `[30:27]` is Owner and `[24:0]` is owner-defined payload—not permission/domain, slot or a separate 9-bit version. |

@@ -83,6 +83,15 @@ not just the reference layout. Keep issued GTs immutable, software version
 ownership distinct from hardware runtime comparison, and Abstract payload
 identity distinct from the Inform/Outform generation field.
 
+Label Domain bit 27 explicitly as **DATA (0) vs CAPABILITY (1)** in the
+GT Field/Case list, not only in the bit diagram or permission descriptions.
+
+**Why:** The user corrected its omission from the Field/Case presentation and
+specified these domain names.
+
+**How to apply:** Include a dedicated Domain row for Inform/Outform; retain
+Abstract's separate Owner-field interpretation.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.
