@@ -16,6 +16,19 @@ the authoritative proof privately, compare it before object and method
 authorization, and never include the proof in audit entries, diagnostics, or
 status messages. Revocation must invalidate the whole pair.
 
+All methods should be Passkey-limited, not only Mint CREATE. Thread and
+Namespace access must be Passkey-guarded even though their GTs have permissions
+NONE and B=0.
+
+**Why:** During Mint's input review, the user explicitly said Thread and
+Namespace should be guarded by a Passkey and “indeed all methods should be
+Passkey limited.”
+
+**How to apply:** Treat this as the intended authorization contract, not proof
+that current methods enforce it. B=0 prevents binding through SAVE; it does
+not replace a Passkey check. This statement does not choose a new per-method
+key format or authorize machine-level changes.
+
 For Mint Phase 1, use the public review package at
 `docs/reviews/mint-phase1/README.md` rather than reconstructing approval from
 archived drafts or memory.

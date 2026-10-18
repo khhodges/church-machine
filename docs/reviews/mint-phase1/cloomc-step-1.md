@@ -31,13 +31,19 @@ The proposed request fields are being reviewed individually. The original
   Thread and Namespace permissions are always NONE.
   Data choices are **RW, R or W only**; Execute is not included.
   Church choices are **E, LS or L only**; S alone is not an allowed choice.
-- **B input: removed.** Mint always sets B=1 on the returned GT.
+- **B input: removed.** Mint sets B=1 on returned GTs except Thread and
+  Namespace GTs, which always have B=0 and permissions NONE.
   This issuance decision is separate from CALL boundary handling. The GT
   descriptions disagree in strength (`golden-tokens-v2.md` says CALL clears B
   on inherited CRs; `golden-tokens.md` says it may). The master ISA's linked
   CALL baseline does not state that B-clear operation, and the inspected
   ordinary simulator CALL path explicitly resets M, not B. Do not claim that
   automatic CALL B-clearing is established across implementations.
+- **Passkey protection:** Thread and Namespace access must be guarded by a
+  Passkey. The user's broader requirement is that all methods be Passkey-limited,
+  not only CREATE. B=0 blocks binding through SAVE; it is not a substitute for
+  Passkey validation before the protected operation. This is an intended
+  contract, not evidence that existing method implementations enforce it.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.

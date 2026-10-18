@@ -89,13 +89,16 @@ The user clarified Data “all” as “Read + Write only (RW).”
 or Execute for Data. Do not implement the old draft's unrestricted 0..7
 permission range as the approved CREATE contract.
 
-Mint always sets B=1 on the returned GT; CREATE has no caller-supplied B input.
+CREATE has no caller-supplied B input. Mint sets B=1 on returned GTs except
+Thread and Namespace GTs, which always use B=0 and permissions NONE.
 
-**Why:** The user explicitly selected “Mint always sets B = 1.”
+**Why:** After selecting “Mint always sets B = 1,” the user explicitly qualified
+it: “Threads and Namespace never use B=1” and must be guarded by a Passkey.
 
 **How to apply:** Keep this issuance rule distinct from CALL boundary semantics.
 The user's question about whether CALL always clears B is not approval to alter
-CALL; reconcile the specification before relying on automatic clearing.
+CALL; reconcile the specification before relying on automatic clearing. B=0
+does not replace Passkey authorization; see [Passkey rules](top-security-passkeys.md).
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
