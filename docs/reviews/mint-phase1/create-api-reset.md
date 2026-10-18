@@ -10,7 +10,10 @@ the current editable source are not this interface.
 CREATE(initialGT, requestedWords, permissions, passkey) -> newGT
 ```
 
-Passkey means the authorizing GT plus its separate proof, not the GT alone.
+Passkey is one logical credential: its authorizing GT plus its private
+128-bit proof (four 32-bit words), not the GT alone. The proof is not a second
+credential. Splitting these components across CR2/CR3 is a proposed calling
+convention, not a separately approved requirement.
 The object definition supplies kind, GT type and Domain; Abstract Owner comes
 from its owning abstraction. How that definition is selected is the open
 interface point below, not an assumed hidden lookup.
@@ -34,12 +37,22 @@ There is no second generic content buffer or 12-word request record.
 
 ## Meaning of the initialization GT
 
-| Object being created | Initialization input |
-|---|---|
-| Namespace | GT identifying a preformatted set of slots |
-| Thread | E-GT of the application abstraction Amoeba will start |
-| Abstraction | GT identifying the defining LUMP |
-| Data | Exact initialization convention has not been separately settled by this review |
+| Object being created | CR4 initialization input | Source access |
+|---|---|---|
+| Namespace | GT identifying the C-list used to populate the Namespace slots | LS |
+| Thread | GT of the application abstraction Amoeba will start | E |
+| Abstraction | GT identifying the defining LUMP as binary data | R is sufficient; RW also provides read access |
+| Data | Exact initialization convention has not been separately settled by this review | Unsettled |
+
+This revised proposal distinguishes the three input forms above within CREATE,
+not by adding a numeric kind argument. Namespace LS describes access to the
+source C-list; its contained GTs retain their individual permissions and need
+not themselves be LS. Mint reads the source LUMP and writes its new allocation;
+it does not require write permission on the source LUMP.
+
+These source permissions are separate from DR3's requested permissions for
+the returned GT. Validate the expected source structure, not merely permission
+bits.
 
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by
 starting the supplied application directly. The application's E-GT is not a
@@ -96,12 +109,13 @@ padding words. No new Abstract GT encoding or credential protocol is proposed.
 
 ## Open point: definition versus initializer
 
-The supplied initializer does not always identify the kind being created:
-for Thread creation it identifies an application Abstraction, not a Thread.
-Consequently CREATE cannot infer “create a Thread” solely from that E-GT.
+The revised proposal uses a CREATE-specific input convention: capability-list
+LS for Namespace, application E for Thread, and readable defining-LUMP data
+for Abstraction. The E-GT still identifies the application, not an existing
+Thread; this proposed convention is what gives it its CREATE meaning.
 
-The existing object definition must identify the creation kind. Its binding
-to this call needs to be explicit before this becomes an executable ABI.
-Do not silently restore a numeric kind selector, invent a definition record,
-or guess from permissions. The register proposal above does not solve this
-missing distinction by itself.
+R/RW alone cannot distinguish a defining LUMP from ordinary Data. Data
+initialization and its distinction from Abstraction creation remain unresolved,
+as does the detailed Amoeba handoff ABI. Do not silently restore a numeric kind
+selector or invent a definition record to fill these gaps. This is not yet a
+complete executable ABI.
