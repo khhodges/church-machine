@@ -8,6 +8,17 @@ It contains the Phase 1 method interfaces and available input/result checks.
 Unfinished bodies remain explicit compilation blockers. This source revision
 does not replace the installed executable Mint LUMP.
 
+### CREATE input review
+
+The proposed request fields are being reviewed individually. The original
+12-word layout below is not an approved final interface.
+
+- **Interface version: removed.** CREATE will not require the caller to supply
+  `0x0101` or another request-format version constant.
+- Remaining field offsets will be settled after the input review. The current
+  source still reflects the earlier proposal; its version check is not an
+  approved requirement.
+
 ## 1. Mint as a Lambda Calculus Abstraction
 **Primary lifecycle functions: CREATE, DESTROY.**
 

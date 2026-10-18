@@ -47,6 +47,14 @@ Review its inputs individually with the programmer before fixing the layout.
 **How to apply:** Explain one proposed input, distinguish requirements from
 assumptions, and obtain its decision before moving to the next input.
 
+CREATE has no caller-supplied interface-version input.
+
+**Why:** In the individual input review, the user explicitly chose to remove
+the proposed version field; no multiple-request-format requirement was established.
+
+**How to apply:** Do not reintroduce the `0x0101` request constant or its
+mandatory input check when implementing the reviewed CREATE interface.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.
