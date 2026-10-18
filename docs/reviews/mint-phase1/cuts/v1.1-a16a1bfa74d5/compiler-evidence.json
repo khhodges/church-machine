@@ -1,0 +1,277 @@
+{
+  "status": "DEFINITION_CUT_ONLY_LUMP_BLOCKED",
+  "definitionPath": "docs/reviews/mint-phase1/cloomc-step-1.md",
+  "definitionSha256": "a16a1bfa74d5732aaed5755cd2a381f8db42f37cd593785e6911de47f0275064",
+  "fingerprint": "4beb4c08e04fa175508afdd7a687cc6ff78b7b3184c4e3c52b5b5431a93b049c",
+  "compilerHashes": {
+    "simulator/cloomc_compiler.js": "b58e70dc8af642c648a24f1f9036a68dd8add8dad430bdb30e4d30a90d73cb43",
+    "simulator/assembler.js": "de99d84538834e3139556534c50d60eb9d40dd38b2d4cb4e0212310afad80e45",
+    "simulator/mint/protected-programs.js": "5798ffea0947d20d5b04e43b9aa98f35786987a2b1e6ea60b7e96630051e8c5f"
+  },
+  "ordinaryCompilerControlPassed": true,
+  "lumpCreated": false,
+  "liveNamespaceChanged": false,
+  "evidence": [
+    {
+      "sourcePath": "simulator/cloomc/mint.cloomc",
+      "sha256": "fce4448d924cb4e08bfa9f1611ff4d1fcba63990f8b41af0e9319d31b71861f2",
+      "compilationErrors": [
+        {
+          "line": 38,
+          "message": "Cannot resolve expression: permsBits & 0x7",
+          "colStart": 25,
+          "colEnd": 40
+        },
+        {
+          "line": 40,
+          "message": "Cannot compile statement: if (turingBits && churchBits) {",
+          "colStart": 8,
+          "colEnd": 10
+        },
+        {
+          "line": 41,
+          "message": "Cannot compile statement: fault(DOMAIN_PURITY)",
+          "colStart": 12,
+          "colEnd": 32
+        },
+        {
+          "line": 47,
+          "message": "Cannot compile statement: if (eBit && lsBits) {",
+          "colStart": 8,
+          "colEnd": 10
+        },
+        {
+          "line": 48,
+          "message": "Cannot compile statement: fault(E_ISOLATION)",
+          "colStart": 12,
+          "colEnd": 30
+        },
+        {
+          "line": 56,
+          "message": "Cannot compile statement: fault(NULL_TYPE)",
+          "colStart": 12,
+          "colEnd": 28
+        },
+        {
+          "line": 60,
+          "message": "Cannot resolve expression: base & 0xFFFF",
+          "colStart": 17,
+          "colEnd": 30
+        },
+        {
+          "line": 64,
+          "message": "Cannot compile statement: if (bindable) {",
+          "colStart": 8,
+          "colEnd": 10
+        },
+        {
+          "line": 80,
+          "message": "Cannot resolve expression: (version + 1) & 0x7F",
+          "colStart": 25,
+          "colEnd": 45
+        },
+        {
+          "line": 82,
+          "message": "Cannot compile statement: write(CR7, nsIndex * 4 + 2, word2)",
+          "colStart": 8,
+          "colEnd": 18
+        },
+        {
+          "line": 14,
+          "colStart": 12,
+          "colEnd": 16,
+          "message": "The LUMP object requires a declared canonical dot-name (for example ide.Service). Correct the source and recompile; no name is inferred."
+        },
+        {
+          "line": 16,
+          "colStart": 8,
+          "colEnd": 14,
+          "message": "C-list row 1 (Navana) requires a declared canonical dot-name, including MMIO (for example ide.UART). Fixed slots, addresses and device shorthand are not object identities."
+        }
+      ],
+      "methods": [
+        "Transfer"
+      ],
+      "compatibleWithLatestDefinition": false
+    },
+    {
+      "sourcePath": "docs/archive/phase-1-expanded-collection/source-drafts/ide.Mint.cloomc",
+      "sha256": "a6d5f41c7bf4685ce71686092e5856b18c0bdf3aefb1410e71001deedbf8458a",
+      "compilationErrors": [
+        {
+          "line": 18,
+          "message": "Undefined label: TODO_CREATE_REQUEST_ABI",
+          "colStart": 11,
+          "colEnd": 34
+        },
+        {
+          "line": 22,
+          "message": "Undefined label: TODO_CREATE_PROOF_AND_GENESIS_AUTHORIZATION",
+          "colStart": 11,
+          "colEnd": 54
+        },
+        {
+          "line": 27,
+          "message": "Undefined label: TODO_CREATE_VALIDATE_AND_PREPARE_ENTRY",
+          "colStart": 11,
+          "colEnd": 49
+        },
+        {
+          "line": 30,
+          "message": "Undefined label: TODO_CREATE_BIND_SLOT_LAMBDA_AND_INPUTS",
+          "colStart": 11,
+          "colEnd": 50
+        },
+        {
+          "line": 34,
+          "message": "Undefined label: TODO_CREATE_CONFIRM_COMMIT_AND_MATERIALIZE_GT",
+          "colStart": 11,
+          "colEnd": 56
+        },
+        {
+          "line": 39,
+          "message": "Undefined label: TODO_REPLACE_REQUEST_ABI",
+          "colStart": 11,
+          "colEnd": 35
+        },
+        {
+          "line": 41,
+          "message": "Undefined label: TODO_REPLACE_PROOF_AND_GENESIS_AUTHORIZATION",
+          "colStart": 11,
+          "colEnd": 55
+        },
+        {
+          "line": 46,
+          "message": "Undefined label: TODO_REPLACE_SAFETY_AND_PREPARE_ENTRY",
+          "colStart": 11,
+          "colEnd": 48
+        },
+        {
+          "line": 48,
+          "message": "Undefined label: TODO_REPLACE_BIND_SLOT_LAMBDA_AND_INPUTS",
+          "colStart": 11,
+          "colEnd": 51
+        },
+        {
+          "line": 51,
+          "message": "Undefined label: TODO_REPLACE_CONFIRM_COMMIT_AND_MATERIALIZE_GT",
+          "colStart": 11,
+          "colEnd": 57
+        },
+        {
+          "line": 57,
+          "message": "Undefined label: TODO_FORGE_REQUEST_AND_GENESIS_POLICY",
+          "colStart": 11,
+          "colEnd": 48
+        },
+        {
+          "line": 61,
+          "message": "Undefined label: TODO_FORGE_GT_AND_GENERATE_128_BIT_PROOF",
+          "colStart": 11,
+          "colEnd": 51
+        },
+        {
+          "line": 65,
+          "message": "Undefined label: TODO_PROTECT_AND_BIND_PROOF",
+          "colStart": 11,
+          "colEnd": 38
+        },
+        {
+          "line": 69,
+          "message": "Undefined label: TODO_SHARE_AS_GENESIS_PERMITS",
+          "colStart": 11,
+          "colEnd": 40
+        },
+        {
+          "line": 70,
+          "message": "Undefined label: TODO_FORGE_SUCCESS_RESULT_AND_CLEANUP",
+          "colStart": 11,
+          "colEnd": 48
+        },
+        {
+          "line": 14,
+          "colStart": 23,
+          "colEnd": 31,
+          "message": "C-list row 1 (pkverify) requires a declared canonical dot-name, including MMIO (for example ide.UART). Fixed slots, addresses and device shorthand are not object identities."
+        }
+      ],
+      "methods": [],
+      "compatibleWithLatestDefinition": false
+    },
+    {
+      "sourcePath": "simulator/mint/protected-programs.js (generated Mint source)",
+      "sha256": "89204ca8d5dfbf9fb7451f6c6b9eba5c7d30252748b38aa1e6e74009cc3fbac1",
+      "compilationErrors": [
+        {
+          "line": 35,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 44,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 45,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 50,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 51,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 54,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 56,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 57,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 60,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        },
+        {
+          "line": 64,
+          "colStart": 0,
+          "colEnd": 4,
+          "message": "Oops! I don't recognise the instruction \"MINT\". Check your spelling — every letter matters! Pseudo-instructions (handled before encoding): NOP, HALT, MVN, MVNcc (e.g. MVNEQ, MVNNE)."
+        }
+      ],
+      "compatibleWithLatestDefinition": false
+    }
+  ],
+  "implementationGaps": [
+    "No current ordinary-CLOOMC CREATE/DESTROY source implementing this definition.",
+    "Hierarchy routing and typed Abstraction-specific argument ABI are not specified.",
+    "Credential issuance record and recipient-delivery binding are not specified.",
+    "GC safe-point/root bindings, TRACE/destruction bindings and cycle ABI are not specified.",
+    "MakeOutform/MakeInform ABI and preserved/remote lifetime checks are not specified.",
+    "Protected fixture service operations are privately lowered and implemented by host code."
+  ]
+}

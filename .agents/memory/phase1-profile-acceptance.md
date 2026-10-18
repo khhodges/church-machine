@@ -27,6 +27,17 @@ check” and a reusable process for turning other Abstractions into CLOOMC LUMPs
 checklist. Start with Mint; do not conflate a helper-backed scenario with
 ordinary compiled source, or expand the work into a replacement debugger.
 
+List every Mint implementation blocker first, then review, simplify and
+resolve them one at a time with the programmer.
+
+**Why:** The user explicitly required each blocking problem to be listed
+and individually reviewed, simplified and resolved before proceeding.
+
+**How to apply:** Distinguish design decisions from ordinary source work.
+Do not treat compiler diagnostic counts as separate design blockers or
+assume every mechanism in a proposed interface must be retained. Do not
+bundle unresolved issues into a single implementation approval.
+
 The top-level Lambda Calculus Abstraction definition must come first in
 Step 1, before the source/machine audit, helper translation or register ABI.
 

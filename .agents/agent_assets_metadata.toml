@@ -1228,3 +1228,17 @@ mtime_ms = 1792328903634
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/06c27d1d-00b4-440f-a1d2-b932d80e7215/6d88555b-1291-417e-a27f-b0af9670acb4"
 storage_version_token = "1792328916339821"
 content_type = "text/html"
+
+[[outputs]]
+id = "nNvLvVBYzuiEG9KJwzsqd"
+uri = "file://generated-artifacts/mint-phase1-cut-a16a1bfa74d5.html"
+type = "html"
+title = "Mint Phase 1 — Frozen definition cut and compiler evidence"
+description = "Frozen latest definition. Clearly records that no executable LUMP was produced, with ordinary compiler diagnostics and remaining implementation interfaces."
+logical_id = "cff6cc0a-3222-44d3-9ebb-5a0fdc76c8e6"
+content_hash = "sha256:86823a439313f224f5da5ab35343d09b0861009deda2b3d191235b2e5588e459"
+size = 44242
+mtime_ms = 1792329205861
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cff6cc0a-3222-44d3-9ebb-5a0fdc76c8e6/3f3d7556-2615-421c-88e8-cbe5c52f887a"
+storage_version_token = "1792329235518263"
+content_type = "text/html"
