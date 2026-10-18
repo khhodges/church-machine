@@ -54,7 +54,9 @@ The proposed request fields are being reviewed individually. The original
   For a Namespace, it identifies a preformatted set of slots. For a Thread,
   an E-GT identifies the abstraction needed to format the stack frame; the
   precise initialization sequence is not specified by this statement.
-  The Abstraction case awaits the continuation of the user's description.
+  For an Abstraction, the GT identifies its defining LUMP: Abstractions are
+  complex structures represented by LUMPs, not reconstructed from a second
+  CREATE-specific scalar format.
   This direction replaces the generic buffer-copy framing; do not assume
   an additional temporary buffer or carry a separate content-length field
   into the final interface without reconciling its purpose.

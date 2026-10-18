@@ -117,16 +117,20 @@ is chosen by this rule.
 CREATE initialization uses a passed GT with object-specific meaning, not a
 uniform source-buffer copying contract. Namespace input identifies preformatted
 slots; Thread input is an E-GT for the abstraction needed to format its stack frame.
+For an Abstraction, the GT identifies the defining LUMP.
 
 **Why:** The user redirected the review: “lets agree to pass GT instead,” then
 specified Namespace slots and the Thread's E abstraction. This supersedes the
 generic buffer framing, not the separate allocation, permissions or Passkey rules.
+The user then clarified that Abstractions are complex structures better defined
+by LUMPs.
 
 **How to apply:** Do not impose a temporary buffer or retain a redundant content
 length merely from the older proposal. Do not infer whether Thread's E-GT is
 called as a formatter or installed as an entry target without reconciling the
 existing Thread contract. Keep rounded allocation distinct from readable source
-extent. Do not invent the unfinished Abstraction case.
+extent. Do not invent a second scalar format for Abstraction creation in place
+of its LUMP.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
