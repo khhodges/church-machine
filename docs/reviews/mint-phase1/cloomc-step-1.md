@@ -15,6 +15,11 @@ The proposed request fields are being reviewed individually. The original
 
 - **Interface version: removed.** CREATE will not require the caller to supply
   `0x0101` or another request-format version constant.
+- **Creation scope:** Mint creates Inform objects, never Outform objects.
+  Outform is withdrawn from the proposed CREATE object-kind options.
+- **Credential classification:** a credential is one case of Abstract, not a
+  separate CREATE kind alongside Abstract. The eight-category proposal below
+  is superseded on these points; the separate object-kind input is still under review.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
@@ -89,8 +94,8 @@ a constructor for raw Owner/payload bits.
 Its results include:
 
 - GTs for new digital objects: Data Read, Write or Execute use, an Enter-only
-  Abstraction, Load or Save Capability Lists, a Thread, or a Namespace;
-- Outform GTs for dependencies; and
+  Abstraction, Load or Save Capability Lists, a Thread, or a Namespace.
+  Mint creates Inform objects, never Outform objects; and
 - **Abstract GTs**, with their meaning and lifecycle defined by the responsible
   Abstraction in the hierarchy. Credentials are one case, not the whole category.
 
@@ -204,7 +209,7 @@ DESTROY(targetGT, credential, proof)        → completion
 
 | Operation | Inputs | Successful result and effects |
 |---|---|---|
-| CREATE | Creation/issuance request; initial content where required; credential and its proof | Deliver the requested Inform, Outform or Abstract GT. Abstract issuance follows the hierarchy of Abstractions. Mint assigns a Namespace slot/version only where required. |
+| CREATE | Creation/issuance request; initial content where required; credential and its proof | Create Inform objects, never Outform objects. Abstract issuance follows the hierarchy of Abstractions; a credential is one case of Abstract, not a separate kind. Mint assigns a Namespace slot/version only where required. |
 | DESTROY | Actual GT identifying the target; credential and its proof | Reject resident and Outform objects before mutation. Destroy an eligible object. For a Namespace-backed object, release its slot and increment its version before returning the memory object to the free pool. For an Abstract object, destruction is performed by its responsible Abstraction. Return completion, not a GT. |
 
 The destination is the Namespace bound to this Mint instance. Neither method

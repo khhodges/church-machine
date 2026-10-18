@@ -55,6 +55,17 @@ the proposed version field; no multiple-request-format requirement was establish
 **How to apply:** Do not reintroduce the `0x0101` request constant or its
 mandatory input check when implementing the reviewed CREATE interface.
 
+Mint creates Inform objects, never Outform objects. A credential is one case
+of Abstract, not a separate category alongside Abstract.
+
+**Why:** During CREATE's input review, the user explicitly corrected both
+categories in the proposed eight-way object-kind selector.
+
+**How to apply:** Do not retain Outform creation or a separate Credential kind
+from the earlier draft. This correction does not approve a separate object-kind
+input or resolve the remaining input layout. Do not equate all Abstract cases
+with credentials.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.
