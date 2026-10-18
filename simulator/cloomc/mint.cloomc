@@ -1,5 +1,18 @@
 ; MINT PHASE 1 -- CURRENT EDITABLE SOURCE. IMPLEMENTATION IN PROGRESS.
 ; Language: Assembly
+;
+; LUMP START: HEADER, THEN METHOD ROUTING TABLE -- ALWAYS.
+; The existing LUMP builder emits this prefix ONCE from the methods below:
+;   LUMP word 0: header
+;   LUMP word 1: CREATE entry       -> CREATE_inputs
+;   LUMP word 2: DESTROY entry      -> DESTROY_inputs
+;   LUMP word 3: MakeOutform entry  -> MakeOutform_inputs
+;   LUMP word 4: MakeInform entry   -> MakeInform_inputs
+;   LUMP word 5 onward: method bodies, beginning with their input checks.
+; Entries are generated body-word offsets in the existing CALL table format.
+; Source method indices 0..3 encode CALL selectors 1..4.
+; Do not prepend another hand-written table or bypass this one with method 0.
+;
 ; Open File -> mint (cloomc/mint.cloomc).
 ; This supersedes the obsolete Encode/Revoke/Transfer source, not the live binary.
 ; Native CLOOMC instruction checks below are real source, not host predicates.
@@ -25,6 +38,7 @@ abstraction ide.Mint {
 capabilities { SELF E }
 
 method CREATE {
+CREATE_inputs:
     ; CR4: 12-word request; CR8: optional initial content; CR7: NULL.
     TPERM CR1, CLEAR
     IADD DR1, DR0, #0
@@ -157,6 +171,7 @@ create_return:
 }
 
 method DESTROY {
+DESTROY_inputs:
     ; CR7: target. Resident and Outform objects MUST be rejected before mutation.
     ; CR4/CR8: NULL. Result CR1: NULL; DR1: completed destruction.
     TPERM CR1, CLEAR
@@ -190,6 +205,7 @@ destroy_result:
 }
 
 method MakeOutform {
+MakeOutform_inputs:
     ; Proposed input: CR7 eligible live object, CR4/CR8 NULL.
     ; Result CR1: Outform for SAME object, not a replacement identity.
     TPERM CR1, CLEAR
@@ -222,6 +238,7 @@ outform_return:
 }
 
 method MakeInform {
+MakeInform_inputs:
     ; Proposed input: CR7 Outform, CR4/CR8 NULL.
     ; Result CR1: Inform for SAME live object. Never resurrect a dead object.
     TPERM CR1, CLEAR

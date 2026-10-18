@@ -26,6 +26,8 @@ assert.equal(compiled.methods.length, 0, 'No partly valid method may escape as a
 assert.equal(compiled.language, 'assembly');
 
 for (const [, name, body] of methods) {
+    assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
+        'Every table entry must reach its own method input checks first');
     assert.match(body, /TPERM CR1, CLEAR/);
     assert.match(body, /IADD DR1, DR0, #0/);
     assert.doesNotMatch(body, /IADD DR1, DR0, #1\b/, 'Wrapper must not manufacture success');

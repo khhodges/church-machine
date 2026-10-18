@@ -3,11 +3,24 @@ name: Callable LUMP method-table prefix
 description: Defines the binary-layout requirement for generated artifacts entered through a numbered CALL method.
 ---
 
-The simulator's canonical numbered-method format prefixes executable bodies with opcode-23 BRANCH dispatch entries. Do not assume the hardware consumer implements that format before validating it. Writing source instructions directly at word 1 is valid only for method-zero entry. An omitted method operand defaults to method one.
+Every callable LUMP starts with its header and method-routing table, before
+method bodies. Use the established compiler/LUMP builder and CALL contract;
+do not create a new dispatcher or use method-zero entry as an excuse to omit
+the table. Historical BRANCH-entry formats and bare-offset formats exist;
+inspect the current producer and consumer rather than assuming which encoding
+is active.
+
+**Why:** The user explicitly corrected work on Mint: “The LUMP starts with a
+method rounting table ALWAYS, the CALL instruction expects it. Start there!”
+Undefined TODO targets had distracted from this already-solved structural
+requirement.
 
 **Why:** A numbered CALL reads the corresponding LUMP word as a dispatch entry. If a builder places the first body instruction there, the dispatcher reads ordinary code as a method-table entry and faults (or an unsafe legacy dispatcher can interpret it as an enormous PC).
 
-**How to apply:** When maintaining special-purpose LUMP builders, either generate `[dispatch table, source body]` or compile every direct-entry call with explicit method zero. Dispatch consumers may accept only bounded legacy offsets.
+**How to apply:** Begin callable source work with the API-ordered table and
+its method entry points, then input checks and bodies. Generate the table
+once through the existing builder. Keep unfinished method implementation
+distinct from verified dispatch-table layout.
 
 Legacy bare entries include the header in their LUMP-word offset; convert to logical PC by subtracting one. Canonical BRANCH entries retain PC-relative semantics.
 
