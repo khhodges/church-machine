@@ -12818,14 +12818,15 @@ function _offerEditorOwnerDraftRestore(owner, draft, editor) {
     _clearAuthoritativeDraftBanner();
     var banner = document.createElement('div');
     banner.id = '_authoritativeDraftBanner';
-    banner.className = 'lump-draft-restore-banner';
+    banner.className = 'lump-draft-restore-banner authoritative-draft-banner';
     banner._ownerDraftRecovery = true;
     banner.innerHTML = '<strong>Recoverable local draft available</strong>' +
         '<span class="lump-draft-copy">Keeping the current source until you choose.</span>' +
-        '<div class="authoritative-source-preview">' +
+        '<details class="authoritative-source-review"><summary>Compare source and recoverable draft</summary>' +
+        '<div class="authoritative-source-preview"><div>' +
         '<label>Current source</label><pre id="_authoritativeBefore"></pre>' +
-        '<label>Recoverable draft</label><pre id="_authoritativeAfter"></pre>' +
-        '</div>' +
+        '</div><div><label>Recoverable draft</label><pre id="_authoritativeAfter"></pre>' +
+        '</div></div></details>' +
         '<button class="btn btn-sm" id="_authoritativeRestore">Restore Draft</button>' +
         '<button class="btn btn-sm" id="_authoritativeKeep">Keep Current</button>';
     banner.querySelector('#_authoritativeBefore').textContent = capturedCode;
@@ -13093,15 +13094,16 @@ function _reconcileAuthoritativeEditor(owner, localCode, editor) {
         _clearAuthoritativeDraftBanner();
         banner = document.createElement('div');
         banner.id = '_authoritativeDraftBanner';
-        banner.className = 'lump-draft-restore-banner';
+        banner.className = 'lump-draft-restore-banner authoritative-draft-banner';
         banner.innerHTML = '<strong>Local draft differs from latest source</strong>' +
             '<span class="lump-draft-copy">Keeping your restored draft.</span>' +
-            '<div class="authoritative-source-preview">' +
+            '<details class="authoritative-source-review"><summary>Compare draft with latest source</summary>' +
+            '<div class="authoritative-source-preview"><div>' +
             '<label>Current draft (before)</label>' +
             '<pre id="_authoritativeBefore"></pre>' +
-            '<label>Latest source (after)</label>' +
+            '</div><div><label>Latest source (after)</label>' +
             '<pre id="_authoritativeAfter"></pre>' +
-            '</div>' +
+            '</div></div></details>' +
             '<button class="btn btn-sm" id="_authoritativeAccept">Accept Latest Source</button>' +
             '<button class="btn btn-sm" id="_authoritativeKeep">Keep Draft</button>';
         banner.querySelector('#_authoritativeBefore').textContent = capturedCode;

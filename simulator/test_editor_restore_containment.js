@@ -261,6 +261,9 @@ function storageObject(initial) {
     await new Promise(resolve => setImmediate(resolve));
     assert.strictEqual(editor.value, 'draft');
     assert.ok(banner, 'divergence is offered without replacing the buffer');
+    assert.match(banner.className, /authoritative-draft-banner/);
+    assert.match(banner.innerHTML, /<details class="authoritative-source-review">/);
+    assert.doesNotMatch(banner.innerHTML, /<details[^>]*\bopen\b/);
     assert.strictEqual(buttons['#_authoritativeBefore'].textContent, 'draft');
     assert.strictEqual(buttons['#_authoritativeAfter'].textContent, 'server source');
     assert.deepStrictEqual(Array.from(stored.bytes.entries()), before);
@@ -305,6 +308,8 @@ function storageObject(initial) {
     assert.ok(banner && banner._ownerDraftRecovery);
     assert.strictEqual(buttons['#_authoritativeBefore'].textContent, 'server source');
     assert.strictEqual(buttons['#_authoritativeAfter'].textContent, 'draft');
+    assert.match(banner.innerHTML, /<details class="authoritative-source-review">/);
+    assert.doesNotMatch(banner.innerHTML, /<details[^>]*\bopen\b/);
     await buttons['#_authoritativeRestore'].onclick();
     assert.strictEqual(editor.value, 'draft');
     assert.strictEqual(preservedDraft, null);

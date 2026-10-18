@@ -3,6 +3,16 @@ name: Editor source authority
 description: Rules for preserving user-owned editor bytes while offering newer authoritative source explicitly.
 ---
 
+Opening the editor must prioritize the editable buffer. Source freshness and
+recovery notices stay compact; full before/after comparisons are opt-in and
+bounded, with decisions accessible without scrolling through source.
+
+**Why:** The programmer's screenshot showed a full comparison consuming the
+editor area and hiding the decision controls, making code opening unusable.
+
+**How to apply:** Keep both draft preservation and explicit replacement consent.
+Do not solve a notice-layout defect by automatically discarding a draft.
+
 The persisted editor document is the user-owned source buffer. Restore its bytes and typed owner exactly. Server, built-in, and immutable-artifact source is advisory until the user explicitly accepts an exact before/after replacement. Never let startup, navigation, background reconciliation, syntax repair, or a stale asynchronous result silently replace the current buffer. Preserve replaced drafts under their owner, and keep editable source authority separate from immutable LUMP binary authority.
 
 **Why:** Freshness or artifact authority does not imply overwrite intent. Startup and asynchronous work can race with typing, navigation, and unsaved-draft recovery; preferring another source can destroy the only copy of user text. Exact restoration, explicit acceptance, and owner-scoped recovery preserve user agency while still exposing authoritative content.

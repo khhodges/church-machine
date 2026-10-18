@@ -2511,6 +2511,51 @@
     white-space: nowrap;
 }
 .lump-draft-copy b { color: #fef3c7; }
+/* Source freshness is advisory: never let a long comparison replace the
+   editable buffer or push its actions offscreen. Closed on initial display. */
+.authoritative-draft-banner {
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+.authoritative-draft-banner strong,
+.authoritative-draft-banner .lump-draft-copy {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+.authoritative-source-review {
+    order: 2;
+    flex: 1 0 100%;
+    min-width: 0;
+}
+.authoritative-source-review summary {
+    cursor: pointer;
+    padding: 0.2rem 0;
+}
+.authoritative-source-review summary:focus-visible {
+    outline: 2px solid #fbbf24;
+    outline-offset: 2px;
+}
+.authoritative-source-preview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.6rem;
+    max-height: min(220px, 28vh);
+    overflow: auto;
+    margin-top: 0.4rem;
+}
+.authoritative-source-preview > div { min-width: 0; }
+.authoritative-source-preview pre {
+    margin: 0.3rem 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 0.75rem;
+}
+@media (max-width: 700px) {
+    .authoritative-source-preview { grid-template-columns: minmax(0, 1fr); }
+}
 #asmEditor.cm-editor-draft {
     border: 2px solid #fbbf24;
     background: #211b08;
