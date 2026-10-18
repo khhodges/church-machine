@@ -1102,3 +1102,31 @@ mtime_ms = 1792259587658
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/8fdfe24e-aabf-4b6b-ad21-310db23e16d5/c06405ac-efeb-41b6-9f33-f75446ef6f22"
 storage_version_token = "1792259632961341"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "GrIV3BOof04AUEQFRY0Rc"
+uri = "file://docs/reviews/mint-phase1/cloomc-step-1.md"
+type = "text"
+title = "Mint — Step 1 audit"
+description = "Helper-by-helper separation of CLOOMC service logic, machine behavior, and unresolved interfaces. No implementation or Namespace changes."
+logical_id = "edf61049-9522-4fe9-b59b-5e39fe9b2ae1"
+content_hash = "sha256:130fec2a47c27b4440ce4516dfb794cecb9ebec00a5c59adcbdc803346f80a5c"
+size = 9804
+mtime_ms = 1792317732712
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/edf61049-9522-4fe9-b59b-5e39fe9b2ae1/f4be646f-3a67-4930-92cb-b16bb6f4743e"
+storage_version_token = "1792317770514527"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "JowE9wCJ2d4hNOnWk6vBI"
+uri = "file://docs/reviews/cloomc-lump-process.md"
+type = "text"
+title = "Abstraction to CLOOMC LUMP — four-step process"
+description = "Reusable review checkpoints from source implementation through editable saved LUMPs and integrated execution."
+logical_id = "dfd75857-4f73-4cc0-bcf6-f6f8abc7f893"
+content_hash = "sha256:b0101eadb6f4d70600f677d82cb72536dde2dbd6beaf690969297ebcd5914ebd"
+size = 5003
+mtime_ms = 1792317750184
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/dfd75857-4f73-4cc0-bcf6-f6f8abc7f893/2a6fccf7-46ed-4442-b09d-fcfbf9774685"
+storage_version_token = "1792317771618556"
+content_type = "text/markdown"

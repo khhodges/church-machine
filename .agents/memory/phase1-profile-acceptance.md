@@ -16,6 +16,17 @@ and select and recompile each LUMP as they see fit.
 editable source/compiler compatibility from runtime acceptance; do not claim
 test-harness-only artifacts are ordinary recompilable IDE LUMPs.
 
+Conversion to CLOOMC LUMPs is programmer-reviewed in four separate steps:
+source/machine separation, real first path, existing-IDE delivery, then remaining
+methods and integration. Stop after each step for review.
+
+**Why:** The user explicitly requested “1, 2, 3 and 4 as individual steps I can
+check” and a reusable process for turning other Abstractions into CLOOMC LUMPs.
+
+**How to apply:** Use `docs/reviews/cloomc-lump-process.md` as the handoff
+checklist. Start with Mint; do not conflate a helper-backed scenario with
+ordinary compiled source, or expand the work into a replacement debugger.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.

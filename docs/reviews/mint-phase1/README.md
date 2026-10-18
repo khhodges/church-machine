@@ -2,6 +2,12 @@
 
 **2026-10-17 · Design/review package, not an operational service.**
 
+**CLOOMC delivery correction:** the helper-backed isolated results below do not
+establish an ordinary CLOOMC-compiled Mint LUMP. See the
+[Step 1 source/machine audit](cloomc-step-1.md) and the
+[four-step delivery process](../cloomc-lump-process.md). Preserve those earlier
+results as scoped evidence, not completion of editable Mint delivery.
+
 **Subsequent isolated implementation:** see
 [Protected Mint simulator](protected-simulator.md) for the approved compiled
 M1/G4/M2/M3 execution path and negative tests. This is not live-service,
