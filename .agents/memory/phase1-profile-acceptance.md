@@ -89,6 +89,14 @@ The user clarified Data “all” as “Read + Write only (RW).”
 or Execute for Data. Do not implement the old draft's unrestricted 0..7
 permission range as the approved CREATE contract.
 
+Mint always sets B=1 on the returned GT; CREATE has no caller-supplied B input.
+
+**Why:** The user explicitly selected “Mint always sets B = 1.”
+
+**How to apply:** Keep this issuance rule distinct from CALL boundary semantics.
+The user's question about whether CALL always clears B is not approval to alter
+CALL; reconcile the specification before relying on automatic clearing.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.

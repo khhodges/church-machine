@@ -31,6 +31,13 @@ The proposed request fields are being reviewed individually. The original
   Thread and Namespace permissions are always NONE.
   Data choices are **RW, R or W only**; Execute is not included.
   Church choices are **E, LS or L only**; S alone is not an allowed choice.
+- **B input: removed.** Mint always sets B=1 on the returned GT.
+  This issuance decision is separate from CALL boundary handling. The GT
+  descriptions disagree in strength (`golden-tokens-v2.md` says CALL clears B
+  on inherited CRs; `golden-tokens.md` says it may). The master ISA's linked
+  CALL baseline does not state that B-clear operation, and the inspected
+  ordinary simulator CALL path explicitly resets M, not B. Do not claim that
+  automatic CALL B-clearing is established across implementations.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
