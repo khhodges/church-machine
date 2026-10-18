@@ -168,6 +168,18 @@ target as distinct roles; do not invent the handoff ABI. Keep rounded allocation
 extent. Do not invent a second scalar format for Abstraction creation in place
 of its LUMP.
 
+CREATE's Abstraction case accepts an R or RW GT to the defining LUMP.
+Source W is unnecessary; returned rights are independently requested as
+E, LS or L, with B=1. Mint zero-fills remaining allocated space.
+
+**Why:** On 2026-10-18 the programmer explicitly confirmed this complete case,
+including separate allocation size and Passkey authority, without a second
+description record.
+
+**How to apply:** Keep source read access separate from returned permissions.
+Do not require writable source LUMPs or caller padding. This approval does not
+settle ordinary Data initialization or how it is distinguished from a LUMP.
+
 CREATE's Thread case uses CR4 E to select Thread creation under the approved
 CREATE-specific input convention. That GT identifies the application Amoeba
 will start, not an existing Thread or Amoeba itself.

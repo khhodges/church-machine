@@ -72,6 +72,22 @@ Namespace and Thread cases confirmed individually by the programmer on 2026-10-1
 Neither case needs a separate kind selector. These approvals do not settle Data initialization, the detailed Amoeba
 handoff, or approve implementation of the whole register ABI.
 
+Abstraction case also confirmed individually by the programmer on 2026-10-18:
+
+| Item | Abstraction — agreed |
+|---|---|
+| CR4 | R or RW GT to the defining LUMP |
+| DR2 | Requested Abstraction allocation size |
+| DR3 | E, LS or L for the returned GT |
+| Passkey | Authorizes creation and allocation |
+| Mint action | Create the Abstraction from its defining LUMP; zero-fill remaining allocated space |
+| Source access | Read only is sufficient; source W is not required |
+| Definition | Supplied by the LUMP, not a second description record |
+| Result | New Abstraction GT with requested permissions and B=1 |
+
+This approval does not define ordinary Data initialization or its discrimination
+from a defining LUMP.
+
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by
 starting the supplied application directly. The application's E-GT is not a
 formatter to execute during CREATE. This defines roles, not the detailed
