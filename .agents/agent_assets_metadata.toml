@@ -1214,3 +1214,17 @@ mtime_ms = 1792328810233
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6b30b1d7-ce02-4d63-90b8-008abe8dd6c1/30d89a6d-7617-40af-8ec8-1060fd9c7471"
 storage_version_token = "1792328832730377"
 content_type = "text/html"
+
+[[outputs]]
+id = "Q9AL-3Ft0s1MyhBm8aFpK"
+uri = "file://generated-artifacts/mint-v1.1-destroy-purpose-a16a1bfa74.html"
+type = "html"
+title = "Mint V1.1 — DESTROY reduces garbage"
+description = "Updated definition leads with DESTROY’s purpose: prompt reclamation to reduce garbage and speed up activities. Resident and Outform exclusions remain."
+logical_id = "06c27d1d-00b4-440f-a1d2-b932d80e7215"
+content_hash = "sha256:2c357fafecc6718e3b4837aa00c3e7722752a93fd9b48dca8de0750cedb8bea8"
+size = 33052
+mtime_ms = 1792328903634
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/06c27d1d-00b4-440f-a1d2-b932d80e7215/6d88555b-1291-417e-a27f-b0af9670acb4"
+storage_version_token = "1792328916339821"
+content_type = "text/html"

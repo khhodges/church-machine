@@ -94,6 +94,16 @@ means DESTROY??”
 separate from that meaning; preserve immutable GT words, the slot-release
 generation rule, and the distinction between a credential and its target.
 
+DESTROY's purpose is to reduce garbage and speed up activities through
+explicit reclamation when the program is finished with an eligible object.
+
+**Why:** The user stated: “The role of destroy is to reduce Garbage and speed
+up activities.”
+
+**How to apply:** Lead with this purpose. Explain how prompt destruction
+reduces work left to GC, without promising measured speedups or weakening
+the resident/Outform exclusions and safe-release rules.
+
 DESTROY cannot destroy resident or Outform objects.
 
 **Why:** The user explicitly corrected the Mint/GC definition with this

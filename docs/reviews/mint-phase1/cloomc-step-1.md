@@ -92,6 +92,12 @@ field alone is not a specification of that convention.
 
 ### DESTROY
 
+**DESTROY's role is to reduce garbage and speed up activities.** When the
+program knows it is finished with an eligible object, it explicitly destroys
+that object and reclaims its resources rather than leaving them for a later
+garbage-collection cycle. This reduces pending garbage, releases capacity
+earlier and reduces the reclamation work left to GC.
+
 **DESTROY destroys the selected object.** It is not a hide, detach or
 temporary-disable operation. It returns completion, not a replacement GT.
 
@@ -330,6 +336,12 @@ ABI above. MakeOutform/MakeInform and the GC interfaces below have semantic
 contracts here; their method selectors and register ABI are not yet assigned.
 
 ### Responsibilities
+
+Explicit DESTROY and GC complement each other. DESTROY uses the program's
+knowledge that an eligible object is no longer needed to reclaim it promptly.
+GC discovers unreachable objects that were not explicitly destroyed. Both
+use Mint's common release path, so prompt destruction reduces garbage without
+introducing a second reclamation mechanism or relaxing safety checks.
 
 | Component | Responsibility |
 |---|---|
