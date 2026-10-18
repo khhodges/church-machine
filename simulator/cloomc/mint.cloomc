@@ -8,7 +8,13 @@
 ;   LUMP word 2: DESTROY entry      -> DESTROY_inputs
 ;   LUMP word 3: MakeOutform entry  -> MakeOutform_inputs
 ;   LUMP word 4: MakeInform entry   -> MakeInform_inputs
-;   LUMP word 5 onward: method bodies, beginning with their input checks.
+;   LUMP word 5: CREATE_inputs -- first instruction of CREATE, not a fifth method.
+; CREATE's remaining instructions follow its entry.
+; DESTROY starts at DESTROY_inputs, addressed by table word 2.
+; MakeOutform starts at MakeOutform_inputs, addressed by table word 3.
+; MakeInform starts at MakeInform_inputs, addressed by table word 4.
+; Those three body addresses depend on emitted method lengths; the builder
+; calculates them. No additional unnamed function is declared by this layout.
 ; Entries are generated body-word offsets in the existing CALL table format.
 ; Source method indices 0..3 encode CALL selectors 1..4.
 ; Do not prepend another hand-written table or bypass this one with method 0.
