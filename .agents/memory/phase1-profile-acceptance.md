@@ -47,6 +47,17 @@ Review its inputs individually with the programmer before fixing the layout.
 **How to apply:** Explain one proposed input, distinguish requirements from
 assumptions, and obtain its decision before moving to the next input.
 
+CREATE's Namespace case uses an LS GT to a source C-list; under this
+CREATE-specific convention it selects Namespace creation without a kind selector.
+The contained GTs retain their individual permissions, not uniformly LS.
+
+**Why:** On 2026-10-18 the programmer explicitly confirmed this case, including
+separate allocation size, Passkey memory authority, and a NONE/B=0 result.
+
+**How to apply:** Preserve that case decision without treating it as approval
+of the whole register ABI or a solution for Data-versus-Abstraction selection.
+The public case approval is in the CREATE reset review.
+
 CREATE has no caller-supplied interface-version input.
 
 **Why:** In the individual input review, the user explicitly chose to remove

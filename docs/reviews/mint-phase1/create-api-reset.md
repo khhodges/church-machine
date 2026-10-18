@@ -54,6 +54,24 @@ These source permissions are separate from DR3's requested permissions for
 the returned GT. Validate the expected source structure, not merely permission
 bits.
 
+### Individual case review
+
+Namespace case confirmed by the programmer on 2026-10-18:
+
+| Item | Namespace — agreed |
+|---|---|
+| CR4 | LS GT to the source C-list |
+| DR2 | Requested Namespace allocation size |
+| DR3 | NONE |
+| Passkey | Authorizes creation and supplies the memory allowance |
+| Mint action | Allocate the Namespace and populate its slots from the supplied C-list |
+| Contained GTs | Retain their individual permissions; not all required to be LS |
+| Result | Namespace GT, permissions NONE, B=0 |
+| Case selection | CR4 LS selects Namespace creation under this CREATE convention; no separate kind selector |
+
+This case approval does not settle Data initialization, the detailed Amoeba
+handoff, or approve implementation of the whole register ABI.
+
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by
 starting the supplied application directly. The application's E-GT is not a
 formatter to execute during CREATE. This defines roles, not the detailed
