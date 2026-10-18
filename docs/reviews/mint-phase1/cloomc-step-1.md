@@ -10,6 +10,11 @@ does not replace the installed executable Mint LUMP.
 
 ### CREATE input review
 
+The consolidated [CREATE reset API draft](create-api-reset.md) is the current
+proposal for this method. It replaces the original scalar request proposal
+as the review starting point and explicitly separates agreed rules from
+remaining interface questions. No executable source was changed by that reset.
+
 The proposed request fields are being reviewed individually. The original
 12-word layout below is not an approved final interface.
 

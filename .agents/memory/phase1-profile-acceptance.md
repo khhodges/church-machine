@@ -157,6 +157,16 @@ target as distinct roles; do not invent the handoff ABI. Keep rounded allocation
 extent. Do not invent a second scalar format for Abstraction creation in place
 of its LUMP.
 
+Do not infer the kind being created solely from CREATE's initialization GT.
+
+**Why:** For Thread creation, the approved initialization E-GT identifies the
+application Abstraction Amoeba will start, not the new Thread. Confusing those
+roles would misclassify the creation request.
+
+**How to apply:** Make the object-definition binding explicit before finalizing
+the executable ABI. Do not silently restore a numeric kind selector or infer
+the kind from permissions to hide this distinction.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.
