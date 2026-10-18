@@ -178,7 +178,17 @@ description record.
 
 **How to apply:** Keep source read access separate from returned permissions.
 Do not require writable source LUMPs or caller padding. This approval does not
-settle ordinary Data initialization or how it is distinguished from a LUMP.
+settle how ordinary Data is distinguished from a LUMP.
+
+CREATE's Data initialization input is an R or RW GT to supplied initial data
+in CR4, rather than an allocation-only or mandatory-zero-only interface.
+
+**Why:** On 2026-10-18 the programmer explicitly selected “Yes—use the supplied
+initial data” in the individual Data-case review.
+
+**How to apply:** Preserve readable-source access separately from returned
+RW/R/W permissions. Do not infer readable source extent from requested
+allocation or treat this input approval as resolving Data-versus-LUMP dispatch.
 
 CREATE's Thread case uses CR4 E to select Thread creation under the approved
 CREATE-specific input convention. That GT identifies the application Amoeba
@@ -192,7 +202,7 @@ creation without an independent kind argument.
 **How to apply:** Preserve this method-specific convention without conflating
 the input application's identity with the new Thread's identity. Do not restore
 a numeric kind selector. The detailed Amoeba handoff and Data-versus-Abstraction
-initialization remain separate unresolved questions.
+discrimination remain separate unresolved questions.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;

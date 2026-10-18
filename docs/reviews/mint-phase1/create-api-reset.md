@@ -42,7 +42,7 @@ There is no second generic content buffer or 12-word request record.
 | Namespace | GT identifying the C-list used to populate the Namespace slots | LS |
 | Thread | GT of the application abstraction Amoeba will start | E |
 | Abstraction | GT identifying the defining LUMP as binary data | R is sufficient; RW also provides read access |
-| Data | Exact initialization convention has not been separately settled by this review | Unsettled |
+| Data | GT identifying the supplied initial data | R or RW |
 
 This revised proposal distinguishes the three input forms above within CREATE,
 not by adding a numeric kind argument. Namespace LS describes access to the
@@ -69,8 +69,8 @@ Namespace and Thread cases confirmed individually by the programmer on 2026-10-1
 | Result | Namespace GT, permissions NONE, B=0 | Thread GT, permissions NONE, B=0 |
 | Case selection | CR4 LS selects Namespace creation under this CREATE convention | CR4 E selects Thread creation under this CREATE convention |
 
-Neither case needs a separate kind selector. These approvals do not settle Data initialization, the detailed Amoeba
-handoff, or approve implementation of the whole register ABI.
+Neither case needs a separate kind selector. These approvals do not settle the
+detailed Amoeba handoff or approve implementation of the whole register ABI.
 
 Abstraction case also confirmed individually by the programmer on 2026-10-18:
 
@@ -85,8 +85,26 @@ Abstraction case also confirmed individually by the programmer on 2026-10-18:
 | Definition | Supplied by the LUMP, not a second description record |
 | Result | New Abstraction GT with requested permissions and B=1 |
 
-This approval does not define ordinary Data initialization or its discrimination
-from a defining LUMP.
+Data initialization was subsequently confirmed individually by the programmer
+on 2026-10-18: use an R or RW GT to the supplied initial data in CR4.
+
+| Item | Namespace | Thread | Abstraction | Data |
+|---|---|---|---|---|
+| CR4 | LS GT to source C-list | E GT to application | R/RW GT to defining LUMP | R/RW GT to initial data |
+| DR2 | Requested Namespace size | Requested Thread size | Requested Abstraction size | Requested Data size |
+| DR3 | NONE | NONE | E, LS or L | RW, R or W |
+| Passkey | Authorizes creation and allocation | Authorizes creation and allocation | Authorizes creation and allocation | Authorizes creation and allocation |
+| Mint action | Populate Namespace slots | Prime with Amoeba | Create from defining LUMP | Copy supplied initial data |
+| Returned CR1 | Namespace GT | Thread GT | Abstraction GT | Data GT |
+| Returned B | 0 | 0 | 1 | 1 |
+
+For Data, the source must be readable even when the returned GT is W-only.
+Mint zero-fills unused destination space. Copying must remain within both the
+established readable source extent and the destination allocation; DR2 does
+not establish readable source extent.
+
+The input-content decision does not yet specify how CREATE distinguishes
+ordinary Data from a defining LUMP when both use R/RW source GTs.
 
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by
 starting the supplied application directly. The application's E-GT is not a
@@ -148,8 +166,9 @@ LS for Namespace, application E for Thread, and readable defining-LUMP data
 for Abstraction. The E-GT still identifies the application, not an existing
 Thread; this proposed convention is what gives it its CREATE meaning.
 
-R/RW alone cannot distinguish a defining LUMP from ordinary Data. Data
-initialization and its distinction from Abstraction creation remain unresolved,
-as does the detailed Amoeba handoff ABI. Do not silently restore a numeric kind
+R/RW alone cannot distinguish a defining LUMP from ordinary Data. Data's
+initialization input is now agreed; its discrimination from Abstraction
+creation remains unresolved, as does the detailed Amoeba handoff ABI.
+Do not silently restore a numeric kind
 selector or invent a definition record to fill these gaps. This is not yet a
 complete executable ABI.
