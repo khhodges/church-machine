@@ -113,6 +113,9 @@ register_suite() {
 # Register all suites
 # ---------------------------------------------------------------------------
 
+register_suite "protected-mint-path-tests" \
+    'node --test tests/mint_phase1/protected_runtime.test.js'
+
 register_suite "check-stale-cr7" \
     'bash scripts/check_stale_cr7.sh'
 
@@ -533,6 +536,7 @@ ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabiliti
 
 ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard wukong-fault-sentinel check-ila-probe-names test-check-ila-probe-names wukong-preflight-launcher-tests boot-change-validation"
 
+ALL_GROUPS["protected-mint"]="protected-mint-path-tests"
 ALL_GROUPS["e2e"]="e2e-tests"
 
 # ---------------------------------------------------------------------------

@@ -8,6 +8,15 @@ or remove any exclusion, authority or containment obligation below. Unspecified
 encodings and protected continuation packing remain engineering reconciliation
 items; existing instruction meanings must not be silently repurposed.
 
+**Implementation evidence:** the [protected isolated simulator](protected-simulator.md)
+now implements the approved path with its own explicitly gated encoding profile.
+The user subsequently approved combined L+S in one Inform GT only in this
+isolated profile, preserving the single-CR1 return ABI. This explicitly resolves
+the Thread-LS/LS result conflict without changing the legacy simulator's rules.
+The proposal below is retained as the requirement record; statements describing
+the earlier missing implementation are historical. Full-profile candidate
+linking, durable custody and hardware acceptance are not supplied by this result.
+
 ## Goal and limits
 
 Make a real compiled caller → Mint → PkVerify → private Lambda → returned

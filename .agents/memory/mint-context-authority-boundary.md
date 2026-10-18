@@ -18,6 +18,31 @@ new credential recipients, or successful runtime acceptance from this approval.
 Unspecified encodings and protected continuation packing still need deliberate
 ISA reconciliation; approval is not permission to bypass enforcement.
 
+The user explicitly selected **one GT with combined L+S in the isolated
+profile**, not separate L/S outputs, for Thread-LS and LS object results.
+
+**Why:** The approved Mint types require LS, while the legacy simulator rejects
+multiple Church permissions. The user chose a scoped permission-rule extension
+rather than changing the single-CR1 result ABI.
+
+**How to apply:** Preserve one result in CR1 and the existing GT encoding/B
+semantics. Do not propagate combined-LS permission admission into the legacy
+simulator, hardware, or other profiles without separate approval.
+
+Keep the protected execution boundary sealed when integrating it with candidate
+linking or the IDE: do not hand loaders, editors, diagnostics or callbacks the
+underlying mutable simulator, RAM or registers.
+
+**Why:** The legacy simulator intentionally exposes direct mutation and rich
+diagnostic paths. Guarding BEGIN alone cannot exclude those actors or retract
+proof material already emitted. The isolated implementation chooses a private
+execution instance rather than claiming that the unrestricted IDE is protected.
+
+**How to apply:** Preserve the isolated boundary or explicitly qualify every
+new producer/observer against the shared inventory before connecting it. Treat
+real candidate linking and all-entry execution as separate acceptance evidence,
+not something established by the standalone protected-service path.
+
 Historical scope: Genesis authorized proposing the minimal missing interfaces
 for review, not implementing them. The proposal is in
 `docs/reviews/mint-phase1/minimal-machine-interfaces.md`.

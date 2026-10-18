@@ -2,6 +2,14 @@
 
 **2026-10-17 · Design/review package, not an operational service.**
 
+**Subsequent isolated implementation:** see
+[Protected Mint simulator](protected-simulator.md) for the approved compiled
+M1/G4/M2/M3 execution path and negative tests. This is not live-service,
+full-profile, durable-custody or hardware acceptance; the historical evidence
+and decision records below retain their original scope.
+The subsequent user decision permits combined L+S in one GT in the isolated
+profile only; the single-CR1 return and legacy permission rules are preserved.
+
 This package covers **ide.Mint**, **ide.PkVerify** and **ide.NSTab** for expert
 open-source review. It publishes the approved guided Q&A and a concrete,
 dependency-ordered implementation and verification proposal. It is not a
