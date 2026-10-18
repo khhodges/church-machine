@@ -59,6 +59,17 @@ latest version of Mint.”
 the previous source as history. Keep unfinished status explicit. Promotion
 of editable source is not proof of a successful compiled or installed release.
 
+Phase 1 Namespace labels must open the current authoring target even without
+a compiled LUMP, including MMIO mappings and the nstab table definition.
+
+**Why:** The user rejected labels that only searched saved compiled revisions
+and explicitly required links for MMIO and nstab as well as Mint.
+
+**How to apply:** Keep source/definition navigation separate from exact
+assigned-artifact inspection and installation. Retain editor-replacement
+consent and Namespace placement. Disclose a label/source spelling mismatch;
+do not silently rename or rebind the selected object.
+
 The top-level Lambda Calculus Abstraction definition must come first in
 Step 1, before the source/machine audit, helper translation or register ABI.
 

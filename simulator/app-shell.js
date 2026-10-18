@@ -1062,9 +1062,16 @@ function _escHtml(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-function openSourceFile(path) {
-    var writeGuard = window._captureEditorWriteGuard('open source file: ' + path);
-    fetch('/' + path)
+function openSourceFile(path, options) {
+    options = options || {};
+    // A caller that already owns this navigation must hand off its guard.
+    // Capturing again advances the epoch and would invalidate that caller.
+    var writeGuard = options.writeGuard ||
+        window._captureEditorWriteGuard('open source file: ' + path);
+    var accepts = function() {
+        return writeGuard.accepts() && (!options.accepts || options.accepts());
+    };
+    return fetch('/' + path, {cache:'no-store'})
         .then(function(r) {
             if (!r.ok) return _actionableResponseError(r, 'Open the source file', {
                 dataChanged: false,
@@ -1074,9 +1081,9 @@ function openSourceFile(path) {
         })
         .then(async function(code) {
             var ed = document.getElementById('asmEditor');
-            if (!ed || !writeGuard.accepts()) return;
+            if (!ed || !accepts()) return;
             if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
-                ed, code, 'Open source file "' + path + '".') || !writeGuard.accepts()) return;
+                ed, code, (options.reason || 'Open source file "' + path + '".')) || !accepts()) return;
             closeOpenFileDialog();
             _catalogActiveIdentity = path;
             if (typeof window._clearAuthoritativeDraftBanner === 'function') {
@@ -1109,6 +1116,7 @@ function openSourceFile(path) {
             if (typeof saveEditorState === 'function') saveEditorState();
             if (typeof updateLineNumbers === 'function') updateLineNumbers();
             if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
+            if (options.showEditor && typeof switchView === 'function') switchView('editor');
             // Show brief confirmation
             var outEl = document.getElementById('assemblyOutput');
             if (outEl) {
@@ -1120,6 +1128,7 @@ function openSourceFile(path) {
             }
         })
         .catch(function(err) {
+            if (options.propagateError) throw err;
             var outEl = document.getElementById('assemblyOutput');
             if (outEl) {
                 var msg = document.createElement('div');

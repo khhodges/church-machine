@@ -190,19 +190,76 @@
             `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button>`:''}`);
     }
     let sourceRequest = 0;
+    // Explicit current authoring targets, not guesses based on filenames,
+    // timestamps or saved-binary identity. This does not change placement.
+    const phase1Sources = Object.freeze({
+        'ide.Mint':'simulator/cloomc/mint.cloomc',
+        'SelfTest':'simulator/examples/post_flash_selftest.cloomc',
+        'CapabilityTest':'simulator/examples/capability_test.cloomc',
+        'WukongCallHome':'simulator/examples/wukong_callhome.cloomc',
+        'ide.Alice':'simulator/examples/alice.cloomc',
+        // Existing Phase 1 label spelling; disclose it in the source review.
+        // Navigation does not rename the saved slot or the source declaration.
+        'ide.Alace':'simulator/examples/alice.cloomc',
+        'ide.Mallory':'simulator/examples/mallory.cloomc'
+    });
+    function definitionTarget(row) {
+        const status=state.dirty?'Current unsaved design':'Current Namespace design';
+        let content=`<p>${esc(status)} · NS[${row.slot}] · ${esc(row.kind)}</p>`;
+        if(row.kind==='mmio') {
+            content+=`<h4>MMIO target</h4><dl><dt>Address</dt><dd>${hex(row.address)}</dd>
+                <dt>Limit (word offset)</dt><dd>${esc(row.limit)}</dd>
+                <dt>Sequence</dt><dd>${esc(row.sequence)}</dd><dt>Policy</dt><dd>${esc(row.policy)}</dd></dl>
+                <p>This label targets the hardware mapping, not a compiled LUMP.
+                Opening it does not read or write the device.</p>`;
+        } else if(row.name==='nstab' || row.kind==='namespace') {
+            content+=`<h4>Namespace table target</h4><p>${slotCount()} slots; four words per
+                entry. Metadata: ${metadata().map(hex).join(' · ')}.</p>
+                <table><thead><tr><th>Slot</th><th>Target</th><th>Kind</th><th>Policy</th></tr></thead><tbody>${
+                    state.document.rows.map(r=>`<tr><td>${r.slot}</td><td><button class="btn btn-xs"
+                        onclick="document.getElementById('namespaceDesignDialog').remove();NamespaceDesignV1.source(${r.slot})">${esc(r.name)}</button></td>
+                        <td>${esc(r.kind)}</td><td>${esc(r.policy)}</td></tr>`).join('')}</tbody></table>
+                <p>This is the current design table, not a substituted manifest or a live-memory claim.</p>`;
+        } else if(row.kind==='thread') {
+            content+=`<h4>Thread target</h4><p>Allocation: ${esc(row.words)} words.
+                Sequence: ${esc(row.sequence)}. Policy: ${esc(row.policy)}.</p>
+                <p>This is a configured Thread object, not an executable abstraction's source.</p>`;
+        } else {
+            content+=`<h4>Current interface definition</h4><p>PkVerify verifies the credential
+                and its four-word proof. Its concrete protected inputs and callable implementation
+                remain unresolved in the current Mint definition. No current executable source
+                is registered; an archived draft is not substituted.</p>
+                <a href="/simulator/#docs?doc=reviews%2Fmint-phase1%2Fcloomc-step-1.md"
+                   target="_blank" rel="noopener">Open current Mint / PkVerify contract</a>`;
+        }
+        dialog(`${row.name} — latest target`,content);
+    }
     async function source(slot) {
         const row=state.document.rows.find(r=>r.slot===slot);
         if (!row) return;
-        if (row.kind!=='lump') return inspect(slot);
         const requestId=++sourceRequest;
+        const profile=state.profile, documentAtStart=state.document;
+        if(profile==='phase1' && (row.kind!=='lump' || row.name==='nstab'))
+            return definitionTarget(row);
+        if (row.kind!=='lump') return inspect(slot);
         root._explicitEditorNavigationClaimed=true;
         const guard=root._captureEditorWriteGuard('open latest Namespace source: '+row.name);
+        const accepts=()=>requestId===sourceRequest && state.profile===profile &&
+            state.document===documentAtStart && guard.accepts();
         try {
+            if(profile==='phase1' && phase1Sources[row.name]) {
+                if(typeof root.openSourceFile!=='function') throw Error('Source editor is unavailable.');
+                return await root.openSourceFile(phase1Sources[row.name],
+                    {accepts,writeGuard:guard,showEditor:true,propagateError:true,
+                        reason:row.name==='ide.Alace'
+                            ? 'The Namespace label is ide.Alace; this source declares ide.Alice. Open the current Alice source without renaming or rebinding the Namespace slot?'
+                            : `Open current editable source for ${row.name}. The assigned Namespace LUMP is unchanged.`});
+            }
             const response=await fetch('/api/lumps/list?abstraction='+encodeURIComponent(row.name)+
                 '&include_archived=1',{cache:'no-store'});
             const catalog=await response.json();
             if (!response.ok || !Array.isArray(catalog)) throw Error(catalog.error || 'Saved LUMP catalog could not be read.');
-            if(requestId!==sourceRequest || !guard.accepts()) return;
+            if(!accepts()) return;
             const time=r=>{
                 if (r.compiled_at == null || r.compiled_at==='') return 0;
                 const n=Number(r.compiled_at);
@@ -211,7 +268,10 @@
             const candidates=catalog.filter(r=>r.abstraction===row.name).sort((a,b)=>
                 time(b)-time(a) || Number(b.lump_version || 0)-Number(a.lump_version || 0));
             const latest=candidates[0];
-            if (!latest) throw Error('No saved revision exists for '+row.name+'.');
+            if (!latest) {
+                if(profile==='phase1' && row.name==='pkverify') return definitionTarget(row);
+                throw Error('No saved revision or current source target exists for '+row.name+'.');
+            }
             if (candidates[1] && time(latest)===time(candidates[1]) &&
                     Number(latest.lump_version)===Number(candidates[1].lump_version))
                 throw Error('The latest saved revision is ambiguous; inspect the repository before opening.');
@@ -228,9 +288,9 @@
                 revision:latest.lump_version
             }},slot);
         } catch(error) {
-            if(requestId!==sourceRequest || !guard.accepts()) return;
-            state.error='Open latest LUMP failed: '+error.message+
-                ' Editor and Namespace placement were not replaced. Inspect the repository and retry.';
+            if(!accepts()) return;
+            state.error='Open latest target failed: '+error.message+
+                ' Editor and Namespace placement were not replaced. Check the target source and retry.';
             render();
         }
     }

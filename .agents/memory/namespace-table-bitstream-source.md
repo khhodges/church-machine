@@ -8,6 +8,18 @@ The Namespace Table is the sole authoritative source of LUMPs and their metadata
 The user reaffirmed this specifically for Phase 1 when rejecting manifests as
 competing sources of truth.
 
+This authority also governs Namespace label navigation, not just image builds.
+A manifest or a hardcoded source-name map must not become a competing authority
+for the target of a Namespace entry.
+
+**Why:** After the Phase 1 label-navigation work, the user reiterated:
+“The manefest is not a truth table, the Namespace is GOD.”
+
+**How to apply:** Derive the target association from the Namespace. Use file
+indexes only to locate that target, never to substitute a catalog-selected
+identity or binding. Preserve access to unfinished editable source without
+mistaking it for executable acceptance.
+
 This applies to failure classification as well as runtime code: an audit must
 not recommend catalog repair or artifact reselection merely because an approved
 Namespace selection lacks an active manifest row.

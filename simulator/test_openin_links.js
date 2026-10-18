@@ -1375,7 +1375,7 @@ trackAsync((async function t21() {
         /function selectUserTab\(id\)[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
             appShellSource));
     assert('T24 opened source files exit saved-LUMP split mode',
-        /function openSourceFile\(path\)[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
+        /function openSourceFile\(path, options\)[\s\S]*?window\.exitSavedLumpEditorMode\(\)/.test(
             appShellSource));
     assert('T24 async open checks its navigation request before committing',
         appLumpsSource.includes(
