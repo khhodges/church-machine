@@ -64,15 +64,15 @@ categories in the proposed eight-way object-kind selector.
 **How to apply:** Do not retain Outform creation or a separate Credential kind
 from the earlier draft. Do not equate all Abstract cases with credentials.
 
-CREATE derives both the object kind and GT type from the supplied object
-definition; neither has a separate caller-supplied selector.
+CREATE derives object kind, GT type, and the Inform GT's DATA/CAPABILITY
+Domain from the supplied object definition; none has a separate caller-supplied selector.
 
 **Why:** The user selected “No—use the kind in the supplied object definition”
 when reviewing object kind, then “Yes—remove the separate GT-type input”
-when reviewing GT type.
+when reviewing GT type, and “Yes—remove the separate Domain input.”
 
-**How to apply:** Remove the redundant kind and GT-type selectors when implementing the
-reviewed interface. This decision does not settle the remaining inputs or
+**How to apply:** Remove the redundant kind, GT-type and Domain selectors when
+implementing the reviewed interface. This decision does not settle the remaining inputs or
 authorize a new object-definition format.
 
 Unfinished Mint must be available as an editable source draft. Implementing

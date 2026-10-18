@@ -24,6 +24,8 @@ The proposed request fields are being reviewed individually. The original
   definition, not a separate caller-supplied kind selector.
 - **GT-type input: removed.** The supplied object definition also determines
   the GT type; the caller does not supply a separate type selector.
+- **Domain input: removed.** For an Inform GT, the supplied definition
+  determines DATA or CAPABILITY; the caller does not pass Domain separately.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
