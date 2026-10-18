@@ -84,6 +84,16 @@ implementation scope for V1.1. Preserve historical evidence as history,
 not the current design; do not silently migrate compiled selectors or infer
 object-specific effects.
 
+DESTROY means destruction of the selected object, not a menu of hide, detach,
+disable or unspecified lifecycle alternatives.
+
+**Why:** The user challenged the unresolved-semantics disclaimer: “Destroy
+means DESTROY??”
+
+**How to apply:** State destruction directly. Keep implementation questions
+separate from that meaning; preserve immutable GT words, the slot-release
+generation rule, and the distinction between a credential and its target.
+
 Mint must acknowledge and own every bit of every immutable GT case and be
 identified up front as the version master, with the complete bit format shown.
 

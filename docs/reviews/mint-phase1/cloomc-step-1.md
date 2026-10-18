@@ -88,12 +88,20 @@ field alone is not a specification of that convention.
 
 ### DESTROY
 
-Destroy or invalidate the selected object according to its defined lifecycle.
-No replacement GT is issued. Detailed destruction semantics remain to be defined.
+**DESTROY destroys the selected object.** It is not a hide, detach or
+temporary-disable operation. It returns completion, not a replacement GT.
 
-Credential creation is a CREATE case; credential invalidation is a DESTROY
-case. Destroying a credential does not implicitly destroy the object it
-accesses. Issued GT words remain immutable.
+- For a Namespace-backed object, release its slot and increment the slot's
+  version before returning the memory object to the free pool. Existing GTs
+  can no longer access the destroyed object through that binding.
+- For an Abstract object, the responsible Abstraction performs destruction
+  through the hierarchy. Its software state enforces that the destroyed
+  object can no longer be used; the Abstract GT has no slot-version field.
+- Destroying a credential destroys that credential, not the separate object
+  it grants access to.
+
+Issued GT words remain immutable. DESTROY acts on the object and its backing
+state/binding; it does not rewrite copies of the GT held elsewhere.
 
 ### Lambda definition and application
 
@@ -155,7 +163,7 @@ DESTROY(targetGT, credential, proof)        → completion
 | Operation | Inputs | Successful result and effects |
 |---|---|---|
 | CREATE | Creation/issuance request; initial content where required; credential and its proof | Deliver the requested Inform, Outform or Abstract GT. Abstract issuance follows the hierarchy of Abstractions. Mint assigns a Namespace slot/version only where required. |
-| DESTROY | Actual GT identifying the target; credential and its proof | Invalidate/destroy the selected object. If releasing a slot, increment its version before returning the memory object to the free pool. Return completion, not a GT. |
+| DESTROY | Actual GT identifying the target; credential and its proof | Destroy the selected object. For a Namespace-backed object, release its slot and increment its version before returning the memory object to the free pool. For an Abstract object, destruction is performed by its responsible Abstraction. Return completion, not a GT. |
 
 The destination is the Namespace bound to this Mint instance. Neither method
 silently switches Namespace. A target GT identifies an object; possession of
@@ -171,8 +179,9 @@ issuance path, not unrestricted packing of caller-supplied Owner/payload bits.
 The result is delivered as an actual GT without requiring a Namespace entry
 for the token itself. For a credential, CREATE includes issuance state and
 delivers its associated proof through the configured recipient-delivery
-binding, not through a public scalar result. DESTROY of a credential records
-its invalidation without implicitly destroying objects accessible through it.
+binding, not through a public scalar result. DESTROY of a credential destroys
+that credential and prevents its further use without destroying objects
+accessible through it.
 NULL is not a successful CREATE result.
 
 ### CREATE request — 12 words
