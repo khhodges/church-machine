@@ -5,6 +5,20 @@ This is not a compiled Mint, a Namespace installation, or runtime acceptance.
 
 ## 1. Mint as a Lambda Calculus Abstraction — definition first
 
+### CREATE — primary definition
+
+CREATE returns an **immutable Golden Token** to access a **new digital object**
+with defined usage permission for:
+
+- Data Read, Write or Execute use;
+- an Enter-only Abstraction;
+- Load or Save Capability Lists;
+- a Thread; or
+- a Namespace.
+
+This programmer-stated definition comes before the proposed elaboration below.
+It does not assign additional permission combinations to Threads or Namespaces.
+
 **Proposed top-level definition for review.** This precedes registers, opcodes,
 helper translation and LUMP layout. It states what Mint means; it does not
 claim that the function bodies below have already been implemented.

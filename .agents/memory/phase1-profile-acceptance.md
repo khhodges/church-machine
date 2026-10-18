@@ -49,6 +49,18 @@ top-level Abstraction definition; allocation and bookkeeping support that produc
 in successful issuance outcomes, and distinguish lifecycle operations that do
 not issue a GT. Do not infer what the programmer's GT must mean or protect.
 
+CREATE's primary definition: returns an immutable Golden Token to access a
+new digital object with defined usage permission for Data Read, Write or
+Execute use, an Enter-only Abstraction, Load or Save Capability Lists, a
+Thread, or a Namespace.
+
+**Why:** The user supplied this definition after rejecting the longer generic
+explanation. Immutability, new-object access and the complete object/use list
+are explicit requirements.
+
+**How to apply:** Put this definition first and retain its scope without
+inventing permission combinations for Threads or Namespaces.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.
