@@ -7,6 +7,7 @@ const Core = require('../namespace-runtime-core');
 const combinedLSProfile = require('./combined-ls-profile');
 const {PROFILE, OPS} = require('./protected-programs');
 const P = require('./protected-policy');
+const counters = require('./execution-counters');
 const states = new WeakMap();
 const need = P.requireThat;
 const machine = (s, action) => {
@@ -114,8 +115,10 @@ class ProtectedCore extends combinedLSProfile(Core) {
                 for (const r of st.plan.privateRanges) {
                     const publicMintEntry = r.base === st.plan.roles.mint.base &&
                         gt === st.plan.roles.mint.enter && (perm === 'E' || perm === null);
+                    // Root identity/activation is not table-as-data authority.
+                    const publicRoot = r.base === 0 && gt === st.plan.root.word0 && perm === null;
                     if (base <= r.base + r.words - 1 && base + limit >= r.base &&
-                        !(publicMintEntry || isMint && r.roles.includes('mint') ||
+                        !(publicMintEntry || publicRoot || isMint && r.roles.includes('mint') ||
                             isVerifier && r.roles.includes('verifier'))) {
                         return {ok: false, fault: 'MINT_PRIVATE'};
                     }
@@ -258,7 +261,8 @@ function writeGate(s, st, address, value) {
         // table, code, registry or allocation while admission is held.
         need(false, 'MINT_EXCLUSION');
     }
-    need(st.allocations.some(a => interval(address, a.base, a.words)), 'MINT_WRITE');
+    need(st.allocations.some(a => interval(address, a.base, a.words)) ||
+        st.plan.publicData?.some(a => interval(address, a.base, a.words)), 'MINT_WRITE');
 }
 
 function protectedOperation(s, st, op) {
@@ -325,6 +329,7 @@ function protectedOperation(s, st, op) {
             c.slot * 4 + i).ok, 'MINT_NSTAB');
         c.old = Array.from(s.memory.slice(c.slot * 4, c.slot * 4 + 4));
         need(c.old.every(v => v === 0), 'MINT_SLOT_HISTORY');
+        counters.tableAccess(st.evidence, 'dataReads');
         c.stage = 'read';
     } else if (op === OPS.CHECK_LIVE_USE) {
         const c = P.context(s, st);
@@ -369,7 +374,9 @@ function protectedOperation(s, st, op) {
         }
         const actual = Array.from(s.memory.slice(c.slot * 4, c.slot * 4 + 4));
         need(P.equal(actual, c.words), 'MINT_READBACK');
+        counters.tableAccess(st.evidence, 'dataWrites');
         need(s.mLoad(c.result, null).ok, 'MINT_RESULT');
+        machine(s, () => { s.memory[2]++; });
         st.usedSlots.add(c.slot);
         st.nextBlock = c.base + c.size;
         st.allocations.push({base: c.base, words: c.size, slot: c.slot, gt: c.result});
@@ -419,7 +426,8 @@ function provision(plan) {
     const st = {plan: p, registry: p.registry, machine: 0, context: null, permit: null,
         poisoned: false, fault: null, admissions: 0, steps: 0, completedWrites: 0,
         usedSlots: new Set(), allocations: [], nextBlock: p.allocationStart, finished: false,
-        lambdaEntries: 0, protectedReturns: 0, comparedWords: 0};
+        lambdaEntries: 0, protectedReturns: 0, comparedWords: 0,
+        evidence: p.evidence?.enabled ? counters.create() : null};
     states.set(s, st);
     // Registry proof is initialized from independent trusted issuance state,
     // never from the client proof buffer.
@@ -462,9 +470,11 @@ function provision(plan) {
         lambdaEntries: st.lambdaEntries, protectedReturns: st.protectedReturns,
         comparedWords: st.comparedWords,
         publications: st.allocations.length, privateDescriptors: p.privateSlots.length,
+        memberCount: s.memory[2],
         result: !st.context && !st.poisoned ? st.lastResult || 0 : 0,
         useConfirmed: !st.context && !st.poisoned && st.lastResult === s.cr[1].word0 &&
             s.dr[3] === 73 && st.allocations.some(a => a.gt === st.lastResult && s.memory[a.base] === 73),
+        ...(st.evidence ? {execution: counters.snapshot(st.evidence)} : {}),
     });
     return Object.freeze({
         status,
@@ -475,6 +485,8 @@ function provision(plan) {
                 const fetch = s._fetchInstruction();
                 need(fetch && fetch.ok !== false, 'MINT_FETCH');
                 const word = s.memory[fetch.addr] >>> 0, d = s.decodeInstruction(word);
+                const before = st.evidence ? counters.before(s) : null;
+                let retired;
                 if (st.context) P.context(s, st,
                     s.parseGT(s.cr[14].word0).index === 15 ? 'verifier' : 'mint');
                 need(![8, 9, 10, 12, 13, 14, 15, 26, 27, 28, 29, 31].includes(d.opcode),
@@ -488,9 +500,10 @@ function provision(plan) {
                         [3, 4].includes(d.crSrc)) {
                         st.context.proofReads = (st.context.proofReads || 0) + 1;
                     }
-                    const result = s.step();
-                    need(result || s.halted, 'MINT_EXECUTION');
+                    retired = s.step();
+                    need(retired || s.halted, 'MINT_EXECUTION');
                 }
+                if (before && !st.poisoned) counters.record(st.evidence, s, before, retired);
                 if (st.context?.stage === 'written') cut(s, st, 'result-written');
                 if (st.context?.stage === 'loaded') cut(s, st, 'loaded');
                 if (st.context?.stage === 'clean') cut(s, st, 'clean');

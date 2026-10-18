@@ -116,6 +116,9 @@ register_suite() {
 register_suite "protected-mint-path-tests" \
     'node --test tests/mint_phase1/protected_runtime.test.js'
 
+register_suite "protected-mint-qualified-tests" \
+    'python3 -m pytest tests/mint_phase1/test_qualified_runtime.py -q'
+
 register_suite "check-stale-cr7" \
     'bash scripts/check_stale_cr7.sh'
 
@@ -536,7 +539,7 @@ ALL_GROUPS["checks"]="check-stale-cr7 check-selftest-lump-stale check-capabiliti
 
 ALL_GROUPS["hardware"]="hardware-sim boot-rom-no-false-halt wukong-boot-rom-guard wukong-fault-sentinel check-ila-probe-names test-check-ila-probe-names wukong-preflight-launcher-tests boot-change-validation"
 
-ALL_GROUPS["protected-mint"]="protected-mint-path-tests"
+ALL_GROUPS["protected-mint"]="protected-mint-path-tests protected-mint-qualified-tests"
 ALL_GROUPS["e2e"]="e2e-tests"
 
 # ---------------------------------------------------------------------------

@@ -43,6 +43,19 @@ new producer/observer against the shared inventory before connecting it. Treat
 real candidate linking and all-entry execution as separate acceptance evidence,
 not something established by the standalone protected-service path.
 
+For combined-profile evidence, distinguish authenticated source-bearing
+candidates from their API-only execution derivatives, and measure both forms.
+Do not transfer an original compiler attestation to bytes changed by compaction.
+
+**Why:** The complete editing form can exceed the approved half-memory budget
+even when the complete API execution form fits. Source-free compilation also
+does not satisfy a save request that claims matching embedded editor source.
+
+**How to apply:** Reuse qualified candidate admission and linking first, retain
+those exact artifacts, then derive and separately hash complete API output.
+Never drop API frames or safeguards to claim fit. Keep startup variants and
+Mallory's intended rejection distinct from a single continuous zero-fault run.
+
 Historical scope: Genesis authorized proposing the minimal missing interfaces
 for review, not implementing them. The proposal is in
 `docs/reviews/mint-phase1/minimal-machine-interfaces.md`.

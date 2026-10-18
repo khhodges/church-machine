@@ -20,6 +20,7 @@ function validate(p) {
         need(seal === s._integrity32(base, authority), 'MINT_PROVISION_DESCRIPTOR');
         entries.set(slot, {base, words: limit + 1, raw: words});
     }
+    need(p.memory[2] === entries.size - 1, 'MINT_PROVISION_COUNT');
     need(equal(entries.get(1)?.raw.slice(0, 2) || [], [0, 1023]) &&
         equal(entries.get(14)?.raw.slice(0, 2) || [], [0, 1023]), 'MINT_PROVISION_NSTAB');
     const privateSlots = [18, 19, 20, 21, 22, 23, 24, 25, 26, 27];
@@ -121,6 +122,19 @@ function validate(p) {
     for (const t of p.threads) {
         need(t.base === entries.get(t.slot).base && t.words === entries.get(t.slot).words,
             'MINT_PROVISION_THREADS');
+    }
+    // Optional qualified Alice data cell. This does not grant data authority:
+    // ordinary R/W capability gates still precede the physical write gate.
+    // No private range, descriptor, instruction or c-list can be opted in.
+    need(!p.publicData || equal(p.publicData.map(r => JSON.stringify(r)),
+        [JSON.stringify({slot: 16, offset: 9, words: 1})]), 'MINT_PROVISION_DATA');
+    if (p.publicData) {
+        const e = entries.get(16), h = e && s.parseLumpHeader(p.memory[e.base]);
+        need(e && h.valid && h.typ === 0 && h.cw >= 9 &&
+            p.memory[e.base + 9] === 0xf0000000 &&
+            !p.privateRanges.some(r => e.base + 9 >= r.base && e.base + 9 < r.base + r.words),
+        'MINT_PROVISION_DATA');
+        p.publicData = [{base: e.base + 9, words: 1}];
     }
     return canonical;
 }

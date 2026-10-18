@@ -3,6 +3,13 @@
 2026-10-17. **Private simulator evidence, not full 17-entry acceptance, live
 installation, a Mint implementation, or hardware qualification.**
 
+**2026-10-18 follow-through:** [Protected Mint with the complete qualified
+Namespace](../mint-phase1/qualified-protected-namespace.md) reuses this linker
+and its corrected candidates in the sealed protected runtime. It adds the
+remaining descriptors, full source/API footprint measurements and explicitly
+separated positive/negative all-entry scenarios. The subset evidence and
+naming-only failure documented here are unchanged.
+
 ## Reproduction
 
 ```sh

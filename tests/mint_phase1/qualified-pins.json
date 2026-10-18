@@ -1,0 +1,27 @@
+{
+  "common": {
+    "profileSha256": "73f2eb89290f525d4d83cc0020d424e3dfa51b9bd55d80e847fdb4c3f156d582",
+    "artifactsSha256": "fd64ca496b2df255bbddf0448f7eacd3ea1b4f5595fba15364f4816aa3ab337f",
+    "bindingsSha256": "bf76cc7139cc63c047b120bbfdf4199c8f9e18232ffb7614395a81797597ef12",
+    "footprint": {
+      "tableWords": 1024,
+      "runtimeStaticWords": 10340,
+      "sourceBearingStaticWords": 30372,
+      "halfMemoryWords": 16384,
+      "namespaceWords": 32768,
+      "allocationStart": 10368,
+      "allocationEnd": 16384,
+      "runtimeFits": true,
+      "sourceBearingFits": false,
+      "aliasExtraWords": 0,
+      "privateBackingWords": 4260
+    }
+  },
+  "images": {
+    "mint": "31653504240a6678a06fef158d749881c4907ca3ecb29d5790917a36a025d6cd",
+    "workload": "b519ebccb5f920691aae35b79028b01ac6b2d553976b228b0489930d9df5355d",
+    "actors": "92564d74c0613ba8e20f56a346ac62e7cba1751bc5ebfa8d3b1bffa19daf6f17",
+    "alice-denied": "505e5a0ab3a83606138514ba891d803a2bcd5278c97f91f0fd923cf5d9326c36",
+    "mallory-denied": "fbb8e1d0b28ebbef83c56a9efc7aa480957ec6d4f825c97c1aa68ae1241a12b8"
+  }
+}

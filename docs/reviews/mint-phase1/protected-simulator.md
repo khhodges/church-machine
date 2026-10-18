@@ -3,6 +3,14 @@
 **Scope: isolated simulator implementation, not full-profile acceptance, live
 installation, production credential custody, RTL or hardware evidence.**
 
+**Complete-set follow-through (2026-10-18):** the standalone evidence below
+remains independently scoped. [Qualified protected Namespace acceptance](qualified-protected-namespace.md)
+now connects it to the existing qualified linker with all 17 approved entries
+and 10 private descriptors, complete API/source measurements and repeated
+full-set scenarios. That report explicitly distinguishes normal operation,
+Mallory's expected rejection, fresh startup variants and the source-bearing
+form's capacity failure.
+
 **Approved LS reconciliation:** the user explicitly chose one GT with combined
 L+S in this isolated profile, rather than separate CR1/CR2 results. Thread-LS
 and LS results therefore retain the single-CR1 ABI and `RETURN #2`. Only the
@@ -244,8 +252,10 @@ shared legacy implementation were changed here. The ordinary RETURN/L-only
 LOAD regressions and the historical 24-check result-containment probe pass;
 the latter still describes the *unrestricted legacy* profile's gaps.
 
-**Full-profile acceptance remains dependent on qualified candidate linking and
-execution of all approved entries.** This implementation does not claim it,
+**This standalone fixture does not establish full-profile acceptance.**
+Qualified linking and complete-set execution are now recorded separately in
+[the combined acceptance report](qualified-protected-namespace.md), not inferred
+from this smaller fixture. This implementation does not by itself
 close hardware gates, provide durable Forge/Revoke custody, authorize new
 recipients/targets, modify any saved LUMP/Namespace, or install/activate an
 image in the IDE.
