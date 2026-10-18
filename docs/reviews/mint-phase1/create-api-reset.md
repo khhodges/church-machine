@@ -56,20 +56,20 @@ bits.
 
 ### Individual case review
 
-Namespace case confirmed by the programmer on 2026-10-18:
+Namespace and Thread cases confirmed individually by the programmer on 2026-10-18:
 
-| Item | Namespace — agreed |
-|---|---|
-| CR4 | LS GT to the source C-list |
-| DR2 | Requested Namespace allocation size |
-| DR3 | NONE |
-| Passkey | Authorizes creation and supplies the memory allowance |
-| Mint action | Allocate the Namespace and populate its slots from the supplied C-list |
-| Contained GTs | Retain their individual permissions; not all required to be LS |
-| Result | Namespace GT, permissions NONE, B=0 |
-| Case selection | CR4 LS selects Namespace creation under this CREATE convention; no separate kind selector |
+| Item | Namespace — agreed | Thread — agreed |
+|---|---|---|
+| CR4 | LS GT to the source C-list | E GT to the application abstraction |
+| DR2 | Requested Namespace allocation size | Requested Thread allocation size |
+| DR3 | NONE | NONE |
+| Passkey | Authorizes creation and supplies the memory allowance | Authorizes creation and supplies the memory allowance |
+| Mint action | Allocate the Namespace and populate its slots from the supplied C-list | Allocate and prime the Thread with Amoeba |
+| Initialization detail | Contained GTs retain their individual permissions; not all required to be LS | Amoeba subsequently starts the application identified by CR4; CR4 is not Amoeba or an existing Thread |
+| Result | Namespace GT, permissions NONE, B=0 | Thread GT, permissions NONE, B=0 |
+| Case selection | CR4 LS selects Namespace creation under this CREATE convention | CR4 E selects Thread creation under this CREATE convention |
 
-This case approval does not settle Data initialization, the detailed Amoeba
+Neither case needs a separate kind selector. These approvals do not settle Data initialization, the detailed Amoeba
 handoff, or approve implementation of the whole register ABI.
 
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by

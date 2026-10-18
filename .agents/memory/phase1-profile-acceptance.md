@@ -168,15 +168,19 @@ target as distinct roles; do not invent the handoff ABI. Keep rounded allocation
 extent. Do not invent a second scalar format for Abstraction creation in place
 of its LUMP.
 
-Do not infer the kind being created solely from CREATE's initialization GT.
+CREATE's Thread case uses CR4 E to select Thread creation under the approved
+CREATE-specific input convention. That GT identifies the application Amoeba
+will start, not an existing Thread or Amoeba itself.
 
-**Why:** For Thread creation, the approved initialization E-GT identifies the
-application Abstraction Amoeba will start, not the new Thread. Confusing those
-roles would misclassify the creation request.
+**Why:** On 2026-10-18 the programmer explicitly confirmed this case, including
+requested Thread size, Passkey allocation authority, Mint's Amoeba priming, and
+a NONE/B=0 result. This resolves the earlier concern about selecting Thread
+creation without an independent kind argument.
 
-**How to apply:** Make the object-definition binding explicit before finalizing
-the executable ABI. Do not silently restore a numeric kind selector or infer
-the kind from permissions to hide this distinction.
+**How to apply:** Preserve this method-specific convention without conflating
+the input application's identity with the new Thread's identity. Do not restore
+a numeric kind selector. The detailed Amoeba handoff and Data-versus-Abstraction
+initialization remain separate unresolved questions.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
