@@ -768,9 +768,9 @@ function smartCompile(options) {
         const src = _smartOptions.source !== undefined
             ? String(_smartOptions.source) : ((document.getElementById('asmEditor') || {}).value || '');
         if (/^\s*abstraction\s+\w+/im.test(src) || /^\s*method\s+\w+/im.test(src)) {
-            lang = 'javascript';
-            if (sel) sel.value = 'javascript';
-            onLangChange(true);
+            // Structured Assembly uses the method-aware compiler, but its
+            // abstraction/method wrappers do not make it JavaScript.
+            lang = 'cloomc';
         } else {
             // Pure raw assembly \u2014 use the assembler path, not the CLOOMC++ compiler.
             try {

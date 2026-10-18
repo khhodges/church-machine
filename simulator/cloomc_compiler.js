@@ -348,6 +348,9 @@ class CLOOMCCompiler {
             } else if (this._detectCLOOMC(cleanSource)) {
                 this._reserveCompilerSelfRow = true;
                 result = this.compileJS(cleanSource, capabilities, compileOptions);
+                if (/^\s*;\s*Language:\s*Assembly\s*$/im.test(cleanSource)) {
+                    result.language = 'assembly';
+                }
             } else if (this._detectAssembly(cleanSource)) {
                 this._reserveCompilerSelfRow = false;
                 result = this.compileAssembly(cleanSource, capabilities, compileOptions);

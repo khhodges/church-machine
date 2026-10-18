@@ -6,9 +6,12 @@ const end=shell.indexOf('// ── Save Source File',start);
 assert.ok(start>=0 && end>start);
 let epoch=0,confirmations=0,view='',allow=true;
 const editor={value:'owned draft',classList:{remove(){}}};
+const selector={value:'javascript'};
+const mintCode='; Language: Assembly\ncurrent Mint';
 const ctx={
-    document:{getElementById:id=>id==='asmEditor'?editor:null,querySelectorAll:()=>[]},
-    fetch:async()=>({ok:true,text:async()=>'current Mint'}),
+    document:{getElementById:id=>id==='asmEditor'?editor:id==='langSelector'?selector:null,querySelectorAll:()=>[]},
+    fetch:async()=>({ok:true,text:async()=>mintCode}),
+    onLangChange(restoring){assert.equal(restoring,true);},
     _captureEditorWriteGuard:()=>{
         const mine=++epoch, text=editor.value;
         return {accepts:()=>epoch===mine && editor.value===text};
@@ -23,11 +26,14 @@ ctx.window=ctx;vm.createContext(ctx);vm.runInContext(shell.slice(start,end),ctx)
     await ctx.openSourceFile('simulator/cloomc/mint.cloomc',
         {writeGuard:guard,accepts:()=>guard.accepts(),showEditor:true});
     assert.equal(epoch,1,'must not cancel the parent navigation with a new epoch');
-    assert.equal(confirmations,1);assert.equal(editor.value,'current Mint');
+    assert.equal(confirmations,1);assert.equal(editor.value,mintCode);
+    assert.equal(selector.value,'assembly');
     assert.equal(view,'editor');
     editor.value='unsaved marker';allow=false;
+    selector.value='haskell';
     await ctx.openSourceFile('another.cloomc',{showEditor:true});
     assert.equal(editor.value,'unsaved marker','reject preserves exact draft');
+    assert.equal(selector.value,'haskell','reject preserves language too');
     const stale=ctx._captureEditorWriteGuard();ctx._captureEditorWriteGuard();
     allow=true;const n=confirmations;
     await ctx.openSourceFile('late.cloomc',{writeGuard:stale});

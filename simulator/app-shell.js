@@ -1110,6 +1110,14 @@ function openSourceFile(path, options) {
             if (typeof updateSaveUserTabBtn === 'function') updateSaveUserTabBtn();
             ed.value = code;
             window._editorSourceFilePath = path;
+            // Explicit source language travels with the document, not the
+            // previously opened editor tab. Change it only after consent.
+            var declaredLanguage = code.match(/^\s*(?:;|\/\/|--)\s*Language:\s*(assembly|cloomc|javascript|haskell|english|lambda|symbolic)\s*$/im);
+            var languageSelector = document.getElementById('langSelector');
+            if (declaredLanguage && languageSelector) {
+                languageSelector.value = declaredLanguage[1].toLowerCase();
+                if (typeof onLangChange === 'function') onLangChange(true);
+            }
             // Show filename in the editor header
             var stem = path.split('/').pop().replace(/\.cloomc$/i, '');
             if (typeof _updateEditorCodeName === 'function') _updateEditorCodeName(stem);

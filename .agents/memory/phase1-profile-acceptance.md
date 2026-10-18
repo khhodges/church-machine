@@ -42,6 +42,17 @@ Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.
 
+Mint's native instruction source must display as Assembly when opened and
+compiled, rather than inheriting JS from another document. Each TODO must
+identify its exact API method and the missing check or operation.
+
+**Why:** The user again reported the wrong language and explicitly required
+method-labelled TODOs and input correctness checks against the API.
+
+**How to apply:** Preserve source language across editor navigation and
+structured-method compilation. Distinguish implemented scalar/permission
+guards from unresolved GT-type, authorization and object-specific checks.
+
 **Why:** The user challenged keeping Mint out of the editor and explicitly
 requested coding each method's API and input/result type checks first.
 
