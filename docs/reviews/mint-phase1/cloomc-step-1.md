@@ -120,7 +120,7 @@ from the machine `LAMBDA` instruction.
 
 Dependencies are captured by the closure; request values are explicit
 arguments. Every free name must have a source definition, parameter or captured
-binding. Concrete bindings and method argument layouts remain to be specified.
+binding. Concrete environment bindings are supplied by the Namespace configuration.
 
 ### Outcomes
 
@@ -128,7 +128,152 @@ Successful issuance delivers `Success(GT, s′)`. DESTROY returns completion
 with updated state. Failure is a hard fault, not a normal rejection return.
 Failure effects must be defined explicitly; rollback is not assumed.
 
-### CLOOMC delivery
+## 2. API — CREATE and DESTROY
+
+**Interface proposal for V1.1 review.** The assignments and request format
+below specify the interface to implement; they are not yet implemented or
+approved by the programmer. They do not add machine instructions.
+
+```text
+CREATE(request, payload, credential, proof) → immutable GT
+DESTROY(targetGT, credential, proof)        → completion
+```
+
+| Operation | Inputs | Successful result and effects |
+|---|---|---|
+| CREATE | Object description; initial content where required; credential and its proof | Create the requested object and deliver its actual GT. Mint assigns any required Namespace slot and version. |
+| DESTROY | Actual GT identifying the target; credential and its proof | Invalidate/destroy the selected object. If releasing a slot, increment its version before returning the memory object to the free pool. Return completion, not a GT. |
+
+The destination is the Namespace bound to this Mint instance. Neither method
+silently switches Namespace. A target GT identifies an object; possession of
+that GT alone does not replace Mint's programmer-authored authorization policy.
+Credential/proof checks execute in Mint/PkVerify software at runtime.
+
+CREATE does not accept a caller-selected slot or generation. Input GTs and
+the returned GT are actual capability values, not integers used as substitutes
+for capability arguments.
+
+For an Abstract value, CREATE delivers the Owner/payload GT without allocating
+a Namespace entry. For a credential, CREATE includes issuance state and
+delivers its associated proof through the configured recipient-delivery
+binding, not through a public scalar result. DESTROY of a credential records
+its invalidation without implicitly destroying objects accessible through it.
+NULL is not a successful CREATE result.
+
+### CREATE request — 12 words
+
+The request is read through a DATA Read capability. All fields are unsigned
+32-bit words; offsets and lengths below are in words. External serialization
+is big-endian. This is a proposed V1.1 record, not a LUMP header.
+
+| Word | Field | Value |
+|---|---|---|
+| 0 | Interface version | `0x00000101` for V1.1. |
+| 1 | Object kind | Codes in the table below. |
+| 2 | GT type | `1` Inform, `2` Outform, `3` Abstract. |
+| 3 | Domain | `0` DATA or `1` CAPABILITY for Inform/Outform; zero for Abstract. |
+| 4 | Permission payload | Three bits `[X,W,R]` or `[E,S,L]` as selected by Domain; zero for Abstract. |
+| 5 | B | Requested Bind bit, `0` or `1`. |
+| 6 | Allocation words | Required local allocation; zero for Outform/Abstract. |
+| 7 | Payload words | Number of initial-content words at payload offset zero; zero when absent. |
+| 8 | Owner | `0–15` for Abstract; zero for Inform/Outform. |
+| 9 | Abstract value | Low 25 bits for an Abstract value; zero for other kinds. Mint assigns credential IDs. |
+| 10–11 | Reserved | Zero. |
+
+| Kind | Object | GT type | Payload |
+|---|---|---|---|
+| 1 | Data | Inform | Initial data words, or no payload for zero-initialized storage. |
+| 2 | Enter-only Abstraction | Inform | Complete executable LUMP. |
+| 3 | Capability List | Inform | Complete C-list object. |
+| 4 | Thread | Inform | Complete Thread object. |
+| 5 | Namespace | Inform | Complete Namespace object. |
+| 6 | Dependency | Outform | Four-word Namespace-format Outform descriptor, including its restore identity. |
+| 7 | Abstract value | Abstract | None; Owner/value are in the request. |
+| 8 | Credential | Abstract | Credential issuance record in the configured Mint credential format. |
+
+Complete objects use their specified object layouts, not new layouts defined
+by this ABI. An allocated object's payload must fit its requested allocation;
+any unused allocated words are initialized to zero. Object creation is not
+activation of a Thread, entry into an Abstraction or a Namespace switch.
+
+Permission fields express the programmer's request. The format does not infer
+a permission set for Threads or Namespaces, predict future GT use, or add
+compiler/loader admission checks. Mint's runtime implementation applies its
+explicit policy and the instructions apply their specified machine checks.
+
+DESTROY uses the target capability directly and has no CREATE request or
+payload. The proof is four readable 32-bit words. Credential issuance record
+layout and recipient-delivery binding must be specified alongside the
+credential implementation; those are not silently supplied by this ABI.
+
+## 3. ABI — call, registers and return
+
+### Method selection
+
+| Method | Source method index | Encoded CALL selector | Register-call spelling |
+|---|---:|---:|---|
+| CREATE | 0 | 1 | `CALL CR0, #0` |
+| DESTROY | 1 | 2 | `CALL CR0, #1` |
+
+The compiler emits the method dispatch table in this order. Encoded selector
+zero is the ISA's direct entry, not another public method. Its Mint entry
+must route through the defined CREATE entry, not bypass that method's body.
+The source indices above are distinct from the mathematical lambda selectors.
+
+### Entry registers
+
+| Register | CREATE | DESTROY |
+|---|---|---|
+| CR0 | Mint Enter GT used for CALL | Mint Enter GT used for CALL |
+| CR1 | No input; result cleared before work | No input; cleared before work |
+| CR2 | Authorization credential | Authorization credential |
+| CR3 | DATA Read capability for four proof words | DATA Read capability for four proof words |
+| CR4 | DATA Read capability for the 12-word request | NULL |
+| CR7 | NULL | Actual target GT |
+| CR8 | DATA Read capability for initial content; NULL if payload length is zero | NULL |
+| CR9–CR11 | No public arguments; Mint scratch | No public arguments; Mint scratch |
+| CR5 / DR5 | Architectural heap capability/cursor; preserve | Same |
+| CR6 | Mint's environment established by CALL | Same |
+| CR12–CR15 | Architectural Thread/reserved/code/Namespace state | Same |
+
+Request, proof and payload start at offset zero of their respective supplied
+views. The readable bounds must cover the declared length. The caller must
+keep input buffers stable until return or hard fault. Private dependencies
+come from Mint's environment, not from incoming scratch registers.
+
+### Successful return
+
+| Result | CREATE | DESTROY |
+|---|---|---|
+| CR1 | Actual issued GT | NULL |
+| DR1 | `1` — completion | `1` — completion |
+| RETURN keep mask | `0x002` — retain current CR1 | `0x000` |
+
+The keep mask preserves the indicated **current** CR value; it does not
+restore the caller's previous value.
+
+- CR0–CR4 and CR7–CR11 are caller-clobbered. Clear them before return except
+  CREATE's CR1 result.
+- Preserve CR5 and DR5. CR6 and CR14 follow architectural CALL/RETURN;
+  CR12 and CR15 remain the current Thread/Namespace; CR13 is untouched.
+- DR0 remains zero. DR2–DR4 and DR6–DR15 are scratch and cleared on successful
+  return. Condition flags are caller-clobbered.
+- A caller must save any live values in clobbered registers before CALL.
+- Mint must likewise preserve its own live values across a nested PkVerify
+  CALL; there is no implicit full-register snapshot.
+
+### Fault behavior
+
+Set DR1 to zero and clear CR1 on entry. A failed operation hard-faults; it does
+not return a failure status, retry, or deliver a partial GT. Success requires
+an actual normal return from this invocation—not an old DR1 value.
+
+No rollback or fault-time cleanup is promised. Interrupted publication must
+not be reported as successful. Runtime faults include inaccessible inputs,
+malformed request framing, failed software authorization and exhausted storage
+or generations. This does not authorize advance interpretation of embedded GTs.
+
+## 4. CLOOMC delivery
 
 The definition is refined into CLOOMC source, compiled into source-bearing
 LUMPs and assigned to the Namespace. The existing IDE must support selecting,
