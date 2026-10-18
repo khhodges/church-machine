@@ -54,12 +54,11 @@ The proposed request fields are being reviewed individually. The original
   request reserves 64 words and requires/deducts 64 words of allowance.
 - **Initialization input: pass a GT with object-specific meaning.**
   For a Namespace, it identifies a preformatted set of slots. For a Thread,
-  the E-GT identifies **the abstraction the Thread will start in**, not a
-  formatter routine to execute. The user further specified that **Mint always
-  primes a Thread with Amoeba** (spelled Amobea in earlier notes). Do not
-  substitute an arbitrary direct entry target for that priming. The relationship
-  between the supplied E-GT and fixed Amoeba priming needs clarification;
-  no extra application handoff is implied.
+  **Mint always primes the Thread with Amoeba** (spelled Amobea in earlier
+  notes). The supplied E-GT identifies **the application abstraction Amoeba
+  will start**, not Amoeba itself or a formatter for Mint to execute.
+  Do not bypass Amoeba by directly starting the application. The handoff's
+  detailed ABI is separate from this agreed division of roles.
   For an Abstraction, the GT identifies its defining LUMP: Abstractions are
   complex structures represented by LUMPs, not reconstructed from a second
   CREATE-specific scalar format.

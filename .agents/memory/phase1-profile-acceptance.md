@@ -124,9 +124,9 @@ is chosen by this rule.
 
 CREATE initialization uses a passed GT with object-specific meaning, not a
 uniform source-buffer copying contract. Namespace input identifies preformatted
-slots; Thread input is the E-GT of its starting abstraction, not a formatter
-routine. The user further specified that Mint always primes a Thread with
-Amoeba; do not bypass that priming with an arbitrary direct entry target.
+slots; Thread input is the E-GT of the application abstraction Amoeba will
+start, not Amoeba itself or a formatter routine. Mint always primes a Thread
+with Amoeba; do not bypass that priming with a direct application entry.
 For an Abstraction, the GT identifies the defining LUMP.
 
 **Why:** The user redirected the review: “lets agree to pass GT instead,” then
@@ -135,11 +135,13 @@ generic buffer framing, not the separate allocation, permissions or Passkey rule
 The user then clarified that Abstractions are complex structures better defined
 by LUMPs and selected “The abstraction the Thread will start in” for the
 Thread's E-GT, then specified “Mint always primes a thread with Amoeba.”
+The user resolved their relationship by selecting “The application abstraction
+Amoeba will start.”
 
 **How to apply:** Do not impose a temporary buffer or retain a redundant content
 length merely from the older proposal. Do not CALL the supplied Thread E-GT
-as an initializer. Reconcile the supplied E-GT's role with fixed Amoeba priming
-before assuming a subsequent application handoff. Keep rounded allocation distinct from readable source
+as an initializer. Preserve the fixed Amoeba priming and supplied application
+target as distinct roles; do not invent the handoff ABI. Keep rounded allocation distinct from readable source
 extent. Do not invent a second scalar format for Abstraction creation in place
 of its LUMP.
 
