@@ -50,12 +50,20 @@ The proposed request fields are being reviewed individually. The original
   is deducted so the count matches the memory reserved. A merely positive but
   insufficient count does not authorize allocation. For example, a 60-word
   request reserves 64 words and requires/deducts 64 words of allowance.
-- **Initial-content-length input: retained.** The caller supplies the length
-  separately, rounded up to a power of two with a minimum of 64 words.
-  **Mint copies shorter initial content and zero-fills the remainder.** The
-  caller need not supply a padded copy, and this contract does not require a
-  temporary buffer. Rounded destination length does not establish readable
-  source length; the actual source extent must be known before copying.
+- **Initialization input: pass a GT with object-specific meaning.**
+  For a Namespace, it identifies a preformatted set of slots. For a Thread,
+  an E-GT identifies the abstraction needed to format the stack frame; the
+  precise initialization sequence is not specified by this statement.
+  The Abstraction case awaits the continuation of the user's description.
+  This direction replaces the generic buffer-copy framing; do not assume
+  an additional temporary buffer or carry a separate content-length field
+  into the final interface without reconciling its purpose.
+  Earlier in this review, a separate power-of-two content length (64 minimum)
+  and Mint-side zero-filling were selected. Those choices must now be
+  reconciled with the object-specific GT input, not imposed as a uniform
+  copying protocol. The separate allocation size, permissions and Passkey
+  requirements remain. Rounded allocation never establishes readable source
+  extent by itself.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.

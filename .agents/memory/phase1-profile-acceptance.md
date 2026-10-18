@@ -114,17 +114,19 @@ rounded allocation for both the allowance check and deduction so accounting
 matches reserved memory. No new Passkey storage format or fault-recovery policy
 is chosen by this rule.
 
-CREATE's initial-content length is supplied separately by the caller and
-follows power-of-two rounding with a minimum of 64 words.
+CREATE initialization uses a passed GT with object-specific meaning, not a
+uniform source-buffer copying contract. Namespace input identifies preformatted
+slots; Thread input is an E-GT for the abstraction needed to format its stack frame.
 
-**Why:** The user retained this input and specified “a number rounded to the
-power rules (64 min),” then selected “Mint copies the shorter content and
-zero-fills the remainder” and questioned the need for a buffer.
+**Why:** The user redirected the review: “lets agree to pass GT instead,” then
+specified Namespace slots and the Thread's E abstraction. This supersedes the
+generic buffer framing, not the separate allocation, permissions or Passkey rules.
 
-**How to apply:** Do not derive this input solely from the object definition.
-Mint supplies zero padding; do not require a caller-padded copy or introduce
-a temporary staging buffer merely to implement rounding. Keep rounded
-destination length distinct from the actual readable source extent.
+**How to apply:** Do not impose a temporary buffer or retain a redundant content
+length merely from the older proposal. Do not infer whether Thread's E-GT is
+called as a formatter or installed as an entry target without reconciling the
+existing Thread contract. Keep rounded allocation distinct from readable source
+extent. Do not invent the unfinished Abstraction case.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
