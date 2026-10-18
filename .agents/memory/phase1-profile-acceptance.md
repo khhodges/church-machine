@@ -97,7 +97,8 @@ generation rule, and the distinction between a credential and its target.
 Mint must work hand in hand with garbage collection.
 
 **Why:** The user explicitly required their API to be designed together, not
-as unrelated allocation and collection services.
+as unrelated allocation and collection services, and requested that their
+interworking be included in the Mint definition.
 
 **How to apply:** Coordinate creation, destruction and binding transitions
 with collection. Keep explicit destruction distinct from unreachable-object

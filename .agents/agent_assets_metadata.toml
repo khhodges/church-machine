@@ -1172,3 +1172,31 @@ mtime_ms = 1792326248181
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4a83d92d-bb86-4060-bae3-37329428583a/2d296d1a-b6da-4138-a5f5-226651b3466c"
 storage_version_token = "1792326274063991"
 content_type = "text/html"
+
+[[outputs]]
+id = "LZd418t_zI2JdmPXZx8c7"
+uri = "file://generated-artifacts/mint-v1.1-gc-interworking-119bdfb750.html"
+type = "html"
+title = "Mint V1.1 — GC interworking — Updated HTML"
+description = "New Section 4 defines Mint/GC responsibilities, collection phases, hierarchy tracing, shared reclamation and fault behavior. Includes a direct section link."
+logical_id = "40d3a544-f810-48b8-b1d7-6e83e98e5fa6"
+content_hash = "sha256:32466398c2170443673af7ce1e1a543772574033e6aec28f6d569a34981db22a"
+size = 31097
+mtime_ms = 1792327897348
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/40d3a544-f810-48b8-b1d7-6e83e98e5fa6/d49f670b-dde8-4744-8ecf-b366ac67119b"
+storage_version_token = "1792327926008787"
+content_type = "text/html"
+
+[[outputs]]
+id = "AzJsebq64VK2ttE3_koxb"
+uri = "file://generated-artifacts/mint-v1.1-gc-interworking-119bdfb750.pdf"
+type = "pdf"
+title = "Mint V1.1 — GC interworking — PDF"
+description = "Printable copy of the updated definition and API proposal for review."
+logical_id = "3489d647-8053-42c2-b8bc-ae27bc5d6cd4"
+content_hash = "sha256:e46e04dbed36344204e3e7b5eff500d18314610ea0cfde4e7b824d7093c57d42"
+size = 87510
+mtime_ms = 1792327914048
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3489d647-8053-42c2-b8bc-ae27bc5d6cd4/906d2814-b8cc-425a-8b66-4e744e960864"
+storage_version_token = "1792327926818718"
+content_type = "application/pdf"

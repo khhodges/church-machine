@@ -3,11 +3,15 @@
 Status: definition for review; implementation not established.
 
 ## 1. Mint as a Lambda Calculus Abstraction
-**Primary functions: CREATE, DESTROY.**
+**Primary lifecycle functions: CREATE, DESTROY.**
 
 **Mint owns every bit of every case of the immutable Golden Token and is
 the version master for its issuance and lifecycle. The GT is Mint's tangible
 product.**
+
+**Mint and garbage collection work together:** GC determines reachability;
+Mint owns destruction, Namespace-binding release, version increments and
+storage reuse. Their interworking contract is defined in Section 4.
 
 The programmer defines how a GT is used and what it protects. GT meaning is
 not evaluated in advance; machine checks apply when instructions execute.
@@ -100,6 +104,11 @@ temporary-disable operation. It returns completion, not a replacement GT.
 - Destroying a credential destroys that credential, not the separate object
   it grants access to.
 
+Destruction ends the object's lifetime, not just its current residence.
+Releasing a slot alone is insufficient: resolution must not restore the
+destroyed object as live elsewhere. The responsible Abstraction maintains
+that lifetime decision. Failure to establish destruction is not completion.
+
 Issued GT words remain immutable. DESTROY acts on the object and its backing
 state/binding; it does not rewrite copies of the GT held elsewhere.
 
@@ -138,6 +147,10 @@ from the machine `LAMBDA` instruction.
 - **Allocation and object storage:** metadata and backing storage.
 - **Credential state and issuance inputs:** registry, proof and administrative inputs.
 - **Working and result storage:** invocation data and GT delivery.
+- **Collection coordination:** GC cycle state, a scheduler safe-point binding,
+  and the common allocation/lifetime records used for reclamation.
+- **Owning Abstractions:** explicit bindings for tracing references and
+  destroying Abstract objects through their hierarchy.
 
 Dependencies are captured by the closure; request values are explicit
 arguments. Every free name must have a source definition, parameter or captured
@@ -302,7 +315,167 @@ not be reported as successful. Runtime faults include inaccessible inputs,
 malformed request framing, failed software authorization and exhausted storage
 or generations. This does not authorize advance interpretation of embedded GTs.
 
-## 4. CLOOMC delivery
+## 4. Mint and garbage collection
+
+This section defines their interworking contract for review, not an implemented
+collector or new machine instructions. CREATE/DESTROY retain their proposed
+ABI above. MakeOutform/MakeInform and the GC interfaces below have semantic
+contracts here; their method selectors and register ABI are not yet assigned.
+
+### Responsibilities
+
+| Component | Responsibility |
+|---|---|
+| Mint | Issue GTs; create and destroy objects; establish/release local bindings; manage slot versions and the allocation/free pool. |
+| GC | Establish a consistent collection scope, trace reachable objects, identify unreachable candidates, and request reclamation through Mint. |
+| Owning Abstraction | Define its Abstract objects' references and destruction effects. Maintain their lifetime state without interpreting their payload as an Inform slot/version. |
+| Scheduler/root providers | Establish the safe point and expose the complete authorized root set for the collection scope. |
+
+Mint and GC use the same authoritative allocation and object-lifetime records.
+GC does not have a second allocator, increment versions independently, or
+derive authority from an object name, mark bit or caller-provided integer.
+Their required capabilities are explicit configured bindings, not ambient
+access to registers, protected Thread state or arbitrary Namespace memory.
+
+### Lifecycle versus representation
+
+Authorization arguments are omitted from these signatures for readability;
+the operations remain subject to their configured runtime authority.
+
+| Mint operation | Result | Relationship to collection |
+|---|---|---|
+| `CREATE(request, payload)` | New GT | Initialize the object and its allocation/tracing metadata before publishing the GT. Publication to the caller must be protected from an intervening collection. |
+| `DESTROY(objectGT)` | Completion | Kill the selected object, even if GT copies remain. Use the common reclamation path; remove its live allocation record when release completes. GC must not later free it a second time. |
+| `MakeOutform(objectGT)` | Outform GT | Preserve the same living object's identity in a resolvable form. If local backing storage is released, establish its preserved representation first and use Mint's binding-release path. |
+| `MakeInform(outformGT)` | Inform GT | Resolve the same living object and establish/reuse its valid local binding. Register any new allocation before returning its GT. Never resurrect a destroyed object. |
+
+MakeOutform does not by itself establish that all local users have stopped
+using the object's storage. Storage release requires that condition as well
+as preservation of the object. MakeInform uses the destination slot's retained
+generation; it does not copy a stale source generation.
+
+These representation operations do not rewrite existing GT copies. They
+return the required GT form and update the applicable binding records.
+Their applicability to an Abstract object is defined by its owning
+Abstraction, not assumed for every type-11 payload.
+
+### GC interface and cycle
+
+| GC operation | Result | Contract |
+|---|---|---|
+| `SCAN(scopeGT)` | Cycle handle | Acquire the configured safe point, establish roots and mark all objects reachable in the scope. Return only when tracing is complete. |
+| `IDENTIFY(cycle)` | Candidate count | Identify unreachable owned objects and unused local bindings. Retain the candidate set privately in GC. |
+| `CLEAR(cycle)` | Reclaimed-object, slot and word counts | Process that candidate set through Mint's destruction or binding-release path, according to what is owned locally. |
+| `FLIP(cycle)` | Completion | After successful CLEAR, toggle GC polarity, retire the cycle handle and release the safe point. |
+
+The handle identifies private GC cycle state and its exact scope, not a
+caller's claim of unreachability. Operations must follow the order
+SCAN → IDENTIFY → CLEAR → FLIP. Wrong-scope, stale or out-of-order calls
+hard-fault before reclamation. Marking/polarity lives in collection metadata,
+not newly assigned GT bits.
+
+For this initial contract, graph-changing execution is excluded throughout
+the cycle, apart from GC's specified reclamation. Mint CREATE, explicit
+DESTROY and representation changes cannot interleave with scanning/sweeping.
+The safe point is scheduler-coordinated; it does not imply a new HALT
+instruction or an undocumented right to read protected state.
+
+### Roots and tracing through the Abstraction hierarchy
+
+The root set includes live Thread/register capabilities, stacks, retained
+capabilities, protected runtime objects and references entering from outside
+the collection scope. The Namespace's inventory of allocated entries is
+**not** itself the root set.
+
+The owning Abstraction provides an internal contract:
+
+```text
+TRACE(objectGT, visitor) → completion
+```
+
+TRACE reports the outgoing object references that keep other objects alive,
+using an authorized, read-only traversal. It must not allocate, change the
+graph or retain the collection visitor for later use. GC handles repeated
+references/cycles without treating a second visit as a new object.
+
+A scalar Abstract value may report no references; an Abstract object with
+backing state may report several. Missing owner/TRACE bindings are not
+evidence that an object has no references. GC does not scan arbitrary DATA
+words as GTs or guess references from an Abstract payload.
+
+If complete roots, external-reference accounting or tracing cannot be
+established, collection hard-faults before CLEAR. Being unmarked after an
+incomplete scan is never permission to destroy an object.
+
+### Shared reclamation path
+
+Mint provides two internal actions, not two competing implementations:
+
+1. **Destroy object:** end the selected object's lifetime through its owning
+   authority, then release its bindings and resources.
+2. **Release local binding:** remove a local reference/representation without
+   killing an object that remains alive elsewhere.
+
+GC CLEAR requests the first only for unreachable objects owned by its scope.
+For an unused Outform entry referencing an object elsewhere, it requests the
+second. Collecting that entry does not authorize destruction of the remote
+or preserved object.
+
+Both actions use the same release procedure:
+
+1. Establish the required runtime authority and absence of active use of the
+   storage being released. Reachability evidence does not bypass these checks.
+2. Retire each released binding and increment its slot generation exactly once,
+   before its memory can return to the free pool.
+3. Zero the complete reclaimed memory block, including unused capacity, before
+   reuse. Do not release backing storage still used by another live binding.
+4. Commit the release in the shared allocation records and return reusable
+   storage to the free pool. A generation-511 slot remains retired even when
+   its former memory is reusable.
+
+Abstract-object destruction without a Namespace slot uses the owner's
+lifetime records; no slot-version increment is invented for its GT.
+Destruction callbacks must not resurrect objects or publish new references
+into the frozen collection graph.
+
+### Normal interworking sequence
+
+```text
+Caller → Mint.CREATE
+    Mint initializes object + tracing/allocation records
+    Mint publishes GT to caller
+
+GC.SCAN(scope)
+    establish safe point and complete roots
+    traverse owned objects through TRACE
+GC.IDENTIFY(cycle)
+    retain unreachable objects / unused bindings as private candidates
+GC.CLEAR(cycle) → Mint
+    destroy unreachable owned objects, or release unused local bindings
+    increment released-slot versions; clear and reclaim memory
+GC.FLIP(cycle)
+    retire cycle and resume graph-changing execution
+```
+
+Explicit DESTROY does not wait for an object to become unreachable. It still
+requires safe destruction and must not reclaim executing code, an active
+Thread or storage still in active use. If that cannot be established, it
+hard-faults without reporting success.
+
+A collection fault is a hard fault, not an automatic retry or rollback.
+Already-completed releases remain completed; incomplete releases are not
+eligible for reuse. A failed cycle must not FLIP or report successful
+completion, and its partial marks must never authorize a later sweep.
+
+### Implementation boundary
+
+Before implementing this contract, bind the safe-point/root interfaces,
+the hierarchy TRACE/destruction calls, the cycle-handle representation and
+GC method ABI explicitly. Define how preserved/remote lifetime decisions
+are checked before MakeInform can succeed. None of these interfaces permits
+hidden JavaScript service work or synthetic evidence of authority.
+
+## 5. CLOOMC delivery
 
 The definition is refined into CLOOMC source, compiled into source-bearing
 LUMPs and assigned to the Namespace. The existing IDE must support selecting,
