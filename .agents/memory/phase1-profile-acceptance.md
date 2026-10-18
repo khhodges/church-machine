@@ -83,6 +83,18 @@ caller-supplied numeric input.
 **How to apply:** Do not restore the old independent Owner field when defining
 CREATE's reviewed interface.
 
+Do not expose every encoded GT field as a separate CREATE argument. The
+agent's raw Abstract-payload input proposal was withdrawn as unjustified.
+
+**Why:** The user asked “Too complex where did it come from??” when presented
+with the proposed raw-payload decision. Its origin was the agent's scalar
+request draft, not a user requirement.
+
+**How to apply:** Start from the supplied GT/LUMP and established allocation,
+permission and Passkey requirements. Distinguish executable Abstraction LUMPs
+from Abstract GT interpretation; do not infer a new payload protocol or alter
+the GT encoding from withdrawal of an API proposal.
+
 CREATE retains a separate requested-permissions input. Threads and Namespaces
 always use NONE. Church choices are E, LS or L only, not S alone.
 Data choices are RW, R or W only, with no Execute. Permission choices are

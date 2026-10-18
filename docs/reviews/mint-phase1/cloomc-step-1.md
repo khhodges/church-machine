@@ -28,6 +28,12 @@ The proposed request fields are being reviewed individually. The original
   determines DATA or CAPABILITY; the caller does not pass Domain separately.
 - **Owner input: removed.** Abstract GT Owner is derived from the owning
   abstraction, not supplied as an independent numeric input.
+- **Raw Abstract-payload input: proposal withdrawn.** The agent had exposed
+  an internal 25-bit GT field as a separate CREATE parameter without establishing
+  a requirement for it. The user questioned that complexity and its origin.
+  Do not treat this as approval of a new payload-generation protocol or a GT
+  encoding change. Abstraction LUMP initialization and Abstract GT interpretation
+  are distinct concerns.
 - **Permissions input: retained.** The caller passes requested permissions,
   restricted by the object category rather than an arbitrary three-bit value.
   Thread and Namespace permissions are always NONE.
