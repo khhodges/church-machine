@@ -26,6 +26,8 @@ The proposed request fields are being reviewed individually. The original
   the GT type; the caller does not supply a separate type selector.
 - **Domain input: removed.** For an Inform GT, the supplied definition
   determines DATA or CAPABILITY; the caller does not pass Domain separately.
+- **Owner input: removed.** Abstract GT Owner is derived from the owning
+  abstraction, not supplied as an independent numeric input.
 - **Permissions input: retained.** The caller passes requested permissions,
   restricted by the object category rather than an arbitrary three-bit value.
   Thread and Namespace permissions are always NONE.
@@ -53,8 +55,11 @@ The proposed request fields are being reviewed individually. The original
 - **Initialization input: pass a GT with object-specific meaning.**
   For a Namespace, it identifies a preformatted set of slots. For a Thread,
   the E-GT identifies **the abstraction the Thread will start in**, not a
-  formatter routine to execute. Amobea retains ownership of initialization
-  and uses that entry target when preparing the initial stack frame.
+  formatter routine to execute. The user further specified that **Mint always
+  primes a Thread with Amoeba** (spelled Amobea in earlier notes). Do not
+  substitute an arbitrary direct entry target for that priming. The relationship
+  between the supplied E-GT and fixed Amoeba priming needs clarification;
+  no extra application handoff is implied.
   For an Abstraction, the GT identifies its defining LUMP: Abstractions are
   complex structures represented by LUMPs, not reconstructed from a second
   CREATE-specific scalar format.

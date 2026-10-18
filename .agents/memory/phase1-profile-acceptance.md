@@ -75,6 +75,14 @@ when reviewing GT type, and “Yes—remove the separate Domain input.”
 implementing the reviewed interface. This decision does not settle the remaining inputs or
 authorize a new object-definition format.
 
+Abstract GT Owner is derived from its owning abstraction, not a separate
+caller-supplied numeric input.
+
+**Why:** The user selected “Yes—derive Owner from the owning abstraction.”
+
+**How to apply:** Do not restore the old independent Owner field when defining
+CREATE's reviewed interface.
+
 CREATE retains a separate requested-permissions input. Threads and Namespaces
 always use NONE. Church choices are E, LS or L only, not S alone.
 Data choices are RW, R or W only, with no Execute. Permission choices are
@@ -117,7 +125,8 @@ is chosen by this rule.
 CREATE initialization uses a passed GT with object-specific meaning, not a
 uniform source-buffer copying contract. Namespace input identifies preformatted
 slots; Thread input is the E-GT of its starting abstraction, not a formatter
-routine. Amobea retains initialization ownership.
+routine. The user further specified that Mint always primes a Thread with
+Amoeba; do not bypass that priming with an arbitrary direct entry target.
 For an Abstraction, the GT identifies the defining LUMP.
 
 **Why:** The user redirected the review: “lets agree to pass GT instead,” then
@@ -125,12 +134,12 @@ specified Namespace slots and the Thread's E abstraction. This supersedes the
 generic buffer framing, not the separate allocation, permissions or Passkey rules.
 The user then clarified that Abstractions are complex structures better defined
 by LUMPs and selected “The abstraction the Thread will start in” for the
-Thread's E-GT.
+Thread's E-GT, then specified “Mint always primes a thread with Amoeba.”
 
 **How to apply:** Do not impose a temporary buffer or retain a redundant content
 length merely from the older proposal. Do not CALL the supplied Thread E-GT
-as an initializer; it supplies the initial execution target under the existing
-Thread frame contract. Keep rounded allocation distinct from readable source
+as an initializer. Reconcile the supplied E-GT's role with fixed Amoeba priming
+before assuming a subsequent application handoff. Keep rounded allocation distinct from readable source
 extent. Do not invent a second scalar format for Abstraction creation in place
 of its LUMP.
 
