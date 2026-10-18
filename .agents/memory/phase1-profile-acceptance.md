@@ -76,15 +76,15 @@ implementing the reviewed interface. This decision does not settle the remaining
 authorize a new object-definition format.
 
 CREATE retains a separate requested-permissions input. Threads and Namespaces
-always use NONE. Permission choices are category-specific, not unrestricted bits.
+always use NONE. Church choices are E, LS or L only, not S alone.
+Permission choices are category-specific, not unrestricted bits.
 
 **Why:** The user explicitly retained this input and said “Threads and Namespace
 are always NONE.” Data was specified as “all or one (R or W)” and Church as
-“E or LS or L or E.”
+“E or LS or L or E,” then explicitly clarified to “E, LS and L only.”
 
-**How to apply:** Preserve those restrictions. Do not infer the meaning of Data
-“all” or silently change the repeated Church E to S; obtain clarification before
-encoding either choice.
+**How to apply:** Preserve those restrictions; do not add S alone for Church.
+Obtain clarification of Data “all” before encoding that choice.
 
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
