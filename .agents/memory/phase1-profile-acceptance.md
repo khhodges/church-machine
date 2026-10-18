@@ -100,6 +100,20 @@ The user's question about whether CALL always clears B is not approval to alter
 CALL; reconcile the specification before relying on automatic clearing. B=0
 does not replace Passkey authorization; see [Passkey rules](top-security-passkeys.md).
 
+CREATE takes allocation size separately from the caller, subject to the
+Passkey's remaining memory count covering it; allocation adjusts that count.
+Allocation sizes are always rounded up to a power of two.
+
+**Why:** The user retained the size input, qualified by “provided the Passkey
+still has positive memory count to match, the count is adjusted accordingly.”
+The user then specified “always rounded to power of 2.”
+
+**How to apply:** Do not treat Passkey validation as an unlimited allocation
+grant or accept a positive balance too small to cover the allocation. Use the
+rounded allocation for both the allowance check and deduction so accounting
+matches reserved memory. No minimum block size, new Passkey storage format,
+or fault-recovery policy is chosen by this rule.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.

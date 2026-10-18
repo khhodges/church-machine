@@ -44,6 +44,12 @@ The proposed request fields are being reviewed individually. The original
   not only CREATE. B=0 blocks binding through SAVE; it is not a substitute for
   Passkey validation before the protected operation. This is an intended
   contract, not evidence that existing method implementations enforce it.
+- **Allocation-size input: retained.** The caller supplies the size separately.
+  Allocation sizes are always rounded up to a power of two. The Passkey's
+  remaining memory count must cover the rounded allocation; that same quantity
+  is deducted so the count matches the memory reserved. A merely positive but
+  insufficient count does not authorize allocation. For example, a 60-word
+  request reserves 64 words and requires/deducts 64 words of allowance.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
