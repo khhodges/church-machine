@@ -39,6 +39,32 @@ def test_new_geometry_exact_pins_and_api_allocations(store):
     assert p["activationAllowed"] is False and p["buildReady"] is False
 
 
+@pytest.mark.parametrize("phase1", [False, True])
+def test_saved_state_evidence_tracks_files_without_automatic_save(store, phase1):
+    store.phase1 = phase1
+    legacy_before = store.legacy_path.read_bytes()
+    generated = store.read()
+    assert generated["persisted"] is False
+    assert not store.path.parent.exists(), "Reading defaults must not create saved state"
+    assert store.read() == generated
+
+    # Even identical default content is saved only after an explicit save.
+    saved = store.save(dict(fingerprint=generated["fingerprint"],
+                            document=generated["document"]))
+    assert saved["persisted"] is True
+    reopened = DesignStore(store.path, store.lumps, store.legacy_path, phase1=phase1).read()
+    assert reopened["persisted"] is True
+    assert reopened["document"] == generated["document"]
+    assert reopened["fingerprint"] == generated["fingerprint"]
+
+    store.path.unlink()
+    missing = store.read()
+    assert missing["persisted"] is False
+    assert missing["document"] == generated["document"]
+    assert not store.path.exists(), "Missing saved state must not be silently restored"
+    assert store.legacy_path.read_bytes() == legacy_before
+
+
 def test_unfinished_add_edit_save_reload_clear_and_stale_tab(store):
     before = store.legacy_path.read_bytes()
     original = store.read()

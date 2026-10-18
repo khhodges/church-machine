@@ -6,7 +6,7 @@
         c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const hex = n => n == null ? 'Unresolved' : '0x' + n.toString(16).toUpperCase().padStart(8,'0');
     const state = {active:true, loading:false, saving:false, document:null, fingerprint:null,
-        projection:null, error:'', dirty:false};
+        projection:null, persisted:null, error:'', dirty:false};
     const endpoint = '/api/namespace/design-v1';
     state.profile = 'ascending';
     const profileKey = 'church_namespace_design_profile';
@@ -41,6 +41,7 @@
         state.document = clone(data.document);
         state.fingerprint = data.fingerprint;
         state.projection = data.projection;
+        state.persisted = typeof data.persisted === 'boolean' ? data.persisted : null;
         state.dirty = false;
         state.error = '';
     }
@@ -64,7 +65,7 @@
         state.active = value !== 'legacy';
         if (state.active && value !== state.profile) {
             Object.assign(state, drafts[value] || {document:null, fingerprint:null,
-                projection:null, error:'', dirty:false, loading:false, saving:false},
+                projection:null, persisted:null, error:'', dirty:false, loading:false, saving:false},
                 {profile:value, active:true});
         }
         try { root.localStorage.setItem(profileKey, value); }
@@ -90,7 +91,7 @@
         if (capacity) capacity.hidden = true;
         if (!state.document) {
             host.innerHTML = state.error ? `<p role="alert">${esc(state.error)}</p><button onclick="NamespaceDesignV1.load()">Retry</button>` :
-                '<p>Loading new-format Namespace design…</p>';
+                `<p>Loading ${esc(profileLabel())} Namespace design…</p>`;
             if (!state.loading && !state.error) load();
             return;
         }
@@ -102,6 +103,24 @@
         const rows=state.document.rows;
         return {counts:{max:slotCount(),assigned:rows.length,resident:rows.filter(r=>r.policy!=='Lazy').length,
             lazy:rows.filter(r=>r.policy==='Lazy').length,garbage:0,free:slotCount()-1-rows.length}};
+    }
+    function profileLabel() {
+        return state.profile === 'phase1' ? 'Phase 1' : 'Ascending layout';
+    }
+    function designStatus() {
+        const origin = state.persisted === true
+            ? 'Loaded from a saved design in this environment.'
+            : state.persisted === false
+                ? 'No saved design file was found for this profile in this environment. These are generated defaults, not recovered user work.'
+                : 'Saved-state evidence is unavailable; this design is not confirmed saved.';
+        const label = state.dirty ? 'Unsaved local draft'
+            : state.persisted === true ? 'Saved design'
+            : state.persisted === false ? 'Generated defaults — not saved' : 'Saved status unknown';
+        return `<div id="namespaceDesignStatus" role="status" style="margin:0 0 10px;padding:10px;border:1px solid #6b5320;border-radius:4px">
+            <strong>${esc(profileLabel())} · ${label}</strong>
+            <div>${origin}${state.dirty ? ' Local changes have not been saved.' : ''}
+            ${state.dirty || state.persisted === false ? 'Use Bind Namespace Design to save explicitly; nothing is saved automatically.' : ''}
+            Design only — not installed.</div></div>`;
     }
     function renderRows(html, host) {
         const d=state.document, p=state.projection;
@@ -136,7 +155,7 @@
         }
         html+='</tbody></table><p id="nsSaveLayoutNote" role="status"></p>';
         if(state.profile==='phase1') html+=`<p>Phase 1: slot 0 metadata · 1 self · 2 entry Thread · 8 UART · 9 ide.Mint (requested E) · 14 nstab (requested RW) · 15 pkverify (requested E). Requested rights are design intent, not granted capabilities.</p><label>Total slots (including metadata) <input type="number" min="16" max="4096" value="${slotCount()}" onchange="NamespaceDesignV1.capacity(this.value)" ${state.saving?'disabled':''}></label><p>${slotCount()*4} table words / ${slotCount()*16} bytes · CR15 table-only limit ${slotCount()*4-1}. Unfinished placements remain non-executable.</p>`;
-        host.innerHTML=html;
+        host.innerHTML=designStatus()+html;
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
         saveButton.textContent='Bind Namespace Design';
