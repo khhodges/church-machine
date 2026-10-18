@@ -21,14 +21,27 @@ used consistently for the new Namespace authority, compiler-owned SELF,
 Thread/boot capabilities, code capabilities, dynamic data aliases, and lazy
 name-resolution capabilities.
 
-**Why:** Reissuing an entry increments its descriptor generation without
-changing its slot. Hardcoding sequence zero can either create an immediately
+**Why:** Releasing a slot increments its generation; reissue uses the retained
+generation. Hardcoding sequence zero can either create an immediately
 nonmatching local binding or incorrectly accept a binding for a different occupant.
 
 **How to apply:** Select the issued sequence once before committing a reused
 slot, then propagate that same value through its W1 and every GT minted for it.
 After commit, read W1[29:21] as the authority; never treat a slot number as
 sufficient identity.
+
+Every slot release increments its version before the memory object returns
+to the free pool. Existing immutable GTs cease to grant access through the
+released binding; their bits and reference identity are not rewritten.
+
+**Why:** During Mint V1.1 review, the user clarified: “Version is always
+incremented if the slot is released so the memory object is not longer
+accessable and can retrun to the free pool.”
+
+**How to apply:** Apply the same rule to release by REPLACE or DESTROY.
+Increment at release, retain the generation, and do not increment again on
+reuse. For V1.1, do not wrap or reset the generation; slot retirement and
+memory returning to the free pool are distinct.
 
 Clearing an assignment must preserve its saved LUMP for later explicit
 assignment to another eligible slot, including after a restart. Catalog

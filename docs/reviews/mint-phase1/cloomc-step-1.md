@@ -3,7 +3,7 @@
 Status: definition for review; implementation not established.
 
 ## 1. Mint as a Lambda Calculus Abstraction
-**Primary functions: CREATE, REPLACE, DESTROY.**
+**Primary functions: CREATE, DESTROY.**
 
 **Mint owns every bit of every case of the immutable Golden Token and is
 the version master for its issuance and lifecycle. The GT is Mint's tangible
@@ -51,10 +51,12 @@ versions; it never increments them.
 
 - Ordinary issued versions: **0–510**. Version **511** retires a slot.
 - A never-used slot starts at 0.
-- Authorized release advances the generation before freeing.
+- Every slot release increments its version before the memory object returns
+  to the free pool. Existing GTs retain their bits but no longer grant access
+  to that memory object through the released slot.
 - Reallocation uses the retained generation without another increment.
 - For V1.1, generations never wrap or reset on reuse.
-- Direct REPLACE generation policy remains to be defined.
+- DESTROY follows this version-increment rule whenever it releases a slot.
 - Abstract GTs use their Owner/payload lifecycle, not an Inform/Outform version.
 
 ### CREATE — primary definition
@@ -71,11 +73,6 @@ with defined usage permission for:
 CREATE delivers the GT itself. Allocation, initialization, verification and
 Namespace bookkeeping support that result.
 
-### REPLACE
-
-Replace the selected object according to its defined lifecycle and return
-the resulting immutable GT. Detailed replacement semantics remain to be defined.
-
 ### DESTROY
 
 Destroy or invalidate the selected object according to its defined lifecycle.
@@ -90,14 +87,12 @@ accesses. Issued GT words remain immutable.
 ```text
 Mint ≜ λγ. λm.
     m (λa. λs. CreateBody  γ a s)
-      (λa. λs. ReplaceBody γ a s)
       (λa. λs. DestroyBody γ a s)
 
 ide.Mint ≜ Mint ΓMint
 
-selectCreate  ≜ λc. λr. λd. c
-selectReplace ≜ λc. λr. λd. r
-selectDestroy ≜ λc. λr. λd. d
+selectCreate  ≜ λc. λd. c
+selectDestroy ≜ λc. λd. d
 
 (((ide.Mint selectCreate) a) s)
     →β* CreateBody ΓMint a s
@@ -107,7 +102,7 @@ selectDestroy ≜ λc. λr. λd. d
 | Symbol | Meaning |
 |---|---|
 | `γ`, instantiated as `ΓMint` | Mint's captured environment: its dependencies and accessible storage. |
-| `m` | CREATE, REPLACE or DESTROY selector. |
+| `m` | CREATE or DESTROY selector. |
 | `a` | The selected operation's explicit arguments. |
 | `s`, `s′` | State before and after evaluation, expressed mathematically—not raw-memory arguments or new access authority. |
 

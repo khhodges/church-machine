@@ -61,16 +61,17 @@ are explicit requirements.
 **How to apply:** Put this definition first and retain its scope without
 inventing permission combinations for Threads or Namespaces.
 
-Mint's primary public functions are CREATE, REPLACE and DESTROY. Fold the
-earlier Forge/Revoke naming into credential creation/destruction cases rather
-than keeping extra public verbs.
+For Phase 1 (V1.1), Mint's only primary public functions are CREATE and
+DESTROY. REPLACE is outside this phase. Credential creation/destruction
+are cases of these functions, not extra Forge/Revoke public verbs.
 
-**Why:** The user requested this primary-function list directly under “1. Mint”
-and questioned the need for Forge alongside Create and Revoke alongside Destroy.
+**Why:** The user narrowed the scope explicitly: “For Phase 1.1 we dont need
+REPLACE, just CREATE and DESTROY.”
 
-**How to apply:** Use the three-function definition in the current review.
-Preserve historical five-method evidence as history, not the current design;
-do not silently migrate compiled selectors or infer object-specific effects.
+**How to apply:** Use the two-function definition, lambda selectors and
+implementation scope for V1.1. Preserve historical evidence as history,
+not the current design; do not silently migrate compiled selectors or infer
+object-specific effects.
 
 Mint must acknowledge and own every bit of every immutable GT case and be
 identified up front as the version master, with the complete bit format shown.
