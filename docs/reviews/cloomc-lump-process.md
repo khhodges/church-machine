@@ -22,6 +22,9 @@ translating host helpers, listing opcodes or assigning registers.
 
 First deliver:
 
+- The Abstraction's purpose and tangible product, stated before supporting
+  mechanisms. For Mint, that product is a Golden Token delivered to its
+  recipient—not allocation, bookkeeping or a success flag.
 - The Abstraction as a lambda expression, its formal parameters and body
   meaning; distinguish a top-level specification from a fully expanded term.
 - The captured environment, explicit arguments and every remaining free name.
@@ -45,7 +48,8 @@ Then deliver:
   grants. Existing service-specific restrictions are not automatically retained.
 
 **Review, in order:** Is this the intended Lambda Calculus Abstraction?
-Are its environment, application semantics and effects correct? Does the
+Is its tangible product explicit? Are its environment, application semantics
+and effects correct? Does the
 proposed implementation boundary preserve that definition, with
 programmer-owned runtime policy and no hidden service implementation?
 

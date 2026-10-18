@@ -9,12 +9,34 @@ This is not a compiled Mint, a Namespace installation, or runtime acceptance.
 helper translation and LUMP layout. It states what Mint means; it does not
 claim that the function bodies below have already been implemented.
 
-Mint is an Abstraction whose application selects an operation in its captured
-environment and evaluates that operation on the supplied arguments. Its
-observable result is a returned value and the resulting state, or a hard fault.
-It creates and manages objects and issues/revokes credentials according to
-its programmer-defined runtime policy. It is not a host allocator or an
-instruction that performs those services on behalf of software.
+**Mint is the Abstraction that produces and delivers Golden Tokens. The
+Golden Token is its tangible product.** A successful issuance application
+must deliver the actual GT to its recipient—not merely allocate an object,
+write a Namespace entry, return a status flag or report a token-shaped number.
+
+Allocation, initialization, Namespace bookkeeping and verification support
+that product; they are not the top-level definition of Mint. Its environment
+and arguments supply the dependencies and inputs for producing the GT under
+the programmer's runtime policy. The programmer determines how the GT works
+and what it protects; the definition introduces no advance interpretation
+or enforcement of its meaning.
+
+The primary successful Create application is therefore specified as:
+
+```text
+(((ide.Mint selectCreate) request) s) ⇓ Success(GT, s′)
+```
+
+Here `GT` is the delivered Golden Token; `s′` records the supporting state
+effects. `⇓` denotes successful evaluation, not a new instruction or evidence
+that the implementation exists. A failed application hard-faults rather than
+producing a substitute for the GT.
+
+The operation family below includes lifecycle operations supporting issuance:
+Create and Replace deliver an object GT; ForgePassKey produces a credential GT
+with its associated proof delivery. Destroy and RevokePassKey do not mint a
+replacement GT. Keeping those operations does not make a generic “returned
+value” the defining product of Mint.
 
 ### Lambda expression and application
 
@@ -34,6 +56,7 @@ selectCreate ≜ λc. λr. λd. λf. λv. c
 
 (((ide.Mint selectCreate) a) s)
     →β* CreateBody ΓMint a s
+    ⇓ Success(GT, s′)              ; on successful issuance
 ```
 
 The other four selectors choose the corresponding bound function. These are
@@ -139,8 +162,9 @@ The existing [Lambda Calculus reference architecture](../../lambda-calculus-arch
 provides conceptual background. Its historical instruction examples and
 permission claims are not adopted here as new normative ISA decisions.
 
-**First review question:** Is this the intended Mint Abstraction—its operation
-family, captured environment, arguments, state effects and returned values?
+**First review question:** Does this define Mint around its product—the Golden
+Token—and correctly describe its issuance applications, supporting lifecycle
+operations, captured environment, arguments and state effects?
 Only after that is agreed should the implementation audit below guide its
 translation. Helper behavior cannot define Mint by accident.
 

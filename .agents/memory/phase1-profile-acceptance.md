@@ -39,6 +39,16 @@ application semantics, results and state effects for programmer review.
 Derive CLOOMC and LUMP structure from that definition, not from host helpers.
 Distinguish the mathematical lambda binder from the machine LAMBDA instruction.
 
+Mint's tangible product is a Golden Token and must be front and center in its
+top-level Abstraction definition; allocation and bookkeeping support that product.
+
+**Why:** The user explicitly corrected the generic operation/state presentation:
+“The tangable comodaty of Mint is a Golden Token it should be front and center.”
+
+**How to apply:** Lead with GT production and delivery, show the GT explicitly
+in successful issuance outcomes, and distinguish lifecycle operations that do
+not issue a GT. Do not infer what the programmer's GT must mean or protect.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.

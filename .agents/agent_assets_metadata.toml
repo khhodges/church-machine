@@ -1107,14 +1107,14 @@ content_type = "text/markdown"
 id = "GrIV3BOof04AUEQFRY0Rc"
 uri = "file://docs/reviews/mint-phase1/cloomc-step-1.md"
 type = "text"
-title = "Revised Step 1 — Mint as a Lambda Calculus Abstraction"
-description = "Starts with the proposed lambda definition, captured environment, application semantics, state and results; implementation audit follows."
+title = "Mint definition — Golden Token first"
+description = "Revised Step 1 leads with the Golden Token as Mint’s tangible product and makes its delivery explicit in successful issuance."
 logical_id = "edf61049-9522-4fe9-b59b-5e39fe9b2ae1"
-content_hash = "sha256:349073a308c7040282afc96a0f4ba6332da4e1b781e18905ba34d736195d5abe"
-size = 17369
-mtime_ms = 1792318868981
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/edf61049-9522-4fe9-b59b-5e39fe9b2ae1/c2dafe3b-d1b5-48eb-9cda-c93cda144144"
-storage_version_token = "1792318893317435"
+content_hash = "sha256:0a60f1ca1e3edee96170dbfe04c722abaf7416a3a8feb0099f3e4c5f2a4ade71"
+size = 18533
+mtime_ms = 1792319972996
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/edf61049-9522-4fe9-b59b-5e39fe9b2ae1/12366d8c-bd1e-4a65-b969-e4b23441efd1"
+storage_version_token = "1792319988595486"
 content_type = "text/markdown"
 
 [[outputs]]
