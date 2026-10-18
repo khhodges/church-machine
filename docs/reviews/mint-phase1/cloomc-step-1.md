@@ -52,8 +52,9 @@ The proposed request fields are being reviewed individually. The original
   request reserves 64 words and requires/deducts 64 words of allowance.
 - **Initialization input: pass a GT with object-specific meaning.**
   For a Namespace, it identifies a preformatted set of slots. For a Thread,
-  an E-GT identifies the abstraction needed to format the stack frame; the
-  precise initialization sequence is not specified by this statement.
+  the E-GT identifies **the abstraction the Thread will start in**, not a
+  formatter routine to execute. Amobea retains ownership of initialization
+  and uses that entry target when preparing the initial stack frame.
   For an Abstraction, the GT identifies its defining LUMP: Abstractions are
   complex structures represented by LUMPs, not reconstructed from a second
   CREATE-specific scalar format.

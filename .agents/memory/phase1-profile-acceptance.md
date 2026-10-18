@@ -116,19 +116,21 @@ is chosen by this rule.
 
 CREATE initialization uses a passed GT with object-specific meaning, not a
 uniform source-buffer copying contract. Namespace input identifies preformatted
-slots; Thread input is an E-GT for the abstraction needed to format its stack frame.
+slots; Thread input is the E-GT of its starting abstraction, not a formatter
+routine. Amobea retains initialization ownership.
 For an Abstraction, the GT identifies the defining LUMP.
 
 **Why:** The user redirected the review: “lets agree to pass GT instead,” then
 specified Namespace slots and the Thread's E abstraction. This supersedes the
 generic buffer framing, not the separate allocation, permissions or Passkey rules.
 The user then clarified that Abstractions are complex structures better defined
-by LUMPs.
+by LUMPs and selected “The abstraction the Thread will start in” for the
+Thread's E-GT.
 
 **How to apply:** Do not impose a temporary buffer or retain a redundant content
-length merely from the older proposal. Do not infer whether Thread's E-GT is
-called as a formatter or installed as an entry target without reconciling the
-existing Thread contract. Keep rounded allocation distinct from readable source
+length merely from the older proposal. Do not CALL the supplied Thread E-GT
+as an initializer; it supplies the initial execution target under the existing
+Thread frame contract. Keep rounded allocation distinct from readable source
 extent. Do not invent a second scalar format for Abstraction creation in place
 of its LUMP.
 
