@@ -94,6 +94,15 @@ means DESTROY??”
 separate from that meaning; preserve immutable GT words, the slot-release
 generation rule, and the distinction between a credential and its target.
 
+Mint must work hand in hand with garbage collection.
+
+**Why:** The user explicitly required their API to be designed together, not
+as unrelated allocation and collection services.
+
+**How to apply:** Coordinate creation, destruction and binding transitions
+with collection. Keep explicit destruction distinct from unreachable-object
+collection; do not treat proposed GC interfaces or concurrency rules as approved.
+
 Mint must acknowledge and own every bit of every immutable GT case and be
 identified up front as the version master, with the complete bit format shown.
 
