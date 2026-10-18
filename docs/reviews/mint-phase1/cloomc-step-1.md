@@ -6,6 +6,61 @@ This is not a compiled Mint, a Namespace installation, or runtime acceptance.
 ## 1. Mint as a Lambda Calculus Abstraction
 **Primary functions: CREATE, REPLACE, DESTROY.**
 
+**Mint owns every bit of every case of the immutable Golden Token and is
+the version master for its issuance and lifecycle.** The GT is the tangible
+product; its complete 32-bit format is acknowledged here before the methods.
+
+### Master GT bit format
+
+```text
+Inform / Outform
+ 31       30:28       27       26:25       24:16          15:0
+ B        Permission Domain   Type        Version        Namespace slot
+ 1 bit    3 bits     1 bit    2 bits      9 bits         16 bits
+
+Abstract
+ 31       30:27               26:25       24:0
+ B        Owner               11          Owner-defined payload
+ 1 bit    4 bits              2 bits      25 bits
+
+NULL
+ 31:27                        26:25       24:0
+ No usable authority          00          No usable authority
+ 5 bits                       2 bits      25 bits
+```
+
+| Field / case | Acknowledged meaning |
+|---|---|
+| B, bit 31 | Bind flag. Included in Mint's issued GT, not an omitted side condition. |
+| Type `00` | NULL regardless of the other 30 bits; not just the all-zero word. |
+| Type `01` | Inform: Namespace-referenced object. |
+| Type `10` | Outform: Namespace-referenced dependency for resolution. Local/far is a Namespace-entry property, not an extra GT bit. |
+| Domain `0`, permission bits `[30:28]` | `[X, W, R]`: Execute, Write, Read. |
+| Domain `1`, permission bits `[30:28]` | `[E, S, L]`: Enter, Save, Load. |
+| Inform/Outform version `[24:16]` | The 9-bit Namespace-slot generation, managed by Mint software; hardware checks the specified runtime match and never increments it. |
+| Inform/Outform slot `[15:0]` | The 16-bit Namespace slot reference. |
+| Type `11` | Abstract: `[30:27]` is Owner and `[24:0]` is owner-defined payload—not permission/domain, slot or a separate 9-bit version. |
+
+Mint owns construction and lifecycle of the complete issued word in each case.
+The programmer defines its intended use and protection; this format introduces
+no advance evaluation of GT meaning.
+
+**Version ownership does not mean mutating an issued GT.** Mint manages the
+Namespace generation and issues the corresponding immutable GT. Under the
+current Phase 1 lifecycle, ordinary versions are 0–510; 511 retires a slot.
+Generations do not wrap or reset on reuse. A never-used slot starts at 0;
+authorized release advances the generation before freeing, and reallocation
+uses that retained generation without another increment. Direct REPLACE
+generation policy remains to be defined, not inferred here. Abstract payload
+identity follows its own defined lifecycle, not the Inform version field.
+
+Format references: [GT fields](../../golden-tokens.md#gt-format),
+[Abstract Owner/payload](service-contract.md#encoding-and-identity), and
+[current Phase 1 generation lifecycle](../../phase-1/01-isa/instruction-set.md#namespace-identity-and-software-lifecycle).
+The Phase 1 lifecycle takes precedence over the older GT reference's
+conflicting release-at-511 wording. This is a definition, not a claim that
+the current Mint implementation meets it.
+
 ### CREATE — primary definition
 
 CREATE returns an **immutable Golden Token** to access a **new digital object**

@@ -72,6 +72,17 @@ and questioned the need for Forge alongside Create and Revoke alongside Destroy.
 Preserve historical five-method evidence as history, not the current design;
 do not silently migrate compiled selectors or infer object-specific effects.
 
+Mint must acknowledge and own every bit of every immutable GT case and be
+identified up front as the version master, with the complete bit format shown.
+
+**Why:** The user explicitly requested this ownership statement and bit-format
+presentation before further Mint definition detail.
+
+**How to apply:** Cover NULL, Inform, Outform and Abstract interpretations,
+not just the reference layout. Keep issued GTs immutable, software version
+ownership distinct from hardware runtime comparison, and Abstract payload
+identity distinct from the Inform/Outform generation field.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.
