@@ -1158,3 +1158,17 @@ mtime_ms = 1792326112601
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/fbcbf44f-9b51-4f4b-a6cc-c76d12d62dea/7c596166-a9eb-4a60-b98a-95f5436f88ef"
 storage_version_token = "1792326119360414"
 content_type = "text/html"
+
+[[outputs]]
+id = "GkmAVOPkEZy-Bw05pEJKl"
+uri = "file://generated-artifacts/mint-v1.1-destroy-defined-5e9c57128e.html"
+type = "html"
+title = "Mint V1.1 — NEW COPY — DESTROY defined"
+description = "Distinctly named HTML with a visible “Review copy: DESTROY defined” label and a direct link to the corrected section."
+logical_id = "4a83d92d-bb86-4060-bae3-37329428583a"
+content_hash = "sha256:ec87c6bcc72b06e7b1047e131f667934069e323eb9b78e518d4b606a47e0503c"
+size = 20319
+mtime_ms = 1792326248181
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4a83d92d-bb86-4060-bae3-37329428583a/2d296d1a-b6da-4138-a5f5-226651b3466c"
+storage_version_token = "1792326274063991"
+content_type = "text/html"
