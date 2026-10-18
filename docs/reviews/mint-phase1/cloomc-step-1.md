@@ -1,4 +1,4 @@
-# Mint to real CLOOMC — Step 1 review
+# Mint — PHASE 1 (V1.1) Definition — Step 1 Review
 
 Status: revised Step 1 definition and source audit; awaiting programmer review.
 This is not a compiled Mint, a Namespace installation, or runtime acceptance.
