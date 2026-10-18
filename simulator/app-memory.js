@@ -6326,8 +6326,8 @@ function _nsLabelOpen(slotIdx) {
     else if (typeof switchView === 'function') switchView('editor');
 }
 
-function _nsOpenDesignSelection(symbolic, slot) {
-    const selection = symbolic.selection;
+function _nsOpenDesignSelection(symbolic, slot, options) {
+    const selection = symbolic.selection || {};
     const exact = selection &&
         /^[0-9a-f]{8}$/i.test(selection.token || '') &&
         typeof selection.filename === 'string' &&
@@ -6337,6 +6337,7 @@ function _nsOpenDesignSelection(symbolic, slot) {
         // The saved selection is a SOURCE navigation, not an Install request.
         // Filename and digest pin the revision even when a token is reused.
         return openLumpInEditor(selection.token, {
+            ...options,
             exactSavedArtifact: {
                 token: selection.token,
                 filename: selection.filename,

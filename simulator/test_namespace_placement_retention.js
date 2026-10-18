@@ -18,6 +18,8 @@ const { JSDOM } = require('jsdom');
     const original = require('../tests/fixtures/phase1_namespace_target.json');
     api.state.profile = 'phase1';
     api.state.document = JSON.parse(JSON.stringify(original));
+    const target={kind:'source',path:'simulator/examples/my_unfinished.cloomc'};
+    api.state.document.rows.find(r=>r.slot===10).authoring=target;
     api.state.projection = {rows:[], warnings:[]};
     await api.edit(10);
     const picker = w.document.getElementById('nsDraftLump');
@@ -28,6 +30,18 @@ const { JSDOM } = require('jsdom');
     w.document.getElementById('nsDraftApply').click();
     assert.deepEqual(JSON.parse(JSON.stringify(api.state.document.rows.find(r => r.slot === 10).selection)),
         original.rows.find(r => r.slot === 10).selection);
+    assert.deepEqual(JSON.parse(JSON.stringify(api.state.document.rows.find(r => r.slot === 10).authoring)),target);
+    api.authoring(10);
+    w.document.getElementById('nsAuthoringPath').value='simulator/examples/reviewed.cloomc';
+    w.document.getElementById('nsAuthoringApply').click();
+    assert.equal(api.state.document.rows.find(r=>r.slot===10).authoring.path,'simulator/examples/reviewed.cloomc');
+    assert.deepEqual(JSON.parse(JSON.stringify(api.state.document.rows.find(r=>r.slot===10).selection)),
+        original.rows.find(r=>r.slot===10).selection,'authoring changes must not rebind the artifact');
+    api.authoring(10);
+    w.document.getElementById('nsAuthoringPath').value='../private.cloomc';
+    w.document.getElementById('nsAuthoringApply').click();
+    assert.match(w.document.getElementById('nsAuthoringError').textContent,/local/);
+    w.document.getElementById('nsDraftClose').click();
     const before = JSON.stringify(api.state.document);
     await api.edit(16);
     w.document.getElementById('nsDraftName').value = 'ide.Cancelled';

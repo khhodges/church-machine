@@ -13,16 +13,16 @@ context.window=context;vm.createContext(context);
 vm.runInContext(fs.readFileSync(__dirname+'/namespace-design-v1.js','utf8'),context);
 const api=context.NamespaceDesignV1;api.state.profile='phase1';
 api.state.document={slotCount:256,rows:[
-    {slot:9,name:'ide.Mint',kind:'lump'},
-    {slot:3,name:'LED_DEV',kind:'mmio',address:0x40000000,limit:4,sequence:0,policy:'Hardware'},
-    {slot:14,name:'nstab',kind:'lump'},
+    {slot:9,name:'ide.Mint',kind:'lump',authoring:{kind:'source',path:'simulator/cloomc/mint.cloomc'}},
+    {slot:3,name:'LED_DEV',kind:'mmio',address:0x40000000,limit:4,sequence:0,policy:'Hardware',authoring:{kind:'entry'}},
+    {slot:14,name:'RenamedTable',kind:'lump',authoring:{kind:'namespace-table'}},
     {slot:15,name:'pkverify',kind:'lump'},
-    {slot:16,name:'ide.Alace',kind:'lump'},
-    {slot:2,name:'Boot.Thread',kind:'thread',words:256,sequence:0,policy:'Resident'},
-    {slot:6,name:'SelfTest',kind:'lump'},
-    {slot:7,name:'WukongCallHome',kind:'lump'},
-    {slot:10,name:'CapabilityTest',kind:'lump'},
-    {slot:17,name:'ide.Mallory',kind:'lump'},
+    {slot:16,name:'ide.Alace',kind:'lump',authoring:{kind:'source',path:'simulator/examples/alice.cloomc'}},
+    {slot:2,name:'Boot.Thread',kind:'thread',words:256,sequence:0,policy:'Resident',authoring:{kind:'entry'}},
+    {slot:6,name:'SelfTest',kind:'lump',authoring:{kind:'source',path:'simulator/examples/post_flash_selftest.cloomc'}},
+    {slot:7,name:'WukongCallHome',kind:'lump',authoring:{kind:'source',path:'simulator/examples/wukong_callhome.cloomc'}},
+    {slot:10,name:'CapabilityTest',kind:'lump',authoring:{kind:'source',path:'simulator/examples/capability_test.cloomc'}},
+    {slot:17,name:'ide.Mallory',kind:'lump',authoring:{kind:'source',path:'simulator/examples/mallory.cloomc'}},
 ]};
 const before=JSON.stringify(api.state.document);
 (async()=>{
@@ -35,18 +35,17 @@ const before=JSON.stringify(api.state.document);
         assert.equal(call.options.accepts(),true);
     }
     assert.equal(opens[0].path,'simulator/cloomc/mint.cloomc');
-    assert.match(opens[4].options.reason,/ide.Alace.*ide.Alice/);
+    assert.match(opens[4].options.reason,/ide.Alace.*alice.cloomc/);
     const last=opens.at(-1);await api.source(3);
     assert.equal(last.options.accepts(),false,'another label invalidates pending source open');
     assert.match(html,/MMIO target/);assert.match(html,/0x40000000/);
     await api.source(14);assert.match(html,/Namespace table target/);assert.match(html,/256 slots/);
     await api.source(2);assert.match(html,/Thread target/);
-    await api.source(15);assert.match(html,/Current interface definition/);
-    assert.match(html,/#docs\?doc=/);
+    await api.source(15);assert.match(html,/no authoring association/);
     await api.source(9);valid=false;
     assert.equal(opens.at(-1).options.accepts(),false);
     valid=true;api.state.profile='ascending';
     assert.equal(opens.at(-1).options.accepts(),false);
     assert.equal(JSON.stringify(api.state.document),before);
-    console.log('PASS Phase 1 label targets: current sources, MMIO, nstab, Thread, verifier definition, spelling disclosure, races and unchanged placement');
+    console.log('PASS explicit Phase 1 targets: sources, MMIO, renamed nstab, Thread, unresolved verifier, spelling disclosure and unchanged placement');
 })().catch(e=>{console.error(e);process.exitCode=1;});

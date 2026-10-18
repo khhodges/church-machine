@@ -107,6 +107,7 @@ const context = vm.createContext(new Proxy(sandbox, {
 }));
 vm.runInContext(open + '\n' + route, context);
 async function run() {
+    const productionOpen = sandbox.openLumpInEditor;
     sandbox.sim.symbolic = {
         name: 'ide.Alice', implementationMissing: true, selection: selected
     };
@@ -183,6 +184,35 @@ async function run() {
     sandbox.openLumpInEditor = async token => requests.push('ordinary:' + token);
     vm.runInContext('_nsLabelOpen(15)', context);
     assert.equal(requests.at(-1), 'ordinary:11223344');
+
+    // The selected Namespace passes its existing epoch through both helpers.
+    // Recapturing at either boundary would cancel an otherwise valid open.
+    sandbox.openLumpInEditor = productionOpen;
+    let epoch=0, current=true, consent=true, confirmations=0;
+    sandbox._captureEditorWriteGuard=()=>{
+        const mine=++epoch, text=editor.value;
+        return {accepts:()=>mine===epoch && text===editor.value};
+    };
+    sandbox.confirmSourceReplacement=async()=>{confirmations++;return consent;};
+    sandbox.fetch=async()=>({ok:true,json:async()=>({
+        filename:selected.filename,binary_hash:selected.binaryHash,
+        words:[0xF8000400,0x01020304],source:'reviewed Namespace source',
+        binary_valid:true, trusted:false, approved:false,
+    })});
+    const navigation=()=>sandbox._nsOpenDesignSelection({name:'ide.Alice',selection:selected},14,{
+        writeGuard:sandbox._captureEditorWriteGuard(),accepts:()=>current,confirmReplacement:true,
+    });
+    editor.value='unsaved protected text';editor.readOnly=false;
+    consent=false;await navigation();
+    assert.equal(editor.value,'unsaved protected text');
+    assert.equal(epoch,1,'saved-artifact opener reuses Namespace guard');
+    consent=true;current=false;const n=confirmations;
+    await navigation();
+    assert.equal(confirmations,n,'stale Namespace must not request replacement');
+    assert.equal(editor.value,'unsaved protected text');
+    current=true;await navigation();
+    assert.equal(editor.value,'reviewed Namespace source');
+    assert.equal(epoch,3);
     console.log('PASS exact design click → saved source, mismatch preservation, missing New, ordinary open');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

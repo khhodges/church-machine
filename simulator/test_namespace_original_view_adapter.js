@@ -46,7 +46,7 @@ assert.match(host.innerHTML,/id="ns-row-2"[\s\S]*?Boot.Thread/);
 assert.match(host.innerHTML,/id="ns-row-8"[\s\S]*?UART_DEV[\s\S]*?0x40000014/);
 assert.match(host.innerHTML,/ns-row-9[\s\S]*?\(no entry installed\)/);
 assert.match(host.innerHTML,/Load policy for slot 7/);
-assert.match(host.innerHTML,/Open LUMP/);
+assert.match(host.innerHTML,/Open assigned LUMP/);
 assert.equal((host.innerHTML.match(/id="ns-row-/g)||[]).length,11);
 assert.match(host.innerHTML,/ns-saved-version-cell">v20/);
 assert.doesNotMatch(host.innerHTML,/jumpToMemory|setBootEntrySlot|_nsTableClear\(/,

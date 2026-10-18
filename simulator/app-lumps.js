@@ -7765,8 +7765,12 @@ async function openLumpInEditor(token, options) {
     }
     // Capture the one shared navigation epoch before awaiting artifact data.
     // Any document transition in any editor path invalidates this open.
-    var _openWriteGuard = window._captureEditorWriteGuard(
-        'open saved LUMP: ' + token);
+    var _parentWriteGuard = options && options.writeGuard ||
+        window._captureEditorWriteGuard('open saved LUMP: ' + token);
+    var _openWriteGuard = {accepts: function() {
+        return _parentWriteGuard.accepts() &&
+            (!(options && options.accepts) || options.accepts());
+    }};
     var _openRequestId = (window._savedLumpOpenRequestId || 0) + 1;
     window._savedLumpOpenRequestId = _openRequestId;
     var lump = _exactSelection ? {
@@ -8576,6 +8580,34 @@ async function openLumpInEditor(token, options) {
     }
     var _savedLumpInspectionText = _savedLumpInspectionParts.join('\n\n');
 
+    // Resolve the actual editor bytes before asking a Namespace caller's
+    // replacement consent. Exact binary inspection remains separate from an
+    // owned navigation draft; neither may change underneath that review.
+    var _recoveredSource = _sourceResolution.source;
+    if (!_recoveredSource && Array.isArray(_sourceResolution.inspectionSources)) {
+        var _draftSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
+            return item && typeof item.source === 'string' && item.source.length > 0;
+        });
+        if (_draftSourceRecord) _recoveredSource = _draftSourceRecord.source;
+    }
+    var _sourceRestored = _sourceResolution.restored;
+    var _editableSourceAvailable = typeof _recoveredSource === 'string' &&
+        _recoveredSource.length > 0;
+    var _navigationBuffer = window._editorNavigationBuffers &&
+        window._editorNavigationBuffers['lump:' + _lumpTokenIdentity(token)];
+    if (_navigationBuffer) _navigationBuffer = Object.assign({}, _navigationBuffer);
+    if (options && options.confirmReplacement) {
+        var _reviewEditor = document.getElementById('asmEditor');
+        var _reviewSource = _navigationBuffer && _editableSourceAvailable &&
+            _navigationBuffer.original === _recoveredSource
+            ? _navigationBuffer.source : (_recoveredSource || '');
+        if (!_openWriteGuard.accepts() || !_reviewEditor ||
+                typeof window.confirmSourceReplacement !== 'function' ||
+                !await window.confirmSourceReplacement(_reviewEditor, _reviewSource,
+                    'Open the exact Namespace-assigned LUMP ' + _exactSelection.filename +
+                    '. No Namespace binding or running image will change.')) return;
+    }
+
     // ── Transfer editor ownership to the saved LUMP ───────────────────────
     // The editor may currently show a built-in example or personal tab. Save
     // a dirty personal tab before replacing its buffer, then clear all active
@@ -8670,20 +8702,6 @@ async function openLumpInEditor(token, options) {
             }
         }
 
-        // Restore only source embedded in the selected immutable binary.
-        var _recoveredSource = _sourceResolution.source;
-        // Trust controls binary use, not access to recoverable source. Retain
-        // the rejection and inspection metadata while editing a separate draft.
-        if (!_recoveredSource && Array.isArray(_sourceResolution.inspectionSources)) {
-            var _draftSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
-                return item && typeof item.source === 'string' && item.source.length > 0;
-            });
-            if (_draftSourceRecord) _recoveredSource = _draftSourceRecord.source;
-        }
-        var _sourceRestored = _sourceResolution.restored;
-        var _editableSourceAvailable = typeof _recoveredSource === 'string' &&
-            _recoveredSource.length > 0;
-
         // Keep the legacy name for compatibility with draft/discard paths;
         // its value is now the original source buffer, not disassembly.
         window._editorOriginalDisasm = _recoveredSource;
@@ -8706,8 +8724,6 @@ async function openLumpInEditor(token, options) {
             }
         };
 
-        var _navigationBuffer = window._editorNavigationBuffers &&
-            window._editorNavigationBuffers['lump:' + _lumpTokenIdentity(token)];
         if (_navigationBuffer && _editableSourceAvailable &&
                 _navigationBuffer.original === _recoveredSource) {
             // Return to this page's own working document, not an unreviewed

@@ -28039,7 +28039,8 @@ def _describe_protected_change(payload):
             f"CR15 table-only limit: {4 * document['slotCount'] - 1}.",
             "Slot 0: four-word header; slot 1: Namespace self; slot 2: entry Thread.",
             "API-only output profile. No LUMP, committed image, bitstream or simulator state is changed.",
-            *[f"NS[{row['slot']}] {row['name']} — {row['policy']}"
+            *[f"NS[{row['slot']}] {row['name']} — {row['policy']}; "
+              f"label authoring target: {row.get('authoring', 'Unresolved (no association)')}"
               for row in sorted(document["rows"], key=lambda row: row["slot"])],
         ]
     if request.path == "/api/namespace/save-table":

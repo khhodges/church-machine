@@ -116,6 +116,20 @@ a stale archived flag blocked saving despite an intact Namespace-selected binary
 preserving integrity, authorization, CAS, and atomicity checks. Catalog metadata
 must never select a replacement for authoritative Namespace state.
 
+Namespace label navigation follows explicit authoring associations owned by the
+selected design, not a pet-name source map or a latest-catalog lookup. Authoring
+source can be unfinished and need not match the assigned immutable artifact.
+Missing associations in saved work must remain unresolved until explicitly
+edited and reviewed; do not silently migrate them.
+
+**Why:** The programmer requires the Namespace to be the sole target authority,
+including editor navigation. Opening current source is not permission to change
+the selected binary, slot, generation, or running image.
+
+**How to apply:** Keep exact assigned-artifact inspection separate from editable
+source navigation. Include authoring changes in the saved-design review, and
+invalidate delayed opens when the selected design or entry changes.
+
 Apply this authority order at every save boundary, including browser selection,
 image generation, and publication.
 **Why:** Independent save paths can otherwise disagree about which bytes are authoritative.

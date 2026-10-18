@@ -239,3 +239,90 @@ def test_http_new_review_does_not_bypass_stale_design_fingerprint(design_http):
     assert "another tab" in response.json["error"]
     assert response.json["dataChanged"] is False
     assert design_snapshot(paths) == before
+
+
+@pytest.mark.parametrize("target", [
+    None, {}, {"kind": "latest"}, {"kind": "source"},
+    {"kind": "source", "path": "../private.cloomc"},
+    {"kind": "source", "path": "simulator/../private.cloomc"},
+    {"kind": "source", "path": "/simulator/examples/a.cloomc"},
+    {"kind": "source", "path": "https://example.com/a.cloomc"},
+    {"kind": "source", "path": "simulator/examples/a.cloomc?x=1"},
+    {"kind": "source", "path": "simulator/%2e%2e/a.cloomc"},
+    {"kind": "source", "path": "simulator/examples/a.cloomc", "fallback": "latest"},
+    {"kind": "namespace-table", "slot": 14},
+    {"kind": "assigned-artifact", "token": "12345678"},
+])
+def test_authoring_schema_rejects_ambiguous_or_unsafe_targets(target):
+    document = phase1_seed()
+    document["rows"][-1]["authoring"] = target
+    with pytest.raises(ValueError, match="authoring|Authoring"):
+        validate(document)
+
+
+@pytest.mark.parametrize("kind", ["mmio", "thread", "namespace"])
+@pytest.mark.parametrize("target", [
+    {"kind": "source", "path": "simulator/examples/a.cloomc"},
+    {"kind": "assigned-artifact"},
+])
+def test_authoring_schema_preserves_object_kinds(kind, target):
+    document = phase1_seed()
+    next(row for row in document["rows"] if row["kind"] == kind)["authoring"] = target
+    with pytest.raises(ValueError):
+        validate(document)
+
+
+def test_read_saved_rows_does_not_infer_or_migrate_authoring(tmp_path):
+    path = tmp_path / "phase1.json"
+    document = phase1_seed()
+    for row in document["rows"]:
+        row.pop("authoring", None)
+    path.write_text(json.dumps(document))
+    before = path.read_bytes()
+    store = DesignStore(path, tmp_path, tmp_path / "absent-legacy.json", phase1=True)
+    assert store.read()["document"] == document
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("profile", ["ascending", "phase1"])
+def test_reviewed_authoring_roundtrip_no_rebinding_or_installation(design_http, profile):
+    client, paths = design_http
+    before = design_snapshot(paths)
+    payload = design_payload(client, profile)
+    row = payload["document"]["rows"][-1]  # An unfinished entry with no LUMP.
+    target = {"kind": "source", "path": "simulator/examples/not_yet_written.cloomc"}
+    row["authoring"] = target
+    selected_before = {r["slot"]: r.get("selection") for r in payload["document"]["rows"]}
+    response = design_put(client, payload, profile)
+    assert response.status_code == 428
+    assert "not_yet_written.cloomc" in response.get_data(as_text=True)
+    assert design_snapshot(paths) == before
+    token = response.json["change_confirmation"]["id"]
+    response = design_put(client, payload, profile, token)
+    assert response.status_code == 200, response.json
+    saved = client.get(design_url(profile)).json
+    assert saved["document"] == payload["document"]
+    assert {r["slot"]: r.get("selection") for r in saved["document"]["rows"]} == selected_before
+    assert saved["projection"]["activationAllowed"] is False
+    assert saved["projection"]["buildReady"] is False
+    assert paths["state"].read_bytes() == before["state"]
+    other = "ascending" if profile == "phase1" else "phase1"
+    assert paths[other].read_bytes() == before[other]
+    # Removing an association is also explicit, reviewed and durable.
+    payload = {k: saved[k] for k in ("fingerprint", "document")}
+    payload["document"]["rows"][-1].pop("authoring")
+    token = design_review(client, paths, payload, profile)
+    assert design_put(client, payload, profile, token).status_code == 200
+    assert "authoring" not in client.get(design_url(profile)).json["document"]["rows"][-1]
+
+
+def test_authoring_approval_cannot_be_reused_for_another_path(design_http):
+    client, paths = design_http
+    payload = design_payload(client)
+    payload["document"]["rows"][-1]["authoring"] = {
+        "kind": "source", "path": "simulator/examples/approved.cloomc"}
+    token = design_review(client, paths, payload)
+    payload["document"]["rows"][-1]["authoring"]["path"] = "simulator/examples/unreviewed.cloomc"
+    before = design_snapshot(paths)
+    assert_review_rejected(design_put(client, payload, token=token), "request_changed")
+    assert design_snapshot(paths) == before

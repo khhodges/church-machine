@@ -26,6 +26,32 @@ def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
+def validate_authoring(target, kind):
+    """Authoring is design intent, independent of artifact placement/admission.
+
+    A source may be unfinished or not yet created. Never resolve by pet name or
+    consult a catalog here, and never add associations while reading saved rows.
+    """
+    if not isinstance(target, dict):
+        raise ValueError("Invalid Namespace authoring target")
+    target_kind = target.get("kind")
+    if target_kind == "source":
+        path = target.get("path")
+        if (set(target) != {"kind", "path"} or kind != "lump" or
+                not isinstance(path, str) or len(path) > 512 or
+                not re.fullmatch(r"simulator/(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.cloomc", path)):
+            raise ValueError("Authoring source must be a local simulator/*.cloomc path on a LUMP row")
+    elif target_kind in ("assigned-artifact", "namespace-table", "entry"):
+        if set(target) != {"kind"}:
+            raise ValueError("Unexpected Namespace authoring target fields")
+        if target_kind == "assigned-artifact" and kind != "lump":
+            raise ValueError("Only LUMP rows can target an assigned artifact")
+        if target_kind == "namespace-table" and kind not in ("namespace", "lump"):
+            raise ValueError("Namespace table target requires a Namespace or LUMP row")
+    else:
+        raise ValueError("Unknown Namespace authoring target kind")
+
+
 def seed(legacy):
     rows = [
         dict(slot=1, name="Boot.NS", kind="namespace", policy="Resident", sequence=0),
@@ -45,6 +71,10 @@ def seed(legacy):
     ]:
         rows.append(dict(slot=slot, name=name, kind="mmio", policy="Hardware",
                          sequence=seq, address=address, limit=limit))
+    # Associations are explicit data in a new design, not a navigation lookup.
+    for row in rows:
+        row["authoring"] = dict(kind="assigned-artifact" if row["kind"] == "lump"
+                               else "namespace-table" if row["kind"] == "namespace" else "entry")
     # Carry existing non-core design membership, never silently discard it.
     names = {r["name"] for r in rows}
     used = {r["slot"] for r in rows}
@@ -76,6 +106,19 @@ def phase1_seed():
                        (16, "ide.Alice"), (17, "ide.Mallory")]:
         document["rows"].append(dict(slot=slot, name=name, kind="lump",
                                      policy="Resident", sequence=0))
+    sources = {
+        6: "simulator/examples/post_flash_selftest.cloomc",
+        7: "simulator/examples/wukong_callhome.cloomc",
+        9: "simulator/cloomc/mint.cloomc",
+        10: "simulator/examples/capability_test.cloomc",
+        16: "simulator/examples/alice.cloomc",
+        17: "simulator/examples/mallory.cloomc",
+    }
+    for row in document["rows"]:
+        if row["slot"] in sources:
+            row["authoring"] = dict(kind="source", path=sources[row["slot"]])
+        elif row["slot"] == 14:
+            row["authoring"] = dict(kind="namespace-table")
     document["rows"].sort(key=lambda row: row["slot"])
     return document
 
@@ -99,7 +142,7 @@ def validate(document):
     for row in rows:
         if not isinstance(row, dict) or set(row) - {
             "slot", "name", "kind", "policy", "sequence", "selection", "boot",
-            "words", "address", "limit",
+            "words", "address", "limit", "authoring",
         }:
             raise ValueError("Unexpected Namespace row fields")
         slot, name = row.get("slot"), row.get("name")
@@ -114,6 +157,8 @@ def validate(document):
         kind = row.get("kind")
         if kind not in ("namespace", "thread", "mmio", "lump"):
             raise ValueError("Invalid member kind")
+        if "authoring" in row:
+            validate_authoring(row["authoring"], kind)
         if row.get("policy") not in ("Resident", "Lazy", "Hardware"):
             raise ValueError("Invalid load policy")
         if phase1 and kind == "lump" and row["policy"] != "Resident":
