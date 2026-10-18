@@ -75,6 +75,17 @@ when reviewing GT type, and “Yes—remove the separate Domain input.”
 implementing the reviewed interface. This decision does not settle the remaining inputs or
 authorize a new object-definition format.
 
+CREATE retains a separate requested-permissions input. Threads and Namespaces
+always use NONE. Permission choices are category-specific, not unrestricted bits.
+
+**Why:** The user explicitly retained this input and said “Threads and Namespace
+are always NONE.” Data was specified as “all or one (R or W)” and Church as
+“E or LS or L or E.”
+
+**How to apply:** Preserve those restrictions. Do not infer the meaning of Data
+“all” or silently change the repeated Church E to S; obtain clarification before
+encoding either choice.
+
 Unfinished Mint must be available as an editable source draft. Implementing
 the method APIs with supported input/result checks is an authorized minimum;
 unfinished bodies must be explicit, not grounds for withholding the source.
