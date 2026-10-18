@@ -64,13 +64,14 @@ categories in the proposed eight-way object-kind selector.
 **How to apply:** Do not retain Outform creation or a separate Credential kind
 from the earlier draft. Do not equate all Abstract cases with credentials.
 
-CREATE derives the object kind from the supplied object definition; it has no
-separate object-kind input.
+CREATE derives both the object kind and GT type from the supplied object
+definition; neither has a separate caller-supplied selector.
 
 **Why:** The user selected “No—use the kind in the supplied object definition”
-when reviewing that proposed input.
+when reviewing object kind, then “Yes—remove the separate GT-type input”
+when reviewing GT type.
 
-**How to apply:** Remove the redundant kind selector when implementing the
+**How to apply:** Remove the redundant kind and GT-type selectors when implementing the
 reviewed interface. This decision does not settle the remaining inputs or
 authorize a new object-definition format.
 

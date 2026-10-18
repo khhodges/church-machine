@@ -22,6 +22,8 @@ The proposed request fields are being reviewed individually. The original
   is superseded on these points.
 - **Object-kind input: removed.** CREATE uses the kind in the supplied object
   definition, not a separate caller-supplied kind selector.
+- **GT-type input: removed.** The supplied object definition also determines
+  the GT type; the caller does not supply a separate type selector.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
   approved requirement.
