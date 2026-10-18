@@ -61,6 +61,17 @@ are explicit requirements.
 **How to apply:** Put this definition first and retain its scope without
 inventing permission combinations for Threads or Namespaces.
 
+Mint's primary public functions are CREATE, REPLACE and DESTROY. Fold the
+earlier Forge/Revoke naming into credential creation/destruction cases rather
+than keeping extra public verbs.
+
+**Why:** The user requested this primary-function list directly under “1. Mint”
+and questioned the need for Forge alongside Create and Revoke alongside Destroy.
+
+**How to apply:** Use the three-function definition in the current review.
+Preserve historical five-method evidence as history, not the current design;
+do not silently migrate compiled selectors or infer object-specific effects.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.

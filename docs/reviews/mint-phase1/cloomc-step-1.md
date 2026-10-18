@@ -3,7 +3,8 @@
 Status: revised Step 1 definition and source audit; awaiting programmer review.
 This is not a compiled Mint, a Namespace installation, or runtime acceptance.
 
-## 1. Mint as a Lambda Calculus Abstraction — definition first
+## 1. Mint as a Lambda Calculus Abstraction
+**Primary functions: CREATE, REPLACE, DESTROY.**
 
 ### CREATE — primary definition
 
@@ -46,11 +47,13 @@ effects. `⇓` denotes successful evaluation, not a new instruction or evidence
 that the implementation exists. A failed application hard-faults rather than
 producing a substitute for the GT.
 
-The operation family below includes lifecycle operations supporting issuance:
-Create and Replace deliver an object GT; ForgePassKey produces a credential GT
-with its associated proof delivery. Destroy and RevokePassKey do not mint a
-replacement GT. Keeping those operations does not make a generic “returned
-value” the defining product of Mint.
+The public operation family is CREATE, REPLACE and DESTROY. The earlier
+ForgePassKey operation is credential creation under CREATE; RevokePassKey is
+credential invalidation under DESTROY, not a separate public verb. Associated
+proof delivery and credential state remain part of the relevant operation.
+Destroying a credential is distinct from destroying the object it accesses.
+The immutable GT itself is not rewritten. Exact object-specific effects remain
+to be defined rather than inferred from a GT.
 
 ### Lambda expression and application
 
@@ -58,22 +61,20 @@ Use the following top-level lambda specification:
 
 ```text
 Mint ≜ λγ. λm.
-    m (λa. λs. CreateBody        γ a s)
-      (λa. λs. ReplaceBody       γ a s)
-      (λa. λs. DestroyBody       γ a s)
-      (λa. λs. ForgePassKeyBody  γ a s)
-      (λa. λs. RevokePassKeyBody γ a s)
+    m (λa. λs. CreateBody  γ a s)
+      (λa. λs. ReplaceBody γ a s)
+      (λa. λs. DestroyBody γ a s)
 
 ide.Mint ≜ Mint ΓMint
 
-selectCreate ≜ λc. λr. λd. λf. λv. c
+selectCreate ≜ λc. λr. λd. c
 
 (((ide.Mint selectCreate) a) s)
     →β* CreateBody ΓMint a s
     ⇓ Success(GT, s′)              ; on successful issuance
 ```
 
-The other four selectors choose the corresponding bound function. These are
+The other two selectors choose the corresponding bound function. These are
 mathematical selectors, not assigned machine selector numbers or instructions.
 `CreateBody` and the other body names are specification abbreviations with the
 contracts below. This is a top-level specification, **not a fully expanded
@@ -123,17 +124,16 @@ objects cannot silently close the Abstraction.
 
 ### Meaning of each application
 
-The operation family follows the existing [service contract](service-contract.md).
-The mathematical presentation here is proposed for review; it does not silently
-replace that contract or approve a new ABI.
+The public operation family is revised here to CREATE, REPLACE and DESTROY.
+The earlier five-method [service contract](service-contract.md) remains
+historical input for the detailed behavior, not the current public method list.
+This definition change does not change compiled selectors or approve a new ABI.
 
 | Body | Explicit argument roles | Successful observable effect/result |
 |---|---|---|
-| Create | Credential, proof, object request and initialization payload | Select and initialize a new allocation, publish its Namespace entry, return the resulting object capability and updated state. |
+| Create | Creation request and its required inputs, including credential/proof or authorized issuance inputs as applicable | Produce and deliver the immutable GT for the new object. Credential creation includes its associated proof delivery and issuance state. |
 | Replace | Credential, proof, target, replacement request and payload | Replace the authorized target according to the defined generation/lifecycle rules; return the resulting object capability and updated state. |
-| Destroy | Credential, proof, target and destruction request | Invalidate/release the target according to its lifecycle rules; return completion and updated state, not a new object capability. |
-| ForgePassKey | Authorized administrative request and issuance inputs | Create the credential/proof pair and its recorded issuance state; deliver it through the defined recipient path. Exact delivery ABI remains to be established. |
-| RevokePassKey | Authorized administrative request identifying the credential | Record and enforce revocation of that credential; return completion and updated state. |
+| Destroy | Destruction request, target and required authorization inputs | Destroy/invalidate the selected object according to its defined lifecycle. For a credential, this covers revocation; it does not implicitly destroy other objects. No replacement GT is issued. |
 
 At specification level, each body has an outcome of the form
 `Success(value, s′)` or `HardFault(s_fault)`. These names describe outcomes,
@@ -277,9 +277,10 @@ This table assigns work, not new instruction encodings or capability grants.
 - **Fixtures:** initial objects and test inputs are legitimate setup. Host
   `usedSlots`, `nextBlock`, allocation lists and thread lists cannot remain
   the operational allocator or be updated by the test instead of Mint.
-- **Other methods:** the private source routes non-Create methods to rejection.
-  That proves neither Replace/Destroy nor ForgePassKey/RevokePassKey is
-  implemented. Keep method completeness separate from credential denial.
+- **Other methods:** the historical private source routes non-Create methods
+  to rejection. That proves neither Replace/Destroy nor the credential
+  creation/invalidation cases are implemented. Its five-entry table is not
+  the revised public definition. Keep completeness separate from denial.
 
 ## Exact interface questions to settle before relying on them
 
