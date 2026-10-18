@@ -211,6 +211,16 @@ permission to migrate live state. Saved designs may be absent in clean
 checkouts: use a clearly identified frozen acceptance fixture, not catalog
 latest-version selection.
 
+Namespace links shared with the programmer must explicitly identify the
+intended profile; a generic Namespace view is not proof of the same selection.
+
+**Why:** A link opened the older default Namespace instead of Phase 1, and the
+user reported it as the wrong, stale Namespace.
+
+**How to apply:** Verify the linked profile and whether its document is actually
+saved rather than a generated seed. Do not describe a server-saved document as
+including unsaved changes from another browser tab or origin.
+
 Primary subsequent priority is fault-free simulator operation with functional
 abstractions and GT coverage across all 17 approved Namespace entries.
 

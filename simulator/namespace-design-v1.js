@@ -17,6 +17,15 @@
             if (state.active) state.profile = saved;
         }
     } catch (_) { /* Storage may be unavailable; keep the default view usable. */ }
+    // A shared link must name its profile; a bare #namespace otherwise depends
+    // on this browser origin's remembered choice (or the ascending default).
+    if(root.location && root.location.search) {
+        const linkedProfile=new URLSearchParams(root.location.search).get('namespaceProfile');
+        if(['ascending','phase1','legacy'].includes(linkedProfile)) {
+            state.active=linkedProfile!=='legacy';
+            if(state.active) state.profile=linkedProfile;
+        }
+    }
     const drafts = {};
     const slotCount = () => state.document.slotCount || 64;
     const metadata = () => [(0xf8800100 | (slotCount() << 10)) >>> 0, 0, state.document.rows.length - 1, 0];
@@ -60,6 +69,12 @@
         }
         try { root.localStorage.setItem(profileKey, value); }
         catch (_) { /* Storage restrictions must not prevent loading the selected design. */ }
+        if(root.location && root.location.search && root.history &&
+                new URLSearchParams(root.location.search).has('namespaceProfile')) {
+            const url=new URL(root.location.href);
+            url.searchParams.set('namespaceProfile',value);
+            root.history.replaceState(null,'',url.href);
+        }
         const legacy = document.getElementById('bootCapacityPanel');
         if (legacy) legacy.hidden = state.active;
         root.updateNamespace();

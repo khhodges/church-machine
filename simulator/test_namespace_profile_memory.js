@@ -4,16 +4,21 @@ const fs = require('node:fs');
 const source = fs.readFileSync(__dirname + '/namespace-design-v1.js', 'utf8');
 const values = new Map();
 const storage = {getItem: key => values.get(key), setItem: (key, value) => values.set(key, value)};
-function start(localStorage = storage) {
+function start(localStorage = storage, linkedProfile) {
     const selector = {};
     const ctx = {localStorage, updateNamespace() {}, document: {
         readyState: 'loading', addEventListener() {},
         getElementById: id => id === 'namespaceDesignProfile' ? selector : null,
     }};
     ctx.window = ctx;
+    if(linkedProfile) {
+        ctx.URLSearchParams=URLSearchParams;ctx.URL=URL;
+        ctx.location=new URL('https://example.invalid/simulator/?namespaceProfile='+linkedProfile+'#namespace');
+        ctx.history={replaceState(_state,_title,url){ctx.location=new URL(url);}};
+    }
     vm.runInNewContext(source, ctx);
     ctx.NamespaceDesignV1.render();
-    return {api: ctx.NamespaceDesignV1, selector};
+    return {api: ctx.NamespaceDesignV1, selector, context:ctx};
 }
 for (const profile of ['phase1', 'legacy', 'ascending']) {
     const first = start();
@@ -29,6 +34,14 @@ assert.equal(start().selector.value, 'ascending', 'busy switches must not persis
 values.set('church_namespace_design_profile', 'invalid');
 assert.equal(start().selector.value, 'ascending');
 assert.equal(start({getItem() { throw Error('denied'); }}).selector.value, 'ascending');
+values.set('church_namespace_design_profile','ascending');
+const linked=start(storage,'phase1');
+assert.equal(linked.selector.value,'phase1','explicit Phase 1 link overrides stale browser preference');
+assert.equal(values.get('church_namespace_design_profile'),'ascending','opening link does not rewrite preferences');
+assert.equal(start({getItem(){throw Error('denied');}},'phase1').selector.value,'phase1');
+assert.equal(start(storage,'legacy').selector.value,'legacy');
+linked.api.setProfile('ascending');
+assert.equal(linked.context.location.search,'?namespaceProfile=ascending','profile switch updates explicit link for reload');
 const phase1 = start().api;
 phase1.state.profile = 'phase1';
 phase1.state.document = {rows: [{slot:16, kind:'lump', policy:'Resident'}]};
