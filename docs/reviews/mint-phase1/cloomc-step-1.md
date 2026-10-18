@@ -95,7 +95,13 @@ field alone is not a specification of that convention.
 **DESTROY destroys the selected object.** It is not a hide, detach or
 temporary-disable operation. It returns completion, not a replacement GT.
 
-- For a Namespace-backed object, release its slot and increment the slot's
+**DESTROY cannot destroy resident or Outform objects.** Either case
+hard-faults before changing object state, binding, slot version or storage.
+This exclusion applies to explicit calls and GC-requested destruction.
+DESTROY must not resolve an Outform with MakeInform or change residency
+to bypass the exclusion.
+
+- For an eligible Namespace-backed object, release its slot and increment the slot's
   version before returning the memory object to the free pool. Existing GTs
   can no longer access the destroyed object through that binding.
 - For an Abstract object, the responsible Abstraction performs destruction
@@ -176,7 +182,7 @@ DESTROY(targetGT, credential, proof)        → completion
 | Operation | Inputs | Successful result and effects |
 |---|---|---|
 | CREATE | Creation/issuance request; initial content where required; credential and its proof | Deliver the requested Inform, Outform or Abstract GT. Abstract issuance follows the hierarchy of Abstractions. Mint assigns a Namespace slot/version only where required. |
-| DESTROY | Actual GT identifying the target; credential and its proof | Destroy the selected object. For a Namespace-backed object, release its slot and increment its version before returning the memory object to the free pool. For an Abstract object, destruction is performed by its responsible Abstraction. Return completion, not a GT. |
+| DESTROY | Actual GT identifying the target; credential and its proof | Reject resident and Outform objects before mutation. Destroy an eligible object. For a Namespace-backed object, release its slot and increment its version before returning the memory object to the free pool. For an Abstract object, destruction is performed by its responsible Abstraction. Return completion, not a GT. |
 
 The destination is the Namespace bound to this Mint instance. Neither method
 silently switches Namespace. A target GT identifies an object; possession of
@@ -244,7 +250,8 @@ Abstraction-specific arguments, require explicit specification before
 implementation. No new hierarchy bit encoding is implied here.
 
 DESTROY uses the target capability directly and has no CREATE request or
-payload. The proof is four readable 32-bit words. Credential issuance record
+payload. It rejects resident and Outform targets at runtime before changing
+the object or its binding. The proof is four readable 32-bit words. Credential issuance record
 layout and recipient-delivery binding must be specified alongside the
 credential implementation; those are not silently supplied by this ABI.
 
@@ -345,7 +352,7 @@ the operations remain subject to their configured runtime authority.
 | Mint operation | Result | Relationship to collection |
 |---|---|---|
 | `CREATE(request, payload)` | New GT | Initialize the object and its allocation/tracing metadata before publishing the GT. Publication to the caller must be protected from an intervening collection. |
-| `DESTROY(objectGT)` | Completion | Kill the selected object, even if GT copies remain. Use the common reclamation path; remove its live allocation record when release completes. GC must not later free it a second time. |
+| `DESTROY(objectGT)` | Completion | Reject resident and Outform objects before mutation. Kill an eligible object, even if GT copies remain. Use the common reclamation path; remove its live allocation record when release completes. GC must not later free it a second time. |
 | `MakeOutform(objectGT)` | Outform GT | Preserve the same living object's identity in a resolvable form. If local backing storage is released, establish its preserved representation first and use Mint's binding-release path. |
 | `MakeInform(outformGT)` | Inform GT | Resolve the same living object and establish/reuse its valid local binding. Register any new allocation before returning its GT. Never resurrect a destroyed object. |
 
@@ -364,7 +371,7 @@ Abstraction, not assumed for every type-11 payload.
 | GC operation | Result | Contract |
 |---|---|---|
 | `SCAN(scopeGT)` | Cycle handle | Acquire the configured safe point, establish roots and mark all objects reachable in the scope. Return only when tracing is complete. |
-| `IDENTIFY(cycle)` | Candidate count | Identify unreachable owned objects and unused local bindings. Retain the candidate set privately in GC. |
+| `IDENTIFY(cycle)` | Candidate count | Identify unreachable owned objects eligible for destruction and unused local bindings eligible for release. Exclude resident and Outform objects from destruction candidates. Retain the candidate set privately in GC. |
 | `CLEAR(cycle)` | Reclaimed-object, slot and word counts | Process that candidate set through Mint's destruction or binding-release path, according to what is owned locally. |
 | `FLIP(cycle)` | Completion | After successful CLEAR, toggle GC polarity, retire the cycle handle and release the safe point. |
 
@@ -411,20 +418,26 @@ incomplete scan is never permission to destroy an object.
 
 Mint provides two internal actions, not two competing implementations:
 
-1. **Destroy object:** end the selected object's lifetime through its owning
-   authority, then release its bindings and resources.
+1. **Destroy object:** reject resident and Outform objects before mutation;
+   end an eligible object's lifetime through its owning authority, then
+   release its bindings and resources.
 2. **Release local binding:** remove a local reference/representation without
    killing an object that remains alive elsewhere.
 
-GC CLEAR requests the first only for unreachable objects owned by its scope.
+GC CLEAR requests the first only for unreachable objects owned by its scope
+that are neither resident nor Outform. Mint rechecks these exclusions;
+membership in GC's candidate set does not override them.
 For an unused Outform entry referencing an object elsewhere, it requests the
 second. Collecting that entry does not authorize destruction of the remote
-or preserved object.
+or preserved object. Binding release must not be used to reclaim a resident
+object indirectly.
 
 Both actions use the same release procedure:
 
-1. Establish the required runtime authority and absence of active use of the
-   storage being released. Reachability evidence does not bypass these checks.
+1. Establish the required runtime authority, the applicable eligibility
+   checks (including the resident/Outform destruction exclusions), and absence
+   of active use of the storage being released. Reachability evidence does not
+   bypass these checks.
 2. Retire each released binding and increment its slot generation exactly once,
    before its memory can return to the free pool.
 3. Zero the complete reclaimed memory block, including unused capacity, before
@@ -449,15 +462,18 @@ GC.SCAN(scope)
     establish safe point and complete roots
     traverse owned objects through TRACE
 GC.IDENTIFY(cycle)
-    retain unreachable objects / unused bindings as private candidates
+    retain eligible unreachable objects / unused bindings as private candidates
+    exclude resident and Outform objects from destruction candidates
 GC.CLEAR(cycle) → Mint
-    destroy unreachable owned objects, or release unused local bindings
+    recheck eligibility, then destroy eligible unreachable owned objects
+    or release eligible unused local bindings without destroying their targets
     increment released-slot versions; clear and reclaim memory
 GC.FLIP(cycle)
     retire cycle and resume graph-changing execution
 ```
 
-Explicit DESTROY does not wait for an object to become unreachable. It still
+Explicit DESTROY does not wait for an object to become unreachable. Resident
+and Outform objects remain excluded regardless of reachability. It still
 requires safe destruction and must not reclaim executing code, an active
 Thread or storage still in active use. If that cannot be established, it
 hard-faults without reporting success.

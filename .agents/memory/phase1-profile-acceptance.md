@@ -94,6 +94,16 @@ means DESTROY??”
 separate from that meaning; preserve immutable GT words, the slot-release
 generation rule, and the distinction between a credential and its target.
 
+DESTROY cannot destroy resident or Outform objects.
+
+**Why:** The user explicitly corrected the Mint/GC definition with this
+exclusion.
+
+**How to apply:** Enforce it for explicit destruction and GC-requested
+destruction before mutation. Do not resolve an Outform or change residency
+inside DESTROY to bypass the rule. Releasing an unused Outform binding
+is distinct from destroying its target.
+
 Mint must work hand in hand with garbage collection.
 
 **Why:** The user explicitly required their API to be designed together, not

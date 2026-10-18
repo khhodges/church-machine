@@ -1200,3 +1200,17 @@ mtime_ms = 1792327914048
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/3489d647-8053-42c2-b8bc-ae27bc5d6cd4/906d2814-b8cc-425a-8b66-4e744e960864"
 storage_version_token = "1792327926818718"
 content_type = "application/pdf"
+
+[[outputs]]
+id = "kzOeaLM6cCe_uNEHE0A18"
+uri = "file://generated-artifacts/mint-v1.1-destroy-exclusions-fe982067d7.html"
+type = "html"
+title = "Mint V1.1 — DESTROY exclusions — Updated HTML"
+description = "Explicit and GC-requested destruction reject resident and Outform objects before mutation. Newly named review copy."
+logical_id = "6b30b1d7-ce02-4d63-90b8-008abe8dd6c1"
+content_hash = "sha256:8381f23b14a708a6aa5c68ab2cfbb2f2b127e29e66a6ae093a070297101052e8"
+size = 32319
+mtime_ms = 1792328810233
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/6b30b1d7-ce02-4d63-90b8-008abe8dd6c1/30d89a6d-7617-40af-8ec8-1060fd9c7471"
+storage_version_token = "1792328832730377"
+content_type = "text/html"
