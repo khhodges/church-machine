@@ -2,6 +2,12 @@
 
 Status: definition for review; implementation not established.
 
+Current editable Mint source: `simulator/cloomc/mint.cloomc`.
+Open **Programs / Editor → Open File → mint** (the `cloomc` source file).
+It contains the Phase 1 method interfaces and available input/result checks.
+Unfinished bodies remain explicit compilation blockers. This source revision
+does not replace the installed executable Mint LUMP.
+
 ## 1. Mint as a Lambda Calculus Abstraction
 **Primary lifecycle functions: CREATE, DESTROY.**
 

@@ -1,97 +1,201 @@
-// Mint — the GT issuance mechanism.
-//
-// Mint is the only code path that may produce a valid Golden Token (GT).
-// It sits just inside the Abstraction Manager (AM) boundary: the AM verifies
-// a cryptographic identity and decides what capabilities to grant; Mint encodes
-// those capabilities into the 32-bit GT word and returns it as the session handle.
-//
-// Mint does NOT allocate memory and does NOT register NS entries.
-// Those are caller responsibilities (Memory.Allocate → Navana.Add → Mint.Encode).
-//
-// Capabilities:
-//   c-list[0] (CR7) = Navana abstraction  — NS entry reads for gt_seq and type
+; MINT PHASE 1 -- CURRENT EDITABLE SOURCE. IMPLEMENTATION IN PROGRESS.
+; Open File -> mint (cloomc/mint.cloomc).
+; This supersedes the obsolete Encode/Revoke/Transfer source, not the live binary.
+; Native CLOOMC instruction checks below are real source, not host predicates.
+; TODO_* branches deliberately have no destination: compilation MUST fail
+; until the corresponding implementation has been reviewed and supplied.
+; No default success, no private MINT opcode, no live Namespace installation.
+;
+; CREATE / DESTROY retain source indices 0 / 1.
+; MakeOutform / MakeInform are proposed additional entries, indices 2 / 3.
+; Their CR7 target convention is a draft for review, not a deployed ABI.
+; Common input: CR2 credential, CR3 DATA R proof (four words at offset zero).
+; PkVerify must establish credential type/authority; non-NULL is NOT validity.
+; Common output: DR1=1 only after completed body, never assigned by a wrapper.
+; CR1 is a non-NULL result GT except DESTROY, which requires architectural NULL.
+; Preserve CR5/DR5 and architectural CR12..15 rules. DR2..4 are scratch.
+; TODO_FINISH_* must clear other caller-clobbered CRs/DRs before entering
+; each *_result label; retain result CR1 and completion DR1 for checking.
+; This draft checks available NULL/permission/scalar shapes only. Exact GT
+; type, residency, provenance, proof and object-specific output checks are
+; explicit unresolved gates, not silently assumed to pass.
 
-abstraction Mint {
-    capabilities {
-        Navana
-    }
+abstraction ide.Mint {
+capabilities { SELF E }
 
-    // Encode(base, exp, permsBits, bindable, far) → GT
-    //
-    // Assemble a 32-bit Golden Token from its components.
-    //
-    //   base      : 16-bit NS slot index  → GT[15:0]  (slot_id)
-    //   exp       : 7-bit freshness counter → GT[22:16] (gt_seq, from Navana.Add)
-    //   permsBits : 6-bit mask R,W,X,L,S,E → GT[30:25] (LSB=R … bit5=E)
-    //   bindable  : boolean               → GT[31]    (B flag)
-    //   far       : boolean               → NS Entry Word 1 hint (not in GT word)
-    //
-    // Precondition checks (fault and return no GT on violation):
-    //   DOMAIN_PURITY : Turing bits (R,W,X = permsBits[2:0]) must not coexist
-    //                   with Church bits (L,S,E = permsBits[5:3])
-    //   E_ISOLATION   : E (permsBits[5]) must not coexist with L (permsBits[3])
-    //                   or S (permsBits[4])
-    //   NULL_TYPE     : the type read from the NS entry at 'base' must not be 00
-    //
-    public method Encode(base, exp, permsBits, bindable, far) {
-        // --- Domain purity check ---
-        var turingBits = permsBits & 0x7          // R=bit0, W=bit1, X=bit2
-        var churchBits = bfext(permsBits, 3, 3)   // L=bit3, S=bit4, E=bit5
-        if (turingBits && churchBits) {
-            fault(DOMAIN_PURITY)
-        }
+method CREATE {
+    ; CR4: 12-word request; CR8: optional initial content; CR7: NULL.
+    TPERM CR1, CLEAR
+    IADD DR1, DR0, #0
+    TPERM CR2, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR3, R
+    BRANCHNE TODO_RUNTIME_FAULT
+    DREAD DR2, CR3, #3
+    TPERM CR4, R
+    BRANCHNE TODO_RUNTIME_FAULT
+    DREAD DR2, CR4, #11
+    MCMP DR2, #0
+    BRANCHNE TODO_RUNTIME_FAULT
+    DREAD DR2, CR4, #10
+    MCMP DR2, #0
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR7, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    ; Interface version 0x101.
+    DREAD DR2, CR4, #0
+    MCMP DR2, #257
+    BRANCHNE TODO_RUNTIME_FAULT
+    ; Object kind 1..8; GT type 1..3.
+    DREAD DR2, CR4, #1
+    MCMP DR2, #1
+    BRANCHCC TODO_RUNTIME_FAULT
+    MCMP DR2, #8
+    BRANCHHI TODO_RUNTIME_FAULT
+    DREAD DR2, CR4, #2
+    MCMP DR2, #1
+    BRANCHCC TODO_RUNTIME_FAULT
+    MCMP DR2, #3
+    BRANCHHI TODO_RUNTIME_FAULT
+    ; Domain and B each 0..1; permissions 0..7; Owner 0..15.
+    DREAD DR2, CR4, #3
+    MCMP DR2, #1
+    BRANCHHI TODO_RUNTIME_FAULT
+    DREAD DR2, CR4, #4
+    MCMP DR2, #7
+    BRANCHHI TODO_RUNTIME_FAULT
+    DREAD DR2, CR4, #5
+    MCMP DR2, #1
+    BRANCHHI TODO_RUNTIME_FAULT
+    DREAD DR2, CR4, #8
+    MCMP DR2, #15
+    BRANCHHI TODO_RUNTIME_FAULT
+    ; A zero-length payload requires NULL; a nonzero length requires DATA R.
+    DREAD DR2, CR4, #7
+    MCMP DR2, #0
+    BRANCHEQ create_empty_payload
+    TPERM CR8, R
+    BRANCHNE TODO_RUNTIME_FAULT
+    BRANCH create_specific_checks
+create_empty_payload:
+    TPERM CR8, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+create_specific_checks:
+    ; Resolve kind/type consistency, 25-bit Abstract input and unused fields,
+    ; full payload bounds, allocation geometry and hierarchy-specific inputs.
+    BRANCH TODO_CREATE_TYPED_INPUTS
+create_authorize:
+    BRANCH TODO_CREATE_PKVERIFY
+create_body:
+    ; Allocate/issue actual GT, register with GC, put GT in CR1, set DR1=1.
+    BRANCH TODO_CREATE_BODY
+create_finish:
+    BRANCH TODO_FINISH_CREATE
+create_result:
+    MCMP DR1, #1
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR1, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    ; Verify issued type/rights/identity against the frozen request.
+    BRANCH TODO_CREATE_RESULT_TYPE
+create_return:
+    RETURNAL #2
+}
 
-        // --- E-isolation check ---
-        var eBit  = bfext(permsBits, 5, 1)        // E flag
-        var lsBits = bfext(permsBits, 3, 2)       // L and S flags
-        if (eBit && lsBits) {
-            fault(E_ISOLATION)
-        }
+method DESTROY {
+    ; CR7: target. Resident and Outform objects MUST be rejected before mutation.
+    ; CR4/CR8: NULL. Result CR1: NULL; DR1: completed destruction.
+    TPERM CR1, CLEAR
+    IADD DR1, DR0, #0
+    TPERM CR2, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR3, R
+    BRANCHNE TODO_RUNTIME_FAULT
+    DREAD DR2, CR3, #3
+    TPERM CR7, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR4, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR8, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    BRANCH TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM
+destroy_authorize:
+    BRANCH TODO_DESTROY_PKVERIFY_AND_ACTIVE_USE
+destroy_body:
+    ; Kill eligible object, increment released-slot version before freeing,
+    ; zero storage before reuse and update shared Mint/GC records once.
+    BRANCH TODO_DESTROY_BODY
+destroy_finish:
+    BRANCH TODO_FINISH_DESTROY
+destroy_result:
+    MCMP DR1, #1
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR1, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    RETURNAL #0
+}
 
-        // --- Read type from NS entry for slot 'base' ---
-        // Each NS entry is 4 words wide; Word 1 (offset +1) holds the type at bits [27:26].
-        var nsWord1 = read(CR7, base * 4 + 1)
-        var gtType  = bfext(nsWord1, 26, 2)
-        if (gtType == 0) {
-            fault(NULL_TYPE)
-        }
+method MakeOutform {
+    ; Proposed input: CR7 eligible live object, CR4/CR8 NULL.
+    ; Result CR1: Outform for SAME object, not a replacement identity.
+    TPERM CR1, CLEAR
+    IADD DR1, DR0, #0
+    TPERM CR2, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR3, R
+    BRANCHNE TODO_RUNTIME_FAULT
+    DREAD DR2, CR3, #3
+    TPERM CR7, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR4, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR8, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    BRANCH TODO_OUTFORM_INPUT_TYPE_AND_AUTHORITY
+outform_body:
+    ; Preserve identity and backing representation before any local release.
+    BRANCH TODO_OUTFORM_BODY
+outform_finish:
+    BRANCH TODO_FINISH_OUTFORM
+outform_result:
+    MCMP DR1, #1
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR1, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    BRANCH TODO_OUTFORM_RESULT_TYPE_AND_IDENTITY
+outform_return:
+    RETURNAL #2
+}
 
-        // --- Assemble GT word ---
-        var gt = base & 0xFFFF                    // bits [15:0]: slot_id
-        bfins(gt, exp,       16, 7)               // bits [22:16]: gt_seq
-        bfins(gt, gtType,    23, 2)               // bits [24:23]: type
-        bfins(gt, permsBits, 25, 6)               // bits [30:25]: E S L X W R
-        if (bindable) {
-            bfins(gt, 1, 31, 1)                   // bit  [31]:    B (bindable)
-        }
-        return(gt)
-    }
-
-    // Revoke(nsIndex) → newSeq
-    //
-    // Increment gt_seq for NS slot nsIndex modulo 128.
-    // Every outstanding GT for this slot immediately fails the hardware
-    // freshness check.  No scan of outstanding GTs is required.
-    //
-    public method Revoke(nsIndex) {
-        // Each NS entry is 4 words wide; Word 2 (offset +2) holds the gt_seq at bits [31:25].
-        var word2      = read(CR7, nsIndex * 4 + 2)
-        var version    = bfext(word2, 25, 7)
-        var newVersion = (version + 1) & 0x7F
-        bfins(word2, newVersion, 25, 7)
-        write(CR7, nsIndex * 4 + 2, word2)
-        return(newVersion)
-    }
-
-    // Transfer(gt, targetCList, targetSlot)
-    //
-    // Place a GT word into a specific slot of a specific c-list.
-    // This is the only way to deliver a freshly issued GT to a c-list other
-    // than Mint's own.  B=0 does not block Transfer; the B bit constrains
-    // user-level mSave, not Mint's internal placement.
-    //
-    public method Transfer(gt, targetCList, targetSlot) {
-        write(targetCList, targetSlot, gt)
-        return(gt)
-    }
+method MakeInform {
+    ; Proposed input: CR7 Outform, CR4/CR8 NULL.
+    ; Result CR1: Inform for SAME live object. Never resurrect a dead object.
+    TPERM CR1, CLEAR
+    IADD DR1, DR0, #0
+    TPERM CR2, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR3, R
+    BRANCHNE TODO_RUNTIME_FAULT
+    DREAD DR2, CR3, #3
+    TPERM CR7, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    TPERM CR4, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR8, NULL
+    BRANCHNE TODO_RUNTIME_FAULT
+    BRANCH TODO_INFORM_REQUIRE_OUTFORM_AND_AUTHORITY
+inform_body:
+    ; Resolve live object, bind retained destination generation, register GC.
+    BRANCH TODO_INFORM_BODY
+inform_finish:
+    BRANCH TODO_FINISH_INFORM
+inform_result:
+    MCMP DR1, #1
+    BRANCHNE TODO_RUNTIME_FAULT
+    TPERM CR1, NULL
+    BRANCHEQ TODO_RUNTIME_FAULT
+    BRANCH TODO_INFORM_RESULT_TYPE_AND_IDENTITY
+inform_return:
+    RETURNAL #2
+}
 }

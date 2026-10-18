@@ -38,6 +38,27 @@ Do not treat compiler diagnostic counts as separate design blockers or
 assume every mechanism in a proposed interface must be retained. Do not
 bundle unresolved issues into a single implementation approval.
 
+Unfinished Mint must be available as an editable source draft. Implementing
+the method APIs with supported input/result checks is an authorized minimum;
+unfinished bodies must be explicit, not grounds for withholding the source.
+
+**Why:** The user challenged keeping Mint out of the editor and explicitly
+requested coding each method's API and input/result type checks first.
+
+**How to apply:** Expose the draft through the existing source-file editor
+without replacing live Mint or an owned editor buffer. Keep unsupported
+checks and bodies visibly unresolved; never manufacture successful results.
+
+The Phase 1 API/checking source is the current editable Mint, not a separate
+optional draft beside an obsolete current version.
+
+**Why:** After seeing the editable minimum, the user requested: “Make it the
+latest version of Mint.”
+
+**How to apply:** Continue work on the canonical Mint source and preserve
+the previous source as history. Keep unfinished status explicit. Promotion
+of editable source is not proof of a successful compiled or installed release.
+
 The top-level Lambda Calculus Abstraction definition must come first in
 Step 1, before the source/machine audit, helper translation or register ABI.
 

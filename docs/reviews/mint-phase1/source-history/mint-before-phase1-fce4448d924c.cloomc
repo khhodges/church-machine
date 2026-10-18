@@ -1,0 +1,97 @@
+// Mint — the GT issuance mechanism.
+//
+// Mint is the only code path that may produce a valid Golden Token (GT).
+// It sits just inside the Abstraction Manager (AM) boundary: the AM verifies
+// a cryptographic identity and decides what capabilities to grant; Mint encodes
+// those capabilities into the 32-bit GT word and returns it as the session handle.
+//
+// Mint does NOT allocate memory and does NOT register NS entries.
+// Those are caller responsibilities (Memory.Allocate → Navana.Add → Mint.Encode).
+//
+// Capabilities:
+//   c-list[0] (CR7) = Navana abstraction  — NS entry reads for gt_seq and type
+
+abstraction Mint {
+    capabilities {
+        Navana
+    }
+
+    // Encode(base, exp, permsBits, bindable, far) → GT
+    //
+    // Assemble a 32-bit Golden Token from its components.
+    //
+    //   base      : 16-bit NS slot index  → GT[15:0]  (slot_id)
+    //   exp       : 7-bit freshness counter → GT[22:16] (gt_seq, from Navana.Add)
+    //   permsBits : 6-bit mask R,W,X,L,S,E → GT[30:25] (LSB=R … bit5=E)
+    //   bindable  : boolean               → GT[31]    (B flag)
+    //   far       : boolean               → NS Entry Word 1 hint (not in GT word)
+    //
+    // Precondition checks (fault and return no GT on violation):
+    //   DOMAIN_PURITY : Turing bits (R,W,X = permsBits[2:0]) must not coexist
+    //                   with Church bits (L,S,E = permsBits[5:3])
+    //   E_ISOLATION   : E (permsBits[5]) must not coexist with L (permsBits[3])
+    //                   or S (permsBits[4])
+    //   NULL_TYPE     : the type read from the NS entry at 'base' must not be 00
+    //
+    public method Encode(base, exp, permsBits, bindable, far) {
+        // --- Domain purity check ---
+        var turingBits = permsBits & 0x7          // R=bit0, W=bit1, X=bit2
+        var churchBits = bfext(permsBits, 3, 3)   // L=bit3, S=bit4, E=bit5
+        if (turingBits && churchBits) {
+            fault(DOMAIN_PURITY)
+        }
+
+        // --- E-isolation check ---
+        var eBit  = bfext(permsBits, 5, 1)        // E flag
+        var lsBits = bfext(permsBits, 3, 2)       // L and S flags
+        if (eBit && lsBits) {
+            fault(E_ISOLATION)
+        }
+
+        // --- Read type from NS entry for slot 'base' ---
+        // Each NS entry is 4 words wide; Word 1 (offset +1) holds the type at bits [27:26].
+        var nsWord1 = read(CR7, base * 4 + 1)
+        var gtType  = bfext(nsWord1, 26, 2)
+        if (gtType == 0) {
+            fault(NULL_TYPE)
+        }
+
+        // --- Assemble GT word ---
+        var gt = base & 0xFFFF                    // bits [15:0]: slot_id
+        bfins(gt, exp,       16, 7)               // bits [22:16]: gt_seq
+        bfins(gt, gtType,    23, 2)               // bits [24:23]: type
+        bfins(gt, permsBits, 25, 6)               // bits [30:25]: E S L X W R
+        if (bindable) {
+            bfins(gt, 1, 31, 1)                   // bit  [31]:    B (bindable)
+        }
+        return(gt)
+    }
+
+    // Revoke(nsIndex) → newSeq
+    //
+    // Increment gt_seq for NS slot nsIndex modulo 128.
+    // Every outstanding GT for this slot immediately fails the hardware
+    // freshness check.  No scan of outstanding GTs is required.
+    //
+    public method Revoke(nsIndex) {
+        // Each NS entry is 4 words wide; Word 2 (offset +2) holds the gt_seq at bits [31:25].
+        var word2      = read(CR7, nsIndex * 4 + 2)
+        var version    = bfext(word2, 25, 7)
+        var newVersion = (version + 1) & 0x7F
+        bfins(word2, newVersion, 25, 7)
+        write(CR7, nsIndex * 4 + 2, word2)
+        return(newVersion)
+    }
+
+    // Transfer(gt, targetCList, targetSlot)
+    //
+    // Place a GT word into a specific slot of a specific c-list.
+    // This is the only way to deliver a freshly issued GT to a c-list other
+    // than Mint's own.  B=0 does not block Transfer; the B bit constrains
+    // user-level mSave, not Mint's internal placement.
+    //
+    public method Transfer(gt, targetCList, targetSlot) {
+        write(targetCList, targetSlot, gt)
+        return(gt)
+    }
+}
