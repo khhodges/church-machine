@@ -28,8 +28,8 @@ The proposed request fields are being reviewed individually. The original
   determines DATA or CAPABILITY; the caller does not pass Domain separately.
 - **Permissions input: retained.** The caller passes requested permissions,
   restricted by the object category rather than an arbitrary three-bit value.
-  Thread and Namespace permissions are always NONE. Data choices were specified
-  as “all or one (R or W)”; the meaning of “all” needs clarification.
+  Thread and Namespace permissions are always NONE.
+  Data choices are **RW, R or W only**; Execute is not included.
   Church choices are **E, LS or L only**; S alone is not an allowed choice.
 - Remaining field offsets will be settled after the input review. The current
   source still reflects the earlier proposal; its version check is not an
