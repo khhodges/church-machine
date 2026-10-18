@@ -1107,14 +1107,14 @@ content_type = "text/markdown"
 id = "GrIV3BOof04AUEQFRY0Rc"
 uri = "file://docs/reviews/mint-phase1/cloomc-step-1.md"
 type = "text"
-title = "Mint definition — Golden Token first"
-description = "Revised Step 1 leads with the Golden Token as Mint’s tangible product and makes its delivery explicit in successful issuance."
+title = "Mint — PHASE 1 (V1.1) Definition"
+description = "Simplified current definition with historical commentary and superseded alternatives removed."
 logical_id = "edf61049-9522-4fe9-b59b-5e39fe9b2ae1"
-content_hash = "sha256:0a60f1ca1e3edee96170dbfe04c722abaf7416a3a8feb0099f3e4c5f2a4ade71"
-size = 18533
-mtime_ms = 1792319972996
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/edf61049-9522-4fe9-b59b-5e39fe9b2ae1/12366d8c-bd1e-4a65-b969-e4b23441efd1"
-storage_version_token = "1792319988595486"
+content_hash = "sha256:48c8528be2231b8bcb9d97723ddb60d03c969dad8dd91a6bb9a7ac5fa570d80d"
+size = 5468
+mtime_ms = 1792323006892
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/edf61049-9522-4fe9-b59b-5e39fe9b2ae1/5eae4da1-b958-465d-803e-4359754d825d"
+storage_version_token = "1792323023028396"
 content_type = "text/markdown"
 
 [[outputs]]

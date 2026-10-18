@@ -92,6 +92,15 @@ specified these domain names.
 **How to apply:** Include a dedicated Domain row for Inform/Outform; retain
 Abstract's separate Owner-field interpretation.
 
+Keep the Mint V1.1 definition focused on the current definition, without
+earlier thoughts, superseded alternatives or implementation-history commentary.
+
+**Why:** The user explicitly requested removing text about earlier thoughts
+to keep the definition simple.
+
+**How to apply:** Preserve current requirements and clearly undefined details;
+do not turn historical discussions into additional definition clauses.
+
 Verify Namespace persistence against the explicitly selected, approved Phase 1
 profile, not the historical saved-Namespace controls or a replacement UI.
 Retain exact selected revisions and unfinished Resident-intent entries.

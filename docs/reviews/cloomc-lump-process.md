@@ -57,7 +57,7 @@ The mathematical lambda binder is not the machine `LAMBDA` instruction.
 Source syntax, CALL/RETURN conventions, optional machine LAMBDA use, register
 assignments and LUMP geometry are refinements—not the top-level definition.
 
-Mint's first application: [Step 1 audit](mint-phase1/cloomc-step-1.md).
+Mint's first application: [PHASE 1 (V1.1) definition](mint-phase1/cloomc-step-1.md).
 
 ## 2. Implement one complete real path
 

@@ -4,7 +4,7 @@
 
 **CLOOMC delivery correction:** the helper-backed isolated results below do not
 establish an ordinary CLOOMC-compiled Mint LUMP. See the
-[Step 1 source/machine audit](cloomc-step-1.md) and the
+[Mint PHASE 1 (V1.1) definition](cloomc-step-1.md) and the
 [four-step delivery process](../cloomc-lump-process.md). Preserve those earlier
 results as scoped evidence, not completion of editable Mint delivery.
 
