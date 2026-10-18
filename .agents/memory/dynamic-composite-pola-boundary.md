@@ -3,6 +3,12 @@ name: Dynamic state uses ISA protection only
 description: Separates static POLA tooling from runtime changes governed solely by ISA capability checks
 ---
 
+GTs are runtime structures. Do not evaluate them in advance or infer and enforce their intended meaning. The programmer is fully responsible for engineering how they work and what they protect.
+
+**Why:** On 2026-10-18 the user repeated this explicit correction: “If you try to read or enforce a meaning you will be wrong, so stay out of the way!”
+
+**How to apply:** Do not introduce compiler, linker, loader, admission, or preflight gates based on inferred GT purpose or protection policy. Apply the specified machine checks when the relevant operation executes, not speculative semantic evaluation beforehand. This instruction supersedes earlier agent-derived recommendations for advance GT-policy enforcement.
+
 POLA persistence does not apply to dynamic changes. Dynamic reads and writes are governed only by the ISA rules for the capability covering each word: type, permissions, and bounds. Do not add a separate persisted POLA state, automatically save dynamic mutations, or rewrite an existing header because protected content changed.
 
 **Why:** Dynamic state is machine execution state, not a new static policy artifact. Treating it as POLA-persisted state adds authority and lifecycle semantics outside the ISA and incorrectly couples content mutation to header or repository mutation.
