@@ -1,0 +1,14 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const {JSDOM}=require('jsdom');
+const dom=new JSDOM('<div id="editorConsole" class="cmp-html"><button id="compileAction">Inspect compiled code</button></div>',{runScripts:'outside-only'});
+const source=fs.readFileSync(__dirname+'/app-run.js','utf8');
+dom.window.eval(source.slice(source.indexOf('function appendOutput('),source.indexOf('function escapeHtml(',source.indexOf('function appendOutput('))));
+const button=dom.window.document.getElementById('compileAction');
+dom.window.appendOutput('program output','info');
+dom.window.appendOutput('fault details','error');
+assert.equal(dom.window.document.getElementById('compileAction'),button);
+assert.equal(dom.window.document.querySelectorAll('[data-runtime-output]').length,1);
+assert.equal(dom.window.document.querySelector('[data-runtime-output]').textContent,'\nprogram output\nfault details');
+dom.window.close();
+console.log('PASS runtime console retains compile listing and ordered output');

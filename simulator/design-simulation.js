@@ -1,10 +1,26 @@
 // Explicit, admitted ascending replay. Never uses the historical image loader,
-// replaces its machine, installs candidate files, or sends hardware commands.
+// installs candidate files or sends hardware commands.
 (function(root) {
     'use strict';
     let machine = null, provenance = null, frozenWords = null, owner = null;
     let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0, intent = 0;
     let reportedMachine = null, reportedOutput = '', reportedFaults = 0;
+    let previousSimulator = null;
+    function displayMachine(candidate) {
+        if (typeof sim !== 'undefined') {
+            if (!previousSimulator) previousSimulator=sim;
+            sim=candidate;
+        }
+        if (typeof repl !== 'undefined' && repl) repl.sim=candidate;
+        if(typeof root.clearTrace==='function') root.clearTrace();
+    }
+    function refreshDisplays() {
+        if (!machine || typeof sim==='undefined' || sim!==machine) return;
+        machine.running=running;
+        if(typeof root.updateDashboard==='function') root.updateDashboard();
+        if(typeof root.updateThreadControl==='function') root.updateThreadControl();
+        if(typeof root.updateLedStrip==='function') root.updateLedStrip();
+    }
 
     // Runtime output belongs in the existing console, not a second simulator UI.
     function publishExecution() {
@@ -67,6 +83,7 @@
         }
         const host = document.getElementById('designSimulationPanel');
         if (host) host.innerHTML = markup();
+        refreshDisplays();
     }
     function stop() {
         intent++; runEpoch++; running=false;
@@ -79,6 +96,11 @@
         render();
     }
     function invalidate() {
+        if(previousSimulator && typeof sim!=='undefined' && sim===machine) {
+            sim=previousSimulator;
+            if(typeof repl!=='undefined' && repl) repl.sim=sim;
+        }
+        previousSimulator=null;
         generation++; runEpoch++; busy=false; running=false; machine=null; provenance=null; frozenWords=null; owner=null;
         message='Saved revision changed. Prepare a fresh private simulation; previous execution is stopped.';
         render();
@@ -96,6 +118,11 @@
             word0:0x02000001, word1:0, word2:record.slotCount*4-1, word3:0, m:1});
         if (!instance.startEntryThread() || instance.halted)
             throw Error('The admitted entry Thread could not start: '+(instance.faultLog || []).map(f=>f.message).join('; '));
+        instance.simulationConfiguration=Object.freeze({...record});
+        if(typeof instance.on==='function') {
+            if(typeof root._traceRecordStep==='function') instance.on('step',root._traceRecordStep);
+            if(typeof root._onSimFaultSnapshot==='function') instance.on('faultSnapshot',root._onSimFaultSnapshot);
+        }
         return instance;
     }
     async function prepare(throwOnError=false) {
@@ -139,6 +166,7 @@
             const candidate=create(active.words,review);
             check();
             machine=candidate; frozenWords=active.words.slice(); owner=selected;
+            displayMachine(machine);
             provenance={...review,approvedRevisionId:approved.approvedRevisionId}; steps=0;
             message='Fresh selected design loaded and verified. Use Step or Run here. Historical artifacts, installed image and hardware are unchanged.';
             return true;
@@ -174,8 +202,16 @@
     }
     function execute(count) {
         if(!ready()) return false;
+        if(machine.halted) throw Error('Simulation is halted. Use Reset before stepping or running again.');
         try {
-            for(let i=0;i<count && !machine.halted;i++) {machine.step();steps++;}
+            for(let i=0;i<count && !machine.halted;i++) {
+                const result=machine.step();steps++;
+                if(result && typeof root._wukongRecordSimulatorStep==='function') root._wukongRecordSimulatorStep(result);
+                if(result && result.pipeline && typeof _pendingPipelineBuffer!=='undefined') {
+                    _pendingPipelineBuffer={pc:result.physicalPC ?? result.pc,pipeline:result.pipeline};
+                    if(typeof root._flushPendingPipelineBuffer==='function') root._flushPendingPipelineBuffer();
+                }
+            }
             message=machine.halted ? 'Private simulation stopped. Inspect its output/fault below; Reset reuses the same verified bytes.' : 'Executing the exact approved private simulation.';
         } catch(error) {
             running=false;machine.halted=true;message='Simulation stopped: '+error.message;
@@ -200,7 +236,7 @@
     function reset() {
         if(!ready()) return;
         stop();
-        try { machine=create(frozenWords,provenance);steps=0;message='Reset to the same verified image and entry Thread.'; }
+        try { machine=create(frozenWords,provenance);displayMachine(machine);steps=0;message='Reset to the same verified image and entry Thread.'; }
         catch(error) {machine=null;message='Private reset blocked: '+error.message;}
         render();
     }
@@ -213,15 +249,23 @@
             if(action==='walk' && running) { stop(); return true; }
             const selected=selection();
             checkViewedTarget(selected);
-            if(typeof sim!=='undefined' && (sim.running || sim.walkActive) && typeof stopSim==='function') stopSim();
+            if(typeof sim!=='undefined' && sim!==machine && (sim.running || sim.walkActive) && typeof stopSim==='function') stopSim();
             actionIntent=++intent;
             if(!machine || !same(owner)) await prepare(true);
             if(actionIntent!==intent) throw Error('Execution was stopped while preparation was pending. No instruction ran.');
             if(!same(selected)) throw Error('Selection changed before execution.');
             if(action==='prepare') return true;
             if(action==='reset') reset();
-            else if(action==='step') { if(!running) execute(1); }
-            else if(action==='run' || action==='walk') run(action==='walk');
+            else if(action==='step') {
+                if(running) throw Error('Simulation is running. Stop it before stepping.');
+                if(!ready()) throw Error(message);
+                if(machine.halted) throw Error('Simulation is halted. Use Reset before stepping again.');
+                return execute(1);
+            }
+            else if(action==='run' || action==='walk') {
+                if(machine.halted) throw Error('Simulation is halted. Use Reset before running again.');
+                run(action==='walk');
+            }
             else throw Error('Unknown selected simulation action.');
             // Keep the programmer in their chosen view; no internal test panel.
             return true;

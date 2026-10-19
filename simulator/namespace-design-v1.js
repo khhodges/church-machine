@@ -61,6 +61,7 @@
             if (select) select.value = state.active ? state.profile : 'legacy';
             return;
         }
+        if(root.DesignSimulation) root.DesignSimulation.invalidate();
         ++sourceRequest;
         const placement = document.getElementById('namespaceDesignDialog');
         if (placement) placement.remove();

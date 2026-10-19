@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),vm=require('node:vm');
+const Simulator=require('./simulator');
+const memory=new Uint32Array(16384);
+memory[0]=((31<<27)|(64<<10)|(1<<8))>>>0;
+const machine=Simulator.fromAscendingNamespaceImage(memory,{word0:0x02000001,word1:0,word2:255,word3:0,m:1});
+const read=machine.readNSEntry.bind(machine),seen=[];
+machine.readNSEntry=slot=>{
+    assert.notEqual(slot,0,'observers must never interpret metadata as a capability');
+    seen.push(slot);return read(slot);
+};
+assert.equal(machine.getState().namespaceTable[0],null);
+assert.deepEqual(machine.configuredThreadSlots(),[]);
+assert(seen.length>0);
+assert.throws(()=>machine._nsSlotBase(0),/metadata/,'runtime authority checks must remain strict');
+const source=fs.readFileSync(__dirname+'/app-run.js','utf8');
+const start=source.indexOf('function _nsOwnerOf('),end=source.indexOf('\nfunction ',start+1);
+const ctx={sim:machine};
+vm.createContext(ctx);
+vm.runInContext(source.slice(start,end),ctx);
+assert.equal(ctx._nsOwnerOf(256),null);
+console.log('PASS state, Thread and instruction-owner observers exclude metadata; runtime rejects slot zero');

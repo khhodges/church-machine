@@ -18,3 +18,15 @@ had hidden the issue by receiving an existing compiler instance.
 
 **How to apply:** Integration tests should load the real scripts in browser
 order with `module` and `require` absent, including deferred construction paths.
+
+Execution integration checks must exercise the normal state observers, not
+only the interpreter in isolation. Metadata slot zero is not a capability in
+the ascending Namespace, including during state snapshots and UI enumeration.
+
+**Why:** Direct execution passed while browser stepping faulted inside state
+reporting that enumerated slot zero. Connecting a new runtime to existing views
+exposed legacy table assumptions after an instruction had executed.
+
+**How to apply:** Test instruction execution together with state snapshots,
+Thread enumeration, and instruction-owner lookup. Exclude metadata from
+observation without weakening runtime rejection of invalid capability slots.

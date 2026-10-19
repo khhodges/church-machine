@@ -23,8 +23,15 @@ function harness(defect) {
         sim:{activateSimulationConfiguration(){throw Error('legacy activation forbidden');}},
         ChurchSimulator:{fromAscendingNamespaceImage(image,cr15){
             assert.equal(cr15.word2,255);
+            const listeners={};
             const machine={pc:1,dr:Array(16).fill(0),faultLog:[],halted:false,
-                startEntryThread(){return true;},step(){this.pc++;this.dr[1]++;this.halted=this.dr[1]===3;}};
+                listeners,on(name,callback){(listeners[name] ||= []).push(callback);},
+                startEntryThread(){return true;},step(){
+                    this.pc++;this.dr[1]++;this.halted=this.dr[1]===3;
+                    const result={pc:this.pc};
+                    for(const callback of listeners.step || []) callback(result);
+                    return result;
+                }};
             instances.push(machine);return machine;
         }},
         fetch:async(url,options)=>{
@@ -61,10 +68,31 @@ function harness(defect) {
     h.api.reset();assert.equal(h.instances.length,2);assert.equal(h.instances[1].dr[1],0);
     const routed=harness();
     const viewChanges=[];
+    const originalSimulator=routed.scope.sim,frames=[],trace=[],normalTrace=[];
+    routed.scope.updateDashboard=()=>frames.push({sim:routed.scope.sim,pc:routed.scope.sim.pc});
+    routed.scope.updateThreadControl=()=>{};
+    routed.scope._wukongRecordSimulatorStep=result=>trace.push(result);
+    routed.scope._traceRecordStep=result=>normalTrace.push(result);
+    routed.scope._onSimFaultSnapshot=()=>{};
     routed.scope.switchView=view=>viewChanges.push(view);
     assert.equal(await routed.api.command('step'),true);
     assert.equal(routed.instances[0].dr[1],1,'main control executes admitted selected image');
     assert.equal(viewChanges.length,0,'execution does not redirect to an internal testing view');
+    assert.equal(routed.scope.sim,routed.instances[0],'normal displays use the executed machine');
+    assert.equal(frames.at(-1).pc,routed.instances[0].pc);
+    assert.equal(normalTrace.length,1,'normal trace follows the active machine');
+    assert.equal(trace.length,1,'optional simulator-follow trace remains separate');
+    assert.equal(routed.instances[0].listeners.faultSnapshot.length,1,'normal fault panel is connected');
+    routed.instances[0].halted=true;
+    const haltedPC=routed.instances[0].pc;
+    assert.equal(await routed.api.command('step'),false);
+    assert.equal(routed.instances[0].pc,haltedPC);
+    assert.match(routed.api.markup(),/halted.*Reset/);
+    assert.equal(await routed.api.command('reset'),true);
+    assert.equal(routed.scope.sim,routed.instances.at(-1),'Reset updates the display machine too');
+    assert.equal(await routed.api.command('step'),true);
+    routed.api.invalidate();
+    assert.equal(routed.scope.sim,originalSimulator,'leaving the selected runtime restores the prior observer');
     const rejected=harness('rejected');
     assert.equal(await rejected.api.command('run'),false);
     assert.equal(rejected.instances.length,0,'failed admission cannot run a legacy image');

@@ -821,7 +821,7 @@ function _clistTypeLabel(name) {
 
 function _nsOwnerOf(addr) {
     if (!sim || !sim.nsCount) return null;
-    for (let i = 0; i < sim.nsCount; i++) {
+    for (let i = sim._namespaceRuntimeReady ? 1 : 0; i < sim.nsCount; i++) {
         const nsBase  = sim._nsSlotBase(i);
         const loc     = sim.memory[nsBase];
         const w1      = sim.memory[nsBase + 1];
@@ -12643,7 +12643,18 @@ function appendOutput(text, type) {
         // Guard: if the console is showing rich cmp-html content (e.g. a CLOOMC++
         // compile listing with interactive buttons), textContent+= would destroy all
         // child elements. Skip the append so the HTML is never clobbered.
-        if (editorConsole.classList.contains('cmp-html')) return;
+        if (editorConsole.classList.contains('cmp-html')) {
+            let runtime=editorConsole.querySelector('[data-runtime-output]');
+            if(!runtime) {
+                runtime=document.createElement('pre');
+                runtime.dataset.runtimeOutput='';
+                runtime.style.whiteSpace='pre-wrap';
+                editorConsole.appendChild(runtime);
+            }
+            runtime.textContent+='\n'+text;
+            editorConsole.scrollTop=editorConsole.scrollHeight;
+            return;
+        }
         editorConsole.textContent += '\n' + text;
         editorConsole.scrollTop = editorConsole.scrollHeight;
     }

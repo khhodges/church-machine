@@ -3158,7 +3158,9 @@ class ChurchSimulator {
 
     get namespaceTable() {
         const entries = [];
-        for (let i = 0; i < this.nsCount; i++) {
+        const first = this._namespaceRuntimeReady ? 1 : 0;
+        if(first) entries.push(null); // slot zero is metadata, not a capability
+        for (let i = first; i < this.nsCount; i++) {
             entries.push(this.readNSEntry(i));
         }
         return entries;
@@ -5601,7 +5603,7 @@ class ChurchSimulator {
     // numbered generated Thread contexts in numeric order.
     configuredThreadSlots() {
         const slots = [];
-        for (let slot = 0; slot < this.nsCount; slot++) {
+        for (let slot = this._namespaceRuntimeReady ? 1 : 0; slot < this.nsCount; slot++) {
             const entry = this.readNSEntry(slot);
             const header = entry &&
                 this.parseLumpHeader(this.memory[entry.word0_location] >>> 0);
