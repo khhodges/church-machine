@@ -1810,6 +1810,7 @@ async function compileAndBuild(options) {
     _compileDraftToken = _compileDraftSource.token;
 
     const _compileClistSlots = _activeCompileClistSlots();
+    if (window.CompileProgress) window.CompileProgress.stage('Checking source and C-list references…');
     let result = _compileWithActiveClist(source, [], _compileClistSlots);
 
     const _browserMethodAuthorityOnly = result.errors.length > 0 &&
@@ -1833,6 +1834,7 @@ async function compileAndBuild(options) {
     if (typeof fetch === 'function') {
         let _serverCompile;
         try {
+            if (window.CompileProgress) window.CompileProgress.stage('Waiting for the server compiler and reference checks…');
             const _compileResponse = await fetch('/api/compile', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1927,6 +1929,7 @@ async function compileAndBuild(options) {
         // the signed record, rather than browser-local compilation, remains
         // the authority for save admission.
         try {
+            if (window.CompileProgress) window.CompileProgress.stage('Verifying compiler output…');
             const _attestResponse = await fetch('/api/compile/attest', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -2034,6 +2037,7 @@ async function compileAndBuild(options) {
         showNextSteps('error');
         return { ok: false, kind: 'cloomc', error: _frameError };
     }
+    if (window.CompileProgress) window.CompileProgress.stage('Building the candidate and embedded interface…');
     const _compilerFrame = Array.isArray(result.words) && result.compiler_record
         ? await _frameBuilder.lumpInspectContentFrame(result.words) : null;
     if (_compilerFrame && (!_compilerFrame.contentFrameValid ||

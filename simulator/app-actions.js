@@ -188,7 +188,7 @@
         const sourceSurface = options.sourceSurface || 'asmEditor';
         const state = eligibility('compile', snapshot, sourceSurface);
         if (!state.ok) return reportUnavailable('compile', sourceSurface);
-        const result = await Promise.resolve(
+        const compile = () => Promise.resolve(
             typeof smartCompile === 'function'
                 ? smartCompile({
                     source: snapshot, candidateOnly: true, skipSavePlan: true,
@@ -197,6 +197,9 @@
                 })
                 : { ok: false, error: 'The compiler entry point is unavailable.' }
         );
+        const result = await (window.CompileProgress
+            ? window.CompileProgress.run(compile, {closeOnSuccess: activeOperation === 'save'})
+            : compile());
         if (result && result.ok === false) {
             const errors = Array.isArray(result.errors) && result.errors.length
                 ? result.errors : [{line: null, message: result.error || 'Compilation failed. No new candidate was produced.'}];

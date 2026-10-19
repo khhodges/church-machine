@@ -46,6 +46,12 @@ Successful builds and saves should prioritize source beside exact binary disasse
 
 **Why:** The user wants to inspect generated instructions, not have successful audit messages replace that view. Source preservation and binary inspection are independent requirements.
 
+Compilation must provide immediate feedback in a console modal while the user
+waits, not only write diagnostics after completion.
+
+**Why:** The user reported that compilation takes many seconds without feedback
+and explicitly requested progress in a console modal.
+
 Main-view navigation must retain document ownership as well as visible text,
 including a personal draft's separate saved-binary inspection. Only an explicit
 document change should replace that ownership.

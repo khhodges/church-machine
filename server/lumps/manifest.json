@@ -1684,5 +1684,60 @@
     "lump_version": 1,
     "compiled_at": 1792426555.0428784,
     "operation_id": "8536c6f2f9984cabb4a35aece98b2ce3"
+  },
+  {
+    "token": "ff353b57",
+    "abstraction": "ide.CapabilityTest",
+    "filename": "ide.CapabilityTest.1.cc80b80a.lump",
+    "lump_version": 3,
+    "compiled_at": 1792443795.4891934,
+    "operation_id": "5de066a9-5dd9-4017-9271-568e087fb2b8",
+    "output_variants": {
+      "api": {
+        "sha256": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d",
+        "bytes": 2048,
+        "url": "/api/lump-variants/5ed77769e49c047c60a4eb4f201054897eeb95b0b896c10bcad12906966afd3e/api"
+      },
+      "compact": {
+        "sha256": "cfb555a8cacc5416077959a007d96e1525c81a4027c5622ca89569eb8aa52665",
+        "bytes": 4096,
+        "url": "/api/lump-variants/5ed77769e49c047c60a4eb4f201054897eeb95b0b896c10bcad12906966afd3e/compact"
+      },
+      "full": {
+        "sha256": "513d5d75787d13c970eb2fd223222ae9a020e1e71c61980259bda2ef40b9cff4",
+        "bytes": 8192,
+        "url": "/api/lump-variants/5ed77769e49c047c60a4eb4f201054897eeb95b0b896c10bcad12906966afd3e/full"
+      }
+    },
+    "variant_primary_hash": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d",
+    "variant_bundle_id": "5ed77769e49c047c60a4eb4f201054897eeb95b0b896c10bcad12906966afd3e",
+    "variant_compiler_record": {
+      "binary_hash": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d",
+      "source_hash": "2db863573039fb651ca0a52ae2b04f1be476ce6fbea9fbe8598a97a39cab0fa4",
+      "language": "assembly",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "49d34f804719bd118b4794de70f76f44e821d40bef23eb5b3b48e6c1795873ce",
+        "inputs": {
+          "language": "auto",
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "assembly"
+      },
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "9a26cd7eda37fe5956cb08e326cf5354b1fb300e1d08d5e56877dbafb15d85e9"
+    }
   }
 ]
