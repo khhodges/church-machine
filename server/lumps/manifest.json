@@ -1676,5 +1676,13 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "6821dd3700b8a19aad1180bba26aecf5ec77a3d8f319397a8adbe973a184cd85"
     }
+  },
+  {
+    "token": "eca30d09",
+    "abstraction": "ide.WukongCallHome",
+    "filename": "ide.WukongCallHome.1.8d0a25eb.lump",
+    "lump_version": 1,
+    "compiled_at": 1792426555.0428784,
+    "operation_id": "8536c6f2f9984cabb4a35aece98b2ce3"
   }
 ]

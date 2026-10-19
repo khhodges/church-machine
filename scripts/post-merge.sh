@@ -3,6 +3,10 @@ set -e
 
 echo "Post-merge setup complete (no dependencies to install)"
 
+# Replay only the exact reviewed, environment-local ascending draft. This is a
+# normal authenticated selection/CAS save, not an installed-image migration.
+python3 -m server.wukong_callhome_selection
+
 # A task merge may include saved runtime artifacts. Refuse to publish a changed
 # Namespace/image bundle unless the checked-out bundle passes the same read-only
 # semantic and image-admission rules as the server. Code-only merges do not
