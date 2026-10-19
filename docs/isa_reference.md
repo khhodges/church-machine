@@ -823,6 +823,13 @@ Syntax:  RETURN [#mask]
 Encoding: opcode[5]=00011 | cond[4] | 0[11] | mask[12]
 ```
 
+**Frame-specific authority:** Follow the
+[master CALL/LAMBDA distinction](instruction-set.md#return-call-versus-lambda).
+An SZ=0 LAMBDA return preserves every current CR and M bit, including CR6 and
+CR14, and ignores the mask. It restores the saved continuation/indicators in
+the existing context, without CALL-boundary clearing, reconstruction or
+M-window writeback. The following mask rules apply **only to SZ=1 CALL returns**.
+
 `mask` is a 12-bit keep mask in instruction bits [11:0]. For CR0–CR4 and
 CR7–CR11, bit N=1 prevents clearing: keep the current descriptor, including
 any callee changes. Bit N=0 zeros that descriptor directly, without capability
@@ -831,14 +838,13 @@ CR5's descriptor words are unchanged by CALL/RETURN; CR6 is reconstructed
 from the saved caller Enter GT regardless of the mask. Bare `RETURN` uses
 mask=0 and clears all ten controlled CRs. There is no separate CLEAR bit.
 
-**Semantics** (see A.12, A.13):
+**CALL-return semantics** (see A.12, A.13):
 1. M-window writeback fires; faults `INVALID_OP` if writeback fails.
 2. Call stack is checked; empty stack or sentinel frame → `STACK_UNDERFLOW`.
 3. All M-bits are reset across all CRs (`_resetAllMBits`).
 4. The saved Enter GT is revalidated and used to reconstruct CR6 and CR14.
 5. Caller's FLAGS and STO are restored from the packed frame word.
 6. PC ← returnPC.
-   - **SZ = 0 (LAMBDA frame):** PC is restored from `lambdaReturnPC` cache without a memory read (O(1) fast path). `lambdaActive` is cleared.
 7. Apply the keep mask to CR0–CR4 and CR7–CR11. M-bit reset is independent
    of descriptor preservation: all M bits reset, including CR5.M and kept
    registers' M bits, then CR6.M is rearmed.
@@ -851,13 +857,14 @@ simulator inspection snapshot is not architectural state and cannot affect
 RETURN.
 
 The canonical frame and Thread private ABI are unchanged; no snapshots are
-added. Hardware lambda-fast RETURN now derives identity from accepted CR14
-Inform/X, revalidates cLoad and code location, and reconstructs CR6; invalid
-identity/location faults before mask clearing. Its legacy `lambda_pc`
-return-address state still differs from the canonical SZ=0 frame path.
+added. LAMBDA RETURN uses the packed SZ=0 continuation, cached or spilled to
+protected stack memory, and preserves current CRs. Earlier descriptions of
+hardware lambda-fast CR6 reconstruction and mask clearing are implementation
+deviations under the 2026-10-19 clarification, not normative LAMBDA behavior.
+Hardware alignment and its legacy `lambda_pc` state remain separate checks.
 There is no special boot-ROM RETURN bypass for `savedPC=3`. Every successful
-standard or LAMBDA RETURN validates caller context through cLoad and
-reconstructs CR6 before committing the keep-mask clearing. A forged or invalid
+CALL RETURN validates caller context through cLoad and reconstructs CR6 before
+committing the keep-mask clearing. A forged or invalid
 caller companion faults without clearing the controlled descriptors.
 The three-instruction boot establishes the poison-root return PC `0x7FFF`;
 returning through that root faults `STACK_UNDERFLOW`, rather than returning

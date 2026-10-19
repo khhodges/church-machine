@@ -133,6 +133,11 @@ record is approved by this proposal.
 
 Lambda performs one frozen-slot READ/recheck/COMMIT operation per invocation.
 Only its audited code references CR10's nstab RW view; clear CR10 before RETURN.
+**2026-10-19 clarification:** This remains a required pre-return postcondition,
+not permission for RETURN or its host adapter to erase CR10. LAMBDA RETURN
+preserves every CR and ignores the CALL keep mask. The proposed interface has
+no approved separate erasure mechanism; the protected adapter now stops with
+`MINT_CLEANUP_UNBOUND` rather than returning with Namespace authority.
 It remains a leaf: no nested CALL, CHANGE, SWITCH or yield during the update.
 Ordinary CALL/RETURN behavior and CR13 remain unchanged. Any change to existing
 Lambda re-entry semantics requires separate reconciliation rather than being

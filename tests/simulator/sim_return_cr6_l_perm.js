@@ -240,7 +240,7 @@ for (const protectedThread of [false, true]) {
     checkContext(sim, caller);
 }
 
-// The SZ=0 RETURN reconstruction derives the same E identity from CR14.
+// SZ=0 is not a CALL boundary: preserve CR6, including a cleared M bit.
 for (const protectedThread of [false, true]) {
     const {sim, install, activate} = fixture(protectedThread);
     const domain = install(30, [0, sim.encodeInstruction(3, 14, 0, 0, 0)]);
@@ -249,7 +249,9 @@ for (const protectedThread of [false, true]) {
     assert(sim._execLambda({crDst: 14}));
     assert.equal(sim.sto, sto - 1);
     sim.cr[6].m = 0;
+    const currentCRs = sim.cr.map(cr => ({...cr}));
     assert(sim.step());
-    checkContext(sim, domain);
+    assert.deepEqual(sim.cr, currentCRs);
+    assert.equal(sim.cr[14].word1, domain.base);
     assert.equal(sim.sto, sto);
 }

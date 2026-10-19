@@ -225,7 +225,12 @@ class ProtectedCore extends combinedLSProfile(Core) {
                 P.equal(Object.values(this.cr[6]), Object.values(continuation.scope)) &&
                 this.cr[12].word0 === continuation.thread &&
                 ['read', 'written'].includes(c.stage), 'MINT_CONTINUATION');
-            this._clearCR(10);
+            // SZ=0 RETURN must preserve every CR. The old profile-specific
+            // CR10 erasure is not a legal instruction mechanism. Do not
+            // resume the service with retained Namespace authority, or claim
+            // a successful return: quarantine until early cleanup is approved.
+            this.fault('MINT_CLEANUP_UNBOUND');
+            return null;
         } else if (slot === st.plan.roles.verifier.slot) {
             P.context(this, st, 'verifier');
             need(c.stage === 'verified' && frame.companion === st.plan.roles.mint.enter &&

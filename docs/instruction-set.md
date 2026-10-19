@@ -4,6 +4,7 @@
 
 - [Document authority](#document-authority)
 - [Approved Phase 1 contract](#approved-phase-1-contract)
+- [RETURN: CALL versus LAMBDA](#return-call-versus-lambda)
 - [October 2026 amendment reconciliation](#october-2026-amendment-reconciliation)
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
@@ -29,6 +30,30 @@ The one-GT CHANGE and indexed-operand corrections below are authoritative.
 Existing encoding tables and repeated instruction descriptions elsewhere in
 this document remain baseline records pending reconciliation; they do not
 override these corrections or establish a new encoding layout.
+
+## RETURN: CALL versus LAMBDA
+
+**Programmer clarification, 2026-10-19:** Capability clearing on RETURN is a
+security rule for **CALL packets only**, not LAMBDA packets.
+
+- **CALL frame (SZ=1):** retain the existing 12-bit keep-mask contract.
+  Zero bits clear CR0–CR4/CR7–CR11 and set bits keep their current descriptors.
+  CR5 is preserved; caller CR6/CR14 and boundary M-state follow the existing
+  CALL-return rules.
+- **LAMBDA frame (SZ=0):** return to the saved stack continuation in the
+  existing context. Preserve **all current CRs**, including CR6/CR14 and M
+  bits, and their capability homes. Do not apply the keep mask, reconstruct
+  CR6, restore pre-LAMBDA CR snapshots, or perform CALL-boundary M-window
+  writeback/reset. A nonzero encoded mask does not authorize clearing.
+- Select behavior from the **frame being popped**, not the saved previous
+  frame's SZ or a diagnostic flag. Validate the saved continuation before
+  committing the return. No new opcode or encoding is introduced.
+
+This supersedes descriptions that applied CALL cleanup to all RETURN paths.
+In particular, a same-context LAMBDA helper cannot be used to erase Mint
+authority. Simulator behavior is not evidence overriding this rule.
+Hardware alignment remains a separate open check; this clarification does
+not change or approve installed binaries or bitstreams.
 
 ## Approved Phase 1 contract
 

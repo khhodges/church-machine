@@ -30,7 +30,10 @@ Authoritative sources: `hardware/hw_types.py`, `hardware/layouts.py`, `hardware/
 
 ## Deviations — Status Summary
 
-All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviations remain.
+Some historical entries below report closure at the time of their original
+investigation. **D-2 is open for hardware alignment with the 2026-10-19
+CALL/LAMBDA RETURN clarification.** Do not infer current hardware conformance
+from the older closure summaries.
 
 ---
 
@@ -39,7 +42,18 @@ All deviations D-1 through D-12 are **CLOSED/RESOLVED**. No open hardware deviat
 - **Decision (architect, May 2026)**: 64 words is an **advisory minimum** — the `n_minus_6` encoding physically cannot express sub-64-word lumps (`n_minus_6 = 0` gives 64 words; the field has no value for smaller). Hardware never receives a smaller-than-64-word lump because the encoding cannot represent one. The minimum is therefore self-enforcing by encoding, not by a run-time fault check.
 - **Action taken**: `architecture.md` updated; no hardware change required. **CLOSED.**
 
-### D-2: RETURN keep mask — implemented; legacy cLoad bypasses remain
+### D-2: RETURN keep mask — CALL-only; LAMBDA hardware alignment open
+
+**Superseding clarification (2026-10-19):** The
+[master ISA](instruction-set.md#return-call-versus-lambda) limits keep-mask
+clearing to CALL packets. LAMBDA returns in the existing context and preserves
+all CRs/M bits. Its RETURN must not reconstruct CR6 or apply CALL cleanup.
+The simulator now distinguishes these frame kinds. Hardware was not modified
+or revalidated in that correction; the older lambda-fast clearing and CR6
+reconstruction claims below describe behavior requiring reconciliation, not
+approved semantics. No installed binary or bitstream conformance is claimed.
+
+**Historical implementation notes (superseded for LAMBDA):**
 
 - **Superseding explicit user decision**: Low12 is a keep mask, not a restore mask. For CR0–CR4/CR7–CR11, 1 prevents clearing and keeps the current descriptor; 0 zeros it directly. Bits 5/6 are ignored. CR5 descriptor words are unchanged by CALL/RETURN. CR6 is reconstructed from saved caller context independently of the mask. All M bits reset, then CR6 is rearmed.
 - **Scope**: Simulator and hardware implement mask clearing; no CLEAR bit, saved snapshots, or frame/Thread ABI extension. The previous mask-ignored decision and assembler-warning advice are superseded.

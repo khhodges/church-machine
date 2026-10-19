@@ -6013,8 +6013,9 @@ class ChurchSimulator {
     }
 
     _mwinWriteback() {
-        // Validated M-window writeback gate.  Must fire at every normal CALL and
-        // RETURN boundary when CR15.m === 1.  Returns true if the operation may
+        // Validated M-window writeback gate. Must fire at CALL and CALL-frame
+        // RETURN boundaries when CR15.m === 1, never same-context LAMBDA RETURN.
+        // Returns true if the operation may
         // proceed; false if it was aborted (INVALID_OP faulted).
         this._mwinWbFired = false;
         if (!this.cr[15] || this.cr[15].m !== 1) return true;
@@ -6050,7 +6051,7 @@ class ChurchSimulator {
     }
 
     _resetAllMBits() {
-        // CALL and RETURN boundaries reset CRn(M) on every CR.
+        // CALL and CALL-frame RETURN boundaries reset CRn(M) on every CR.
         for (let i = 0; i < 16; i++) this.cr[i].m = 0;
     }
 
@@ -8343,6 +8344,9 @@ class ChurchSimulator {
         // the caller's previous frame and is restored into the indicator.
         const activeFrameSZ = protectedFrame.indicator
             ? protectedFrame.indicator.sz : protectedFrame.frame.sz;
+        // Only CALL frames cross an authority boundary. LAMBDA returns within
+        // the existing context and must preserve every current CR (including M).
+        const isCallReturn = activeFrameSZ === 1;
         // Locate only the non-serialised caller snapshot by the protected
         // frame address.  The protected Thread image, not callStack ordering,
         // owns which frame RETURN is unwinding.
@@ -8412,10 +8416,10 @@ class ChurchSimulator {
                 return null;
             }
         }
-        // Prepare CR6 before any destructive return work. Bit 6 never gates
-        // caller-context reconstruction. LAMBDA shares the caller code identity.
+        // Prepare CR6 only for a CALL return. LAMBDA retains the current CR6,
+        // not a reconstructed descriptor or a saved pre-LAMBDA snapshot.
         let returnCR6 = null;
-        if (protectedFrame.threadBase === null && frame.savedCRs?.[6]) {
+        if (isCallReturn && protectedFrame.threadBase === null && frame.savedCRs?.[6]) {
             // Lump-only adapters lack protected Thread RAM. Use the validated
             // companion identity, not a legacy snapshot's L permission word.
             returnCR6 = {...frame.savedCRs[6], m: 1};
@@ -8429,11 +8433,8 @@ class ChurchSimulator {
                     returnCR6.word3 = entry.word2_seals >>> 0;
                 }
             }
-        } else if (protectedFrame.threadBase !== null) {
-            const identity = activeFrameSZ === 1
-                ? protectedFrame.companionParsed : this.parseGT(this.cr[14].word0);
-            const entry = activeFrameSZ === 1
-                ? protectedFrame.companionCheck.entry : this.readNSEntry(identity.index);
+        } else if (isCallReturn && protectedFrame.threadBase !== null) {
+            const entry = protectedFrame.companionCheck.entry;
             const base = entry.word0_location >>> 0;
             const hdr = this.parseLumpHeader(this.memory[base] >>> 0);
             if (!hdr.valid) {
@@ -8441,38 +8442,39 @@ class ChurchSimulator {
                 return null;
             }
             returnCR6 = {
-                word0: activeFrameSZ === 1 ? protectedFrame.companion
-                    : this.createGT(identity.gt_seq, identity.index, {E: 1}, 1) >>> 0,
+                word0: protectedFrame.companion,
                 word1: (base + hdr.lumpSize - hdr.cc) >>> 0,
                 word2: entry.word1_limit >>> 0,
                 word3: entry.word2_seals >>> 0,
                 m: 1,
             };
         }
-        if (!this._mwinWriteback()) return null;
+        if (isCallReturn && !this._mwinWriteback()) return null;
         if (runtimeFrame) {
             const runtimeIndex = this.callStack.lastIndexOf(runtimeFrame);
             this.callStack.splice(runtimeIndex, 1);
         }
 
-        this._resetAllMBits();   // RETURN boundary: M is reset on all CRs (architecture rule)
+        if (isCallReturn) this._resetAllMBits(); // CALL security boundary only.
 
         // Capture the CALLER's saved CR14 from the frame — RETURN_CR14 payload per
         // debug-packet-protocol.md: "CR14 ← restored from frame (caller's code cap)".
         // frame.savedCRs includes all 16 CRs snapshotted at CALL/LAMBDA time.
-        const _retCallerCR14GT = protectedFrame.companionParsed
+        const _retCallerCR14GT = !isCallReturn ? this.cr[14].word0 >>> 0
+            : protectedFrame.companionParsed
             ? this.createGT(
                 protectedFrame.companionParsed.gt_seq,
                 protectedFrame.companionParsed.index, {X: 1}, 1) >>> 0
             : ((frame.savedCRs && frame.savedCRs[14])
                 ? (frame.savedCRs[14].word0 >>> 0) : 0);
 
-        // MASK prevents clearing: never restore working CRs from savedCRs.
+        // CALL MASK prevents clearing: never restore working CRs from savedCRs.
+        // LAMBDA ignores the mask entirely: descriptors and homes stay intact.
         // CR5 is thread state (descriptor unchanged); CR6 is caller context.
         const tnBaseRet = this._activeThreadBase();
         const clearedCRs = [];
         const preservedCRs = [];
-        for (let i = 0; i < 12; i++) {
+        for (let i = 0; isCallReturn && i < 12; i++) {
             if (i === 5 || i === 6) continue;
             if (mask & (1 << i)) {
                 // Preserve callee's CR_i — it carries a return value to the caller
@@ -8491,9 +8493,9 @@ class ChurchSimulator {
         // isolated-register authority carried across the domain boundary.
         // M is not ordinary saved-register state: the boundary reset above
         // clears every M bit, then RETURN explicitly grants CR6.M.
-        this.cr[6].m = 1;
+        if (isCallReturn) this.cr[6].m = 1;
 
-        if (frame.savedDRs) {
+        if (isCallReturn && frame.savedDRs) {
             // DR1–DR3 are caller-saved argument/return registers.  Preserve the
             // callee's values across RETURN; restore DR4–DR15 from the caller.
             // DR0 remains hardwired zero through _writeDR.
@@ -8531,8 +8533,7 @@ class ChurchSimulator {
                     this.physicalPC = entry.word0_location + 1 + cachedReturnPC;
                 }
             }
-            const maskDesc = mask ? ` MASK=0b${mask.toString(2).padStart(12, '0')} preserved[${preservedCRs.join(',')||'none'}]` : '';
-            const desc = `RETURN (LAMBDA/SZ=0) PC→${cachedReturnPC} [leaf — cached continuation]${maskDesc}`;
+            const desc = `RETURN (LAMBDA/SZ=0) PC→${cachedReturnPC} [same context; all CRs preserved; mask ignored]`;
             this.output += desc + '\n';
             this._emitTrace(this.physicalPC, TRACE_EV_RETURN_POP,  0);
             this._emitTrace(this.physicalPC, TRACE_EV_RETURN_CR6,  this.cr[6].word0  >>> 0);
@@ -10701,14 +10702,16 @@ class ChurchSimulator {
 
     _returnPipeline(d, frame, mask, activeFrameSZ = frame.sz) {
         const stages = [];
-        if (this._mwinWbFired) {
+        if (activeFrameSZ === 1 && this._mwinWbFired) {
             stages.push({ stage: 'MWIN_WB', desc: `M-window writeback: DR11–DR13 → CR15, M cleared`, status: 'pass' });
         }
         stages.push({ stage: 'POP', desc: `Pop ${activeFrameSZ === 0 ? '1-word LAMBDA' : '2-word CALL'} frame; restore FLAGS, STO←${frame.savedSTO}`, status: 'pass' });
         if (activeFrameSZ === 1) {
             stages.push({ stage: 'E-GT', desc: 'Revalidate caller E-GT → re-derive CR6/CR14', perm: 'E', status: 'pass' });
         }
-        stages.push({ stage: 'RETURN', desc: `PC→${frame.returnPC}, MASK=0b${mask.toString(2).padStart(12,'0')} (CR0–4/7–11: 1 prevents clearing, 0 zeros; CR5 unchanged; CR6 reconstructed; M boundary reset)`, status: 'pass' });
+        stages.push({ stage: 'RETURN', desc: activeFrameSZ === 0
+            ? `PC→${frame.returnPC}; same context, all CR descriptors/M bits preserved; MASK ignored`
+            : `PC→${frame.returnPC}, MASK=0b${mask.toString(2).padStart(12,'0')} (CR0–4/7–11: 1 prevents clearing, 0 zeros; CR5 unchanged; CR6 reconstructed; M boundary reset)`, status: 'pass' });
         return stages;
     }
 

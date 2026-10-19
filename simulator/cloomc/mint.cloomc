@@ -37,6 +37,14 @@
 ; CREATE consumes packed DR2 and permission mask DR3 before using scratch.
 ; TODO_<Method>_FINISH must clear other caller-clobbered CRs/DRs before entering
 ; each *_result label; retain result CR1 and completion DR1 for checking.
+; CALL-frame RETURN keep masks erase CR0..4/CR7..11 (and their Thread homes):
+; #2 retains only CR1; #0 retains none. CR5 is preserved, CR6 reconstructed.
+; This is exit cleanup, NOT a binding for the earlier *_CLEAR_* / FINISH gates.
+; LAMBDA-frame RETURN preserves ALL CRs, regardless of mask: same context,
+; not a CALL security boundary. It CANNOT implement any early cleanup helper.
+; Early result/proof/private-authority clearing still needs a legal mechanism.
+; LOAD of NULL faults; zero-permission attenuation is still a non-NULL GT.
+; Do not replace these gates with TPERM CLEAR, host writes or an invented opcode.
 ; This draft checks available NULL/permission/scalar shapes only. Exact GT
 ; type, residency, provenance, proof and object-specific output checks are
 ; explicit unresolved gates, not silently assumed to pass.
@@ -116,7 +124,20 @@ create_data_set_slot:
     ; identifies the executable, not this private label. Do not import the
     ; protected profile's host link/PC selection as ordinary CLOOMC semantics.
     LAMBDA CR9
-    BRANCH TODO_CREATE_CLEAR_LAMBDA_AUTHORITY
+    ; LAMBDA RETURN does not erase CR8 or CR9. Do not proceed to release/issue.
+    BRANCH TODO_CREATE_CLEAR_DESTINATION_AND_LAMBDA_AUTHORITY
+create_data_slot_after_clear:
+    ; Reach only after a separately established legal cleanup mechanism.
+    ; Verify its postcondition before release; these tests do not erase authority.
+    TPERM CR8, NULL
+    BRANCHNE TODO_CREATE_DESTINATION_AUTHORITY_RETAINED
+    TPERM CR9, NULL
+    BRANCHNE TODO_CREATE_LAMBDA_AUTHORITY_RETAINED
+    TPERM CR10, NULL
+    BRANCHNE TODO_CREATE_NS_AUTHORITY_RETAINED
+    ; Release only after confirmed writes AND private authority removal.
+    ; On a fault, accepted writes are not implicitly rolled back.
+    BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION
 create_data_account_and_issue:
     ; Service binding missing: finish GC/accounting after confirmed slot writes,
     ; debit exactly DR6 words once, issue Inform DATA RW B=1 in CR1.
@@ -164,16 +185,12 @@ create_data_slot_write:
     DREAD DR4, CR10, #3, DR7
     MCMP DR4, DR11
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
-    ; Requires a real capability-erasure operation/binding, not TPERM CLEAR.
+    ; Namespace authority must be removed before release. LAMBDA RETURN
+    ; preserves CR10 and therefore cannot satisfy this gate.
     BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY
-create_data_slot_after_clear:
-    ; Release only after confirmation and removal of Namespace authority.
-    ; On a fault, accepted writes are not implicitly rolled back.
-    BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION
-    ; Bare RETURN currently scrubs CR0..4/CR7..11 (including CR8/9/10).
-    ; Its working-register contract needs review with the entry binding;
-    ; this is not the PC-only fast return described in the older Lambda note.
 create_data_slot_return:
+    ; Resume the saved stack continuation in the unchanged context.
+    ; No capability clearing on this SZ=0 return.
     RETURNAL
 }
 
@@ -181,7 +198,8 @@ method DESTROY {
 DESTROY_inputs:
     ; CR7: target. Resident and Outform objects MUST be rejected before mutation.
     ; CR4/CR8: NULL. Result CR1: NULL; DR1: completed destruction.
-    TPERM CR1, CLEAR
+    BRANCH TODO_DESTROY_CLEAR_RESULT_AUTHORITY
+destroy_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_DESTROY_INPUT_CREDENTIAL_NULL
@@ -215,7 +233,8 @@ method MakeOutform {
 MakeOutform_inputs:
     ; Proposed input: CR7 eligible live object, CR4/CR8 NULL.
     ; Result CR1: Outform for SAME object, not a replacement identity.
-    TPERM CR1, CLEAR
+    BRANCH TODO_MakeOutform_CLEAR_RESULT_AUTHORITY
+outform_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_MakeOutform_INPUT_CREDENTIAL_NULL
@@ -248,7 +267,8 @@ method MakeInform {
 MakeInform_inputs:
     ; Proposed input: CR7 Outform, CR4/CR8 NULL.
     ; Result CR1: Inform for SAME live object. Never resurrect a dead object.
-    TPERM CR1, CLEAR
+    BRANCH TODO_MakeInform_CLEAR_RESULT_AUTHORITY
+inform_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_MakeInform_INPUT_CREDENTIAL_NULL

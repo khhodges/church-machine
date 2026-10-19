@@ -16,7 +16,7 @@ function fixture() {
     s.cr[12] = { word0: s.createGT(0, 1, {R: 1, W: 1}, 1), word1: 0, word2: 255, word3: 0, m: 0 };
     for (let slot = 2; slot <= 4; slot++) s.memory[slot * 256] = header(8, 1);
     s.cr[14] = { word0: s.createGT(0, 2, {X: 1}, 1), word1: 512, word2: 63, word3: 0, m: 0 };
-    s.cr[6] = { word0: s.createGT(0, 2, {L: 1}, 1), word1: 575, word2: 63, word3: 0, m: 1 };
+    s.cr[6] = { word0: s.createGT(0, 2, {E: 1}, 1), word1: 575, word2: 63, word3: 0, m: 1 };
     s.memory[17] = s._packProtectedIndicator(241, 1, {});
     s.memory[242] = s.createGT(0, 2, {E: 1}, 1);
     s.memory[243] = s._packFrameWordRaw(0x7FFF, 1, 243);
@@ -132,10 +132,16 @@ for (const lambda of [false, true]) {
         for (const i of [0,1,2,3,4,7,8,9,10,11]) {
             s.cr[i] = {word0: 100+i, word1: 200+i, word2: 300+i, word3: 400+i, m: 1};
         }
-        // A stale diagnostic CR6 must never outrank protected caller context.
+        // A stale diagnostic CR6 must never outrank protected CALL context;
+        // LAMBDA instead preserves the current CR6 exactly, even if changed.
         s.callStack.at(-1).savedCRs[6] = {word0: 0, word1: 999, word2: 0, word3: 0, m: 0};
         s.cr[6] = {word0: 0, word1: 888, word2: 0, word3: 0, m: 0};
+        const currentCRs = s.cr.map(cr => ({...cr}));
         assert.ok(s._execReturn({imm: mask}));
+        if (lambda) {
+            assert.deepEqual(s.cr, currentCRs, 'Lambda return preserves every current CR and M bit');
+            continue;
+        }
         for (const i of [0,1,2,3,4,7,8,9,10,11]) {
             assert.equal(s.cr[i].word0, mask & (1 << i) ? 100+i : 0);
             assert.equal(s.cr[i].m, 0);

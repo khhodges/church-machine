@@ -97,12 +97,14 @@ Source: [ChurchLambda](../../../hardware/lambda_unit.py), CHECK_PERM/EXECUTE;
    core's leaf latch; the JS one-word continuation remains a different model.
    Mint's planned dispatcher must remain a leaf, but that restriction alone
    does not fix entry, capture or validation.
-5. RETURN masks retain **current** CR values. Mask `0x002` can retain CR1;
+5. CALL-frame RETURN masks retain **current** CR values. Mask `0x002` can retain CR1;
    it cannot turn DR bits into a capability. The JS probe proves retention
    of an already present capability; RTL probe proves accepted-mask latching.
    Core/register-bank cleanup and cLoad completion are not exercised by these
    component probes. The proposed private RW/L result-cell alias still grants
    capability-manufacturing power and requires explicit provisioning approval.
+   The 2026-10-19 programmer clarification excludes Lambda packets from mask
+   cleanup: Lambda RETURN preserves every CR, including CR1 and CR6.
 
 **Disposition:** no new binding, opcode, internal X alias, return-frame format
 or result-cell alias is selected here. Settle the Master ISA's explicitly open

@@ -1,5 +1,13 @@
 # Native Mint LAMBDA: entry/return reconciliation
 
+**Superseding programmer clarification, 2026-10-19:** RETURN from LAMBDA
+preserves every current CR; capability clearing applies only to CALL packets.
+The [master ISA correction](../../instruction-set.md#return-call-versus-lambda)
+resolves that return-ABI question. The simulator and inline probes now preserve
+all CRs/M bits and do not reconstruct CR6. The earlier clearing observations
+below describe the rejected implementation, not legal erasure. Entry binding
+and Mint's separate early-cleanup mechanism remain unresolved.
+
 **Status: interface blocker submitted for review, not an ISA amendment.**
 No ordinary simulator instruction, protected-profile implementation, artifact,
 Namespace installation or hardware is changed by this investigation.
@@ -12,11 +20,11 @@ copy or authority over existing storage is introduced.
 |---|---|---|
 | `docs/instruction-set.md`, Document authority, TPERM NULL and EXACT, Services and evidence | Master authority; only Mint's same-scope single-slot LAMBDA references NSRW-GT; Mint's approved contract governs proof/publication | No current rule mapping an own-object X GT to a private source-label offset |
 | `docs/instruction-set-history.md`, LAMBDA | Historical intent: apply X code in caller scope, not a CALL/C-list switch | Historical intent does not choose a new operand encoding or link interface |
-| `docs/lambda-instruction.md` | Older function-application design: branch to code, machine-status PC+4, PC-only fast return, tag 1 for Lambda, no nesting | Not the implemented word-index PC/SZ protocol; not authority to discard current RETURN validation/mask behavior |
+| `docs/lambda-instruction.md` | Older function-application design: branch to code, machine-status PC+4, PC-only fast return, tag 1 for Lambda, no nesting; now links the all-CR preservation correction | Not the implemented word-index PC/SZ protocol; historical cleanup observations do not override the master rule |
 | `docs/isa_reference.md`, A.13 and LAMBDA | Historical baseline: SZ=0, PC+1, CR6/CR14 unchanged, NIA “derived from CRn's lump”, CR6 re-entry exception | “Derived” does not define the private label selector; differs from the older note on tags/nesting |
 | `simulator/simulator.js`, `_execLambda` | Real mLoad X check, Thread geometry check, one-word continuation/cache, protected STO update | Ends with `pc++`; no branch, label lookup or entry offset selection |
-| Same file, `_readProtectedCallFrame` / `_execReturnCore` | Validates protected STO/frame relation and executable return bounds; cached SZ=0 word may supply NIA; applies mask, M reset/CR6 rearm, flags/prior SZ/STO restoration | Not a pure PC-only return; cached frame and diagnostic CR snapshots are not the protected Mint profile's sealed continuation guarantee |
-| `simulator/mint/protected-runtime.js`, `_execLambda` / `_execReturn` | Scoped M2 extension: exact own-object execute GT, checked read/commit link entry, same-artifact bounds, immediate frame flush to private Thread RAM, captured scope/code/thread/frame checks, CR10 clearing, then ordinary RETURN | Does not make that link producer, host entry selection or protected erasure an ordinary CLOOMC instruction |
+| Same file, `_readProtectedCallFrame` / `_execReturnCore` | Validates protected STO/frame relation and executable return bounds; cached SZ=0 word may supply NIA; restores flags/prior SZ/STO while preserving all CRs on Lambda RETURN | CALL alone applies masks, M reset and CR6 reconstruction; cached frame and diagnostic CR snapshots are not the protected Mint profile's sealed continuation guarantee |
+| `simulator/mint/protected-runtime.js`, `_execLambda` / `_execReturn` | Scoped M2 extension: checked read/commit link entry, same-artifact bounds, frame flush and captured context validation; now faults `MINT_CLEANUP_UNBOUND` instead of clearing CR10 and returning | No successful protected Lambda/service return until a separate early-erasure mechanism is approved; no ordinary CLOOMC entry binding is established |
 
 The approved isolated M2 implementation is not authorization to extend ordinary
 CLOOMC. It selects `readEntry` or `commitEntry` from protected invocation stage,
@@ -52,10 +60,10 @@ Before native integration, an architectural decision must specify:
 3. **Continuation authority:** select protected SZ=0 storage/cache rules,
    accepted caller NIA/FLAGS/prior SZ/STO validation and nested/re-entry rules.
    Do not replace these with the older PC-only description by implication.
-4. **Return ABI:** decide whether the existing keep-mask/M behavior applies.
-   Today bare `RETURNAL` in the private body clears CR8/CR9/CR10 as well as other
-   scratch capabilities. A caller must not assume CR8 survives for accounting.
-   A keep-mask is not a substitute for scoped CR10 cleanup or exclusion.
+4. **Return ABI (now resolved):** keep-mask clearing and CALL-boundary M behavior
+   do not apply. LAMBDA RETURN preserves all CRs and M bits, including CR8/9/10
+   and the current CR6/CR14. Mint still needs a separate legal early-erasure
+   mechanism; no Lambda mask can satisfy scoped CR10 cleanup or exclusion.
 
 These are decisions required for a legal binding, not already-approved new
 requirements for all LAMBDA uses. The narrow recommendation is to keep native
@@ -83,8 +91,9 @@ execution, never redirected to a body to claim entry.
   It checks saved NIA, frame/indicator consistency, caller code/scope and
   CR5/CR12–15 descriptors, flags, prior STO/SZ, physical fetch address, cache
   removal, and unchanged Namespace authority (normal mLoad G-bit marking is
-  allowed; CR6 descriptor metadata is rederived). Mask zero scrubs CR8/9/10; mask 4095
-  retains them. Returning to the inline RETURN is intentional diagnostic
+  allowed). CR6 descriptor metadata is preserved, not rederived. Both mask zero
+  and mask 4095 preserve all CRs, including CR8/9/10 and M bits.
+  Returning to the inline RETURN is intentional diagnostic
   evidence and is **not a successful private-body invocation**.
 - Existing source-fragment probes retain exact all-word zeroing and four-word
   slot write/read-back evidence. TPERM CLEAR still does not erase authority.
@@ -93,8 +102,8 @@ execution, never redirected to a body to claim entry.
 
 ## Review disposition
 
-Pending explicit review: accept the identified missing ordinary entry binding
-and continuation/return contract as the remaining interface blocker, or provide
-an authoritative rule resolving it. No runtime or ISA change is authorized by
-accepting the blocker. Successful native private entry **and** return with
+Pending explicit review: resolve the identified missing ordinary entry binding
+and remaining continuation storage details. The programmer has separately
+resolved the CR-preservation rule as noted above; accepting the original
+blocker alone did not authorize that correction. Successful native private entry **and** return with
 protected context intact remain unproven.

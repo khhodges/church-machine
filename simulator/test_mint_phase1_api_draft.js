@@ -28,9 +28,9 @@ assert.equal(compiled.language, 'assembly');
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
         'Every table entry must reach its own method input checks first');
-    assert.match(body, name === 'CREATE'
-        ? /BRANCH TODO_CREATE_CLEAR_RESULT_AUTHORITY/
-        : /TPERM CR1, CLEAR/);
+    assert.match(body, new RegExp(`BRANCH TODO_${name}_CLEAR_RESULT_AUTHORITY`));
+    assert.doesNotMatch(body, /^\s*TPERM\s+CR\d+,\s*CLEAR/m,
+        'No method may use a permission test as capability erasure');
     assert.match(body, /IADD DR1, DR0, #0/);
     assert.doesNotMatch(body, /IADD DR1, DR0, #1\b/, 'Wrapper must not manufacture success');
     for (const label of body.match(/TODO_\w+/g) || []) {
@@ -59,16 +59,24 @@ assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
 assert.ok([...create.matchAll(/^\s*DREAD\s+\w+,\s*(CR\d+)/gm)]
     .every(m=>['CR3','CR10'].includes(m[1])),
     'Reads are confined to proof and private Namespace metadata, never payload');
-assert.match(create, /LAMBDA CR9\s+BRANCH TODO_CREATE_CLEAR_LAMBDA_AUTHORITY/);
+assert.match(create, /LAMBDA CR9[\s\S]*?BRANCH TODO_CREATE_CLEAR_DESTINATION_AND_LAMBDA_AUTHORITY\s+create_data_slot_after_clear:/);
+const continuation = create.slice(create.indexOf('create_data_slot_after_clear:'),
+    create.indexOf('create_data_account_and_issue:'));
+for (const [reg, role] of [[8, 'DESTINATION'], [9, 'LAMBDA'], [10, 'NS']]) {
+    assert.match(continuation, new RegExp(`TPERM CR${reg}, NULL\\s+BRANCHNE TODO_CREATE_${role}_AUTHORITY_RETAINED`));
+}
+assert.ok(continuation.indexOf('TODO_CREATE_SLOT_RELEASE_EXCLUSION') >
+    continuation.indexOf('TODO_CREATE_NS_AUTHORITY_RETAINED'));
 assert.doesNotMatch(create, /^\s*TPERM\s+CR\d+,\s*CLEAR/m,
     'TPERM CLEAR is a test, never authority erasure');
 const slotBody=create.slice(create.indexOf('create_data_slot_lambda:'));
 assert.doesNotMatch(slotBody, /^\s*(CALL|CHANGE|SWITCH|LAMBDA)\b/m);
-assert.match(slotBody, /BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY[\s\S]*BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION/);
-assert.match(slotBody, /create_data_slot_return:\s+RETURNAL/);
+assert.match(slotBody, /BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY\s+create_data_slot_return:/);
+assert.doesNotMatch(slotBody, /TODO_CREATE_SLOT_RELEASE_EXCLUSION|RETURNAL #/);
+assert.match(slotBody, /create_data_slot_return:[\s\S]*RETURNAL/);
 assert.doesNotMatch(create.slice(0,create.indexOf('create_data_slot_lambda:')),
-    /^\s*(?:DREAD|DWRITE|LOAD|TPERM).*CR10\b/m,
-    'Namespace authority is confined to the private Lambda');
+    /^\s*(?:DREAD|DWRITE|LOAD).*CR10\b/m,
+    'Namespace access is confined to the private Lambda; continuation only checks NULL');
 assert.match(create, /BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA/);
 assert.match(create, /BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE/);
 assert.match(create, /BRANCH TODO_CREATE_RESULT_TYPE/);
@@ -85,6 +93,9 @@ function walk(start, dr, destination=[], namespace=[], corruptRead=-1) {
     dr.DR0=0;
     for(let pc=labels.get(start),steps=0;pc<guards.length && steps++<10000;pc++) {
         const line=guards[pc];
+        // This walker does NOT simulate capability erasure or RETURN.
+        // Real simulator coverage owns that boundary.
+        if(line==='create_data_slot_return:') return 'create_data_slot_return';
         if(line.endsWith(':')) continue;
         const [op,...args]=line.replace(/,/g,'').split(/\s+/);
         const value=s=>s.startsWith('#')?Number(s.slice(1)):dr[s];

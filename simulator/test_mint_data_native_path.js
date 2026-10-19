@@ -86,7 +86,8 @@ for (const size of [8, 64, 256]) {
 const slotText = fragment('create_data_slot_offset', 'create_data_slot_return');
 const stops = [...new Set([...slotText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];
 const {s: slotSim, labels: slotLabels, token} = fixture(
-    slotText + '\n' + stops.map(label => label + ':\nHALT').join('\n'));
+    slotText + '\ncreate_data_slot_return:\nHALT\n' +
+    stops.map(label => label + ':\nHALT').join('\n'));
 const selected = 39, offset = slotSim.NS_TABLE_BASE + selected * 4;
 // Test provisioning: choose an in-range empty slot, not an implicit table growth.
 slotSim.memory.fill(0, offset, offset + 4);
@@ -103,7 +104,7 @@ expected.splice(selected * 4, 4, ...descriptor);
 assert.deepEqual(Array.from(slotSim.memory.slice(slotSim.NS_TABLE_BASE,
     slotSim.NS_TABLE_BASE + slotSim.nsCount * 4)), expected);
 assert.notEqual(slotSim.cr[10].word0, 0,
-    'Authority remains at the unresolved erasure boundary; no false cleanup claim');
+    'Authority remains at the unresolved erasure gate; Lambda RETURN must preserve it');
 
 const {s: clearSim} = fixture('TPERM CR10, CLEAR\nHALT');
 const retained = {...clearSim.cr[10]};
@@ -136,7 +137,7 @@ assert.equal(lambdaSim.mLoad(lambdaSim.cr[9].word0, 'X', 9).ok, true,
 // No runtime methods are replaced and no PC is redirected after provisioning.
 for (const mask of [0, 4095]) {
     const {s: ret} = fixture(`LAMBDA CR9\nRETURNAL #${mask}\nHALT`);
-    const context = [5, 6, 12, 13, 14, 15].map(i => ({...ret.cr[i]}));
+    const context = ret.cr.map(cr => ({...cr}));
     const indicator = ret._unpackProtectedIndicator(ret.memory[17]);
     const flags = {...ret.flags};
     const namespace = Array.from(ret.memory.slice(ret.NS_TABLE_BASE,
@@ -161,24 +162,19 @@ for (const mask of [0, 4095]) {
     assert.deepEqual(ret._unpackProtectedIndicator(ret.memory[17]),
         {...indicator, nia: 1}, 'Protected STO/prior SZ restored with current NIA');
     assert.deepEqual(ret.flags, flags);
-    const codeEntry = ret.readNSEntry(40);
-    // CR6 identity/base survive; RETURN rederives descriptor metadata, including
-    // the normal mLoad mark-live G bit and the Namespace integrity word.
-    context[1].word2 = codeEntry.word1_limit;
-    context[1].word3 = codeEntry.word2_seals;
-    assert.deepEqual([5, 6, 12, 13, 14, 15].map(i => ret.cr[i]), context,
-        'Caller scope identity, code fence and protected descriptors preserved');
+    assert.deepEqual(ret.cr, context,
+        'Lambda RETURN preserves ALL descriptors and M bits; no CR6 reconstruction');
     const withoutGC = words => words.map((word, i) =>
         i % 4 === 1 ? (word & ~0x40000000) >>> 0 : word);
     assert.deepEqual(withoutGC(Array.from(ret.memory.slice(ret.NS_TABLE_BASE,
         ret.NS_TABLE_BASE + ret.nsCount * 4))), withoutGC(namespace),
     'Namespace authority unchanged apart from native mLoad G-bit marking');
     for (const reg of [8, 9, 10]) {
-        assert.equal(ret.cr[reg].word0 === 0, mask === 0,
-            'Bare Lambda RETURN scrubs scratch authority; keep-mask retains it');
+        assert.notEqual(ret.cr[reg].word0, 0,
+            'Lambda RETURN preserves private authority for every mask');
     }
 }
 console.log('PASS: native zeroing and exact-slot write/read-back fragments');
-console.log('PASS: isolated inline SZ=0 RETURN restores caller context; mask behavior measured.');
-console.log('BLOCKED: TPERM CLEAR does not erase capability authority.');
+console.log('PASS: isolated inline SZ=0 RETURN resumes the saved context and preserves ALL CRs.');
+console.log('PASS: TPERM CLEAR is a test, not erasure; only CALL-frame RETURN masks supply erasure.');
 console.log('BLOCKED: ordinary LAMBDA falls through; no private-body entry binding. No complete CREATE claim.');

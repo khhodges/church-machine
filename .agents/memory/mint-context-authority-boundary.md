@@ -3,6 +3,30 @@ name: Mint context authority boundary
 description: Keep synthetic context evidence distinct from granting Mint access to protected Thread state.
 ---
 
+The programmer clarified: “The RETURN from LAMBDA should NOT CLEAR any CRs
+that is a security rule that only applies to CALL packets.”
+Lambda returns to the saved stack address in the existing context.
+
+**Why:** Mint cleanup initially treated the simulator's shared RETURN clearing
+as ISA authority. Passing native tests demonstrated that implementation, not
+its architectural correctness. The programmer explicitly rejected applying
+CALL boundary cleanup to same-context Lambda return.
+
+**How to apply:** Never propose a Lambda-return mask as an erasure mechanism.
+Preserve current CRs rather than restoring snapshots or reconstructing CR6.
+Keep Mint's pre-return cleanup gates unresolved until a separate legal
+mechanism is established. Separate entry failures from continuation loss.
+Do not substitute host redirection or claim hardware alignment from simulator
+tests. The master ISA carries the normative rule.
+
+Apply that rule to protected adapters too: a host-side clear immediately before
+delegating to ordinary Lambda RETURN is still forbidden return-time erasure.
+If a service requires private authority removed before resumption and lacks a
+legal mechanism, stop rather than return with that authority.
+
+**Why:** Correcting the ordinary core alone left the isolated protected profile
+enforcing the rejected behavior through its own pre-return hook.
+
 **2026-10-17 superseding approval:** The user explicitly approved implementation
 of the proposed protected Mint interfaces in the isolated simulator, with no
 live installation or hardware changes. New candidates use `ide.*` identities

@@ -1,5 +1,18 @@
 # Protected Mint: isolated executable implementation
 
+**Superseded operational status — 2026-10-19:** The programmer clarified that
+LAMBDA RETURN preserves every CR; only CALL packets apply security cleanup.
+The protected adapter previously erased CR10 immediately before returning.
+That shortcut has been removed. A valid protected Lambda return now faults
+`MINT_CLEANUP_UNBOUND` and quarantines the instance, before the first
+publication or returned result. No legal early-erasure mechanism is yet bound.
+The successful service runs and positive acceptance tests described below are
+historical evidence, not current acceptance. Do not bypass the gate to restore
+them. Current fail-closed coverage is
+`node tests/mint_phase1/protected_lambda_cleanup.test.js`, also included in
+`mint-authority-removal-tests`. Fault scrubbing is containment after execution
+has stopped, not a successful RETURN cleanup operation.
+
 **Scope: isolated simulator implementation, not full-profile acceptance, live
 installation, production credential custody, RTL or hardware evidence.**
 
@@ -112,7 +125,8 @@ The linked address is logical code PC: physical fetch is the actual descriptor
 base + header word + PC, never a relocated descriptor or fabricated callable
 nstab object. CR6 scope is preserved. The existing protected SZ=0 frame contains
 NIA/flags/prior STO; a private machine record additionally binds the original
-code/bounds, scope, Thread and accepted frame bytes. RETURN revalidates both.
+code/bounds, scope, Thread and accepted frame bytes. RETURN revalidates both,
+then stops at the unresolved cleanup gate described above.
 No new Thread frame packing is introduced.
 
 READ and COMMIT are separate leaf invocations; PkVerify runs between them under

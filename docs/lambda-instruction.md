@@ -36,6 +36,17 @@ LAMBDA CRn
 - **E (Enter)**: Reserved for CALL — domain crossing with full ceremony (stack frame, C-List switch, mLoad revalidation).
 - The distinction is Church's: λ-application within a scope (LAMBDA/X) vs. service invocation across a boundary (CALL/E).
 
+
+## RETURN preservation rule
+
+The [master ISA clarification](instruction-set.md#return-call-versus-lambda)
+requires LAMBDA RETURN to preserve **all current CRs**, including CR6/CR14,
+M bits and capability homes. It resumes the saved stack continuation in the
+existing context. The RETURN keep mask and security-boundary cleanup apply
+only to CALL packets, never SZ=0 Lambda packets. Do not reconstruct CR6,
+restore saved CR snapshots or use a Lambda RETURN as a capability eraser.
+Historical fast-path descriptions below do not override that distinction.
+
 ## Execution: Machine-Status Fast Path
 
 ### LAMBDA Entry:

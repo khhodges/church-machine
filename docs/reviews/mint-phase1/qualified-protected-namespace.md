@@ -1,5 +1,13 @@
 # Protected Mint with the complete qualified Namespace
 
+**Current status, 2026-10-19:** The acceptance below is historical. The
+programmer's all-CR-preserving LAMBDA RETURN rule invalidates the protected
+adapter's former CR10-erasure shortcut. The adapter now faults
+`MINT_CLEANUP_UNBOUND` at its first protected Lambda return instead of
+publishing or delivering a result. Qualified positive service acceptance must
+be repeated only after a separate legal early-erasure mechanism is approved.
+See [the protected-runtime status](protected-simulator.md).
+
 **2026-10-18 — isolated, hash-pinned simulator acceptance. No live installation,
 hardware, production credentials, or new recipients/Replace/Destroy grants.**
 
