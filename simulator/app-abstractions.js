@@ -1122,32 +1122,50 @@ window.addEventListener('beforeunload', function (e) {
     }
 });
 
-async function renderLumps() {
+async function renderLumps(options) {
+    const requestId = (window._lumpRepositoryRequestId || 0) + 1;
+    window._lumpRepositoryRequestId = requestId;
+    if (options && options.followExecution) window._lumpRepositoryFollowsExecution = true;
     const listEl = document.getElementById('lumpsListContent');
     if (!listEl) return;
     listEl.innerHTML = '<div class="lumps-loading">Loading lumps...</div>';
 
     try {
-        const r = await fetch('/api/lumps/list');
+        const design = window.NamespaceDesignV1;
+        if (design && design.state.active && !design.state.document) {
+            await design.load();
+            if (window._lumpRepositoryRequestId !== requestId) return;
+            if (!design.state.document) {
+                window.LumpRegistry.setCurrent(null);
+                _showUnresolvedExecutedLump({absName: 'Selected Namespace', cw: null});
+                listEl.textContent = 'Selected Namespace is unavailable. Open Namespace and retry; no catalog default was selected.';
+                return;
+            }
+        }
+        // A Namespace may remain pinned after a newer save archives its
+        // revision. History supplies metadata, never selection authority.
+        const r = await fetch('/api/lumps/list?include_archived=1');
         if (!r.ok) throw await _actionableResponseError(r, 'Load the LUMP repository', {
             dataChanged: false,
             nextAction: 'Check the IDE connection, then click Refresh.',
         });
         let lumps = await r.json();
+        if (window._lumpRepositoryRequestId !== requestId) return;
         if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
 
-        // Abstraction-name-based pending navigation (set by _goToLumpByAbstractionName).
-        // Prefer user-saved (versioned, floating) over boot-resident when names clash.
+        // A name-based navigation resolves only through the selected Namespace.
         if (_pendingLumpAbstractionName) {
-            const _allMatched = lumps.filter(l => l.abstraction === _pendingLumpAbstractionName);
-            const _matched = _allMatched.find(l => l.version && (l.ns_slot === null || l.ns_slot === undefined))
-                          || _allMatched[0];
+            window._lumpRepositoryFollowsExecution = false;
+            const _targetState = {absName: _pendingLumpAbstractionName, ignoreFocus: true};
+            const _matched = _namespaceLumpSelection(lumps, _targetState);
             if (_matched && window.LumpRegistry) {
                 window.LumpRegistry.setCurrent(_matched.token);
                 if (_pendingLumpMethodName && _matched.token) {
                     window._pendingLumpTab = (typeof _pendingLumpMethodTarget !== 'undefined' && _pendingLumpMethodTarget === 'hexdump')
                         ? 'hexdump' : 'content';
                 }
+            } else {
+                _showUnresolvedExecutedLump(_targetState);
             }
             _pendingLumpAbstractionName = null;
         }
@@ -1159,12 +1177,14 @@ async function renderLumps() {
         if (window.LumpRegistry) {
             const _ptToken = window.LumpRegistry.consumePending();
             if (_ptToken) {
+                window._lumpRepositoryFollowsExecution = false;
                 if (!lumps.some(l => l.token === _ptToken)) {
                     try {
                         const _detailResponse = await fetch(
                             `/api/lumps/${encodeURIComponent(_ptToken)}/detail`);
                         if (_detailResponse.ok) {
                             const _historicalDetail = await _detailResponse.json();
+                            if (window._lumpRepositoryRequestId !== requestId) return;
                             if (_historicalDetail && _historicalDetail.archived === true) {
                                 lumps = lumps.concat([_historicalDetail]);
                                 window.LumpRegistry.registerFromServer(lumps);
@@ -1191,46 +1211,25 @@ async function renderLumps() {
         // Keep the Live LUMP banner and repository detail on one identity.
         // Priority order:
         //   1. Pending token (already consumed above) — highest priority.
-        //   2. Live CR14 abstraction — select its latest saved primary revision.
-        //      The exact live token still belongs in the execution-identity
-        //      banner, but it must not force editor/Run back to an older
-        //      boot-resident binary after a newer revision has been saved.
+        //   2. Exact live CR14 artifact when entering from execution.
         //   3. Browsing history — only when there is no live executable LUMP.
-        if (!_pendingTokenResolved && window.LumpRegistry) {
+        if (!_pendingTokenResolved && window.LumpRegistry &&
+                window._lumpRepositoryFollowsExecution !== false) {
             const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
-            const _liveToken = (_liveState && typeof sim !== 'undefined' && sim &&
-                                typeof sim.lumpTokenAtSlot === 'function')
-                ? sim.lumpTokenAtSlot(_liveState.nsIdx) : null;
-            const _liveSaved = _liveToken && lumps.some(l => l.token === _liveToken);
+            const _liveRow = _namespaceLumpSelection(lumps, _liveState);
+            const _liveSaved = !!_liveRow;
             if (_liveSaved) {
-                const _liveRow = lumps.find(l => l.token === _liveToken);
-                const _latestLiveRevision = _liveRow
-                    ? _latestPrimaryLump(lumps, _liveRow.abstraction)
-                    : null;
-                window.LumpRegistry.setCurrent(
-                    _latestLiveRevision ? _latestLiveRevision.token : _liveToken);
-            } else if (!window.LumpRegistry.getCurrent()) {
-                let _histToken = null;
-                try { _histToken = localStorage.getItem('lastSelectedLumpToken'); } catch (_e) {}
-                if (_histToken) window.LumpRegistry.setCurrent(_histToken);
+                window.LumpRegistry.setCurrent(_liveRow.token);
+            } else if (_liveState) {
+                _showUnresolvedExecutedLump(_liveState);
+            } else {
+                _showUnresolvedExecutedLump({absName: 'Selected Namespace', cw: null});
             }
         }
 
-        // A persisted browser selection may point at an older token that
-        // shares an abstraction name with a newer active save. This can happen
-        // when a destination-bound correction moves the live artifact to a new
-        // token. History remains available from its own tab, but repository,
-        // editor, and Compile must follow the latest active primary revision.
-        if (!_pendingTokenResolved && window.LumpRegistry) {
-            const _currentToken = window.LumpRegistry.getCurrent();
-            const _currentRow = lumps.find(l => l.token === _currentToken);
-            if (_currentRow) {
-                const _primary = _latestPrimaryLump(lumps, _currentRow.abstraction);
-                if (_primary && _primary.token !== _currentToken) {
-                    window.LumpRegistry.setCurrent(_primary.token);
-                }
-            }
-        }
+        // An exact executed or explicitly selected revision is navigation
+        // authority. A newer save is not permission to substitute another LUMP.
+        if (window._lumpRepositoryRequestId !== requestId) return;
 
         const _selTok = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
 
@@ -1337,8 +1336,9 @@ async function renderLumps() {
         if (_selTok) {
             // Always re-render the detail panel so compress/POLA/save changes
             // (lump_size, cc, etc.) are reflected without a manual click.
-            if (typeof window.showLumpDetail === 'function') window.showLumpDetail(_selTok);
-            else if (typeof showLumpDetail === 'function') showLumpDetail(_selTok);
+            const focusOptions = { executionFocus: window._lumpRepositoryFollowsExecution !== false };
+            if (typeof window.showLumpDetail === 'function') window.showLumpDetail(_selTok, focusOptions);
+            else if (typeof showLumpDetail === 'function') showLumpDetail(_selTok, focusOptions);
             // Sync the "Viewing: <name>" label directly — showLumpDetail is async
             // so the label would stay hidden until the fetch completes. Calling
             // _updateLumpViewingLabel here covers the synchronous restore path
@@ -1411,6 +1411,8 @@ function _updateLumpRepoCount(x, y) {
 
 // Called by the lump picker <select> when the user chooses a different lump.
 window.lumpPickerChanged = function(token) {
+    window._lumpRepositoryFollowsExecution = false;
+    window._lumpRepositoryRequestId = (window._lumpRepositoryRequestId || 0) + 1;
     if (!token) {
         _updateLumpViewingLabel('');
         _setLumpRepositoryCollapsed(false);
@@ -1659,20 +1661,191 @@ let _liveLumpLastNsIdx = null;
 let _liveLumpLastToken = null;
 let _liveLumpInputCache = { name: '', version: '' };
 
+function _namespaceExecutionKey(state) {
+    return state && Number.isInteger(state.nsIdx)
+        ? JSON.stringify([state.nsIdx, state.absName, state.baseLoc]) : '';
+}
+
+function _namespaceLumpTarget(state) {
+    const design = window.NamespaceDesignV1 && window.NamespaceDesignV1.state;
+    const rows = design && design.active
+        ? design.document && design.document.rows
+        : window._nsState && window._nsState.abstractions;
+    if (!Array.isArray(rows)) return null;
+    // A deliberate Namespace click wins only within that execution context.
+    // Starting a different program invalidates old focus, but never changes an
+    // explicitly browsed repository selection (_sync checks its mode first).
+    const canReconcile = !state || (!state.ignoreFocus && Number.isInteger(state.nsIdx));
+    if (design && design.active && Number.isInteger(design.focusedSlot) &&
+            canReconcile && design.focusedExecutionKey !== _namespaceExecutionKey(state)) {
+        delete design.focusedSlot;
+        delete design.focusedExecutionKey;
+    }
+    // The programmer's selected Namespace is the master. A live slot from
+    // another layout must not select that layout's unrelated occupant.
+    const named = state ? rows.filter(row => row.name === state.absName) : [];
+    const focused = !(state && state.ignoreFocus) && design && design.active && Number.isInteger(design.focusedSlot)
+        ? rows.find(row => row.slot === design.focusedSlot) : null;
+    const row = focused || (named.length === 1 ? named[0] :
+        named.find(row => Number(row.slot) === Number(state.nsIdx)));
+    if (!row) return null;
+    const selected = row.selection || row;
+    return {
+        token: selected.token, filename: selected.filename,
+        binary_hash: selected.binaryHash || selected.binary_hash,
+        abstraction: row.name, slot: row.slot,
+    };
+}
+
+function _namespaceLumpSelection(lumps, state) {
+    const selected = _namespaceLumpTarget(state);
+    if (!selected || !/^[0-9a-f]{8}$/i.test(selected.token || '') ||
+            !selected.filename || !/^[0-9a-f]{64}$/i.test(selected.binary_hash || '')) return null;
+    // The catalog supplies metadata for this exact assignment only. Neither
+    // an unseen catalog record nor a "latest" revision can choose the target.
+    return lumps.find(row => String(row.token).toLowerCase() === selected.token.toLowerCase() &&
+        row.filename === selected.filename &&
+        String(row.binary_hash).toLowerCase() === selected.binary_hash.toLowerCase()) || null;
+}
+
+function _executedLumpSelection(lumps, state) {
+    if (!state || typeof sim === 'undefined' || !sim || !Array.isArray(lumps)) return null;
+    const selected = _namespaceLumpSelection(lumps, state);
+    if (!selected) return null;
+    const normalize = value => String(value || '').replace(/^0x/i, '').toLowerCase();
+    // Localization changes C-list bytes, so a CRC of live RAM need not be the
+    // saved token. Prefer the exact identity registered at installation, never
+    // a name/slot join or the newest same-name revision.
+    const identity = typeof sim.getSlotIdentity === 'function'
+        ? sim.getSlotIdentity(state.nsIdx) : null;
+    if (identity && /^[0-9a-f]{64}$/i.test(identity.binaryHash || '')) {
+        return normalize(selected.binary_hash) === normalize(identity.binaryHash) ? selected : null;
+    }
+    const token = typeof sim.lumpTokenAtSlot === 'function'
+        ? sim.lumpTokenAtSlot(state.nsIdx) : null;
+    return token && normalize(selected.token) === normalize(token) ? selected : null;
+}
+
+function _showUnresolvedExecutedLump(state) {
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(null);
+    _liveLumpLastToken = null;
+    if (typeof _updateLumpViewingLabel === 'function') _updateLumpViewingLabel('');
+    const title = document.getElementById('lumpsDetailTitle');
+    const content = document.getElementById('lumpsDetailContent');
+    const selected = _namespaceLumpTarget(state);
+    if (title) title.textContent = (selected ? selected.abstraction : state.absName) +
+        ' — Namespace assignment unavailable';
+    if (content) content.innerHTML =
+        '<p role="status">No exact artifact for this program could be opened from the selected Namespace list. ' +
+        'Check its assigned filename and identity in Namespace. No catalog fallback or newer revision was substituted. ' +
+        'The code below is a separate snapshot of the running image, not the selected Namespace source.</p>' +
+        '<pre aria-label="Executed code snapshot">' + _escHtml(
+            _executedCodeText(state, Number.isInteger(state.cw) && state.cw >= 0
+                ? Array.from(sim.memory.slice(state.baseLoc + 1, state.baseLoc + 1 + state.cw)) : [])) +
+        '</pre>' +
+        '<button class="btn" onclick="_openExecutedLumpInEditor()">Inspect executed code</button>';
+}
+
+function _executedCodeText(state, words) {
+    return words.map((word, i) => {
+        const hex = value => (value >>> 0).toString(16).padStart(8, '0');
+        const decoded = typeof assembler !== 'undefined' && assembler &&
+            typeof assembler.disassemble === 'function' ? assembler.disassemble(word) : '';
+        return '0x' + hex(state.baseLoc + 1 + i) + '  0x' + hex(word) + '  ' + decoded;
+    }).join('\n') || 'No valid executable extent is available.';
+}
+
+async function _openProgrammerEditor() {
+    const guard = window._captureEditorWriteGuard('open selected Namespace program');
+    try {
+        const design = window.NamespaceDesignV1;
+        if (design && design.state.active && !design.state.document) await design.load();
+        if (!guard.accepts()) return;
+        const live = typeof _getLiveLumpState === 'function' ? _getLiveLumpState() : null;
+        const selected = _namespaceLumpTarget(live);
+        if (selected) {
+            const frozen = JSON.stringify(selected);
+            return await openLumpInEditor(selected.token, {
+                exactSavedArtifact: selected, writeGuard: guard, confirmReplacement: true,
+                accepts: () => JSON.stringify(_namespaceLumpTarget(live)) === frozen,
+            });
+        }
+        if (live) return await _openExecutedLumpInEditor();
+        // With no selected program, retain the programmer's own document.
+        // No built-in example or catalog default is loaded.
+        switchView('editor');
+    } catch (error) {
+        if (typeof appendOutput === 'function') appendOutput(
+            'Could not open the selected Namespace program: ' + error.message +
+            '. Your draft is unchanged. Check the Namespace assignment and retry.', 'error');
+    }
+}
+
+async function _openExecutedLumpInEditor() {
+    const state = typeof _getLiveLumpState === 'function' ? _getLiveLumpState() : null;
+    if (!state) { switchView('editor'); return; }
+    const guard = window._captureEditorWriteGuard('open executed program');
+    // Freeze the inspected bytes before any fetch. No fabricated source or
+    // slot/name-based catalog fallback is permitted.
+    const words = Number.isInteger(state.cw) && state.cw >= 0
+        ? Array.from(sim.memory.slice(state.baseLoc + 1, state.baseLoc + 1 + state.cw)) : [];
+    const selectedBefore = typeof sim.getSlotIdentity === 'function'
+        ? sim.getSlotIdentity(state.nsIdx) : null;
+    const tokenBefore = typeof sim.lumpTokenAtSlot === 'function'
+        ? sim.lumpTokenAtSlot(state.nsIdx) : null;
+    const namespaceBefore = JSON.stringify(_namespaceLumpTarget(state));
+    try {
+        if (window.LumpRegistry && !window.LumpRegistry.isServerListFetched())
+            await window.LumpRegistry.warmServerList();
+        if (!guard.accepts() || JSON.stringify(_namespaceLumpTarget(state)) !== namespaceBefore) return;
+        const current = _getLiveLumpState();
+        if (!current || current.nsIdx !== state.nsIdx || current.baseLoc !== state.baseLoc ||
+                (sim.getSlotIdentity && sim.getSlotIdentity(state.nsIdx) !== selectedBefore) ||
+                (sim.lumpTokenAtSlot && sim.lumpTokenAtSlot(state.nsIdx) !== tokenBefore)) return;
+        const row = _executedLumpSelection(_lumpsCache, state);
+        if (row && row.filename && /^[0-9a-f]{64}$/i.test(row.binary_hash || '')) {
+            return await openLumpInEditor(row.token, {
+                executionFocus: true, writeGuard: guard,
+                exactSavedArtifact: row,
+            });
+        }
+        // Keep the draft untouched when no exact source is available. This
+        // read-only snapshot is explicitly code from this execution, not source.
+        const dialog = document.createElement('dialog');
+        dialog.style.cssText = 'max-width:90vw;max-height:85vh;overflow:auto';
+        const title = document.createElement('h2');
+        title.textContent = state.absName + ' — executed code';
+        const note = document.createElement('p');
+        note.textContent = 'Exact saved source is unavailable. This is a read-only snapshot of simulator code, not a replacement program. Your editor draft is unchanged.';
+        const pre = document.createElement('pre');
+        pre.textContent = _executedCodeText(state, words);
+        const close = document.createElement('button');
+        close.textContent = 'Close inspection';
+        close.onclick = () => dialog.close();
+        dialog.addEventListener('close', () => dialog.remove());
+        dialog.append(title, note, pre, close);
+        document.body.appendChild(dialog);
+        dialog.showModal();
+    } catch (error) {
+        if (typeof appendOutput === 'function') appendOutput(
+            'Could not open executed code: ' + error.message +
+            '. Your draft is unchanged. Retry opening the program.', 'error');
+    }
+}
+
 function _syncLumpRepositoryToLive(state) {
-    if (!state || !window.LumpRegistry || typeof sim === 'undefined' || !sim ||
-            typeof sim.lumpTokenAtSlot !== 'function') return;
-    const token = sim.lumpTokenAtSlot(state.nsIdx);
-    if (!token || token === _liveLumpLastToken) return;
-    _liveLumpLastToken = token;
-    if (!Array.isArray(_lumpsCache) || !_lumpsCache.some(l => l.token === token)) return;
+    if (!state || !window.LumpRegistry || window._lumpRepositoryFollowsExecution === false) return;
+    const selected = _namespaceLumpSelection(_lumpsCache, state);
+    if (!selected) { _showUnresolvedExecutedLump(state); return; }
+    const token = selected.token;
     if (window.LumpRegistry.getCurrent() === token) return;
 
+    _liveLumpLastToken = token;
     window.LumpRegistry.setCurrent(token);
     const picker = document.getElementById('lumpPickerSelect');
     if (picker) picker.value = token;
     if (typeof _updateLumpViewingLabel === 'function') _updateLumpViewingLabel(token);
-    if (typeof showLumpDetail === 'function') showLumpDetail(token);
+    if (typeof showLumpDetail === 'function') showLumpDetail(token, {executionFocus: true});
 }
 
 function updateLiveLumpBanner() {
@@ -1689,6 +1862,23 @@ function updateLiveLumpBanner() {
         return;
     }
     _syncLumpRepositoryToLive(state);
+    const assigned = _namespaceLumpSelection(_lumpsCache, state);
+    const executed = _executedLumpSelection(_lumpsCache, state);
+    // A changed Namespace assignment is not the running image. Never label
+    // its different revision as LIVE above the selected artifact's details.
+    if (assigned && !executed) {
+        el.style.display = 'none';
+        return;
+    }
+    // Explicit repository browsing owns the page. Do not place a different
+    // live program's heading above the selected artifact's body.
+    if (window._lumpRepositoryFollowsExecution === false) {
+        const live = _executedLumpSelection(_lumpsCache, state);
+        if (!live || window.LumpRegistry.getCurrent() !== live.token) {
+            el.style.display = 'none';
+            return;
+        }
+    }
     const e = _escHtml;
     const nsChanged = (state.nsIdx !== _liveLumpLastNsIdx);
     _liveLumpLastNsIdx = state.nsIdx;

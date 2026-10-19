@@ -21,7 +21,13 @@ function _openLumpVariantInspector(token) {
     if (button) button.click();
 }
 
-function showLumpDetail(token) {
+function showLumpDetail(token, options) {
+    if (!(options && options.executionFocus)) window._lumpRepositoryFollowsExecution = false;
+    if (!(options && options.executionFocus)) {
+        window._lumpRepositoryRequestId = (window._lumpRepositoryRequestId || 0) + 1;
+        const banner = document.getElementById('liveLumpBanner');
+        if (banner) banner.style.display = 'none';
+    }
     _lumpEditDirty = false;
     if (window.LumpRegistry) window.LumpRegistry.setCurrent(token);
     if (typeof _lumpRecordView === 'function') _lumpRecordView(token);
@@ -8593,10 +8599,14 @@ async function openLumpInEditor(token, options) {
     var _sourceRestored = _sourceResolution.restored;
     var _editableSourceAvailable = typeof _recoveredSource === 'string' &&
         _recoveredSource.length > 0;
-    var _navigationBuffer = window._editorNavigationBuffers &&
+    var _navigationBuffer = !(options && options.executionFocus) && window._editorNavigationBuffers &&
         window._editorNavigationBuffers['lump:' + _lumpTokenIdentity(token)];
     if (_navigationBuffer) _navigationBuffer = Object.assign({}, _navigationBuffer);
-    if (options && options.confirmReplacement) {
+    // Explicitly opening another document is navigation, not a source patch.
+    // Its outgoing draft was preserved above under its own owner. Only an
+    // overwrite of the same owned document needs the replacement comparison.
+    if (options && options.confirmReplacement &&
+            _sameLumpToken(window._editorOpenLumpToken, token)) {
         var _reviewEditor = document.getElementById('asmEditor');
         var _reviewSource = _navigationBuffer && _editableSourceAvailable &&
             _navigationBuffer.original === _recoveredSource

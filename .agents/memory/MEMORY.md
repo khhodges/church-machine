@@ -98,7 +98,7 @@
 - [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows
 - [Editor source authority](editor-source-authority.md) — preserve owned drafts; authority refresh is advisory and replacement requires explicit preview and acceptance
 - [C-list row zero SELF boundary](clist-row-zero-advisory-self.md) — compiler output must establish SELF at row zero; immutable historical bytes remain inspectable without rewriting
-- [Latest saved LUMP selection](latest-saved-lump-selection.md) — live identity stays exact, while editor and Run choose the newest saved revision even if history-marked
+- [Explicit LUMP selection](latest-saved-lump-selection.md) — selected Namespace and programmer choices outrank automatic latest-revision defaults; freshness stays advisory.
 - [Trace-symbol preview isolation](trace-symbol-preview-isolation.md) — invalid factory artifacts must block hardware builds without taking down the web IDE’s fallback trace labels
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate

@@ -112,6 +112,9 @@ create_data_publish:
 create_data_set_slot:
     ; Ordinary simulator LAMBDA currently falls through; trusted entry/return
     ; binding must be resolved before this can execute as the intended call.
+    ; See docs/reviews/mint-phase1/native-lambda-binding.md: an own-object X GT
+    ; identifies the executable, not this private label. Do not import the
+    ; protected profile's host link/PC selection as ordinary CLOOMC semantics.
     LAMBDA CR9
     BRANCH TODO_CREATE_CLEAR_LAMBDA_AUTHORITY
 create_data_account_and_issue:
@@ -167,6 +170,9 @@ create_data_slot_after_clear:
     ; Release only after confirmation and removal of Namespace authority.
     ; On a fault, accepted writes are not implicitly rolled back.
     BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION
+    ; Bare RETURN currently scrubs CR0..4/CR7..11 (including CR8/9/10).
+    ; Its working-register contract needs review with the entry binding;
+    ; this is not the PC-only fast return described in the older Lambda note.
 create_data_slot_return:
     RETURNAL
 }

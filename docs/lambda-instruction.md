@@ -1,5 +1,19 @@
 # LAMBDA Instruction Specification
 
+> **Authority and native Mint status (2026-10-19):** The
+> [master ISA](instruction-set.md#document-authority) takes precedence.
+> The machine-status fast path, PC+4, frame-tag polarity and unconditional
+> non-nesting descriptions below are historical design material, not authority
+> to change the current instruction or grant protected Mint interfaces to
+> ordinary CLOOMC. In the current JS simulator LAMBDA validates X and creates
+> an SZ=0 continuation but advances inline; it does **not** enter an internal
+> label. RETURN also applies a keep-mask and reconstructs caller scope, rather
+> than only restoring PC. The separately scoped protected Mint runtime adds a
+> checked link and entry selection. See the
+> [native Mint reconciliation and review blocker](reviews/mint-phase1/native-lambda-binding.md)
+> for the exact differences and reproducible evidence. The examples below do
+> not establish a legal native private-body binding.
+
 **v1.0 — 2026-04-29**
 **CONFIDENTIAL**
 

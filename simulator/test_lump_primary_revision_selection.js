@@ -80,14 +80,14 @@ assert.strictEqual(
 assert(source.includes('const _primaryLumps = _repositoryPrimaryLumps(lumps)') &&
        source.includes('const name  = lump.dot_name || lump.abstraction ||'),
     'top-level repository groups by canonical dot name and displays it');
-assert(source.includes('_primary.token !== _currentToken'),
-    'persisted older-token selection follows the latest active primary revision');
-assert(source.includes('_latestPrimaryLump(lumps, _liveRow.abstraction)') &&
-       source.includes('_latestLiveRevision ? _latestLiveRevision.token : _liveToken'),
-    'live execution identity selects the latest saved artifact for editor and Run');
-assert(editorSource.includes('lump && lump.archived === true') &&
-       editorSource.includes('_primaryCandidates[0].token !== token') &&
-       editorSource.includes('window.LumpRegistry.setCurrent(token)'),
-    'Open in Editor redirects only an older archived token to the latest save');
+assert(!source.includes('_primary.token !== _currentToken'),
+    'explicit revision selection is not redirected to the latest primary');
+assert(source.includes('_namespaceLumpSelection(lumps, _liveState)') &&
+       !source.includes('_latestLiveRevision ? _latestLiveRevision.token : _liveToken'),
+    'execution-focused opening selects the exact executed artifact');
+assert(editorSource.includes('Historical selections retain their exact token;'),
+    'Open in Editor preserves the exact selected revision');
 
 console.log('PASS LUMP browser selects the current documented revision');
+// Keep the execution/Namespace focus regression in this existing workflow.
+require('./test_programmer_lump_focus.js');

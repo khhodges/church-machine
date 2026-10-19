@@ -265,6 +265,11 @@
     async function source(slot, assignedArtifact=false) {
         const row=state.document.rows.find(r=>r.slot===slot);
         if (!row) return;
+        state.focusedSlot=slot;
+        root._lumpRepositoryFollowsExecution=true;
+        state.focusedExecutionKey=typeof root._namespaceExecutionKey==='function'
+            ? root._namespaceExecutionKey(typeof root._getLiveLumpState==='function'
+                ? root._getLiveLumpState() : null) : '';
         const requestId=++sourceRequest;
         const profile=state.profile, documentAtStart=state.document;
         const rowAtStart=JSON.stringify(row);

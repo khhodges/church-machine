@@ -188,6 +188,8 @@ async function run() {
     // The selected Namespace passes its existing epoch through both helpers.
     // Recapturing at either boundary would cancel an otherwise valid open.
     sandbox.openLumpInEditor = productionOpen;
+    sandbox._sameLumpToken=(left,right)=>left!=null && right!=null &&
+        String(left).replace(/^0x/i,'').toLowerCase()===String(right).replace(/^0x/i,'').toLowerCase();
     let epoch=0, current=true, consent=true, confirmations=0;
     sandbox._captureEditorWriteGuard=()=>{
         const mine=++epoch, text=editor.value;
@@ -202,17 +204,25 @@ async function run() {
     const navigation=()=>sandbox._nsOpenDesignSelection({name:'ide.Alice',selection:selected},14,{
         writeGuard:sandbox._captureEditorWriteGuard(),accepts:()=>current,confirmReplacement:true,
     });
+    // Opening another Namespace-selected program is navigation, not a
+    // before/after rewrite of the unrelated current document.
+    sandbox._editorOpenLumpToken='other-document';
     editor.value='unsaved protected text';editor.readOnly=false;
     consent=false;await navigation();
+    assert.equal(editor.value,'reviewed Namespace source');
+    assert.equal(confirmations,0,'cross-document open must not compare unrelated programs');
+    sandbox._editorOpenLumpToken=selected.token;
+    editor.value='unsaved protected text';
+    await navigation();
     assert.equal(editor.value,'unsaved protected text');
-    assert.equal(epoch,1,'saved-artifact opener reuses Namespace guard');
+    assert.equal(epoch,2,'saved-artifact opener reuses Namespace guard');
     consent=true;current=false;const n=confirmations;
     await navigation();
     assert.equal(confirmations,n,'stale Namespace must not request replacement');
     assert.equal(editor.value,'unsaved protected text');
     current=true;await navigation();
     assert.equal(editor.value,'reviewed Namespace source');
-    assert.equal(epoch,3);
+    assert.equal(epoch,4);
     console.log('PASS exact design click → saved source, mismatch preservation, missing New, ordinary open');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

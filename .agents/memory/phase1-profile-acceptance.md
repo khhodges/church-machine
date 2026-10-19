@@ -231,10 +231,9 @@ atomicity. Trusted binding, metadata validation and exclusion remain required.
 Mint instruction evidence must use the real simulator for authority-changing
 and control-transfer behavior, not just an assembler or hand-written walker.
 
-**Why:** The first native Data trial exposed two false assumptions in earlier
-fragment evidence: TPERM CLEAR tests rather than erases authority, and ordinary
-LAMBDA falls through without the protected profile's extra entry/return handling.
-The walker had falsely reported cleanup; syntax checks had not tested dispatch.
+**Why:** Syntax checks and hand-written walkers cannot establish authority
+removal or protected control transfer. Protected-profile behavior is not
+evidence that ordinary machine instructions have the same contract.
 
 **How to apply:** Keep hand walkers for arithmetic only, and label test-provided
 authority as fixture privilege. Do not port protected-profile semantics into

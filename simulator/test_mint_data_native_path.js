@@ -43,6 +43,10 @@ function fixture(text, size = 64) {
     s.memory[CODE] = s.packLumpHeader(2, program.words.length, 0, 0);
     s.memory.set(program.words, CODE + 1);
     install(14, 40, 'RX');
+    install(6, 40, 'E');
+    // Normal caller scope: C-list begins after this zero-row executable.
+    s.cr[6].word1 = CODE + 256;
+    s.cr[6].m = 1;
     install(8, 41, 'RW');
     install(9, 40, 'X');
     install(10, 42, 'RW');
@@ -124,6 +128,57 @@ assert.equal(lambdaSim.pc, lambdaLabels.continuation,
 assert.equal(lambdaSim.lambdaActive, true);
 assert.equal(lambdaSim.dr[2], 0);
 assert.notEqual(lambdaSim.pc, lambdaLabels.intended_body);
+assert.equal(lambdaSim.mLoad(lambdaSim.cr[9].word0, 'X', 9).ok, true,
+    'The blocker must not be confused with a missing X permission');
+
+// Independent RETURN probe, deliberately placed INLINE after LAMBDA. This
+// diagnoses the existing SZ=0 unwind; it is NOT evidence of body entry.
+// No runtime methods are replaced and no PC is redirected after provisioning.
+for (const mask of [0, 4095]) {
+    const {s: ret} = fixture(`LAMBDA CR9\nRETURNAL #${mask}\nHALT`);
+    const context = [5, 6, 12, 13, 14, 15].map(i => ({...ret.cr[i]}));
+    const indicator = ret._unpackProtectedIndicator(ret.memory[17]);
+    const flags = {...ret.flags};
+    const namespace = Array.from(ret.memory.slice(ret.NS_TABLE_BASE,
+        ret.NS_TABLE_BASE + ret.nsCount * 4));
+    ret.step();
+    assert.equal(ret.pc, 1, 'Known fall-through, not successful private entry');
+    assert.equal(ret.lambdaActive, true);
+    const frame = ret._readProtectedCallFrame();
+    assert.equal(frame.ok, true);
+    assert.equal(frame.indicator.sz, 0);
+    assert.equal(frame.frame.returnPC, 1);
+    assert.equal(frame.frame.savedSTO, frame.frameAddress);
+    // Ordinary implementation retains a cached frame, unlike protected Mint.
+    assert.ok(ret.lambdaCachedFrame);
+    ret.step();
+    assert.equal(ret.halted, false, JSON.stringify(ret.faultLog));
+    assert.equal(ret.pc, 1, 'RETURN restores the saved inline caller NIA');
+    assert.equal(ret.physicalPC, CODE + 2);
+    assert.equal(ret.lambdaActive, false);
+    assert.equal(ret.lambdaCachedFrame, null);
+    assert.equal(ret.callStack.length, 0);
+    assert.deepEqual(ret._unpackProtectedIndicator(ret.memory[17]),
+        {...indicator, nia: 1}, 'Protected STO/prior SZ restored with current NIA');
+    assert.deepEqual(ret.flags, flags);
+    const codeEntry = ret.readNSEntry(40);
+    // CR6 identity/base survive; RETURN rederives descriptor metadata, including
+    // the normal mLoad mark-live G bit and the Namespace integrity word.
+    context[1].word2 = codeEntry.word1_limit;
+    context[1].word3 = codeEntry.word2_seals;
+    assert.deepEqual([5, 6, 12, 13, 14, 15].map(i => ret.cr[i]), context,
+        'Caller scope identity, code fence and protected descriptors preserved');
+    const withoutGC = words => words.map((word, i) =>
+        i % 4 === 1 ? (word & ~0x40000000) >>> 0 : word);
+    assert.deepEqual(withoutGC(Array.from(ret.memory.slice(ret.NS_TABLE_BASE,
+        ret.NS_TABLE_BASE + ret.nsCount * 4))), withoutGC(namespace),
+    'Namespace authority unchanged apart from native mLoad G-bit marking');
+    for (const reg of [8, 9, 10]) {
+        assert.equal(ret.cr[reg].word0 === 0, mask === 0,
+            'Bare Lambda RETURN scrubs scratch authority; keep-mask retains it');
+    }
+}
 console.log('PASS: native zeroing and exact-slot write/read-back fragments');
+console.log('PASS: isolated inline SZ=0 RETURN restores caller context; mask behavior measured.');
 console.log('BLOCKED: TPERM CLEAR does not erase capability authority.');
 console.log('BLOCKED: ordinary LAMBDA falls through; no private-body entry binding. No complete CREATE claim.');

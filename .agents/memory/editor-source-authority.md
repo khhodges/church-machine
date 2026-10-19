@@ -3,7 +3,7 @@ name: Editor source authority
 description: Rules for preserving user-owned editor bytes while offering newer authoritative source explicitly.
 ---
 
-Opening the editor must prioritize the editable buffer. Source freshness and
+Ordinary editor reopening must prioritize the editable buffer. Source freshness and
 recovery notices stay compact; full before/after comparisons are opt-in and
 bounded, with decisions accessible without scrolling through source.
 
@@ -13,9 +13,26 @@ editor area and hiding the decision controls, making code opening unusable.
 **How to apply:** Keep both draft preservation and explicit replacement consent.
 Do not solve a notice-layout defect by automatically discarding a draft.
 
-The persisted editor document is the user-owned source buffer. Restore its bytes and typed owner exactly. Server, built-in, and immutable-artifact source is advisory until the user explicitly accepts an exact before/after replacement. Never let startup, navigation, background reconciliation, syntax repair, or a stale asynchronous result silently replace the current buffer. Preserve replaced drafts under their owner, and keep editable source authority separate from immutable LUMP binary authority.
+The persisted editor document is the user-owned source buffer. Restore its bytes and typed owner exactly. Server, built-in, and immutable-artifact source is advisory until the user explicitly accepts an exact before/after replacement of that document. Never let startup, navigation, background reconciliation, syntax repair, or a stale asynchronous result silently overwrite an owned draft. Preserve drafts under their owner when changing documents, and keep editable source authority separate from immutable LUMP binary authority.
 
 **Why:** Freshness or artifact authority does not imply overwrite intent. Startup and asynchronous work can race with typing, navigation, and unsaved-draft recovery; preferring another source can destroy the only copy of user text. Exact restoration, explicit acceptance, and owner-scoped recovery preserve user agency while still exposing authoritative content.
+
+**Execution-focused navigation clarification — 2026-10-19:** The user requires
+the editor to match the simulator: after executing CapabilityTest, the user
+assumes CapabilityTest is in focus. An unrelated Self-Test buffer must not be
+presented as its "before" source when opening the executed program.
+
+**Why:** The user called that cross-program replacement presentation
+"incompatable" with the execution context. Draft preservation must not make
+the IDE present a different program as the one being investigated.
+
+**How to apply:** Distinguish document navigation from overwriting a document.
+Execution/fault-focused opening selects the exact executed artifact, preserving
+other drafts under their own owners rather than asking to rewrite one program
+into another. Keep unsaved edits distinct from executed source; if matching
+source is unavailable, expose exact binary inspection with that limitation,
+not a substituted latest revision. This does not authorize discarding drafts,
+changing running bytes, or installing artifacts.
 
 Successful builds and saves should prioritize source beside exact binary disassembly, with build diagnostics available separately. Candidate bytes must never be labeled as the saved artifact.
 

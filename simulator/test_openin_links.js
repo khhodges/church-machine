@@ -78,10 +78,13 @@ const SCROLL_METHOD_SRC = extractFunctionByName('app-lumps.js', '_scrollToLumpMe
 const REFRESH_LINKS_SRC = extractFunctionByName('app-shell.js', '_refreshEditorJumpLinks');
 const EDITOR_TO_LUMP_SRC = extractFunctionByName('app-shell.js', '_editorJumpToLump');
 const EDITOR_TO_ABS_SRC  = extractFunctionByName('app-shell.js', '_editorJumpToAbstraction');
-// Task #1997: the real version-preference resolver (renderLumps) that decides
+// The real exact Namespace resolver (renderLumps) that decides
 // WHICH token _pendingLumpAbstractionName/_pendingLumpMethodName resolve
 // against when several lumps share one abstraction name (different versions).
 const RENDER_LUMPS_SRC   = extractFunctionByName('app-abstractions.js', 'renderLumps');
+const NAMESPACE_SELECTION_SRC = ['_namespaceExecutionKey', '_namespaceLumpTarget',
+    '_namespaceLumpSelection', '_executedCodeText', '_showUnresolvedExecutedLump']
+    .map(name => extractFunctionByName('app-abstractions.js', name)).join('\n\n');
 const LUMP_REPOSITORY_NAME_SRC =
     extractFunctionByName('app-abstractions.js', '_lumpRepositoryName');
 const LATEST_REPOSITORY_LUMP_SRC =
@@ -113,7 +116,7 @@ const ALL_SRC = [TOAST_SRC, ABS_TO_EDITOR_SRC, ABS_TO_LUMP_SRC,
                   LUMP_VERSION_LABEL_SRC, LUMP_TOKEN_ID_SRC, SWITCH_LUMP_VERSION_SRC, INSPECTED_METHOD_SRC, SCROLL_METHOD_SRC,
                  REFRESH_LINKS_SRC, EDITOR_TO_LUMP_SRC, EDITOR_TO_ABS_SRC,
                  LUMP_REPOSITORY_NAME_SRC, LATEST_REPOSITORY_LUMP_SRC,
-                 REPOSITORY_PRIMARY_LUMPS_SRC, RENDER_LUMPS_SRC].join('\n\n');
+                  REPOSITORY_PRIMARY_LUMPS_SRC, NAMESPACE_SELECTION_SRC, RENDER_LUMPS_SRC].join('\n\n');
 
 // ── Minimal LumpRegistry mock ────────────────────────────────────────────────
 // Provides the same API as lump-registry.js (window.LumpRegistry) without
@@ -156,7 +159,7 @@ function _makeMockRegistry(initialLumps) {
 // index.html) plus a real _lumpsCache / abstractionRegistry pair and spies for
 // every production entry point (switchView, showLumpDetail,
 // showAbstractionDetail, openLumpInEditor).
-function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
+function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null, namespaceRows = [],
                     lumpsListHtmlId = 'lumpsListContent', fastTimers = false } = {}) {
     const dom = new JSDOM(
         '<!DOCTYPE html><body>' +
@@ -203,6 +206,7 @@ function makeCtx({ lumpsCache = [], abstractions = [], fetchImpl = null,
         window: { _pseudoEditContext: null, _editorLastSavedToken: null, _editorJumpTargets: null,
                   _pendingLumpTab: null, _pendingLumpToken: null,
                   LumpRegistry: _reg,
+                  _nsState: {abstractions: namespaceRows},
                   // Template-open cases model explicit user consent.
                   confirmSourceReplacement: async () => true },
         _lumpsCache: lumpsCache,
@@ -545,22 +549,21 @@ trackAsync((async function t13() {
 // tokens/versions with disjoint method sets:
 //   - WIDGETBOOT — boot-resident (ns_slot set, no version), has "MethodX".
 //   - WIDGETV2FLOAT — a newer, versioned floating fork, has "MethodY" only.
-// renderLumps()'s "prefer user-saved (versioned, floating) over
-// boot-resident" rule (app-abstractions.js ~566-569) must pick
-// WIDGETV2FLOAT over WIDGETBOOT. The drill-down must then be attempted
-// against the RESOLVED token (WIDGETV2FLOAT), not whatever token was
-// selected before renderLumps ran — and since "MethodX" does not exist on
-// WIDGETV2FLOAT, it must degrade to the not-found toast rather than
-// silently matching same-named-but-wrong-version content.
+// The Namespace explicitly selects the archived revision. Metadata lookup
+// must include history, never prefer the newer live record. Method lookup
+// then uses that exact revision rather than stale cards for another token.
 trackAsync((async function t14() {
-    const WIDGET_BOOT  = { abstraction: 'Widget', token: 'WIDGETBOOT',    version: null, ns_slot: 5 };
-    const WIDGET_V2     = { abstraction: 'Widget', token: 'WIDGETV2FLOAT', version: 2,    ns_slot: null };
+    const WIDGET_BOOT  = { abstraction: 'Widget', token: '12340001', version: 3, ns_slot: 5 };
+    const WIDGET_V2     = { abstraction: 'Widget', token: '12340002', version: 2, ns_slot: null,
+        archived: true, filename: 'Widget.1.12340002.lump', binary_hash: 'a'.repeat(64) };
     const lumps = [WIDGET_BOOT, WIDGET_V2];
 
     const { ctx, document, calls } = makeCtx({
         lumpsCache: lumps,
+        namespaceRows: [{name: 'Widget', slot: 5, ...WIDGET_V2}],
         fastTimers: true,
-        fetchImpl: async () => ({ ok: true, json: async () => lumps }),
+        fetchImpl: async url => ({ ok: true, json: async () =>
+            url.includes('include_archived=1') ? lumps : [WIDGET_BOOT] }),
     });
 
     // Simulate the user having been on the boot-resident version and
@@ -575,14 +578,14 @@ trackAsync((async function t14() {
     // The Content tab (for whichever token gets resolved) only has "MethodY"
     // rendered — matching WIDGETV2FLOAT's real method set, not WIDGETBOOT's.
     const panel = document.createElement('div');
-    panel.id = 'lumpTabContent_WIDGETV2FLOAT';
+    panel.id = 'lumpTabContent_12340002';
     panel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="MethodY">card body</div>';
     document.body.appendChild(panel);
     // A same-named "MethodX" card also exists under the STALE boot token's
     // panel, simulating the old version's content still being cached in the
     // DOM from a prior view — it must never be the one that gets matched.
     const stalePanel = document.createElement('div');
-    stalePanel.id = 'lumpTabContent_WIDGETBOOT';
+    stalePanel.id = 'lumpTabContent_12340001';
     stalePanel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="MethodX">stale card</div>';
     document.body.appendChild(stalePanel);
     const staleCard = stalePanel.querySelector('.lump-method-card');
@@ -592,14 +595,14 @@ trackAsync((async function t14() {
     // version" step under test.
     await vm.runInContext('renderLumps()', ctx);
 
-    assert('T14 renderLumps resolved _selectedLumpToken to the versioned floating fork (not boot-resident)',
-        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === 'WIDGETV2FLOAT',
+    assert('T14 renderLumps selects the exact archived Namespace assignment, not the newer catalog row',
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === WIDGET_V2.token,
         vm.runInContext('window.LumpRegistry.getCurrent()', ctx));
     assert('T14 renderLumps requested the Content tab for the RESOLVED token',
-        calls.switchLumpTab.length === 1 && calls.switchLumpTab[0][0] === 'WIDGETV2FLOAT' && calls.switchLumpTab[0][1] === 'content',
+        calls.switchLumpTab.length === 1 && calls.switchLumpTab[0][0] === WIDGET_V2.token && calls.switchLumpTab[0][1] === 'content',
         calls.switchLumpTab);
     assert('T14 showLumpDetail called with the resolved token',
-        calls.showLumpDetail.includes('WIDGETV2FLOAT'), calls.showLumpDetail);
+        calls.showLumpDetail.includes(WIDGET_V2.token), calls.showLumpDetail);
 
     // Give the (fast-timer) retry poll a moment to exhaust its attempts —
     // it must give up on the resolved token's panel (which only has
@@ -626,21 +629,23 @@ trackAsync((async function t14() {
 //
 // WIDGETBOOT (boot-resident) has "MethodX" in API data inspected from its
 // embedded content frame;
-// WIDGETV2FLOAT (versioned, resolved by renderLumps' preference rule) does
+// WIDGETV2FLOAT (explicitly selected by Namespace) does
 // not have it rendered in its Content-tab panel. Since WIDGETBOOT.methods
 // really does list "MethodX", this is a genuine version mismatch, not a
 // missing method.
 trackAsync((async function t15() {
-    const WIDGET_BOOT = { abstraction: 'Widget', token: 'WIDGETBOOT', version: null, ns_slot: 5,
+    const WIDGET_BOOT = { abstraction: 'Widget', token: '12340001', version: null, ns_slot: 5,
         api_definition_source: 'binary-inspection',
         api_definition: { methods: [{ name: 'MethodX' }] } };
-    const WIDGET_V2   = { abstraction: 'Widget', token: 'WIDGETV2FLOAT', version: 2, ns_slot: null,
+    const WIDGET_V2   = { abstraction: 'Widget', token: '12340002', version: 2, ns_slot: null,
+        filename: 'Widget.1.12340002.lump', binary_hash: 'a'.repeat(64),
         api_definition_source: 'binary-inspection',
         api_definition: { methods: [{ name: 'MethodY' }] } };
     const lumps = [WIDGET_BOOT, WIDGET_V2];
 
     const { ctx, document } = makeCtx({
         lumpsCache: lumps,
+        namespaceRows: [{name: 'Widget', slot: 5, ...WIDGET_V2}],
         fastTimers: true,
         fetchImpl: async () => ({ ok: true, json: async () => lumps }),
     });
@@ -650,12 +655,12 @@ trackAsync((async function t15() {
     await vm.runInContext('_goToLumpByAbstractionName("Widget", "MethodX")', ctx);
     await vm.runInContext('renderLumps()', ctx);
     assert('T15 rendered cache preserves inspected MethodX metadata',
-        vm.runInContext('_lumpHasInspectedMethod(_lumpsCache.find(l => l.token === "WIDGETBOOT"), "MethodX")', ctx) === true);
+        vm.runInContext('_lumpHasInspectedMethod(_lumpsCache.find(l => l.token === "12340001"), "MethodX")', ctx) === true);
 
     // Only WIDGETV2FLOAT's panel exists in the DOM (the resolved token) and
     // it never gets a "MethodX" card — matching its real method set.
     const panel = document.createElement('div');
-    panel.id = 'lumpTabContent_WIDGETV2FLOAT';
+    panel.id = 'lumpTabContent_12340002';
     panel.innerHTML = '<div class="lump-method-card" data-collapsed="1" data-method-name="MethodY">card body</div>';
     document.body.appendChild(panel);
 
@@ -678,7 +683,7 @@ trackAsync((async function t15() {
     await new Promise(resolve => setTimeout(resolve, 50));
     assert('T15 action switches window._pendingLumpToken to the sibling lump',
         vm.runInContext('window.LumpRegistry.getPending()', ctx) === null && // consumed by renderLumps() re-run
-        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === 'WIDGETBOOT',
+        vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === WIDGET_BOOT.token,
         { selected: vm.runInContext('window.LumpRegistry.getCurrent()', ctx) });
 })());
 
@@ -738,10 +743,17 @@ trackAsync((async function t15() {
         vm.runInContext('window.LumpRegistry.getCurrent()', ctx) === LED_FLASH_TOKEN,
         vm.runInContext('window.LumpRegistry.getCurrent()', ctx));
 
-    // ── Step 3: Simulate the user clicking "Open Lump" (triggers renderLumps()).
-    // The live-state fallback only fires when getCurrent() === null.
-    // Since getCurrent() already returns LED_FLASH_TOKEN, the fallback must be
-    // skipped — renderLumps() must not clobber the selection with SelfTest.
+    // ── Step 3: Use the real explicit Open LUMP transition, not a bare
+    // registry mutation. showLumpDetail claims deliberate browsing before
+    // the async repository refresh settles.
+    vm.runInContext(extractFunctionByName('app-lumps.js', 'showLumpDetail'), ctx);
+    const productionShowDetail = ctx.showLumpDetail;
+    ctx.showLumpDetail = (token, options) => {
+        calls.showLumpDetail.push(token);
+        return productionShowDetail(token, options);
+    };
+    vm.runInContext(`window._editorJumpTargets = {token: '${LED_FLASH_TOKEN}'};
+        _editorJumpToLump();`, ctx);
     await vm.runInContext('renderLumps()', ctx);
 
     // ── Step 4: Selection must still be LED Flash, not SelfTest.

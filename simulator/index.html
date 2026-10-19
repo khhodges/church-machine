@@ -447,7 +447,7 @@
                             <div class="ham-section">
                                 <div class="ham-subhead ham-category ham-section-head">Code</div>
                                 <div class="ham-group" id="ham-grp-code">
-                                    <button class="ham-item" id="hamItem-editor" onclick="switchView('editor');closeHamburger()">Programs / Editor</button>
+                                    <button class="ham-item" id="hamItem-editor" onclick="_openProgrammerEditor();closeHamburger()">Programs / Editor</button>
                                     <button class="ham-item" id="hamItem-resume-draft" style="display:none;color:#daa520;" onclick="window.location='/start';closeHamburger()">&#x270F;&#xFE0F; Resume Draft</button>
                                     <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math / REPL<kbd class="ham-kbd">C+M</kbd></button>
                                     <button class="ham-item" id="hamItem-source-library" onclick="window.location='/start?abstraction=1';closeHamburger()">Source Library</button>
@@ -721,7 +721,7 @@
                 <div class="home-tile-name">Workshop</div>
                 <div class="home-tile-desc">Build and inspect abstractions</div>
             </div>
-            <div class="home-tile" data-card-id="code" draggable="true" onclick="switchView('editor')" data-tooltip="Code — Write CLOOMC programs and compile them">
+            <div class="home-tile" data-card-id="code" draggable="true" onclick="_openProgrammerEditor()" data-tooltip="Code — Follow the programmer's selected Namespace program">
                 <div class="home-tile-icon">📝</div>
                 <div class="home-tile-name">Code</div>
                 <div class="home-tile-desc">Write and compile CLOOMC programs</div>

@@ -12,6 +12,11 @@ This authority also governs Namespace label navigation, not just image builds.
 A manifest or a hardcoded source-name map must not become a competing authority
 for the target of a Namespace entry.
 
+The programmer reiterated on 2026-10-19: “the selected Namespace list is the
+master list NOT some unseen catalog.” This includes the editor and LUMP details:
+selection must follow that Namespace and the programmer's chosen entry, with no
+implicit SelfTest default or automatic promotion to a catalog's newest revision.
+
 **Why:** After the Phase 1 label-navigation work, the user reiterated:
 “The manefest is not a truth table, the Namespace is GOD.”
 

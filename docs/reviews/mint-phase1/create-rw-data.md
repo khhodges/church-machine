@@ -78,6 +78,11 @@ prove an exclusion mechanism. Partial writes on faults are not rolled back.
 
 ## Verification
 
+The [native LAMBDA reconciliation](native-lambda-binding.md) distinguishes the
+missing ordinary private-entry binding from the separately scoped protected
+Mint implementation. Native fall-through and inline RETURN are diagnostic
+evidence, not successful private-body execution.
+
 `node simulator/test_mint_phase1_api_draft.js` checks ordinary compiler syntax,
 requires all remaining compile errors to be unresolved TODO labels, and walks
 the actual scalar/zeroing source fragments with test-owned storage. It covers
