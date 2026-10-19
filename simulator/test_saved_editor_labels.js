@@ -30,4 +30,27 @@ assert.equal(label.textContent,'CapabilityTest · Source v45');
 ctx.window._editorOpenLumpToken='other';
 ctx._refreshEditorActionIdentity('Different');
 assert.equal(label.textContent,'Different', 'never borrow another artifact revision');
+// Exercise the actual Namespace -> exact editor metadata handoff. Previously
+// both stages dropped the saved revision even though they retained its hash.
+const memorySource=fs.readFileSync(__dirname+'/app-memory.js','utf8');
+const lumpSource=fs.readFileSync(__dirname+'/app-lumps.js','utf8');
+let opened;
+ctx.openLumpInEditor=(token,options)=>{opened={token,options};};
+vm.runInContext(memorySource.slice(memorySource.indexOf('function _nsOpenDesignSelection('),
+    memorySource.indexOf('function _showNSThreadModal(')),ctx);
+ctx._nsOpenDesignSelection({name:'ide.CapabilityTest',selection:{
+    token:'961bfee3',filename:'ide.CapabilityTest.1.ea7c9154.lump',
+    binaryHash:'a'.repeat(64),revision:2,
+}},10);
+assert.equal(opened.options.exactSavedArtifact.lump_version,2);
+ctx._exactSelection=opened.options.exactSavedArtifact;
+ctx.token=opened.token;
+const metadataStart=lumpSource.indexOf('    var lump = _exactSelection ?');
+const metadataEnd=lumpSource.indexOf('\n\n',metadataStart);
+vm.runInContext(lumpSource.slice(metadataStart,metadataEnd),ctx);
+assert.equal(ctx.lump.lump_version,2);
+ctx.window._editorOpenLumpToken=opened.token;
+ctx.window._editorOpenLumpMeta=ctx.lump;
+ctx._refreshEditorActionIdentity('ide.CapabilityTest');
+assert.equal(label.textContent,'ide.CapabilityTest · Source v2');
 console.log('Saved editor language and revision labels: PASS');

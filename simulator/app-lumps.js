@@ -7810,6 +7810,7 @@ async function openLumpInEditor(token, options) {
         token: token, filename: _exactSelection.filename,
         binary_hash: _exactSelection.binary_hash,
         abstraction: _exactSelection.abstraction || token, ns_slot: null,
+        lump_version: _exactSelection.lump_version ?? _exactSelection.revision,
     } : window.LumpRegistry
         ? (window.LumpRegistry.resolve(token)?.sources?.server || null) : null;
 

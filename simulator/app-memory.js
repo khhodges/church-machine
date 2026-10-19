@@ -6343,6 +6343,7 @@ function _nsOpenDesignSelection(symbolic, slot, options) {
                 filename: selection.filename,
                 binary_hash: selection.binaryHash,
                 abstraction: symbolic.name,
+                lump_version: selection.revision,
             },
         });
     }
