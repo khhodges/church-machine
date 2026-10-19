@@ -1704,27 +1704,7 @@ function init() {
         clearTrace();
     });
     sim.on('fault', (f) => {
-        _lastFault = f;
-        // Secondary UI/persistence failures must not suppress the fault modal.
-        // Persistence also covers single-step faults, not just full runs.
-        for (const notify of [
-            () => appendOutput(`FAULT [${f.type}]: ${f.message}`, 'error'),
-            () => faultAlertOn(),
-            () => { if (typeof _saveFaultLog === 'function') _saveFaultLog(); },
-        ]) {
-            try { notify(); }
-            catch (err) { console.error('[fault] notification failed:', err); }
-        }
-        try {
-            showFaultModal(f);
-        } catch(err) {
-            console.error('[fault] showFaultModal threw:', err);
-            setTimeout(() => {
-                try { showFaultModal(f); } catch(e2) {
-                    console.error('[fault] showFaultModal retry failed:', e2);
-                }
-            }, 0);
-        }
+        _reportSimulatorFault(f);
     });
     sim.on('halt', () => appendOutput('Machine halted.', 'info'));
 

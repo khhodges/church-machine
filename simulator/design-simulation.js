@@ -34,6 +34,10 @@
         reportedOutput=output;
         const faults=machine.faultLog || [];
         for (const fault of faults.slice(reportedFaults)) {
+            if (typeof root._reportSimulatorFault === 'function') {
+                root._reportSimulatorFault(fault);
+                continue;
+            }
             const text='Simulation fault: '+(fault.message || fault.type || 'Unknown fault');
             if(typeof root.appendOutput==='function') root.appendOutput(text,'error');
             if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation fault',text,'error',15000);

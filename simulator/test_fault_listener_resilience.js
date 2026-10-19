@@ -3,6 +3,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const source = fs.readFileSync(require.resolve('./app-shell.js'), 'utf8');
+const runSource = fs.readFileSync(require.resolve('./app-run.js'), 'utf8');
+const sharedHandler = runSource.slice(runSource.indexOf('function _reportSimulatorFault('),
+    runSource.indexOf('function faultAlertOn('));
 const start = source.indexOf("    sim.on('fault', (f) => {");
 const end = source.indexOf("    sim.on('halt',", start);
 assert.ok(start >= 0 && end > start);
@@ -21,7 +24,7 @@ for (const failing of ['appendOutput', 'faultAlertOn', '_saveFaultLog', 'none', 
     };
     for (const name of ['appendOutput', 'faultAlertOn', '_saveFaultLog'])
         context[name] = () => { if (name === failing) throw new Error(`${name} unavailable`); };
-    vm.runInNewContext(source.slice(start, end), context);
+    vm.runInNewContext(sharedHandler + source.slice(start, end), context);
     const fault = {type: 'STACK_CORRUPT', message: 'synthetic RETURN failure'};
     listener(fault);
     timers.forEach(callback => callback());

@@ -4247,6 +4247,28 @@ let _faultModalRawWord       = null;
 let _faultModalEvidence      = null;
 let _lastRetryLump = null;
 
+// Shared by the original simulator and selected-design execution.
+function _reportSimulatorFault(f) {
+    _lastFault = f;
+    for (const notify of [
+        () => appendOutput(`FAULT [${f.type}]: ${f.message}`, 'error'),
+        () => faultAlertOn(),
+        () => { if (typeof _saveFaultLog === 'function') _saveFaultLog(); },
+    ]) {
+        try { notify(); }
+        catch (err) { console.error('[fault] notification failed:', err); }
+    }
+    try {
+        showFaultModal(f);
+    } catch (err) {
+        console.error('[fault] showFaultModal threw:', err);
+        setTimeout(() => {
+            try { showFaultModal(f); }
+            catch (retryError) { console.error('[fault] showFaultModal retry failed:', retryError); }
+        }, 0);
+    }
+}
+
 function faultAlertOn() {
     const btn = document.getElementById('toolFaultBtn');
     if (!btn) return;

@@ -123,3 +123,12 @@ was restored.
 
 **How to apply:** Reuse the existing trace presentation and preserve captured
 instruction evidence when appending later console output.
+
+Every selected simulator must present the existing fault modal on a runtime
+fault, not merely write console output or show a toast.
+
+**Why:** The user observed the selected simulation stop on CHANGE without the
+normal fault report. Changing runtime ownership must retain fault presentation.
+
+**How to apply:** Keep fault recall, exact incident evidence, notification
+failure containment, and modal presentation consistent across execution paths.

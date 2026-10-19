@@ -113,6 +113,36 @@ function harness(defect) {
     // Exercise the shared core's actual pause/resume semantics through the
     // selected-design controls, with deterministic timers and no live writes.
     const Core=require('./simulator.js');
+    for (const action of ['step','walk','run']) {
+        const b = harness('boot'), modals = [];
+        b.scope._lastFault = null;
+        b.scope.appendOutput = () => {};
+        b.scope.faultAlertOn = () => {};
+        b.scope.showFaultModal = fault => modals.push(fault);
+        vm.runInContext(runSource.slice(runSource.indexOf('function _reportSimulatorFault('),
+            runSource.indexOf('function faultAlertOn(')), b.scope);
+        await b.api.prepare(true);
+        const machine = b.instances[0];
+        machine.bootComplete = true;
+        machine.fault = function(type,message) {
+            this.faultLog.push({type,message,pc:15,physicalPC:0x0710});
+            this.halted = true;
+        };
+        machine.step = function() {
+            const word = 0x27630009;
+            Core.prototype._execChangeCore.call(this,
+                {crDst:(word>>>19)&15, crSrc:(word>>>15)&15, imm:word&0x7fff},16);
+            return {pc:15,physicalPC:0x0710};
+        };
+        await b.api.command(action);
+        assert.equal(machine.halted,true);
+        assert.equal(modals.length,1,action+' opens the shared fault modal');
+        assert.equal(modals[0],machine.faultLog[0],'modal retains exact fault evidence');
+        assert.equal(modals[0].type,'INVALID_OP');
+        assert.equal(b.scope._lastFault,modals[0],'fault recall uses the same incident');
+        b.api.render(); b.api.stop();
+        assert.equal(modals.length,1,'render and stop do not reopen the dismissed fault');
+    }
     for(const action of ['step','walk','run']) {
         const b=harness('boot');
         const pauses=[];
