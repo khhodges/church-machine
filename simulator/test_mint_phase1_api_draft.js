@@ -50,20 +50,25 @@ const create = methods[0][2], destroy = methods[1][2];
 assert.doesNotMatch(create, /12-word|#257|CR4, #11|CR4, #10/);
 assert.match(create, /BFEXT DR4, DR2, #0, #3/);
 assert.match(create, /BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE/);
-assert.match(create, /BRANCH TODO_CREATE_SOURCE_EXTENT/);
+assert.match(create, /TPERM CR4, NULL\s+BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL/);
+assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy|DR10|DR11/);
+assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
+    'Data CREATE must never read a source payload');
+assert.deepEqual([...create.matchAll(/^\s*DREAD\s+.*$/gm)].map(m=>m[0].trim()),
+    ['DREAD DR4, CR3, #3'], 'Only the Passkey proof bounds probe remains');
 assert.match(create, /BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA/);
 assert.match(create, /BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE/);
 assert.match(create, /BRANCH TODO_CREATE_RESULT_TYPE/);
 assert.ok(destroy.indexOf('TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM') <
     destroy.indexOf('destroy_body:'));
 
-// Walk the actual draft's scalar/copy instructions, NOT the unresolved services.
+// Walk the actual draft's scalar/zeroing instructions, NOT unresolved services.
 // Native syntax is independently checked above. This is not full Mint acceptance.
 const guards=create.slice(create.indexOf('create_data_scalar_checks:'),
     create.indexOf('create_finish:')).split('\n')
     .map(s=>s.split(';')[0].trim()).filter(Boolean);
 const labels=new Map(guards.map((s,i)=>[s.endsWith(':')?s.slice(0,-1):'',i]));
-function walk(start, dr, source=[], destination=[]) {
+function walk(start, dr, destination=[]) {
     let cmp=0;
     dr.DR0=0;
     for(let pc=labels.get(start),steps=0;pc<guards.length && steps++<10000;pc++) {
@@ -76,12 +81,6 @@ function walk(start, dr, source=[], destination=[]) {
         else if(op==='BFINS') {
             const mask=((2**value(args[3]))-1)<<value(args[2]);
             dr[args[0]]=((value(args[0]) & ~mask) | ((value(args[1])<<value(args[2])) & mask))>>>0;
-        }
-        else if(op==='DREAD') {
-            assert.equal(args[1],'CR4');
-            const i=value(args[2])+value(args[3]);
-            assert.ok(i<source.length,'source read must be bounded');
-            dr[args[0]]=source[i]>>>0;
         }
         else if(op==='DWRITE') {
             assert.equal(args[1],'CR8');
@@ -125,18 +124,13 @@ assert.equal(requestGate(4).gate,'TODO_CREATE_INPUT_ALLOCATION_ZERO');
 for(const size of [24,40,56,72,0xfffffff8]) {
     assert.equal(requestGate(size+4).gate,'TODO_CREATE_INPUT_SIZE_NOT_POWER_TWO');
 }
-assert.equal(walk('create_data_extent_checked',{DR11:65,DR6:64}),
-    'TODO_CREATE_INPUT_SOURCE_EXCEEDS_ALLOCATION');
-assert.equal(walk('create_data_extent_checked',{DR11:64,DR6:64}),
-    'TODO_CREATE_ALLOCATE_PRIVATE_DATA');
-// Enter isolated copy fragment with TEST-owned storage, not claimed allocation.
-for(const count of [0,1,3,63,64]) {
-    const input=Array.from({length:count},(_,i)=>(0x80000000+i)>>>0);
-    const before=input.slice(), output=Array(64).fill(0xdeadbeef);
-    assert.equal(walk('create_data_copy_begin',{DR6:64,DR11:count},input,output),
+// Test-owned dirty storage, not claimed allocation. Every allocated word must
+// be zero before publication; words outside the allocation must be untouched.
+for(const size of [8,16,64,256,1024]) {
+    const output=Array(size+2).fill(0xdeadbeef);
+    assert.equal(walk('create_data_zero_begin',{DR6:size,DR9:0xffffffff},output),
         'TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE');
-    assert.deepEqual(output,[...input,...Array(64-count).fill(0)]);
-    assert.deepEqual(input,before,'source is never modified');
+    assert.deepEqual(output,[...Array(size).fill(0),0xdeadbeef,0xdeadbeef]);
 }
 
 // Verify masked-return encodings through the ordinary assembler, not a

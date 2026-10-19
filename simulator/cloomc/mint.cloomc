@@ -47,7 +47,8 @@ capabilities { SELF E }
 method CREATE {
 CREATE_inputs:
     ; First implementation slice: case 4, DATA RW only.
-    ; CR2/CR3: Passkey GT/proof. CR4: readable initial data.
+    ; CR2/CR3: Passkey GT/proof. CR4: NULL; Data has no source payload.
+    ; Allocate separate storage and zero EVERY word before issuing its GT.
     ; DR2 = power-of-two word size | 4 (low three bits).
     ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
     ; Other cases/permissions remain unsupported, never silently become Data.
@@ -59,8 +60,8 @@ CREATE_inputs:
     BRANCHNE TODO_CREATE_INPUT_PROOF_READ
     ; Probe proof bounds without clobbering packed DR2 or permission DR3.
     DREAD DR4, CR3, #3
-    TPERM CR4, R
-    BRANCHNE TODO_CREATE_INPUT_DATA_READ
+    TPERM CR4, NULL
+    BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL
 create_data_scalar_checks:
     BFEXT DR4, DR2, #0, #3
     MCMP DR4, #4
@@ -85,30 +86,15 @@ create_data_power_loop:
 create_data_authorize:
     ; Service binding missing: verify all four proof words, credential authority,
     ; and remaining allowance >= DR6 before allocation or destination writes.
-    ; Preserve CR4 and decoded DR6. Non-NULL is never authorization.
+    ; Preserve decoded DR6. Non-NULL is never authorization.
     BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE
-create_data_source_extent:
-    ; Service binding missing: validate source kind and derive readable word
-    ; extent from CR4's authorized object metadata into DR11, not caller input.
-    ; No NS authority or source length may be guessed from DR2.
-    BRANCH TODO_CREATE_SOURCE_EXTENT
-create_data_extent_checked:
-    MCMP DR11, DR6
-    BRANCHHI TODO_CREATE_INPUT_SOURCE_EXCEEDS_ALLOCATION
 create_data_allocate:
     ; Service binding missing: reserve DR6 words and a slot/generation;
-    ; obtain a private DATA RW destination in CR8, disjoint from the source.
-    ; Preserve CR4/DR6/DR11. Caller-supplied CR8 is NOT allocation authority.
+    ; obtain private DATA RW authority in CR8 to a separate allocation.
+    ; Preserve DR6. Caller-supplied CR8 is NOT allocation authority.
     BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA
-create_data_copy_begin:
+create_data_zero_begin:
     IADD DR9, DR0, #0
-create_data_copy_loop:
-    MCMP DR9, DR11
-    BRANCHEQ create_data_zero_loop
-    DREAD DR10, CR4, #0, DR9
-    DWRITE DR10, CR8, #0, DR9
-    IADD DR9, DR9, #1
-    BRANCH create_data_copy_loop
 create_data_zero_loop:
     MCMP DR9, DR6
     BRANCHEQ create_data_publish

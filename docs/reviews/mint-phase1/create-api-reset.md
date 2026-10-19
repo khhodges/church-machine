@@ -27,7 +27,7 @@ the object details. Abstract Owner comes from its owning abstraction.
 |---|---|
 | CR2 | Authorizing Passkey GT |
 | CR3 | Readable GT for the four-word Passkey proof |
-| CR4 | Object-specific initialization GT |
+| CR4 | Object-specific initialization GT; NULL for Data |
 | DR2 | Power-of-two allocation size in words, packed with creation case 1–4 |
 | DR3 | Requested permission selection |
 | CR1 | Returned object GT |
@@ -45,7 +45,7 @@ There is no second generic content buffer or 12-word request record.
 | Namespace | GT identifying the C-list used to populate the Namespace slots | LS |
 | Thread | GT of the application abstraction Amoeba will start | E |
 | Abstraction | GT identifying the defining LUMP as binary data | R is sufficient; RW also provides read access |
-| Data | GT identifying the supplied initial data | R or RW |
+| Data | No source; allocate separate storage and return all zero | CR4 NULL in working draft |
 
 The packed DR2 case distinguishes these input forms within CREATE,
 without adding another argument. Namespace LS describes access to the
@@ -92,26 +92,24 @@ Abstraction case also confirmed individually by the programmer on 2026-10-18:
 | Definition | Supplied by the LUMP, not a second description record |
 | Result | New Abstraction GT with requested permissions and B=1 |
 
-Data initialization was subsequently confirmed individually by the programmer
-on 2026-10-18: use an R or RW GT to the supplied initial data in CR4.
+The initial Data source-GT decision was superseded after confidentiality review:
+the programmer chose separate storage and specified “And return it clean(all
+zero)”. Data takes no initial payload. The working draft requires CR4 NULL.
 
 | Item | Namespace | Thread | Abstraction | Data |
 |---|---|---|---|---|
-| CR4 | LS GT to source C-list | E GT to application | R/RW GT to defining LUMP | R/RW GT to initial data |
+| CR4 | LS GT to source C-list | E GT to application | R/RW GT to defining LUMP | NULL; no source |
 | DR2 | Size packed with case 1 | Size packed with case 2 | Size packed with case 3 | Size packed with case 4 |
 | DR3 | NONE | NONE | E, LS or L | RW, R or W |
 | Passkey | Authorizes creation and allocation | Authorizes creation and allocation | Authorizes creation and allocation | Authorizes creation and allocation |
-| Mint action | Populate Namespace slots | Prime with Amoeba | Create from defining LUMP | Copy supplied initial data |
+| Mint action | Populate Namespace slots | Prime with Amoeba | Create from defining LUMP | Allocate separate storage and zero every word |
 | Returned CR1 | Namespace GT | Thread GT | Abstraction GT | Data GT |
 | Returned B | 0 | 0 | 1 | 1 |
 
-For Data, the source must be readable even when the returned GT is W-only.
-Mint zero-fills unused destination space. Copying must remain within both the
-established readable source extent and the destination allocation; DR2 does
-not establish readable source extent.
-
-The packed creation case distinguishes ordinary Data (4) from a defining LUMP
-(3), even though both source GTs provide R/RW access.
+For Data, there are no source reads, source-length inputs, or copying. Mint must
+zero the entire allocation before issuing its GT. This applies independently
+of returned RW/R/W permissions; it does not authorize new aliases for existing
+storage. The packed case continues to select Data (4) or Abstraction (3).
 
 Mint always primes a Thread with Amoeba; it must not bypass Amoeba by
 starting the supplied application directly. The application's E-GT is not a
@@ -194,8 +192,8 @@ overlap. It does not independently approve that minimum. For 64 words, DR2 is
 65, 66, 67 or 68 for cases 1, 2, 3 or 4 respectively.
 
 Validate case 1–4 and a supported power-of-two decoded size; reject malformed
-values. Validate the CR4 source for the selected case rather than guessing the
-case from its contents or permissions. Passkey accounting uses decoded size,
+values. Validate the selected case's CR4 convention (NULL for Data), rather than
+guessing the case from contents or permissions. Passkey accounting uses decoded size,
 never the packed value.
 
 The detailed Amoeba handoff ABI remains unresolved. Packing resolves case

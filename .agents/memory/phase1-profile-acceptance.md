@@ -204,26 +204,19 @@ description record.
 Do not require writable source LUMPs or caller padding. This approval does not
 independently settle case selection; apply the later packed-size decision.
 
-CREATE's Data initialization input is an R or RW GT to supplied initial data
-in CR4, rather than an allocation-only or mandatory-zero-only interface.
+Data CREATE allocates separate storage and returns it entirely zeroed. It takes
+no initial payload; this supersedes the earlier R/RW source-GT approval.
 
-**Why:** On 2026-10-18 the programmer explicitly selected “Yes—use the supplied
-initial data” in the individual Data-case review.
+**Why:** After challenging why Mint should read potentially top-secret data,
+the programmer selected “No—create separate storage” and added “And return it
+clean(all zero)”.
 
-**How to apply:** Preserve readable-source access separately from returned
-RW/R/W permissions. Do not infer readable source extent from requested
-allocation. The later packed-size decision resolves Data-versus-LUMP selection.
-
-Data CREATE's payload confidentiality is under review; the prior readable-source
-approval must not be treated as acceptance of Mint seeing secret contents.
-
-**Why:** The programmer challenged Mint's copy loop because the source might
-be top secret. A readable GT grants payload access even if Mint avoids DREAD.
-
-**How to apply:** Resolve Mint's necessary authority before completing the copy
-path. Distinguish allocating a separate initialized object from issuing authority
-for existing storage. Neither replacement has yet been selected; do not claim
-that moving the copy to a helper or merely omitting reads establishes isolation.
+**How to apply:** Remove source reads, source-length plumbing and copying from
+the Data path. Zero the entire allocation before issuance, not just a remainder.
+Keep Passkey allocation accounting and requested RW/R/W result permissions.
+Do not replace allocation with a new GT alias for existing storage. This removes
+payload exposure during CREATE; it is not proof of post-return confidentiality
+without controlling retained allocator authority.
 
 CREATE's Thread case uses CR4 E for its initializer; the later packed-size
 decision selects Thread creation. That GT identifies the application Amoeba

@@ -70,7 +70,11 @@ The proposed request fields are being reviewed individually. The original
   is deducted so the count matches the memory reserved. A merely positive but
   insufficient count does not authorize allocation. For example, a 60-word
   request reserves 64 words and requires/deducts 64 words of allowance.
-- **Initialization input: pass a GT with object-specific meaning.**
+- **Initialization input: case-specific; no source for Data.**
+  The superseding Data decision is to allocate separate storage and return it
+  clean (all zero), not copy potentially secret contents or alias existing
+  storage. The working Data draft requires CR4 NULL and zeroes every allocated
+  word before issuance. Source extent and copy loops are unnecessary for Data.
   For a Namespace, it identifies a preformatted set of slots. For a Thread,
   **Mint always primes the Thread with Amoeba** (spelled Amobea in earlier
   notes). The supplied E-GT identifies **the application abstraction Amoeba
