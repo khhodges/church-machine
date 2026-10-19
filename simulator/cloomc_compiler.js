@@ -1301,7 +1301,7 @@ class CLOOMCCompiler {
     compileAssembly(source, capabilities, options) {
         // Callable assembly uses the existing explicit method grammar. Compile
         // the bodies normally; the LUMP builder owns the single dispatch table.
-        if (/^\s*abstraction\s+[A-Za-z_][\w.]*/m.test(source)) {
+        if (/^\s*abstraction\s+[A-Za-z_][\w.]*/im.test(source)) {
             const compiled = this.compile(source, capabilities || [], options);
             compiled.language = 'assembly';
             if (!(compiled.methods || []).length && !(compiled.errors || []).length)

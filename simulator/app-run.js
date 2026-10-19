@@ -278,7 +278,7 @@ function assembleAndLoad(options) {
 
     // Callable artifacts must use the compiler-owned method/interface snapshot,
     // not the raw assembler's code-only registry and hand-built dispatch table.
-    if (/^\s*abstraction\s+[A-Za-z_][\w.]*/m.test(source)) {
+    if (/^\s*abstraction\s+[A-Za-z_][\w.]*/im.test(source)) {
         return compileAndBuild({ ..._assembleOptions, source });
     }
     const callableAssembly = /^\s*;\s*(?:Abstraction:|@abstraction)\s+\S+/im.test(source) ||
@@ -296,7 +296,7 @@ function assembleAndLoad(options) {
         cloomcCompiler._detectEnglish(source) ||
         cloomcCompiler._detectHaskell(source) ||
         cloomcCompiler._detectSymbolic(source) ||
-        /^\s*abstraction\s+\w+/m.test(source)
+        /^\s*abstraction\s+\w+/im.test(source)
     );
 
     if (isHighLevel) {
