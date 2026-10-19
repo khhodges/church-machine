@@ -621,6 +621,23 @@
     overflow-wrap: anywhere;
     word-break: break-word;
 }
+.saved-lump-identity-panel a,
+.saved-lump-identity-panel a:visited {
+    color: #ffe08a;
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+}
+.saved-lump-identity-panel a:hover {
+    color: #ffffff;
+    text-decoration-thickness: 2px;
+}
+.saved-lump-identity-panel a:focus-visible {
+    color: #ffffff;
+    outline: 2px solid #ffe08a;
+    outline-offset: 3px;
+    border-radius: 2px;
+}
 .saved-lump-identity-row.is-unavailable > code {
     color: var(--text-secondary);
     font-family: inherit;
