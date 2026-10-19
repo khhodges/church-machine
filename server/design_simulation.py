@@ -104,6 +104,8 @@ def stage(cfg, document, directory, entry_slot):
     # working graph so those reports can never become approval-comparison input.
     runtime_bindings = copy.deepcopy(source_bindings)
     rows = selected_rows(document)
+    from server.namespace_binding_targets import non_lump_rows
+    rows.extend(non_lump_rows(document))
     artifacts, prepared = {}, []
     by_slot = {row["slot"]: row for row in rows}
     for binding in source_bindings:

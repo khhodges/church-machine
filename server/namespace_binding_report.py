@@ -65,6 +65,8 @@ def binding_report(document, directory, fingerprint):
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
             item["reason"] = str(exc)
 
+    from server.namespace_binding_targets import non_lump_rows
+    rows.extend(non_lump_rows(document))
     by_slot = {binding["slot"]: binding for binding in candidates}
     for item in lists:
         binding = by_slot.get(item["slot"])
@@ -91,7 +93,9 @@ def binding_report(document, directory, fingerprint):
                 for row, resolved in zip(item["rows"], report["rows"]):
                     row.update(resolved)
                 item.update(status=report["status"], calls=report["calls"],
-                            reason="Binding snapshot saved; unresolved references HardFault only if executed. Not activated.")
+                            reason=("All references bound for this selected design. Not activated."
+                                    if report["status"] == "bound" else
+                                    "Binding snapshot saved; unresolved references HardFault only if executed. Not activated."))
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
             item["reason"] = str(exc)
     status = ("complete" if lists and all(item["status"] == "bound" for item in lists)

@@ -123,8 +123,12 @@ def _localize_portable(raw, binding, rows, bindings, directory):
 
 def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=False):
     from server.symbolic_binding import bind, embedded_api
+    from server.namespace_binding_targets import naming_context, qualified_name
+    names = naming_context()
+    leaves = [row for row in rows if row.get("type") in ("Data", "Thread", "Namespace")]
     words = _validate_body(raw)
     snapshot_key = digest({"source": binding["binaryHash"], "slot": binding["slot"],
+        "namespaceLeaves": leaves, "naming": names,
         "destinations": sorted([
             {"slot": b["slot"], "hash": b["binaryHash"], "filename": b["filename"],
              "seq": next(r.get("seq") for r in rows if r["slot"] == b["slot"])}
@@ -159,8 +163,11 @@ def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=Fals
         api = embedded_api(target_words)
         # This destination descriptor grants executable Inform authority only;
         # never invent writable/private storage grants from an object's name.
-        targets.append({**target, "name": identity[0], "rights": ["E"],
+        targets.append({**target, "name": qualified_name(identity[0], names), "rights": ["E"],
                         "methods": api.get("methods", [])})
+    for target in leaves:
+        targets.append({**target, "name": qualified_name(target["name"], names),
+                        "methods": []})
     owner = next(row for row in targets if row["slot"] == binding["slot"])
     result, report = bind(words, binding["portableBinding"], owner, targets)
     binding["symbolicReport"] = report

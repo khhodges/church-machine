@@ -430,6 +430,20 @@
             });
         } catch(e) { overlay.querySelector('#nsDraftError').textContent=e.message; }
     }
+    function acceptSavedResult(result) {
+        accept(result);
+        if (result.bindingReport && root.NamespaceBindingWindows) {
+            root.NamespaceBindingWindows.show(result.bindingReport);
+            const st=result.bindingReport.status;
+            if (st==='partial' || st==='unresolved') {
+                state.error='Design saved. Some references remain unresolved; they fault only if executed. See the C-list windows. No running session was changed.';
+            } else if (st !== 'complete') {
+                state.error='Design saved. Binding is blocked; see the C-list windows for the exact reasons. No runtime image was changed.';
+            }
+        } else {
+            state.error='Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.';
+        }
+    }
     async function save() {
         if(state.saving || !state.document) return;
         state.saving=true; render();
@@ -440,18 +454,7 @@
                 return;
             }
             const result = await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)});
-            accept(result);
-            if (result.bindingReport && root.NamespaceBindingWindows) {
-                root.NamespaceBindingWindows.show(result.bindingReport);
-                const st=result.bindingReport.status;
-                if (st==='partial' || st==='unresolved') {
-                    state.error='Design saved. Some references remain unresolved; they fault only if executed. See the C-list windows. No running session was changed.';
-                } else if (st !== 'complete') {
-                    state.error='Design saved. Binding is blocked; see the C-list windows for the exact reasons. No runtime image was changed.';
-                }
-            } else {
-                state.error='Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.';
-            }
+            acceptSavedResult(result);
         }
         catch(e) { state.error=e.message+
             ' Check the IDE node status above: its save is separate and may already have completed. '+
@@ -471,7 +474,7 @@
         if(state.saving || state.dirty) throw Error('Namespace design has unsaved edits; preserve and save them before realignment.');
         const result = await request('PUT',{fingerprint:state.fingerprint,
             document:{...clone(state.document),rows:clone(rows)}});
-        accept(result);
+        acceptSavedResult(result);
         render();
     }
     async function newSelfTestRevision() {

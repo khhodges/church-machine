@@ -8,3 +8,17 @@ SelfTest follows the ordinary non-bootstrap Resident LUMP model. Resolve exactly
 **Why:** Historical address-token, fixed-slot, fixed-filename, and fixed-allocation shortcuts allowed stale approved bytes to diverge from current source and caused larger SelfTest bodies to overlap later Wukong residents.
 
 **How to apply:** Any save, approval, stale check, boot generator, simulator fallback, hardware ROM, upload projection, or provenance report must consume the same active binding, reject archived or ambiguous records, and verify all final resident ranges are disjoint.
+
+Removing an implicit SelfTest fallback does not authorize dropping SelfTest
+when a selected program explicitly declares or calls it. Preserve the chosen
+CapabilityTest revision and resolve that dependency to the latest valid saved
+SelfTest, rather than asking whether to rewrite CapabilityTest.
+
+**Why:** The user explicitly directed keeping CapabilityTest v2 and using the
+latest SelfTest, and corrected the unnecessary choice between dependency
+binding and rewriting their selected program.
+
+**How to apply:** Validate the newest saved SelfTest's exact bytes and compiler
+approval, assign it explicitly without making it the boot target, and bind the
+declared dependency. Never restore an old fallback merely because its slot was
+historically reserved.
