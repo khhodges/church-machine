@@ -895,14 +895,23 @@ RETURN AL                 ; mask=0; zero CR0–CR4 and CR7–CR11, retain DRs
 ```
 Syntax:  CHANGE CRn
 Operand: the GT already held in CRn, identifying the new Thread
+
+Simulator extension: CHANGE CR6, #row
+Operand: one Thread GT read from that current C-list row
 ```
 
 **Authority:** See the [master one-GT CHANGE correction](instruction-set.md#change-one-gt-thread-activation).
-The indexed `CRd, CRs, idx` description is superseded, not an alternative form.
+The old general indexed `CRd, CRs, idx` description is superseded.
+The specific `CHANGE CR6, #row` simulator extension was separately approved on
+2026-10-19; see its [master definition and encoding](instruction-set.md#indexed-change--simulator-extension).
+FPGA support for that extension is not implemented or verified by this approval.
 
 **Programmer access:** CHANGE is not a protected instruction. CRn supplies the
-input GT; it is not a destination register. There is no second register, index,
-or implicit `[0]` lookup. Validation of the GT and Thread context belongs to
+input GT; it is not a destination register. The direct form has no index or
+implicit `[0]` lookup. The simulator indexed form reads one GT through CR6
+using L permission or CR6.M, with a bounded zero-based row. It does not supply
+a second Thread GT, insert LOAD or overwrite a scratch register. Both forms
+use the same Thread transition. Validation of the GT and Thread context belongs to
 execution, not an asymmetric CR12-only compiler exemption.
 
 **Authority:** The valid input Thread GT has **no permissions**, preventing
@@ -1614,7 +1623,7 @@ SHR AL, DR1, DR2, #3, ASR   ; ASR, mode=1; imm = (1 << 5) | 3 = 0x23
 | 1   | 0x01 | SAVE        | Church  | CRd(S) | CRs(B) | c-list row (0–32767)                   | —             | NULL, PERM, BOUNDS, SEAL | —        |
 | 2   | 0x02 | CALL        | Church  | CRs    | 0      | method index (0=fast, N+1=user N)      | —             | NULL, PERM, SEAL, PRIVATE_METHOD, STACK_OVERFLOW | — |
 | 3   | 0x03 | RETURN      | Church  | 0      | 0      | mask[11:0] — 1 keeps current CR, 0 zeros; bits 5/6 ignored | — | STACK_UNDERFLOW | — |
-| 4   | 0x04 | CHANGE      | Church  | One input GT (CRn) | — | No index; corrected bit mapping not specified | — | GT/Thread validation | — |
+| 4   | 0x04 | CHANGE      | Church  | Direct Phase 1: 0; indexed simulator: 12 | Direct: CRn; indexed: 6 | Direct: 0; indexed simulator: unsigned C-list row[14:0] | Restored Thread flags | Source-read and GT/Thread validation | Indexed form is simulator-only; see master for direct compatibility encoding |
 | 5   | 0x05 | SWITCH      | Church  | CR12–15 | CRs  | c-list row[14:0]                        | —             | PRIV_REG, INVALID_OP, LOAD faults | — |
 | 6   | 0x06 | TPERM       | Church  | CRd    | 0      | preset[4:0] (bit4=B-mod, [3:0]=code)   | N=!Z Z C=0 V=0 | TPERM_RSV            | D-3 (reserved presets) |
 | 7   | 0x07 | LAMBDA      | Church  | CRn    | 0      | 0 (unused)                             | —             | NULL, PERM, BOUNDS    | —           |

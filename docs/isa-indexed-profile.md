@@ -38,9 +38,11 @@ binary or change the meaning of missing execution metadata.
   Source authority precedes exact index arithmetic and protected range checks.
   Direct one-word CALL uses typed IDX1 dispatch when entering an IDX1 object;
   RETURN derives the caller profile from its canonical saved Enter identity.
-* Indexed CALL, SAVE, SWITCH and CHANGE are not enabled. IDX1 SAVE, SWITCH,
+* In this **IDX1 packet profile**, indexed CALL, SAVE, SWITCH and CHANGE are not enabled. IDX1 SAVE, SWITCH,
   CHANGE and LAMBDA instructions, constants blocks, and lazy/Abstract LOAD
   resolution remain unavailable; they are not silently downgraded.
+  The separately approved [single-word indexed CHANGE simulator extension](instruction-set.md#indexed-change--simulator-extension)
+  is not an IDX1 packet instruction and does not enable these packet families.
 * Installed executable code, dispatch data, header/SELF and Namespace authority
   are protected from memory aliases and bulk writes. GC's non-authority G-bit
   remains mutable. Reinstallation/replacement of an installed IDX1 object

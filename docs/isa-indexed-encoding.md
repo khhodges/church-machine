@@ -5,9 +5,12 @@ proposals. This packet design is retained as historical evidence only, not a
 candidate to revive. See the Genesis-approved Phase 1
 [single-word CALL encoding](phase-1/CALL-SINGLE-WORD-DRAFT.md).
 
-**CHANGE correction:** Programmatic CHANGE takes one GT already in the operand
-register, not an indexed operand. All CHANGE indexing modes and byte examples
-below are superseded by the [master one-GT rule](instruction-set.md#change-one-gt-thread-activation).
+**CHANGE correction:** CHANGE consumes one Thread GT. The direct form takes
+that GT from a register; the separately approved
+[single-word simulator extension](instruction-set.md#indexed-change--simulator-extension)
+takes it from a bounded CR6 C-list row. That 2026-10-19 approval does not enable
+this document's multiword/IDX1 forms or establish FPGA support. All CHANGE
+indexing modes and byte examples below remain superseded by the master.
 Boot uses only the incoming half into CR12, with reset entry slot 2.
 For Phase 1, CR13 is NULL and never touched; the earlier IRQ swap proposal
 is superseded. No IRQ entry/return mechanism is introduced. This document does not

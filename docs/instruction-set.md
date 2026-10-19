@@ -166,6 +166,10 @@ assembler/RTL modification or bitstream build is authorized by this selection.
 Consumer agreement, noncanonical-word rejection and exact-build FPGA evidence
 remain downstream release requirements.
 
+The separately approved [indexed simulator form](#indexed-change--simulator-extension)
+does not revise this ordinary Phase 1 layout. Its fixed `12/6` field pattern
+is a simulator extension, not approval of an IDX flag or an FPGA encoding.
+
 #### Reset-only activation marker — approved
 
 Reserve exact word **0x27000001** for incoming-only Thread activation at the
@@ -757,7 +761,7 @@ These remain requests for confirmation, not established supersessions.
 | Subject | Controlling interpretation |
 |---|---|
 | Ordinary CHANGE | The one permissionless Thread GT already held in CRn is authoritative. No implicit C-List lookup, extra operand, or general operand-M requirement is introduced. |
-| Indexed CHANGE | Remains a proposal, not an enabled form under the one-GT correction. A reported INDEX deferral needs its decision record and exact scope; it must not be inferred to cancel the selected compact indexed LOAD/SAVE rules. |
+| Indexed CHANGE | Approved on 2026-10-19 as the single-instruction **simulator extension** `CHANGE CR6, #row`: read one permissionless Thread GT from the current C-list, then apply ordinary Thread activation checks. See [encoding and scope](#indexed-change--simulator-extension). Other indexed CHANGE proposals remain unapproved; FPGA implementation and verification of this extension are not established. |
 | Direct CHANGE encoding | Approved: opcode 4, ordinary condition, bits 22:19 zero, source CRn in 18:15, bits 14:0 zero; destination CR12 implicit. AL CHANGE CR12 = `0x27060000`. No IDX field or migration policy is approved. |
 | Reset boot | Approved marker `0x27000001`: trusted reset ROM only, incoming-only activation of NS[2] into CR12; no additional CR12.M grant. Consume admission on valid acceptance, before activation; only fresh reset re-arms it. ROM fetch authority ends on successful final CALL CR0 transfer. Initial Namespace authority and ordinary M rules are unchanged. |
 | CR13 | Reserved NULL and never touched in Phase 1. Executed CHANGE CR13 or SWITCH targeting CR13 faults INVALID_OP before instruction effects; condition-false instructions skip the CR13 check. Earlier IRQ-swap proposals are superseded. |
@@ -768,13 +772,16 @@ explicitly use slot 2. Neither operation touches CR13, including clearing it.
 
 ### CHANGE binary disposition — direct form and reset marker approved
 
-The direct form and restricted reset marker are selected; other words below remain evidence or candidates.
+The direct Phase 1 form and restricted reset marker are selected. The separately
+approved simulator-only indexed form is identified explicitly in the table;
+other words remain evidence or candidates.
 No collision or current execution defect is claimed by this inventory.
 
 | Word | Provenance / meaning in its source | Disposition before cutover |
 |---|---|---|
 | `0x27660000` | Earlier repeated-register direct `CHANGE CR12` word; legacy fields repeat CR12 and immediate is zero. | Noncanonical under the approved ordinary CHANGE layout; do not reinterpret as indexed CHANGE. Existing binaries remain unchanged pending an authorized release rebuild. |
 | `0x27060000` | Approved AL direct `CHANGE CR12`. | CR12 destination implicit; source in bits 18:15; unused fields zero. Implementation and exact-build conformance remain unverified by this selection. |
+| `0x27630009` | AL indexed `CHANGE CR6, #9`, one permissionless Thread GT read from C-list row 9. | Approved simulator extension on 2026-10-19. Not a Namespace-slot lookup, direct Phase 1 word, or verified FPGA encoding. |
 | `0x27678001` | Source-derived legacy reset-ROM CHANGE, encoded with destination CR12, source CR15, immediate 1. | Existing ROM evidence, not either proposed direct word or the proposed boot marker. Verify the exact release image and decoder before changing its meaning. |
 | `0x27000001` | Approved one-shot reset-ROM marker, incoming-only activation from NS[2] into CR12. | INVALID_OP outside authorized reset context. Consume at valid acceptance before activation; faults never re-arm it, fresh reset does. No additional CR12.M grant; ROM fetch authority ends at successful final CALL CR0 transfer. |
 | `0x276E8000` | Repeated-register `CHANGE CR13` word also discussed as a hidden-return trigger in a separate proposal. | Not approved as an IRQ-return trigger by a successful round trip. Any retained ordinary meaning and any proposed special meaning must be distinguished explicitly. |
@@ -939,26 +946,20 @@ The usual condition predicate applies; a false predicate has no effects.
 
 ## CHANGE: one-GT Thread activation
 
-**Simulator indexed extension — approved 2026-10-19.** In addition to the direct
-register form below, the simulator accepts `CHANGE CR6, #row` (or a declared
-C-list pet name). It reads exactly one Thread GT from the current C-list and
-passes that value through the same permissionless-Thread, identity, frame,
-C-list and atomic save/restore checks. The lookup requires CR6 load authority
-(L permission or CR6.M), uses a bounded zero-based C-list row, and never treats
-the row as a Namespace slot. No scratch register or extra LOAD is introduced.
-Condition-false instructions do not perform the lookup. The existing simulator
-encoding uses destination field 12, source field 6 and a 15-bit unsigned row;
-for example row 9 is `0x27630009`. This simulator-only approval supersedes the
-indexed exclusion below for this form, not the Phase 1 hardware encoding,
-internal boot CHANGE, arbitrary two-register forms, or FPGA behavior.
+**Current scope:** CHANGE consumes one Thread GT. The ordinary direct-register
+form and its Phase 1 encoding remain as specified below. The
+[indexed simulator extension](#indexed-change--simulator-extension), explicitly
+approved on 2026-10-19, adds a way to obtain that one GT from the current C-list;
+it does not introduce a second Thread-GT operand.
 
-**Normative correction — 2026-10-03.** This section supersedes the indexed
+**Normative correction — 2026-10-03, with the scoped 2026-10-19 extension below.**
+This section supersedes the older indexed
 CHANGE descriptions, privileged-register-write variants, and encoding tables
 elsewhere in this document and in derived references.
 
 ### General programmatic case
 
-CHANGE takes **one GT identifying the new Thread**:
+The direct-register form takes **one GT identifying the new Thread**:
 
 ```asm
 CHANGE CRn
@@ -1026,12 +1027,13 @@ CR13; it must not be interpreted as installing an interrupt-handler GT into CR13
 
 ### Boot exception
 
-**Simulator implementation boundary:** General CHANGE now consumes the GT in
+**Simulator implementation boundary:** Direct CHANGE consumes the GT in
 the register named by the existing assembler's one-operand spelling. For
 software compatibility, that word repeats the register in both legacy fields
-and has zero immediate; no indexed lookup is performed. Other legacy indexed
-words are rejected. This is not approval of a new hardware encoding, migration
-of saved binaries, or implementation of the proposed IRQ-return trigger.
+and has zero immediate; no indexed lookup is performed **in that direct form**.
+The separately approved `12/6/row` simulator encoding below performs a C-list
+lookup. Other legacy indexed words remain rejected. Neither form authorizes
+migration of saved binaries or implementation of the proposed IRQ-return trigger.
 The simulator checks the incoming frame, C-List geometry, matching executable
 SELF and resolvable Inform entries before publishing restored context.
 This simulator implementation description is not a requirement for a complete
@@ -1043,6 +1045,70 @@ The isolated regression is `node simulator/test_change_one_gt.js`.
 Boot uses the **back half** of the Thread transition: the incoming Thread is
 loaded into CR12. There is no outgoing programmatic Thread context to suspend.
 This special initialization path does not add operands to programmatic CHANGE.
+
+### Indexed CHANGE — simulator extension
+
+**Decision and support boundary — 2026-10-19:** The programmer explicitly
+authorized indexed CHANGE as one simulator instruction. This changes simulator
+semantics for the form defined here. FPGA support for this extension is **not
+implemented or verified by this approval**; no bitstream build, programming,
+saved-artifact rewrite or ordinary Phase 1 encoding migration is authorized.
+The previously approved direct Phase 1 encoding remains separate.
+
+```asm
+CHANGE CR6, #9
+CHANGE CR6[9]
+CHANGE Thread.3       ; equivalent only when Thread.3 is declared at C-list row 9
+```
+
+`CHANGE CR6[Thread.3]` and `CHANGE CR6, Thread.3` select the same declared
+C-list row. Pet names resolve against the source's C-list, never directly to
+a Namespace slot. These forms compile to **one word**: no inserted LOAD and
+no scratch-register overwrite. Bare `CHANGE CR6` remains the direct-register
+form; `CHANGE CR6, #0` is a distinct indexed lookup of row zero.
+
+#### Simulator encoding
+
+| Bits | Meaning |
+|---|---|
+| 31:27 | Opcode 4 (`00100`) |
+| 26:23 | Ordinary condition code |
+| 22:19 | Fixed `1100` (12), identifying this simulator indexed form |
+| 18:15 | Fixed `0110` (6), current C-list source CR6 |
+| 14:0 | Unsigned zero-based C-list row, 0–32767 |
+
+For AL (`1110`), row 9 is **`0x27630009`**:
+`00100 | 1110 | 1100 | 0110 | 000000000001001`.
+The row is not a DR-index/magnitude field, a Namespace slot, an additional GT,
+or an arbitrary destination. The Thread activation destination remains CR12.
+This table documents the approved **simulator extension**, not an FPGA layout.
+
+#### Lookup and activation
+
+1. Evaluate the condition first. A false condition skips the instruction,
+   including the C-list read and all activation effects.
+2. Check that the row is inside CR6's current C-list and its addressed memory.
+   The encoded range alone does not grant access to undeclared rows.
+3. Validate CR6 source identity, range and load authority using the ordinary
+   capability checks: L permission or CR6.M. This is authority to **read the
+   C-list**, not permission on the incoming Thread GT.
+4. Read exactly one GT from that row, without installing it into a scratch
+   register or overwriting CR6 to obtain the operand.
+5. Apply the same permissionless-Thread, type, generation/identity, stack-frame
+   and restored-C-list checks as direct CHANGE. Only after validation succeeds,
+   save the outgoing Thread with the continuation after this one instruction,
+   then restore the incoming Thread. Self-target CHANGE resumes at that
+   continuation. Normal Thread restoration may reconstruct CR6 for the new
+   context; this is distinct from using it as a scratch operand register.
+
+Out-of-range rows, denied C-list reads, NULL or non-Thread GTs, any permissions
+on the target Thread GT, stale identity, invalid frames and unusable restored
+C-lists hard-fault. No silent fallback, generated target, partial Thread
+save/restore or automatic repair is permitted. Existing Namespace access/G-bit
+accounting is not a partial Thread activation.
+
+This extension does not enable arbitrary `CHANGE CRd, CRs, #index` forms,
+the internal boot-only operation, IDX1 packets or IRQ-return proposals.
 
 ### Earlier IRQ hardware exception — superseded for Phase 1
 
@@ -1070,8 +1136,11 @@ and the return authorization/consumption rules remain to be agreed.
 
 ### Encoding and implementation status
 
-The approved ordinary CHANGE layout is specified above. It does not change the
-compiler/simulator/RTL, regenerate saved LUMPs, or approve a bitstream.
+The approved ordinary Phase 1 CHANGE layout is specified above. Its
+documentation approval does not change the compiler/simulator/RTL, regenerate
+saved LUMPs, or approve a bitstream. The separately approved simulator indexed
+extension is implemented in the simulator, but is not FPGA implementation or
+conformance evidence and does not migrate direct-form words.
 The legacy `CRd, CRs, idx` implementation is not ISA authority.
 In particular, expanding `CHANGE CR13` to `CHANGE CR13, CR13[0x0000]` and emitting
 `0x276E8000` is not established as a conforming encoding by assembler/disassembler
@@ -1079,6 +1148,12 @@ round-trip tests. CR13 remains reserved. A binary migration policy is not
 specified here; implementation conformance remains separate work.
 
 ## Uniform indexed operands
+
+**Scoped simulator exception:** The separately approved
+[indexed CHANGE extension](#indexed-change--simulator-extension) uses an
+unsigned literal C-list row in bits 14:0. It does not use the DR-index/magnitude
+layout below and does not authorize DR-based CHANGE indexing or IDX1 packets.
+The common indexed-operand rule remains unchanged for its other instructions.
 
 Every instruction operand that denotes an index uses the selected data register's
 runtime value added to the immediate, within the indexed instruction itself:
@@ -1255,6 +1330,7 @@ as “hidden ELOADCALL” does not authorize executing opcode 8.
 | `LOAD CRd, CRs, #n` / `SAVE CRd, CRs, #n` | Index n, encoded with DR0 and the signed magnitude |
 | `LOAD CRd, CRs, DRr + n` / `SAVE CRd, CRs, DRr - n` | Runtime unsigned DR value plus/minus magnitude, with non-wrapping arithmetic and access checks |
 | `CHANGE CRn` | The permissionless Thread GT in CRn, not `CRn[0]` |
+| `CHANGE CR6, #row` (simulator extension) | One permissionless Thread GT read from the declared C-list row under CR6 load authority; not a Namespace-slot operand or a second GT |
 
 For LOAD/SAVE, the magnitude is 10 unsigned bits plus a separate sign bit
 (±1023). Immediate 7 encodes as operand `0x0070`; operand `0x0007` instead

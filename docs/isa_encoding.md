@@ -5,6 +5,13 @@ For current encoding decisions use the
 All baseline tables and diagrams below are historical, not a current opcode
 catalog. In particular, opcode 8 (ELOADCALL) and opcode 9 (XLOADLAMBDA) are
 retired; their operand layouts and backward-compatibility claims are obsolete.
+For CHANGE, the baseline "NS slot index" row is not current authority. The
+[master indexed CHANGE definition](instruction-set.md#indexed-change--simulator-extension)
+records the simulator-only approval of 2026-10-19: opcode 4, ordinary condition,
+fixed fields 12/6, unsigned C-list row[14:0]; AL row 9 is `0x27630009`.
+It reads one permissionless Thread GT under CR6 load authority. This does not
+amend the separate direct Phase 1 encoding or establish FPGA support. Historical
+tables below remain unchanged as evidence.
 Current LOAD/SAVE uses the master's single-word DR-plus-signed-magnitude layout,
 not the baseline immediate-only field or the experimental IDX1 packet format.
 Phase 1 DREAD/DWRITE is now approved to use that same operand layout:
