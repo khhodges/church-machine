@@ -39,6 +39,18 @@ confirmed exact-record History refresh worked, but those saves never called it.
 Distinguish an old Namespace assignment from a stale History fetch; do not
 silently merge separate abstraction identities or substitute their binaries.
 
+When the user asks to recover a saved LUMP, correct the existing stale working
+selection as well as future save behavior, using the ordinary protected-change
+review and exact artifact hash.
+
+**Why:** Fixing future refresh hooks did not repair the already-stale Namespace
+assignment; repeated screenshots still showed the old artifact after reload.
+
+**How to apply:** Verify the saved binary first, preserve other rows and history,
+then persist only the authorized matching design selection. Verify a full reload,
+not merely a temporary library selection. Do not activate simulation or hardware
+as a side effect of this recovery.
+
 For ascending designs, private replay and the historical IDE machine must stay
 separate until ordinary IDE controls explicitly support both runtime models.
 Do not make a successful save clear the historical execution barrier merely
