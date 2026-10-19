@@ -52,7 +52,9 @@ CREATE_inputs:
     ; DR2 = power-of-two word size | 4 (low three bits).
     ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
     ; Other cases/permissions remain unsupported, never silently become Data.
-    TPERM CR1, CLEAR
+    ; TPERM CLEAR tests presence; it does NOT erase a capability.
+    BRANCH TODO_CREATE_CLEAR_RESULT_AUTHORITY
+create_data_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_CREATE_INPUT_CREDENTIAL_NULL
@@ -108,8 +110,10 @@ create_data_publish:
     ; DR6 remains the allocation size; the zeroed destination stays private.
     BRANCH TODO_CREATE_BIND_SLOT_LAMBDA_AND_DESCRIPTOR
 create_data_set_slot:
+    ; Ordinary simulator LAMBDA currently falls through; trusted entry/return
+    ; binding must be resolved before this can execute as the intended call.
     LAMBDA CR9
-    TPERM CR9, CLEAR
+    BRANCH TODO_CREATE_CLEAR_LAMBDA_AUTHORITY
 create_data_account_and_issue:
     ; Service binding missing: finish GC/accounting after confirmed slot writes,
     ; debit exactly DR6 words once, issue Inform DATA RW B=1 in CR1.
@@ -157,7 +161,9 @@ create_data_slot_write:
     DREAD DR4, CR10, #3, DR7
     MCMP DR4, DR11
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
-    TPERM CR10, CLEAR
+    ; Requires a real capability-erasure operation/binding, not TPERM CLEAR.
+    BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY
+create_data_slot_after_clear:
     ; Release only after confirmation and removal of Namespace authority.
     ; On a fault, accepted writes are not implicitly rolled back.
     BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION

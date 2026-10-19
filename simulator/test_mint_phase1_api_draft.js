@@ -28,7 +28,9 @@ assert.equal(compiled.language, 'assembly');
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
         'Every table entry must reach its own method input checks first');
-    assert.match(body, /TPERM CR1, CLEAR/);
+    assert.match(body, name === 'CREATE'
+        ? /BRANCH TODO_CREATE_CLEAR_RESULT_AUTHORITY/
+        : /TPERM CR1, CLEAR/);
     assert.match(body, /IADD DR1, DR0, #0/);
     assert.doesNotMatch(body, /IADD DR1, DR0, #1\b/, 'Wrapper must not manufacture success');
     for (const label of body.match(/TODO_\w+/g) || []) {
@@ -57,10 +59,12 @@ assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
 assert.ok([...create.matchAll(/^\s*DREAD\s+\w+,\s*(CR\d+)/gm)]
     .every(m=>['CR3','CR10'].includes(m[1])),
     'Reads are confined to proof and private Namespace metadata, never payload');
-assert.match(create, /create_data_set_slot:\s+LAMBDA CR9\s+TPERM CR9, CLEAR/);
+assert.match(create, /LAMBDA CR9\s+BRANCH TODO_CREATE_CLEAR_LAMBDA_AUTHORITY/);
+assert.doesNotMatch(create, /^\s*TPERM\s+CR\d+,\s*CLEAR/m,
+    'TPERM CLEAR is a test, never authority erasure');
 const slotBody=create.slice(create.indexOf('create_data_slot_lambda:'));
 assert.doesNotMatch(slotBody, /^\s*(CALL|CHANGE|SWITCH|LAMBDA)\b/m);
-assert.match(slotBody, /TPERM CR10, CLEAR[\s\S]*BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION/);
+assert.match(slotBody, /BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY[\s\S]*BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION/);
 assert.match(slotBody, /create_data_slot_return:\s+RETURNAL/);
 assert.doesNotMatch(create.slice(0,create.indexOf('create_data_slot_lambda:')),
     /^\s*(?:DREAD|DWRITE|LOAD|TPERM).*CR10\b/m,
@@ -102,10 +106,6 @@ function walk(start, dr, destination=[], namespace=[], corruptRead=-1) {
             const i=value(args[2])+value(args[3]);
             assert.ok(i<namespace.length);
             dr[args[0]]=(namespace[i] ^ (i===corruptRead?1:0))>>>0;
-        }
-        else if(op==='TPERM') {
-            assert.deepEqual(args,['CR10','CLEAR']);
-            dr.namespaceAuthorityCleared=true;
         }
         else if(op==='MCMP') cmp=value(args[0])-value(args[1]);
         else if(op==='SHR') dr[args[0]]=value(args[1])>>>value(args[2]);
@@ -163,9 +163,8 @@ for(const slot of [0,1,14,255]) {
     const dr={DR7:slot,DR8:descriptor[0],DR9:descriptor[1],
         DR10:descriptor[2],DR11:descriptor[3]};
     assert.equal(walk('create_data_slot_offset',dr,[],namespace),
-        'TODO_CREATE_SLOT_RELEASE_EXCLUSION');
+        'TODO_CREATE_CLEAR_NS_AUTHORITY');
     assert.deepEqual(namespace,expected,'only the selected slot may change');
-    assert.equal(dr.namespaceAuthorityCleared,true);
 }
 for(let word=0;word<4;word++) {
     const dr={DR7:14,DR8:descriptor[0],DR9:descriptor[1],

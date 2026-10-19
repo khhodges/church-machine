@@ -228,6 +228,19 @@ the selected slot after zeroing, and confirm writes before issuing the result.
 Do not turn the slot body into another public method or treat LAMBDA itself as
 atomicity. Trusted binding, metadata validation and exclusion remain required.
 
+Mint instruction evidence must use the real simulator for authority-changing
+and control-transfer behavior, not just an assembler or hand-written walker.
+
+**Why:** The first native Data trial exposed two false assumptions in earlier
+fragment evidence: TPERM CLEAR tests rather than erases authority, and ordinary
+LAMBDA falls through without the protected profile's extra entry/return handling.
+The walker had falsely reported cleanup; syntax checks had not tested dispatch.
+
+**How to apply:** Keep hand walkers for arithmetic only, and label test-provided
+authority as fixture privilege. Do not port protected-profile semantics into
+ordinary code by assumption or add host PC/register mutation to make a test
+claim service success. Resolve real erasure and continuation before publishing.
+
 CREATE's Thread case uses CR4 E for its initializer; the later packed-size
 decision selects Thread creation. That GT identifies the application Amoeba
 will start, not an existing Thread or Amoeba itself.

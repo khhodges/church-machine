@@ -34,7 +34,7 @@ and non-power-of-two size. Decoded size is retained in DR6. The still-proposed
 | Passkey proof, authority and sufficient allowance | Explicit unresolved service branch |
 | Private allocation, slot/generation reservation | Explicit unresolved service branch; proposed internal CR8 destination |
 | Zero entire allocation | Native indexed DWRITE loop; no payload reads |
-| Namespace slot update | Private same-scope LAMBDA, four writes and read-back checks; protected binding/exclusion still unresolved |
+| Namespace slot update | Four native writes/read-back checks verified separately; LAMBDA entry/return binding and exclusion remain unresolved |
 | Publication, GC bookkeeping, accounting and issuance | Explicit unresolved service branch after Lambda return |
 | Cleanup and final issued identity checks | Explicit unresolved branches, with native completion/NULL/RW checks |
 
@@ -66,9 +66,10 @@ or another public method.
 
 These internal values must be bound from the validated reservation, not
 accepted as caller authority. DR8–DR11 carry Namespace metadata, not payload.
-The body writes exactly the selected four words, reads each back, checks
-equality, and clears CR10 before releasing exclusion and returning. The caller
-clears CR9 and proceeds to accounting/issuance. No result is issued first.
+The body writes exactly the selected four words, reads each back and checks
+equality. Clearing CR10 before release/return and clearing CR9 before issuance
+are explicit unresolved gates. TPERM CLEAR does not erase either capability.
+No result is issued first.
 
 Explicit blockers still cover trusted X/NSRW binding, descriptor preparation,
 slot bounds and empty-slot generation checks, and writer/observer exclusion.
@@ -84,9 +85,32 @@ packed cases, permissions, power-of-two boundaries, absence of payload reads,
 zeroing every allocated word from dirty storage, and leaving words outside
 the allocation untouched. Passkey proof reads remain necessary.
 The slot fragment is separately exercised with test-owned metadata to check
-exact-slot writes, all four read-back mismatch branches, and clearing Namespace
-authority before release. Ordinary compilation checks LAMBDA/RETURN syntax;
-these tests do not establish real X-capability binding or runtime continuation.
+exact-slot writes and all four read-back mismatch branches. It stops at the
+unresolved authority-erasure gate. Ordinary compilation checks LAMBDA/RETURN
+syntax; these tests do not establish real X-capability binding or continuation.
+
+### Native simulator trial
+
+`node simulator/test_mint_data_native_path.js` executes the extracted zeroing
+and slot-update instruction fragments with the ordinary simulator. It uses
+test-provisioned descriptors and capabilities, without replacing mLoad,
+instruction implementations, permissions, or continuation behavior.
+
+- Native zeroing passes at 8, 64 and 256 words, leaving adjacent words untouched.
+- Native descriptor writes/read-backs modify exactly the selected in-range
+  slot and reach the explicit authority-erasure boundary.
+- TPERM CLEAR leaves the capability unchanged. Earlier fragment tests wrongly
+  modeled it as erasure; those claims and the CREATE source have been corrected.
+  Other unfinished methods still contain their earlier TPERM CLEAR draft usage
+  and must not be treated as having working cleanup.
+- Ordinary LAMBDA saves continuation state but falls through instead of
+  entering the intended private label. The separate protected Mint profile
+  supplies additional entry/return handling; that does not establish ordinary
+  CLOOMC support. The native probe records this blocker, not successful dispatch.
+
+No complete CREATE happy path has run. Authority erasure and legal Lambda
+entry/return binding must be reconciled before connecting these fragments;
+Passkey, allocation, exclusion and accounting remain unfinished too.
 
 This is fragment verification, not proof of Passkey validation, real allocation,
 successful service execution, or committed accounting.
