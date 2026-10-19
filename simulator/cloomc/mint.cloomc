@@ -33,7 +33,8 @@
 ; PkVerify must establish credential type/authority; non-NULL is NOT validity.
 ; Common output: DR1=1 only after completed body, never assigned by a wrapper.
 ; CR1 is a non-NULL result GT except DESTROY, which requires architectural NULL.
-; Preserve CR5/DR5 and architectural CR12..15 rules. DR2..4 are scratch.
+; Preserve CR5/DR5 and architectural CR12..15 rules.
+; CREATE consumes packed DR2 and permission mask DR3 before using scratch.
 ; TODO_<Method>_FINISH must clear other caller-clobbered CRs/DRs before entering
 ; each *_result label; retain result CR1 and completion DR1 for checking.
 ; This draft checks available NULL/permission/scalar shapes only. Exact GT
@@ -45,132 +46,91 @@ capabilities { SELF E }
 
 method CREATE {
 CREATE_inputs:
-    ; CR4: 12-word request; CR8: optional initial content; CR7: NULL.
+    ; First implementation slice: case 4, DATA RW only.
+    ; CR2/CR3: Passkey GT/proof. CR4: readable initial data.
+    ; DR2 = power-of-two word size | 4 (low three bits).
+    ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
+    ; Other cases/permissions remain unsupported, never silently become Data.
     TPERM CR1, CLEAR
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_CREATE_INPUT_CREDENTIAL_NULL
     TPERM CR3, R
     BRANCHNE TODO_CREATE_INPUT_PROOF_READ
-    DREAD DR2, CR3, #3
+    ; Probe proof bounds without clobbering packed DR2 or permission DR3.
+    DREAD DR4, CR3, #3
     TPERM CR4, R
-    BRANCHNE TODO_CREATE_INPUT_REQUEST_READ
-    DREAD DR2, CR4, #11
-    MCMP DR2, #0
-    BRANCHNE TODO_CREATE_INPUT_RESERVED_WORD11
-    DREAD DR2, CR4, #10
-    MCMP DR2, #0
-    BRANCHNE TODO_CREATE_INPUT_RESERVED_WORD10
-    TPERM CR7, NULL
-    BRANCHNE TODO_CREATE_INPUT_CR7_NOT_NULL
-    ; Interface version 0x101.
-    DREAD DR2, CR4, #0
-    MCMP DR2, #257
-    BRANCHNE TODO_CREATE_INPUT_INTERFACE_VERSION
-    ; Object kind 1..8; GT type 1..3.
-    DREAD DR2, CR4, #1
-    MCMP DR2, #1
-    BRANCHCC TODO_CREATE_INPUT_KIND_LOW
-    MCMP DR2, #8
-    BRANCHHI TODO_CREATE_INPUT_KIND_HIGH
-    DREAD DR2, CR4, #2
-    MCMP DR2, #1
-    BRANCHCC TODO_CREATE_INPUT_TYPE_LOW
-    MCMP DR2, #3
-    BRANCHHI TODO_CREATE_INPUT_TYPE_HIGH
-    ; Domain and B each 0..1; permissions 0..7; Owner 0..15.
-    DREAD DR2, CR4, #3
-    MCMP DR2, #1
-    BRANCHHI TODO_CREATE_INPUT_DOMAIN
-    DREAD DR2, CR4, #4
-    MCMP DR2, #7
-    BRANCHHI TODO_CREATE_INPUT_PERMISSIONS
-    DREAD DR2, CR4, #5
-    MCMP DR2, #1
-    BRANCHHI TODO_CREATE_INPUT_BIND_FLAG
-    DREAD DR2, CR4, #8
-    MCMP DR2, #15
-    BRANCHHI TODO_CREATE_INPUT_OWNER
-    ; A zero-length payload requires NULL; a nonzero length requires DATA R.
-    DREAD DR2, CR4, #7
-    MCMP DR2, #0
-    BRANCHEQ create_empty_payload
-    TPERM CR8, R
-    BRANCHNE TODO_CREATE_INPUT_PAYLOAD_READ
-    BRANCH create_specific_checks
-create_empty_payload:
-    TPERM CR8, NULL
-    BRANCHNE TODO_CREATE_INPUT_EMPTY_PAYLOAD_NOT_NULL
-create_specific_checks:
-    ; Kind 1..5 => Inform; 6 => Outform; 7..8 => Abstract.
-    DREAD DR2, CR4, #1
-    DREAD DR3, CR4, #2
-    MCMP DR2, #6
-    BRANCHEQ create_outform_request
-    BRANCHHI create_abstract_request
-    MCMP DR3, #1
-    BRANCHNE TODO_CREATE_INPUT_KIND_REQUIRES_INFORM
-    DREAD DR3, CR4, #6
-    MCMP DR3, #0
-    BRANCHEQ TODO_CREATE_INPUT_ALLOCATION_ZERO
-    DREAD DR4, CR4, #7
-    MCMP DR4, DR3
-    BRANCHHI TODO_CREATE_INPUT_PAYLOAD_EXCEEDS_ALLOCATION
-    MCMP DR2, #1
-    BRANCHEQ create_reference_fields
-    MCMP DR4, #0
-    BRANCHEQ TODO_CREATE_INPUT_COMPLETE_OBJECT_MISSING
-    BRANCH create_reference_fields
-create_outform_request:
-    MCMP DR3, #2
-    BRANCHNE TODO_CREATE_INPUT_KIND_REQUIRES_OUTFORM
-    DREAD DR3, CR4, #6
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_OUTFORM_ALLOCATION_NOT_ZERO
-    DREAD DR3, CR4, #7
-    MCMP DR3, #4
-    BRANCHNE TODO_CREATE_INPUT_OUTFORM_DESCRIPTOR_LENGTH
-create_reference_fields:
-    DREAD DR3, CR4, #8
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_UNUSED_OWNER_NOT_ZERO
-    DREAD DR3, CR4, #9
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_UNUSED_ABSTRACT_PAYLOAD_NOT_ZERO
-    BRANCH create_typed_checks
-create_abstract_request:
+    BRANCHNE TODO_CREATE_INPUT_DATA_READ
+create_data_scalar_checks:
+    BFEXT DR4, DR2, #0, #3
+    MCMP DR4, #4
+    BRANCHNE TODO_CREATE_INPUT_CASE_NOT_DATA
     MCMP DR3, #3
-    BRANCHNE TODO_CREATE_INPUT_KIND_REQUIRES_ABSTRACT
-    DREAD DR3, CR4, #3
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_ABSTRACT_DOMAIN_NOT_ZERO
-    DREAD DR3, CR4, #4
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_ABSTRACT_PERMISSIONS_NOT_ZERO
-    DREAD DR3, CR4, #6
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_ABSTRACT_ALLOCATION_NOT_ZERO
-    DREAD DR3, CR4, #9
-    SHR DR3, DR3, #25
-    MCMP DR3, #0
-    BRANCHNE TODO_CREATE_INPUT_ABSTRACT_PAYLOAD_OVER_25_BITS
-create_typed_checks:
-    ; Still requires actual GT-type, full payload bounds, object geometry,
-    ; and hierarchy-specific input checks; scalar checks do not confer authority.
-    BRANCH TODO_CREATE_TYPED_INPUTS
-create_authorize:
-    BRANCH TODO_CREATE_PKVERIFY
-create_body:
-    ; Allocate/issue actual GT, register with GC, put GT in CR1, set DR1=1.
-    BRANCH TODO_CREATE_BODY
+    BRANCHNE TODO_CREATE_INPUT_PERMISSIONS_NOT_RW
+    IADD DR6, DR2, #0
+    BFINS DR6, DR0, #0, #3
+    MCMP DR6, #0
+    BRANCHEQ TODO_CREATE_INPUT_ALLOCATION_ZERO
+    ; Exact power of two: shift until one, rejecting any earlier odd value.
+    ; No unapproved 64-word minimum is enforced here.
+    IADD DR7, DR6, #0
+create_data_power_loop:
+    MCMP DR7, #1
+    BRANCHEQ create_data_authorize
+    BFEXT DR4, DR7, #0, #1
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_INPUT_SIZE_NOT_POWER_TWO
+    SHR DR7, DR7, #1
+    BRANCH create_data_power_loop
+create_data_authorize:
+    ; Service binding missing: verify all four proof words, credential authority,
+    ; and remaining allowance >= DR6 before allocation or destination writes.
+    ; Preserve CR4 and decoded DR6. Non-NULL is never authorization.
+    BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE
+create_data_source_extent:
+    ; Service binding missing: validate source kind and derive readable word
+    ; extent from CR4's authorized object metadata into DR11, not caller input.
+    ; No NS authority or source length may be guessed from DR2.
+    BRANCH TODO_CREATE_SOURCE_EXTENT
+create_data_extent_checked:
+    MCMP DR11, DR6
+    BRANCHHI TODO_CREATE_INPUT_SOURCE_EXCEEDS_ALLOCATION
+create_data_allocate:
+    ; Service binding missing: reserve DR6 words and a slot/generation;
+    ; obtain a private DATA RW destination in CR8, disjoint from the source.
+    ; Preserve CR4/DR6/DR11. Caller-supplied CR8 is NOT allocation authority.
+    BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA
+create_data_copy_begin:
+    IADD DR9, DR0, #0
+create_data_copy_loop:
+    MCMP DR9, DR11
+    BRANCHEQ create_data_zero_loop
+    DREAD DR10, CR4, #0, DR9
+    DWRITE DR10, CR8, #0, DR9
+    IADD DR9, DR9, #1
+    BRANCH create_data_copy_loop
+create_data_zero_loop:
+    MCMP DR9, DR6
+    BRANCHEQ create_data_publish
+    DWRITE DR0, CR8, #0, DR9
+    IADD DR9, DR9, #1
+    BRANCH create_data_zero_loop
+create_data_publish:
+    ; Service binding missing: commit initialized allocation, NS/GC bookkeeping,
+    ; debit exactly DR6 words once, issue Inform DATA RW B=1 in CR1.
+    ; Only completed publication may set DR1=1. No rollback is promised.
+    BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE
 create_finish:
+    ; Clear proof references, private destination and caller-clobbered scratch.
     BRANCH TODO_CREATE_FINISH
 create_result:
     MCMP DR1, #1
     BRANCHNE TODO_CREATE_RESULT_COMPLETION
     TPERM CR1, NULL
     BRANCHEQ TODO_CREATE_RESULT_NULL
-    ; Verify issued type/rights/identity against the frozen request.
+    TPERM CR1, RW
+    BRANCHNE TODO_CREATE_RESULT_NOT_RW
+    ; Verify Inform DATA, B=1, and exact committed allocation identity.
     BRANCH TODO_CREATE_RESULT_TYPE
 create_return:
     RETURNAL #2

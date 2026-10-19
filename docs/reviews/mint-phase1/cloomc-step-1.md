@@ -13,7 +13,9 @@ does not replace the installed executable Mint LUMP.
 The consolidated [CREATE reset API draft](create-api-reset.md) is the current
 proposal for this method. It replaces the original scalar request proposal
 as the review starting point and explicitly separates agreed rules from
-remaining interface questions. No executable source was changed by that reset.
+remaining interface questions. The subsequent
+[RW Data implementation slice](create-rw-data.md) replaces CREATE's old
+request-record checks in the editable source; it is not yet runnable Mint.
 
 The proposed request fields are being reviewed individually. The original
 12-word layout below is not an approved final interface.
@@ -87,9 +89,8 @@ The proposed request fields are being reviewed individually. The original
   copying protocol. The separate allocation size, permissions and Passkey
   requirements remain. Rounded allocation never establishes readable source
   extent by itself.
-- Remaining field offsets will be settled after the input review. The current
-  source still reflects the earlier proposal; its version check is not an
-  approved requirement.
+- CREATE's editable RW Data slice now uses the packed-size input, not the old
+  request record or version check. Other methods remain unfinished drafts.
 
 ## 1. Mint as a Lambda Calculus Abstraction
 **Primary lifecycle functions: CREATE, DESTROY.**

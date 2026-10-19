@@ -1,8 +1,10 @@
 # CREATE — reset API draft
 
 Status: proposal consolidated from the guided input review. Not an implemented
-register ABI or an approval to install a LUMP. The older 12-word request and
-the current editable source are not this interface.
+register ABI or an approval to install a LUMP. The older 12-word request is
+superseded. The editable CREATE source now starts the RW Data case using the
+working packed-size layout below, with unresolved service bindings remaining
+explicit compilation blockers; see [RW Data implementation slice](create-rw-data.md).
 
 ## Logical interface
 

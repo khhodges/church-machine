@@ -47,6 +47,17 @@ Review its inputs individually with the programmer before fixing the layout.
 **How to apply:** Explain one proposed input, distinguish requirements from
 assumptions, and obtain its decision before moving to the next input.
 
+After CREATE input review, develop its easiest RW Data path before moving
+to another Mint method.
+
+**Why:** The programmer explicitly rejected moving on to DESTROY and requested
+writing CREATE on the RW Data path first.
+
+**How to apply:** Keep the next implementation review focused on that path.
+Do not expand into other creation cases or substitute an API-only discussion
+for writing the ordinary instruction body. Missing protected service bindings
+must remain explicit, not be replaced by host authority or success stubs.
+
 CREATE's Namespace case uses an LS GT to a source C-list; under this
 CREATE-specific convention originally selected Namespace creation without a
 separate kind argument; the later packed-size decision below selects the case.
