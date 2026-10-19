@@ -11,7 +11,7 @@
             host = document.createElement('div');
             host.id = 'savedLumpRealignmentStatus';
             host.setAttribute('role','status');
-            host.style.cssText='position:fixed;top:80px;right:16px;z-index:100000;max-width:min(520px,calc(100vw - 32px));padding:10px;background:#29344c;color:#fff;border:1px solid #e0a055;box-shadow:0 4px 20px #0008';
+            host.style.cssText='position:fixed;top:80px;right:16px;z-index:100000;box-sizing:border-box;max-width:min(520px,calc(100vw - 32px));padding:10px 76px 10px 10px;background:#29344c;color:#fff;border:1px solid #e0a055;box-shadow:0 4px 20px #0008';
             document.body.prepend(host);
         }
         host.replaceChildren();
@@ -29,6 +29,15 @@
             button.onclick=()=>realign(retryInput.response,retryInput.metadata).catch(()=>{});
             host.append(button);
         }
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.textContent = 'Close';
+        close.setAttribute('aria-label', 'Close saved revision notice');
+        close.style.cssText = 'position:absolute;top:6px;right:6px;min-height:32px;padding:4px 10px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:4px;cursor:pointer';
+        // Dismiss presentation only. Never clear the execution barrier or
+        // cancel an in-flight preparation just because its notice is closed.
+        close.onclick = () => { host.hidden = true; };
+        host.append(close);
     }
     function barrier(value) {
         if (value && retryInput) value.retryInput = retryInput;

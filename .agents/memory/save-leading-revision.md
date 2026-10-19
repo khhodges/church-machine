@@ -96,3 +96,13 @@ both the control and code watching it.
 **How to apply:** Saved revision/date/History metadata is read-only and independent
 of old handoff records. This does not remove binary validation or explicit
 Namespace/configuration approval.
+
+Saved-revision status notices must be dismissible in every state. Dismissing a
+notice hides presentation only; it must not clear execution barriers or cancel
+preparation.
+
+**Why:** The user identified the persistent success notice as uncloseable after
+its wording was corrected. A notice is not itself execution authority.
+
+**How to apply:** Keep the Close action separate from status-clearing or
+activation functions, including for pending and failed preparations.
