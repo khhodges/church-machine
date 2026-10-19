@@ -111,11 +111,15 @@ activation functions, including for pending and failed preparations. Preserve
 dismissal separately from the underlying execution state.
 
 Selected-design execution must retain the established numbered Boot and Code
-step output and trace displays, including Step, Walk, and Run.
+step output and trace displays, including Step, Walk, and Run. The Simulator
+Trace window itself must show the three Boot instructions as well as Code;
+restoring Console Output or the separate pipeline view is not sufficient.
 
 **Why:** The user reported the loss of the familiar execution steps after the
 selected-design execution path was introduced. Runtime selection must not
-silently remove existing debugging feedback.
+silently remove existing debugging feedback. The user explicitly corrected
+verification that treated console steps as proof the Simulator Trace window
+was restored.
 
 **How to apply:** Reuse the existing trace presentation and preserve captured
 instruction evidence when appending later console output.
