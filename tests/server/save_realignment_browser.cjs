@@ -217,23 +217,36 @@ async function main() {
             await route.fulfill({response});
         });
         const beforeConflict = await snapshot();
+        const namespaceWritesBeforeConflict = calls.filter(([path]) => path === '/api/namespace/save-table').length;
         const rejection = page.waitForResponse(response =>
             response.url().endsWith('/api/namespace/save-table') && response.status() === 409);
         result = await publish(46, result.saved);
         assert(competed);
         const conflict = await (await rejection).json();
         assert.equal(conflict.committed, false);
-        assert.match(conflict.message, /Namespace changed since review/);
-        assert.match(result.barrier.message, /change_preflight_failed/);
+        assert.equal(conflict.error, 'change_preflight_failed');
+        assert.match(conflict.message, /Namespace changed since review; reload before saving/);
+        assert(result.barrier.message.includes(conflict.message), 'barrier retains the server explanation and next action');
+        const status = page.locator('#savedLumpRealignmentStatus');
+        assert(await status.isVisible(), 'alignment failure must be visible');
+        const visibleMessage = await status.innerText();
+        assert.match(visibleMessage, /LUMP saved; realignment incomplete/);
+        assert(visibleMessage.includes(conflict.message), 'visible status explains the conflict and how to proceed');
         assert.deepEqual(await snapshot(), beforeConflict);
         const conflictedRows = await namespace();
         assert.notEqual(conflictedRows.find(row => row.slot === 10).filename, result.saved.filename);
         assert.equal(conflictedRows.find(row => row.slot === 14).label, 'concurrent engineer edit');
+        await assertHistory(result.saved);
         await assertBlocked();
+        assert.deepEqual(await namespace(), conflictedRows, 'competing rows remain unchanged while execution is blocked');
+        assert.equal(calls.filter(([path]) => path === '/api/namespace/save-table').length,
+            namespaceWritesBeforeConflict + 1, 'no silent retry of the rejected Namespace write');
         await page.unroute('**/api/boot-image/ns-state');
         await page.getByRole('button', {name:'Retry saved-revision alignment', exact:true}).click();
         await page.waitForFunction(() => window._savedLumpRealignment === null);
         await assertActivated(result.saved, 46);
+        assert.equal((await namespace()).find(row => row.slot === 14).label, 'concurrent engineer edit',
+            'explicit retry must preserve the competing edit');
         for (const endpoint of ['lumps/save-plan','lumps/approval-intent','lumps/save',
             'namespace/save-table','simulation/prepare','simulation/approve','simulation/activate'])
             assert(calls.some(([path,status]) => path === '/api/'+endpoint && status < 300), endpoint);

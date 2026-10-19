@@ -81,7 +81,11 @@
         const response = await fetch(url, body === undefined ? {cache:'no-store'} : {
             method, headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(body)});
         const data = await response.json();
-        if (!response.ok || data.ok === false) throw Error(data.error || `Realignment failed (${response.status}).`);
+        if (!response.ok || data?.ok === false) {
+            const explanation = [data?.message, data?.error]
+                .find(value => typeof value === 'string' && value.trim());
+            throw Error(explanation || `Realignment failed (${response.status}).`);
+        }
         return data;
     }
     async function refreshHistory(response) {
