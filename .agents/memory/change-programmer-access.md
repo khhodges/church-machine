@@ -3,6 +3,17 @@ name: CHANGE programmer access
 description: One-GT CHANGE is programmer-accessible but uses microcode authority on a permissionless Thread GT.
 ---
 
+Pet-name CHANGE syntax work is compiler-only unless separately authorized.
+Do not infer permission to add indexed simulator execution or invent a machine
+encoding from a request to accept `CHANGE Thread.3` or `CHANGE CR6, #9`.
+
+**Why:** The user explicitly corrected the scope: “Only a compiler issue”
+after an attempted parser fix also changed simulator semantics.
+
+**How to apply:** Resolve source syntax against the existing machine contract.
+If that exposes a contract mismatch, report it rather than silently changing
+the simulator to make newly emitted words execute.
+
 CHANGE is not a protected instruction. Do not invent a general operand-M
 requirement or rewrite programmer-authored CHANGE into SWITCH. Later Phase 1
 approval reserves CR13: executed CHANGE CR13 and SWITCH-to-CR13 fault INVALID_OP
