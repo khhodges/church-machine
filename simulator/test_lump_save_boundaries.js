@@ -10,6 +10,7 @@ const path = require('path');
 const vm = require('vm');
 const ChurchSimulator = require('./simulator.js');
 const CapabilityTokens = require('./capability_tokens.js');
+require('./test_compact_presave_binding.js');
 
 let pass = 0;
 let fail = 0;

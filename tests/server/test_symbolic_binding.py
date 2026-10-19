@@ -79,6 +79,14 @@ def test_real_compiler_emits_integrity_covered_symbolic_contract():
     assert contract["owner"] == "ide.Caller"
     assert contract["calls"][0]["full_name"] == "ide.Target.Run"
     assert result["words"][contract["calls"][0]["word_offset"]] == FAULT
+    compact_zero = result["words"][:]
+    compact_zero[-(compact_zero[0] & 255)] = 0
+    assert embedded(compact_zero) == contract
+    for row in (0, 1):
+        injected = compact_zero[:]
+        injected[len(injected) - (injected[0] & 255) + row] = 0x46000006
+        with pytest.raises(ValueError, match="must remain unresolved"):
+            embedded(injected)
 
 
 @pytest.mark.parametrize("target_type,expected", [("Thread", "bound"), ("Namespace", "bound"),

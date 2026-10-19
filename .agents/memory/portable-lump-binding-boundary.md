@@ -33,6 +33,29 @@ Validate successful resolutions individually and test both an unused unresolved
 entry and an executed reference to it. This does not waive structural,
 integrity, or authorization checks.
 
+Publication validation must use the exact portable artifact's declaration
+contract, not destination lookup results. Verify the real Save preflight and
+final-plan checks whenever changing binding diagnostics.
+
+**Why:** An informational audit previously concealed a separate Save gate that
+still demanded resolved GTs and rejected valid permissionless Thread imports.
+Passing the audit alone did not prove that saving worked.
+
+**How to apply:** Cover unresolved dependencies and permissionless Thread
+imports through both publication checks, alongside identity, permissions,
+row-count and injected-GT rejection. Keep destination validation strict.
+
+Compact symbolic publication uses zero SELF, while original compiler pairs
+can retain the inert SELF marker. Validate both representations without
+rewriting historical evidence; neither permits a destination GT.
+
+**Why:** The browser's compact formatting and the compiler pair reached different
+SELF representations, so legacy marker-only server validation blocked saving
+after the client preflight was corrected.
+
+**How to apply:** Check browser and server symbolic guards together, including
+the real isolated approval/publication path and injected-GT negative cases.
+
 Canonical portable LUMPs must contain symbolic Self and unresolved dependency
 rows. Local slots, sequences, and GTs are permitted only in a destination copy
 after exact N, T, actual-byte full hash, identity hash, authorization, rights,

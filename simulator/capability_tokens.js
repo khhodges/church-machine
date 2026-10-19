@@ -531,7 +531,8 @@
         const frame = node ? require('./lump-content-frame') : globalThis.LumpContentFrame;
         const stored = frame && frame.lumpDecodeContentFrameApi(words);
         if (stored && stored.methods && !Array.isArray(stored.methods) &&
-                resolvedCaps.every(cap => cap.canonical_unresolved === true)) {
+                ((context && context.canonicalArtifact === true) ||
+                 resolvedCaps.every(cap => cap.canonical_unresolved === true))) {
             const check = materialize(resolvedCaps, Array.from(words), clistStart,
                 {...context,canonicalArtifact:true});
             if (!check.ok) return check;

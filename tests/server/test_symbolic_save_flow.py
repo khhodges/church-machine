@@ -4,7 +4,7 @@ from test_idx1_save_endpoint import client, isolated_lumps
 
 def test_missing_target_compiles_and_reaches_signed_save_plan(client, isolated_lumps, monkeypatch):
     source = ("abstraction test.SymbolicCaller {\n"
-              "capabilities { SELF E, ide.SelfTest E, ide.WukongCallHome E }\n"
+              "capabilities { SELF E, ide.SelfTest E, ide.WukongCallHome E, ide.LED_DEV RW, ide.Thread.2, ide.Thread.3 }\n"
               "method Run() {\nCALL ide.SelfTest.Run\nCALL ide.WukongCallHome.Run\nRETURN\n}\n}\n")
     response = client.post("/api/compile", json={
         "source": source, "language": "javascript", "tier": 2})
@@ -12,6 +12,11 @@ def test_missing_target_compiles_and_reaches_signed_save_plan(client, isolated_l
     assert response.status_code == 200 and compiled["ok"], compiled
     assert compiled["binding_status"] == "unresolved"
     assert compiled["warnings"] == []
+    # Format LUMP publishes compact portable rows as zero, including SELF.
+    # Retain the compiler's original marker-bearing pair separately.
+    compiler_words = compiled["words"][:]
+    cc = compiler_words[0] & 255
+    compiled["words"] = compiler_words[:-cc] + [0] * cc
     response = client.post("/api/lumps/save-plan", json={
         "binary": compiled["words"],
         "metadata": {

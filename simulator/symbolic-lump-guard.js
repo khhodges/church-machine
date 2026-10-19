@@ -50,8 +50,12 @@
                 !Array.isArray(contract.calls))
             throw new Error('Symbolic LUMP contract geometry is invalid');
         const start = size - cc;
-        if (binary[start] !== SELF_MARKER)
-            throw new Error('Symbolic LUMP SELF row 0 must be canonical 0xFEED5E1F');
+        const api = decodeApi(binary);
+        const compact = api && api.methods && !Array.isArray(api.methods);
+        // Retain original compiler markers without rewriting historical bytes.
+        // Compact publication also permits the inert zero SELF representation.
+        if (binary[start] !== SELF_MARKER && !(compact && binary[start] === 0))
+            throw new Error('Symbolic LUMP SELF row 0 must be an unresolved canonical placeholder');
         for (let row = 1; row < cc; row++) {
             if (binary[start + row] !== 0)
                 throw new Error(`Symbolic LUMP row ${row} contains a destination-local word`);

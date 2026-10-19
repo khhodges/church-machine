@@ -16911,6 +16911,7 @@ function _validateFinalLumpSaveBinary(words, capabilities, plan) {
     const validation = CapabilityTokens.validateClist(
         words, start, resolved,
         {
+            canonicalArtifact: true,
             sim,
             allowCompilerSelfPlaceholder: !!(embeddedSelf &&
                 ['SELF', '__SELF__'].includes(embeddedSelf.name) &&
@@ -17227,6 +17228,9 @@ async function confirmSaveToNamespace() {
             _preSaveHdr.lumpSize - _preSaveHdr.cc,
             _preSaveResolved,
             {
+                // Publication validates portable declarations against the
+                // embedded compact API, not against live Namespace bindings.
+                canonicalArtifact: true,
                 sim,
                 lumps: (typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache))
                     ? _lumpsCache : [],
