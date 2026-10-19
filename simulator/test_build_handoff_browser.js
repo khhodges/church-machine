@@ -15,18 +15,14 @@ const assert = require('assert');
         const artifact = {token: '4a000007', filename: 'Test.1.saved.lump',
             dot_name: 'Test', issue_n: 1, lump_version: 16,
             binary_hash: 'a'.repeat(64), _identityProvenance: 'verified'};
-        let state = {released: false, revision: 0, updated_at: null};
         let posts = 0;
         await page.route('**/*', route => {
-            if (route.request().url().includes('/api/build-handoff')) {
+            if (route.request().url().includes('/api/saved-artifact-metadata')) {
                 if (route.request().method() === 'POST') {
                     posts++;
-                    state = {released: route.request().postDataJSON().released,
-                        revision: state.revision + 1, updated_at: '2026-09-23T12:00:00Z'};
                 }
                 return route.fulfill({contentType: 'application/json', body: JSON.stringify({
-                    identity: {...artifact, compiled_at: '2026-09-22T12:00:00Z', eligible: true},
-                    handoff: state, csrf: 'isolated-test-only', committed: true
+                    identity: {...artifact, compiled_at: '2026-09-22T12:00:00Z'}
                 })});
             }
             return route.fulfill({contentType: 'text/html',
@@ -52,20 +48,14 @@ const assert = require('assert');
             _renderSavedLumpIdentityPanel(row, row.token);
         }, artifact);
         await render();
-        const box = page.locator('[data-testid="released-to-builder"]');
-        await page.waitForFunction(() => !document.querySelector('input').disabled);
-        assert((await page.locator('#savedLumpIdentityPanel').textContent()).includes('v16'));
-        await box.click();
-        await page.waitForFunction(() => document.querySelector('[role=status]').textContent.startsWith('Released'));
-        assert(await box.isChecked());
+        await page.waitForFunction(() => document.body.textContent.includes('2026-09-22T12:00:00Z'));
+        assert.equal(await page.locator('input').count(), 0);
+        assert(!/Released|Not released/.test(await page.locator('#savedLumpIdentityPanel').textContent()));
         await page.screenshot({path: '/tmp/build-handoff-preview.png'});
         await render();
-        await page.waitForFunction(() => document.querySelector('input').checked);
-        await box.click();
-        await page.waitForFunction(() => document.querySelector('[role=status]').textContent.startsWith('Not released'));
-        assert.equal(await box.isChecked(), false);
-        assert.equal(posts, 2);
-        console.log('PASS isolated Chromium production panel, date/version, release/reload/revoke; all requests mocked');
+        await page.waitForFunction(() => document.body.textContent.includes('2026-09-22T12:00:00Z'));
+        assert.equal(posts, 0);
+        console.log('PASS isolated Chromium read-only saved metadata, no release control or writes');
     } finally {
         await browser.close();
     }

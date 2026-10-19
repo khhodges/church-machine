@@ -73,3 +73,26 @@ silently restore authority that the selected profile does not have.
 
 **How to apply:** Keep fresh replay visibly identified as the selected design's
 private simulation. Candidate review alone remains insufficient authority.
+
+The user requires all simulator execution to follow the selected view and
+rejects SelfTest as an implicit fallback. Main controls must dispatch to the
+selected design's admitted runtime or stop; they must not run the historical
+image behind a newer saved-artifact view.
+
+**Why:** A selected v2 design and a legacy simulator image coexisted, allowing
+ordinary Run to execute old code despite the corrected repository selection.
+
+**How to apply:** Validate the selected saved identity and Namespace ownership
+before execution and across asynchronous work. Remove auto-inserted SelfTest
+defaults, preserve historical files and deliberate user assignments, and never
+substitute an old image when admission or a dependency fails.
+
+Do not reintroduce the “Released to build handoff” checkbox or a release-status
+dependency for inspecting or using saved LUMPs.
+
+**Why:** The user explicitly identified this setting as stale and asked to remove
+both the control and code watching it.
+
+**How to apply:** Saved revision/date/History metadata is read-only and independent
+of old handoff records. This does not remove binary validation or explicit
+Namespace/configuration approval.

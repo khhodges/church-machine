@@ -15,7 +15,7 @@ const ctx = {document:dom.window.document,window:{},
     _getLumpFieldSizeLayout:actual=>{assert.equal(actual,words);return {source:0};},
     _renderSavedLumpWordUsage:(panel,actual)=>{assert.equal(actual,words);},
 };
-ctx.window.renderBuildHandoff=(panel,actual)=>assert.equal(actual,artifact);
+ctx.window.renderSavedArtifactMetadata=(panel,actual)=>assert.equal(actual,artifact);
 vm.createContext(ctx);
 vm.runInContext(source.slice(source.indexOf('function _renderSavedLumpIdentityPanel('),
     source.indexOf('function _renderSavedLumpWordUsage(')),ctx);

@@ -22,6 +22,27 @@
     // Retain the execution hook, but freshness is no longer an execution gate.
     // Image admission, byte validation and target authorization remain separate.
     async function checkExecutionFreshness() {
+        // Legacy entry points must not execute behind a selected design view.
+        // Main controls dispatch through DesignSimulation before reaching here.
+        if (window.NamespaceDesignV1?.state.active) {
+            if (typeof appendOutput === 'function') appendOutput(
+                'Execution blocked: use the selected Namespace simulation, not the historical image.', 'error');
+            return false;
+        }
+        const editor = document.getElementById('editor');
+        const repository = document.getElementById('lumps');
+        const viewed = editor?.classList.contains('active') ? window._editorSavedBinaryReceipt :
+            repository?.classList.contains('active') ? document.getElementById('lumpsDetailContent')?._displayedLump : null;
+        if (viewed) {
+            const bindings = sim?.simulationConfiguration?.artifactBindings;
+            const rows = Array.isArray(bindings) ? bindings : Object.values(bindings || {});
+            if (!rows.some(row => row.token === viewed.token && row.filename === viewed.filename &&
+                    (row.binaryHash || row.binary_hash) === viewed.binary_hash)) {
+                if (typeof appendOutput === 'function') appendOutput(
+                    'Execution blocked: the loaded image does not prove the exact viewed saved LUMP. Prepare that selection first.', 'error');
+                return false;
+            }
+        }
         if (window._savedLumpRealignment) {
             const text = window._savedLumpRealignment.message;
             if (typeof appendOutput === 'function') appendOutput(text, 'error');

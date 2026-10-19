@@ -53,6 +53,8 @@
         finally { state.loading = false; render(); }
     }
     function setProfile(value) {
+        if(root.DesignSimulation) root.DesignSimulation.stop();
+        if(typeof root.stopSim==='function') root.stopSim();
         if (!['ascending','phase1','legacy'].includes(value)) return;
         if (state.loading || state.saving) {
             const select = document.getElementById('namespaceDesignProfile');
@@ -81,7 +83,10 @@
         if (legacy) legacy.hidden = state.active;
         root.updateNamespace();
     }
-    function changed() { ++sourceRequest; state.dirty=true; state.error=''; render(); }
+    function changed() {
+        if(root.DesignSimulation) root.DesignSimulation.stop();
+        ++sourceRequest; state.dirty=true; state.error=''; render();
+    }
     function render() {
         const selector = document.getElementById('namespaceDesignProfile');
         if (selector) selector.value = state.active ? state.profile : 'legacy';

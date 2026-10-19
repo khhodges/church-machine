@@ -3,7 +3,7 @@
 (function(root) {
     'use strict';
     let machine = null, provenance = null, frozenWords = null, owner = null;
-    let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0;
+    let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0, intent = 0;
     let message = 'Save a LUMP or prepare this saved design for private simulation. Hardware and installed images stay unchanged.';
     const esc = value => String(value).replace(/[&<>"']/g, c =>
         ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,14 +34,14 @@
                 ' · NIA: '+machine.pc+' · DR1: '+(machine.dr[1]>>>0)+
                 (machine.halted?' · stopped':'')+'\n'+(machine.output || '').slice(-4000)+
                 '\n'+(machine.faultLog || []).map(f=>f.message || f.type).join('\n'))+'</pre>':'')+
-            '<small>These controls run the verified ascending runtime only. Legacy Run remains separate and blocked after a save. No hardware certification or installation.</small>';
+            '<small>Main Run, Step, Walk and Reset use this selected design. No legacy-image fallback, hardware certification or installation.</small>';
     }
     function render() {
         if (typeof document === 'undefined') return;
         const host = document.getElementById('designSimulationPanel');
         if (host) host.innerHTML = markup();
     }
-    function stop() { runEpoch++; running=false; render(); }
+    function stop() { intent++; runEpoch++; running=false; render(); }
     function invalidate() {
         generation++; runEpoch++; running=false; machine=null; provenance=null; frozenWords=null; owner=null;
         message='Saved revision changed. Prepare a fresh private simulation; previous execution is stopped.';
@@ -116,7 +116,23 @@
         if(busy || !machine || !same(owner)) {
             stop(); message='The selected design differs from this private simulation. Prepare it again.'; render(); return false;
         }
+        try { checkViewedTarget(selection()); }
+        catch(error) { stop(); message=error.message; render(); return false; }
         return true;
+    }
+    function checkViewedTarget(selected) {
+        const boot=JSON.parse(selected.document).rows.filter(row=>row.boot);
+        if(boot.length!==1 || !boot[0].selection)
+            throw Error('Select exactly one saved execution target in this Namespace. No default target will run.');
+        if(typeof document==='undefined') return;
+        const editor=document.getElementById('editor');
+        const repository=document.getElementById('lumps');
+        const viewed=editor?.classList.contains('active') ? root._editorSavedBinaryReceipt :
+            repository?.classList.contains('active') ? document.getElementById('lumpsDetailContent')?._displayedLump : null;
+        if(viewed && (viewed.token!==boot[0].selection.token ||
+                viewed.filename!==boot[0].selection.filename ||
+                viewed.binary_hash!==boot[0].selection.binaryHash))
+            throw Error('The viewed saved LUMP is not the selected Namespace execution target. Select it in Namespace before running; no other image was run.');
     }
     function execute(count) {
         if(!ready()) return false;
@@ -127,13 +143,13 @@
         render();
         return !machine.halted;
     }
-    function run() {
+    function run(walking=false) {
         if(running || !ready()) return;
         running=true;
         const ticket=generation, epoch=++runEpoch;
         const batch=()=>{
             if(!running || ticket!==generation || epoch!==runEpoch) return;
-            if(execute(250) && running) setTimeout(batch,0);
+            if(execute(walking ? 1 : 250) && running) setTimeout(batch,walking ? 500 : 0);
             else {running=false;render();}
         };
         batch();
@@ -145,6 +161,34 @@
         catch(error) {machine=null;message='Private reset blocked: '+error.message;}
         render();
     }
-    root.DesignSimulation={prepare,stop,invalidate,markup,render,run,reset,
+    async function command(action) {
+        try {
+            if(action==='stop') { stop(); return true; }
+            if(root.TargetState && !root.TargetState.authorize('simulator',{id:'simulator-state'}).ok)
+                throw Error('Select the Simulator target before executing this design.');
+            if(action==='walk' && running) { stop(); return true; }
+            const selected=selection();
+            checkViewedTarget(selected);
+            if(typeof sim!=='undefined' && (sim.running || sim.walkActive) && typeof stopSim==='function') stopSim();
+            const actionIntent=++intent;
+            if(!machine || !same(owner)) await prepare(true);
+            if(actionIntent!==intent) throw Error('Execution was stopped while preparation was pending. No instruction ran.');
+            if(!same(selected)) throw Error('Selection changed before execution.');
+            if(action==='prepare') return true;
+            if(action==='reset') reset();
+            else if(action==='step') { if(!running) execute(1); }
+            else if(action==='run' || action==='walk') run(action==='walk');
+            else throw Error('Unknown selected simulation action.');
+            // Show the machine that actually executed, never the old dashboard.
+            if(typeof root.switchView==='function') root.switchView('namespace');
+            return true;
+        } catch(error) {
+            stop(); message='Selected simulation blocked: '+error.message; render();
+            if(typeof root.appendOutput==='function') root.appendOutput(message,'error');
+            if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation blocked',message,'error',15000);
+            return false;
+        }
+    }
+    root.DesignSimulation={prepare,command,stop,invalidate,markup,render,run,reset,
         step:()=>{if(!running) execute(1);}};
 })(typeof window!=='undefined'?window:globalThis);

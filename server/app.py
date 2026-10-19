@@ -17034,7 +17034,6 @@ def _resolve_build_handoff_identity(payload):
     snapshot = _validate_lump_snapshot(str(path), row)
     if snapshot["binary_hash"] != digest:
         raise ValueError("Saved binary identity changed; reopen the exact artifact.")
-    canonical = _check_lump_canonical_integrity(LUMPS_DIR, token, snapshot["raw_bytes"])
     compiled_at = row.get("compiled_at")
     date = None
     if type(compiled_at) in (int, float):
@@ -17047,8 +17046,6 @@ def _resolve_build_handoff_identity(payload):
         "token": token, "filename": filename, "binary_hash": digest,
         "lump_version": version, "compiled_at": date,
         "abstraction": row.get("abstraction"),
-        "eligible": bool(snapshot["valid"] and snapshot["approved"] and snapshot["trusted"]
-                         and canonical is True),
     }
 
 

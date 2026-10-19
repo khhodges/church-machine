@@ -17,8 +17,6 @@ PINS = [
      "549aa4138bf722b48c2ff304ec628af0139d70685ea99e66dfb3200ad0055738", 20, "232f0de4"),
     (10, "CapabilityTest", "CapabilityTest.1.1feaf30b.lump",
      "e41b861a87a13066e4a7cb76e5a01d39c62857bfddfffc5e3f2ffdcb12dd8c21", 45, "17fc5571"),
-    (6, "SelfTest", "SelfTest.1.8b19abd7.lump",
-     "65f6e254b1f0a164f2d2163239f28e4521d792d8d96800b26cdbff607f77b5de", 98, "4a000006"),
 ]
 
 
@@ -79,6 +77,11 @@ def seed(legacy):
     names = {r["name"] for r in rows}
     used = {r["slot"] for r in rows}
     for old in legacy.get("abstractions", []):
+        # Historical demo membership must not silently reintroduce SelfTest
+        # into a newly generated design. Explicit persisted designs are read
+        # unchanged; a programmer may still deliberately add this artifact.
+        if old["name"] == "SelfTest":
+            continue
         if old["name"] in names:
             continue
         slot = old["slot"]
@@ -107,7 +110,6 @@ def phase1_seed():
         document["rows"].append(dict(slot=slot, name=name, kind="lump",
                                      policy="Resident", sequence=0))
     sources = {
-        6: "simulator/examples/post_flash_selftest.cloomc",
         7: "simulator/examples/wukong_callhome.cloomc",
         9: "simulator/cloomc/mint.cloomc",
         10: "simulator/examples/capability_test.cloomc",

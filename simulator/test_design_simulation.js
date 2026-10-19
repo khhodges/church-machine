@@ -13,7 +13,9 @@ function harness(defect) {
         designProfile:profile,sourceNamespaceFingerprint:fingerprint,hardwareCertified:false,
         imageFormat:'ascending-nst-metadata-slot0-v1',slotCount:64,artifactBindings:[{filename:'exact.lump'}]};
     const scope={console,setTimeout,Uint32Array,Uint8Array,ArrayBuffer,DataView,crypto:webcrypto,
-        NamespaceDesignV1:{state:{active:true,profile,fingerprint,document:{rows:[]},dirty:false}},
+        NamespaceDesignV1:{state:{active:true,profile,fingerprint,document:{rows:[
+            {slot:10,boot:true,selection:{token:'961bfee3',filename:'exact.lump',binaryHash:'b'.repeat(64)}}
+        ]},dirty:false}},
         document:{getElementById:id=>id==='designSimulationPanel'?panel:null},
         // Reject any accidental switch to the legacy machine.
         sim:{activateSimulationConfiguration(){throw Error('legacy activation forbidden');}},
@@ -44,6 +46,22 @@ function harness(defect) {
     assert.deepEqual(h.calls.map(s=>s.split('/').pop()),['prepare','approve','activate']);
     h.api.step();assert.equal(h.instances[0].dr[1],1);
     h.api.reset();assert.equal(h.instances.length,2);assert.equal(h.instances[1].dr[1],0);
+    const routed=harness();
+    assert.equal(await routed.api.command('step'),true);
+    assert.equal(routed.instances[0].dr[1],1,'main control executes admitted selected image');
+    const rejected=harness('rejected');
+    assert.equal(await rejected.api.command('run'),false);
+    assert.equal(rejected.instances.length,0,'failed admission cannot run a legacy image');
+    const mismatch=harness();
+    mismatch.scope._editorSavedBinaryReceipt={token:'old',filename:'old.lump',binary_hash:'old'};
+    mismatch.scope.document.getElementById=id=>id==='editor'?{classList:{contains:()=>true}}:null;
+    assert.equal(await mismatch.api.command('step'),false);
+    assert.equal(mismatch.calls.length,0,'view mismatch cannot prepare another target');
+    const stopped=harness();
+    const pendingStep=stopped.api.command('step');
+    stopped.api.stop();
+    assert.equal(await pendingStep,false);
+    assert(stopped.instances.every(machine=>machine.dr[1]===0),'Stop cancels pending execution');
     h.scope.NamespaceDesignV1.state.profile='phase1';
     h.api.step();assert.equal(h.instances[1].dr[1],0,'selection drift blocks execution');
     assert.match(h.api.markup(),/selected design has changed/);

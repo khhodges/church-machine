@@ -1983,8 +1983,8 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken, savedWords) {
         panel.insertAdjacentHTML('beforeend', note(
             'No source is embedded in this binary. Separately retained editing source is not included in these word counts.'));
     }
-    if (typeof window.renderBuildHandoff === 'function') {
-        window.renderBuildHandoff(panel, lump, lookupToken, _identityVerified);
+    if (typeof window.renderSavedArtifactMetadata === 'function') {
+        window.renderSavedArtifactMetadata(panel, lump, lookupToken, _identityVerified);
     }
 }
 

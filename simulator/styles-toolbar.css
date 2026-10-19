@@ -550,10 +550,6 @@
     white-space: pre-line;
 }
 
-.saved-lump-handoff .handoff-status-warning {
-    color: var(--church-gold);
-}
-
 .disassembly-pane-heading {
     flex: 0 0 auto;
     padding: 0.45rem 0.65rem;
@@ -603,15 +599,8 @@
 .saved-lump-identity-row {
     display: contents;
 }
-.saved-lump-handoff {
+.saved-artifact-metadata {
     display: contents;
-}
-.saved-lump-handoff > label {
-    grid-column: 1 / -1;
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-top: 0.25rem;
 }
 .saved-lump-identity-row > span {
     color: var(--text-secondary);

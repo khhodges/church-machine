@@ -22,7 +22,7 @@ def test_new_geometry_exact_pins_and_api_allocations(store):
     data = store.read()
     p = data["projection"]
     by = {r["slot"]: r for r in p["rows"]}
-    assert p["metadataWords"] == [0xf8810100, 0, 11, 0]
+    assert p["metadataWords"] == [0xf8810100, 0, 10, 0]
     assert (by[1]["name"], by[1]["entryWord"], by[1]["limit"]) == ("Boot.NS", 4, 255)
     assert (by[2]["name"], by[2]["entryWord"], by[2]["location"]) == ("Boot.Thread", 8, 256)
     assert by[8]["name"] == "UART_DEV" and by[8]["sequence"] == 1
@@ -34,7 +34,8 @@ def test_new_geometry_exact_pins_and_api_allocations(store):
     assert by[10]["selection"]["token"] == "17fc5571"
     assert by[7]["allocationWords"] < 4096
     assert by[10]["allocationWords"] < 2048
-    assert any("RunAbstraction" in w for w in p["warnings"])
+    assert 6 not in by
+    assert not any("RunAbstraction" in w for w in p["warnings"])
     assert not data["persisted"] and not store.path.exists()
     assert p["activationAllowed"] is False and p["buildReady"] is False
 
@@ -72,7 +73,7 @@ def test_unfinished_add_edit_save_reload_clear_and_stale_tab(store):
     draft["rows"].append(dict(slot=14, name="ide.Mint", kind="lump", policy="Lazy", sequence=0))
     saved = store.save(dict(fingerprint=original["fingerprint"], document=draft))
     assert store.read()["document"] == draft
-    assert saved["projection"]["metadataWords"][2] == 12
+    assert saved["projection"]["metadataWords"][2] == 11
     assert store.legacy_path.read_bytes() == before
     with pytest.raises(ValueError, match="another tab"):
         store.save(dict(fingerprint=original["fingerprint"], document=original["document"]))

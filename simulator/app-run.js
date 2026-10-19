@@ -916,6 +916,7 @@ function _bootNIARows(bootStep) {
 }
 
 async function stepSim() {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('step');
     if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Step')) return;
@@ -1746,6 +1747,7 @@ function onRunBtnClick() {
 }
 
 function prepareAndRunSavedArtifact(propagateError) {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('prepare');
     // Compatibility entry point: preparation never approves, activates or runs.
     return Promise.resolve().then(() => {
         if (!window.SimulationPreparation) throw new Error('Simulation preparation is unavailable.');
@@ -2215,6 +2217,7 @@ async function _applyPendingSimLoad() {
 }
 
 async function runSimGo(preserveView, options) {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('run');
     if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_bootHasCommittedImage()) {
@@ -2262,6 +2265,7 @@ async function runSimGo(preserveView, options) {
 }
 
 function stopSim() {
+    if (window.DesignSimulation) window.DesignSimulation.stop();
     _runStopped = true;
 }
 
@@ -2762,6 +2766,7 @@ function updateWalkBtn() {
 }
 
 function finishWalk() {
+    if (window.DesignSimulation) window.DesignSimulation.stop();
     walkRunning = false;
     if (walkTimer) { clearTimeout(walkTimer); walkTimer = null; }
     if (walkBootTimer) { clearInterval(walkBootTimer); walkBootTimer = null; }
@@ -2773,6 +2778,7 @@ function finishWalk() {
     updateDashboard();
 }
 async function walkToggle() {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('walk');
     if (walkRunning) {
         finishWalk();
         return;
@@ -2814,6 +2820,7 @@ async function walkToggle() {
 }
 
 async function walkNext() {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('step');
     if (_idx1AdmissionInFlight) return;
     if (!walkRunning || !sim.bootComplete) {
         finishWalk();
@@ -3294,17 +3301,24 @@ function _blockBootForMissingCommittedImage(context, reason) {
 // Only explicit activation grants execution authority. Never fetch repository
 // bytes or silently reset a paused machine while answering this gate.
 function _ensureCommittedImageForBoot(context) {
+    if (window.NamespaceDesignV1?.state.active) {
+        _showBootPreparationBlocked(context, new Error(
+            'The selected Namespace uses its own validated simulation. Historical boot images and default SelfTest execution are not allowed in this view.'));
+        return false;
+    }
     if (_bootHasCommittedImage()) return true;
     return _blockBootForMissingCommittedImage(context);
 }
 
 function _requireCommittedImageForExecution(context) {
+    if (window.NamespaceDesignV1?.state.active) return _ensureCommittedImageForBoot(context);
     if (_bootHasCommittedImage()) return true;
     _ensureCommittedImageForBoot(context);
     return false;
 }
 
 function instantBoot() {
+    if (window.NamespaceDesignV1?.state.active) return _ensureCommittedImageForBoot('instant boot');
     if (!_bootHasCommittedImage() || sim._bootImageLoaded !== true) {
         return _ensureCommittedImageForBoot('instant boot');
     }
@@ -3347,6 +3361,7 @@ function instantBoot() {
 }
 
 function slowBoot() {
+    if (window.NamespaceDesignV1?.state.active) return _ensureCommittedImageForBoot('animated boot');
     if (!sim.bootComplete && (!_bootHasCommittedImage() || sim._bootImageLoaded !== true)) {
         _ensureCommittedImageForBoot('animated boot');
         return;
@@ -3534,6 +3549,7 @@ async function _startBootLumpPrefetch() {
 }
 
 function runSim(preserveView) {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('run');
     if (_idx1AdmissionInFlight) return;
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return;
     if (!_requireCommittedImageForExecution('Run')) return;
@@ -5866,6 +5882,7 @@ async function runLazyLoadTest() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function resetSim() {
+    if (window.NamespaceDesignV1?.state.active) return window.DesignSimulation.command('reset');
     if (!window.TargetState.authorize('simulator', { id: 'simulator-state' }).ok) return false;
     // Reset only the private retained image, with no shared-cache fallback.
     if (!_ensureCommittedImageForBoot('Reset')) return false;
