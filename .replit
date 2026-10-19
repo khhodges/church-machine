@@ -223,6 +223,10 @@ args = "method-dispatch-gate-tests"
 task = "workflow.run"
 args = "mint-authority-removal-tests"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "save-realignment-handoff-tests"
+
 [[workflows.workflow]]
 name = "Church Machine IDE"
 author = "agent"
@@ -1220,6 +1224,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node simulator/test_mint_phase1_api_draft.js && node simulator/test_mint_data_native_path.js && node simulator/test_mint_authority_removal.js"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "save-realignment-handoff-tests"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/run-save-realignment-tests.sh -q"
 
 [workflows.workflow.metadata]
 isValidation = true

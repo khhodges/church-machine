@@ -14,3 +14,17 @@ buffer. Those failures can look like broken navigation or missing source.
 Model acceptance or rejection explicitly. Keep display-only mocks separate
 from ownership and source-authority decisions; never fix these tests with an
 unconditional successful ownership check.
+
+Saved-revision handoff tests should preserve the real callback, review receipts,
+Namespace CAS, private admission and execution controls even when Save dialog
+field-entry coverage is kept separate.
+
+**Why:** Mocking Namespace writes or preparation can establish orchestration
+order without proving that published bytes can actually become an executable
+image. A passing UI refresh alone is insufficient.
+
+**How to apply:** Use private storage and the explicitly supported profile.
+Assert the refreshed History revision before execution can change the detail
+selection; then compare the complete localized artifact and execute through
+the normal boot-aware controls. Label in-memory restart simulation separately
+from a full server-process restart.

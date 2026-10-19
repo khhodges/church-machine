@@ -116,6 +116,9 @@ register_suite() {
 register_suite "protected-mint-path-tests" \
     'node --test tests/mint_phase1/protected_runtime.test.js'
 
+register_suite "save-realignment-handoff-tests" \
+    'bash scripts/run-save-realignment-tests.sh -q'
+
 register_suite "protected-mint-qualified-tests" \
     'python3 -m pytest tests/mint_phase1/test_qualified_runtime.py -q'
 
