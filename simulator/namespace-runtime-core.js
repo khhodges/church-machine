@@ -88,6 +88,34 @@ class NamespaceRuntimeCore extends Simulator {
             Simulator.isNullGT(this.cr[15].word0) ? this._bootRoot : this.cr[15];
     }
     namespaceGeometry() { return view.geometry(this.memory, this._namespaceRoot()); }
+    _liveNamespaceTableGeometry() {
+        const ns = this.namespaceGeometry();
+        return {
+            base: ns.base, start: ns.base, end: ns.bodyStart,
+            tableWords: ns.tableWords,
+            description: 'Ascending Namespace table (slot 0 metadata)',
+            direction: 'ascending',
+        };
+    }
+    _validateLiveLumpContext(context) {
+        try {
+            return super._validateLiveLumpContext(context);
+        } catch (error) {
+            if (!(error instanceof view.NamespaceGeometryError)) throw error;
+            // Invalid active metadata prevents every descriptor lookup. Keep
+            // the real diagnostic visible instead of letting updateGateLog's
+            // render catch drop all cards. This does not raise/clear a machine
+            // fault or alter the runtime's fail-closed geometry checks.
+            return {
+                key: context.key, title: context.title,
+                register: `CR${context.register}`, expected: context.expected,
+                state: 'fault', status: 'fault', result: 'fault',
+                slot: null, name: null, reason: error.message,
+                checks: [{id: 'header', label: 'NS HEADER', pass: false,
+                    state: 'fault', detail: error.message}],
+            };
+        }
+    }
     beginBoot() {
         if(this._liveThreadOwned || this.halted) throw Error('Boot requires a fresh Namespace image');
         this._bootRoot = Object.freeze({...this.cr[15]});

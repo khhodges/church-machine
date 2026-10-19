@@ -4172,6 +4172,20 @@ class ChurchSimulator {
         return result;
     }
 
+    // Diagnostic geometry only. Execution/admission continue to use their own
+    // gates. New-format runtimes override this rather than borrowing the
+    // legacy instruction engine's NS_TABLE_BASE compatibility property.
+    _liveNamespaceTableGeometry() {
+        return {
+            base: this.NS_TABLE_BASE,
+            start: this.NS_TABLE_BASE + this.NS_TABLE_RESERVE - this.nsCount * this.NS_ENTRY_WORDS,
+            end: this.NS_TABLE_BASE + this.NS_TABLE_RESERVE,
+            tableWords: null,
+            description: 'v1.2 Namespace table',
+            direction: 'inverted',
+        };
+    }
+
     _validateLiveLumpContext(context) {
         const unavailable = (reason, extra = {}) => ({
             key: context.key,
@@ -4262,28 +4276,27 @@ class ChurchSimulator {
         addCheck('integrity', 'INTEGRITY', integrityPass,
             integrityPass ? 'Namespace integrity32 matches location and authority' : 'Namespace integrity32 does not match location and authority');
 
-        // The live Namespace is a raw v1.2 Namespace table, not a code LUMP
-        // with an embedded LUMP header at its base.  Its canonical structure is
-        // the 4-word descriptor table described by NS[0]'s authority limit.
+        // A Namespace descriptor table is not a code LUMP. Diagnose it using
+        // the active runtime's geometry, never the selected repository image.
         if (context.expected === 'namespace') {
+            const geometry = this._liveNamespaceTableGeometry();
             const tableWords = authorityFields.limit + 1;
             const tableFits = location < this.memory.length && location + tableWords <= this.memory.length;
             const descriptorAligned = tableWords >= this.NS_ENTRY_WORDS &&
-                tableWords % this.NS_ENTRY_WORDS === 0;
-            // NS descriptors are inverted: slot 0 is at the high end of the
-            // reserve, then subsequent slots grow down.  A short declaration
-            // from NS_TABLE_BASE must therefore reach the high-end descriptor
-            // span; a simple `nsCount * stride` check is not sufficient.
-            const liveDescriptorStart = this.NS_TABLE_BASE + this.NS_TABLE_RESERVE -
-                this.nsCount * this.NS_ENTRY_WORDS;
-            const liveDescriptorEnd = this.NS_TABLE_BASE + this.NS_TABLE_RESERVE;
+                tableWords % this.NS_ENTRY_WORDS === 0 &&
+                (geometry.tableWords === null || tableWords === geometry.tableWords);
+            // Historical descriptors grow down from the reserve's high end;
+            // ascending descriptors grow up after slot-0 metadata. Use the
+            // runtime-provided span rather than guessing from count alone.
+            const liveDescriptorStart = geometry.start;
+            const liveDescriptorEnd = geometry.end;
             const coversLiveSlots = location <= liveDescriptorStart &&
                 location + tableWords >= liveDescriptorEnd;
-            // The simulator has one authoritative live Namespace table at its
-            // inverted-table base.  An aligned Thread LUMP can otherwise mimic
+            // The runtime has one authoritative active Namespace table.
+            // An aligned Thread LUMP can otherwise mimic
             // a table's geometry (for example at location zero), so geometry
             // alone must never produce a Namespace PASS.
-            const canonicalTableBase = location === this.NS_TABLE_BASE;
+            const canonicalTableBase = location === geometry.base;
             entryInfo.tableWords = tableWords;
             entryInfo.tableEntries = descriptorAligned ? tableWords / this.NS_ENTRY_WORDS : null;
             if (authorityFields.f) {
@@ -4298,11 +4311,11 @@ class ChurchSimulator {
                 addCheck('header', 'NS HEADER', descriptorAligned && canonicalTableBase,
                     descriptorAligned
                         ? (canonicalTableBase
-                            ? `v1.2 Namespace table has ${this.NS_ENTRY_WORDS}-word descriptors at the canonical table base`
-                            : `Namespace descriptor table must begin at ${this.NS_TABLE_BASE}, not ${location}`)
+                            ? `${geometry.description} has ${this.NS_ENTRY_WORDS}-word descriptors at the canonical table base`
+                            : `Namespace descriptor table must begin at ${geometry.base}, not ${location}`)
                         : `Namespace table has invalid ${tableWords}-word descriptor geometry`);
                 addCheck('layout', 'LAYOUT', tableFits && coversLiveSlots,
-                    `declared ${tableWords} words (${entryInfo.tableEntries == null ? '?' : entryInfo.tableEntries} entries); live inverted descriptors occupy ${liveDescriptorStart}..${liveDescriptorEnd - 1}`);
+                    `declared ${tableWords} words (${entryInfo.tableEntries == null ? '?' : entryInfo.tableEntries} entries); live ${geometry.direction} descriptors occupy ${liveDescriptorStart}..${liveDescriptorEnd - 1}`);
                 addCheck('type', 'TYPE', canonicalTableBase,
                     canonicalTableBase
                         ? 'CR15 resolves to the live Namespace table context'
