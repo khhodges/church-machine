@@ -3390,6 +3390,7 @@ function _instrSymbolicMeaning(decoded) {
         case 'RETURN':
             return 'Return using the saved frame; keep mask 0x' + (imm & 0xFFF).toString(16).toUpperCase() + ': CR0–CR4/CR7–CR11 set bits prevent clearing, zero bits clear; CR5 descriptor unchanged; CR6 always reconstructed. M boundary rules still apply.';
         case 'CHANGE':
+            if (dst === 12 && src === 6) return 'CHANGE using one permissionless Thread GT from C-list row CR6[' + imm + ']; requires CR6 load authority; save the running Thread and restore the target Thread.';
             return 'CHANGE using the permissionless Thread GT held in CR' + dst +
                 '; save the running Thread and restore the target Thread. Self-target resumes after CHANGE; no operand M-bit required.';
         case 'SWITCH':

@@ -1,4 +1,5 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [CHANGE operand authority](change-programmer-access.md) — indexed CR6 lookup is now explicitly approved for the simulator; still one Thread GT, no scratch LOAD, no FPGA approval.
 - [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
 - [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.
 - [Wide-screen touch refresh](wide-touch-refresh.md) — suppress pull-to-refresh in the wide-screen IDE while retaining normal touch scrolling.

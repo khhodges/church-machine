@@ -124,6 +124,13 @@ function harness(defect) {
         await b.api.prepare(true);
         const machine = b.instances[0];
         machine.bootComplete = true;
+        machine.cr = Array.from({length:16},()=>({word0:0,word1:0,m:0}));
+        machine.cr[6] = {word0:1,word1:0,m:1};
+        machine.memory = new Uint32Array(64); // indexed target is NULL
+        machine._clistCountForCR = () => 10;
+        machine.mLoad = () => ({ok:true});
+        machine.parseGT = Core.prototype.parseGT;
+        machine._activateChangeThread = Core.prototype._activateChangeThread;
         machine.fault = function(type,message) {
             this.faultLog.push({type,message,pc:15,physicalPC:0x0710});
             this.halted = true;
@@ -138,7 +145,7 @@ function harness(defect) {
         assert.equal(machine.halted,true);
         assert.equal(modals.length,1,action+' opens the shared fault modal');
         assert.equal(modals[0],machine.faultLog[0],'modal retains exact fault evidence');
-        assert.equal(modals[0].type,'INVALID_OP');
+        assert.equal(modals[0].type,'TYPE');
         assert.equal(b.scope._lastFault,modals[0],'fault recall uses the same incident');
         b.api.render(); b.api.stop();
         assert.equal(modals.length,1,'render and stop do not reopen the dismissed fault');

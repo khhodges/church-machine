@@ -12,7 +12,7 @@ function assemble(text) {
     assert.deepEqual(a.errors, []);
     return result.words;
 }
-function fixture() {
+function fixture(indexed = false) {
     const sim = new Simulator();
     for (let i = 0; !sim.bootComplete && !sim.halted && i < 32; i++) sim._bootStep();
     assert(sim.bootComplete && !sim.halted, 'separate boot back half still works');
@@ -23,9 +23,10 @@ function fixture() {
     }
     function driver(slot, base, text) {
         const code = assemble(text), words = Array(64).fill(0);
-        words[0] = sim.packLumpHeader(0, code.length, 1, 0);
+        words[0] = sim.packLumpHeader(0, code.length, indexed && slot === 32 ? 10 : 1, 0);
         code.forEach((word, i) => words[i + 1] = word);
-        words[63] = Simulator.SELF_CAPABILITY_PLACEHOLDER;
+        words[indexed && slot === 32 ? 54 : 63] = Simulator.SELF_CAPABILITY_PLACEHOLDER;
+        if (indexed && slot === 32) words[63] = gt(slots[1]);
         assert(sim.memory.slice(base, base + 64).every(w => w === 0));
         const minted = sim._mintOrdinaryLumpIdentity(words, slot, base, {compilerOwnedSelf: true});
         assert(minted.ok, minted.message);
@@ -37,7 +38,7 @@ function fixture() {
         return {gt: minted.selfGT, entry: sim.readNSEntry(slot),
             header: sim.parseLumpHeader(minted.words[0]), base};
     }
-    const manager = driver(32, 4096, 'CHANGE CR13\nIADD DR2, DR0, #303\nHALT');
+    const manager = driver(32, 4096, (indexed ? 'CHANGE CR6, #9' : 'CHANGE CR13') + '\nIADD DR2, DR0, #303\nHALT');
     const incoming = driver(33, 4160, 'IADD DR1, DR0, #202\nCHANGE CR2\nHALT');
     const target = slots[1], entry = sim.readNSEntry(target), base = entry.word0_location;
     const layout = sim._threadLayoutAtBase(base);
@@ -76,9 +77,9 @@ test('instruction-driven CR13 -> Thread.2 -> manager preserves continuation and 
     assert.equal(sim.dr[2], 303);
     assert.deepEqual(sim.faultLog, []);
 });
-function rejects(name, mutate, reason) {
+function rejects(name, mutate, reason, indexed = false) {
     test(name, () => {
-        const f = fixture(), {sim} = f;
+        const f = fixture(indexed), {sim} = f;
         mutate(f);
         const memory = sim.memory.slice(), cr = sim.cr.map(r => ({...r}));
         const dr = [...sim.dr], slot = sim._currentThreadSlot;
@@ -95,6 +96,74 @@ function rejects(name, mutate, reason) {
         assert.deepEqual([...sim.dr], dr, 'no partial DR restore');
     });
 }
+test('indexed CHANGE reads exactly one GT and preserves the caller continuation', () => {
+    const {sim,target,slots} = fixture(true);
+    assert.equal(sim.memory[4097],0x27630009);
+    const callerCR6 = {...sim.cr[6]};
+    assert(sim.step());
+    assert.equal(sim._currentThreadSlot,target);
+    assert.equal(sim.stepCount,1,'one instruction, no inserted LOAD');
+    assert(sim.step()); assert(sim.step());
+    assert.equal(sim._currentThreadSlot,slots[0]);
+    assert.equal(sim.pc,1);
+    assert.equal(sim.cr[6].word0,callerCR6.word0);
+    assert.equal(sim.cr[6].word1,callerCR6.word1);
+    assert.equal(sim.dr[1],101);
+    assert.deepEqual(sim.faultLog,[]);
+});
+test('indexed self CHANGE resumes after the same instruction', () => {
+    const {sim,slots,gt} = fixture(true);
+    sim.memory[4159] = gt(slots[0]);
+    const sto = sim.sto;
+    assert(sim.step());
+    assert.equal(sim.pc,1);
+    assert.equal(sim.sto,sto);
+    assert.equal(sim._currentThreadSlot,slots[0]);
+    assert.deepEqual(sim.faultLog,[]);
+});
+test('condition-false indexed CHANGE performs no C-list access', () => {
+    const {sim} = fixture(true);
+    sim.memory[4097] = assemble('CHANGEEQ CR6, #32767')[0];
+    sim.flags.Z = false;
+    sim.cr[6].m = 0;
+    assert(sim.step());
+    assert.equal(sim.pc,1);
+    assert.deepEqual(sim.faultLog,[]);
+});
+test('indexed CHANGE accepts source L authority without source M', () => {
+    const {sim,gt,target} = fixture(true);
+    sim.cr[6].word0 = gt(32,{L:1});
+    sim.cr[6].m = 0;
+    assert(sim.step(),JSON.stringify(sim.faultLog));
+    assert.equal(sim._currentThreadSlot,target);
+    assert.deepEqual(sim.faultLog,[]);
+});
+rejects('indexed CHANGE bounds', f => {
+    f.sim.memory[4097] = assemble('CHANGE CR6, #10')[0];
+}, /out of bounds/, true);
+rejects('indexed CHANGE requires C-list load authority', f => {
+    f.sim.cr[6].m = 0;
+}, /C-list access/, true);
+rejects('indexed CHANGE rejects NULL target', f => {
+    f.sim.memory[4159] = 0;
+}, /non-null/, true);
+rejects('indexed CHANGE rejects non-Thread target', f => {
+    f.sim.memory[4159] = f.gt(32);
+}, /Thread descriptor/, true);
+for (const permission of ['B','R','W','X','L','S','E']) {
+    rejects(`indexed CHANGE rejects Thread permission ${permission}`, f => {
+        f.sim.memory[4159] = f.gt(f.target,{[permission]:1});
+    }, /no permissions/, true);
+}
+rejects('indexed CHANGE rejects stale Thread', f => {
+    f.sim.memory[4159] = f.sim.createGT(63,f.target,{},1);
+}, /seq mismatch|stale/i, true);
+rejects('indexed CHANGE validates incoming frame', f => {
+    f.sim.memory[f.base+17] = 0;
+}, /frame/, true);
+rejects('indexed CHANGE validates incoming C-list', f => {
+    f.sim.memory[f.incoming.base+63] = 0;
+}, /C-List SELF/, true);
 for (const permission of ['B', 'R', 'W', 'X', 'L', 'S', 'E']) {
     rejects(`permission ${permission} is a hard fault`, f => {
         f.sim.cr[13].word0 = f.gt(f.target, {[permission]: 1});

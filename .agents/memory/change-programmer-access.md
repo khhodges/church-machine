@@ -10,16 +10,23 @@ itself mean two GT operands or establish an approved addressing-mode encoding.
 **Why:** The user reiterated “Change requires one GT” after an explanation
 conflated the rejected indexed encoding with the number of GTs consumed.
 
-Pet-name CHANGE syntax work is compiler-only unless separately authorized.
-Do not infer permission to add indexed simulator execution or invent a machine
-encoding from a request to accept `CHANGE Thread.3` or `CHANGE CR6, #9`.
+On 2026-10-19 the user explicitly authorized indexed CHANGE as one simulator
+instruction. CR6 plus a C-list row obtains one Thread GT; there is no scratch
+register or extra LOAD. Keep ordinary C-list read authority and all existing
+Thread activation validation. Direct-register CHANGE remains supported.
+
+**Why:** The user selected “Authorize indexed CHANGE as one instruction
+(changes simulator semantics)” after the compiler/runtime mismatch was explained.
+This supersedes the earlier compiler-only restriction for this specific form,
+not FPGA behavior, arbitrary indexed destinations, or saved-artifact changes.
+
+Before that approval, pet-name CHANGE syntax work was compiler-only.
 
 **Why:** The user explicitly corrected the scope: “Only a compiler issue”
 after an attempted parser fix also changed simulator semantics.
 
-**How to apply:** Resolve source syntax against the existing machine contract.
-If that exposes a contract mismatch, report it rather than silently changing
-the simulator to make newly emitted words execute.
+**How to apply:** Keep simulator-only indexed approval distinct from the direct
+Phase 1 hardware encoding and earlier historical decisions below.
 
 CHANGE is not a protected instruction. Do not invent a general operand-M
 requirement or rewrite programmer-authored CHANGE into SWITCH. Later Phase 1

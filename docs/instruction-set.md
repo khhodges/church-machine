@@ -939,6 +939,19 @@ The usual condition predicate applies; a false predicate has no effects.
 
 ## CHANGE: one-GT Thread activation
 
+**Simulator indexed extension — approved 2026-10-19.** In addition to the direct
+register form below, the simulator accepts `CHANGE CR6, #row` (or a declared
+C-list pet name). It reads exactly one Thread GT from the current C-list and
+passes that value through the same permissionless-Thread, identity, frame,
+C-list and atomic save/restore checks. The lookup requires CR6 load authority
+(L permission or CR6.M), uses a bounded zero-based C-list row, and never treats
+the row as a Namespace slot. No scratch register or extra LOAD is introduced.
+Condition-false instructions do not perform the lookup. The existing simulator
+encoding uses destination field 12, source field 6 and a 15-bit unsigned row;
+for example row 9 is `0x27630009`. This simulator-only approval supersedes the
+indexed exclusion below for this form, not the Phase 1 hardware encoding,
+internal boot CHANGE, arbitrary two-register forms, or FPGA behavior.
+
 **Normative correction — 2026-10-03.** This section supersedes the indexed
 CHANGE descriptions, privileged-register-write variants, and encoding tables
 elsewhere in this document and in derived references.

@@ -8617,12 +8617,34 @@ class ChurchSimulator {
     }
 
     _execChangeCore(d, continuationPC) {
+        // Indexed simulator form: obtain one Thread GT from the current C-list,
+        // without loading it into a programmer register or changing CR6.
+        if (d.crDst === 12 && d.crSrc === 6) {
+            const source = this.cr[6];
+            const base = source.word1;
+            const count = this._clistCountForCR(6);
+            if (!Number.isInteger(d.imm) || d.imm < 0 || d.imm >= count ||
+                    !Number.isInteger(base) || base < 0 ||
+                    base + d.imm >= this.memory.length) {
+                this.fault('NO_CAPABILITY', `CHANGE: c-list row ${d.imm} is out of bounds`);
+                return null;
+            }
+            const address = base + d.imm;
+            const check = this.mLoad(source.word0, source.m === 1 ? null : 'L',
+                6, address, {base, upperBound:base + count - 1});
+            if (!check.ok) {
+                this.fault(check.fault, `CHANGE: CR6 C-list access: ${check.message}`);
+                return null;
+            }
+            const threadGT = this.memory[address] >>> 0;
+            return this._activateChangeThread(threadGT, d, continuationPC);
+        }
         // Simulator compatibility with the existing one-operand assembler:
         // both register fields repeat the input CR; the index must be zero.
         // This does not approve a new hardware encoding or the IRQ proposal.
         if (!Number.isInteger(d.crDst) || d.crDst < 0 || d.crDst > 15 ||
                 d.crSrc !== d.crDst || d.imm !== 0) {
-            this.fault('INVALID_OP', 'CHANGE requires one Thread GT register; indexed/two-register CHANGE is not supported');
+            this.fault('INVALID_OP', 'CHANGE requires one Thread GT register or an indexed CR6 C-list reference');
             return null;
         }
         return this._activateChangeThread(this.cr[d.crDst].word0 >>> 0, d, continuationPC);
