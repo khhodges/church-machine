@@ -229,15 +229,23 @@ for (const [invalidate, type] of [
     assert.strictEqual(sim.lastStepEvidence.post.cr[12].m, 1);
 }
 // Real CALL/RETURN boundary: exact caller and callee capability snapshots.
-{
+// LUMP word 0 is the header, word 1 the method table, word 2 the RETURN
+// body. Numbered CALL dispatches through word 1; method zero enters word 1
+// directly and must execute its BRANCH before reaching the same body.
+for (const [method, tableEntry] of [
+    [1, word(23, 0, 0, 1)], // canonical PC-relative BRANCH: word 1 -> word 2
+    [1, 2],                 // legacy offset includes the header word
+    [0, word(23, 0, 0, 1)], // direct entry executes the canonical table
+]) {
     const sim = new Simulator();
     function lump(slot, base, code) {
         sim.writeNSEntry(slot, base, 63, 0, 0, 1, 0, 1, 0);
         sim.memory[base] = ((0x1f << 27) | (code.length << 10) | 1) >>> 0;
         code.forEach((w, i) => { sim.memory[base + 1 + i] = w; });
     }
-    lump(4, 0x300, [word(2, 0, 0), 0]);
-    lump(7, 0x700, [0, word(3, 0, 0), 0]);
+    const callWord = word(2, 0, 0, method);
+    lump(4, 0x300, [callWord, 0]);
+    lump(7, 0x700, [tableEntry, word(3, 0, 0), 0]);
     sim.cr[12] = { word0: 0, word1: 0, word2: 0, word3: 0, m: 0 };
     sim.cr[14] = { word0: sim.createGT(0, 4, { R: 1, X: 1 }, 1),
         word1: 0x300, word2: 63, word3: 0, m: 0 };
@@ -252,20 +260,41 @@ for (const [invalidate, type] of [
     const call = sim.step().executionEvidence;
     assert.strictEqual(emitted, call);
     assert.strictEqual(call.instruction.physicalPC, 0x301);
-    assert.strictEqual(call.instruction.raw, word(2, 0, 0));
+    assert.strictEqual(call.instruction.raw, callWord);
+    assert.strictEqual(call.outcome, 'retired');
+    assert.strictEqual(call.pre.pc, 0);
+    assert.strictEqual(call.post.pc, method === 0 ? 0 : 1);
     assert.strictEqual(call.pre.artifact.slot, 4);
     assert.strictEqual(call.post.artifact.slot, 7);
     assert.strictEqual(call.occurrenceId.split(':')[0], String(call.epoch));
+    const capturedCall = JSON.stringify(call);
     sim._slotIdentity.get(4).binaryHash = 'b'.repeat(64);
     assert.strictEqual(call.pre.artifact.identity.binaryHash, 'a'.repeat(64));
+    if (method === 0) {
+        const entry = sim.step().executionEvidence;
+        assert.strictEqual(entry.outcome, 'retired');
+        assert.strictEqual(entry.instruction.physicalPC, 0x701);
+        assert.strictEqual(entry.instruction.raw, tableEntry);
+        assert.strictEqual(entry.pre.pc, 0);
+        assert.strictEqual(entry.post.pc, 1);
+        assert.strictEqual(entry.pre.artifact.slot, 7);
+        assert.strictEqual(entry.post.artifact.slot, 7);
+        assert.notStrictEqual(entry.occurrenceId, call.occurrenceId);
+    }
     const ret = sim.step().executionEvidence;
     assert.strictEqual(ret.instruction.physicalPC, 0x702);
     assert.strictEqual(ret.instruction.raw, word(3, 0, 0));
+    assert.strictEqual(ret.outcome, 'retired');
+    assert.strictEqual(ret.pre.pc, 1);
+    assert.strictEqual(ret.post.pc, 1);
     assert.notStrictEqual(call.occurrenceId, ret.occurrenceId);
     assert.strictEqual(ret.pre.artifact.slot, 7);
     assert.strictEqual(ret.post.artifact.slot, 4);
     assert.strictEqual(call.post.callDepth, ret.pre.callDepth);
     assert.strictEqual(call.post.artifact.slot, 7);
     assert.strictEqual(ret.pre.artifact.slot, 7);
+    assert.strictEqual(ret.post.callDepth, call.pre.callDepth);
+    assert.strictEqual(JSON.stringify(call), capturedCall,
+        'callee execution and RETURN must not rewrite the CALL occurrence');
 }
 console.log('instruction execution evidence: passed');
