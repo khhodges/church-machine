@@ -24,6 +24,9 @@ Coverage:
 - Legacy `CapabilityTest` Namespace label → `ide.CapabilityTest`, exact artifact
   identity and full body comparison (only destination-local SELF differs).
 - Same token/new revision refreshes an already loaded History panel.
+- Repeated unchanged-source saves keep the same canonical filename/token/hash
+  while advancing History, Namespace and the whole private machine. Shared
+  hash approvals cannot relabel archived catalog rows as the current revision.
 - An unsaved Namespace draft blocks alignment but not artifact publication.
 - A competing real HTTP CAS wins between read and write; stale rows are rejected.
 - Expiring a preparation immediately before activation leaves old memory intact

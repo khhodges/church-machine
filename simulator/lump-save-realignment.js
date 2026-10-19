@@ -90,10 +90,15 @@
     }
     async function refreshHistory(response) {
         const list = await request('/api/lumps/list?include_archived=1');
-        const records = list.filter(row => row.token === response.token &&
+        const records = list.filter(row => row.archived !== true &&
+            row.token === response.token &&
             row.filename === (response.lump || response.filename) &&
-            row.binary_hash === (response.digest || response.binary_hash));
-        if (records.length !== 1) throw Error('The exact committed revision could not be found; no substitute was selected.');
+            row.binary_hash === (response.digest || response.binary_hash) &&
+            (response.lump_version == null || row.lump_version === response.lump_version));
+        if (records.length !== 1) throw Error(
+            `Expected one active catalog record for the saved LUMP, but found ${records.length}. ` +
+            'No substitute was selected; execution remains stopped. Refresh the LUMP library and retry saved-revision alignment. ' +
+            'If another save superseded it, explicitly select the intended revision from History.');
         const artifact = records[0];
         root._lumpLibraryBrowsing = true;
         if (typeof renderLumps === 'function') await renderLumps();
@@ -103,7 +108,7 @@
     }
     async function realign(response, metadata) {
         retryInput = {response:{token:response.token,lump:response.lump || response.filename,
-            digest:response.digest || response.binary_hash},
+            digest:response.digest || response.binary_hash,lump_version:response.lump_version},
             metadata:{save_as_copy:metadata.save_as_copy,editor_base:metadata.editor_base}};
         begin();
         try {

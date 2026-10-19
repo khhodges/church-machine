@@ -35,3 +35,16 @@ Manifest/history transitions and Namespace validation/publication must share one
 **Why:** Independent manifest and Namespace locks permit a selector to validate as live, become archived concurrently, and then enter committed Namespace state; admission can likewise overwrite a concurrent Namespace save.
 
 **How to apply:** Use the combined history-transition guard for every operation that can change either side of the manifest-to-Namespace binding. Revalidate concrete filename/hash selectors only after acquiring it.
+
+Unchanged source is not necessarily the same publication: retain the existing
+new-history-version semantics rather than suppressing an approved identical-byte
+save. Hash-scoped approval evidence cannot own revision-scoped catalog metadata.
+
+**Why:** Repeated saves can share canonical bytes, token, filename and approval
+while having distinct history versions. Treating the shared approval's latest
+locator as a historical row's locator made a committed save appear ambiguous
+and left execution stopped.
+
+**How to apply:** Keep each history row's locator and timestamp authoritative.
+Bind saved-revision alignment and retained retries to the returned publication
+version as well as its bytes; do not silently adopt a later identical-byte save.

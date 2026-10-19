@@ -16131,8 +16131,13 @@ def list_lumps():
                 row["legacy_incompatible"] = bool(
                     entry.get("archived") and not bootstrap_identity["valid"])
             if approval:
+                # Approval is keyed by binary hash, so identical saves share
+                # it. Its latest publication locator/timestamp must never
+                # relabel an older manifest row as the current revision.
                 row.update({k: v for k, v in approval.items()
-                            if k not in {"source", "cw", "cc", "typ", "lump_size"}})
+                            if k not in {"source", "cw", "cc", "typ", "lump_size",
+                                         "filename", "token", "lump_version",
+                                         "compiled_at", "archived"}})
         except (OSError, ValueError) as exc:
             row["binary_valid"] = False
             row["approved"] = False

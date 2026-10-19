@@ -15,16 +15,19 @@ vm.runInNewContext(detailSource.slice(resetStart,resetEnd),resetContext);
 assert.equal(resetContext._lumpTimelineLoaded.saved,undefined);
 const artifact={abstraction:'ide.CapabilityTest',token:'12345678',filename:'ide.CapabilityTest.1.new.lump',binary_hash:'a'.repeat(64),lump_version:3};
 const row={slot:10,name:'CapabilityTest',token:'87654321',filename:'old.lump',boot:true,location:1296,limit:1024,seq:4};
-function harness(fail) {
+function harness(fail, records=[artifact]) {
     const calls=[], state={abstractions:[row,{slot:6,name:'SelfTest',filename:'self.lump'}],namespaceFingerprint:'b'.repeat(64)};
+    const storage = new Map();
     const context={console,setTimeout,window:null,
+        sessionStorage:{getItem:key=>storage.get(key)||null,
+            setItem:(key,value)=>storage.set(key,value),removeItem:key=>storage.delete(key)},
         stopSim(){calls.push('stop');},finishWalk(){},renderLumps:async()=>calls.push('render'),
         showLumpDetail(token,options){calls.push(['show',token,options.assignedLump.filename]);},
         _switchLumpTab(token,tab){calls.push(['tab',token,tab]);},_lumpTokenIdentity:x=>x,
         SimulationPreparation:Object.fromEntries(['prepare','approve','activate'].map(action=>[action,async()=>{calls.push(action);return action!==fail;}])),
         fetch:async(url,options)=>{
             calls.push(url);
-            if(url.includes('/list'))return {ok:true,json:async()=>[artifact]};
+            if(url.includes('/list'))return {ok:true,json:async()=>records};
             if(url.includes('/ns-state'))return {ok:true,json:async()=>state};
             if(fail==='namespace')return {ok:false,json:async()=>({error:'conflict'})};
             const submitted=JSON.parse(options.body);
@@ -116,7 +119,8 @@ function harness(fail) {
     assert.equal(JSON.stringify(h.state),original);
     assert.equal(h.api.replacementRows([row],artifact,{save_as_copy:true},false).slots.length,0);
     assert.throws(()=>h.api.replacementRows([row,{...row,slot:11}],artifact,{},false),/Several/);
-    const response={token:artifact.token,lump:artifact.filename,digest:artifact.binary_hash};
+    const response={token:artifact.token,lump:artifact.filename,digest:artifact.binary_hash,
+        lump_version:artifact.lump_version};
     await h.api.realign(response,{});
     assert.equal(h.context._savedLumpRealignment,null);
     assert.equal(h.context._nsState.abstractions[0].filename,artifact.filename);
@@ -124,6 +128,28 @@ function harness(fail) {
     assert(h.calls.indexOf('prepare')<h.calls.indexOf('approve'));
     assert(h.calls.indexOf('approve')<h.calls.indexOf('activate'));
     assert(h.calls.some(c=>Array.isArray(c)&&c[0]==='tab'&&c[2]==='history'));
+    // An older catalog server may still attach a shared approval's current
+    // filename to an archived row. Only the exact active version is eligible.
+    const repeated=harness(null,[{...artifact,archived:true,lump_version:2},artifact]);
+    await repeated.api.realign(response,{});
+    assert.equal(repeated.context._savedLumpRealignment,null);
+    assert(repeated.calls.includes('activate'));
+    for (const records of [[], [{...artifact,archived:true}],
+        [{...artifact,lump_version:4}], [artifact,{...artifact}]]) {
+        const ambiguous=harness(null,records);
+        await assert.rejects(ambiguous.api.realign(response,{}),/Refresh the LUMP library and retry/);
+        assert(!ambiguous.calls.includes('/api/namespace/save-table'));
+        assert(!ambiguous.calls.includes('prepare'));
+        const retained=JSON.parse(ambiguous.context.sessionStorage.getItem('savedLumpRealignment'));
+        assert.equal(retained.pending,false);
+        assert.equal(retained.retryInput.response.lump_version,artifact.lump_version,
+            'retry must not adopt a later unchanged save sharing the filename/hash');
+        assert.match(retained.message,/LUMP saved; realignment incomplete/);
+    }
+    const legacy=harness();
+    const {lump_version,...legacyResponse}=response;
+    await legacy.api.realign(legacyResponse,{});
+    assert.equal(legacy.context._savedLumpRealignment,null);
     for(const failure of ['namespace','prepare','approve','activate']) {
         const failed=harness(failure);
         await assert.rejects(failed.api.realign(response,{}));

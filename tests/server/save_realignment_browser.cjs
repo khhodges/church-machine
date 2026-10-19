@@ -121,9 +121,12 @@ async function main() {
             const list = await (await fetch('/api/lumps/list?include_archived=1')).json();
             const matches = list.filter(row => row.token === committed.token &&
                 row.filename === committed.lump && row.binary_hash === committed.digest);
-            if (matches.length !== 1) throw Error('exact publication missing');
+            if (matches.length !== 1) throw Error('exact publication missing: ' +
+                JSON.stringify({committed, matches, barrier:window._savedLumpRealignment}));
             const saved = matches[0];
-            return {saved, barrier:window._savedLumpRealignment};
+            if (saved.archived === true || saved.lump_version !== committed.lump_version)
+                throw Error('catalog does not identify the committed active version');
+            return {saved, committed, barrier:window._savedLumpRealignment};
         }, {value, previous, mode, callback});
     }
     async function assertActivated(saved, value) {
@@ -168,10 +171,33 @@ async function main() {
         await assertActivated(result.saved, 43);
         const sameToken = result.saved;
 
+        // Identical source produces the same canonical file, token and bytes.
+        // Each approved save still has its own history version; do not confuse
+        // the archived rows sharing its hash with the committed active row.
+        let previous = sameToken;
+        for (let repeat = 0; repeat < 2; repeat++) {
+            const callStart = calls.length;
+            result = await publish(43, previous);
+            assert.equal(result.committed.committed, true);
+            for (const key of ['token', 'filename', 'binary_hash'])
+                assert.equal(result.saved[key], sameToken[key], key);
+            assert(result.saved.lump_version > previous.lump_version);
+            assert.equal(result.barrier, null, JSON.stringify(result.barrier));
+            await assertHistory(result.saved);
+            assert.equal(await page.evaluate(() => sim.stepCount), 0,
+                'unchanged save must still replace the stopped private machine');
+            await assertActivated(result.saved, 43);
+            for (const endpoint of ['namespace/save-table', 'simulation/prepare',
+                'simulation/approve', 'simulation/activate'])
+                assert(calls.slice(callStart).some(([path, status]) =>
+                    path === '/api/' + endpoint && status < 300), endpoint);
+            previous = result.saved;
+        }
+
         // Dirty draft: publication succeeds, neither table nor image advances.
         const beforeDraft = await snapshot();
         const draftRows = await namespace();
-        result = await publish(44, sameToken, 'draft');
+        result = await publish(44, previous, 'draft');
         assert.match(result.barrier.message, /unsaved edits/);
         assert.deepEqual(await snapshot(), beforeDraft);
         assert.deepEqual(await namespace(), draftRows);
@@ -251,7 +277,7 @@ async function main() {
             'namespace/save-table','simulation/prepare','simulation/approve','simulation/activate'])
             assert(calls.some(([path,status]) => path === '/api/'+endpoint && status < 300), endpoint);
         assert(calls.some(([path,status]) => path === '/api/simulation/activate' && status === 409));
-        console.log('PASS executed saved revision: canonical identity, same-token History, draft/CAS, activation barrier, restart/retry');
+        console.log('PASS executed saved revision: canonical identity, unchanged saves, same-token History, draft/CAS, activation barrier, restart/retry');
     } catch (error) {
         console.error(error);
         console.error('Save status:', await page.locator('#saveNSStatus').textContent().catch(() => 'absent'));

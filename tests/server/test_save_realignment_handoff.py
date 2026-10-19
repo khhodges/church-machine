@@ -24,6 +24,57 @@ def tree_digest(directory):
             for p in directory.rglob("*") if p.is_file()}
 
 
+def compile_publish(client, name, value):
+    source = f"abstraction {name} {{\n method Ping() {{ return({value}) }}\n}}\n"
+    result = client.post("/api/compile", json={
+        "source": source, "language": "javascript", "tier": 2})
+    assert result.status_code == 200 and result.json["ok"], result.json
+    compiled = result.json
+    record = compiled["compiler_record"]
+    saved = publish(client, {"binary": compiled["words"], "metadata": {
+        "abstraction": name, "language": "javascript", "content_type": "code",
+        "capabilities": compiled["capabilities"], "submitted_source": source,
+        "trust_origin": compiled["trust_origin"], "compiler_record": record,
+        "compiler_identity": record["compiler_identity"],
+        "compiler_version": record["compiler_version"], "grants": ["E"]}})
+    return dict(saved, source=source)
+
+
+def test_unchanged_save_committed_catalog_identity(isolated_lumps, monkeypatch):
+    monkeypatch.setenv("COMPILER_SIGNING_SECRET", "private-save-handoff-" + "x" * 40)
+    client = app_module.app.test_client()
+    first = compile_publish(client, "ide.RepeatedSave", 42)
+    immutable = {p: p.read_bytes() for p in isolated_lumps.glob("*.lump")}
+    previous = first
+    for _ in range(2):
+        saved = compile_publish(client, "ide.RepeatedSave", 42)
+        assert saved["committed"] is True
+        assert saved["token"] == first["token"]
+        assert saved["filename"] == first["filename"]
+        assert saved["digest"] == first["digest"]
+        assert saved["final_binary"] == first["final_binary"]
+        assert saved["lump_version"] > previous["lump_version"]
+        catalog = client.get("/api/lumps/list?include_archived=1").json
+        manifest = json.loads((isolated_lumps / "manifest.json").read_text())
+        for entry in manifest:
+            catalog_rows = [row for row in catalog
+                            if row["lump_version"] == entry["lump_version"]]
+            assert len(catalog_rows) == 1
+            for key in ("filename", "compiled_at", "archived"):
+                assert catalog_rows[0].get(key) == entry.get(key)
+        matches = [row for row in catalog
+                   if row["token"] == saved["token"]
+                   and row["filename"] == saved["lump"]
+                   and row["binary_hash"] == saved["digest"]]
+        assert len(matches) == 1, {"committed": saved, "matches": matches}
+        assert matches[0].get("archived") is not True
+        assert matches[0]["lump_version"] == saved["lump_version"]
+        for path, original in immutable.items():
+            assert path.read_bytes() == original
+        immutable.update({p: p.read_bytes() for p in isolated_lumps.glob("*.lump")})
+        previous = saved
+
+
 def test_save_callback_reaches_executed_revision(isolated_lumps, monkeypatch):
     root = isolated_lumps
     live_before = tree_digest(ROOT / "server" / "lumps")
@@ -43,25 +94,10 @@ def test_save_callback_reaches_executed_revision(isolated_lumps, monkeypatch):
     (root / "absent-boot.bin").write_bytes(b"do not install shared image")
     client = app_module.app.test_client()
 
-    def compile_publish(name, value):
-        source = f"abstraction {name} {{\n method Ping() {{ return({value}) }}\n}}\n"
-        result = client.post("/api/compile", json={
-            "source": source, "language": "javascript", "tier": 2})
-        assert result.status_code == 200 and result.json["ok"], result.json
-        compiled = result.json
-        record = compiled["compiler_record"]
-        saved = publish(client, {"binary": compiled["words"], "metadata": {
-            "abstraction": name, "language": "javascript", "content_type": "code",
-            "capabilities": compiled["capabilities"], "submitted_source": source,
-            "trust_origin": compiled["trust_origin"], "compiler_record": record,
-            "compiler_identity": record["compiler_identity"],
-            "compiler_version": record["compiler_version"], "grants": ["E"]}})
-        return dict(saved, source=source)
-
-    bootstrap = compile_publish("ide.SelfTest", 7)
-    old = compile_publish("ide.CapabilityTest", 11)
-    unrelated_old = compile_publish("ide.Unrelated", 31)
-    unrelated = compile_publish("ide.Unrelated", 32)
+    bootstrap = compile_publish(client, "ide.SelfTest", 7)
+    old = compile_publish(client, "ide.CapabilityTest", 11)
+    unrelated_old = compile_publish(client, "ide.Unrelated", 31)
+    unrelated = compile_publish(client, "ide.Unrelated", 32)
     location = 272
     for slot, saved in [(6, bootstrap), (10, old), (14, unrelated)]:
         name = {6: "SelfTest", 10: "CapabilityTest"}.get(slot, saved["abstraction"])
