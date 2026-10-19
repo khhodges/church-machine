@@ -42,6 +42,7 @@
         }
     } catch (_) {}
     function begin() {
+        if (root.DesignSimulation) root.DesignSimulation.invalidate();
         barrier({pending:true,message:'Saved revision is being aligned. Stale execution is stopped.'});
         if (typeof stopSim === 'function') stopSim();
         if (typeof finishWalk === 'function') finishWalk();
@@ -128,7 +129,12 @@
             if (typeof _switchLumpTab === 'function') _switchLumpTab(_lumpTokenIdentity(artifact.token),'history');
             if (!advanced) throw Error('This saved LUMP has no Namespace assignment. Select a destination before simulation.');
             if (design && design.state.active) {
-                throw Error('Namespace design and History now select the saved revision. This design profile requires its validated simulation admission; stale execution remains stopped.');
+                if (!root.DesignSimulation) throw Error('Validated design simulation admission is unavailable. Reload the IDE and retry; stale execution remains stopped.');
+                await root.DesignSimulation.prepare(true);
+                // A successful ascending replay does not authorize legacy Run
+                // or silently replace its differently formatted machine.
+                barrier({pending:false,privateReady:true,message:'Saved revision selected and verified in the selected design’s private simulator. Use its Run/Step controls in Namespace. Legacy execution remains stopped.'});
+                return artifact;
             }
             // Do not splice a c-list into the running image: replace the complete
             // validated private simulation, leaving it stopped at the new boot.

@@ -566,11 +566,11 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
             expected_entry_name = (
                 "CapabilityTest" if ordinal_text.isdigit() and int(ordinal_text) <= 3
                 else "SelfTest")
-            if binding.get("entryName") != expected_entry_name:
+            if binding.get("entryName") not in (expected_entry_name, "ide." + expected_entry_name):
                 raise ValueError(
                     f"NS[{slot}] fresh Thread must explicitly target {expected_entry_name}")
             captest = next((candidate for candidate in by_slot.values()
-                            if candidate.get("name") == expected_entry_name), None)
+                            if candidate.get("name") == binding["entryName"]), None)
             if captest is None:
                 raise ValueError(
                     f"NS[{slot}] fresh Thread has no destination {expected_entry_name} row")

@@ -4980,6 +4980,74 @@ _simulation_preparations = _SimulationPreparationStore(
     revision_store=lambda: RevisionStore(os.path.join(
         _BUILD_SNAPSHOTS_DIR, "revisions")))
 
+# A separate admission service, not a promotion of ascending candidate approval.
+from server import design_simulation as _design_simulation
+_design_simulation_stores = {
+    profile: _SimulationPreparationStore(
+        revision_store=lambda: RevisionStore(os.path.join(_BUILD_SNAPSHOTS_DIR, "revisions")),
+        binding_reader=_design_simulation.bindings,
+        purpose="approved-design-simulation")
+    for profile in ("ascending", "phase1")
+}
+
+
+@app.route("/api/simulation/design/<profile>/<action>", methods=["POST"])
+def simulation_design_transition(profile, action):
+    from pathlib import Path
+    from urllib.parse import urlparse
+    from server.namespace_design_v1 import DesignStore, digest, FORMAT
+    if profile not in _design_simulation_stores or action not in ("prepare", "approve", "activate"):
+        return jsonify(ok=False, error="Unknown private design simulation operation"), 400
+    origin = request.headers.get("Origin")
+    if (not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign"
+            or origin and urlparse(origin).netloc != request.host):
+        return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
+    design = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
+                         ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
+                         LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
+    payload = request.get_json(silent=True)
+    store = _design_simulation_stores[profile]
+    try:
+        design.path.parent.mkdir(parents=True, exist_ok=True)
+        with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR), \
+                open(str(design.path) + ".lock", "a") as design_lock:
+            import fcntl
+            fcntl.flock(design_lock, fcntl.LOCK_EX)
+            if action == "prepare":
+                if not isinstance(payload, dict) or set(payload) != {"namespaceFingerprint"}:
+                    raise ValueError("Expected the exact saved design fingerprint.")
+                if not design.path.is_file():
+                    raise ValueError("Save this Namespace design before preparing simulation.")
+                document = design.read_document()
+                if digest(document) != payload["namespaceFingerprint"]:
+                    raise ValueError("Saved design changed; reload it and retry simulation.")
+                entry = next(row["slot"] for row in document["rows"] if row.get("boot"))
+                result = store.prepare(document, _design_simulation.configuration(document),
+                    LUMPS_DIR, entry, stage=_design_simulation.stage,
+                    provenance_extra=dict(imageFormat=FORMAT, designProfile=profile,
+                        designFormat=document["format"], slotCount=document["slotCount"],
+                        installationAllowed=False, hardwareProgrammingAllowed=False))
+            else:
+                result = store.transition(payload, design.read_document, LUMPS_DIR,
+                                          activate=action == "activate")
+        return jsonify(ok=True, **result)
+    except (OSError, ValueError, TypeError, KeyError, IndexError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False,
+                       hardwareCertified=False,
+                       nextAction="The LUMP save is retained. Correct the selected design and retry private simulation; no installed image or hardware was changed."), 409
+
+
+@app.route("/api/namespace/selftest-source", methods=["GET"])
+def namespace_selftest_revision_source():
+    """An explicit editor input, never a compilation/publication/selection."""
+    from server.selftest_authoring import declared_source
+    from flask import Response
+    try:
+        return Response(declared_source(), mimetype="text/plain",
+                        headers={"Cache-Control": "no-store"})
+    except (OSError, ValueError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
+
 
 @app.route("/api/simulation/history", methods=["GET"])
 def simulation_history():

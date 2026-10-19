@@ -16,3 +16,15 @@ live code and c-lists or touch hardware. Failed downstream preparation must
 not roll back a successful artifact save or masquerade as current execution.
 New unassigned copies need an explicit destination; unsupported design-profile
 admission must remain blocked rather than borrowing a legacy image.
+
+For ascending designs, private replay and the historical IDE machine must stay
+separate until ordinary IDE controls explicitly support both runtime models.
+Do not make a successful save clear the historical execution barrier merely
+because a separate ascending replay was admitted.
+
+**Why:** The ascending core intentionally excludes legacy host dispatch and
+slot metadata. Treating it as an interchangeable historical machine would
+silently restore authority that the selected profile does not have.
+
+**How to apply:** Keep fresh replay visibly identified as the selected design's
+private simulation. Candidate review alone remains insufficient authority.

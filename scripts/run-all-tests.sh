@@ -246,6 +246,9 @@ register_suite "lump-builder-dispatch-tests" \
 register_suite "catalog-compile-tests" \
     'node simulator/test_catalog_compile.js'
 
+register_suite "design-simulation-tests" \
+    'node simulator/test_design_simulation.js && node simulator/test_lump_save_realignment.js && python -m pytest tests/server/test_design_simulation.py -q'
+
 register_suite "boot-entry-sync-tests" \
     'node simulator/test_namespace_handoff_target.js && node simulator/test_namespace_design_source_notice.js && node simulator/test_namespace_handoff_probe.js --require-handoff && node simulator/test_namespace_runtime_view.js && node simulator/test_namespace_runtime_browser.js && node simulator/test_boot_entry_sync.js && node simulator/test_boot_fault_register_context.js'
 

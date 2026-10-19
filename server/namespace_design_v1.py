@@ -220,7 +220,10 @@ def api_size(row, lumps):
     api = json.loads(raw[(cw+2)*4:(cw+2)*4+length])
     needed = cw + cc + 2 + math.ceil(length/4)
     allocation = max(64, 1 << (needed-1).bit_length())
-    warning = None if api.get("name") == row["name"] else f"Embedded API names {api.get('name')}, not {row['name']}; identity needs review"
+    warning = None if api.get("name") == row["name"] else (
+        f"Embedded API names {api.get('name')}, not {row['name']}. "
+        "Declare the intended abstraction in source, compile and approve Save LUMP as a new revision, "
+        "then select that exact revision. Historical bytes must remain unchanged.")
     return allocation, warning
 
 
@@ -261,7 +264,10 @@ def project(document, lumps):
     return dict(rows=sorted(rows, key=lambda r: r["slot"]),
                 metadataWords=[header, 0, len(rows)-1, 0], tableWords=4 * document["slotCount"],
                 usedWords=cursor, warnings=warnings, activationAllowed=False,
-                buildReady=False, addressesAreProposed=True)
+                buildReady=False, addressesAreProposed=True,
+                privateSimulationAdmission="exact-saved-design",
+                privateSimulationNote="Private simulation has a separate compiler-authenticated admission path. "
+                    "Candidate approval does not authorize activation, installation or hardware.")
 
 
 class DesignStore:

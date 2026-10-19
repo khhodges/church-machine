@@ -366,11 +366,14 @@ def stage_image(cfg, rows, directory, entry_slot):
 
 class PreparationStore:
     """Ephemeral review/activation tickets backed by immutable approved revisions."""
-    def __init__(self, ttl=1800, capacity=32, revision_store=None):
+    def __init__(self, ttl=1800, capacity=32, revision_store=None,
+                 binding_reader=artifact_bindings, purpose="approved-simulation"):
         self.records = {}
         self.lock = threading.RLock()
         self.ttl, self.capacity = ttl, capacity
         self.revision_store = revision_store
+        self.binding_reader = binding_reader
+        self.purpose = purpose
 
     def _history_store(self):
         return self.revision_store() if callable(self.revision_store) else self.revision_store
@@ -382,7 +385,7 @@ class PreparationStore:
         return [{"revisionId": row["revision_id"], "approved": True,
                  **copy.deepcopy(row["metadata"]["provenance"])}
                 for row in store.history("namespace")
-                if row["metadata"].get("purpose") == "approved-simulation"]
+                if row["metadata"].get("purpose") == self.purpose]
 
     def reopen(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"revisionId"}:
@@ -394,7 +397,7 @@ class PreparationStore:
         if not isinstance(revision, str):
             raise ValueError("Invalid revision identity")
         retained = store.read("namespace", revision)
-        if retained["metadata"].get("purpose") != "approved-simulation":
+        if retained["metadata"].get("purpose") != self.purpose:
             raise ValueError("Revision is not an approved simulation")
         provenance = copy.deepcopy(retained["metadata"]["provenance"])
         image = Path(store.file_path("namespace", revision, "simulation.bin")).read_bytes()
@@ -416,7 +419,8 @@ class PreparationStore:
                 "expires": now + self.ttl, "approved": True, "activated": False}
             return dict(copy.deepcopy(provenance), approved=True, activated=False)
 
-    def prepare(self, rows, cfg, directory, entry_slot, stage=stage_image):
+    def prepare(self, rows, cfg, directory, entry_slot, stage=stage_image,
+                provenance_extra=None):
         with self.lock:
             now = time.monotonic()
             self.records = {key: value for key, value in self.records.items()
@@ -426,8 +430,10 @@ class PreparationStore:
             source = copy.deepcopy(rows)
             image, prepared, bindings = stage(copy.deepcopy(cfg), copy.deepcopy(source),
                                               directory, entry_slot)
-            changes = [{"slot": row["slot"], "before": before, "after": row}
-                       for before, row in zip(source, prepared) if before != row]
+            source_rows = source["rows"] if isinstance(source, dict) else source
+            before_by_slot = {row["slot"]: row for row in source_rows}
+            changes = [{"slot": row["slot"], "before": before_by_slot[row["slot"]], "after": row}
+                       for row in prepared if before_by_slot[row["slot"]] != row]
             provenance = {
                 "preparationId": uuid.uuid4().hex,
                 "sourceNamespaceFingerprint": digest(source),
@@ -435,6 +441,7 @@ class PreparationStore:
                 "artifactBindings": bindings, "hardwareCertified": False,
                 "approvalRequired": True, "bootEntrySlot": entry_slot,
                 "imageHash": hashlib.sha256(image).hexdigest(),
+                **(provenance_extra or {}),
             }
             provenance["configurationHash"] = digest({"provenance": provenance, "config": cfg})
             self.records[provenance["preparationId"]] = {
@@ -465,7 +472,7 @@ class PreparationStore:
                     rows = rows()
                 if digest(rows) != provenance["sourceNamespaceFingerprint"]:
                     raise ValueError("Saved Namespace changed; prepare again")
-                if artifact_bindings(record["source"], directory) != provenance["artifactBindings"]:
+                if self.binding_reader(record["source"], directory) != provenance["artifactBindings"]:
                     raise ValueError("Saved artifacts changed; prepare again")
             if not activate and not record["approved"] and self._history_store() is not None:
                 files = {"simulation.bin": record["image"],
@@ -477,7 +484,7 @@ class PreparationStore:
                         raise ValueError("Saved artifacts changed during approval; prepare again")
                     files[binding["filename"]] = raw
                 revision = self._history_store().publish("namespace", {
-                    "purpose": "approved-simulation", "provenance": copy.deepcopy(provenance),
+                    "purpose": self.purpose, "provenance": copy.deepcopy(provenance),
                 }, files)
                 provenance["approvedRevisionId"] = revision
             result = copy.deepcopy(provenance)

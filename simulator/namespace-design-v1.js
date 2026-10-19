@@ -121,7 +121,11 @@
             <strong>${esc(profileLabel())} · ${label}</strong>
             <div>${origin}${state.dirty ? ' Local changes have not been saved.' : ''}
             ${state.dirty || state.persisted === false ? 'Use Bind Namespace Design to save explicitly; nothing is saved automatically.' : ''}
-            Design only — not installed.</div></div>`;
+            Design only — not installed.</div>
+            ${state.document.rows.some(row=>['SelfTest','ide.SelfTest'].includes(row.name)) ?
+                '<button class="btn btn-sm" onclick="NamespaceDesignV1.newSelfTestRevision()">Open corrected SelfTest source</button><span> Review, compile and approve a new ide.SelfTest revision; historical LUMPs are not edited.</span>' : ''}
+            </div>`+
+            (root.DesignSimulation ? '<section id="designSimulationPanel" style="padding:10px;border:1px solid #6b5320;margin-bottom:10px">'+root.DesignSimulation.markup()+'</section>' : '');
     }
     function renderRows(html, host) {
         const d=state.document, p=state.projection;
@@ -465,7 +469,21 @@
         accept(result);
         render();
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision};
+    async function newSelfTestRevision() {
+        const profile=state.profile, documentAtStart=state.document;
+        if(!state.active || !documentAtStart) return;
+        try {
+            await root.openSourceFile('api/namespace/selftest-source', {
+                accepts:()=>state.active && state.profile===profile && state.document===documentAtStart,
+                showEditor:true,propagateError:true,
+                reason:'Create a new ide.SelfTest revision from the canonical SelfTest body with explicit callable identity. Review before replacing the editor. Compile and approve Save LUMP separately; no historical binary or Namespace selection is changed by opening this source.'
+            });
+        } catch(error) {
+            state.error='Could not open corrected SelfTest source: '+error.message+'. Nothing was saved; retry.';
+            render();
+        }
+    }
+    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');

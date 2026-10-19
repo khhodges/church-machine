@@ -62,8 +62,15 @@ function harness(fail) {
     const design=harness();
     design.context.NamespaceDesignV1={state:{active:true,document:{rows:[{slot:10,name:row.name,selection:{filename:row.filename}}]}},
         advanceSavedRevision:async rows=>{design.context.NamespaceDesignV1.state.document.rows=rows;}};
-    await assert.rejects(design.api.realign(response,{}),/validated simulation admission/);
+    await assert.rejects(design.api.realign(response,{}),/Validated design simulation admission/);
     assert.equal(design.context.NamespaceDesignV1.state.document.rows[0].selection.filename,artifact.filename);
     assert(!design.calls.includes('activate'),'no bypass of unapproved design profile boundary');
+    design.context.DesignSimulation={invalidate(){},async prepare(throwOnError){
+        assert.equal(throwOnError,true);design.calls.push('design-admission');return true;
+    }};
+    await design.api.realign(response,{});
+    assert(design.calls.includes('design-admission'));
+    assert.equal(design.context._savedLumpRealignment.privateReady,true);
+    assert(!design.calls.includes('activate'),'legacy simulation must remain separate');
     console.log('PASS save realignment: exact revision, history, Namespace preservation, ordered activation, failure barrier, and design boundary');
 })().catch(e=>{console.error(e);process.exitCode=1;});
