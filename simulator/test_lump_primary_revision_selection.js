@@ -77,7 +77,7 @@ assert.strictEqual(
     sandbox._latestRepositoryLump(dotNameRows, 'New.anyname').token,
     'new-anyname',
     'archived New.anyname history cannot replace its active revision');
-assert(source.includes('const _primaryLumps = _repositoryPrimaryLumps(lumps)') &&
+assert(source.includes('const _primaryLumps = libraryBrowsing ? _repositoryPrimaryLumps(lumps) : lumps') &&
        source.includes('const name  = lump.dot_name || lump.abstraction ||'),
     'top-level repository groups by canonical dot name and displays it');
 assert(!source.includes('_primary.token !== _currentToken'),
@@ -91,3 +91,4 @@ assert(editorSource.includes('Historical selections retain their exact token;'),
 console.log('PASS LUMP browser selects the current documented revision');
 // Keep the execution/Namespace focus regression in this existing workflow.
 require('./test_programmer_lump_focus.js');
+require('./test_namespace_catalog.js');

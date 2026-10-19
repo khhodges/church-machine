@@ -2,6 +2,7 @@
 
 // The opt-in protected adapter must not reintroduce Lambda-return erasure.
 require('../tests/mint_phase1/protected_lambda_cleanup.test.js');
+require('./test_return_protected_validation.js');
 
 // Isolated ISA evidence, NOT Mint service execution. Provisioning ends before
 // the first step. Cleanup is performed only by fetched, assembled instructions.
@@ -17,7 +18,10 @@ for (const method of ['CREATE', 'DESTROY', 'MakeOutform', 'MakeInform']) {
     const body = source.match(new RegExp(`method ${method} \\{([\\s\\S]*?)^\\}`, 'm'))[1];
     const returnInstruction = body.match(/^\s*RETURNAL #\d+/m)[0].trim();
     const mask = method === 'DESTROY' ? 0 : 2;
+    const previousCount = global.window.bootConfig.step1.threadCount;
+    global.window.bootConfig.step1.threadCount = 2;
     const {sim, compile, activate} = fixture(true);
+    global.window.bootConfig.step1.threadCount = previousCount;
     // Restore the real fault handler (the shared fixture normally asserts).
     sim.fault = Sim.prototype.fault;
     sim.programCapabilities = null;
@@ -37,8 +41,28 @@ ${returnInstruction}`, values);
     const caller = compile(30, `${loads}
 LOAD CR11, CR6, #11
 CALL CR11, #0
+CHANGE CR13
 HALT`, [...values, callee.gt]);
+    const slots = sim.configuredThreadSlots();
+    assert.ok(slots.length >= 2);
+    const threadGT = slot => sim.createGT(
+        sim.parseNSWord1(sim.readNSEntry(slot).word1_limit).gtSeq, slot, {}, 1);
+    const other = compile(35, 'CHANGE CR2\nHALT');
+    const otherEntry = sim.readNSEntry(slots[1]);
+    const otherBase = otherEntry.word0_location;
+    const otherLayout = sim._threadLayoutAtBase(otherBase);
+    sim.memory.fill(0, otherBase + otherLayout.capsStart,
+        otherBase + otherLayout.capsStart + 12);
+    sim.memory[otherBase + otherLayout.capsStart] = other.gt;
+    sim.memory[otherBase + otherLayout.capsStart + 2] = threadGT(slots[0]);
+    assert.ok(sim._formatThreadRootSentinel(otherBase, otherLayout, other.gt, {image: true}));
+    const rootSTO = otherLayout.stackEnd - 2;
+    sim.memory[otherBase + rootSTO - 1] = other.gt;
+    sim.memory[otherBase + rootSTO] = sim._packFrameWord(0, 1, rootSTO);
+    sim.memory[otherBase + 17] = (1 << 12) | (rootSTO - 2);
     activate(caller);
+    sim.cr[13] = {word0: threadGT(slots[1]), word1: otherBase,
+        word2: otherEntry.word1_limit, word3: 0, m: 0};
     sim.pc = 1; // Initial entry after method routing table, before any execution.
     const heap = {...sim.cr[5], m: 0};
     const thread = {...sim.cr[12], m: 0};
@@ -77,8 +101,24 @@ HALT`, [...values, callee.gt]);
         returned = true;
     }
     assert.ok(returned, `${method}: native RETURN must execute`);
+    let changes = 0;
+    for (let budget = 20; budget > 0 && changes < 2; budget--) {
+        const result = sim.step();
+        assert.equal(sim.halted, false, JSON.stringify(sim.faultLog));
+        assert.ok(result);
+        if (result.instr.opcode === 4) {
+            changes++;
+            assert.equal(sim._currentThreadSlot, slots[changes === 1 ? 1 : 0]);
+        }
+    }
+    assert.equal(changes, 2, 'must execute CHANGE away and back, not simulate restoration');
+    for (const reg of controlled.filter(reg => !(mask & (1 << reg)))) {
+        assert.equal(sim.cr[reg].word0, 0, `${method}: CR${reg} authority must not reappear`);
+        assert.equal(sim.memory[threadBase + layout.capsStart + reg], 0,
+            `${method}: CR${reg} home stays NULL after switching back`);
+    }
 }
-console.log('PASS: all four Mint exit masks erase actual CR descriptors and Thread homes via native CALL/RETURN');
+console.log('PASS: all four Mint exit masks erase authority through native CALL/RETURN and CHANGE away/back');
 
 // Probe SZ=0 RETURN independently of the unresolved X-target entry binding.
 // Ordinary LAMBDA currently falls through. Explicit *fixture instructions*

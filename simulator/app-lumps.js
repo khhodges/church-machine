@@ -40,7 +40,7 @@ function showLumpDetail(token, options) {
         });
     }
 
-    const lump = _lumpsCache.find(l => l.token === token);
+    const lump = options && options.assignedLump || _lumpsCache.find(l => l.token === token);
     if (!lump) return;
 
     const titleEl = document.getElementById('lumpsDetailTitle');
@@ -458,7 +458,16 @@ function showLumpDetail(token, options) {
     const delBtn = contentEl.querySelector('.lump-delete-btn[data-delete-token]');
     if (delBtn) delBtn.addEventListener('click', () => deleteLump(delBtn.dataset.deleteToken));
     const editBtn = contentEl.querySelector('.lump-edit-btn[data-edit-token]');
-    if (editBtn) editBtn.addEventListener('click', () => openLumpInEditor(editBtn.dataset.editToken));
+    if (editBtn) editBtn.addEventListener('click', () => {
+        const assigned = options && options.assignedLump;
+        if (!assigned) return openLumpInEditor(editBtn.dataset.editToken);
+        const frozenNamespace = JSON.stringify(_namespaceCatalogRows());
+        const accepts = () => frozenNamespace === JSON.stringify(_namespaceCatalogRows()) &&
+            _namespaceCatalog([assigned], _namespaceCatalogRows()).assigned.length === 1;
+        if (!accepts()) return renderLumps();
+        return openLumpInEditor(editBtn.dataset.editToken,
+            {exactSavedArtifact: assigned, accepts});
+    });
     const auditBtn = contentEl.querySelector('.lump-audit-btn[data-audit-token]');
     if (auditBtn) {
         auditBtn.addEventListener('click', () => {
@@ -1161,6 +1170,12 @@ function _lumpLogicCatalogSearchInput() {
 function _populateLumpLogicCatalog() {
     const el = document.getElementById('lumpWsLogicContent');
     if (!el) return;
+    if (!window._lumpLibraryBrowsing) {
+        el.innerHTML = '<div class="lump-logic-section"><div class="lump-logic-desc">' +
+            'Select an assigned LUMP above to inspect its interface. ' +
+            'Unassigned examples are available only through separate library browsing.</div></div>';
+        return;
+    }
     if (typeof abstractionRegistry === 'undefined' || !abstractionRegistry) {
         el.innerHTML = '<div class="lump-logic-section"><div class="lump-logic-desc">Abstraction catalog not loaded.</div></div>';
         return;

@@ -1122,6 +1122,71 @@ window.addEventListener('beforeunload', function (e) {
     }
 });
 
+function _namespaceCatalogRows() {
+    const design = window.NamespaceDesignV1 && window.NamespaceDesignV1.state;
+    const rows = design && design.active ? design.document && design.document.rows
+        : window._nsState && window._nsState.abstractions;
+    return Array.isArray(rows) ? rows : [];
+}
+
+function _namespaceCatalog(lumps, rows) {
+    const assigned = [], unavailable = [];
+    for (const row of rows) {
+        const selection = row.selection || row;
+        if (!selection.token && !selection.filename && row.kind !== 'lump') continue;
+        const hash = selection.binaryHash || selection.binary_hash;
+        const matches = lumps.filter(lump =>
+            /^[0-9a-f]{8}$/i.test(selection.token || '') &&
+            /^[0-9a-f]{64}$/i.test(hash || '') &&
+            String(lump.token).toLowerCase() === selection.token.toLowerCase() &&
+            lump.filename === selection.filename &&
+            String(lump.binary_hash).toLowerCase() === hash.toLowerCase());
+        if (matches.length === 1) assigned.push({...matches[0], ns_slot: row.slot});
+        else unavailable.push(row);
+    }
+    return {assigned, unavailable};
+}
+
+async function _resolveNamespaceCatalog(lumps, rows) {
+    const catalog = _namespaceCatalog(lumps, rows);
+    const unavailable = [];
+    for (const row of catalog.unavailable) {
+        const selected = row.selection || row;
+        const hash = selected.binaryHash || selected.binary_hash;
+        if (!/^[0-9a-f]{8}$/i.test(selected.token || '') ||
+                !/^[0-9a-f]{64}$/i.test(hash || '') ||
+                !/^[^/\\]+\.lump$/.test(selected.filename || '')) {
+            unavailable.push(row);
+            continue;
+        }
+        try {
+            // Missing library metadata is not a veto on a Namespace assignment.
+            // Resolve its immutable bytes directly, never a name/latest lookup.
+            const response = await fetch(`/api/lump/${encodeURIComponent(selected.token)}/words` +
+                `?exact_filename=${encodeURIComponent(selected.filename)}&binary_hash=${encodeURIComponent(hash)}`,
+                {cache: 'no-store'});
+            const data = response.ok ? await response.json() : null;
+            if (!data || data.error || data.filename !== selected.filename ||
+                    String(data.binary_hash).toLowerCase() !== hash.toLowerCase() ||
+                    !Array.isArray(data.words) || !data.words.length ||
+                    !data.words.every(word => Number.isInteger(word) && word >= 0 && word <= 0xffffffff))
+                throw new Error('Exact artifact unavailable');
+            catalog.assigned.push({token: selected.token, filename: selected.filename,
+                binary_hash: hash, abstraction: row.name, ns_slot: row.slot,
+                lump_size: data.words.length, binary_valid: data.binary_valid});
+        } catch (_) {
+            unavailable.push(row);
+        }
+    }
+    return {assigned: catalog.assigned, unavailable};
+}
+
+window.toggleLumpLibrary = function() {
+    window._lumpLibraryBrowsing = !window._lumpLibraryBrowsing;
+    if (window.LumpRegistry) window.LumpRegistry.setCurrent(null);
+    renderLumps();
+};
+
 async function renderLumps(options) {
     const requestId = (window._lumpRepositoryRequestId || 0) + 1;
     window._lumpRepositoryRequestId = requestId;
@@ -1142,6 +1207,8 @@ async function renderLumps(options) {
                 return;
             }
         }
+        const namespaceSnapshot = JSON.stringify(_namespaceCatalogRows());
+        const libraryBrowsing = window._lumpLibraryBrowsing === true;
         // A Namespace may remain pinned after a newer save archives its
         // revision. History supplies metadata, never selection authority.
         const r = await fetch('/api/lumps/list?include_archived=1');
@@ -1151,7 +1218,20 @@ async function renderLumps(options) {
         });
         let lumps = await r.json();
         if (window._lumpRepositoryRequestId !== requestId) return;
+        if (namespaceSnapshot !== JSON.stringify(_namespaceCatalogRows())) return renderLumps(options);
+        const catalog = libraryBrowsing ? {assigned: [], unavailable: []}
+            : await _resolveNamespaceCatalog(lumps, JSON.parse(namespaceSnapshot));
+        if (window._lumpRepositoryRequestId !== requestId) return;
+        if (namespaceSnapshot !== JSON.stringify(_namespaceCatalogRows())) return renderLumps(options);
+        // The shared library remains lookup infrastructure for other views.
+        // Namespace projection is local to this view, never a destructive cache filter.
         if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
+        if (!libraryBrowsing && window.LumpRegistry) window.LumpRegistry.registerFromServer(catalog.assigned);
+        if (!libraryBrowsing) lumps = catalog.assigned;
+        if (!libraryBrowsing && window.LumpRegistry &&
+                !lumps.some(row => row.token === window.LumpRegistry.getCurrent())) {
+            window.LumpRegistry.setCurrent(null);
+        }
 
         // A name-based navigation resolves only through the selected Namespace.
         if (_pendingLumpAbstractionName) {
@@ -1176,7 +1256,7 @@ async function renderLumps(options) {
         var _pendingTokenResolved = false;
         if (window.LumpRegistry) {
             const _ptToken = window.LumpRegistry.consumePending();
-            if (_ptToken) {
+            if (_ptToken && (libraryBrowsing || lumps.some(row => row.token === _ptToken))) {
                 window._lumpRepositoryFollowsExecution = false;
                 if (!lumps.some(l => l.token === _ptToken)) {
                     try {
@@ -1233,15 +1313,23 @@ async function renderLumps(options) {
 
         const _selTok = window.LumpRegistry ? window.LumpRegistry.getCurrent() : null;
 
-        let html = '';
+        let html = `<p>${libraryBrowsing ? 'Library — browsing does not assign LUMPs to the Namespace.'
+            : 'Selected Namespace — exact assigned LUMPs only.'}</p>` +
+            `<button type="button" class="lump-hs-btn" onclick="toggleLumpLibrary()">${libraryBrowsing
+                ? 'Back to selected Namespace' : 'Browse unassigned library separately'}</button>`;
+        if (!libraryBrowsing && catalog.unavailable.length) {
+            html += '<p role="status">Assigned artifacts unavailable or ambiguous: ' +
+                catalog.unavailable.map(row => _escHtml(`${row.name || 'LUMP'} (slot ${row.slot})`)).join(', ') +
+                '. Check the Namespace assignments; no replacement was selected.</p>';
+        }
         if (!lumps || lumps.length === 0) {
-            html = '<div class="lumps-placeholder">No lumps saved yet. Use Build LUMP in the editor to compile and save an abstraction.</div>';
+            html += '<div class="lumps-placeholder">No LUMPs available in this view.</div>';
         } else {
             // Show one top-level artifact per canonical dot name: the latest
             // saved revision.  A pet-name such as New.anyname is a distinct
             // repository object even when its legacy abstraction field is
             // shared with another row.
-            const _primaryLumps = _repositoryPrimaryLumps(lumps);
+            const _primaryLumps = libraryBrowsing ? _repositoryPrimaryLumps(lumps) : lumps;
             const _sortedLumps = _lumpsSorted(_primaryLumps.length ? _primaryLumps : lumps);
             html += `<select id="lumpPickerSelect" class="lump-picker-select" onchange="lumpPickerChanged(this.value)">`;
             html += `<option value="">— pick a lump —</option>`;
@@ -1336,7 +1424,8 @@ async function renderLumps(options) {
         if (_selTok) {
             // Always re-render the detail panel so compress/POLA/save changes
             // (lump_size, cc, etc.) are reflected without a manual click.
-            const focusOptions = { executionFocus: window._lumpRepositoryFollowsExecution !== false };
+            const focusOptions = { executionFocus: window._lumpRepositoryFollowsExecution !== false,
+                assignedLump: !libraryBrowsing ? lumps.find(row => row.token === _selTok) : null };
             if (typeof window.showLumpDetail === 'function') window.showLumpDetail(_selTok, focusOptions);
             else if (typeof showLumpDetail === 'function') showLumpDetail(_selTok, focusOptions);
             // Sync the "Viewing: <name>" label directly — showLumpDetail is async
@@ -1344,6 +1433,13 @@ async function renderLumps(options) {
             // _updateLumpViewingLabel here covers the synchronous restore path
             // (e.g. after a page reload when the registry is already populated).
             _updateLumpViewingLabel(_selTok);
+        } else {
+            const title = document.getElementById('lumpsDetailTitle');
+            const content = document.getElementById('lumpsDetailContent');
+            if (title) title.textContent = 'Select a LUMP';
+            if (content) content.textContent = 'Choose an available artifact from this view. No replacement was selected.';
+            if (typeof _populateLumpLogicCatalog === 'function') _populateLumpLogicCatalog();
+            _updateLumpViewingLabel('');
         }
          _setLumpRepositoryCollapsed(Boolean(_selTok));
         // If a pending tab was requested (e.g. from _openLumpSource), apply it now
@@ -1411,6 +1507,17 @@ function _updateLumpRepoCount(x, y) {
 
 // Called by the lump picker <select> when the user chooses a different lump.
 window.lumpPickerChanged = function(token) {
+    let assignedLump = null;
+    if (!window._lumpLibraryBrowsing && token) {
+        const assigned = _namespaceCatalog(
+            typeof _lumpsCache === 'undefined' ? [] : _lumpsCache,
+            _namespaceCatalogRows()).assigned.filter(row => row.token === token);
+        if (assigned.length !== 1) {
+            renderLumps();
+            return;
+        }
+        assignedLump = assigned[0];
+    }
     window._lumpRepositoryFollowsExecution = false;
     window._lumpRepositoryRequestId = (window._lumpRepositoryRequestId || 0) + 1;
     if (!token) {
@@ -1423,8 +1530,8 @@ window.lumpPickerChanged = function(token) {
     _lumpRecordView(token);
     _updateLumpViewingLabel(token);
     _setLumpRepositoryCollapsed(true);
-    if (typeof window.showLumpDetail === 'function') window.showLumpDetail(token);
-    else if (typeof showLumpDetail === 'function') showLumpDetail(token);
+    if (typeof window.showLumpDetail === 'function') window.showLumpDetail(token, {assignedLump});
+    else if (typeof showLumpDetail === 'function') showLumpDetail(token, {assignedLump});
 };
 
 // Keep the selected LUMP detail as the primary workspace after a selection.

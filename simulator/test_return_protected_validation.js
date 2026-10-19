@@ -30,6 +30,19 @@ function call(s, slot) {
     assert.ok(s._execCall({crDst: 0, imm: 0}));
 }
 function unchangedFault(s, type) {
+    const layout = s._threadLayoutAtBase(s.cr[12].word1);
+    const homesStart = s.cr[12].word1 + layout.capsStart;
+    // Provision nonzero private authority for every rejection case, including
+    // root-underflow probes reached after earlier successful clearing returns.
+    for (const reg of [8, 9, 10]) {
+        s.cr[reg] = {...s.cr[6], m: 0};
+        assert.notEqual(s.cr[reg].word0, 0);
+        s.memory[homesStart + reg] = s.cr[reg].word0;
+    }
+    // Full Thread storage includes capability homes, protected frames and M state.
+    const threadStart = s.cr[12].word1;
+    const threadBefore = s.memory.slice(threadStart, threadStart + layout.lumpSize);
+    const homesBefore = s.memory.slice(homesStart, homesStart + 12);
     const before = { cr: structuredClone(s.cr), dr: [...s.dr], sto: s.sto,
         pc: s.pc, indicator: s.memory[17], depth: s.callStack.length };
     let event;
@@ -38,6 +51,10 @@ function unchangedFault(s, type) {
     assert.equal(event?.type, type);
     assert.equal(s.halted, true);
     assert.deepEqual(s.cr, before.cr);
+    assert.deepEqual(s.memory.slice(homesStart, homesStart + 12), homesBefore,
+        'rejected RETURN must not clear or write back capability homes');
+    assert.deepEqual(s.memory.slice(threadStart, threadStart + layout.lumpSize), threadBefore,
+        'rejected RETURN must not partially commit Thread state');
     assert.deepEqual(s.dr, before.dr);
     assert.equal(s.sto, before.sto);
     assert.equal(s.pc, before.pc);
