@@ -168,11 +168,11 @@
         host.innerHTML=designStatus()+html;
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
-        saveButton.textContent='Bind Namespace Design';
+        saveButton.textContent=state.saving?'Binding…':'Bind Namespace Design';
         saveButton.title='Save this design and show fresh C-list binding results. Does not activate or change a running image.';
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
-        host.querySelector('#nsSaveLayoutNote').textContent=state.error ||
+        host.querySelector('#nsSaveLayoutNote').textContent=state.saving?'Binding selected Namespace…':state.error ||
             (state.profile==='phase1'?'Phase 1':'Ascending layout')+' · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
             p.warnings.join('; ');
         const bolt=host.querySelector('#nsBoltDrag');
@@ -430,6 +430,19 @@
             });
         } catch(e) { overlay.querySelector('#nsDraftError').textContent=e.message; }
     }
+    function showBindingFailure(message) {
+        state.error=message;
+        if (root.NamespaceBindingWindows) {
+            const rows=state.document && state.document.rows || [];
+            root.NamespaceBindingWindows.show({
+                fingerprint:state.fingerprint, status:'blocked', installed:false,
+                lists:rows.filter(row=>row.kind==='lump').map(row=>({
+                    slot:row.slot, name:row.name, filename:row.selection && row.selection.filename,
+                    status:'blocked', rows:[], reason:message
+                }))
+            });
+        }
+    }
     function acceptSavedResult(result) {
         accept(result);
         if (result.bindingReport && root.NamespaceBindingWindows) {
@@ -441,24 +454,24 @@
                 state.error='Design saved. Binding is blocked; see the C-list windows for the exact reasons. No runtime image was changed.';
             }
         } else {
-            state.error='Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.';
+            showBindingFailure('Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.');
         }
     }
     async function save() {
         if(state.saving || !state.document) return;
-        state.saving=true; render();
+        state.saving=true; state.error=''; render();
         try {
             if (!root.NamespaceIdeNode) throw Error('IDE node setting is unavailable. Reload the page before saving.');
             if (!await root.NamespaceIdeNode.savePending()) {
-                state.error='IDE node was not saved. Namespace design save stopped; your edits are retained.';
+                showBindingFailure('IDE node was not saved. Binding did not run; your Namespace edits are retained. Resolve the IDE node setting, then bind again.');
                 return;
             }
             const result = await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)});
             acceptSavedResult(result);
         }
-        catch(e) { state.error=e.message+
+        catch(e) { showBindingFailure(e.message+
             ' Check the IDE node status above: its save is separate and may already have completed. '+
-            'No executable image was changed. Your Namespace draft is retained.'; }
+            'No executable image was changed. Your Namespace draft is retained.'); }
         finally { state.saving=false; render(); }
     }
     function capacity(value) {

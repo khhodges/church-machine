@@ -26,3 +26,25 @@ paths to adding adapters, fallback authorities or special-case repairs. Simplify
 and refactor the affected code during scoped changes while preserving approved
 behavior; this standing goal does not authorize unrelated broad rewrites,
 saved-artifact changes or hardware actions.
+
+Every completed explicit Bind action must visibly present its outcome, even
+when the design is unchanged or earlier result windows were closed.
+
+**Why:** The user repeatedly reported missing binding popups. An inline error
+below the table does not satisfy the Bind interaction they expect.
+
+**How to apply:** Show fresh per-LUMP reports on success and the actual blocking
+reason on failure; never substitute cached successful results. Make an in-flight
+Bind visibly busy rather than appearing to ignore the click.
+
+Namespace membership must not silently shrink during binding, fallback removal,
+or profile changes. A successful binding report is not evidence that all
+programmer-declared members were preserved.
+
+**Why:** The user reported slots 6 and 9 disappearing from Newlayout without
+warning. Missing or invalid dependencies must remain visible, not be removed
+to make the remaining bindings pass.
+
+**How to apply:** Preserve selected rows and distinguish each profile's saved
+membership. Any proposed removal must explicitly identify its slot and name for
+confirmation; verify membership as well as binding status.
