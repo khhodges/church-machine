@@ -894,6 +894,7 @@ function _bootNIARows(bootStep) {
             Number(record.bootRomAddress) === index || Number(record.bootRomAddress) === (index * 4));
         return evidence ? Object.assign({}, step, {
             status: evidence.status || 'unexecuted',
+            disasm: evidence.instruction || step.disasm,
             word: evidence.word,
             bootRomAddress: evidence.bootRomAddress,
             destinationRegister: evidence.destinationRegister,

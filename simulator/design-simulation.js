@@ -116,8 +116,7 @@
     function create(words, record) {
         const instance = ChurchSimulator.fromAscendingNamespaceImage(new Uint32Array(words), {
             word0:0x02000001, word1:0, word2:record.slotCount*4-1, word3:0, m:1});
-        if (!instance.startEntryThread() || instance.halted)
-            throw Error('The admitted entry Thread could not start: '+(instance.faultLog || []).map(f=>f.message).join('; '));
+        instance.beginBoot();
         instance.simulationConfiguration=Object.freeze({...record});
         if(typeof instance.on==='function') {
             if(typeof root._traceRecordStep==='function') instance.on('step',root._traceRecordStep);
@@ -205,7 +204,15 @@
         if(machine.halted) throw Error('Simulation is halted. Use Reset before stepping or running again.');
         try {
             for(let i=0;i<count && !machine.halted;i++) {
-                const result=machine.step();steps++;
+                const booting=!machine.bootComplete;
+                const result=booting ? machine._bootStep() : machine.step();steps++;
+                if(booting) {
+                    if(typeof pipelineViz!=='undefined' && pipelineViz && typeof _bootNIARows==='function') {
+                        pipelineViz.setNIA(_bootNIARows(machine.bootStep));
+                        pipelineViz.render();
+                    }
+                    continue;
+                }
                 if(result && typeof root._wukongRecordSimulatorStep==='function') root._wukongRecordSimulatorStep(result);
                 if(result && result.pipeline && typeof _pendingPipelineBuffer!=='undefined') {
                     _pendingPipelineBuffer={pc:result.physicalPC ?? result.pc,pipeline:result.pipeline};
@@ -228,7 +235,8 @@
         const ticket=generation, epoch=++runEpoch;
         const batch=()=>{
             if(!running || ticket!==generation || epoch!==runEpoch) return;
-            if(execute(walking ? 1 : 250) && running) setTimeout(batch,walking ? 500 : 0);
+            const booting=!machine.bootComplete;
+            if(execute(booting || walking ? 1 : 250) && running) setTimeout(batch,booting || walking ? 500 : 0);
             else {running=false;render();}
         };
         batch();

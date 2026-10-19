@@ -3700,6 +3700,9 @@ class ChurchSimulator {
             + `— body lazy-loads on first Tier 2 fault\n`;
     }
 
+    _bootNamespaceSlot() { return BOOT_NS_SLOT_HEADER; }
+    _bootThreadSlot() { return BOOT_NS_SLOT_THREAD; }
+
     _newBootProgress(attemptId) {
         const instructions = [
             { mnemonic: 'LOAD', change: 'LOAD CR15, CR15[0]', destinationRegister: 15, opcode: 0 },
@@ -3784,7 +3787,7 @@ class ChurchSimulator {
         if (this._liveThreadOwned &&
                 !this._suspendLiveThread(this._currentThreadSlot, null, this.pc)) return false;
         this._liveThreadOwned = false;
-        this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
+        this._currentThreadSlot = this._bootThreadSlot();
         // This is a reset-bank wipe, not an architectural CR writeback. In
         // particular it must not zero the prepared CR0 home through CR12.
         for (let i = 0; i < 16; i++) {
@@ -3881,13 +3884,13 @@ class ChurchSimulator {
 
         if (index === 0) {
             this._setBootFaultContext(index, 15, 0);
-            const entry = this.readNSEntry(BOOT_NS_SLOT_HEADER);
+            const entry = this.readNSEntry(this._bootNamespaceSlot());
             if (!entry) {
                 this.fault('BOOT', 'LOAD CR15: Namespace root entry is unavailable.');
                 return this._bootFailInstruction(index, 'Namespace root is unavailable.');
             }
             const seq = this.parseNSWord1(entry.word1_limit).gtSeq;
-            const rootGT = this.createGT(seq, BOOT_NS_SLOT_HEADER,
+            const rootGT = this.createGT(seq, this._bootNamespaceSlot(),
                 {R:0,W:0,X:0,L:0,S:0,E:0}, 1);
             this._setBootFaultContext(index, 15, rootGT);
             const check = this.mLoad(rootGT, null, 15);
@@ -3901,17 +3904,17 @@ class ChurchSimulator {
             this.pc = 1;
             this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, 0);
             this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, this.cr[15].word0 >>> 0);
-            this.output += 'BOOT LOAD CR15, CR15[0] — Namespace root established\n';
+            this.output += `BOOT ${this.bootProgress[index].instruction} — Namespace root established\n`;
         } else if (index === 1) {
             this._setBootFaultContext(index, 15, this.cr[15].word0);
             const result = this._execBootChangeCore({
-                opcode: 4, cond: 14, crDst: 12, crSrc: 15, imm: BOOT_NS_SLOT_THREAD,
+                opcode: 4, cond: 14, crDst: 12, crSrc: 15, imm: this._bootThreadSlot(),
                 mnemonic: 'CHANGE',
             }, this.pc);
             if (!result || this.halted) {
                 return this._bootFailInstruction(index, 'CHANGE CR12 was rejected.');
             }
-            this.output += 'BOOT CHANGE CR12, CR15[1] — Boot.Thread restored\n';
+            this.output += `BOOT ${this.bootProgress[index].instruction} — Boot.Thread restored\n`;
         } else {
             // CR0 is the sole boot-entry authority after CHANGE restored the
             // prepared Thread home.  Do not consult the mutable UI selection
@@ -3948,7 +3951,7 @@ class ChurchSimulator {
             // C-list access before the first ordinary instruction.
             this.cr[6].m = 1;
             this.bootComplete = true;
-            this._currentThreadSlot = BOOT_NS_SLOT_THREAD;
+            this._currentThreadSlot = this._bootThreadSlot();
             this._liveThreadOwned = true;
             this.ledBits = 0b111111;
             this.ledMode = 'boot';
@@ -8615,7 +8618,7 @@ class ChurchSimulator {
     _execBootChangeCore(d, continuationPC) {
         // Internal boot entry only; an instruction cannot select this path.
         if (!this.mElevation || this.bootComplete || d.crDst !== 12 ||
-                d.crSrc !== 15 || d.imm !== BOOT_NS_SLOT_THREAD) {
+                d.crSrc !== 15 || d.imm !== this._bootThreadSlot()) {
             this.fault('INVALID_OP', 'Internal boot CHANGE invoked outside boot');
             return null;
         }
@@ -8661,7 +8664,7 @@ class ChurchSimulator {
             return null;
         }
         let gt = 0;
-        if (!threadSwitch) {
+        if (!threadSwitch && d.crDst !== 12) {
             const gtRead = this._capRead(d.crSrc, entry.word0_location, null, `CHANGE CR${d.crDst}`);
             if (!gtRead.ok) {
                 this.fault(gtRead.fault, gtRead.message);

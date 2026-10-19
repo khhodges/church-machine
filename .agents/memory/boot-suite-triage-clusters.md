@@ -11,3 +11,7 @@ Durable lessons:
 - Existing workflow output without a run timestamp and input fingerprints is historical evidence, not a fresh test of the current checkout. Keep source inspection and new read-only probes separately attributed.
 - **Why:** Baseline triage can encounter a still-running full suite alongside cached failed workflow outputs. Combining those with current file hashes would falsely imply one coherent run.
 - **How to apply:** Avoid duplicate broad runs; retain observed excerpts, capture current protected-input hashes separately, and label unresolved fixture-versus-runtime causes explicitly.
+
+- A private test copy must dereference artifact symlinks into private files, or explicitly verify that every writable target stays inside the sandbox.
+- **Why:** Ordinary recursive copying can retain links to the live artifact tree; a different working directory alone is not isolation.
+- **How to apply:** Exclude transient staging directories, copy fixture data with dereferencing, and keep only intentionally read-only dependency links.

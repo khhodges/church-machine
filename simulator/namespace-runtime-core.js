@@ -60,7 +60,9 @@ class NamespaceRuntimeCore extends Simulator {
             get: () => this._liveThreadOwned && !Simulator.isNullGT(this.cr[12].word0)
                 ? this.parseGT(this.cr[12].word0).index : null,
             set: value => {
-                if (value !== null && value !== this.parseGT(this.cr[12].word0).index) {
+                if (value !== null && value !== this.parseGT(this.cr[12].word0).index &&
+                        !(this._bootRoot && !this.bootComplete && !this._liveThreadOwned &&
+                            value === this._bootThreadSlot())) {
                     throw new Error('Active Thread identity is defined by CR12');
                 }
             },
@@ -77,7 +79,32 @@ class NamespaceRuntimeCore extends Simulator {
     emptyCapability() {
         return {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
     }
-    namespaceGeometry() { return view.geometry(this.memory, this.cr[15]); }
+    _bootNamespaceSlot() { return 1; }
+    _bootThreadSlot() { return 2; }
+    _namespaceRoot() {
+        // Only the reset/LOAD boundary may inspect the admitted root before
+        // CR15 exists. Runtime authority never falls back to another Namespace.
+        return this._bootRoot && !this.bootComplete && this.bootStep === 0 &&
+            Simulator.isNullGT(this.cr[15].word0) ? this._bootRoot : this.cr[15];
+    }
+    namespaceGeometry() { return view.geometry(this.memory, this._namespaceRoot()); }
+    beginBoot() {
+        if(this._liveThreadOwned || this.halted) throw Error('Boot requires a fresh Namespace image');
+        this._bootRoot = Object.freeze({...this.cr[15]});
+        this.bootComplete = false;
+        this.bootStep = 0;
+        this.bootAttemptId++;
+        this.bootProgress = this._newBootProgress(this.bootAttemptId);
+        const load=this.bootProgress[0], change=this.bootProgress[1];
+        load.instruction='LOAD CR15, CR15[1]';
+        load.word=this.encodeInstruction(0,14,15,15,16);
+        change.instruction='CHANGE CR12, CR15[2]';
+        change.word=this.encodeInstruction(4,14,12,15,2);
+        this.cr=Array.from({length:16},()=>this.emptyCapability());
+        this.output='';
+        this.pc=0;
+        this.physicalPC=0;
+    }
     _mmioDeviceSlot(index) {
         if (!this._namespaceRuntimeReady) return super._mmioDeviceSlot(index);
         // Device routing follows the verified descriptor's hardware address,
@@ -103,12 +130,12 @@ class NamespaceRuntimeCore extends Simulator {
     }
     _nsSlotBase(index) {
         return this._namespaceRuntimeReady
-            ? view.slotAddress(this.memory, this.cr[15], index)
+            ? view.slotAddress(this.memory, this._namespaceRoot(), index)
             : super._nsSlotBase(index);
     }
     readNSEntry(index) {
         return this._namespaceRuntimeReady
-            ? view.readEntry(this.memory, this.cr[15], index)
+            ? view.readEntry(this.memory, this._namespaceRoot(), index)
             : super.readNSEntry(index);
     }
     isNSEntryValid(index) {

@@ -16,6 +16,13 @@ fetch, inspection, import, reset, and already-running execution never promote
 or swap artifacts. CR0 remains preparation-owned and is committed with the
 Namespace binding and generated image as one CAS transaction.
 
+Normal Step, Walk, and Run must execute and display real boot instructions for
+the selected Namespace, not adopt an already-entered Thread. Reset returns to
+the boot boundary. Private simulation is not permission to skip boot.
+
+**Why:** The user explicitly requested restoration after selected-design replay
+bypassed boot and removed its visible progress from the normal controls.
+
 Validation/approval evidence is keyed to the exact artifact digest and never
 transfers across revisions. Namespace identity and dependencies are validated
 before publication. Any failure preserves the previous valid selection and

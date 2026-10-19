@@ -1242,3 +1242,17 @@ mtime_ms = 1792329205861
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cff6cc0a-3222-44d3-9ebb-5a0fdc76c8e6/3f3d7556-2615-421c-88e8-cbe5c52f887a"
 storage_version_token = "1792329235518263"
 content_type = "text/html"
+
+[[outputs]]
+id = "OZJY0pVU9NYNqMA9TmiFK"
+uri = "file://reports/ide-functional-audit-2026-10-19.html"
+type = "html"
+title = "IDE functional audit — findings and coverage"
+description = "Prioritized functional findings, browser evidence, all 102 loaded scripts, 273 route declarations, results for 289 test programs, and explicit untested areas. This is a partial functional audit, not 100% certification."
+logical_id = "f05efba0-32ac-45f1-aea2-a420bb37ca3d"
+content_hash = "sha256:eaab64b7903d8c1528feddd204dc5a471a536b046b8b415e0763343128818809"
+size = 87209
+mtime_ms = 1792439322727
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f05efba0-32ac-45f1-aea2-a420bb37ca3d/610a57f6-c2ea-41cc-94ca-f8468fa337c2"
+storage_version_token = "1792439345774637"
+content_type = "text/html"

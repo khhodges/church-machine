@@ -7,7 +7,7 @@ assert(scripts.indexOf('namespace-runtime-core.js') < scripts.indexOf('design-si
 assert(scripts.indexOf('design-simulation.js') < scripts.indexOf('namespace-design-v1.js'));
 function harness(defect) {
     const panel={innerHTML:''},calls=[],instances=[];
-    const toolbar=[];
+    const toolbar=[], timers=[];
     const words=[0xf8810100,0,2,0], profile='ascending', fingerprint='a'.repeat(64);
     const hash=require('node:crypto').createHash('sha256').update(Buffer.from(new Uint32Array(words).buffer)).digest('hex');
     const review={preparationId:'ticket',configurationHash:'b'.repeat(64),imageHash:hash,
@@ -26,7 +26,9 @@ function harness(defect) {
             const listeners={};
             const machine={pc:1,dr:Array(16).fill(0),faultLog:[],halted:false,
                 listeners,on(name,callback){(listeners[name] ||= []).push(callback);},
-                startEntryThread(){return true;},step(){
+                beginBoot(){this.bootComplete=defect!=='boot';this.bootStep=0;},
+                _bootStep(){this.bootStep++;this.bootComplete=this.bootStep===3;return true;},
+                step(){
                     this.pc++;this.dr[1]++;this.halted=this.dr[1]===3;
                     const result={pc:this.pc};
                     for(const callback of listeners.step || []) callback(result);
@@ -45,10 +47,39 @@ function harness(defect) {
             if(defect==='rejected' && action==='prepare')return {ok:false,json:async()=>({error:'Embedded API names RunAbstraction',nextAction:'Compile a new revision.'})};
             return {ok:true,json:async()=>data};
         }};
+    if(defect==='boot') scope.setTimeout=callback=>timers.push(callback);
     scope.window=scope;vm.createContext(scope);vm.runInContext(code,scope);
-    return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar};
+    return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
 }
 (async()=>{
+    for(const action of ['step','walk','run']) {
+        const boot=harness('boot');
+        await boot.api.command(action);
+        assert.equal(boot.instances[0].bootStep,1);
+        assert.equal(boot.instances[0].dr[1],0);
+        for(let n=2;n<=3;n++){
+            if(action==='step') await boot.api.command('step');
+            else boot.timers.shift()();
+            assert.equal(boot.instances[0].bootStep,n);
+            assert.equal(boot.instances[0].dr[1],0,'boot must not fast-forward into program execution');
+        }
+        boot.api.stop();
+        for(const timer of boot.timers) timer();
+        assert.equal(boot.instances[0].dr[1],0,'Stop cancels the transition into program execution');
+        await boot.api.command('reset');
+        assert.equal(boot.instances.at(-1).bootStep,0);
+        assert.equal(boot.instances.at(-1).bootComplete,false,'Reset returns to the real boot boundary');
+    }
+    for(const action of ['walk','run']) {
+        const paused=harness('boot');
+        await paused.api.command(action);
+        assert.equal(paused.instances[0].bootStep,1);
+        await paused.api.command('stop');
+        const atStop=paused.instances[0].bootStep;
+        for(const timer of paused.timers) timer();
+        assert.equal(paused.instances[0].bootStep,atStop,
+            'no queued boot stage may execute after the Stop handler');
+    }
     const h=harness();
     assert.equal(await h.api.prepare(true),true);
     assert.equal(h.instances.length,1);
