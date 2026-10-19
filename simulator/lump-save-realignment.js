@@ -2,8 +2,18 @@
 // an unrelated "latest", rewrite editor text, or send anything to hardware.
 (function(root) {
     const storageKey = 'savedLumpRealignment';
+    const dismissalKey = 'savedLumpRealignmentDismissedNotice';
     const readyMessage = 'Saved revision ready. Use Run or Step in Namespace.';
     let retryInput = null;
+    let dismissedNotice = null;
+    try { dismissedNotice = root.sessionStorage.getItem(dismissalKey); } catch (_) {}
+    function noticeKey(state) {
+        if (!state) return null;
+        const saved = (state.retryInput || retryInput)?.response || {};
+        // Canonical fields, not object property order or transient pending state.
+        return JSON.stringify([state.privateReady === true, state.message,
+            saved.token, saved.lump, saved.digest, saved.lump_version]);
+    }
     function renderStatus() {
         if (typeof document === 'undefined' || !document.body) return;
         let host = document.getElementById('savedLumpRealignmentStatus');
@@ -16,7 +26,7 @@
         }
         host.replaceChildren();
         const state = root._savedLumpRealignment;
-        host.hidden = !state;
+        host.hidden = !state || dismissedNotice === noticeKey(state);
         if (!state) return;
         const ready = !state.pending && state.privateReady === true;
         host.setAttribute('data-state', ready ? 'success' : state.pending ? 'pending' : 'error');
@@ -36,7 +46,11 @@
         close.style.cssText = 'position:absolute;top:6px;right:6px;min-height:32px;padding:4px 10px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:4px;cursor:pointer';
         // Dismiss presentation only. Never clear the execution barrier or
         // cancel an in-flight preparation just because its notice is closed.
-        close.onclick = () => { host.hidden = true; };
+        close.onclick = () => {
+            dismissedNotice = noticeKey(state);
+            try { root.sessionStorage.setItem(dismissalKey, dismissedNotice); } catch (_) {}
+            host.hidden = true;
+        };
         host.append(close);
     }
     function barrier(value) {
@@ -60,6 +74,10 @@
         }
     } catch (_) {}
     function begin() {
+        // Only an explicit new preparation resets dismissal, never a redraw
+        // or restoration of the same notice after page reload.
+        dismissedNotice = null;
+        try { root.sessionStorage.removeItem(dismissalKey); } catch (_) {}
         if (root.DesignSimulation) root.DesignSimulation.invalidate();
         barrier({pending:true,message:'Saved revision is being aligned. Stale execution is stopped.'});
         if (typeof stopSim === 'function') stopSim();
