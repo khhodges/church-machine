@@ -4,6 +4,26 @@
     'use strict';
     let machine = null, provenance = null, frozenWords = null, owner = null;
     let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0, intent = 0;
+    let reportedMachine = null, reportedOutput = '', reportedFaults = 0;
+
+    // Runtime output belongs in the existing console, not a second simulator UI.
+    function publishExecution() {
+        if (!machine) return;
+        if (reportedMachine !== machine) {
+            reportedMachine=machine; reportedOutput=''; reportedFaults=0;
+        }
+        const output=String(machine.output || '');
+        const added=output.startsWith(reportedOutput) ? output.slice(reportedOutput.length) : output;
+        if (added && typeof root.appendOutput==='function') root.appendOutput(added,'info');
+        reportedOutput=output;
+        const faults=machine.faultLog || [];
+        for (const fault of faults.slice(reportedFaults)) {
+            const text='Simulation fault: '+(fault.message || fault.type || 'Unknown fault');
+            if(typeof root.appendOutput==='function') root.appendOutput(text,'error');
+            if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation fault',text,'error',15000);
+        }
+        reportedFaults=faults.length;
+    }
 
     let toolbarOwned = false;
     let message = 'Save a LUMP or prepare this saved design for private simulation. Hardware and installed images stay unchanged.';
@@ -157,7 +177,12 @@
         try {
             for(let i=0;i<count && !machine.halted;i++) {machine.step();steps++;}
             message=machine.halted ? 'Private simulation stopped. Inspect its output/fault below; Reset reuses the same verified bytes.' : 'Executing the exact approved private simulation.';
-        } catch(error) {running=false;machine.halted=true;message='Private simulation stopped: '+error.message;}
+        } catch(error) {
+            running=false;machine.halted=true;message='Simulation stopped: '+error.message;
+            if(typeof root.appendOutput==='function') root.appendOutput(message,'error');
+            if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation stopped',message,'error',15000);
+        }
+        publishExecution();
         render();
         return !machine.halted;
     }
@@ -198,8 +223,7 @@
             else if(action==='step') { if(!running) execute(1); }
             else if(action==='run' || action==='walk') run(action==='walk');
             else throw Error('Unknown selected simulation action.');
-            // Show the machine that actually executed, never the old dashboard.
-            if(typeof root.switchView==='function') root.switchView('namespace');
+            // Keep the programmer in their chosen view; no internal test panel.
             return true;
         } catch(error) {
             if(actionIntent!==intent) return false;

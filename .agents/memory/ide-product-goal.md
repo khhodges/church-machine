@@ -58,3 +58,13 @@ overwrite; the user clarified that it was their own deliberate edit.
 **How to apply:** Do not restore Mint to slot 9 or investigate that confirmed
 removal as data loss unless the user requests a new change. It is separate from
 the simulator display issue.
+
+Internal IDE testing controls, preparation details, and repair shortcuts must
+not appear as a separate programmer-facing simulator workflow.
+
+**Why:** The user explicitly rejected the private-simulator panel and internal
+“installed image” terminology as confusing.
+
+**How to apply:** Keep internal verification behind the normal controls. Show
+actual program output and errors through the existing programmer-facing UI,
+not a duplicate diagnostic simulator panel.

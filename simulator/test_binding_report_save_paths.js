@@ -84,6 +84,9 @@ const {JSDOM}=require('jsdom');
     w.updateNamespace=()=>api.renderRows(
         '<button id="nsSaveBtn"></button><span id="nsBoltDrag"></span><table><tbody>',host);
     api.render();
+    assert(!host.textContent.includes('Open corrected SelfTest source'));
+    assert(!host.textContent.includes('not installed'));
+    assert.equal(host.querySelector('#designSimulationPanel'),null);
     for(let i=0;i<3;i++){
         w.NamespaceBindingWindows.closeAll();
         const count=writes;
