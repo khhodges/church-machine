@@ -1061,8 +1061,8 @@ def _save_lump_diagnostic_event(*, stage, event, outcome="unknown", error=None,
         return False
 
 
-def _diagnostic_origin_is_same_site():
-    """Accept browser diagnostics only from the current configured origin."""
+def _ide_origin_is_same_site():
+    """Shared browser-origin policy for IDE requests behind the preview proxy."""
     fetch_site = request.headers.get("Sec-Fetch-Site", "").strip().lower()
     if fetch_site == "cross-site":
         return False
@@ -1095,6 +1095,13 @@ def _diagnostic_origin_is_same_site():
         if domain:
             allowed.update((f"https://{domain}", f"http://{domain}"))
     return supplied in allowed
+
+
+def _is_ide_design_request():
+    """One request boundary for Namespace design writes and simulation."""
+    return (request.is_json
+            and request.headers.get("X-Requested-With") == "NamespaceDesign"
+            and _ide_origin_is_same_site())
 
 
 def _diagnostic_session_binding():
@@ -1193,7 +1200,7 @@ def save_lump_diagnostics():
             "received": received,
         }), status
 
-    if not _diagnostic_origin_is_same_site():
+    if not _ide_origin_is_same_site():
         return _rejected("same-origin diagnostics required", 403)
     if not _diagnostic_rate_allowed():
         return _rejected("diagnostic reporting rate limit exceeded", 429)
@@ -4478,14 +4485,10 @@ def _validate_step1(target_board, step1):
 @app.route("/api/ide-hierarchy", methods=["GET", "PUT"])
 def get_ide_hierarchy():
     from server.ide_leaf_policy import configuration, save_node
-    from urllib.parse import urlparse
     try:
         if request.method == "PUT":
-            if not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign":
-                return jsonify(error="Expected an IDE JSON design request", dataChanged=False), 403
-            origin = request.headers.get("Origin")
-            if origin and urlparse(origin).netloc != request.host:
-                return jsonify(error="Cross-origin design writes are not allowed", dataChanged=False), 403
+            if not _is_ide_design_request():
+                return jsonify(error="Expected a same-origin IDE design request", dataChanged=False), 403
             return jsonify(save_node(request.get_json(silent=True)))
         return jsonify(configuration())
     except ValueError as exc:
@@ -4994,13 +4997,10 @@ _design_simulation_stores = {
 @app.route("/api/simulation/design/<profile>/<action>", methods=["POST"])
 def simulation_design_transition(profile, action):
     from pathlib import Path
-    from urllib.parse import urlparse
     from server.namespace_design_v1 import DesignStore, digest, FORMAT
     if profile not in _design_simulation_stores or action not in ("prepare", "approve", "activate"):
         return jsonify(ok=False, error="Unknown private design simulation operation"), 400
-    origin = request.headers.get("Origin")
-    if (not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign"
-            or origin and urlparse(origin).netloc != request.host):
+    if not _is_ide_design_request():
         return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
     design = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
                          ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
@@ -5154,7 +5154,6 @@ def namespace_save_table():
 def namespace_design_v1():
     """New-format editor persistence, strictly separate from executable stores."""
     from pathlib import Path
-    from urllib.parse import urlparse
     from server.namespace_design_v1 import DesignStore
     profile = request.args.get("profile", "ascending")
     if profile not in ("ascending", "phase1"):
@@ -5164,11 +5163,8 @@ def namespace_design_v1():
                         LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
     try:
         if request.method == "PUT":
-            if not request.is_json or request.headers.get("X-Requested-With") != "NamespaceDesign":
-                return jsonify(ok=False, error="Expected an IDE JSON design request"), 403
-            origin = request.headers.get("Origin")
-            if origin and urlparse(origin).netloc != request.host:
-                return jsonify(ok=False, error="Cross-origin design writes are not allowed"), 403
+            if not _is_ide_design_request():
+                return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
             return jsonify(store.save(request.get_json(silent=True)))
         return jsonify(store.read())
     except (OSError, ValueError, TypeError, KeyError) as exc:
@@ -17054,7 +17050,7 @@ try:
 except ImportError:
     from server.build_handoff import install as _install_build_handoff
 _install_build_handoff(app, _resolve_build_handoff_identity,
-                       _namespace_commit_guard, _diagnostic_origin_is_same_site)
+                       _namespace_commit_guard, _ide_origin_is_same_site)
 
 
 def _validate_lump_snapshot(

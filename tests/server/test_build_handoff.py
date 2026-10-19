@@ -18,14 +18,14 @@ def fixture(tmp_path):
     rows = [dict(token="1234abcd", filename=name, lump_version=2, compiled_at=1700000000)]
     tree = ast.parse(Path("server/app.py").read_text())
     functions = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in
-                 ("_resolve_build_handoff_identity", "_diagnostic_origin_is_same_site")]
+                 ("_resolve_build_handoff_identity", "_ide_origin_is_same_site")]
     env = dict(os=os, re=re, request=request, LUMPS_DIR=str(tmp_path),
                _read_manifest_safe=lambda _: rows,
                _validate_lump_snapshot=lambda path, row: {
                    "binary_hash": hashlib.sha256(Path(path).read_bytes()).hexdigest()})
     exec(compile(ast.Module(body=functions, type_ignores=[]), "isolated", "exec"), env)
     app = Flask(__name__)
-    install(app, env["_resolve_build_handoff_identity"], nullcontext, env["_diagnostic_origin_is_same_site"])
+    install(app, env["_resolve_build_handoff_identity"], nullcontext, env["_ide_origin_is_same_site"])
     locator = dict(token="1234abcd", filename=name, binary_hash=hashlib.sha256(raw).hexdigest())
     return app.test_client(), locator, rows, tmp_path
 

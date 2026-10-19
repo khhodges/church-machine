@@ -17,6 +17,18 @@ secret. Proxy-origin checks also proved unreliable in the live IDE path.
 save endpoints. Keep hardware, deployment, bridge, upload, and other privileged
 operations on their existing authorization paths.
 
+Use one shared browser-origin policy for IDE design operations, rather than
+adding endpoint-specific host comparisons or retry/bypass alternatives.
+
+**Why:** The preview's public origin can differ from the host seen by the
+server. A separate simulation check rejected legitimate IDE requests while
+other routes already handled that proxy boundary. The user explicitly asked
+to simplify and remove alternative solutions to the same problem.
+
+**How to apply:** Keep the design JSON/header requirements and cross-site
+rejection, reuse the established origin policy, and test public/internal
+host-and-port differences without changing or activating a design.
+
 Apply the same classification to nested review/preflight requests and saves
 that include staged build configuration; those are still ordinary IDE saves.
 **Why:** A secondary configuration branch retained privileged authorization
