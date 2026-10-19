@@ -52,6 +52,64 @@ function harness(defect) {
     return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
 }
 (async()=>{
+    // The selected runtime must use the existing Boot/Code presentation, not
+    // merely append raw machine output. Keep rich listings and step evidence.
+    const {JSDOM} = require('jsdom');
+    const runSource = fs.readFileSync(__dirname + '/app-run.js', 'utf8');
+    for (const action of ['step', 'walk', 'run']) {
+        const b = harness('boot');
+        const dom = new JSDOM('<div id="editorConsole" class="cmp-html"><button id="listing">Compiled listing</button></div>');
+        b.scope.document = dom.window.document;
+        vm.runInContext(runSource.slice(runSource.indexOf('function appendOutput('),
+            runSource.indexOf('function escapeHtml(', runSource.indexOf('function appendOutput('))), b.scope);
+        vm.runInContext(runSource.slice(runSource.indexOf('function _appendSimulatorStepLog('),
+            runSource.indexOf('let _wukongStaleBannerDismissed', runSource.indexOf('function _appendSimulatorStepLog('))), b.scope);
+        const frames = [];
+        b.scope.pipelineViz = {mode:'audit',setNIA() {},render() {},
+            showFullPipeline: stages => frames.push(stages)};
+        b.scope._bootNIARows = () => [];
+        b.scope._buildNIARows = () => [];
+        b.scope._bootAuditAccum = [];
+        await b.api.prepare(true);
+        const machine = b.instances[0], step = machine.step.bind(machine);
+        machine.output = '';
+        machine._bootStep = function() {
+            this.bootStep++; this.bootComplete = this.bootStep === 3;
+            this.output += `Boot instruction ${this.bootStep}\n`;
+            this.auditLog.push({gate:'NS',label:`boot-${this.bootStep}`,result:'pass',
+                checks:{identity:{pass:true}}});
+        };
+        machine._nextPhysicalAddr = () => machine.pc;
+        machine.step = function() {
+            const result = step();
+            this.output += `Code output ${this.dr[1]}\n`;
+            return Object.assign(result, {stepCount:this.dr[1],desc:`Instruction ${this.dr[1]}`,
+                pipeline:[{stage:'EXEC',desc:'executed code'}],
+                auditPipeline:[{stage:'CHECK',desc:'code audit'}],
+                eventLocation:{kind:'CALL'}});
+        };
+        if (action === 'step') {
+            for (let i=0;i<6;i++) await b.api.command('step');
+        } else {
+            await b.api.command(action);
+            while (b.timers.length) b.timers.shift()();
+        }
+        const con = dom.window.document.getElementById('editorConsole');
+        assert(dom.window.document.getElementById('listing'), action+' preserves the listing');
+        for (let i=1;i<=3;i++) {
+            assert(con.textContent.includes(`[boot ${i}/3]`), action+' displays each boot step');
+            assert(con.textContent.includes(`[${i}] Instruction ${i}`), action+' displays each code step');
+        }
+        assert.match(con.textContent,/EXEC\s+executed code/);
+        assert.equal(con.querySelectorAll('.call-return-event').length,3,
+            action+' retains exact step drilldowns after later output');
+        assert.equal(frames.length,6);
+        assert.equal(frames[0].length,1);
+        assert.equal(frames[2][0].label,'boot-3','Boot audit replaces the previous step');
+        assert.equal(frames[3][0].desc,'code audit','Code trace honors audit mode');
+        assert.equal(b.scope._bootAuditAccum.length,1);
+        dom.window.close();
+    }
     // Exercise the shared core's actual pause/resume semantics through the
     // selected-design controls, with deterministic timers and no live writes.
     const Core=require('./simulator.js');

@@ -12652,11 +12652,11 @@ function appendOutput(text, type) {
                 runtime.style.whiteSpace='pre-wrap';
                 editorConsole.appendChild(runtime);
             }
-            runtime.textContent+='\n'+text;
+            runtime.appendChild(document.createTextNode('\n'+text));
             editorConsole.scrollTop=editorConsole.scrollHeight;
             return;
         }
-        editorConsole.textContent += '\n' + text;
+        editorConsole.appendChild(document.createTextNode('\n' + text));
         editorConsole.scrollTop = editorConsole.scrollHeight;
     }
 }

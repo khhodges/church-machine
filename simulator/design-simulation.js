@@ -41,6 +41,34 @@
         reportedFaults=faults.length;
     }
 
+    function recordConsoleStep(result, bootPhase) {
+        if (typeof document === 'undefined') return;
+        const con = document.getElementById('editorConsole');
+        if (!con) return;
+        // Preserve compiled listings and exact CALL/RETURN evidence buttons.
+        let target = con;
+        if (con.classList.contains('cmp-html')) {
+            target = con.querySelector('[data-runtime-output]');
+            if (!target) {
+                target = document.createElement('pre');
+                target.dataset.runtimeOutput = '';
+                target.style.whiteSpace = 'pre-wrap';
+                con.appendChild(target);
+            }
+        }
+        if (bootPhase != null) {
+            const lastLine = String(machine.output || '').split('\n').filter(Boolean).pop() || '';
+            target.appendChild(document.createTextNode(`\n[boot ${bootPhase}/3] ${lastLine}`));
+        } else {
+            if (typeof root._appendSimulatorStepLog === 'function') root._appendSimulatorStepLog(result, target);
+            for (const stage of result.pipeline || []) {
+                target.appendChild(document.createTextNode(
+                    `\n     → ${(stage.stage || '').padEnd(6)}  ${stage.desc || ''}`));
+            }
+        }
+        con.scrollTop = con.scrollHeight;
+    }
+
     let toolbarOwned = false;
     let message = 'Save a LUMP or prepare this saved design for private simulation. Hardware and installed images stay unchanged.';
     const esc = value => String(value).replace(/[&<>"']/g, c =>
@@ -220,11 +248,28 @@
                         paused=true; break;
                     }
                 }
+                const bootPhase = booting ? machine.bootStep + 1 : null;
+                if (booting) machine.auditLog = [];
                 const result=booting ? machine._bootStep() : machine.step();steps++;
+                publishExecution();
                 if(booting) {
+                    const audit = (machine.auditLog || []).slice();
+                    if (typeof _bootAuditAccum !== 'undefined') _bootAuditAccum = audit;
+                    recordConsoleStep(null, bootPhase);
                     if(typeof pipelineViz!=='undefined' && pipelineViz && typeof _bootNIARows==='function') {
                         pipelineViz.setNIA(_bootNIARows(machine.bootStep));
-                        pipelineViz.render();
+                        if (pipelineViz.mode === 'audit') {
+                            pipelineViz.showFullPipeline(audit.map(a => ({
+                                stage:a.gate, type:a.gate,
+                                desc:a.desc !== undefined ? a.desc : a.nsIndex != null
+                                    ? `${a.gate}(NS[${a.nsIndex}]="${a.label}"${a.requiredPerm ? ', '+a.requiredPerm : ''})`
+                                    : `${a.gate} — ${a.label}`,
+                                label:a.label, nsIndex:a.nsIndex, requiredPerm:a.requiredPerm,
+                                checks:Object.entries(a.checks || {}).map(([k,v]) =>
+                                    ({name:k.toUpperCase(),pass:v.pass,perm:v.perm || null})),
+                                status:a.result, b:a.b, f:a.f,
+                            })));
+                        } else pipelineViz.render();
                     }
                     if(machine.bootComplete && typeof root._setEntryBreakpoint==='function') root._setEntryBreakpoint();
                     continue;
@@ -233,8 +278,15 @@
                     message='Simulation paused: execution is suspended. No further instruction was attempted.';
                     paused=true; break;
                 }
+                recordConsoleStep(result, null);
                 if(result && typeof root._wukongRecordSimulatorStep==='function') root._wukongRecordSimulatorStep(result);
-                if(result && result.pipeline && typeof _pendingPipelineBuffer!=='undefined') {
+                if (typeof pipelineViz !== 'undefined' && pipelineViz &&
+                        typeof _buildNIARows === 'function') {
+                    pipelineViz.setNIA(_buildNIARows(result.physicalPC ?? result.pc, machine._nextPhysicalAddr()));
+                    const stages = pipelineViz.mode === 'audit' && result.auditPipeline
+                        ? result.auditPipeline : result.pipeline;
+                    if (stages) pipelineViz.showFullPipeline(stages);
+                } else if(result && result.pipeline && typeof _pendingPipelineBuffer!=='undefined') {
                     _pendingPipelineBuffer={pc:result.physicalPC ?? result.pc,pipeline:result.pipeline};
                     if(typeof root._flushPendingPipelineBuffer==='function') root._flushPendingPipelineBuffer();
                 }
