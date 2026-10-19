@@ -14,6 +14,11 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     const panel = w.document.getElementById('panel');
     const identity = {token: '4a000007', filename: 'Example.1.saved.lump', binary_hash: 'a'.repeat(64),
         lump_version: 16, compiled_at: '2026-09-22T12:00:00+00:00', eligible: true};
+    w._editorOpenLumpToken = identity.token;
+    w._editorSavedBinaryReceipt = {token: identity.token, filename: identity.filename,
+        binary_hash: identity.binary_hash};
+    let identityRefreshes = 0;
+    w._refreshEditorActionIdentity = () => identityRefreshes++;
     let released = false, revision = 0, fail = false, pending = null;
     let requests = [];
     w.fetch = async (url, options) => {
@@ -42,7 +47,13 @@ const tick = () => new Promise(resolve => setImmediate(resolve));
     };
     const box = () => panel.querySelector('input');
     render(); await tick(); await tick();
-    assert(panel.textContent.includes('v16'));
+    assert(panel.textContent.includes('View this saved revision'));
+    assert.equal(w._editorSavedBinaryReceipt.lump_version, 16,
+        'exact handoff restores version omitted from the editor receipt');
+    assert(identityRefreshes > 0);
+    assert(panel.textContent.includes('Saved at (UTC)'));
+    assert(!panel.textContent.includes('Date (compiled'));
+    assert(!panel.textContent.includes('Saved version'));
     assert(panel.textContent.includes(identity.compiled_at));
     assert.equal(box().checked, false);
     assert.equal(box().disabled, false);

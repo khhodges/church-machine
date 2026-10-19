@@ -35,8 +35,8 @@ assert(html.indexOf('id="asmEditor"') < html.indexOf('id="savedLumpDisassemblyPa
     'source and exact disassembly coexist in the editor layout');
 
 for (const label of [
-    'Canonical identity', 'Bootstrap binding (T = GT)', 'Exact lookup token',
-    'Golden T ID', 'Runtime Golden Token', 'Binary seal'
+    'Canonical identity', 'Bootstrap binding (T = GT)',
+    'Identity hash', 'Binary SHA-256'
 ]) {
     assert(lumps.includes(label), `complete workspace shows ${label}`);
 }

@@ -95,7 +95,15 @@
         }, true);
     })();
     </script>
-    <style>html,body{background:#08080f;color:#d0d0e8}</style>
+    <style>
+        html,body{background:#08080f;color:#d0d0e8}
+        /* Session counters are not evidence about the immutable saved artifact. */
+        body:has(#editor.active .saved-lump-editor-layout) #activeThreadStatus,
+        body:has(#editor.active .saved-lump-editor-layout) #faultFreeCounter,
+        body:has(#editor.active .saved-lump-editor-layout) .execution-counter-strip {
+            display:none !important;
+        }
+    </style>
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Church Machine IDE — Capability-Based Secure Computing">
     <meta name="twitter:description" content="Learn capability-based secure computing with a browser-based FPGA simulator, assembler, and CLOOMC compiler.">
@@ -3643,11 +3651,11 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="app-ns-dna.js"></script>
     <script src="lump-audit.js?v=sha256-80e1d626a627"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>
-    <script src="build-handoff.js?v=sha256-4a64ee3f2f0f"></script>
+    <script src="build-handoff.js?v=sha256-5ff226e760ac"></script>
     <script src="lump-public-api.js?v=sha256-28c8dd805571"></script>
     <script src="lump-variant-inspector.js?v=sha256-cfcc2aeff918"></script>
     <script src="hardfault-map.js?v=sha256-ee3348e16ca2"></script>
-    <script src="app-lumps.js?v=sha256-6610927b7784"></script>
+    <script src="app-lumps.js?v=sha256-e9248ccbbb4c"></script>
     <script src="app-absdetail.js?v=sha256-eb101a18d476"></script>
     <!-- Load order matters: app-compile must precede app-run (exports LANG_EXAMPLE_GROUPS
          via window._cloomcLangExampleGroups); both must precede app-source-library. -->
@@ -3657,7 +3665,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="lump_save_handler.js?v=sha256-ec3eda592cae"></script>
     <script src="lump_lease_ui.js?v=sha256-622b3d8a575c"></script>
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
-    <script src="app-run.js?v=sha256-6fcadb20f4e5"></script>
+    <script src="app-run.js?v=sha256-b453eb1236d1"></script>
     <script src="app-simulation-preparation.js?v=20261015-image-identity"></script>
     <script src="lump-save-realignment.js"></script>
     <script src="app-actions.js?v=sha256-60e0deaed7c2"></script>

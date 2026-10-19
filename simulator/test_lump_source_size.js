@@ -32,7 +32,7 @@ function artifact(text, flags = 3) {
     assert.equal(layoutOf(plain).source, 4); // length word + ceil(11 bytes / 4)
     assert.equal(layoutOf(plain).api, 6); // frame header + ceil(18 bytes / 4)
     assert.equal(await summaryOf(plain),
-        '256 words total, 13 used, 243 unused; header=1, code=1, API=6, source=4, cc=1 (stored words, including framing/padding)');
+        '256 words total, 13 used, 243 unused; header=1, code=1, API frame=6, embedded source=4, C-list=1 (32-bit stored words, including framing/padding)');
     assert.equal(layoutOf(artifact('λ😀')).source, 3); // six UTF-8 bytes
     const text = 'repeat '.repeat(100);
     const compressed = artifact(text, 7);
@@ -84,7 +84,7 @@ function artifact(text, flags = 3) {
         ...lumpFramePackBE(Array.from(physicalSource))];
     selfTestShape.splice(501, frame.length, ...frame);
     assert.equal(await summaryOf(selfTestShape),
-        '2048 words total, 1950 used, 98 unused; header=1, code=500, API=49, source=1399, cc=1 (stored words, including framing/padding)');
+        '2048 words total, 1950 used, 98 unused; header=1, code=500, API frame=49, embedded source=1399, C-list=1 (32-bit stored words, including framing/padding)');
     assert(ui.includes('await _getSavedLumpWordUsageSummary(serverWords)'));
     assert(!ui.includes("_lhFree2 + ' free"));
     console.log('PASS stored-word accounting: totals, compressed payload, UTF-8 padding, empty/absent, malformed/unknown, non-Code and draft isolation');

@@ -12715,19 +12715,22 @@ function _refreshEditorActionIdentity(name) {
         const receipt = window._editorSavedBinaryReceipt;
         const ownedReceipt = receipt && window._editorOpenLumpToken &&
             receipt.token === window._editorOpenLumpToken ? receipt : null;
-        const revision = tab && Number.isInteger(tab.sourceRevision)
+        const savedRevision = ownedReceipt && Number.isInteger(ownedReceipt.lump_version)
+            ? ownedReceipt.lump_version
+            : openMeta && openMeta.token === window._editorOpenLumpToken &&
+                Number.isInteger(openMeta.lump_version) ? openMeta.lump_version : null;
+        const revision = Number.isInteger(savedRevision) ? savedRevision
+            : tab && Number.isInteger(tab.sourceRevision)
             ? tab.sourceRevision
-            : (openMeta && Number.isInteger(openMeta.lump_version)
-                ? openMeta.lump_version
-                : ownedReceipt && Number.isInteger(ownedReceipt.lump_version)
-                    ? ownedReceipt.lump_version : null);
+            : null;
+        const revisionKind = Number.isInteger(savedRevision) ? 'Saved LUMP' : 'Source';
         identityName.textContent = chosenName +
-            (Number.isInteger(revision) ? ` · Source v${revision}` : '');
+            (Number.isInteger(revision) ? ` · ${revisionKind} v${revision}` : '');
         identityName.title = chosenName
             ? `Program name: ${chosenName}` +
-                (Number.isInteger(revision) ? `; source revision v${revision}` : '')
+                (Number.isInteger(revision) ? `; ${revisionKind} revision v${revision}` : '')
             : 'Program name';
-        identityName.setAttribute('aria-label', 'Program name and source revision');
+        identityName.setAttribute('aria-label', 'Program name and ' + revisionKind.toLowerCase() + ' revision');
     }
 }
 

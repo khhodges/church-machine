@@ -51,6 +51,17 @@ then persist only the authorized matching design selection. Verify a full reload
 not merely a temporary library selection. Do not activate simulation or hardware
 as a side effect of this recovery.
 
+Saved-artifact inspection must separate saved LUMP revision, identity issue,
+authored source version comments, and runtime/session evidence.
+
+**Why:** The user requested removing duplicate and misleading fields and
+deriving the inspected information from the selected saved revision.
+
+**How to apply:** Use the exact token/filename/hash and saved revision; label
+publication timestamps as saved times, not compilation times. Do not rewrite
+immutable binaries or authored comments just to make different version concepts
+look equal. Keep runtime counters outside saved-artifact evidence.
+
 For ascending designs, private replay and the historical IDE machine must stay
 separate until ordinary IDE controls explicitly support both runtime models.
 Do not make a successful save clear the historical execution barrier merely

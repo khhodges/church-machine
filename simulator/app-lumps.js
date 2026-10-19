@@ -737,9 +737,9 @@ async function _getSavedLumpWordUsageSummary(words) {
     const used = 1 + layout.code + layout.api + layout.source + layout.clist;
     const total = used + layout.empty;
     return total + ' words total, ' + used + ' used, ' + layout.empty +
-        ' unused; header=1, code=' + layout.code + ', API=' + layout.api +
-        ', source=' + layout.source + ', cc=' + layout.clist +
-        ' (stored words, including framing/padding)';
+        ' unused; header=1, code=' + layout.code + ', API frame=' + layout.api +
+        ', embedded source=' + layout.source + ', C-list=' + layout.clist +
+        ' (32-bit stored words, including framing/padding)';
 }
 
 function _renderLumpFieldSizeSummary(layout) {
@@ -1968,17 +1968,21 @@ function _renderSavedLumpIdentityPanel(lump, lookupToken, savedWords) {
             ? row('Bootstrap binding (T = GT)', identity.goldenToken,
                 'complete-lump-bootstrap-binding') +
               note('Bootstrap note: T === GT for this local binding. T and runtime GT are distinct roles outside this bootstrap equality.')
-            : row('Exact lookup token', identity.lookupToken, 'complete-lump-lookup-token') +
-              row('Golden T ID', identity.goldenT, 'complete-lump-golden-t') +
-              row('Runtime Golden Token', identity.goldenToken,
-                  'complete-lump-golden-token')) +
-        row('Binary seal', identity.binarySeal, 'complete-lump-binary-seal');
+            : row('Identity hash', identity.goldenT, 'complete-lump-golden-t')) +
+        row('Binary SHA-256', identity.binarySeal, 'complete-lump-binary-seal');
     panel.innerHTML =
         '<div class="saved-lump-identity-heading">' +
-        (_identityVerified ? 'Verified artifact identity' :
-            'Artifact identity — provenance unverified') + '</div>' +
-        _identityRows;
+        (_identityVerified ? 'Saved artifact — identity and binary verified' :
+            'Saved artifact — provenance unverified') + '</div>' +
+        _identityRows +
+        note('Exact saved binary only; not unsaved editor text or runtime state. ' +
+            'The number before the token in the canonical identity is the issue, not the saved revision.');
     _renderSavedLumpWordUsage(panel, savedWords);
+    const savedLayout = savedWords && _getLumpFieldSizeLayout(savedWords);
+    if (savedLayout && savedLayout.source === 0) {
+        panel.insertAdjacentHTML('beforeend', note(
+            'No source is embedded in this binary. Separately retained editing source is not included in these word counts.'));
+    }
     if (typeof window.renderBuildHandoff === 'function') {
         window.renderBuildHandoff(panel, lump, lookupToken, _identityVerified);
     }

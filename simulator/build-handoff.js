@@ -16,8 +16,8 @@
             section.append(element);
             return text;
         }
-        var version = row('Saved version', 'unavailable');
-        var date = row('Date (compiled, UTC)', 'unavailable');
+        var version = row('History', 'unavailable');
+        var date = row('Saved at (UTC)', 'unavailable');
         var label = document.createElement('label');
         var checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
@@ -56,7 +56,8 @@
         function matches(identity) {
             return identity && identity.token === locator.token &&
                 identity.filename === locator.filename && identity.binary_hash === locator.binary_hash &&
-                Number.isInteger(identity.lump_version) && identity.lump_version > 0;
+                Number.isInteger(identity.lump_version) && identity.lump_version > 0 &&
+                (!Number.isInteger(lump.lump_version) || identity.lump_version === lump.lump_version);
         }
         function present(data) {
             if (!matches(data.identity) || !data.handoff ||
@@ -66,7 +67,19 @@
             }
             current = data;
             if (data.csrf) csrf = data.csrf;
-            version.textContent = 'v' + data.identity.lump_version;
+            // Restored editor receipts may lack revision metadata. Fill it
+            // only from this exact token/filename/hash response, never from
+            // a current catalog lookup or a different editor's late request.
+            var receipt = window._editorSavedBinaryReceipt;
+            if (window._editorOpenLumpToken === locator.token && receipt &&
+                    receipt.token === locator.token && receipt.filename === locator.filename &&
+                    receipt.binary_hash === locator.binary_hash) {
+                receipt.lump_version = data.identity.lump_version;
+                if (typeof window._refreshEditorActionIdentity === 'function') {
+                    window._refreshEditorActionIdentity();
+                }
+            }
+            version.textContent = 'View this saved revision';
             if (typeof window._openSavedLumpVersionDetails === 'function') {
                 var link = document.createElement('a');
                 link.href = '#saved-lump-details';
