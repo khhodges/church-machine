@@ -3,6 +3,17 @@ name: ISA versus implementation boundary
 description: Keep implementation mechanisms out of normative ISA wording.
 ---
 
+The user requires: "the existing ISA must not change in any way" for IDE
+auditing and simplification.
+
+**Why:** Fixture cleanup and IDE simplification must not become an architectural
+redesign or change instruction behavior to accommodate obsolete examples.
+
+**How to apply:** Preserve encodings, semantics, permissions, faults and
+architectural state contracts. Report implementation contradictions separately;
+do not resolve them by changing the ISA. Audit approval does not authorize
+implementation changes.
+
 The user explicitly states that cached bases and other implementation-specific
 details are not part of the ISA.
 
