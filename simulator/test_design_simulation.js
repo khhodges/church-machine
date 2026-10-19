@@ -7,12 +7,14 @@ assert(scripts.indexOf('namespace-runtime-core.js') < scripts.indexOf('design-si
 assert(scripts.indexOf('design-simulation.js') < scripts.indexOf('namespace-design-v1.js'));
 function harness(defect) {
     const panel={innerHTML:''},calls=[],instances=[];
+    const toolbar=[];
     const words=[0xf8810100,0,2,0], profile='ascending', fingerprint='a'.repeat(64);
     const hash=require('node:crypto').createHash('sha256').update(Buffer.from(new Uint32Array(words).buffer)).digest('hex');
     const review={preparationId:'ticket',configurationHash:'b'.repeat(64),imageHash:hash,
         designProfile:profile,sourceNamespaceFingerprint:fingerprint,hardwareCertified:false,
         imageFormat:'ascending-nst-metadata-slot0-v1',slotCount:64,artifactBindings:[{filename:'exact.lump'}]};
     const scope={console,setTimeout,Uint32Array,Uint8Array,ArrayBuffer,DataView,crypto:webcrypto,
+        _showStopBtn:show=>toolbar.push(show),
         NamespaceDesignV1:{state:{active:true,profile,fingerprint,document:{rows:[
             {slot:10,boot:true,selection:{token:'961bfee3',filename:'exact.lump',binaryHash:'b'.repeat(64)}}
         ]},dirty:false}},
@@ -37,7 +39,7 @@ function harness(defect) {
             return {ok:true,json:async()=>data};
         }};
     scope.window=scope;vm.createContext(scope);vm.runInContext(code,scope);
-    return {api:scope.DesignSimulation,scope,calls,instances,panel};
+    return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar};
 }
 (async()=>{
     const h=harness();
@@ -59,9 +61,47 @@ function harness(defect) {
     assert.equal(mismatch.calls.length,0,'view mismatch cannot prepare another target');
     const stopped=harness();
     const pendingStep=stopped.api.command('step');
+    assert.equal(stopped.toolbar.at(-1),true,'main Stop remains reachable while preparing');
     stopped.api.stop();
+    assert.equal(stopped.toolbar.at(-1),false,'Stop releases toolbar before response returns');
     assert.equal(await pendingStep,false);
+    assert.equal(stopped.toolbar.at(-1),false,'main Run returns after canceled preparation');
     assert(stopped.instances.every(machine=>machine.dr[1]===0),'Stop cancels pending execution');
+    assert.equal(stopped.calls.length,1,'canceled preparation cannot approve or activate');
+    const walking=harness();
+    await walking.api.command('walk');
+    assert.equal(walking.toolbar.at(-1),true,'main Stop is visible during selected Walk');
+    walking.api.stop();
+    assert.equal(walking.toolbar.at(-1),false,'main Run returns after selected Stop');
+    const leaving=harness();
+    const pendingLeave=leaving.api.command('step');
+    leaving.api.stop(); // setProfile stops first, before changing active
+    leaving.scope.NamespaceDesignV1.state.active=false;
+    assert.equal(leaving.toolbar.at(-1),false,'profile exit immediately releases pending Stop');
+    assert.equal(await pendingLeave,false);
+    assert.equal(leaving.toolbar.at(-1),false,'leaving design mode releases its pending Stop button');
+    // An old completion must not clear the newer preparation's busy/toolbar
+    // state or admit the canceled bytes.
+    const race=harness();
+    const originalFetch=race.scope.fetch, releases=[];
+    race.scope.fetch=async(...args)=>{
+        const response=await originalFetch(...args);
+        if(args[0].endsWith('/prepare')) await new Promise(resolve=>releases.push(resolve));
+        return response;
+    };
+    const oldCommand=race.api.command('step');
+    await Promise.resolve();
+    race.api.stop();
+    const newCommand=race.api.command('step');
+    await Promise.resolve();
+    releases[0]();
+    assert.equal(await oldCommand,false);
+    assert.equal(race.toolbar.at(-1),true,'old response cannot release newer toolbar ownership');
+    assert.equal(race.instances.length,0);
+    releases[1]();
+    assert.equal(await newCommand,true);
+    assert.equal(race.instances.length,1);
+    assert.equal(race.instances[0].dr[1],1);
     h.scope.NamespaceDesignV1.state.profile='phase1';
     h.api.step();assert.equal(h.instances[1].dr[1],0,'selection drift blocks execution');
     assert.match(h.api.markup(),/selected design has changed/);

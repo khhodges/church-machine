@@ -4,6 +4,8 @@
     'use strict';
     let machine = null, provenance = null, frozenWords = null, owner = null;
     let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0, intent = 0;
+
+    let toolbarOwned = false;
     let message = 'Save a LUMP or prepare this saved design for private simulation. Hardware and installed images stay unchanged.';
     const esc = value => String(value).replace(/[&<>"']/g, c =>
         ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -38,12 +40,26 @@
     }
     function render() {
         if (typeof document === 'undefined') return;
+        if (typeof root._showStopBtn === 'function' &&
+                (root.NamespaceDesignV1?.state.active || toolbarOwned)) {
+            toolbarOwned = !!root.NamespaceDesignV1?.state.active && (busy || running);
+            root._showStopBtn(toolbarOwned);
+        }
         const host = document.getElementById('designSimulationPanel');
         if (host) host.innerHTML = markup();
     }
-    function stop() { intent++; runEpoch++; running=false; render(); }
+    function stop() {
+        intent++; runEpoch++; running=false;
+        if (busy) {
+            // Revoke the pending operation before releasing the toolbar. Late
+            // responses must neither admit bytes nor modify a newer operation.
+            generation++; busy=false;
+            message='Execution was stopped while preparation was pending. No instruction ran.';
+        }
+        render();
+    }
     function invalidate() {
-        generation++; runEpoch++; running=false; machine=null; provenance=null; frozenWords=null; owner=null;
+        generation++; runEpoch++; busy=false; running=false; machine=null; provenance=null; frozenWords=null; owner=null;
         message='Saved revision changed. Prepare a fresh private simulation; previous execution is stopped.';
         render();
     }
@@ -107,10 +123,12 @@
             message='Fresh selected design loaded and verified. Use Step or Run here. Historical artifacts, installed image and hardware are unchanged.';
             return true;
         } catch(error) {
-            message='Private simulation blocked: '+error.message;
+            if(ticket===generation) message='Private simulation blocked: '+error.message;
             if(throwOnError) throw error;
             return false;
-        } finally { busy=false; render(); }
+        } finally {
+            if(ticket===generation) { busy=false; render(); }
+        }
     }
     function ready() {
         if(busy || !machine || !same(owner)) {
@@ -162,6 +180,7 @@
         render();
     }
     async function command(action) {
+        let actionIntent=intent;
         try {
             if(action==='stop') { stop(); return true; }
             if(root.TargetState && !root.TargetState.authorize('simulator',{id:'simulator-state'}).ok)
@@ -170,7 +189,7 @@
             const selected=selection();
             checkViewedTarget(selected);
             if(typeof sim!=='undefined' && (sim.running || sim.walkActive) && typeof stopSim==='function') stopSim();
-            const actionIntent=++intent;
+            actionIntent=++intent;
             if(!machine || !same(owner)) await prepare(true);
             if(actionIntent!==intent) throw Error('Execution was stopped while preparation was pending. No instruction ran.');
             if(!same(selected)) throw Error('Selection changed before execution.');
@@ -183,6 +202,7 @@
             if(typeof root.switchView==='function') root.switchView('namespace');
             return true;
         } catch(error) {
+            if(actionIntent!==intent) return false;
             stop(); message='Selected simulation blocked: '+error.message; render();
             if(typeof root.appendOutput==='function') root.appendOutput(message,'error');
             if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation blocked',message,'error',15000);

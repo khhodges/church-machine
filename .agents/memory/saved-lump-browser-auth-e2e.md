@@ -15,3 +15,15 @@ browser from reaching the test.
 **How to apply:** Click the rendered detail-header Load into Sim control, assert
 denials through the browser dialog, compare simulator state before and after,
 and count the simulator load call for the accepted response.
+
+Successful selected-design execution needs a real compiler-authenticated
+fixture and real prepare/approve/activate responses, not the authorization
+stubs above or whichever design happens to be selected in the workspace.
+
+**Why:** A deliberately blocked saved design can prove rejection but cannot
+establish successful Run, Walk, or Reset. Invented admission responses would
+also miss integration failures between compilation and execution.
+
+**How to apply:** Keep successful-execution evidence compiler-authenticated
+and isolated from live selections; rejection-only or stubbed authorization
+evidence cannot establish the successful-execution contract.
