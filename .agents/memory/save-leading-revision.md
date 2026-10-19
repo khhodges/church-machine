@@ -28,6 +28,17 @@ while earlier post-commit failures could still skip the refresh.
 simulation success effect. Verify failure paths as well as successful alignment;
 keep the exact displayed artifact authoritative for its tabs.
 
+The successful-save contract applies to all entry points, including automatic
+compile saves and reconciled commits, not just the main Save dialog.
+
+**Why:** A repeated stale-History report in the workspace preview exposed that
+the dialog-only correction left automatic saves unhandled. Browser inspection
+confirmed exact-record History refresh worked, but those saves never called it.
+
+**How to apply:** Enforce History acknowledgement at the shared commit boundary.
+Distinguish an old Namespace assignment from a stale History fetch; do not
+silently merge separate abstraction identities or substitute their binaries.
+
 For ascending designs, private replay and the historical IDE machine must stay
 separate until ordinary IDE controls explicitly support both runtime models.
 Do not make a successful save clear the historical execution barrier merely

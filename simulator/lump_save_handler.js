@@ -460,11 +460,34 @@ function _lumpSaveRequest(fetchImpl, url, payload, onCommit, recovery) {
         outcome: 'unknown'
     });
     _lumpSavePersistPendingOperation(operationId, url, payload);
-    function commit(resp) {
+    async function commit(resp) {
         _lumpSaveDiagnosticResponseMetadata(payload, resp);
         _lumpSaveDiagnosticStageComplete(payload, 'commit', 'committed', {
             http_status: resp && resp.status
         });
+        // Every save path (including automatic compile and reconciliation)
+        // acknowledges its exact committed revision in History before running
+        // optional caller-specific editor/Namespace/simulation work.
+        if (typeof window !== 'undefined') {
+            try {
+                if (!window.LumpSaveRealignment ||
+                        typeof window.LumpSaveRealignment.refreshHistory !== 'function') {
+                    throw new Error('History refresh is unavailable; reload the IDE.');
+                }
+                await window.LumpSaveRealignment.refreshHistory(resp);
+            } catch (historyError) {
+                resp.history_refresh_error = String(historyError && historyError.message || historyError);
+                _lumpSaveDiagnosticStageException(payload, 'reload', historyError,
+                    { outcome: 'unknown' });
+                console.error('[LUMP save] committed; History refresh failed:', resp.history_refresh_error);
+                if (typeof _showFpgaToast === 'function') {
+                    _showFpgaToast('LUMP Saved — History Refresh Failed',
+                        'The save committed, but History could not refresh: ' +
+                        resp.history_refresh_error + ' Reload the LUMP library.',
+                        'error', 15000);
+                }
+            }
+        }
         // A durable save remains successful if rendering, a toast, or a local
         // simulator refresh throws.  That exception is post-commit UI work, not
         // a transport failure and must not cause a duplicate retry.

@@ -17452,16 +17452,8 @@ async function confirmSaveToNamespace() {
         _setSaveNSFeedback('info',
             'Saving the approved snapshot. If a protected-change review opens, choose “Confirm this change” to commit, or “Reject — keep unchanged” to cancel.');
         return _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, async function(resp) {
-            // Commit acknowledgement owns History. Editor/Namespace/simulator
-            // refresh failures below must never skip this independent update.
-            try {
-                if (!window.LumpSaveRealignment) throw new Error('History refresh is unavailable; reload the IDE.');
-                await window.LumpSaveRealignment.refreshHistory(resp);
-            } catch (err) {
-                _showFpgaToast('LUMP Saved — History Refresh Failed',
-                    `The save committed, but History could not refresh: ${err.message} Reload the LUMP library.`,
-                    'error', 15000);
-            }
+            // The shared save handler has already refreshed committed History,
+            // independently of the editor/Namespace/simulator work below.
             if (window.LumpSaveRealignment) window.LumpSaveRealignment.begin();
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful

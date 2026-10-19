@@ -1,6 +1,8 @@
 'use strict';
 const assert=require('node:assert/strict'), fs=require('fs'), vm=require('vm');
 const code=fs.readFileSync(__dirname+'/lump-save-realignment.js','utf8');
+const {_lumpSaveRequest}=require('./lump_save_handler.js');
+const responseFor = data => ({ok:true,status:200,json:async()=>data,text:async()=>JSON.stringify(data)});
 // Rebuilding a same-token detail view must discard the old History load flag.
 const detailSource=fs.readFileSync(__dirname+'/app-lumps.js','utf8');
 const resetStart=detailSource.indexOf('    const _prevTab =');
@@ -52,10 +54,39 @@ function harness(fail) {
         };
         ctx.window=ctx;vm.createContext(ctx);
         const callback=vm.runInContext('('+runSource.slice(callbackStart,callbackEnd)+'\n})',ctx);
-        await callback({token:artifact.token,lump:artifact.filename});
+        global.window=ctx;
+        try {
+            await _lumpSaveRequest(async()=>responseFor({
+                ok:true,token:artifact.token,lump:artifact.filename
+            }),'/api/lumps/save',{binary:[0],metadata:{}},callback);
+        } finally {delete global.window;}
         assert.equal(calls[0],'history',failure+' must not skip History');
         assert(calls.includes(failure));
     }
+    // Automatic callers omit onCommit. A transport-lost acknowledgement also
+    // enters the same committed-History path after server reconciliation.
+    for (const recovered of [false,true]) {
+        const saved={ok:true,token:artifact.token,lump:artifact.filename,digest:artifact.binary_hash};
+        const seen=[];
+        global.window={LumpSaveRealignment:{refreshHistory:async response=>seen.push(response)}};
+        try {
+            const result=await _lumpSaveRequest(async(url,options)=>{
+                if(recovered && options.method==='POST')throw Error('lost acknowledgement');
+                return responseFor(recovered ? {committed:true,response:saved}:saved);
+            },'/api/lumps/save',{binary:[0],metadata:{}});
+            assert.deepEqual(result,saved);
+            assert.deepEqual(seen,[saved],'automatic/reconciled save refreshes exact History once');
+        } finally {delete global.window;}
+    }
+    let callbackAfterFailure=false;
+    global.window={LumpSaveRealignment:{refreshHistory:async()=>{throw Error('History offline');}}};
+    try {
+        const saved=await _lumpSaveRequest(async()=>responseFor({
+            ok:true,token:artifact.token,lump:artifact.filename
+        }),'/api/lumps/save',{binary:[0],metadata:{}},()=>{callbackAfterFailure=true;});
+        assert.equal(saved.history_refresh_error,'History offline');
+        assert(callbackAfterFailure,'History errors cannot turn a committed save into a failed transaction');
+    } finally {delete global.window;}
     // Tab lookup must honor the exact displayed artifact, even with no cache
     // record, and expose its pending load rather than return before History.
     const {JSDOM}=require('jsdom');
