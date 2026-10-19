@@ -2,6 +2,7 @@
 // an unrelated "latest", rewrite editor text, or send anything to hardware.
 (function(root) {
     const storageKey = 'savedLumpRealignment';
+    const readyMessage = 'Saved revision ready. Use Run or Step in Namespace.';
     let retryInput = null;
     function renderStatus() {
         if (typeof document === 'undefined' || !document.body) return;
@@ -17,8 +18,12 @@
         const state = root._savedLumpRealignment;
         host.hidden = !state;
         if (!state) return;
+        const ready = !state.pending && state.privateReady === true;
+        host.setAttribute('data-state', ready ? 'success' : state.pending ? 'pending' : 'error');
+        host.style.borderColor = ready ? '#4ade80' : state.pending ? '#93c5fd' : '#e0a055';
+        host.style.background = ready ? '#16372b' : '#29344c';
         host.append(document.createTextNode(state.message+' '));
-        if (!state.pending && retryInput) {
+        if (!state.pending && !ready && retryInput) {
             const button=document.createElement('button');
             button.textContent='Retry saved-revision alignment';
             button.onclick=()=>realign(retryInput.response,retryInput.metadata).catch(()=>{});
@@ -39,6 +44,10 @@
         if (root._savedLumpRealignment) {
             retryInput = root._savedLumpRealignment.retryInput || null;
             root._savedLumpRealignment.pending = false;
+            // Refresh the wording of already-persisted successful statuses too.
+            if (root._savedLumpRealignment.privateReady === true) {
+                root._savedLumpRealignment.message = readyMessage;
+            }
         }
     } catch (_) {}
     function begin() {
@@ -146,7 +155,7 @@
                 await root.DesignSimulation.prepare(true);
                 // A successful ascending replay does not authorize legacy Run
                 // or silently replace its differently formatted machine.
-                barrier({pending:false,privateReady:true,message:'Saved revision selected and verified in the selected design’s private simulator. Use its Run/Step controls in Namespace. Legacy execution remains stopped.'});
+                barrier({pending:false,privateReady:true,message:readyMessage});
                 return artifact;
             }
             // Do not splice a c-list into the running image: replace the complete

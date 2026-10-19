@@ -1,6 +1,7 @@
 'use strict';
 const assert=require('node:assert/strict'), fs=require('fs'), vm=require('vm');
 const code=fs.readFileSync(__dirname+'/lump-save-realignment.js','utf8');
+require('./test_lump_save_realignment_status.js');
 const {_lumpSaveRequest}=require('./lump_save_handler.js');
 const responseFor = data => ({ok:true,status:200,json:async()=>data,text:async()=>JSON.stringify(data)});
 // Rebuilding a same-token detail view must discard the old History load flag.
