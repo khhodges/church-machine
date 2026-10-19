@@ -30,10 +30,8 @@ const retryInput = {response:{token:'saved'}, metadata:{}};
 const ready = mount({pending:false, privateReady:true,
     message:'Saved revision selected and verified in the selected design’s private simulator. Legacy execution remains stopped.',
     retryInput});
-assert.equal(ready.host.attributes['data-state'], 'success');
-assert.equal(ready.host.children[0].textContent, 'Saved revision ready. Use Run or Step in Namespace. ');
-assert.equal(ready.host.children.filter(n => n.textContent === 'Retry saved-revision alignment').length, 0);
-assert.equal(ready.host.style.borderColor, '#4ade80');
+assert.equal(ready.host.hidden, true, 'saved success is never replayed as a popup');
+assert.equal(ready.host.children.length, 0, 'no redundant success message or Close control');
 assert.equal(ready.context._savedLumpRealignment.privateReady, true,
     'display correction preserves the execution barrier');
 assert.equal(ready.context._savedLumpRealignment.retryInput.response.token, retryInput.response.token);
@@ -62,10 +60,17 @@ function dismissAndCheck(harness) {
         assert.equal(reloaded.storage.get('savedLumpRealignment'), storedBefore);
     }
 }
-dismissAndCheck(ready);
+for (let i=0;i<3;i++) {
+    // Reproduce restoration without the separate dismissal key, which the
+    // earlier close/reload-only regression did not cover.
+    ready.storage.delete('savedLumpRealignmentDismissedNotice');
+    const restored = mount(undefined,ready.storage);
+    assert.equal(restored.host.hidden,true,'restored success stays absent without a dismissal marker');
+    assert.equal(restored.context._savedLumpRealignment.privateReady,true);
+}
 const newRevision = mount({...ready.context._savedLumpRealignment,
     retryInput:{...retryInput,response:{token:'new-saved',lump_version:4}}}, new Map(ready.storage));
-assert.equal(newRevision.host.hidden, false, 'a genuinely different revision is not suppressed');
+assert.equal(newRevision.host.hidden, true, 'another successful revision also needs no popup');
 const failed = mount({pending:false, message:'LUMP saved; realignment incomplete. Connection failed.', retryInput});
 assert.equal(failed.host.attributes['data-state'], 'error');
 assert.match(failed.host.children[0].textContent, /Connection failed/);
@@ -78,4 +83,4 @@ assert.equal(failed.host.attributes['data-state'], 'pending');
 assert.equal(failed.host.children.filter(n => n.textContent === 'Retry saved-revision alignment').length, 0);
 dismissAndCheck(failed);
 assert.equal(mount(null).host.hidden, true);
-console.log('PASS saved-revision banner: persistent dismissal across repeated reloads, new revision/operation visibility, error retry, unchanged execution state');
+console.log('PASS saved-revision notices: no success popup even without dismissal storage; pending/error dismissal, retry and execution state preserved');

@@ -97,14 +97,18 @@ both the control and code watching it.
 of old handoff records. This does not remove binary validation or explicit
 Namespace/configuration approval.
 
-Saved-revision status notices must be dismissible in every state. Dismissing a
+Do not display a persistent successful-save popup: saved identity already has
+an editor presentation. Pending and failed saved-revision status notices must
+remain dismissible. Dismissing a
 notice hides presentation only; it must not clear execution barriers or cancel
 preparation. Closing must stay effective for that notice across rendering and
 page reloads, rather than redisplaying the same acknowledged status.
 
 **Why:** The user identified the persistent success notice as uncloseable after
 its wording was corrected, then explicitly objected when it repeatedly
-returned after closing. A notice is not itself execution authority.
+returned after closing. The user supplied a screenshot of the same green
+success popup returning despite the separate dismissal marker. Success must
+stay absent even when that marker is missing. A notice is not itself execution authority.
 
 **How to apply:** Keep the Close action separate from status-clearing or
 activation functions, including for pending and failed preparations. Preserve

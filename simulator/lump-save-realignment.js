@@ -26,14 +26,17 @@
         }
         host.replaceChildren();
         const state = root._savedLumpRealignment;
-        host.hidden = !state || dismissedNotice === noticeKey(state);
-        if (!state) return;
-        const ready = !state.pending && state.privateReady === true;
-        host.setAttribute('data-state', ready ? 'success' : state.pending ? 'pending' : 'error');
-        host.style.borderColor = ready ? '#4ade80' : state.pending ? '#93c5fd' : '#e0a055';
-        host.style.background = ready ? '#16372b' : '#29344c';
+        // Saved identity is already visible in the editor. Never replay a
+        // successful save as a persistent popup, even without dismissal storage.
+        // Retain the underlying state: presentation is not execution authority.
+        const ready = state && !state.pending && state.privateReady === true;
+        host.hidden = !state || ready || dismissedNotice === noticeKey(state);
+        if (!state || ready) return;
+        host.setAttribute('data-state', state.pending ? 'pending' : 'error');
+        host.style.borderColor = state.pending ? '#93c5fd' : '#e0a055';
+        host.style.background = '#29344c';
         host.append(document.createTextNode(state.message+' '));
-        if (!state.pending && !ready && retryInput) {
+        if (!state.pending && retryInput) {
             const button=document.createElement('button');
             button.textContent='Retry saved-revision alignment';
             button.onclick=()=>realign(retryInput.response,retryInput.metadata).catch(()=>{});

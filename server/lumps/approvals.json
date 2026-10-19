@@ -1639,7 +1639,7 @@
       "issue_n": 1,
       "abstraction": "ide.CapabilityTest",
       "filename": "ide.CapabilityTest.1.cc80b80a.lump",
-      "compiled_at": 1792443795.4891934,
+      "compiled_at": 1792448843.6050527,
       "portable_binding": {
         "calls": [
           {
@@ -1758,7 +1758,7 @@
         "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
         "compact_compile_context": {
-          "compiler_sha256": "49d34f804719bd118b4794de70f76f44e821d40bef23eb5b3b48e6c1795873ce",
+          "compiler_sha256": "75ea58a3d6728dcd3ea756a7fff814238af9519dcc9e1185b770eaa361c38822",
           "inputs": {
             "language": "auto",
             "_ide_hierarchy": {
@@ -1777,7 +1777,7 @@
         },
         "signing_scheme": "church-compiler-hmac-sha256/v2",
         "signing_key_id": "compiler-signing-secret/v1",
-        "signature": "9a26cd7eda37fe5956cb08e326cf5354b1fb300e1d08d5e56877dbafb15d85e9"
+        "signature": "9fb9cff94151f7a3e0c5b76d3e0639834e93e6a883a8da48ea848dfd75d893ba"
       },
       "identity_hash": "e34d95a87b1d5de3ea01d7c44b37f0801dbe44b7ff791d2a976640f61157e97e"
     }

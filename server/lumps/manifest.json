@@ -1688,7 +1688,7 @@
   {
     "token": "ff353b57",
     "abstraction": "ide.CapabilityTest",
-    "filename": "ide.CapabilityTest.1.cc80b80a.lump",
+    "filename": "ide.CapabilityTest_v3.lump",
     "lump_version": 3,
     "compiled_at": 1792443795.4891934,
     "operation_id": "5de066a9-5dd9-4017-9271-568e087fb2b8",
@@ -1738,6 +1738,63 @@
       "signing_scheme": "church-compiler-hmac-sha256/v2",
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "9a26cd7eda37fe5956cb08e326cf5354b1fb300e1d08d5e56877dbafb15d85e9"
+    },
+    "archived": true,
+    "binary_hash": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d"
+  },
+  {
+    "token": "ff353b57",
+    "abstraction": "ide.CapabilityTest",
+    "filename": "ide.CapabilityTest.1.cc80b80a.lump",
+    "lump_version": 4,
+    "compiled_at": 1792448843.6050527,
+    "operation_id": "84102b46-1fc0-42a8-ab8f-00b6478c6353",
+    "output_variants": {
+      "api": {
+        "sha256": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d",
+        "bytes": 2048,
+        "url": "/api/lump-variants/dbbc267331c93487a2aeffa52918718fab7169efd0411e35d852716d4d5634cf/api"
+      },
+      "compact": {
+        "sha256": "cfb555a8cacc5416077959a007d96e1525c81a4027c5622ca89569eb8aa52665",
+        "bytes": 4096,
+        "url": "/api/lump-variants/dbbc267331c93487a2aeffa52918718fab7169efd0411e35d852716d4d5634cf/compact"
+      },
+      "full": {
+        "sha256": "513d5d75787d13c970eb2fd223222ae9a020e1e71c61980259bda2ef40b9cff4",
+        "bytes": 8192,
+        "url": "/api/lump-variants/dbbc267331c93487a2aeffa52918718fab7169efd0411e35d852716d4d5634cf/full"
+      }
+    },
+    "variant_primary_hash": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d",
+    "variant_bundle_id": "dbbc267331c93487a2aeffa52918718fab7169efd0411e35d852716d4d5634cf",
+    "variant_compiler_record": {
+      "binary_hash": "059cdada2d5e5c931e32c9e65649540a708004f52e9aff9b40f12330df9bcb5d",
+      "source_hash": "2db863573039fb651ca0a52ae2b04f1be476ce6fbea9fbe8598a97a39cab0fa4",
+      "language": "assembly",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "75ea58a3d6728dcd3ea756a7fff814238af9519dcc9e1185b770eaa361c38822",
+        "inputs": {
+          "language": "auto",
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "assembly"
+      },
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "9fb9cff94151f7a3e0c5b76d3e0639834e93e6a883a8da48ea848dfd75d893ba"
     }
   }
 ]
