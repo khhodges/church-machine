@@ -52,6 +52,77 @@ function harness(defect) {
     return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
 }
 (async()=>{
+    // Exercise the shared core's actual pause/resume semantics through the
+    // selected-design controls, with deterministic timers and no live writes.
+    const Core=require('./simulator.js');
+    for(const action of ['step','walk','run']) {
+        const b=harness('boot');
+        const pauses=[];
+        await b.api.prepare(true);
+        const m=b.instances[0];
+        m.bootAttemptId=1;
+        m.checkBootLoadCR15BreakpointBeforeExecute=Core.prototype.checkBootLoadCR15BreakpointBeforeExecute;
+        m.checkBreakpointBeforeExecute=Core.prototype.checkBreakpointBeforeExecute;
+        m._nextPhysicalAddr=()=>m.pc;
+        m.memory=new Uint32Array(100);
+        m.decodeInstruction=()=>({opcode:4});
+        const addresses=new Set(), opcodes=new Set();
+        b.scope._bootLoadCR15BreakpointBeforeNextInstruction=()=>m.checkBootLoadCR15BreakpointBeforeExecute(true);
+        b.scope._reportBootLoadCR15BreakpointPause=()=>pauses.push('boot');
+        b.scope._breakpointBeforeNextInstruction=()=>m.checkBreakpointBeforeExecute(addresses,opcodes);
+        b.scope._reportBreakpointPause=addr=>pauses.push(addr);
+        b.scope._setEntryBreakpoint=()=>addresses.add(m.pc);
+        await b.api.command(action);
+        assert.equal(m.bootStep,0,action+' pauses before boot LOAD');
+        assert.equal(b.toolbar.at(-1),false);
+        await b.api.command(action);
+        assert.equal(m.bootStep,1,action+' resumes boot exactly once');
+        b.api.stop();
+        await b.api.command('step'); await b.api.command('step');
+        assert.equal(m.bootStep,3);
+        await b.api.command(action);
+        assert.equal(m.dr[1],0,action+' respects entry address before execution');
+        assert.equal(pauses.at(-1),m.pc);
+        await b.api.command('step');
+        assert.equal(m.dr[1],1,'resume executes the paused instruction once');
+        opcodes.add(4);
+        await b.api.command(action);
+        assert.equal(m.dr[1],1,action+' respects universal instruction breakpoints');
+        b.api.stop();
+    }
+    for(const continuous of [false,true]) {
+        const b=harness('boot');
+        b.scope.continuousRun=continuous; b.scope.runBatchSize=3000;
+        await b.api.prepare(true);
+        const m=b.instances[0];
+        m.bootComplete=true;
+        m.step=function(){this.pc++;this.dr[1]++;return {pc:this.pc};};
+        await b.api.command('run');
+        // Changes apply to the next Run, not the current one.
+        b.scope.continuousRun=!continuous;
+        while(m.dr[1]<12000 && b.timers.length) b.timers.shift()();
+        assert.equal(m.dr[1],continuous?12000:10000);
+        assert.equal(b.toolbar.at(-1),continuous);
+        b.api.stop();
+        const stopped=m.dr[1];
+        while(b.timers.length) b.timers.shift()();
+        assert.equal(m.dr[1],stopped,'queued Run callbacks cannot outlive Stop');
+        await b.api.command('run');
+        const old=m.dr[1];
+        await b.api.command('reset');
+        while(b.timers.length) b.timers.shift()();
+        assert.equal(m.dr[1],old,'Reset invalidates old Run callbacks');
+        assert.equal(b.instances.at(-1).bootStep,0);
+    }
+    const suspended=harness('boot');
+    await suspended.api.prepare(true);
+    const waiting=suspended.instances[0];
+    waiting.bootComplete=true;
+    waiting.step=()=>{waiting.dr[1]++;return {suspended:true};};
+    await suspended.api.command('run');
+    assert.equal(waiting.dr[1],1,'a suspended instruction ends the batch immediately');
+    assert.equal(suspended.timers.length,0);
+    assert.equal(suspended.toolbar.at(-1),false);
     for(const action of ['step','walk','run']) {
         const boot=harness('boot');
         await boot.api.command(action);

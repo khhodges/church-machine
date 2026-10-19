@@ -15,6 +15,17 @@ the LightningBolt LUMP.
 separate from the main simulator toolbar. Apply this rule to the toolbar Run
 button and its keyboard command.
 
+Selected-design simulation uses the same breakpoint semantics and execution
+settings as normal simulation; it must not introduce a competing control policy.
+Suspension must end the current batch, but is not authorization to invoke a
+legacy loader that could substitute bytes outside the admitted image.
+
+**Why:** The user approved fixing execution-control consistency while keeping
+the selected saved artifacts and hardware untouched.
+
+**How to apply:** Reuse the shared breakpoint checks and resume bookkeeping.
+Keep any future selected-design lazy-loading work within exact-image admission.
+
 Preparation status, newer saved revisions, and deployment approval must not
 disable volatile simulator testing. Keep stale/mismatched evidence visible as
 warnings, and offer an explicit choice to test a compiled candidate.

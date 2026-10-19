@@ -202,16 +202,36 @@
     function execute(count) {
         if(!ready()) return false;
         if(machine.halted) throw Error('Simulation is halted. Use Reset before stepping or running again.');
+        let paused=false;
         try {
             for(let i=0;i<count && !machine.halted;i++) {
                 const booting=!machine.bootComplete;
+                if(booting && typeof root._bootLoadCR15BreakpointBeforeNextInstruction==='function' &&
+                        root._bootLoadCR15BreakpointBeforeNextInstruction()) {
+                    root._reportBootLoadCR15BreakpointPause();
+                    message='Breakpoint at B:00 — LOAD CR15 (paused before execution).';
+                    paused=true; break;
+                }
+                if(!booting && typeof root._breakpointBeforeNextInstruction==='function') {
+                    const address=root._breakpointBeforeNextInstruction();
+                    if(address!==null) {
+                        root._reportBreakpointPause(address);
+                        message='Breakpoint at 0x'+(address>>>0).toString(16).toUpperCase()+' (paused before execution).';
+                        paused=true; break;
+                    }
+                }
                 const result=booting ? machine._bootStep() : machine.step();steps++;
                 if(booting) {
                     if(typeof pipelineViz!=='undefined' && pipelineViz && typeof _bootNIARows==='function') {
                         pipelineViz.setNIA(_bootNIARows(machine.bootStep));
                         pipelineViz.render();
                     }
+                    if(machine.bootComplete && typeof root._setEntryBreakpoint==='function') root._setEntryBreakpoint();
                     continue;
+                }
+                if(!result || result.absent || result.suspended || result.lazySuspended) {
+                    message='Simulation paused: execution is suspended. No further instruction was attempted.';
+                    paused=true; break;
                 }
                 if(result && typeof root._wukongRecordSimulatorStep==='function') root._wukongRecordSimulatorStep(result);
                 if(result && result.pipeline && typeof _pendingPipelineBuffer!=='undefined') {
@@ -219,24 +239,39 @@
                     if(typeof root._flushPendingPipelineBuffer==='function') root._flushPendingPipelineBuffer();
                 }
             }
-            message=machine.halted ? 'Private simulation stopped. Inspect its output/fault below; Reset reuses the same verified bytes.' : 'Executing the exact approved private simulation.';
+            if(!paused) message=machine.halted ? 'Private simulation stopped. Inspect its output/fault below; Reset reuses the same verified bytes.' : 'Executing the exact approved private simulation.';
         } catch(error) {
             running=false;machine.halted=true;message='Simulation stopped: '+error.message;
             if(typeof root.appendOutput==='function') root.appendOutput(message,'error');
             if(typeof root._showFpgaToast==='function') root._showFpgaToast('Simulation stopped',message,'error',15000);
         }
+        if(paused || machine.halted) running=false;
         publishExecution();
         render();
-        return !machine.halted;
+        return !machine.halted && !paused;
     }
     function run(walking=false) {
         if(running || !ready()) return;
         running=true;
+        // Match normal Run: settings are captured once; breakpoints remain live.
+        const unlimited=typeof continuousRun!=='undefined' && continuousRun;
+        const size=typeof runBatchSize!=='undefined' && Number.isFinite(runBatchSize)
+            ? Math.max(1,Math.min(10000,Math.floor(runBatchSize))) : 500;
+        let executed=0;
         const ticket=generation, epoch=++runEpoch;
         const batch=()=>{
             if(!running || ticket!==generation || epoch!==runEpoch) return;
             const booting=!machine.bootComplete;
-            if(execute(booting || walking ? 1 : 250) && running) setTimeout(batch,booting || walking ? 500 : 0);
+            const before=steps;
+            const proceed=execute(booting || walking ? 1 : unlimited ? size : Math.min(size,10000-executed));
+            if(!booting) executed+=steps-before;
+            if(!walking && !unlimited && executed>=10000 && proceed) {
+                running=false;
+                message='Run paused after 10000 instructions. Enable Continuous Run to run without this limit.';
+                if(typeof root.appendOutput==='function') root.appendOutput(message,'info');
+                render(); return;
+            }
+            if(proceed && running) setTimeout(batch,booting || walking ? 500 : size===1 ? 16 : 0);
             else {running=false;render();}
         };
         batch();
