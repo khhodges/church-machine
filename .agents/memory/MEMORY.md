@@ -85,6 +85,7 @@
 - [Wukong one-shot Skip Fault](wukong-skip-fault-protocol.md) — explicit post-snapshot skip needs authenticated FPGA-sequence proof; lost correlation requires reboot
 - [LUMP output profiles](lump-output-profile-stability.md) — linked editing/sharing/build forms, allocation semantics, and black-box public API boundary.
 - [LUMP save vs boot rebuild](lump-save-boot-rebuild-boundary.md) — an approved LUMP save must not roll back because an unchanged boot-image dependency cannot rebuild
+- [Save advances the IDE](save-leading-revision.md) — successful saves advance the exact working revision; preserve history, stop stale execution, and keep hardware untouched.
 - [SelfTest dynamic allocation](selftest-dynamic-allocation.md) — SelfTest authority comes from one active manifest+NS binding; size, slot, sequence, and resident layout are never legacy constants
 - [C-List picker programmer authority](clist-picker-programmer-authority.md) — capability declarations may use live, committed, library-only, or not-yet-created pet names
 - [Compile CALL API authority](compile-call-api-authority.md) — dot-names suffice for LUMP formation; destination API and method resolution belong to the linking loader.

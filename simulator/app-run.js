@@ -16753,10 +16753,10 @@ async function _reloadCommittedLumpArtifact(response, fallbackName, savedMetadat
             'IDX1 LUMP saved. Use Load into Sim for protected admission; Prepare Boot and hardware delivery remain unavailable.', 'info');
         return committedWords;
     }
-    // Artifact retention is not approval to splice bytes into an executing
-    // machine. Explicit Prepare/Run or Load owns runtime admission.
+    // Do not splice bytes into a running machine. The save realignment step
+    // replaces the complete private simulation after Namespace publication.
     if (typeof appendOutput === 'function') appendOutput(
-        'LUMP saved. Running machine unchanged; use explicit Prepare/Run or Load to install.', 'info');
+        'LUMP saved. Realigning the Namespace and private simulator to this exact revision.', 'info');
     return committedWords;
 }
 
@@ -17341,7 +17341,7 @@ async function confirmSaveToNamespace() {
             }
             _saveApproval = await window._confirmLumpSavePlan(
                 _svPayload.binary, _svPayload.metadata,
-                () => `Publish "${_svAbsName}" as a ${saveAsCopy ? 'new copy' : 'new revision'}? Namespace and simulation remain unchanged.`,
+                () => `Publish "${_svAbsName}" as a ${saveAsCopy ? 'new copy' : 'new revision'}? The IDE will follow this saved revision. Simulation stops while its corresponding Namespace selection and image are refreshed; hardware is unchanged.`,
                 {
                     // The unified IDE dialog already shows the exact candidate,
                     // destination and permissions. Keep the server-authored
@@ -17452,10 +17452,11 @@ async function confirmSaveToNamespace() {
         _setSaveNSFeedback('info',
             'Saving the approved snapshot. If a protected-change review opens, choose “Confirm this change” to commit, or “Reject — keep unchanged” to cancel.');
         return _lumpSaveRequest(fetch, '/api/lumps/save', _svPayload, async function(resp) {
+            if (window.LumpSaveRealignment) window.LumpSaveRealignment.begin();
             // The repository has committed the save. Close immediately so a
             // later client-state/render exception cannot leave a successful
             // transaction looking unfinished.
-            _setSaveNSFeedback('loading', 'LUMP revision published — Namespace and simulation unchanged.');
+            _setSaveNSFeedback('loading', 'LUMP revision published — realigning the IDE to the saved revision.');
             _persistSaveOperationStatus(resp.operation_id ||
                 _svPayload.metadata.operation_id, 'committed',
                 `Saved "${resp.abstraction || label}" as ${resp.lump || resp.token}.`);
@@ -17546,8 +17547,17 @@ async function confirmSaveToNamespace() {
                 if (typeof appendOutput === 'function') appendOutput(recovery, 'error');
                 return;
             }
-            const nextAction = `Published "${label}" to the LUMP library. ` +
-                'Namespace assignments and the running simulation are unchanged.';
+            try {
+                if (!window.LumpSaveRealignment) throw new Error('Save realignment is unavailable; reload the IDE.');
+                await window.LumpSaveRealignment.realign(resp, _svPayload.metadata);
+            } catch (error) {
+                const message = `Saved "${label}". ${error.message}`;
+                _showFpgaToast('LUMP Saved — Realignment Blocked', message, 'error', 15000);
+                if (typeof appendOutput === 'function') appendOutput(message, 'error');
+                return;
+            }
+            const nextAction = `Published "${label}". Repository, History and Namespace select the saved revision. ` +
+                'The refreshed simulator is ready; use Run, Step or Walk.';
             _showFpgaToast('Lump Saved',
                 nextAction,
                 'ok', 9000);

@@ -79,6 +79,9 @@ function showLumpDetail(token, options) {
 
     const _prevTab = _lumpActiveTab[_tk] || 'overview';
     delete _lumpContentLoaded[_tk];
+    // A rebuilt detail panel has a new, empty History container even when a
+    // new revision shares the previous content token.
+    delete _lumpTimelineLoaded[_tk];
     delete _lumpHexLoaded[_tk];
     delete _lumpTokensLoaded[_tk];
 

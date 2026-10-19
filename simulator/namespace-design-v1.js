@@ -458,7 +458,14 @@
         }
         state.document.slotCount=n; changed();
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity};
+    async function advanceSavedRevision(rows) {
+        if(state.saving || state.dirty) throw Error('Namespace design has unsaved edits; preserve and save them before realignment.');
+        const result = await request('PUT',{fingerprint:state.fingerprint,
+            document:{...clone(state.document),rows:clone(rows)}});
+        accept(result);
+        render();
+    }
+    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');

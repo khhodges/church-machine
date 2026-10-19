@@ -11,6 +11,7 @@ const path = require('path');
 const vm = require('vm');
 const LumpContentFrame = require('./lump-content-frame');
 require('./test_structured_assembly_routing');
+require('./test_lump_save_realignment');
 
 function extractBlock(source, marker) {
     const start = source.indexOf(marker);

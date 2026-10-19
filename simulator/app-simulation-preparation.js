@@ -15,13 +15,18 @@
         const configuration = typeof sim !== 'undefined' && sim.simulationConfiguration;
         const hash = configuration && configuration.imageHash;
         indicator.textContent = 'Simulator image: ' + (hash ? String(hash).slice(0, 12) : 'identity unavailable') +
-            ' · latest-version check disabled';
+            (window._savedLumpRealignment ? ' · saved-revision alignment required' : ' · loaded configuration');
         indicator.title = hash ? 'Loaded image SHA-256: ' + hash : 'No loaded image hash is available.';
         indicator.style.display = 'block';
     }
     // Retain the execution hook, but freshness is no longer an execution gate.
     // Image admission, byte validation and target authorization remain separate.
     async function checkExecutionFreshness() {
+        if (window._savedLumpRealignment) {
+            const text = window._savedLumpRealignment.message;
+            if (typeof appendOutput === 'function') appendOutput(text, 'error');
+            return false;
+        }
         updateImageIndicator();
         return true;
     }

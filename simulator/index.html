@@ -3425,12 +3425,12 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
             <label class="modal-label">Pet Name:
                 <input type="text" id="saveNSLabel" class="modal-input" placeholder="e.g. SelfTest, LED Blink, Math Demo…">
             </label>
-            <div class="modal-hint">Publish this frozen LUMP candidate to the library. Namespace assignments, approved configurations and the running simulation remain unchanged. The engineer adopts revisions separately.</div>
+            <div class="modal-hint">Save this exact revision and realign the IDE: refresh History, advance its matching Namespace assignment, and replace the private simulator image after validation. Execution stops during alignment. Historical revisions and hardware remain unchanged. A new unassigned LUMP requires a destination before simulation.</div>
             <div class="modal-label" id="saveNSInfo" style="font-family:'Courier New',monospace;color:var(--church-gold);"></div>
             <div id="saveNSStatus" role="status" aria-live="polite"
                  style="display:none;margin-top:10px;padding:10px 12px;border-radius:6px;font-size:.92rem;line-height:1.35;"></div>
             <div class="modal-buttons">
-                <button id="saveNSConfirmBtn" class="btn btn-primary" onclick="beginSaveToNamespace()" data-tooltip="Save LUMP — Approve and publish this reviewed artifact only">Save LUMP</button>
+                <button id="saveNSConfirmBtn" class="btn btn-primary" onclick="beginSaveToNamespace()" data-tooltip="Save LUMP — Publish this revision and realign the IDE">Save LUMP</button>
                 <button id="saveNSCancelBtn" class="btn btn-warning" onclick="closeSaveDialog()" data-tooltip="Cancel — Close without publishing">Cancel</button>
             </div>
         </div>
@@ -3658,6 +3658,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="whats-new-feed.js?v=sha256-4f1499720d0d"></script>
     <script src="app-run.js?v=sha256-6fcadb20f4e5"></script>
     <script src="app-simulation-preparation.js?v=20261015-image-identity"></script>
+    <script src="lump-save-realignment.js"></script>
     <script src="app-actions.js?v=sha256-60e0deaed7c2"></script>
     <script src="thread-heap-record.js?v=2"></script>
     <script src="app-heap-record.js?v=sha256-653a8f689f16"></script>
