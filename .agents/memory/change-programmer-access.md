@@ -3,6 +3,13 @@ name: CHANGE programmer access
 description: One-GT CHANGE is programmer-accessible but uses microcode authority on a permissionless Thread GT.
 ---
 
+CHANGE consumes one Thread GT. Distinguish that semantic operand count from
+the syntax used to refer to its location; an indexed reference does not by
+itself mean two GT operands or establish an approved addressing-mode encoding.
+
+**Why:** The user reiterated “Change requires one GT” after an explanation
+conflated the rejected indexed encoding with the number of GTs consumed.
+
 Pet-name CHANGE syntax work is compiler-only unless separately authorized.
 Do not infer permission to add indexed simulator execution or invent a machine
 encoding from a request to accept `CHANGE Thread.3` or `CHANGE CR6, #9`.
