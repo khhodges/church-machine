@@ -17,6 +17,17 @@ not roll back a successful artifact save or masquerade as current execution.
 New unassigned copies need an explicit destination; unsupported design-profile
 admission must remain blocked rather than borrowing a legacy image.
 
+Every successful save must refresh History independently of editor reload,
+Namespace alignment, and simulation admission.
+
+**Why:** The user reiterated this after seeing the old CapabilityTest History
+despite a newer save. Correcting a History cache flag alone was insufficient
+while earlier post-commit failures could still skip the refresh.
+
+**How to apply:** Treat History as a commit acknowledgement, not a downstream
+simulation success effect. Verify failure paths as well as successful alignment;
+keep the exact displayed artifact authoritative for its tabs.
+
 For ascending designs, private replay and the historical IDE machine must stay
 separate until ordinary IDE controls explicitly support both runtime models.
 Do not make a successful save clear the historical execution barrier merely

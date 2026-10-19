@@ -46,6 +46,9 @@ function showLumpDetail(token, options) {
     const titleEl = document.getElementById('lumpsDetailTitle');
     const contentEl = document.getElementById('lumpsDetailContent');
     if (!titleEl || !contentEl) return;
+    // Tabs belong to the exact displayed artifact, including assigned revisions
+    // not yet present in the shared library cache.
+    contentEl._displayedLump = lump;
 
     const _tk = _lumpTokenIdentity(token);
     const isNamespace = lump.lump_type === 'namespace' || lump.typ === 1;
@@ -3314,7 +3317,9 @@ function _switchLumpTab(tk, tab) {
             btn.classList.toggle('lump-tab-active', btn.textContent.trim() === labelMap[tab]);
         });
     }
-    const lump = _lumpsCache.find(l => _lumpTokenIdentity(l.token) === tk);
+    const displayed = document.getElementById('lumpsDetailContent')?._displayedLump;
+    const lump = displayed && _lumpTokenIdentity(displayed.token) === tk
+        ? displayed : _lumpsCache.find(l => _lumpTokenIdentity(l.token) === tk);
     const token = lump ? lump.token : tk;
     if (tab === 'api' && lump) {
         _populateLumpApiTab(lump, `lumpTabApi_${tk}`);
@@ -3331,8 +3336,12 @@ function _switchLumpTab(tk, tab) {
     }
     if (tab === 'history' && !_lumpTimelineLoaded[tk] && lump) {
         _lumpTimelineLoaded[tk] = true;
-        _fetchAndShowLumpTimeline(token, lump);
+        const body = document.getElementById(`lumpHistoryBody_${tk}`);
+        const loading = _fetchAndShowLumpTimeline(token, lump);
+        if (body) body._historyLoad = loading;
+        return loading;
     }
+    if (tab === 'history') return document.getElementById(`lumpHistoryBody_${tk}`)?._historyLoad;
 }
 
 const _dnaRendered = {};

@@ -84,24 +84,28 @@
         if (!response.ok || data.ok === false) throw Error(data.error || `Realignment failed (${response.status}).`);
         return data;
     }
+    async function refreshHistory(response) {
+        const list = await request('/api/lumps/list?include_archived=1');
+        const records = list.filter(row => row.token === response.token &&
+            row.filename === (response.lump || response.filename) &&
+            row.binary_hash === (response.digest || response.binary_hash));
+        if (records.length !== 1) throw Error('The exact committed revision could not be found; no substitute was selected.');
+        const artifact = records[0];
+        root._lumpLibraryBrowsing = true;
+        if (typeof renderLumps === 'function') await renderLumps();
+        if (typeof showLumpDetail === 'function') showLumpDetail(artifact.token,{assignedLump:artifact});
+        if (typeof _switchLumpTab === 'function') await _switchLumpTab(_lumpTokenIdentity(artifact.token),'history');
+        return artifact;
+    }
     async function realign(response, metadata) {
         retryInput = {response:{token:response.token,lump:response.lump || response.filename,
             digest:response.digest || response.binary_hash},
             metadata:{save_as_copy:metadata.save_as_copy,editor_base:metadata.editor_base}};
         begin();
         try {
-            const list = await request('/api/lumps/list?include_archived=1');
-            const records = list.filter(row => row.token === response.token &&
-                row.filename === (response.lump || response.filename) &&
-                row.binary_hash === (response.digest || response.binary_hash));
-            if (records.length !== 1) throw Error('The exact committed revision could not be found; no substitute was selected.');
-            const artifact = records[0];
             // Publication is already committed: History must advance even if
             // downstream Namespace admission needs correction.
-            root._lumpLibraryBrowsing = true;
-            if (typeof renderLumps === 'function') await renderLumps();
-            if (typeof showLumpDetail === 'function') showLumpDetail(artifact.token,{assignedLump:artifact});
-            if (typeof _switchLumpTab === 'function') _switchLumpTab(_lumpTokenIdentity(artifact.token),'history');
+            const artifact = await refreshHistory(response);
             const design = root.NamespaceDesignV1;
             let advanced = false;
             if (design && design.state.active) {
@@ -126,7 +130,7 @@
             root._lumpLibraryBrowsing = !advanced;
             if (typeof renderLumps === 'function') await renderLumps();
             if (typeof showLumpDetail === 'function') showLumpDetail(artifact.token,{assignedLump:artifact});
-            if (typeof _switchLumpTab === 'function') _switchLumpTab(_lumpTokenIdentity(artifact.token),'history');
+            if (typeof _switchLumpTab === 'function') await _switchLumpTab(_lumpTokenIdentity(artifact.token),'history');
             if (!advanced) throw Error('This saved LUMP has no Namespace assignment. Select a destination before simulation.');
             if (design && design.state.active) {
                 if (!root.DesignSimulation) throw Error('Validated design simulation admission is unavailable. Reload the IDE and retry; stale execution remains stopped.');
@@ -153,7 +157,7 @@
             throw error;
         }
     }
-    root.LumpSaveRealignment = {realign,replacementRows,begin,clear:()=>barrier(null)};
+    root.LumpSaveRealignment = {realign,refreshHistory,replacementRows,begin,clear:()=>barrier(null)};
     renderStatus();
     if (typeof module !== 'undefined') module.exports = root.LumpSaveRealignment;
 })(typeof window !== 'undefined' ? window : globalThis);

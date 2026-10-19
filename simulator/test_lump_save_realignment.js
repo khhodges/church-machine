@@ -33,6 +33,46 @@ function harness(fail) {
     return {context,calls,state,api:context.LumpSaveRealignment};
 }
 (async()=>{
+    // A committed save refreshes History before either early-return failure:
+    // binary reload and dashboard/editor refresh. Run the real callback.
+    const runSource=fs.readFileSync(__dirname+'/app-run.js','utf8');
+    const callbackStart=runSource.indexOf('async function(resp) {',
+        runSource.indexOf("return _lumpSaveRequest(fetch, '/api/lumps/save'"));
+    const callbackEnd=runSource.indexOf('\n        }, {',callbackStart);
+    assert(callbackStart>=0 && callbackEnd>callbackStart);
+    for (const failure of ['reload','dashboard']) {
+        const calls=[];
+        const ctx={console:{error(){}},window:null,label:'ide.CapabilityTest',
+            _svPayload:{metadata:{}},_svLang:'clooms',_caps:[],
+            _setSaveNSFeedback(){},_persistSaveOperationStatus(){},closeSaveDialog(){},
+            _showFpgaToast(){},appendOutput(){},
+            _reloadCommittedLumpArtifact:async()=>{calls.push('reload');if(failure==='reload')throw Error('reload failed');},
+            updateDashboard(){calls.push('dashboard');throw Error('dashboard failed');},
+            LumpSaveRealignment:{refreshHistory:async()=>calls.push('history'),begin(){}}
+        };
+        ctx.window=ctx;vm.createContext(ctx);
+        const callback=vm.runInContext('('+runSource.slice(callbackStart,callbackEnd)+'\n})',ctx);
+        await callback({token:artifact.token,lump:artifact.filename});
+        assert.equal(calls[0],'history',failure+' must not skip History');
+        assert(calls.includes(failure));
+    }
+    // Tab lookup must honor the exact displayed artifact, even with no cache
+    // record, and expose its pending load rather than return before History.
+    const {JSDOM}=require('jsdom');
+    const dom=new JSDOM('<div id="lumpsDetailContent"></div><div id="lumpHistoryBody_12345678"></div>');
+    dom.window.document.getElementById('lumpsDetailContent')._displayedLump=artifact;
+    let resolveHistory, historyCalls=0;
+    const loading=new Promise(resolve=>{resolveHistory=resolve;});
+    const tabs={document:dom.window.document,_lumpActiveTab:{},_lumpTimelineLoaded:{},
+        _lumpsCache:[],_lumpTokenIdentity:x=>x,
+        _fetchAndShowLumpTimeline(token,lump){historyCalls++;assert.equal(lump,artifact);return loading;}};
+    vm.createContext(tabs);
+    vm.runInContext(detailSource.slice(detailSource.indexOf('function _switchLumpTab('),
+        detailSource.indexOf('const _dnaRendered')),tabs);
+    assert.equal(tabs._switchLumpTab(artifact.token,'history'),loading);
+    assert.equal(tabs._switchLumpTab(artifact.token,'history'),loading);
+    assert.equal(historyCalls,1);
+    resolveHistory();await loading;
     const h=harness();
     const original=JSON.stringify(h.state);
     const result=h.api.replacementRows(h.state.abstractions,artifact,{},false);
