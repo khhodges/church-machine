@@ -1554,27 +1554,47 @@ const _traceData = [];
 const _TRACE_MAX = 50000;
 let _traceRenderedCount = 0;
 let _tracePendingRAF = false;
+let _traceDesignConfiguration = null;
+let _traceExecutedIdentity = null;
+let _traceExecutedEvidence = null;
+window._renderTraceExecutionIdentity = _renderTraceExecutionIdentity;
 
 function _traceRecordStep(result) {
     if (!result) return;
+    const configuration = sim.simulationConfiguration || null;
+    const design = window.DesignSimulation;
+    const selectedDesign = design && design.traceContext();
+    const executedIdentity = selectedDesign ? design.traceIdentity(result) : null;
+    _traceDesignConfiguration = selectedDesign ? configuration : null;
+    _traceExecutedIdentity = executedIdentity;
+    _traceExecutedEvidence = result.executionEvidence || null;
     const state = sim.getState();
     const instr = result.instr;
+    const boot = result.bootEvidence;
     const physicalPC = Number.isInteger(result.physicalPC) ? result.physicalPC : null;
     const owner = physicalPC != null && typeof _nsOwnerOf === 'function'
         ? _nsOwnerOf(physicalPC)
         : null;
     const nsIdx = owner && Number.isInteger(owner.nsIdx) ? owner.nsIdx : null;
     const entry = {
-        step: state.stepCount,
-        pc: result.pc,
+        domain: boot ? 'boot-rom' : 'code',
+        step: boot ? `boot-${boot.phase}` : state.stepCount,
+        stepLabel: boot ? `Boot ${boot.phase}/3` : `Code ${state.stepCount}`,
+        pc: boot ? `B:${String(boot.instruction.bootRomAddress).padStart(2, '0')}` : result.pc,
         physicalPC: physicalPC,
-        nsIdx: nsIdx,
-        lumpToken: nsIdx != null && typeof _canonicalEditorTokenForSlot === 'function'
+        nsIdx: executedIdentity ? executedIdentity.nsSlot : nsIdx,
+        executionIdentity: executedIdentity,
+        executionEvidence: result.executionEvidence || null,
+        bootEvidence: boot || null,
+        simulationConfiguration: configuration,
+        lumpToken: selectedDesign ? (executedIdentity && executedIdentity.token) :
+            nsIdx != null && typeof _canonicalEditorTokenForSlot === 'function'
             ? _canonicalEditorTokenForSlot(nsIdx)
             : (nsIdx != null && typeof sim.lumpTokenAtSlot === 'function'
                 ? sim.lumpTokenAtSlot(nsIdx)
                 : null),
-        instrIdx: owner && Number.isInteger(owner.offset) && owner.offset > 0
+        instrIdx: selectedDesign ? (executedIdentity ? executedIdentity.instrIdx : null) :
+            owner && Number.isInteger(owner.offset) && owner.offset > 0
             ? owner.offset - 1
             : null,
         opName: instr ? sim.opName(instr.opcode) : '',
@@ -1619,6 +1639,7 @@ function _traceRecordStep(result) {
         _traceRenderedCount = Math.max(0, _traceRenderedCount - removeCount);
     }
     _traceData.push(entry);
+    if (!_renderTraceExecutionIdentity() && window.ExecutionIdentity) window.ExecutionIdentity.render();
     if (!_tracePendingRAF) {
         _tracePendingRAF = true;
         requestAnimationFrame(_traceFlushRender);
@@ -1670,7 +1691,7 @@ function _traceBuildRow(idx) {
     }
 
     const cells = [
-        entry.step,
+        entry.stepLabel || entry.step,
         entry.pc,
         entry.opName,
         entry.cond,
@@ -1852,14 +1873,19 @@ window._traceOpenExecutedSource = _traceOpenExecutedSource;
 
 function clearTrace() {
     _traceData.length = 0;
+    _traceDesignConfiguration = null;
+    _traceExecutedIdentity = null;
+    _traceExecutedEvidence = null;
     _traceRenderedCount = 0;
     const tbody = document.getElementById('traceTableBody');
     if (tbody) tbody.innerHTML = '';
     const countEl = document.getElementById('traceRowCount');
     if (countEl) countEl.textContent = '0 rows';
+    if (!_renderTraceExecutionIdentity() && window.ExecutionIdentity) window.ExecutionIdentity.render();
 }
 
 function renderTraceView() {
+    _renderTraceExecutionIdentity();
     if (_traceRenderedCount < _traceData.length) {
         _traceFlushRender();
     }
@@ -4514,4 +4540,38 @@ function confirmResetLaunchTests() {
             })
             .catch(function() { close(); });
     });
+}
+
+function _renderTraceExecutionIdentity() {
+    const design = window.DesignSimulation;
+    const context = design && design.traceContext();
+    if (!context && !_traceDesignConfiguration) return false;
+    if (context && !_traceDesignConfiguration) _traceDesignConfiguration = context.configuration;
+    const current = context && context.current &&
+        (!_traceDesignConfiguration || context.configuration === _traceDesignConfiguration);
+    // The row's receipt remains historical; the current header must recheck
+    // live executable bytes and binding even when no new step was taken.
+    const identity = current && _traceExecutedIdentity && design.traceIdentity({
+        executionEvidence:_traceExecutedEvidence});
+    const text = !current
+        ? 'Previous simulation — selection changed. Prepare the selected design again. Retained rows are historical evidence.'
+        : identity
+        ? `VERIFIED SAVED PROGRAM · ${identity.dotName} · NS[${identity.nsSlot}] · Private simulation`
+        : _traceExecutedIdentity
+        ? 'Saved program identity no longer verified — live executable bytes or Namespace binding changed. Retained rows are historical evidence.'
+        : context.bootComplete
+        ? 'Saved program execution identity unverified — no matching admitted instruction evidence.'
+        : 'Verified private image · Boot in progress — no saved program instruction executed yet.';
+    const host = document.getElementById('executionIdentityTrace');
+    if (host) {
+        host.className = 'execution-identity-strip execution-identity-' + (identity ? 'current' : 'unverified');
+        host.textContent = text;
+        host.setAttribute('aria-label', 'Execution identity: ' + text);
+        host.title = identity
+            ? `Executed saved artifact: ${identity.filename}\nBinary SHA-256: ${identity.binaryHash}\nImage SHA-256: ${identity.imageHash}\nConfiguration: ${identity.configurationHash}\nEditor freshness and hardware execution are not asserted.`
+            : text;
+    }
+    const announcement = document.getElementById('executionIdentityAnnouncement');
+    if (announcement && announcement.textContent !== text) announcement.textContent = text;
+    return true;
 }

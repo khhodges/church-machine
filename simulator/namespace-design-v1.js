@@ -89,6 +89,7 @@
         ++sourceRequest; state.dirty=true; state.error=''; render();
     }
     function render() {
+        if (typeof root._renderTraceExecutionIdentity === 'function') root._renderTraceExecutionIdentity();
         const selector = document.getElementById('namespaceDesignProfile');
         if (selector) selector.value = state.active ? state.profile : 'legacy';
         if (!state.active) return;

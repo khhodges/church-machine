@@ -258,6 +258,9 @@ function _executionIdentityRecompute() {
 }
 
 function _executionIdentityRenderOne(id) {
+    if (id === 'executionIdentityTrace' &&
+            typeof window._renderTraceExecutionIdentity === 'function' &&
+            window._renderTraceExecutionIdentity()) return;
     const host = document.getElementById(id);
     if (!host) return;
     const s = _executionIdentity;
@@ -323,7 +326,8 @@ function _executionIdentityRender() {
     if (announcement !== _executionIdentityLastAnnouncement) {
         _executionIdentityLastAnnouncement = announcement;
         const announcer = document.getElementById('executionIdentityAnnouncement');
-        if (announcer) {
+        if (announcer && !(typeof window._renderTraceExecutionIdentity === 'function' &&
+                window._renderTraceExecutionIdentity())) {
             announcer.textContent = `Execution identity ${_executionIdentity.status}: ${_executionIdentity.reason}`;
         }
     }

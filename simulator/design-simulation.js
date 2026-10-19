@@ -6,6 +6,12 @@
     let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0, intent = 0;
     let reportedMachine = null, reportedOutput = '', reportedFaults = 0;
     let previousSimulator = null;
+
+    function freezeRecord(value) {
+        if (!value || typeof value !== 'object') return value;
+        return Object.freeze(Array.isArray(value) ? value.map(freezeRecord) :
+            Object.fromEntries(Object.entries(value).map(([key, item]) => [key, freezeRecord(item)])));
+    }
     function displayMachine(candidate) {
         if (typeof sim !== 'undefined') {
             if (!previousSimulator) previousSimulator=sim;
@@ -108,6 +114,7 @@
     }
     function render() {
         if (typeof document === 'undefined') return;
+        if (typeof root._renderTraceExecutionIdentity === 'function') root._renderTraceExecutionIdentity();
         if (typeof root._showStopBtn === 'function' &&
                 (root.NamespaceDesignV1?.state.active || toolbarOwned)) {
             toolbarOwned = !!root.NamespaceDesignV1?.state.active && (busy || running);
@@ -149,7 +156,7 @@
         const instance = ChurchSimulator.fromAscendingNamespaceImage(new Uint32Array(words), {
             word0:0x02000001, word1:0, word2:record.slotCount*4-1, word3:0, m:1});
         instance.beginBoot();
-        instance.simulationConfiguration=Object.freeze({...record});
+        instance.simulationConfiguration=freezeRecord(record);
         if(typeof instance.on==='function') {
             if(typeof root._traceRecordStep==='function') instance.on('step',root._traceRecordStep);
             if(typeof root._onSimFaultSnapshot==='function') instance.on('faultSnapshot',root._onSimFaultSnapshot);
@@ -253,10 +260,22 @@
                     }
                 }
                 const bootPhase = booting ? machine.bootStep + 1 : null;
+                const bootProgress = booting && machine.bootProgress && machine.bootProgress[machine.bootStep];
+                const bootPre = bootProgress && typeof machine._executionEvidenceState === 'function'
+                    ? machine._executionEvidenceState() : null;
                 if (booting) machine.auditLog = [];
                 const result=booting ? machine._bootStep() : machine.step();steps++;
                 publishExecution();
                 if(booting) {
+                    if (bootProgress && typeof root._traceRecordStep === 'function') {
+                        const bootEvidence = freezeRecord({domain:'boot-rom', phase:bootPhase,
+                            instruction:{raw:bootProgress.word, bootRomAddress:bootProgress.bootRomAddress},
+                            progress:bootProgress, pre:bootPre, post:machine._executionEvidenceState(),
+                            simulationConfiguration:machine.simulationConfiguration});
+                        root._traceRecordStep({
+                            bootEvidence, instr:machine.decodeInstruction(bootProgress.word),
+                            desc:`Boot ${bootPhase}/3 · ${bootProgress.instruction} — ${bootProgress.status}`});
+                    }
                     const audit = (machine.auditLog || []).slice();
                     if (typeof _bootAuditAccum !== 'undefined') _bootAuditAccum = audit;
                     recordConsoleStep(null, bootPhase);
@@ -376,6 +395,59 @@
             return false;
         }
     }
-    root.DesignSimulation={prepare,command,stop,invalidate,markup,render,run,reset,
+    root.DesignSimulation={prepare,command,stop,invalidate,markup,render,run,reset,traceContext,traceIdentity,
         step:()=>{if(!running) execute(1);}};
+
+    // Verify the occurrence against the admitted image, never editor/registry
+    // selection or a post-CALL CR14. Mutable data is not executable identity.
+    function traceIdentity(result) {
+        const context = traceContext(), evidence = result && result.executionEvidence;
+        const pre = evidence && evidence.pre, instruction = evidence && evidence.instruction;
+        const configuration = context && context.configuration;
+        if (!context || !context.current || evidence !== machine.lastStepEvidence ||
+                !pre || !pre.cr || !pre.cr[15] || !instruction ||
+                JSON.stringify(evidence.simulationConfiguration) !== JSON.stringify(configuration)) return null;
+        const slot = pre.artifact && pre.artifact.slot;
+        const bindings = configuration.artifactBindings.filter(binding => binding.slot === slot);
+        if (bindings.length !== 1 || !Number.isInteger(slot) || slot < 1 ||
+                slot >= configuration.slotCount || pre.cr[15].word1 !== 0 ||
+                pre.cr[15].word2 !== configuration.slotCount * 4 - 1) return null;
+        if (!machine.cr || !machine.cr[15] ||
+                ['word0','word1','word2'].some(key => machine.cr[15][key] !== pre.cr[15][key])) return null;
+        const binding = bindings[0], name = /^(.+)\.([1-9][0-9]*)\.([0-9a-f]{8})\.lump$/.exec(binding.filename);
+        if (!name || !/^[0-9a-f]{64}$/.test(binding.binaryHash)) return null;
+        const descriptor = slot * 4, base = frozenWords[descriptor];
+        const code = pre.artifact.codeCapability;
+        // mLoad marks the live descriptor's G bit. That GC visitation bit
+        // changes during ordinary boot; it is not a new artifact or generation.
+        const withoutG = word => (word & ~0x40000000) >>> 0;
+        if (!code || code.word1 !== base ||
+                withoutG(code.word2) !== withoutG(frozenWords[descriptor + 1]) ||
+                pre.artifact.headerWord !== frozenWords[base]) return null;
+        for (let i = 0; i < 4; i++) {
+            const actual = machine.memory[descriptor + i], expected = frozenWords[descriptor + i];
+            if (i === 1 ? withoutG(actual) !== withoutG(expected) : actual !== expected) return null;
+        }
+        const header = machine.parseLumpHeader(frozenWords[base]);
+        const pc = instruction.physicalPC;
+        if (header.magic !== 31 || header.cw + header.cc + 1 > header.lumpSize ||
+                !Number.isInteger(pc) || pc <= base || pc > base + header.cw ||
+                instruction.raw !== frozenWords[pc] || base + header.lumpSize > frozenWords.length) return null;
+        // Check all code and localized capability rows, not just one matching
+        // instruction. Runtime data/freespace may legitimately change.
+        for (let i = 0; i <= header.cw; i++)
+            if (machine.memory[base + i] !== frozenWords[base + i]) return null;
+        for (let i = header.lumpSize - header.cc; i < header.lumpSize; i++)
+            if (machine.memory[base + i] !== frozenWords[base + i]) return null;
+        return Object.freeze({dotName:name[1] + '#' + name[2], token:binding.token,
+            filename:binding.filename, binaryHash:binding.binaryHash, nsSlot:slot,
+            instrIdx:pc - base - 1, physicalPC:pc, rawWord:instruction.raw,
+            configurationHash:configuration.configurationHash, imageHash:configuration.imageHash});
+    }
+
+    function traceContext() {
+        return machine && typeof sim !== 'undefined' && sim === machine
+            ? {configuration:machine.simulationConfiguration, current:same(owner), bootComplete:machine.bootComplete}
+            : null;
+    }
 })(typeof window!=='undefined'?window:globalThis);

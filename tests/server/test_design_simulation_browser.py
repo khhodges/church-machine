@@ -40,7 +40,22 @@ def test_selected_design_toolbar_in_browser(setup_design, monkeypatch):
         assert response.status_code == 200, response.json
         expected[profile] = response.json["imageHash"]
     assert expected["ascending"] != expected["phase1"]
+    run_private_browser(root, path, monkeypatch, "design_simulation_browser.cjs",
+                        {"hashes": expected}, "PASS selected-design toolbar")
 
+
+def test_saved_design_trace_identity_in_browser(setup_design, monkeypatch):
+    root, client, document, path, _ = setup_design
+    document["rows"][-1]["slot"] = 10
+    document.update(format=PHASE1_FORMAT, slotCount=256)
+    path = path.parent / "phase1.json"
+    path.write_text(json.dumps(document))
+    run_private_browser(root, path, monkeypatch, "design_trace_identity_browser.cjs",
+                        {"selection": document["rows"][-1]["selection"]},
+                        "PASS saved-design trace identity")
+
+
+def run_private_browser(root, path, monkeypatch, script, inputs, marker):
     # All catalog bytes, approvals, selections, and the installed-image sentinel
     # stay identical. Only private simulation history is allowed to grow.
     protected = [*root.glob("*.lump"), root / "manifest.json", root / "approvals.json",
@@ -64,12 +79,11 @@ def test_selected_design_toolbar_in_browser(setup_design, monkeypatch):
     thread = threading.Thread(target=http.serve_forever, daemon=True)
     thread.start()
     try:
-        run = subprocess.run(["node", "tests/server/design_simulation_browser.cjs"],
-            input=json.dumps({"url": f"http://127.0.0.1:{http.server_port}",
-                              "hashes": expected}),
+        run = subprocess.run(["node", f"tests/server/{script}"],
+            input=json.dumps({"url": f"http://127.0.0.1:{http.server_port}", **inputs}),
             text=True, capture_output=True, cwd=ROOT, timeout=150)
         assert run.returncode == 0, run.stdout + run.stderr
-        assert "PASS selected-design toolbar" in run.stdout
+        assert marker in run.stdout
         assert not forbidden, forbidden
         assert {p: hashlib.sha256(p.read_bytes()).hexdigest() for p in protected} == before
     finally:

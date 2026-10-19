@@ -28,3 +28,19 @@ stable name.
 **How to apply:** Key the quiet state on absence of program metadata and known
 live memory, not merely on unverified status. Resolve loaded display identity
 from canonical server metadata before falling back to an abstraction label.
+
+Private saved-design execution identity is distinct from editor freshness.
+Correlate captured pre-instruction identity with the exact admitted image and
+immutable artifact binding. Live Namespace G visitation bits may change during
+ordinary boot; do not treat that bit alone as an artifact change, or mask other
+descriptor fields such as generation.
+
+**Why:** Comparing the complete live descriptor to the frozen image falsely
+rejected valid booted programs after mLoad set G. Comparing only the observed
+instruction would instead miss changes elsewhere in executable code.
+
+**How to apply:** Keep occurrence-bound evidence on historical rows, compare
+code and localized capabilities to the admitted baseline, and invalidate the
+current header independently when the selection or runtime changes. Recheck
+the current label on presentation, not only when another instruction retires:
+an unchanged selection does not prove that executable memory is unchanged.
