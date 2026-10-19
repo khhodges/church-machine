@@ -4,6 +4,16 @@ Scope: editable ordinary CLOOMC assembly in `simulator/cloomc/mint.cloomc`,
 not a runnable service, installed LUMP, private-opcode implementation, or
 hardware change. Requested by the programmer after the four-case input review.
 
+**Confidentiality review reopened:** The programmer questioned why Mint should
+read initial data that might be top secret. The current copy loop does load
+payload words into Mint registers. Passing an R/RW source GT already grants
+read authority, so removing the reads alone would not establish confidentiality.
+The earlier initializer approval is not acceptance of this exposure.
+No replacement has been selected: allocating a separate initialized object and
+issuing authority for existing storage have different identity and accounting
+semantics. Resolve this boundary before completing the copy path; do not treat
+helper delegation as proof of payload isolation.
+
 ## Working inputs
 
 | Input | Meaning |

@@ -214,6 +214,17 @@ initial data” in the individual Data-case review.
 RW/R/W permissions. Do not infer readable source extent from requested
 allocation. The later packed-size decision resolves Data-versus-LUMP selection.
 
+Data CREATE's payload confidentiality is under review; the prior readable-source
+approval must not be treated as acceptance of Mint seeing secret contents.
+
+**Why:** The programmer challenged Mint's copy loop because the source might
+be top secret. A readable GT grants payload access even if Mint avoids DREAD.
+
+**How to apply:** Resolve Mint's necessary authority before completing the copy
+path. Distinguish allocating a separate initialized object from issuing authority
+for existing storage. Neither replacement has yet been selected; do not claim
+that moving the copy to a helper or merely omitting reads establishes isolation.
+
 CREATE's Thread case uses CR4 E for its initializer; the later packed-size
 decision selects Thread creation. That GT identifies the application Amoeba
 will start, not an existing Thread or Amoeba itself.
