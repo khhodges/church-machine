@@ -2365,6 +2365,34 @@ class ChurchAssembler {
                 break;
             }
             case 4: {
+                // Source shorthand for the existing indexed representation
+                // CHANGE CR12, CR6, #row. This does not define runtime semantics.
+                const operand = (parts[1] || '').replace(/,/g, '').trim();
+                const rawOperand = line.replace(/^\S+\s*/, '').trim();
+                if (/^CR6\s*\[/i.test(rawOperand) &&
+                        !/^CR6\s*\[\s*[^\]\s]+\s*\]$/i.test(rawOperand)) {
+                    this.errors.push({line: lineNum, message: 'Indexed CHANGE accepts one C-List reference: CHANGE CR6[row].'});
+                    return null;
+                }
+                const indexed = /^CR6$/i.test(operand) && parts.length === 3;
+                const registerAlias = Object.prototype.hasOwnProperty.call(this._crAliases, operand);
+                const pet = parts.length === 2 && !registerAlias &&
+                    /^[A-Za-z_][A-Za-z0-9_.]*$/.test(operand) &&
+                    !/^CR\d+$/i.test(operand);
+                if (indexed || pet) {
+                    const reference = pet ? operand : parts[2];
+                    const numeric = /^#?(?:0x[0-9a-f]+|\d+)$/i.test(reference);
+                    const row = numeric ? Number(reference.replace(/^#/, '')) :
+                        this._declaredRowFor(reference);
+                    if (row === null || !Number.isInteger(row) || row < 0 || row > 32767) {
+                        this.errors.push({line: lineNum,
+                            ...this._tokenCols(this._currentLineText, reference),
+                            message: `CHANGE cannot resolve "${reference}" to a C-List row. Use a declared PetName or CHANGE CR6, #row (0–32767).`});
+                        return null;
+                    }
+                    crDst = 12; crSrc = 6; imm = row;
+                    break;
+                }
                 // CHANGE is available to programmer code. Isolated register
                 // operands are not a compile-time privilege violation;
                 // execution validates the operation and capability authority.
@@ -3481,6 +3509,11 @@ class ChurchAssembler {
             }
             // CHANGE CRd, CR6[idx] / CRs[idx]
             case 4: {
+                if (crDst === 12 && crSrc === 6) {
+                    const ref = cdNamed(imm);
+                    return ref.slotName ? `${mnemonic}  ${ref.slotName}${ref.comment}` :
+                        `${mnemonic}  CR6, #${imm}`;
+                }
                 // The simulator's general one-GT form uses the existing
                 // shorthand word. Keep legacy indexed words explicit.
                 if (crSrc === crDst && imm === 0) return `${mnemonic}  CR${crDst}`;
