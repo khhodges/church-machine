@@ -458,7 +458,7 @@
                                     <button class="ham-item" id="hamItem-editor" onclick="_openProgrammerEditor();closeHamburger()">Programs / Editor</button>
                                     <button class="ham-item" id="hamItem-resume-draft" style="display:none;color:#daa520;" onclick="window.location='/start';closeHamburger()">&#x270F;&#xFE0F; Resume Draft</button>
                                     <button class="ham-item" id="hamItem-repl" onclick="switchView('repl');closeHamburger()">Math / REPL<kbd class="ham-kbd">C+M</kbd></button>
-                                    <button class="ham-item" id="hamItem-source-library" onclick="window.location='/start?abstraction=1';closeHamburger()">Source Library</button>
+                                    <button class="ham-item" id="hamItem-source-library" onclick="switchView('abstractions');switchAbsSubtab('sources');closeHamburger()">Source Library</button>
                                 </div>
                             </div>
                             <!-- Builder -->
@@ -3647,7 +3647,7 @@ python3 server/local_bridge.py /dev/ttyUSB2 57600 8766 --ide=https://lab.cloomc.
     <script src="namespace-design-v1.js?v=sha256-7caed87ebdb4"></script>
     <script src="namespace-ide-node.js?v=3"></script>
     <script src="lump_admission.js?v=sha256-096fa959d8de"></script>
-    <script src="app-abstractions.js?v=sha256-ff7d5881a6b7"></script>
+    <script src="app-abstractions.js?v=sha256-ec1a1c0d4159"></script>
     <script src="app-ns-dna.js"></script>
     <script src="lump-audit.js?v=sha256-80e1d626a627"></script>
     <script src="rci-show-errs.js?v=sha256-652eda848fcc"></script>

@@ -59,6 +59,38 @@ function harness() {
     return {s, nodes, opened, shown};
 }
 (async () => {
+    const admitted = harness();
+    const design = admitted.s.window.NamespaceDesignV1.state;
+    design.profile='ascending';design.fingerprint='9'.repeat(64);
+    const row=design.document.rows.find(r=>r.slot===10);
+    admitted.s.sim.simulationConfiguration={
+        designProfile:design.profile,sourceNamespaceFingerprint:design.fingerprint,
+        artifactBindings:[{slot:10,token:row.selection.token,
+            filename:row.selection.filename,binaryHash:row.selection.binaryHash}],
+    };
+    admitted.s._getLiveLumpState=()=>({nsIdx:10,absName:'Unnamed',baseLoc:80,cw:2});
+    await admitted.s._openProgrammerEditor();
+    assert.equal(admitted.opened.length,1,'unlabeled admitted execution opens the exact selected source');
+    assert.equal(admitted.opened[0][0],row.selection.token);
+    assert.equal(admitted.opened[0][1].confirmReplacement,true,'draft replacement remains guarded');
+    const accepts=admitted.opened[0][1].accepts;
+    design.fingerprint='8'.repeat(64);
+    assert.equal(accepts(),false,'selection drift cancels a pending editor open');
+    assert.equal(admitted.s._namespaceLumpTarget(admitted.s._getLiveLumpState()),null,
+        'a different Namespace must never inherit the executing slot mapping');
+    let inspectorCalls=0,view=null;
+    const errors=[];
+    admitted.s.appendOutput=(text,type)=>errors.push({text,type});
+    admitted.s._openExecutedLumpInEditor=()=>{inspectorCalls++;};
+    admitted.s.switchView=v=>{view=v;};
+    await admitted.s._openProgrammerEditor();
+    assert.equal(inspectorCalls,0,'ordinary Editor navigation never substitutes the inspector');
+    assert.equal(view,'editor');
+    assert(errors.some(e=>e.type==='error' && e.text.includes('draft is unchanged')));
+    const menu=fs.readFileSync(__dirname+'/index.html','utf8');
+    const library=menu.match(/<button[^>]*id="hamItem-source-library"[^>]*>/)[0];
+    assert(library.includes("switchView('abstractions');switchAbsSubtab('sources')"));
+    assert(!library.includes('/start'),'Source Library is not the creation wizard');
     const {s, nodes, opened, shown} = harness();
     const state = s._getLiveLumpState();
     assert.equal(s._executedLumpSelection(s._lumpsCache, state), cap,

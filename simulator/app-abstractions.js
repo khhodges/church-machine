@@ -1793,7 +1793,22 @@ function _namespaceLumpTarget(state) {
     const named = state ? rows.filter(row => row.name === state.absName) : [];
     const focused = !(state && state.ignoreFocus) && design && design.active && Number.isInteger(design.focusedSlot)
         ? rows.find(row => row.slot === design.focusedSlot) : null;
-    const row = focused || (named.length === 1 ? named[0] :
+    // Private execution deliberately has no catalog labels. Resolve its slot
+    // only through the admitted image's exact saved-Namespace provenance.
+    const config = typeof sim !== 'undefined' && sim && sim.simulationConfiguration;
+    let admitted = null;
+    if (state && design && design.active && config &&
+            typeof design.fingerprint === 'string' && design.fingerprint.length === 64 &&
+            config.sourceNamespaceFingerprint === design.fingerprint &&
+            config.designProfile === design.profile && Array.isArray(config.artifactBindings)) {
+        const binding = config.artifactBindings.find(b => b.slot === state.nsIdx);
+        const candidate = rows.find(r => r.slot === state.nsIdx);
+        const selected = candidate && candidate.selection;
+        if (binding && selected && binding.filename === selected.filename &&
+                binding.binaryHash === (selected.binaryHash || selected.binary_hash) &&
+                [binding.token, binding.canonicalToken].includes(selected.token)) admitted = candidate;
+    }
+    const row = focused || admitted || (named.length === 1 ? named[0] :
         named.find(row => Number(row.slot) === Number(state.nsIdx)));
     if (!row) return null;
     const selected = row.selection || row;
@@ -1877,7 +1892,10 @@ async function _openProgrammerEditor() {
                 accepts: () => JSON.stringify(_namespaceLumpTarget(live)) === frozen,
             });
         }
-        if (live) return await _openExecutedLumpInEditor();
+        if (live) {
+            switchView('editor');
+            throw Error('The executing LUMP could not be matched to an exact saved Namespace selection. Select its saved LUMP in Namespace, or explicitly use Inspect executed code');
+        }
         // With no selected program, retain the programmer's own document.
         // No built-in example or catalog default is loaded.
         switchView('editor');

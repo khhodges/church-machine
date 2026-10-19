@@ -34,6 +34,14 @@ source is unavailable, expose exact binary inspection with that limitation,
 not a substituted latest revision. This does not authorize discarding drafts,
 changing running bytes, or installing artifacts.
 
+Label-free private execution must be matched to editor source through the
+admitted Namespace fingerprint and exact artifact binding, never a slot number
+alone or a fabricated runtime name. Ordinary Programs / Editor navigation must
+not silently become the executed-code inspector.
+
+**Why:** The user approved correcting navigation after a legitimate label-free
+runtime appeared as “Unnamed” and sent Programs / Editor to a different tool.
+
 Successful builds and saves should prioritize source beside exact binary disassembly, with build diagnostics available separately. Candidate bytes must never be labeled as the saved artifact.
 
 **Why:** The user wants to inspect generated instructions, not have successful audit messages replace that view. Source preservation and binary inspection are independent requirements.
