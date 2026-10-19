@@ -99,13 +99,16 @@ Namespace/configuration approval.
 
 Saved-revision status notices must be dismissible in every state. Dismissing a
 notice hides presentation only; it must not clear execution barriers or cancel
-preparation.
+preparation. Closing must stay effective for that notice across rendering and
+page reloads, rather than redisplaying the same acknowledged status.
 
 **Why:** The user identified the persistent success notice as uncloseable after
-its wording was corrected. A notice is not itself execution authority.
+its wording was corrected, then explicitly objected when it repeatedly
+returned after closing. A notice is not itself execution authority.
 
 **How to apply:** Keep the Close action separate from status-clearing or
-activation functions, including for pending and failed preparations.
+activation functions, including for pending and failed preparations. Preserve
+dismissal separately from the underlying execution state.
 
 Selected-design execution must retain the established numbered Boot and Code
 step output and trace displays, including Step, Walk, and Run.
