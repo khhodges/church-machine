@@ -102,7 +102,16 @@ create_data_zero_loop:
     IADD DR9, DR9, #1
     BRANCH create_data_zero_loop
 create_data_publish:
-    ; Service binding missing: commit initialized allocation, NS/GC bookkeeping,
+    ; Internal binding missing: CR9 = trusted X GT to create_data_slot_lambda.
+    ; Freeze reserved slot in DR7 and its four prepared descriptor words DR8..11.
+    ; Inputs come from the verified reservation, never caller-supplied registers.
+    ; DR6 remains the allocation size; the zeroed destination stays private.
+    BRANCH TODO_CREATE_BIND_SLOT_LAMBDA_AND_DESCRIPTOR
+create_data_set_slot:
+    LAMBDA CR9
+    TPERM CR9, CLEAR
+create_data_account_and_issue:
+    ; Service binding missing: finish GC/accounting after confirmed slot writes,
     ; debit exactly DR6 words once, issue Inform DATA RW B=1 in CR1.
     ; Only completed publication may set DR1=1. No rollback is promised.
     BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE
@@ -120,6 +129,40 @@ create_result:
     BRANCH TODO_CREATE_RESULT_TYPE
 create_return:
     RETURNAL #2
+
+create_data_slot_lambda:
+    ; Private same-scope X body, NOT a public method or an E-GT CALL.
+    ; Only this body may acquire the configured Namespace RW view in CR10.
+    ; Validate frozen Namespace identity, DR7 slot bounds, empty-slot generation
+    ; and all four prepared words against the authorized reservation.
+    ; Hold the required writer/observer exclusion through read-back and cleanup;
+    ; LAMBDA alone does not provide atomicity. No CALL/CHANGE/SWITCH in interval.
+    BRANCH TODO_CREATE_SLOT_BIND_VALIDATE_AND_EXCLUDE
+create_data_slot_offset:
+    SHL DR7, DR7, #2
+create_data_slot_write:
+    DWRITE DR8, CR10, #0, DR7
+    DWRITE DR9, CR10, #1, DR7
+    DWRITE DR10, CR10, #2, DR7
+    DWRITE DR11, CR10, #3, DR7
+    DREAD DR4, CR10, #0, DR7
+    MCMP DR4, DR8
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD0
+    DREAD DR4, CR10, #1, DR7
+    MCMP DR4, DR9
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD1
+    DREAD DR4, CR10, #2, DR7
+    MCMP DR4, DR10
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD2
+    DREAD DR4, CR10, #3, DR7
+    MCMP DR4, DR11
+    BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
+    TPERM CR10, CLEAR
+    ; Release only after confirmation and removal of Namespace authority.
+    ; On a fault, accepted writes are not implicitly rolled back.
+    BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION
+create_data_slot_return:
+    RETURNAL
 }
 
 method DESTROY {

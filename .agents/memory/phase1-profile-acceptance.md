@@ -218,6 +218,16 @@ Do not replace allocation with a new GT alias for existing storage. This removes
 payload exposure during CREATE; it is not proof of post-return confidentiality
 without controlling retained allocator authority.
 
+CREATE sets its Namespace slot through Mint's private same-scope LAMBDA body.
+
+**Why:** The programmer explicitly directed “Set the slot as well using LAMBDA”
+after choosing separate zero-filled Data allocation.
+
+**How to apply:** Keep Namespace RW authority inside the private Lambda, update
+the selected slot after zeroing, and confirm writes before issuing the result.
+Do not turn the slot body into another public method or treat LAMBDA itself as
+atomicity. Trusted binding, metadata validation and exclusion remain required.
+
 CREATE's Thread case uses CR4 E for its initializer; the later packed-size
 decision selects Thread creation. That GT identifies the application Amoeba
 will start, not an existing Thread or Amoeba itself.

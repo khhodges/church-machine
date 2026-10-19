@@ -51,11 +51,20 @@ assert.doesNotMatch(create, /12-word|#257|CR4, #11|CR4, #10/);
 assert.match(create, /BFEXT DR4, DR2, #0, #3/);
 assert.match(create, /BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE/);
 assert.match(create, /TPERM CR4, NULL\s+BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL/);
-assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy|DR10|DR11/);
+assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy/);
 assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
     'Data CREATE must never read a source payload');
-assert.deepEqual([...create.matchAll(/^\s*DREAD\s+.*$/gm)].map(m=>m[0].trim()),
-    ['DREAD DR4, CR3, #3'], 'Only the Passkey proof bounds probe remains');
+assert.ok([...create.matchAll(/^\s*DREAD\s+\w+,\s*(CR\d+)/gm)]
+    .every(m=>['CR3','CR10'].includes(m[1])),
+    'Reads are confined to proof and private Namespace metadata, never payload');
+assert.match(create, /create_data_set_slot:\s+LAMBDA CR9\s+TPERM CR9, CLEAR/);
+const slotBody=create.slice(create.indexOf('create_data_slot_lambda:'));
+assert.doesNotMatch(slotBody, /^\s*(CALL|CHANGE|SWITCH|LAMBDA)\b/m);
+assert.match(slotBody, /TPERM CR10, CLEAR[\s\S]*BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION/);
+assert.match(slotBody, /create_data_slot_return:\s+RETURNAL/);
+assert.doesNotMatch(create.slice(0,create.indexOf('create_data_slot_lambda:')),
+    /^\s*(?:DREAD|DWRITE|LOAD|TPERM).*CR10\b/m,
+    'Namespace authority is confined to the private Lambda');
 assert.match(create, /BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA/);
 assert.match(create, /BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE/);
 assert.match(create, /BRANCH TODO_CREATE_RESULT_TYPE/);
@@ -64,11 +73,10 @@ assert.ok(destroy.indexOf('TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM') <
 
 // Walk the actual draft's scalar/zeroing instructions, NOT unresolved services.
 // Native syntax is independently checked above. This is not full Mint acceptance.
-const guards=create.slice(create.indexOf('create_data_scalar_checks:'),
-    create.indexOf('create_finish:')).split('\n')
+const guards=create.slice(create.indexOf('create_data_scalar_checks:')).split('\n')
     .map(s=>s.split(';')[0].trim()).filter(Boolean);
 const labels=new Map(guards.map((s,i)=>[s.endsWith(':')?s.slice(0,-1):'',i]));
-function walk(start, dr, destination=[]) {
+function walk(start, dr, destination=[], namespace=[], corruptRead=-1) {
     let cmp=0;
     dr.DR0=0;
     for(let pc=labels.get(start),steps=0;pc<guards.length && steps++<10000;pc++) {
@@ -83,13 +91,25 @@ function walk(start, dr, destination=[]) {
             dr[args[0]]=((value(args[0]) & ~mask) | ((value(args[1])<<value(args[2])) & mask))>>>0;
         }
         else if(op==='DWRITE') {
-            assert.equal(args[1],'CR8');
+            assert.ok(['CR8','CR10'].includes(args[1]));
+            const memory=args[1]==='CR8'?destination:namespace;
             const i=value(args[2])+value(args[3]);
-            assert.ok(i<destination.length,'destination write must be bounded');
-            destination[i]=value(args[0])>>>0;
+            assert.ok(i<memory.length,'destination write must be bounded');
+            memory[i]=value(args[0])>>>0;
+        }
+        else if(op==='DREAD') {
+            assert.equal(args[1],'CR10','Only Namespace read-back in this fragment');
+            const i=value(args[2])+value(args[3]);
+            assert.ok(i<namespace.length);
+            dr[args[0]]=(namespace[i] ^ (i===corruptRead?1:0))>>>0;
+        }
+        else if(op==='TPERM') {
+            assert.deepEqual(args,['CR10','CLEAR']);
+            dr.namespaceAuthorityCleared=true;
         }
         else if(op==='MCMP') cmp=value(args[0])-value(args[1]);
         else if(op==='SHR') dr[args[0]]=value(args[1])>>>value(args[2]);
+        else if(op==='SHL') dr[args[0]]=(value(args[1])<<value(args[2]))>>>0;
         else if(op.startsWith('BRANCH')) {
             const take={BRANCH:true,BRANCHEQ:cmp===0,BRANCHNE:cmp!==0,BRANCHHI:cmp>0}[op];
             assert.notEqual(take,undefined,op);
@@ -129,8 +149,29 @@ for(const size of [24,40,56,72,0xfffffff8]) {
 for(const size of [8,16,64,256,1024]) {
     const output=Array(size+2).fill(0xdeadbeef);
     assert.equal(walk('create_data_zero_begin',{DR6:size,DR9:0xffffffff},output),
-        'TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE');
+        'TODO_CREATE_BIND_SLOT_LAMBDA_AND_DESCRIPTOR');
     assert.deepEqual(output,[...Array(size).fill(0),0xdeadbeef,0xdeadbeef]);
+}
+
+// Test-only prepared descriptors and Namespace view. This verifies exact-slot
+// writes/confirmation, NOT legal binding, allocation, exclusion or publication.
+const descriptor=[0x80001000,0x12345678,0x87654321,0xffffffff];
+for(const slot of [0,1,14,255]) {
+    const namespace=Array(256*4).fill(0xa5a5a5a5);
+    const expected=namespace.slice();
+    expected.splice(slot*4,4,...descriptor);
+    const dr={DR7:slot,DR8:descriptor[0],DR9:descriptor[1],
+        DR10:descriptor[2],DR11:descriptor[3]};
+    assert.equal(walk('create_data_slot_offset',dr,[],namespace),
+        'TODO_CREATE_SLOT_RELEASE_EXCLUSION');
+    assert.deepEqual(namespace,expected,'only the selected slot may change');
+    assert.equal(dr.namespaceAuthorityCleared,true);
+}
+for(let word=0;word<4;word++) {
+    const dr={DR7:14,DR8:descriptor[0],DR9:descriptor[1],
+        DR10:descriptor[2],DR11:descriptor[3]};
+    assert.equal(walk('create_data_slot_offset',dr,[],Array(1024).fill(0),56+word),
+        `TODO_CREATE_SLOT_CONFIRM_WORD${word}`);
 }
 
 // Verify masked-return encodings through the ordinary assembler, not a
