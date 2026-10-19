@@ -6016,6 +6016,7 @@ pre:hover .code-copy-btn {
 .lump-audit-row:last-child { border-bottom: none; }
 
 .lump-audit-row-pass   { color: #8bd4a8; }
+.lump-audit-row-info   { color: #a7bfd8; }
 .lump-audit-row-warn   { color: #e0a055; }
 .lump-audit-row-error  { color: #e07070; }
 

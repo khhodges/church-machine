@@ -129,5 +129,56 @@ function freshContainer() {
     check('J7 pass severity never renders a jump button', !btn);
 })();
 
+// Real audit bytes: repeated LOADs into five unresolved rows are binding
+// information, not eight warnings or proof of destination execution readiness.
+{
+    const assert = require('node:assert/strict');
+    const {lumpAudit, lumpAuditHasErrors, lumpAuditHasWarnings} = require('./lump-audit.js');
+    const Assembler = require('./assembler.js');
+    const assembler = new Assembler();
+    const code = assembler.assemble([1,2,3,4,5,4,2,1]
+        .map(slot => `LOAD CR1, CR6, #${slot}`).join('\n')).words;
+    assert.deepEqual(assembler.errors, []);
+    const words = Array(64).fill(0);
+    words[0] = ((31 << 27) | (code.length << 10) | 6) >>> 0;
+    words.splice(1, code.length, ...code);
+    const before = words.slice();
+    for (const skipRnc of [false, true]) {
+        const result = lumpAudit(words, {pet_names:{CR:{1:'ide.SelfTest',2:'ide.LED_DEV',
+            3:'ide.UART_DEV',4:'ide.BTN_DEV',5:'ide.TIMER_DEV'}}}, null, {skipRnc});
+        const info = result.find(row => row.ruleId === 'RNC');
+        assert.equal(info.severity, 'info');
+        assert.match(info.message, /^5 referenced capabilities/);
+        assert.equal(info.references.length, 8);
+        assert.equal(info.violations, undefined);
+        assert.equal(lumpAuditHasWarnings([info]), false);
+        assert.equal(lumpAuditHasErrors([info]), false);
+        const container = freshContainer();
+        const outcome = lumpAuditRenderPanel(container, [info],
+            {token:'12345678', startOpen:true});
+        assert.equal(outcome.hasWarnings, false);
+        assert.equal(outcome.hasErrors, false);
+        assert.equal(container.querySelectorAll('details').length, 1);
+        assert.equal(container.querySelector('details').open, false);
+        assert.equal(container.querySelectorAll('details li').length, 8);
+        assert.equal(container.querySelectorAll('.lump-audit-jump-btn').length, 0);
+        assert.equal((container.textContent.match(/Instruction 1 \(LOAD\)/g) || []).length, 1);
+        assert.doesNotMatch(container.textContent, /not written|runtime fills|injected at deployment|review required/);
+        assert.match(container.textContent, /HardFault only if execution references it/);
+        container.querySelector('details').open = true;
+        assert.equal(container.querySelector('details').open, true);
+    }
+    assert.deepEqual(words, before, 'audit and rendering never change saved bytes');
+    const badHeader = words.slice(); badHeader[0] = 0;
+    assert.equal(lumpAuditHasErrors(lumpAudit(badHeader)), true);
+    const outOfRange = words.slice();
+    outOfRange[1] = new Assembler().assemble('LOAD CR1, CR6, #6').words[0];
+    const errors = lumpAudit(outOfRange);
+    assert.equal(errors.find(row => row.ruleId === 'RCI').severity, 'error');
+    const mixed = lumpAuditRenderPanel(freshContainer(), errors, {startOpen:true});
+    assert.equal(mixed.hasErrors, true, 'binding information never suppresses real errors');
+    console.log('PASS non-blocking binding status, eight expandable references, and preserved structural errors');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail > 0) process.exit(1);

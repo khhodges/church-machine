@@ -2228,7 +2228,7 @@ async function compileAndBuild(options) {
         _errListing += `\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\n\n`;
         _errListing += `  The assembled binary has structural errors. Fix them and rebuild:\n\n`;
         for (const r of _auditResults) {
-            const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
+            const _sym = r.severity === 'info' ? 'i' : r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
             _errListing += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
         }
         _errListing += `\n  \u2717 ${_auditErrors.length} error${_auditErrors.length !== 1 ? 's' : ''} \u2014 binary not downloaded or saved.\n`;
@@ -2499,7 +2499,7 @@ async function compileAndBuild(options) {
                 listing += `      it does not prove that capabilities lost their identities or will automatically resolve at load time.\n`;
                 continue;
             }
-            const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
+            const _sym = r.severity === 'info' ? 'i' : r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
             listing += `    ${_sym} [${r.ruleId}] ${r.message} \u2014 ${r.detail}\n`;
         }
         if (_auditWarns.length > 0) {
@@ -2833,7 +2833,7 @@ function auditLumpOnly() {
     listing += `  Header: 0x${(header >>> 0).toString(16).padStart(8, '0')}\n\n`;
     listing += `  Checks:\n`;
     for (const r of auditResults) {
-        const _sym = r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
+        const _sym = r.severity === 'info' ? 'i' : r.severity === 'pass' ? '\u2713' : r.severity === 'warn' ? '\u26a0' : '\u2717';
         listing += `    ${_sym} [${_auditHE(r.ruleId)}] ${_auditHE(r.message)} \u2014 ${_auditHE(r.detail)}\n`;
         if ((r.severity === 'error' || r.severity === 'warn') && Array.isArray(r.violations)) {
             for (const v of r.violations) {

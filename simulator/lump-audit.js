@@ -6,7 +6,7 @@
  *   words    — Array or Uint32Array of 32-bit unsigned integers (the LUMP binary)
  *   manifest — optional object with cw / cc / lump_size fields from sidecar / manifest JSON
  *
- * severity values: 'pass' | 'warn' | 'error'
+ * severity values: 'pass' | 'info' | 'warn' | 'error'
  *
  * Rules checked
  *   R1  — bits[31:27] of word 0 must equal 0x1F
@@ -648,9 +648,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
                         (manifest && Array.isArray(manifest.capabilities) &&
                          manifest.capabilities[slot] && manifest.capabilities[slot].name) || null;
                     const _nullNameHint = _nullCapName ? ` ("${_nullCapName}")` : '';
-                    const _nullMsg = `Instruction ${wi} (${_rciOpName[op]}) accesses capability slot ${slot}${_nullNameHint},` +
-                        ` but that slot contains a NULL GT (0x00000000).` +
-                        ` The ${_nullCapName || 'capability'} GT was not written into the c-list.`;
+                    const _nullMsg = `Instruction ${wi} (${_rciOpName[op]}) references unbound capability slot ${slot}${_nullNameHint}.`;
                     const _nullSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
                     _rncViolations.push({ msg: _nullMsg, sourceLine: _nullSrcLine, slot, wordIndex: codeIdx });
                 }
@@ -717,21 +715,9 @@ function lumpAudit(words, manifest, lineNums, opts) {
             });
         }
 
-        // ── RNC — NULL GT in c-list (warning) ────────────────────────────────
-        // skipRnc is set when auditing a freshly compiled binary whose c-list is
-        // intentionally all-zeros (GTs are injected at deployment time by the server).
-        // In that context the warning is always a false positive — the Capabilities
-        // panel above already shows the named slots from the manifest.
-        if (opts && opts.skipRnc) {
-            if (cc > 0) {
-                results.push({
-                    ruleId: 'RNC',
-                    severity: 'pass',
-                    message: 'C-list slots not checked \u2014 GTs populated at deployment \u2713',
-                    detail: 'In a freshly compiled binary the c-list area is 0x00000000; the server injects capability GTs when the lump is saved to the namespace. Named slots are listed in the Capabilities panel above.',
-                });
-            }
-        } else if (_rncViolations.length === 0) {
+        // RNC describes these bytes, not destination binding or execution approval.
+        // Legacy skipRnc callers also receive this non-blocking status.
+        if (_rncViolations.length === 0) {
             if (cc > 0) {
                 results.push({
                     ruleId: 'RNC',
@@ -742,14 +728,14 @@ function lumpAudit(words, manifest, lineNums, opts) {
             }
         } else {
             const _nullSlots = [...new Set(_rncViolations.map(v => v.slot))].sort((a, b) => a - b);
-            const _slotLabel = `slot${_nullSlots.length !== 1 ? 's' : ''} [${_nullSlots.join(', ')}]`;
             results.push({
                 ruleId: 'RNC',
-                severity: 'warn',
-                message: `NULL GT in c-list \u2014 ${_slotLabel} contain${_nullSlots.length === 1 ? 's' : ''} a NULL GT (0x00000000).`,
-                detail: _rncViolations.map(v => v.msg).join(' ') +
-                    ' Note: c-list slots are always 0x00000000 in a freshly compiled binary \u2014 the runtime fills them at load time. This warning is expected for any lump that has not yet been deployed to the namespace.',
-                violations: _rncViolations,
+                severity: 'info',
+                message: `${_nullSlots.length} referenced ${_nullSlots.length === 1 ? 'capability is' : 'capabilities are'} not yet bound in these bytes.`,
+                detail: 'Unresolved bindings do not block saving. Use Bind Namespace Design to resolve against the selected Namespace. ' +
+                    'A remaining unresolved binding causes a HardFault only if execution references it. ' +
+                    'This static report does not establish whether the instruction will execute or whether a destination copy is bound.',
+                references: _rncViolations,
             });
         }
     } else if (legacyInstructions && typ !== 2 && typ !== 1 /* Thread/data lumps silently skip RCI; only warn for other failures */) {
@@ -998,6 +984,7 @@ function lumpAuditRenderPanel(container, results, opts) {
     });
     const hasErrors   = lumpAuditHasErrors(results);
     const hasWarnings = lumpAuditHasWarnings(results);
+    const hasInfo = results.some(r => r.severity === 'info');
     const allPass     = !hasErrors && !hasWarnings;
 
     const o = opts || {};
@@ -1018,6 +1005,7 @@ function lumpAuditRenderPanel(container, results, opts) {
         ? `${results.filter(r => r.severity === 'error').length} check${results.filter(r => r.severity === 'error').length !== 1 ? 's' : ''} failed`
         : hasWarnings
         ? `${results.filter(r => r.severity === 'warn').length} audit warning${results.filter(r => r.severity === 'warn').length !== 1 ? 's' : ''} — review required`
+        : hasInfo ? 'No blocking errors or warnings — binding information below'
         : 'Reported checks passed — not execution approval';
 
     header.innerHTML = `<span class="lump-audit-icon">${icon}</span>` +
@@ -1066,6 +1054,22 @@ function lumpAuditRenderPanel(container, results, opts) {
         row.appendChild(ruleSpan);
         row.appendChild(content);
         body.appendChild(row);
+
+        if (r.severity === 'info' && Array.isArray(r.references) && r.references.length) {
+            const disclosure = document.createElement('details');
+            const summary = document.createElement('summary');
+            summary.textContent = `Instruction references (${r.references.length})`;
+            disclosure.appendChild(summary);
+            const list = document.createElement('ul');
+            for (const reference of r.references) {
+                const item = document.createElement('li');
+                item.textContent = reference.msg +
+                    (reference.sourceLine != null ? ` Source line ${reference.sourceLine}.` : '');
+                list.appendChild(item);
+            }
+            disclosure.appendChild(list);
+            content.appendChild(disclosure);
+        }
 
         // Any warning/failure row that carries per-violation location data gets a
         // precise "↑ line N" jump button (RCI errors, RNC warnings, and any future
