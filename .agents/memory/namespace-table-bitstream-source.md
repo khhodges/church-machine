@@ -17,6 +17,16 @@ master list NOT some unseen catalog.” This includes the editor and LUMP detail
 selection must follow that Namespace and the programmer's chosen entry, with no
 implicit SelfTest default or automatic promotion to a catalog's newest revision.
 
+The user explicitly requires any simplified IDE catalog to be slaved to the
+selected Namespace. A unified source catalog is not a replacement authority.
+
+**Why:** Consolidating example and source lookup must not recreate an unseen
+catalog that chooses membership or revisions independently of the Namespace.
+
+**How to apply:** Derive the active catalog from the selected Namespace and its
+exact assigned LUMPs. Keep optional example/library browsing distinct from
+Namespace membership; never automatically install or substitute those entries.
+
 **Why:** After the Phase 1 label-navigation work, the user reiterated:
 “The manefest is not a truth table, the Namespace is GOD.”
 

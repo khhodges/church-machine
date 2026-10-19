@@ -73,6 +73,12 @@ they are never invoked indirectly; coverage registration needs explicit review.
 
 ## Simplification boundaries
 
+The active IDE catalog must be subordinate to the selected Namespace: derive
+membership and exact LUMP selections from that Namespace, not from a manifest,
+example inventory or latest-revision index. Consolidated source lookup is only
+lookup infrastructure. Optional library/examples must remain distinct from
+installed membership and must never substitute artifacts automatically.
+
 Safe candidates for small follow-up changes:
 
 1. Shared valid positive-fixture builders using the real compiler/assembler,
