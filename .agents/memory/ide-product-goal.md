@@ -48,3 +48,13 @@ to make the remaining bindings pass.
 **How to apply:** Preserve selected rows and distinguish each profile's saved
 membership. Any proposed removal must explicitly identify its slot and name for
 confirmation; verify membership as well as binding status.
+
+The user explicitly confirmed on 2026-10-19 that they removed `ide.Mint` from
+Newlayout slot 9 after its restoration.
+
+**Why:** Its later absence was incorrectly suspected to be an unexplained
+overwrite; the user clarified that it was their own deliberate edit.
+
+**How to apply:** Do not restore Mint to slot 9 or investigate that confirmed
+removal as data loss unless the user requests a new change. It is separate from
+the simulator display issue.
