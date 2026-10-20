@@ -61,6 +61,18 @@ authorized input. Do not implicitly select CR6 or copy the constructor's E-list
 as the Namespace definition. This distinction does not approve a binary format
 or grant new construction authority.
 
+The user endorses the three-layer Namespace design: the programmer supplies
+the definition C-list; a Namespace abstraction constructs the machine table;
+SecurityRegulator validates the Passkey and performs the privileged activation.
+
+**Why:** This keeps programmer-defined organization separate from table
+construction and machine-register authority. The user explicitly approved
+this separation as the “3 layer cake.”
+
+**How to apply:** Preserve these boundaries when working through Namespace
+SWITCH and subsequent Regulator methods. This is design-direction approval,
+not approval of an ABI, binary format, implementation or hardware change.
+
 **Why:** Encapsulate privileged control as operations instead of exposing raw
 whole-word writes or leaving M authority with the caller.
 
