@@ -3,7 +3,6 @@
 - [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
 - [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.
 - [Wide-screen touch refresh](wide-touch-refresh.md) — suppress pull-to-refresh in the wide-screen IDE while retaining normal touch scrolling.
-- [Hardware CHANGE fetch addresses](hardware-change-fetch-address.md) — use actual imem_addr and absolute saved NIAs; completion alone does not prove executable activation.
 - [ISA review decisions](isa-review-index.md) — scope, compatibility, encoding checks, conformance fixtures, instruction commentary and scheduling.
 - [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
 - [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
@@ -33,7 +32,7 @@
 - [NS slot labels across hard resets](ns-slot-label-persistence.md) — reseeding must override temporary '(reserved)' labels after binary restoration
 - [Boot.Abstr c-list must be pre-populated](boot-abstr-clist-must-be-prepopulated.md) — boot path skips lazy GT injection; LUMP needs correct GTs baked in; JS vs Python GT formats differ; manifest filename field governs lump-consistency binary reads
 - [Mint gate for NS slot registration](mint-gate-ns-registration.md) — only Mint.RegisterOutform→Navana.ADD→writeNSEntry may add NS slots; _seedIrqLazyManifest handles post-allocation state; no direct writeNSEntry outside this chain
-- [Hardware release evidence](hardware-release-index.md) — serialized builds, source fingerprints, fresh staging, complete bundles, and historical authority.
+- [Hardware profiles and release evidence](hardware-release-index.md) — resource abstraction, activation proof, internal probes, builds and release provenance.
 - [Wukong IRQ arm gate](wukong-irq-arm-gate.md) — irq_armed_reg+first_call_done_reg cleared on FAULT_RST; dispatch disabled until first CALL→method→RETURN completes
 - [Wukong boot CALL direct-GT resolution](wukong-boot-call-resolution.md) — decoder call_mask=0 always; boot window uses BOOT_RESTORE_MASK (CR0+CR12); CALL bypasses c-list via mload_direct+boot_window_lat
 - [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
@@ -150,7 +149,6 @@
 - [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
 - [Namespace handoff authority](namespace-handoff-evidence.md) — no hidden caches; entry GT version 0; faulting CR identifies software blacklisting; hardware never changes versions.
-- [Internal Wukong probes](wukong-internal-probe-preservation.md) — keep optional ILA observations internal and preserve attributes until Vivado; Yosys may copy attributes to aliases.
 - [Ascending-v1 candidate boundary](ascending-v1-candidate-boundary.md) — profile approval is separate from Header V2 approval and never authorizes installation, activation, or hardware programming.
 - [Authenticated compact API admission](authenticated-compact-api-admission.md) — expand embedded rows from exact bytes; recover source PetNames only from matching signed compiler rows.
 - [Alternative IDE prototype](alternative-ide-prototype.md) — include Thread/Namespace authoring; separate URL and demo state, with no live artifact or hardware changes.

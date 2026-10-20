@@ -1270,3 +1270,17 @@ mtime_ms = 1792509731630
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/eb3ea3d0-9a06-45ec-8619-2bfbbb770cae/c5ccb02b-686e-4c79-a07d-85de5a65b511"
 storage_version_token = "1792509742875028"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "pPJRh1fhhrtgGaC05uSzy"
+uri = "file://docs/reviews/artix7-hardware-abstraction.md"
+type = "text"
+title = "Artix-7 / Wukong Hardware Abstraction"
+description = "Review definition covering current resources and unused expansion options, with separate board-support, implementation, verification and access status. No hardware changes."
+logical_id = "4798db03-7622-4f98-9b74-25ff83840398"
+content_hash = "sha256:32da3aba2337979a4170d3359d4d20abbdf0f1ed6908c3d9c50e0a9290c511a4"
+size = 5557
+mtime_ms = 1792510328222
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4798db03-7622-4f98-9b74-25ff83840398/fe3c7e6c-0e0d-4bf8-b763-2ce8dadaa467"
+storage_version_token = "1792510386499136"
+content_type = "text/markdown"

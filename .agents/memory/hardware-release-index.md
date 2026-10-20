@@ -3,6 +3,9 @@ name: Hardware release evidence
 description: Build-host, staging, artifact tracking, and release authority constraints.
 ---
 
+- [Hardware abstraction](hardware-abstraction-boundary.md) — Artix7/Wukong catalogs include unused options without implying implementation or access.
+- [CHANGE fetch evidence](hardware-change-fetch-address.md) — actual fetch addresses and absolute saved NIAs prove activation, not completion alone.
+- [Internal probes](wukong-internal-probe-preservation.md) — preserve optional ILA observations and attributes without creating external ports.
 - [Build-host policy](wukong-build-host-policy.md) — serialize resource-constrained vendor builds; require timing-clean provenance.
 - [Readiness fingerprints](hardware-readiness-fingerprint.md) — generated hardware must identify its active source inputs.
 - [Release candidate baseline](bitstream-release-candidate-baseline.md) — distinguish pending hardware work from trusted released artifacts.
