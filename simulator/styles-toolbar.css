@@ -1044,6 +1044,11 @@
     white-space: nowrap;
 }
 
+.dashboard-active-label.cr14-context-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .flags-led-row .flags-bar {
     flex: 1 1 auto;
     min-width: 0;

@@ -1424,6 +1424,17 @@ function _currentSimulatorInstructionAddress(machine) {
     return Number.isInteger(address) && address >= 0 ? address >>> 0 : null;
 }
 
+function _cr14CodeContextHeading(machine) {
+    const label = (index, role) => {
+        const word = machine.cr[index].word0 >>> 0;
+        const gt = machine.parseGT(word);
+        if (gt.type === 0) return `${role}: unavailable`;
+        const pet = machine.nsLabels && machine.nsLabels[gt.index];
+        return `${role}: ${pet || `unnamed (slot ${gt.index})`}`;
+    };
+    return `Code — ${label(14, 'Pet name / Abstraction')} · ${label(12, 'Thread')} · ${label(15, 'Namespace')}`;
+}
+
 function updateCRDetail() {
     if (typeof window !== 'undefined') {
         window._currentCodeControlFlowAddresses = {
@@ -1613,13 +1624,17 @@ function updateCRDetail() {
         crDetailTab === 'register' ? 'Register' :
         crDetailTab === 'binary'   ? 'Binary'   : 'Code';
 
-    const _headingText = _absLabel
+    const _headingText = crIdx === 14 && crDetailTab === 'code'
+        ? _cr14CodeContextHeading(sim)
+        : _absLabel
         ? (_activeTabLabel && _activeTabLabel !== 'Code' ? `${_absLabel} \u2014 ${_activeTabLabel}` : _absLabel)
         : _activeTabLabel;
 
     const activeLabelEl = document.getElementById('crdMenuActiveLabel');
     if (activeLabelEl) {
         activeLabelEl.textContent = _headingText;
+        activeLabelEl.title = _headingText;
+        activeLabelEl.classList.toggle('cr14-context-label', crIdx === 14 && crDetailTab === 'code');
         activeLabelEl.setAttribute('data-abs-label', _absLabel ? _absLabel.replace(/"/g,'&quot;') : '');
     }
 
@@ -1715,7 +1730,9 @@ function updateCRDetail() {
     html += '<div class="cr-detail-grid">';
     {
         html += '<div class="cr-detail-section">';
-        html += '<div class="cr-detail-heading">Code View \u2014 Executable Memory</div>';
+        html += '<div class="cr-detail-heading">' +
+            (crIdx === 14 ? _escapeCRDisplayName(_cr14CodeContextHeading(sim)) :
+                'Code View \u2014 Executable Memory') + '</div>';
         // Sticky patch badge — shown when a patch is queued to survive reset
         if (typeof _stickyPatches !== 'undefined' && _stickyPatches[nsIdx]) {
             html += `<div class="crd-sticky-badge">` +
