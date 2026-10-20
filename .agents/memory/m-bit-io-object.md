@@ -31,6 +31,15 @@ The user names this abstraction **SecurityRegulator**, "in Babbage's tradition."
 Use that name in future interface discussion; naming does not allocate a GT
 or change device custody.
 
+SecurityRegulator's proposed functional method contract must include a Passkey
+to regulate users, as explicitly requested by the user. Apply the existing
+GT-plus-independent-proof model from `top-security-passkeys.md`.
+
+**Why:** Encapsulating M operations alone does not authorize their callers.
+
+**How to apply:** Include caller, method and target authorization in the proposed
+contract; this request is for interface design, not operational provisioning.
+
 **Why:** Encapsulate privileged control as operations instead of exposing raw
 whole-word writes or leaving M authority with the caller.
 
