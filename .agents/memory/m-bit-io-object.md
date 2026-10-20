@@ -40,6 +40,16 @@ GT-plus-independent-proof model from `top-security-passkeys.md`.
 **How to apply:** Include caller, method and target authorization in the proposed
 contract; this request is for interface design, not operational provisioning.
 
+The user's current design direction is to limit SecurityRegulator to machine
+register functionality, leaving abstraction architecture to programmers.
+
+**Why:** The user questioned whether purpose-specific methods such as dependency
+installation improperly assign programmer choices to the Regulator.
+
+**How to apply:** Propose instruction/register-level operations, not constructors,
+schedulers or dependency policies. Separate Passkey validation from issuance
+policy. Exact method signatures remain proposals, not approved implementation.
+
 **Why:** Encapsulate privileged control as operations instead of exposing raw
 whole-word writes or leaving M authority with the caller.
 
