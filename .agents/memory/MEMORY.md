@@ -155,3 +155,4 @@
 - [Phase 1 review decisions](phase-1-document-collection.md) — guided scope decisions; two Namespaces on one FPGA for networking tests belong to Phase 2.
 - [Phase 1 profile acceptance](phase1-profile-acceptance.md) — historical save evidence cannot close the approved profile; use isolated exact selections and original controls.
 - [Mint context authority](mint-context-authority-boundary.md) — synthetic frame evidence grants no service access; approve protected interfaces and Lambda authority before implementation.
+- [Alice/Mallory Threads](alice-mallory-thread-isolation.md) — separate Threads; CR1 proposed for each actor's entry capability, with distinct capability grants.
