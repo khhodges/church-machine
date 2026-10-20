@@ -23,3 +23,13 @@ preboot fixture provisioning without proving the saved-design preparation path.
 **How to apply:** Label fixture-only initialization and historical source
 adaptations explicitly; never present that run as installation or execution
 of the user's saved NewLayout.
+
+Alice's stash must survive fault restart and be readable afterward without
+running Stash again.
+
+**Why:** The user accepted LUMP-backed storage conditionally on survival through
+fault restart; unchanged bytes at the fault itself are insufficient.
+
+**How to apply:** Distinguish restarting execution over retained memory from
+reloading a pristine image. Verify Reveal after recovery, not just the
+pre-restart value. Do not imply persistence across power loss.
