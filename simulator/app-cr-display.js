@@ -34,6 +34,27 @@ function _escapeCRDisplayName(value) {
         .replace(/'/g, '&#39;');
 }
 
+function _currentCRFault(machine) {
+    if (!machine || !machine.halted) return null;
+    const fault = machine.faultLog && machine.faultLog[machine.faultLog.length - 1];
+    if (!fault || fault.step !== machine.stepCount) return null;
+    if (fault.threadSlot != null && fault.threadSlot !== machine._currentThreadSlot) return null;
+    const reason = String(fault.rawDiagnosticReason || fault.message || '');
+    // Use the fault's diagnostic evidence, not the selected row or instruction
+    // destination. Do not guess when several registers are named.
+    const registers = [...new Set([...reason.matchAll(/\bCR(1[0-5]|[0-9])\b/g)].map(m => Number(m[1])))];
+    if (registers.length !== 1) return null;
+    const index = registers[0];
+    const captured = fault.crSnapshot && fault.crSnapshot[index];
+    const live = machine.cr && machine.cr[index];
+    if (captured && (!live || ['word0','word1','word2','word3','m']
+            .some(key => captured[key] !== live[key]))) return null;
+    const permission = reason.match(/\blacks\s+([BRWXLSE])[- ]permission\b/i);
+    const missing = permission ? permission[1].toUpperCase() : null;
+    return {index, reason, missing,
+        label: `CR${index}: ${missing ? missing + ' permission missing' : reason}`};
+}
+
 function updateCRDisplay() {
     if (!sim) return;
     const container = document.getElementById('crRegs');
@@ -57,6 +78,7 @@ function updateCRDisplay() {
         15: { group: 'privil', role: 'privil', badge: 'Priv'   },
     };
     const TOTAL_COLS = 15;
+    const currentFault = _currentCRFault(sim);
     const inspection = _displayedCRContext && _displayedCRContext.crIdx === selectedCR
         ? _displayedCRContext : null;
     let html = inspection
@@ -65,6 +87,10 @@ function updateCRDisplay() {
             `<strong>CR target:</strong> ${_escapeCRDisplayName(_displayedCRContextText(inspection))}` +
             `</div>`
         : '';
+    if (currentFault) {
+        html += `<div class="cr-fault-summary" role="alert" style="padding:8px;margin-bottom:8px;border-left:4px solid #ff6b6b;background:#451f29;color:#fff;">` +
+            `<strong>${_escapeCRDisplayName(currentFault.label)}</strong></div>`;
+    }
     html += '<table class="cr-table"><thead>';
     html += '<tr class="cr-table-groups">';
     html += '<th rowspan="2" class="cr-group-cr-id">CR#</th>';
@@ -134,10 +160,11 @@ function updateCRDisplay() {
                 `title="${escCell(message)}" aria-label="${escCell(message)}">` +
                 `${icon} ${gtVersion} / NS ${nsVersion}</span>`;
         }
-        html += `<tr class="${nullCls}${groupCls}${clickable}" ${!cr.isNull ? `onclick="openCRDetail(${i})"` : ''}>`;
+        const rowFault = currentFault && currentFault.index === i ? currentFault : null;
+        html += `<tr class="${nullCls}${groupCls}${clickable}${rowFault ? ' cr-fault-row' : ''}" ${rowFault ? `data-fault-cr="${i}" title="${_escapeCRDisplayName(rowFault.reason)}" style="background:#451f29;outline:2px solid #ff6b6b;outline-offset:-2px;"` : ''} ${!cr.isNull ? `onclick="openCRDetail(${i})"` : ''}>`;
         html += `<td class="cr-idx">${i}</td>`;
         html += `<td class="cr-gt">0x${cr.word0_gt}</td>`;
-        html += `<td class="cr-perms">[${cr.perms}]</td>`;
+        html += `<td class="cr-perms">[${cr.perms}]${rowFault && rowFault.missing ? `<strong class="cr-fault-permission" style="display:block;color:#ff8c8c;">${rowFault.missing} missing</strong>` : ''}</td>`;
         html += `<td class="cr-version">${versionHtml}</td>`;
         html += `<td class="cr-target">${targetHtml}</td>`;
         html += `<td class="cr-type">${cr.gtTypeName}</td>`;

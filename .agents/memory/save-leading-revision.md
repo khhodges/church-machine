@@ -141,6 +141,15 @@ do not treat the separate Trace popup or console output as the CR14 Code window.
 Every selected simulator must present the existing fault modal on a runtime
 fault, not merely write console output or show a toast.
 
+The CRs view should also identify the faulting register and missing permission
+when that view is visible, without requiring another modal.
+
+**Why:** The user requested easy inspection of a CR11 missing-W fault directly
+in the register table.
+
+**How to apply:** Use the current incident's evidence; do not mark a different
+Thread's registers or retain the marker after reset merely because fault history exists.
+
 **Why:** The user observed the selected simulation stop on CHANGE without the
 normal fault report. Changing runtime ownership must retain fault presentation.
 
