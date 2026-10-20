@@ -7,6 +7,9 @@ Phase 1.1 refines Phase 1; it is not the start of Phase 2.
 1. [ISA review](isa-review.md) — discrepancies and evidence from the first pass.
 2. [Decisions](decisions.md) — approved scope and decisions made during review.
 
+Current review: [proposed SWITCH replacement wording](isa-review.md#proposed-switch-replacement-wording).
+This is a draft, not an amendment to the Master.
+
 ## Authority and scope
 
 The existing [Master ISA](../01-isa/instruction-set.md) remains authoritative.

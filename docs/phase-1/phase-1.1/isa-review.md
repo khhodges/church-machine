@@ -132,9 +132,92 @@ approved Genesis rules where available, and identify only genuinely missing
 decisions. Do not choose behavior merely because the current simulator or RTL
 does it.
 
+## Proposed SWITCH replacement wording
+
+**Draft for review — not incorporated or approved.** Replace the Master's
+SWITCH “Fault behavior” subsection through its version-blacklisting sentence
+with the text below. Retain the preceding encoding, source, lifecycle and
+entry-Thread rules. The final Boot Thread/purgatory sentence requires the
+separate recovery decision below; this draft does not silently remove it.
+
+### Draft: instruction admission and failure
+
+SWITCH has fixed destinations: CR15 for the incoming Namespace and CR12 for
+its slot-2 entry Thread. Bits 22:19 must be zero; they do not select a
+destination register. A nonzero field is noncanonical, including the former
+explicit-destination value 15. The source selector must name CR0–CR11.
+Malformed encodings and prohibited source selectors fault with `INVALID_OP`
+when subject to the applicable encoding and operand checks.
+
+For an otherwise well-formed, condition-true SWITCH, latched CR15.M must be
+set; otherwise the instruction faults with `PERM_L`. No additional CR12.M
+grant is required. The source must hold a valid ordinary C-list capability
+with explicit L permission. Source M does not supply that permission,
+including when the source is CR6.
+
+The row is `DR[index] ± magnitude`, using the approved ten-bit magnitude
+and four-bit DR selector. Calculate it without wraparound. Source capability,
+bounds, generation, integrity and Namespace-type admission checks must
+succeed before the handoff begins. An admission failure does not begin
+outgoing Thread save or install either incoming context.
+
+After admission, SWITCH performs outgoing Thread save under the outgoing
+Namespace, Namespace installation into CR15, and incoming slot-2 Thread
+activation into CR12, in that order and without another instruction.
+The ordinary entry GT uses version zero; the guarded boot-pair exception
+remains unchanged. Entry validation is mandatory. A valid poison-root entry
+starts its declared code at NIA zero; a suspended entry resumes its validated
+continuation. Successful handoff consumes CR15.M. CR13 is never loaded,
+restored or explicitly cleared.
+
+Any failure is a hard fault. Once outgoing-save writes have begun, no rollback
+is promised. Do not retry the instruction, substitute a target, silently repair
+state, or continue execution in a partially transitioned context. A failed
+handoff must not execute the target Thread.
+
+A condition-false SWITCH skips operand checks and instruction effects,
+including handoff and M consumption. This does not waive independent fetch
+or encoding faults. The remaining malformed-encoding versus predication
+ordering is governed by the ISA's explicit rules and unresolved oracle items,
+not newly decided by this paragraph.
+
+Fault attribution follows the GT in the faulting CR, not a blanket choice of
+outgoing Namespace, incoming Namespace or current Thread. Hardware never
+changes version numbers. Authorized software management performs version-based
+blacklisting; an already-stale GT does not cause another slot-version change.
+
+### Recovery decision kept separate
+
+The draft above specifies the failed instruction, not what subsequently
+reboots. A hard fault and a later authorized recovery action are distinct;
+recovery must not be described as a successful SWITCH or a retry.
+
+The current Master says a Boot Thread fault leaves the CM in purgatory.
+The newer direction is to reboot only the responsible Namespace, with a
+double-error fallback to first Genesis and Genesis as the default for
+unfinished or unspecified behavior. Before replacing the purgatory sentence,
+the review must specify:
+
+- How the faulting-CR attribution identifies the responsible Namespace,
+  including failures before and after CR15 installation.
+- What constitutes a double error, and how first Genesis is identified.
+- The recovery entry and authority, with first-fault evidence retained and
+  outstanding accepted writes completed before recovery writes begin.
+
+These are recovery-contract questions, not permission to add fallback targets
+inside SWITCH. The two-Namespace integration demonstration remains Phase 2.
+
+### Review limits
+
+This draft removes selectable-destination language and retains the approved
+SWITCH contract. It does not assign new fault codes or multi-fault precedence,
+settle all predication/encoding cases, alter the Master, or authorize simulator,
+RTL, saved-artifact or FPGA changes. Acceptance cases H03/H09 remain the
+starting points for later independently encoded checks; none were run here.
+
 ## Small next step
 
-Review and close the SWITCH contract first: retain the approved encoding,
+Review the proposed wording above and close the SWITCH contract first: retain the approved encoding,
 fixed destinations, CR13 preservation and entry semantics; reconcile its stale
 fault wording; then make simulator and RTL checks use independently packed
 instruction words. Existing acceptance cases H03 and H09 cover this scope.
