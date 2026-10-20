@@ -21,10 +21,12 @@
         'tuple-mallory-foreign-write': {label: 'Tuple: Mallory foreign write', limit: 8},
         'tuple-mallory-range-read': {label: 'Tuple: Mallory out-of-range read', limit: 8},
         'tuple-mallory-range-write': {label: 'Tuple: Mallory out-of-range write', limit: 8},
+        'ascending-actors': {label: 'Ascending layout: Alice / Mallory in separate Threads', limit: 40},
     });
     function createScenario(name, binaries) {
         if (!Object.prototype.hasOwnProperty.call(scenarios, name)) throw new Error('Unknown lab scenario');
         if (name.startsWith('tuple-')) return tupleLab().createScenario(name, binaries);
+        if (name === 'ascending-actors') return ascendingLab().create(binaries);
         const state = fixture.createAliceMalloryThreadFixture(false, binaries);
         const {sim, threadSlots, bodies, roles, nextBase} = state;
         const instruction = (op, dst, src, imm, cond = 14) =>
@@ -98,6 +100,7 @@
     }
     function outcome(state) {
         if (state.scenario.startsWith('tuple-')) return tupleLab().outcome(state);
+        if (state.scenario === 'ascending-actors') return ascendingLab().outcome(state);
         const {sim, scenario, attempts, limit, bodies, roles} = state;
         if (scenario === 'setup') return 'Setup validated; no workload executed.';
         if (attempts < limit) return `In progress: ${attempts}/${limit} attempts`;
@@ -154,6 +157,10 @@
     }
     function step(state) {
         if (state.scenario.startsWith('tuple-')) return tupleLab().step(state);
+        if (state.scenario === 'ascending-actors') {
+            if (state.passed || state.attempts >= state.limit || state.sim.halted) return outcome(state);
+            return ascendingLab().step(state);
+        }
         if (state.attempts >= state.limit) return outcome(state);
         const sim = state.sim;
         if (state.scenario === 'mallory' && state.attempts === state.limit - 2) {
@@ -190,6 +197,10 @@
     function tupleLab() {
         return typeof module !== 'undefined' && module.exports
             ? require('./alice_mallory_tuple_lab') : globalThis.AliceMalloryTupleLab;
+    }
+    function ascendingLab() {
+        return typeof module !== 'undefined' && module.exports
+            ? require('./alice_mallory_ascending_lab') : globalThis.AliceMalloryAscendingLab;
     }
     return {scenarios, createScenario, step, outcome, savedFixtures: fixture.savedFixtures};
 });

@@ -30,6 +30,7 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0c1020;padding:12px;b
 <option value="tuple-mallory-foreign-write">Tuple: Mallory CR5 write targeting Alice</option>
 <option value="tuple-mallory-range-read">Tuple: Mallory CR5 read past Thread range</option>
 <option value="tuple-mallory-range-write">Tuple: Mallory CR5 write past Thread range</option>
+<option value="ascending-actors">Ascending layout: Alice / Mallory in separate Threads</option>
 </select>
 <button id="load">Load isolated test</button>
 <button id="step" disabled>Step instruction</button>
@@ -52,6 +53,7 @@ Denied attempts check exact first-fault evidence, unchanged data registers, and 
 The tuple regression uses explicitly pinned baseline Alice/Mallory fixtures, not the latest editor revisions.
 This is a bounded simulator regression, not a proof for every attack, FPGA validation, or a Dijkstra messaging test.</p>
 <pre id="tuple-evidence">Choose a tuple test to collect evidence.</pre></section>
+<p class="note">The ascending-layout test is an isolated fixture, not the selected NewLayout image, admission path or FPGA proof. Boot.Thread is NS[2]; Thread.2 and Thread.3 are NS[11] and NS[12]. A preboot fixture provisions CR0 driver continuations and places each actor’s E capability in that actor’s own CR1. Pinned historical LOADs are adapted only in RAM.</p>
 <section><h2>Current execution</h2><pre id="execution">No test loaded.</pre></section>
 <section><h2>Thread inspection</h2><label for="thread">Inspect:</label><select id="thread" disabled></select>
 <pre id="registers">No test loaded.</pre></section>
@@ -61,9 +63,13 @@ This is a bounded simulator regression, not a proof for every attack, FPGA valid
 <script src="abstract_gt_manager.js"></script>
 <script src="thread_design.js"></script>
 <script src="simulator.js"></script>
+<script src="namespace-runtime-view.js"></script>
+<script src="namespace-runtime-core.js"></script>
 <script src="test_alice_mallory_thread_setup.js"></script>
 <script src="thread-heap-record.js"></script>
 <script src="alice_mallory_tuple_lab.js"></script>
+<script>window.ChurchSimulator = ChurchSimulator;</script>
+<script src="alice_mallory_ascending_lab.js"></script>
 <script src="alice_mallory_lab.js"></script>
 <script src="alice_mallory_lab_ui.js"></script>
 </body></html>

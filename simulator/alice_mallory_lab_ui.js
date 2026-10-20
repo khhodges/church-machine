@@ -58,7 +58,7 @@
     }
     function refresh() {
         const has = !!state;
-        const done = !has || state.attempts >= state.limit;
+        const done = !has || state.attempts >= state.limit || !!state.passed;
         el('step').disabled = done;
         el('run').disabled = done;
         el('reset').disabled = !has;
@@ -70,11 +70,18 @@
         const address = entry ? entry.word0_location + 1 + sim.pc : null;
         const next = !done && address !== null && address < sim.memory.length
             ? sim.decodeInstruction(sim.memory[address]) : null;
-        const label = slot === 32 ? 'fixture manager' : slot === 33 ? 'fixture Alice driver'
+        const asc = state.scenario === 'ascending-actors';
+        const threadName = n => asc ? (n === 2 ? 'Boot.Thread' : n === 11 ? 'Thread.2' : n === 12 ? 'Thread.3' : `NS[${n}]`)
+            : (n === 1 ? 'Boot.Thread' : n === 11 ? 'Thread.2' : 'Thread.3');
+        const ascNames = asc ? {[state.manager.slot]: 'fixture manager', [state.alice.slot]: 'fixture Alice driver',
+            [state.mallory.slot]: 'fixture Mallory driver'} : {};
+        const role = roles.find(r => r.slot === slot);
+        const label = asc ? (ascNames[slot] || (role ? `${role.name} (RAM fixture)` : `NS[${slot}]`))
+            : slot === 32 ? 'fixture manager' : slot === 33 ? 'fixture Alice driver'
             : slot === 34 ? 'fixture Mallory driver'
             : (roles.find(role => role.slot === slot)
                 ? `${roles.find(role => role.slot === slot).abstraction} (RAM fixture)` : `NS[${slot}]`);
-        el('execution').textContent = `Executing Thread NS[${sim._currentThreadSlot}] (${sim._currentThreadSlot === 1 ? 'Boot.Thread' : sim._currentThreadSlot === 11 ? 'Thread.2' : 'Thread.3'})\n` +
+        el('execution').textContent = `Executing Thread NS[${sim._currentThreadSlot}] (${threadName(sim._currentThreadSlot)})\n` +
             `Executable ${label} NS[${slot}]; PC ${sim.pc}; attempted ${state.attempts}/${state.limit}\n` +
             (next ? `Next @${hex(address)}: ${hex(next.raw)} opcode=${next.opcode} condition=${next.cond} CRdst=${next.crDst} CRsrc=${next.crSrc} imm=${next.imm}`
                 : 'At bounded test boundary — no further instructions will execute.');
@@ -104,6 +111,13 @@
                     `First fault: ${state.firstFaultEvidence.fault.type}; ${state.firstFaultEvidence.fault.message}\n` +
                     `Data registers unchanged: ${state.malloryRegistersBefore.every((word, i) => word === sim.dr[i])}\n` : '') +
                 'Raw inspection is test-harness observation, not authority granted to Mallory.')
+            : asc ? 'Isolated ascending-layout fixture (not the selected NewLayout image, admission or FPGA proof).\n' +
+                `Thread slots: ${state.threadSlots.map(n => `NS[${n}] ${threadName(n)}`).join(', ')}\n` +
+                `Actors: ${roles.map(r => `${r.name} NS[${r.slot}]`).join(', ')}\n` +
+                `Alice returned: ${state.aliceReturned}; first fault: ${state.firstFaultEvidence
+                    ? state.firstFaultEvidence.fault?.type : 'none yet'}\n` +
+                `Alice data unchanged during attack: ${state.secretBeforeAttack ? state.secretBeforeAttack.every(
+                    (w, i) => w === sim.memory[roles[0].base + i]) : 'not yet measured'}`
             : 'Choose a tuple test to collect evidence.';
         el('trace').textContent = state.retired.map((r, i) =>
             `${i + 1}. Thread NS[${r.owner}] PC ${r.pc} @${hex(r.physicalPC)} opcode ${r.opcode}: ${r.outcome}`).join('\n') +
@@ -123,12 +137,14 @@
             el('thread').replaceChildren(...state.bodies.map((body, index) => {
                 const option = document.createElement('option');
                 option.value = body.slot;
-                option.textContent = index === 0 ? 'Boot.Thread' : `Thread.${index + 1}`;
+                option.textContent = (index === 0 ? 'Boot.Thread' : `Thread.${index + 1}`) + ` (NS[${body.slot}])`;
                 return option;
             }));
-            setStatus(AliceMalloryLab.outcome(state) +
-                ' Canonical boot completed in isolation; suspended driver entry prepared. ' +
-                'Pinned historical LOADs adapted only in newly minted RAM fixtures (no saved-file/editor/Namespace write).');
+            setStatus(AliceMalloryLab.outcome(state) + (state.scenario === 'ascending-actors'
+                ? ' Isolated ascending-layout fixture: preboot fixture provisions CR0 driver continuations and each actor E capability in its own CR1. ' +
+                    'Pinned historical LOADs adapted only in RAM; main CapabilityTest and saved Namespace untouched. Not a NewLayout image/admission/FPGA proof.'
+                : ' Canonical boot completed in isolation; suspended driver entry prepared. ' +
+                'Pinned historical LOADs adapted only in newly minted RAM fixtures (no saved-file/editor/Namespace write).'));
         } catch (err) {
             clearState();
             setStatus(`Load failed: ${err.message}`, true);
@@ -139,7 +155,7 @@
         }
     }
     function step() {
-        if (!state || state.attempts >= state.limit) return;
+        if (!state || state.attempts >= state.limit || state.passed) return;
         try {
             setStatus(AliceMalloryLab.step(state));
         } catch (err) {
@@ -153,7 +169,7 @@
     el('run').addEventListener('click', () => {
         if (!state) return;
         // Fixed scenario limit prevents executing recovery or unrelated code.
-        while (state && state.attempts < state.limit && !el('status').classList.contains('error')) step();
+        while (state && state.attempts < state.limit && !state.passed && !el('status').classList.contains('error')) step();
     });
     el('reset').addEventListener('click', () => state ? load(state.scenario) : undefined);
     el('scenario').addEventListener('change', () => {

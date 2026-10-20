@@ -266,9 +266,9 @@ return {sim, threadSlots, bodies, roles, nextBase};
 
 if (inNode) {
     if (require.main === module) createAliceMalloryThreadFixture(true);
-    module.exports = {createAliceMalloryThreadFixture, installThreadDriver,
+    module.exports = {binaryFor, adaptHistoricalCode, createAliceMalloryThreadFixture, installThreadDriver,
         savedFixtures, savedHashes, threadGT, prepareThreadContinuation, bindManagerTargets};
 } else {
-    window.AliceMalloryThreadFixture = {createAliceMalloryThreadFixture, installThreadDriver,
+    window.AliceMalloryThreadFixture = {binaryFor, adaptHistoricalCode, createAliceMalloryThreadFixture, installThreadDriver,
         savedFixtures, savedHashes, threadGT, prepareThreadContinuation, bindManagerTargets};
 }

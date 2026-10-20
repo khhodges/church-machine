@@ -4,8 +4,8 @@ description: User-directed separate Thread setup for the NewLayout protection de
 ---
 
 Run Alice and Mallory in different Threads for the protection demonstration.
-The user proposed priming them in CR1; the stated interpretation is each
-Thread's respective entry capability, not the protected object's capability.
+The user confirmed priming each Thread's respective actor entry capability
+in CR1, not the protected object's capability.
 
 **Why:** The user explicitly requested different Threads rather than running
 both actors in one execution context.
@@ -13,3 +13,13 @@ both actors in one execution context.
 **How to apply:** Preserve distinct saved register contexts and deliberate
 capability grants. Do not infer that Thread separation alone restricts object
 access, or that this requires separate Namespaces or SWITCH.
+
+Isolated actor fixture provisioning is not adoption into the user's selected
+Namespace. Keep the evidence and user-facing claims distinct.
+
+**Why:** An ascending-layout runtime can exercise protection correctly using
+preboot fixture provisioning without proving the saved-design preparation path.
+
+**How to apply:** Label fixture-only initialization and historical source
+adaptations explicitly; never present that run as installation or execution
+of the user's saved NewLayout.
