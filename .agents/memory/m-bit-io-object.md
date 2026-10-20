@@ -50,6 +50,17 @@ installation improperly assign programmer choices to the Regulator.
 schedulers or dependency policies. Separate Passkey validation from issuance
 policy. Exact method signatures remain proposals, not approved implementation.
 
+The C-list used to specify or construct a Namespace is not necessarily the
+constructing abstraction's E-list. They may coincide but are distinct roles.
+
+**Why:** The user explicitly corrected the assumption that Namespace membership
+must come from the abstraction's own execution list.
+
+**How to apply:** Model the construction C-list as an independently supplied,
+authorized input. Do not implicitly select CR6 or copy the constructor's E-list
+as the Namespace definition. This distinction does not approve a binary format
+or grant new construction authority.
+
 **Why:** Encapsulate privileged control as operations instead of exposing raw
 whole-word writes or leaving M authority with the caller.
 
