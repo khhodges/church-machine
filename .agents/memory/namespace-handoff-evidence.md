@@ -283,20 +283,19 @@ rule above is the explicit exception to the earlier phase-independent rule.
 Preserve the faulting GT and its proper resolution context rather than
 attributing the fault from registers after recovery has replaced them.
 
-## Boot Thread fault: purgatory
+## Namespace reboot and double error — later approved recovery rule
 
-The user specifies: “If it is a boot thread fault the CM is stuck in
-purgatory.”
+A fault reboots only the responsible Namespace. If that reboot itself faults
+before completing, restart first Genesis. Double error means a fault during
+recovery, not two unrelated faults.
 
-**Why:** The ordinary blacklist-until-management-decides policy must not
-presume that management can execute when the Boot Thread itself has faulted.
+**Why:** The user explicitly approved this simple rule as the replacement
+for the older Boot Thread → purgatory direction.
 
-**How to apply:** Describe a Boot Thread fault as leaving the CM in purgatory,
-not as a successful handoff to the Thread manager. Do not invent an alternate
-entry Thread, automatic blacklist removal, or an automatic escape. This
-statement does not specify a new hardware state bit or whether purgatory halts
-or loops. Under the KISS rule, do not treat an unspecified escape procedure as
-a requirement to invent a recovery strategy.
+**How to apply:** Use this rule in the Phase 1.1 review. Earlier purgatory
+references in this memory are historical, not the current review direction.
+Master incorporation and implementation require separate work; do not claim
+the existing machine already performs this recovery.
 
 ## External recovery precedent
 

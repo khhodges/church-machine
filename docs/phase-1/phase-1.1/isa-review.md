@@ -193,13 +193,16 @@ The draft above specifies the failed instruction, not what subsequently
 reboots. A hard fault and a later authorized recovery action are distinct;
 recovery must not be described as a successful SWITCH or a retry.
 
-The current Master says a Boot Thread fault leaves the CM in purgatory.
-The newer direction is to reboot only the responsible Namespace, with a
-double-error fallback to first Genesis and Genesis as the default for
-unfinished or unspecified behavior. Before replacing the purgatory sentence,
-the review must specify:
+**Recovery — approved review decision:** A fault reboots only the responsible
+Namespace. If that reboot itself faults before completing, restart first
+Genesis. This is a double error: a fault during recovery, not two unrelated
+faults. This replaces the older Boot Thread → purgatory rule in the review;
+the Master has not yet been amended.
 
-- What constitutes a double error, and how first Genesis is identified.
+Genesis remains the default for unfinished or unspecified behavior.
+Remaining concrete test expectations include:
+
+- How first Genesis is identified and when Namespace reboot is complete.
 - The recovery entry and authority, with first-fault evidence retained and
   outstanding accepted writes completed before recovery writes begin.
 

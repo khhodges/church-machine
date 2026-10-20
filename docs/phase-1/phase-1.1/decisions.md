@@ -40,7 +40,12 @@ Namespace is at fault. No faulting-CR lookup is needed to choose between them.
 This decision updates the review draft; it does not itself change the Master
 or implementation.
 
-The recent Namespace-local reboot, double-error Genesis fallback and Genesis
-default directions are recorded as discussion inputs in the review. Their
-precise incorporation into Phase 1 fault wording remains to be worked through.
-Creating this folder does not silently replace the current ISA fault contract.
+### Namespace reboot and double error — approved
+
+A fault reboots only the responsible Namespace. If that reboot itself faults
+before completing, restart first Genesis. “Double error” means a fault during
+recovery, not two unrelated faults. This replaces the older Boot Thread →
+purgatory rule in the review.
+
+Genesis remains the default for unfinished or unspecified behavior.
+Incorporation into the Master and implementation remain separate.
