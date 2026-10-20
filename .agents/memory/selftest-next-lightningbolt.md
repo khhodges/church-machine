@@ -10,6 +10,18 @@ Boot.Thread to Thread.2 initially, then Thread.2 to itself.
 
 ## Phase 1 loop test scope
 
+The immediate loop milestone targets the new Namespace/LUMP memory layout;
+full Phase 1 acceptance is deferred. “New layout” does not mean the new IDE
+interface.
+
+**Why:** The user explicitly clarified this distinction and selected the new
+memory layout while deferring full acceptance.
+
+**How to apply:** Evaluate the loop against that layout without claiming full
+Phase 1 qualification. This scope choice alone does not authorize installing
+candidate bytes, replacing saved programs, or programming hardware. The user
+is editing CapabilityTest; leave those edits untouched until invited to test.
+
 CHANGE must be tested in Phase 1; SWITCH execution testing is deferred to
 Phase 2. Keep SWITCH out of the CapabilityTest/SelfTest/WukongCallHome loop.
 Its ISA definition is not removed by this test-scope decision.
