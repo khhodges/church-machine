@@ -38,7 +38,9 @@ pre{white-space:pre-wrap;word-break:break-word;background:#0c1020;padding:12px;b
 <button id="reset" disabled>Reset loaded test</button>
 <p id="status" role="status">Choose a test and load it. Saved Alice/Mallory binaries are fetched read-only.</p>
 </section>
-<p>All scenarios select exact historical Alice/Mallory files, not the latest editor revisions.
+<p>The ascending-layout scenario compiles the current <a href="examples/alice.cloomc">Alice source</a>
+and <a href="examples/mallory.cloomc">Mallory source</a>. It does not patch their instructions.
+Other scenarios select exact historical Alice/Mallory files, not the latest editor revisions.
 Their legacy literal LOAD indexes are adapted to current encodings in disposable RAM copies,
 then minted as separate fixture identities. Saved binaries and live IDE state are never changed.
 Thread drivers resume explicit continuations above retained poison roots.</p>
@@ -53,7 +55,7 @@ Denied attempts check exact first-fault evidence, unchanged data registers, and 
 The tuple regression uses explicitly pinned baseline Alice/Mallory fixtures, not the latest editor revisions.
 This is a bounded simulator regression, not a proof for every attack, FPGA validation, or a Dijkstra messaging test.</p>
 <pre id="tuple-evidence">Choose a tuple test to collect evidence.</pre></section>
-<p class="note">The ascending-layout test is an isolated fixture, not the selected NewLayout image, admission path or FPGA proof. Boot.Thread is NS[2]; Thread.2 and Thread.3 are NS[11] and NS[12]. A preboot fixture provisions CR0 driver continuations and places each actor’s E capability in that actor’s own CR1. Pinned historical LOADs are adapted only in RAM.</p>
+<p class="note">The ascending-layout test compiles the current Alice/Mallory source, without historical instruction patches. It is an isolated fixture, not the selected NewLayout image, admission path or FPGA proof. Boot.Thread is NS[2]; Thread.2 and Thread.3 are NS[11] and NS[12]. A preboot fixture binds the declared own-RW rows, provisions CR0 driver continuations and places each actor’s E capability in that actor’s own CR1. Alice's data is checked at Mallory's fault; survival through fault restart is not yet verified. Reset loaded test reloads the initial image and does not preserve the stash.</p>
 <section><h2>Current execution</h2><pre id="execution">No test loaded.</pre></section>
 <section><h2>Thread inspection</h2><label for="thread">Inspect:</label><select id="thread" disabled></select>
 <pre id="registers">No test loaded.</pre></section>

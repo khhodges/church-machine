@@ -8,8 +8,7 @@ assert.equal(lab.scenarios['ascending-actors'].label, 'Ascending layout: Alice /
 const html = fs.readFileSync(__dirname + '/alice-mallory-lab.html', 'utf8');
 assert(html.includes('value="ascending-actors"'));
 assert(html.indexOf('alice_mallory_ascending_lab.js') < html.indexOf('alice_mallory_lab.js'));
-const binaries = {};
-for (const name of ['ide.Alice', 'ide.Mallory']) binaries[name] = fixture.binaryFor(name);
+const binaries = require('./compile_actor_programs').compileActorPrograms();
 const s = lab.createScenario('ascending-actors', binaries);
 assert.equal(s.scenario, 'ascending-actors');
 assert.deepEqual(s.threadSlots, [2, 11, 12]);

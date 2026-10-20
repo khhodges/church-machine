@@ -17,6 +17,23 @@
         refresh();
     }
     async function getBinaries(scenario) {
+        if (scenario === 'ascending-actors') {
+            const result = {};
+            for (const actor of ['Alice', 'Mallory']) {
+                const response = await fetch('examples/' + actor.toLowerCase() + '.cloomc', {cache:'no-store'});
+                if (!response.ok) throw Error(actor + ' source unavailable: HTTP ' + response.status);
+                const source = await response.text();
+                const compiled = await fetch('/api/compile', {
+                    method:'POST', headers:{'Content-Type':'application/json'},
+                    body:JSON.stringify({source, language:'assembly', tier:2}),
+                });
+                const data = await compiled.json();
+                if (!compiled.ok || !data.ok || !Array.isArray(data.words))
+                    throw Error(actor + ' compile failed: ' + JSON.stringify(data.errors || data.error || data));
+                result['ide.' + actor] = data.words;
+            }
+            return result;
+        }
         // Only exact pinned, validated saved artifacts (even if later archived):
         // never accept a replacement
         // by token or a browser-generated/mock binary.
@@ -142,7 +159,7 @@
             }));
             setStatus(AliceMalloryLab.outcome(state) + (state.scenario === 'ascending-actors'
                 ? ' Isolated ascending-layout fixture: preboot fixture provisions CR0 driver continuations and each actor E capability in its own CR1. ' +
-                    'Pinned historical LOADs adapted only in RAM; main CapabilityTest and saved Namespace untouched. Not a NewLayout image/admission/FPGA proof.'
+                    'Current Alice/Mallory sources compiled without opcode patches; main CapabilityTest and saved Namespace untouched. Fault-restart retention is not yet verified. Not a saved NewLayout image/admission/FPGA proof.'
                 : ' Canonical boot completed in isolation; suspended driver entry prepared. ' +
                 'Pinned historical LOADs adapted only in newly minted RAM fixtures (no saved-file/editor/Namespace write).'));
         } catch (err) {

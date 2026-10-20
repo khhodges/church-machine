@@ -2,7 +2,8 @@
 const assert = require('node:assert/strict');
 const lab = require('./alice_mallory_ascending_lab');
 for (let run = 0; run < 3; run++) {
-    const state = lab.create();
+    const secret = [1, 0x2A7, 4095][run];
+    const state = lab.create(null, {secret});
     const {sim, roles, bodies} = state;
     assert.deepEqual(state.threadSlots, [2, 11, 12]);
     assert.equal(sim.cr[15].word1, 0);
@@ -25,7 +26,7 @@ for (let run = 0; run < 3; run++) {
     assert(!state.retired.some(row => row.owner === 12 && row.opcode === 16),
         'Mallory must never reach its data-read instruction');
     assert.equal(sim.faultLog.length, 1);
-    assert.equal(sim.memory[roles[0].base + 9], 0x2A7);
+    assert.equal(sim.memory[roles[0].base + 9], secret);
     assert(state.retired.some(row => row.owner === 11 && row.opcode === 2));
     assert(state.retired.some(row => row.owner === 12 && row.opcode === 2));
     assert(!state.retired.some(row => row.opcode === 5), 'No SWITCH in the test');

@@ -8,7 +8,12 @@
     const check = (ok, message) => { if (!ok) throw Error(message); };
     const SECRET = 0x2A7;
 
-    function create(binaries) {
+    function create(binaries, options = {}) {
+        if (!binaries && node) binaries = require('./compile_actor_programs').compileActorPrograms();
+        check(binaries, 'Current compiled actor programs are required');
+        const secret = options.secret === undefined ? SECRET : options.secret;
+        check(Number.isInteger(secret) && secret >= 0 && secret <= 16383,
+            'Fixture secret must fit the test driver immediate');
         const words = new Uint32Array(16384);
         words[0] = ((31 << 27) | (64 << 10) | (1 << 8)) >>> 0;
         words[2] = 2;
@@ -45,10 +50,18 @@
             return {slot, base, header, gt:minted.selfGT, name:label};
         }
         const roles = ['ide.Alice', 'ide.Mallory'].map((name, i) => {
-            const raw = fixtures.binaryFor(name, binaries);
-            const adaptations = fixtures.adaptHistoricalCode(name, raw);
-            return {...resident(30 + i, name, raw, [1]), adaptations,
-                filename:fixtures.savedFixtures[name]};
+            check(Array.isArray(binaries[name]), name + ' compiled words missing');
+            const raw = binaries[name].slice();
+            const header = sim.parseLumpHeader(raw[0]);
+            check(header.valid && header.cc === 2, name + ' requires SELF and own RW rows only');
+            check(raw[raw.length - 1] === 0,
+                name + ' fixture requires an unresolved own-RW binding');
+            raw[raw.length - 1] = 0xFEEDDA7A;
+            // The actor executable is used exactly as compiled, without
+            // historical opcode patches. Only fixture SELF/private RW rows
+            // are bound to their destination before boot.
+            return {...resident(30 + i, name, raw, [1]),
+                sourceFile:'examples/' + name.slice(4).toLowerCase() + '.cloomc'};
         });
         const instr = (op, dst, src, imm, cond = 14) => sim.encodeInstruction(op, cond, dst, src, imm);
         const load = (reg, row) => instr(0, reg, 6, row << 4);
@@ -67,9 +80,9 @@
             load(2, 1), change(2), load(3, 2), change(3), 0,
         ], [threadGT(11), threadGT(12)]);
         const alice = driver(33, 'ActorTest.AliceDriver', [
-            add(1, SECRET), instr(2, 1, 0, 1), // Alice.Stash via primed CR1
+            add(1, secret), instr(2, 1, 0, 1), // Alice.Stash via primed CR1
             load(1, 1), add(1, 0), instr(2, 1, 0, 2), // reload after RETURN, Reveal
-            instr(22, 3, 1, 0x4000 | SECRET), // compare result before handing off
+            instr(22, 3, 1, 0x4000 | secret), // compare result before handing off
             instr(23, 0, 0, 4, 1), // NE: skip handoff to explicit HALT
             load(2, 2), change(2), 0, 0,
         ], [roles[0].gt, threadGT(2)]);
@@ -92,7 +105,7 @@
         check(sim.bootComplete && sim._currentThreadSlot === 2, 'Manager must own boot');
         return {sim, bodies, roles, threadSlots, manager, alice, mallory, initialImage,
             attempts:0, limit:40, retired:[], scenario:'ascending-actors',
-            aliceReturned:false, secretBeforeAttack:null, firstFaultEvidence:null, passed:false};
+            secret, aliceReturned:false, secretBeforeAttack:null, firstFaultEvidence:null, passed:false};
     }
 
     function step(state) {
@@ -110,9 +123,9 @@
         state.attempts++;
         state.retired.push({owner, pc, physicalPC, opcode, outcome:sim.halted ? 'stopped' : 'retired'});
         if (owner === 11 && sim._currentThreadSlot === 2) {
-            check(sim.memory[bodies[1].base + bodies[1].layout.drStart + 1] === SECRET,
+            check(sim.memory[bodies[1].base + bodies[1].layout.drStart + 1] === state.secret,
                 'Alice Reveal did not return the stored value');
-            check(sim.memory[roles[0].base + 9] === SECRET, 'Alice Stash did not write the secret');
+            check(sim.memory[roles[0].base + 9] === state.secret, 'Alice Stash did not write the secret');
             state.aliceReturned = true;
         }
         if (sim.halted) {
