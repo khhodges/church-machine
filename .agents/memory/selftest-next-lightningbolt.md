@@ -8,6 +8,19 @@ CapabilityTest calls SelfTest and WukongCallHome, each returning to CapabilityTe
 and loops. CapabilityTest performs CHANGE to Thread.2 on each iteration:
 Boot.Thread to Thread.2 initially, then Thread.2 to itself.
 
+## Phase 1 loop test scope
+
+CHANGE must be tested in Phase 1; SWITCH execution testing is deferred to
+Phase 2. Keep SWITCH out of the CapabilityTest/SelfTest/WukongCallHome loop.
+Its ISA definition is not removed by this test-scope decision.
+
+**Why:** The user explicitly clarified that SWITCH cannot be tested until
+Phase 2, whereas CHANGE must be tested now.
+
+**How to apply:** Verify the initial Boot.Thread → Thread.2 handoff and repeated
+Thread.2 self-handoffs, with CR15 unchanged and CR13 untouched. Do not make
+SWITCH execution acceptance a prerequisite for this Phase 1 milestone.
+
 Both Thread.2 and Thread.3 must use CapabilityTest as their prepared entry.
 
 **Why:** The user explicitly confirmed this applies to both secondary Threads,
