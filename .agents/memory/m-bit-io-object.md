@@ -73,6 +73,19 @@ this separation as the “3 layer cake.”
 SWITCH and subsequent Regulator methods. This is design-direction approval,
 not approval of an ABI, binary format, implementation or hardware change.
 
+The user's subsequent interface proposal passes a Namespace abstraction and
+Passkey to SecurityRegulator, which confirms the table before transition,
+rather than requiring the programmer to pass a raw completed table.
+
+**Why:** This keeps Namespace construction encapsulated while making the
+Regulator responsible for validating the actual transition target.
+
+**How to apply:** Distinguish preparing the abstraction's table from making it
+the active Namespace. Define how the confirmed table remains the exact table
+consumed by SWITCH; do not claim an existing validation-to-use interlock.
+Preparation must not receive raw M authority. This remains an interface
+proposal, not an approved method ABI or implementation.
+
 **Why:** Encapsulate privileged control as operations instead of exposing raw
 whole-word writes or leaving M authority with the caller.
 
