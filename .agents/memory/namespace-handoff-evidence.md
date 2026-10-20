@@ -289,8 +289,14 @@ A fault reboots only the responsible Namespace. If that reboot itself faults
 before completing, restart first Genesis. Double error means a fault during
 recovery, not two unrelated faults.
 
+Reboot completes when the final boot `CALL CR0` succeeds. A fault before that
+success (including failure of the CALL itself) triggers first Genesis; a fault
+afterward starts a new Namespace-local recovery.
+
 **Why:** The user explicitly approved this simple rule as the replacement
-for the older Boot Thread → purgatory direction.
+for the older Boot Thread → purgatory direction, and selected the existing
+successful boot handoff as the completion boundary rather than a new timer
+or instruction.
 
 **How to apply:** Use this rule in the Phase 1.1 review. Earlier purgatory
 references in this memory are historical, not the current review direction.

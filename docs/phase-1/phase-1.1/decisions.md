@@ -47,5 +47,12 @@ before completing, restart first Genesis. “Double error” means a fault durin
 recovery, not two unrelated faults. This replaces the older Boot Thread →
 purgatory rule in the review.
 
+### Reboot completion — approved
+
+Reboot completes when the final boot `CALL CR0` succeeds. A fault before that
+success, including a fault in the CALL itself, triggers first Genesis.
+A fault afterward starts a new Namespace-local recovery. Reaching or issuing
+the CALL alone does not complete reboot.
+
 Genesis remains the default for unfinished or unspecified behavior.
 Incorporation into the Master and implementation remain separate.

@@ -199,10 +199,15 @@ Genesis. This is a double error: a fault during recovery, not two unrelated
 faults. This replaces the older Boot Thread → purgatory rule in the review;
 the Master has not yet been amended.
 
+**Reboot completion — approved review decision:** Reboot completes when the
+final boot `CALL CR0` succeeds. A fault before that success, including a fault
+in that CALL, triggers first Genesis. A fault afterward starts a new
+Namespace-local recovery. Merely reaching or issuing the CALL is not completion.
+
 Genesis remains the default for unfinished or unspecified behavior.
 Remaining concrete test expectations include:
 
-- How first Genesis is identified and when Namespace reboot is complete.
+- How first Genesis is identified.
 - The recovery entry and authority, with first-fault evidence retained and
   outstanding accepted writes completed before recovery writes begin.
 
