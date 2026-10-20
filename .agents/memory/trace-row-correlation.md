@@ -53,3 +53,13 @@ slot numbers and historical lookup tokens alone did not distinguish the artifact
 
 **How to apply:** Match filename, binary hash and token together; pass that exact
 identity through editor navigation instead of reducing it to a token-only open.
+
+Fault descriptions must follow the failed instruction and its captured operand
+pet names, not apply a generic caller-to-callee formula to every fault.
+
+**Why:** The user rejected a DWRITE report saying “From NS[10].Run -> To
+unknown.unknown” instead of identifying the actual capability.
+
+**How to apply:** Capture names from the executed artifact's declarations and
+fault-time GTs. Retain CR numbers for inspection and the unmodified diagnostic
+reason; only actual transfers should describe a destination method.

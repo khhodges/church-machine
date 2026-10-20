@@ -147,7 +147,7 @@ function namedCallFixture() {
     assert.strictEqual(fault.rawDiagnosticReason, reason);
     assert.strictEqual(
         fault.message,
-        `From unknown.unknown -> To unknown.unknown — ${reason}`);
+        reason);
 }
 
 console.log('fault CALL route tests passed');

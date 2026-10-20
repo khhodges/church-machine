@@ -6391,6 +6391,38 @@ class ChurchSimulator {
         return null;
     }
 
+    _faultDeclaredPetNames() {
+        const names = {};
+        const bindings = this.simulationConfiguration?.artifactBindings;
+        if (!Array.isArray(bindings) || !this.cr[14] || !this.cr[6]) return names;
+        const slot = this.parseGT(this.cr[14].word0).index;
+        const matches = bindings.filter(b => b.slot === slot);
+        if (matches.length !== 1) return names;
+        const contract = matches[0].portableBinding;
+        if (!contract || !Array.isArray(contract.dependencies)) return names;
+        const count = this._clistCountForCR(6), base = this.cr[6].word1;
+        for (let register = 0; register < this.cr.length; register++) {
+            const word = this.cr[register].word0 >>> 0;
+            if (ChurchSimulator.isNullGT(word)) continue;
+            const target = this.parseGT(word), candidates = new Set();
+            for (const dependency of contract.dependencies) {
+                const row = dependency.relocation_row;
+                if (!Number.isInteger(row) || row < 0 || row >= count ||
+                        base + row >= this.memory.length) continue;
+                const declaredWord = this.memory[base + row] >>> 0;
+                if (ChurchSimulator.isNullGT(declaredWord)) continue;
+                const declared = this.parseGT(declaredWord);
+                if (declared.type !== target.type || declared.index !== target.index ||
+                        declared.gt_seq !== target.gt_seq) continue;
+                const name = dependency.symbolic_self ? contract.owner :
+                    (dependency.name || dependency.dot_name);
+                if (name) candidates.add(name);
+            }
+            if (candidates.size === 1) names[register] = [...candidates][0];
+        }
+        return names;
+    }
+
     fault(type, message, meta = null) {
         if (this._executionAttempt) this._executionAttempt.fault = { type, message };
         if (this.executionStats) this.executionStats.faults++;
@@ -6429,10 +6461,12 @@ class ChurchSimulator {
         // Register-specific aliases win; ordinary capabilities fall back to
         // the fault-time Namespace label for their GT slot.
         const _petNames = {};
+        const _declaredNames = this._faultDeclaredPetNames();
         for (let _gi = 0; _gi < this.cr.length; _gi++) {
             const _gc = this.cr[_gi];
             if (!_gc || (_gc.word0 >>> 0) === 0) continue;
             let _pname = (this._petNameCRMap || {})[_gi] || null;
+            if (!_pname && _gi !== 5) _pname = _declaredNames[_gi] || null;
             // CR5 is not the Thread object itself; architecturally it names
             // that Thread's Heap subregion. Preserve that register-specific
             // role in the immutable fault snapshot when the referenced
@@ -6500,8 +6534,11 @@ class ChurchSimulator {
         const fromMethod = route ? route.callerMethod : 'unknown';
         const toName = route && route.transfer ? route.destinationName : 'unknown';
         const toMethod = route && route.transfer ? route.destinationMethod : 'unknown';
-        const routedMessage =
-            `From ${fromName}.${fromMethod} -> To ${toName}.${toMethod} — ${rawDiagnosticReason}`;
+        // A data access has no callee. Only a captured transfer may describe
+        // a caller/destination route; ordinary faults describe their instruction.
+        const routedMessage = route && route.transfer
+            ? `From ${fromName}.${fromMethod} -> To ${toName}.${toMethod} — ${rawDiagnosticReason}`
+            : rawDiagnosticReason;
         const entry = {
             type, message: routedMessage, rawDiagnosticReason,
             // Capture identity from this attempt, never from a later reset or
