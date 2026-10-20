@@ -19,6 +19,9 @@
         }
         if (typeof repl !== 'undefined' && repl) repl.sim=candidate;
         if(typeof root.clearTrace==='function') root.clearTrace();
+        if (!candidate.bootComplete && typeof root.switchView === 'function') {
+            root.switchView('pipeline');
+        }
     }
     function refreshDisplays() {
         if (!machine || typeof sim==='undefined' || sim!==machine) return;
@@ -294,7 +297,12 @@
                             })));
                         } else pipelineViz.render();
                     }
-                    if(machine.bootComplete && typeof root._setEntryBreakpoint==='function') root._setEntryBreakpoint();
+                    if(machine.bootComplete && !machine.halted) {
+                        if(typeof root._setEntryBreakpoint==='function') root._setEntryBreakpoint();
+                        refreshDisplays();
+                        if(typeof root.switchView==='function') root.switchView('dashboard');
+                        if(typeof root.openCRDetail==='function') root.openCRDetail(14);
+                    }
                     continue;
                 }
                 if(!result || result.absent || result.suspended || result.lazySuspended) {

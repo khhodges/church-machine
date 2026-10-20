@@ -128,6 +128,16 @@ was restored.
 **How to apply:** Reuse the existing trace presentation and preserve captured
 instruction evidence when appending later console output.
 
+Open the Boot view whenever simulation boot starts, including Reset. On clean
+completion of the three boot instructions, open the CR14 Code window immediately,
+before requiring a user-code step.
+
+**Why:** The user explicitly requires the visible window to follow boot versus
+simulator code execution, rather than leaving them on the prior editor view.
+
+**How to apply:** Apply the transition consistently for Step, Walk and Run;
+do not treat the separate Trace popup or console output as the CR14 Code window.
+
 Every selected simulator must present the existing fault modal on a runtime
 fault, not merely write console output or show a toast.
 

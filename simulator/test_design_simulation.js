@@ -114,6 +114,28 @@ function harness(defect) {
     // selected-design controls, with deterministic timers and no live writes.
     const Core=require('./simulator.js');
     for (const action of ['step','walk','run']) {
+        const b = harness('boot'), views = [], registers = [];
+        b.scope.switchView = view => views.push(view);
+        b.scope.openCRDetail = cr => registers.push(cr);
+        await b.api.command(action);
+        assert.deepEqual(views,['pipeline'],action+' opens Boot at start');
+        assert.deepEqual(registers,[]);
+        if(action==='step') await b.api.command('step');
+        else b.timers.shift()();
+        assert.deepEqual(registers,[],action+' does not open Code during boot');
+        if(action==='step') await b.api.command('step');
+        else b.timers.shift()();
+        assert.equal(b.instances[0].bootStep,3);
+        assert.equal(views.at(-1),'dashboard');
+        assert.deepEqual(registers,[14],action+' opens CR14 immediately at boot exit');
+        assert.equal(b.instances[0].dr[1],0,'no Code instruction required to open Code');
+        await b.api.command('reset');
+        assert.equal(views.at(-1),'pipeline','Reset reopens Boot');
+        assert.equal(b.instances.at(-1).bootStep,0);
+        for(const timer of b.timers) timer();
+        assert.equal(views.at(-1),'pipeline','old callbacks cannot reopen Code');
+    }
+    for (const action of ['step','walk','run']) {
         const b = harness('boot'), modals = [];
         b.scope._lastFault = null;
         b.scope.appendOutput = () => {};
