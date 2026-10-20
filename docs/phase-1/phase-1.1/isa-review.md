@@ -199,6 +199,12 @@ Genesis. This is a double error: a fault during recovery, not two unrelated
 faults. This replaces the older Boot Thread → purgatory rule in the review;
 the Master has not yet been amended.
 
+**Recovery entry and authority — approved review decision:** Recovery uses
+the trusted boot sequence for the responsible Namespace, without saving the
+faulted Thread as a resumable continuation. No M-bit grant from the faulted
+program is required. Fault evidence is retained. This is recovery, not an
+ordinary CHANGE/SWITCH outgoing-context save.
+
 **Reboot completion — approved review decision:** Reboot completes when the
 final boot `CALL CR0` succeeds. A fault before that success, including a fault
 in that CALL, triggers first Genesis. A fault afterward starts a new
@@ -209,13 +215,10 @@ power-on boot context, fixed by the machine's boot configuration—not the
 most recently active Namespace. Double-error recovery restarts that context.
 
 Genesis remains the default for unfinished or unspecified behavior.
-Remaining concrete test expectations include:
-
-- The recovery entry and authority, with first-fault evidence retained and
-  outstanding accepted writes completed before recovery writes begin.
-
-These are recovery-contract questions, not permission to add fallback targets
-inside SWITCH. The two-Namespace integration demonstration remains Phase 2.
+Concrete tests must verify first-fault evidence retention and completion of
+outstanding accepted writes before recovery writes begin. These requirements
+do not authorize fallback targets inside SWITCH. The two-Namespace integration
+demonstration remains Phase 2.
 
 **Namespace responsibility — approved review decision:** Before SWITCH's
 Namespace-load midpoint, responsibility belongs to the initial Namespace.

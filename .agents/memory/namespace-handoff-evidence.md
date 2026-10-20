@@ -296,11 +296,17 @@ afterward starts a new Namespace-local recovery.
 First Genesis is the original power-on boot context, fixed by the machine's
 boot configuration—not the most recently active Namespace.
 
+Recovery uses that Namespace's trusted boot sequence without saving the
+faulted Thread as a resumable continuation or requiring an M-bit grant from
+the faulted program. Retain fault evidence. This supersedes earlier save-first
+recovery direction, not ordinary CHANGE/SWITCH outgoing-save semantics.
+
 **Why:** The user explicitly approved this simple rule as the replacement
 for the older Boot Thread → purgatory direction, and selected the existing
 successful boot handoff as the completion boundary rather than a new timer
 or instruction. They also approved the original power-on context as the fixed
-double-error destination.
+double-error destination, and explicitly approved trusted recovery without a
+resumable faulted-Thread save or a program-supplied M grant.
 
 **How to apply:** Use this rule in the Phase 1.1 review. Earlier purgatory
 references in this memory are historical, not the current review direction.

@@ -49,6 +49,11 @@ purgatory rule in the review.
 
 ### Reboot completion — approved
 
+Recovery uses the trusted boot sequence for the responsible Namespace,
+without saving the faulted Thread as a resumable continuation. It requires
+no M-bit grant from the faulted program. Fault evidence is retained.
+This recovery rule is distinct from ordinary CHANGE/SWITCH outgoing saves.
+
 Reboot completes when the final boot `CALL CR0` succeeds. A fault before that
 success, including a fault in the CALL itself, triggers first Genesis.
 A fault afterward starts a new Namespace-local recovery. Reaching or issuing
