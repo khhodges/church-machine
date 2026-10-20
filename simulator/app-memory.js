@@ -1,9 +1,40 @@
 var _crDetailHighlightPC = null;
 
+// The admitted simulation owns inspection identity. Legacy Namespace state and
+// a repository's newer revisions must not relabel the running image.
+function _simulationInspectionLump(slotIdx) {
+    const config = sim && sim.simulationConfiguration;
+    const bindings = config && config.artifactBindings;
+    if (!Array.isArray(bindings)) return null;
+    const matches = bindings.filter(b => Number(b.slot) === Number(slotIdx));
+    if (matches.length !== 1) return null;
+    const binding = matches[0];
+    if (!/^[0-9a-f]{8}$/i.test(binding.token || '') ||
+            !/^[^/\\]+\.lump$/.test(binding.filename || '') ||
+            !/^[0-9a-f]{64}$/i.test(binding.binaryHash || '')) return null;
+    const records = typeof _lumpsCache !== 'undefined' && Array.isArray(_lumpsCache)
+        ? _lumpsCache.filter(r => r.filename === binding.filename &&
+            String(r.token).toLowerCase() === binding.token.toLowerCase() &&
+            String(r.binary_hash || '').toLowerCase() === binding.binaryHash.toLowerCase())
+        : [];
+    // Missing catalog metadata is not permission to substitute another artifact.
+    // Keep the bound identity usable; leave its revision unknown.
+    return Object.assign({}, records.length === 1 ? records[0] : {}, {
+        token:binding.token, filename:binding.filename, binary_hash:binding.binaryHash,
+        abstraction:records.length === 1 ? records[0].abstraction :
+            binding.filename.replace(/\.\d+\.[0-9a-f]+\.lump$/i, ''),
+        _simulationBound:true,
+    });
+}
+
 function _canonicalEditorTokenForSlot(nsIdx) {
     // NS[0] is Namespace data describing Boot.NS, not a saved executable
     // LUMP.  Its code-facing navigation is the hardwired ROM inspector below.
     if (Number(nsIdx) === 0) return null;
+    if (sim && sim.simulationConfiguration) {
+        const exact = _simulationInspectionLump(nsIdx);
+        return exact ? exact.token : null;
+    }
     const savedRows = window._nsState && Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
     const saved = savedRows.find(function(row) {
@@ -26,6 +57,18 @@ async function _openSimulatorInstructionSource(nsIdx, instrIdx) {
             typeof _canonicalEditorTokenForSlot !== 'function') return false;
     if (nsIdx === 0) {
         _showBootROMInspector();
+        return true;
+    }
+    if (sim.simulationConfiguration) {
+        const exact = _simulationInspectionLump(nsIdx);
+        if (!exact || typeof openLumpInEditor !== 'function') return false;
+        await openLumpInEditor(exact.token, {exactSavedArtifact:exact});
+        const receipt = window._editorSavedBinaryReceipt;
+        if (!receipt || receipt.filename !== exact.filename ||
+                receipt.binary_hash !== exact.binary_hash) return false;
+        if (typeof _jumpToDecompiledInstruction === 'function') {
+            _jumpToDecompiledInstruction(instrIdx);
+        }
         return true;
     }
     const token = _canonicalEditorTokenForSlot(nsIdx);
@@ -1197,6 +1240,7 @@ function _namespaceSummarySnapshot() {
 window._namespaceSummarySnapshot = _namespaceSummarySnapshot;
 
 function _findSrcLump(slotIdx, slotLabel) {
+    if (sim && sim.simulationConfiguration) return _simulationInspectionLump(slotIdx);
     if (typeof _lumpsCache === 'undefined' || !Array.isArray(_lumpsCache)) return null;
     const normaliseToken = function(token) {
         const text = String(token || '').trim().toLowerCase();
@@ -6314,8 +6358,9 @@ function _nsLabelOpen(slotIdx) {
         ? _findSrcLump(slotIdx, rawLabel)
         : null;
     if (srcLump && srcLump.token) {
-        if (typeof openLumpInEditor === 'function') openLumpInEditor(srcLump.token);
-        else if (window.openLumpInEditor) window.openLumpInEditor(srcLump.token);
+        const options = srcLump._simulationBound ? {exactSavedArtifact:srcLump} : undefined;
+        if (typeof openLumpInEditor === 'function') openLumpInEditor(srcLump.token, options);
+        else if (window.openLumpInEditor) window.openLumpInEditor(srcLump.token, options);
         return;
     }
     if (e && e.gtType === 1) {

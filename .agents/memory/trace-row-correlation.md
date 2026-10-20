@@ -42,3 +42,14 @@ making the branch appear to write an LED.
 address metadata and word-derived metadata as separate evidence until their
 instruction identity is validated. Never resolve a conflict by preferring
 pieces from both sources.
+
+Active simulation inspection must resolve the admitted artifact binding before
+consulting legacy Namespace or repository metadata. A missing exact catalog
+match means revision metadata is unavailable, not permission to choose “latest.”
+
+**Why:** A legacy CapabilityTest assignment made inspection select v44 while
+the selected simulation continued executing ide.CapabilityTest bytes. Namespace
+slot numbers and historical lookup tokens alone did not distinguish the artifacts.
+
+**How to apply:** Match filename, binary hash and token together; pass that exact
+identity through editor navigation instead of reducing it to a token-only open.
