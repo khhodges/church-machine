@@ -5,14 +5,18 @@ description: Defines the first-stage symbolic naming boundary between Church cap
 
 Use petnames for every GT currently held in a Church capability register. Keep Turing data registers numeric and do not assign source-variable names to them yet.
 
-The CR14 Code header must include the code pet name/Abstraction, active Thread,
-and Namespace together.
+The CR14 Code header must show four separate identities: Code (method, e.g.
+Run), Abstraction, Thread (compact T.n), and Namespace/layout context.
 
-**Why:** The user explicitly requested execution identity on the Code header,
-not only in separate register views.
+**Why:** The user corrected a header that conflated Code and Abstraction and
+looked only in the legacy slot-label map, despite known names in the loaded
+private simulation.
 
 **How to apply:** Use the current execution registers rather than editor
-selection, and show unknown identity explicitly instead of inventing a name.
+selection. Private images retain naming in their frozen preparation, not
+necessarily the legacy slot-label map. Distinguish the NewLayout profile
+from the stored Namespace SELF label (which may still be Boot.NS).
+Resolve the method from the executed binary; do not hardcode Run.
 
 **Why:** This Phase 1 architecture was explicitly approved on 2026-09-15. It preserves the Church/Turing split and gives capability-bearing state meaningful identity without requiring CLOOMC++ dataflow metadata for ordinary values.
 

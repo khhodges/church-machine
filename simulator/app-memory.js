@@ -1425,14 +1425,39 @@ function _currentSimulatorInstructionAddress(machine) {
 }
 
 function _cr14CodeContextHeading(machine) {
-    const label = (index, role) => {
+    const identity = index => {
         const word = machine.cr[index].word0 >>> 0;
         const gt = machine.parseGT(word);
-        if (gt.type === 0) return `${role}: unavailable`;
-        const pet = machine.nsLabels && machine.nsLabels[gt.index];
-        return `${role}: ${pet || `unnamed (slot ${gt.index})`}`;
+        if (gt.type === 0) return {name: 'unavailable'};
+        const configuration = machine.simulationConfiguration;
+        const rows = configuration && configuration.preparedRows;
+        const matches = Array.isArray(rows) ? rows.filter(row =>
+            row.slot === gt.index && row.seq === gt.gt_seq &&
+            Number(row.location) === (machine.cr[index].word1 >>> 0)) : [];
+        const pet = matches.length === 1 ? matches[0].name :
+            (!configuration && machine.nsLabels && machine.nsLabels[gt.index]);
+        return {slot: gt.index, bound: matches.length === 1,
+            name: pet || `unnamed (slot ${gt.index})`};
     };
-    return `Code — ${label(14, 'Pet name / Abstraction')} · ${label(12, 'Thread')} · ${label(15, 'Namespace')}`;
+    const abstraction = identity(14), thread = identity(12), namespace = identity(15);
+    let method = null;
+    if (Number.isInteger(abstraction.slot) &&
+            (!machine.simulationConfiguration || abstraction.bound) &&
+            typeof machine._methodNameForPC === 'function') {
+        // An invalid execution root must not take down the inspection panel.
+        try {
+            method = machine._methodNameForPC(
+                abstraction.slot, machine.pc, machine.cr[14].word1 >>> 0);
+        } catch (_) {}
+    }
+    // Profile display names are not the Namespace's stored SELF-row label.
+    // Keep both visible, and never derive them from the mutable design selector.
+    const profile = machine.simulationConfiguration && machine.simulationConfiguration.designProfile;
+    const profileName = {ascending: 'NewLayout', phase1: 'Phase 1'}[profile];
+    const namespaceName = namespace.bound && profileName
+        ? `${profileName} (${namespace.name})` : namespace.name;
+    const threadName = thread.name.replace(/^Thread[.#](\d+)$/, 'T.$1');
+    return `Code: ${method || 'unavailable'} · Abstraction: ${abstraction.name} · Thread: ${threadName} · Namespace: ${namespaceName}`;
 }
 
 function updateCRDetail() {
