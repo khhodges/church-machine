@@ -1284,3 +1284,17 @@ mtime_ms = 1792510328222
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/4798db03-7622-4f98-9b74-25ff83840398/fe3c7e6c-0e0d-4bf8-b763-2ce8dadaa467"
 storage_version_token = "1792510386499136"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "4G_mnCd24eHik7NhU-7z3"
+uri = "file://docs/reviews/phase1-isa-review-phase2-compatibility.md"
+type = "text"
+title = "Phase 1 ISA Review — Phase 2 Compatibility Only"
+description = "Focused review of the authoritative ISA, SWITCH and recovery discrepancies, and remaining conformance expectations. Includes one reproduced simulator encoding mismatch; no ISA or executable code changes."
+logical_id = "f621aa1d-8395-472e-9378-549ca2755b21"
+content_hash = "sha256:f8567f57b4dc8809c7a064592e0944c95933b2f45f90298b5096ed6bbb837c12"
+size = 7661
+mtime_ms = 1792512241702
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f621aa1d-8395-472e-9378-549ca2755b21/76bac65d-f406-42ce-ad54-d97cc5e6057e"
+storage_version_token = "1792512264296219"
+content_type = "text/markdown"
