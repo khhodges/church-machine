@@ -19,6 +19,20 @@ and its hard-fault conditions; do not repair missing inputs during execution.
 The user directs that faults default to a hard fault rather than initiating
 new recovery strategies.
 
+The user subsequently approved Namespace-local reboot for a fault attributable
+to that Namespace: reboot only the Namespace that caused the error, preserving
+other Namespaces. This qualifies the recovery scope, not the instruction's
+fail-stop behavior.
+
+**Why:** With multiple Namespaces resident in one FPGA memory, a software fault
+in one must not require rebooting the others or reconfiguring the FPGA.
+
+**How to apply:** Preserve fault evidence and establish fault ownership before
+local reboot. Do not claim current implementation or hardware conformance,
+silently retry the instruction, or reset shared devices used by other Namespaces.
+Attribution during a transition and failures of shared trusted machinery still
+need an explicit contract; do not promise local containment without evidence.
+
 Intentional HARDFAULT has a selected word, but selection must not be treated as
 approval of map binding, compiler emission, or target release. The detached
 signed-map format is a proposal, not a user-approved trust policy.

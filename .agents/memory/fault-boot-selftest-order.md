@@ -3,6 +3,13 @@ name: Fault recovery boot precedence
 description: Boot wins after a fault; its three steps enter the prepared lightning-bolt target, without an implicit SelfTest.
 ---
 
+For the approved multi-Namespace design, the user subsequently qualified the
+reboot scope: a Namespace-attributable fault reboots only the responsible
+Namespace, preserving other Namespaces and the running FPGA configuration.
+This is intended behavior, not established implementation. The historical
+single-Namespace boot sequence below must not be interpreted as requiring a
+whole-machine reset for every Namespace fault.
+
 After a fault, boot always takes control, not a direct handoff from the faulted Thread to a test manager. The user requires diagnosis after SelfTest, but this does not insert SelfTest into the boot sequence: the lightning-bolt target follows the three Boot steps. With CapabilityTest selected and prepared, those steps enter CapabilityTest.
 
 **Why:** The user explicitly corrected both the proposed direct-manager recovery path and the assumption that boot unconditionally enters SelfTest. A test stopped at the initial fault boundary proves rejection, not the complete recovery lifecycle.
