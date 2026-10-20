@@ -50,6 +50,12 @@ encoding, hardware build or board action is authorized by this agreement.
 
 ## Save-first fault recovery direction
 
+**Superseded for recovery:** The later approved rule uses trusted Namespace
+boot without saving a resumable faulted Thread and without a program-supplied
+M grant; fault evidence remains retained. See
+[Namespace recovery decisions](namespace-handoff-evidence.md).
+The text below records the earlier direction, not current recovery authority.
+
 The user confirmed trying full CHANGE to preserve the faulting Thread first,
 with incoming-half-only fallback if the recovery CHANGE faults while saving
 the outgoing context. ColdStart has no outgoing Thread to save. The user

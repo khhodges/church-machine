@@ -257,9 +257,9 @@ from the midpoint onward, the target Namespace is at fault.
 superseding the earlier faulting-CR rule for selecting the responsible
 Namespace during SWITCH.
 
-**How to apply:** Use this boundary in Phase 1.1 review and subsequent approved
-incorporation. Do not reopen faulting-CR-based selection between the two
-Namespaces. This review decision does not itself authorize implementation.
+**How to apply:** Do not reopen faulting-CR-based selection between the two
+Namespaces. The user authorized Master/acceptance document incorporation only,
+not implementation or hardware changes.
 
 ## General fault attribution: GT in the faulting CR (earlier rule)
 
@@ -310,8 +310,9 @@ resumable faulted-Thread save or a program-supplied M grant.
 
 **How to apply:** Use this rule in the Phase 1.1 review. Earlier purgatory
 references in this memory are historical, not the current review direction.
-Master incorporation and implementation require separate work; do not claim
-the existing machine already performs this recovery.
+The user authorized incorporation into the Master and acceptance documents,
+not implementation. Do not claim the existing machine already performs this
+recovery.
 
 ## External recovery precedent
 

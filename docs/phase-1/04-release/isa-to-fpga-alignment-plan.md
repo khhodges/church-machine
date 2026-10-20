@@ -54,6 +54,42 @@ exercise negative intermediate values and carry beyond 32 bits. For H06/H08
 inject one defect at a time, then combine defects only where precedence is
 defined. Use nonzero sentinels in every supposedly unchanged register/word.
 
+### Phase 1.1 SWITCH and recovery acceptance
+
+These requirements incorporate the approved
+[Namespace recovery contract](../01-isa/instruction-set.md#namespace-fault-recovery).
+They extend the cases above; status remains **not run**.
+
+- **H03/H09 — canonical SWITCH:** Independently pack required-zero bits 22:19,
+  source CR0–CR11 and the compact signed row operand. Include immediate row 7
+  (`0x0070`), both signs and effective-index boundaries. Reject the former
+  explicit-destination field 15 under the applicable encoding rules.
+  Check CR15.M (not CR0.M), no extra CR12.M grant, explicit source L including
+  CR6, and no source-M substitute. CR13 must not be written.
+- **H09/H18 — directional responsibility:** Inject faults before, at and after
+  the Namespace-load midpoint. Before the midpoint, only the initial Namespace
+  is responsible; from the midpoint onward, only the target is responsible.
+  Distinct initial/target fixtures must expose a wrong selection. Retain fault
+  evidence; failed handoffs must not execute the target or roll back accepted
+  outgoing-save writes.
+- **H17/H18 — trusted recovery:** Reboot only the responsible Namespace through
+  trusted boot with no resumable faulted-Thread save and no M-bit grant from the
+  faulted program. Preserve boot validation and first-fault evidence. Complete
+  the outstanding accepted write before recovery uses memory; admit no remaining
+  writes from the interrupted instruction. Ordinary CHANGE/SWITCH saves remain
+  required; failed outgoing saves must never be reported as successful.
+- **H10/H18/H20 — double error and completion:** Fault during recovery, including
+  in the final boot `CALL CR0`, and observe restart of the original power-on
+  boot context fixed by boot configuration. Do not select the most recently
+  active Namespace. Reaching/issuing the CALL must not mark recovery complete;
+  its successful transfer must. A later fault starts a new Namespace-local
+  recovery, not a double error merely because an earlier fault occurred.
+
+The two-Namespace networking/integration demonstration remains Phase 2.
+Controlled instruction fixtures do not claim that demonstration or physical
+acceptance. Do not infer new fault precedence or close remaining oracle gaps
+from these requirements.
+
 ### Keep software acceptance separate
 
 | ID | Required release work; not a hardware-bitstream gate |

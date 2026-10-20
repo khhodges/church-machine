@@ -7,8 +7,10 @@ Phase 1.1 refines Phase 1; it is not the start of Phase 2.
 1. [ISA review](isa-review.md) — discrepancies and evidence from the first pass.
 2. [Decisions](decisions.md) — approved scope and decisions made during review.
 
-Current review: [proposed SWITCH replacement wording](isa-review.md#proposed-switch-replacement-wording).
-This is a draft, not an amendment to the Master.
+The approved SWITCH and recovery decisions have been incorporated into the
+[Master ISA](../01-isa/instruction-set.md#fault-behavior) and matching acceptance
+criteria. The [wording record](isa-review.md#proposed-switch-replacement-wording)
+preserves the review history; implementation and conformance remain separate.
 
 ## Authority and scope
 
@@ -21,8 +23,8 @@ Review Phase 1 semantics, encodings, register authority, continuations, geometry
 and fault behavior. Consider Phase 2 compatibility without making the
 two-Namespace demonstration or new service framework a Phase 1 prerequisite.
 
-The first proposed review topic is SWITCH. Its existing approved contract is
-distinct from stale wording and implementation behavior.
+The first review topic, SWITCH wording and recovery, is incorporated.
+Implementation discrepancies and remaining ISA oracle gaps remain open.
 
 ## Evidence boundaries
 

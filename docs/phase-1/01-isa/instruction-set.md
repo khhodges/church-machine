@@ -526,28 +526,29 @@ The Phase 1 Mint exclusion of MMIO creation does not exclude this
 Genesis-provisioned platform MMIO object. No new slot, register ABI, software
 delivery gate or passed hardware-conformance claim is introduced here.
 
-**Watchdog context-capture authority — approved:** Use the existing validated
-Thread-save path to save the faulting Thread's context. Retain its validation
-checks; do not give the watchdog a separate unrestricted RAM-write bypass.
-If outgoing context cannot be saved, it remains a failed save, not permission
-to bypass validation or claim capture succeeded. This selects capture authority,
-not a new recovery handler or CR13 role; preserve the existing save-first
-recovery direction. Exact implementation and hardware evidence remain required.
+**Watchdog fault evidence and recovery — Phase 1.1 approved:** Retain the
+first-fault evidence, but do not save the faulted Thread as a resumable
+continuation. Use the responsible Namespace's trusted boot sequence under
+the [Namespace recovery contract](#namespace-fault-recovery).
+No M-bit grant from the faulted program is required. Evidence retention is
+not an unrestricted RAM-write bypass or a new CR13 role. This supersedes
+the earlier save-first recovery direction, not ordinary CHANGE/SWITCH saves.
+Exact implementation and hardware evidence remain required.
 
 **Watchdog accepted-write boundary — approved:** Latch the watchdog fault at
 the deadline and stop new program-side writes. Already-accepted memory writes
 must finish within a verified hardware bound before recovery uses memory.
 This is not extra program execution time, cancellation of committed writes,
 rollback or permission to complete unaccepted writes of a multi-write operation.
-Recovery's validated Thread-save writes are a separate operation and retain
-their checks. The acceptance/completion boundary and exact bound require
+Recovery writes are a separate operation and retain their applicable validation
+checks. The acceptance/completion boundary and exact bound require
 hardware evidence; do not assume completion merely from elapsed time or reset.
 
 **Write completion before watchdog recovery — selected under delegated FPGA
 discretion:** Serialize program-side memory writes with at most one accepted
 write awaiting completion. On expiry, stop admission of new program writes;
-wait only for the previously accepted write before permitting the validated
-Thread-save path to use memory. Do not finish unaccepted writes belonging to
+wait only for the previously accepted write before permitting trusted recovery
+to use memory. Do not finish unaccepted writes belonging to
 the interrupted instruction, replay requests, retry, or roll back committed data.
 
 For synchronous on-chip RAM, acceptance and completion may be the same
@@ -1410,23 +1411,63 @@ still rejects a poison-root sentinel as a suspended continuation.
 
 ### Fault behavior
 
-A non-isolated destination, isolated source, or malformed operand encoding
-faults with `INVALID_OP`. An otherwise well-formed SWITCH whose latched
-destination M is clear faults with `PERM_L`. Invalid sources, bounds,
-version, integrity, and type failures during source admission fault before
-beginning the handoff.
+**Phase 1.1 reconciliation — approved:** SWITCH has fixed destinations CR15
+and CR12. Bits 22:19 must be zero; they do not select a destination register.
+A nonzero field, including the former explicit-destination value 15, is
+noncanonical. The source selector must name CR0–CR11. Malformed encodings
+and prohibited source selectors fault with `INVALID_OP` when subject to the
+applicable encoding and operand checks.
 
-For CR12–CR14, failure leaves capability registers, M bits, Namespace entries,
-memory words, and the source capability unchanged. For CR15, this is not a
-promise of rollback after outgoing-save writes have begun. **Any failure is a
-hard fault:** do not retry, substitute a Thread, silently repair state, or
-continue executing a partially transitioned context. A false condition skips
-the instruction without consuming M authorization.
+An otherwise well-formed, condition-true SWITCH whose latched CR15.M is clear
+faults with `PERM_L`. No additional CR12.M grant is required. The source
+requires explicit L permission; source M does not supply it, including for
+CR6. Source capability, bounds, generation, integrity and Namespace-type
+admission checks must succeed before outgoing Thread save or installation
+of either incoming context begins.
 
-Fault attribution follows the GT in the faulting CR, not a blanket choice of
-source Namespace, destination Namespace, or current Thread. **Hardware never
-changes version numbers.** Authorized software management performs version-based
-blacklisting; an already-stale GT does not cause another slot-version change.
-A Boot Thread fault leaves the CM in purgatory, not an automatically reachable
-management or fallback Thread.
+After admission, the save → Namespace load → entry-Thread activation sequence
+above applies, with its fixed slot-2 selection and mandatory entry validation.
+**Any failure is a hard fault.** Once outgoing-save writes have begun, no
+rollback is promised. Do not retry the instruction, substitute a target,
+silently repair state, or continue executing a partially transitioned context.
+A failed handoff must not execute the target Thread. CR13 remains untouched.
+
+A condition-false SWITCH skips operand checks and instruction effects,
+including handoff and M consumption. This does not waive independent fetch
+or encoding faults. This reconciliation does not settle the remaining
+malformed-encoding/predication oracle gaps or assign new multi-fault precedence.
+
+**Namespace responsibility is directional:** Before SWITCH's Namespace-load
+midpoint, the initial Namespace is at fault. From the midpoint onward, the
+target Namespace is at fault. A faulting-CR lookup does not choose between
+the two Namespaces. Retain the faulting capability as fault evidence.
+**Hardware never changes version numbers.** Authorized software management
+performs version-based blacklisting; an already-stale GT does not cause another
+slot-version change.
+
+### Namespace fault recovery
+
+**Phase 1.1 recovery contract — approved:**
+
+- A fault reboots only the responsible Namespace through its trusted boot
+  sequence. Do not save the faulted Thread as a resumable continuation.
+  No M-bit grant from the faulted program is required. Retain first-fault
+  evidence; recovery is not a successful SWITCH or a retry.
+- If that reboot itself faults before completing, restart **first Genesis**.
+  This is a double error: a fault during recovery, not two unrelated faults.
+- Reboot completes when the final boot `CALL CR0` succeeds. Reaching or issuing
+  the CALL is insufficient. A fault in that CALL is still a recovery fault;
+  a fault after its success starts a new Namespace-local recovery.
+- First Genesis is the original power-on boot context, fixed by the machine's
+  boot configuration—not the most recently active Namespace.
+- Preserve applicable boot validation and the existing write-completion
+  safeguards: outstanding accepted writes must complete before recovery uses
+  memory. No rollback, unaccepted instruction writes or unrestricted recovery
+  write bypass is authorized.
+
+This replaces the older Boot Thread → purgatory and save-first recovery
+directions. Ordinary CHANGE/SWITCH outgoing saves remain unchanged. Genesis
+remains the default for unfinished or unspecified behavior.
+These are architectural rules, not a claim of simulator, RTL or physical
+conformance, nor authorization to build or program hardware.
 

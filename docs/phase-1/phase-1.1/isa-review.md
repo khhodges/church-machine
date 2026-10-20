@@ -3,6 +3,12 @@
 Status: first-pass contract and implementation discrepancy review. This is
 not a replacement ISA, full conformance report, or release approval.
 
+**Document incorporation complete:** With explicit approval, the SWITCH
+wording and recovery decisions below are incorporated into the Master ISA and
+matching acceptance criteria. Findings 2 and 5 are historical document findings
+now resolved by that incorporation. Implementation findings remain open; no
+conformance test is marked passed. Review-time line references below are historical.
+
 Authority: [Master ISA](../01-isa/instruction-set.md).
 Acceptance: [Hardware acceptance](../04-release/isa-to-fpga-alignment-plan.md).
 No executable code, retained artifacts, Namespace state or hardware changed.
@@ -134,13 +140,12 @@ does it.
 
 ## Proposed SWITCH replacement wording
 
-**Draft for review — not incorporated or approved.** Replace the Master's
-SWITCH “Fault behavior” subsection through its version-blacklisting sentence
-with the text below. Retain the preceding encoding, source, lifecycle and
-entry-Thread rules. The final Boot Thread/purgatory sentence requires the
-separate recovery decision below; this draft does not silently remove it.
+**Historical wording record — incorporated with approval.** The Master now
+contains the reconciled SWITCH fault behavior and the recovery decisions below.
+The Master is authoritative; this section records how the wording was reviewed,
+not a competing ISA. The older Boot Thread/purgatory rule has been replaced.
 
-### Draft: instruction admission and failure
+### Reviewed wording: instruction admission and failure
 
 SWITCH has fixed destinations: CR15 for the incoming Namespace and CR12 for
 its slot-2 entry Thread. Bits 22:19 must be zero; they do not select a
@@ -197,7 +202,7 @@ recovery must not be described as a successful SWITCH or a retry.
 Namespace. If that reboot itself faults before completing, restart first
 Genesis. This is a double error: a fault during recovery, not two unrelated
 faults. This replaces the older Boot Thread → purgatory rule in the review;
-the Master has not yet been amended.
+the Master now contains the approved replacement.
 
 **Recovery entry and authority — approved review decision:** Recovery uses
 the trusted boot sequence for the responsible Namespace, without saving the
@@ -224,25 +229,23 @@ demonstration remains Phase 2.
 Namespace-load midpoint, responsibility belongs to the initial Namespace.
 Once SWITCH reaches that midpoint, responsibility belongs to the target
 Namespace. This replaces the earlier faulting-CR-based Namespace selection
-in this draft; incorporation into the Master remains separate.
+in the review and is now incorporated into the Master.
 
 ### Review limits
 
 This draft removes selectable-destination language and retains the approved
 SWITCH contract. It does not assign new fault codes or multi-fault precedence,
-settle all predication/encoding cases, alter the Master, or authorize simulator,
+settle all predication/encoding cases or authorize simulator,
 RTL, saved-artifact or FPGA changes. Acceptance cases H03/H09 remain the
 starting points for later independently encoded checks; none were run here.
 
 ## Small next step
 
-Review the proposed wording above and close the SWITCH contract first: retain the approved encoding,
-fixed destinations, CR13 preservation and entry semantics; reconcile its stale
-fault wording; then make simulator and RTL checks use independently packed
-instruction words. Existing acceptance cases H03 and H09 cover this scope.
-
-After that, close the explicitly enumerated oracle gaps and recovery-scope
-wording. Do not start a constructor framework, broad refactor or two-Namespace
+The approved SWITCH wording and recovery rules are incorporated. Next, close
+the explicitly enumerated ISA oracle gaps. Simulator and RTL alignment with
+independently packed instruction words remains separate work; acceptance cases
+H03/H09 and the Phase 1.1 recovery extensions define the relevant checks.
+Do not start a constructor framework, broad refactor or two-Namespace
 integration project as a prerequisite.
 
 ## Evidence limits
