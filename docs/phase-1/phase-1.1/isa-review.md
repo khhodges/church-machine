@@ -204,10 +204,13 @@ final boot `CALL CR0` succeeds. A fault before that success, including a fault
 in that CALL, triggers first Genesis. A fault afterward starts a new
 Namespace-local recovery. Merely reaching or issuing the CALL is not completion.
 
+**First Genesis — approved review decision:** First Genesis is the original
+power-on boot context, fixed by the machine's boot configuration—not the
+most recently active Namespace. Double-error recovery restarts that context.
+
 Genesis remains the default for unfinished or unspecified behavior.
 Remaining concrete test expectations include:
 
-- How first Genesis is identified.
 - The recovery entry and authority, with first-fault evidence retained and
   outstanding accepted writes completed before recovery writes begin.
 

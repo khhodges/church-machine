@@ -54,5 +54,11 @@ success, including a fault in the CALL itself, triggers first Genesis.
 A fault afterward starts a new Namespace-local recovery. Reaching or issuing
 the CALL alone does not complete reboot.
 
+### First Genesis — approved
+
+First Genesis is the original power-on boot context, fixed by the machine's
+boot configuration—not the most recently active Namespace. Double-error
+recovery restarts that context.
+
 Genesis remains the default for unfinished or unspecified behavior.
 Incorporation into the Master and implementation remain separate.

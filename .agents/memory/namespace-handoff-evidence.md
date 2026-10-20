@@ -293,10 +293,14 @@ Reboot completes when the final boot `CALL CR0` succeeds. A fault before that
 success (including failure of the CALL itself) triggers first Genesis; a fault
 afterward starts a new Namespace-local recovery.
 
+First Genesis is the original power-on boot context, fixed by the machine's
+boot configuration—not the most recently active Namespace.
+
 **Why:** The user explicitly approved this simple rule as the replacement
 for the older Boot Thread → purgatory direction, and selected the existing
 successful boot handoff as the completion boundary rather than a new timer
-or instruction.
+or instruction. They also approved the original power-on context as the fixed
+double-error destination.
 
 **How to apply:** Use this rule in the Phase 1.1 review. Earlier purgatory
 references in this memory are historical, not the current review direction.
