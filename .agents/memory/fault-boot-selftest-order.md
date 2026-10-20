@@ -13,6 +13,18 @@ whole-machine reset for every Namespace fault.
 The user requires the ultimate double-error fallback to reboot the first
 Genesis Namespace.
 
+Genesis is also the default for unfinished or unspecified behavior; improvements
+are second-order refinements rather than prerequisites to that baseline.
+
+**Why:** The user explicitly stated, “By default Genesis is anything unfinished
+or unspecified, improvements are second order effects.”
+
+**How to apply:** Use Genesis as the design baseline where no more specific
+behavior is defined. Do not invent additional recovery layers or repeatedly
+block discussion on optional refinements. Keep intended default behavior
+distinct from demonstrated implementation; this rule does not waive existing
+capability checks or grant unspecified operations authority.
+
 **Why:** Namespace-local reboot needs a final recovery target when recovery
 itself fails; it must not recursively depend on the failing Namespace.
 
