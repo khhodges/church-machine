@@ -1,0 +1,23 @@
+.bpi-overlay { position:fixed; inset:0; z-index:10050; background:rgba(4,4,10,0.62); display:flex; align-items:flex-start; justify-content:center; padding:5vh 1rem; overflow-y:auto; }
+.bpi-modal { width:min(860px,100%); background:var(--bg-panel,#12121f); border:1px solid var(--border,#2a2a4a); border-top:2px solid #daa520; border-radius:6px; box-shadow:0 12px 32px rgba(0,0,0,0.55); color:#d0d0e8; font-size:0.8rem; padding:0.9rem 1rem 1rem; }
+.bpi-head { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:0.6rem; }
+.bpi-title { font-family:Georgia,serif; color:#daa520; font-size:1.05rem; }
+.bpi-sub { color:#888; font-size:0.72rem; margin-top:2px; }
+.bpi-close { background:#1a1a2e; color:#c8c8e0; border:1px solid #3a3a5a; border-radius:4px; padding:0.25rem 0.7rem; cursor:pointer; font-size:0.78rem; }
+.bpi-close:hover, .bpi-close:focus { border-color:#daa520; color:#daa520; outline:none; }
+.bpi-context { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0.25rem 1rem; padding:0.5rem 0.6rem; background:#0d0d18; border:1px solid #2a2a4a; border-radius:4px; margin-bottom:0.5rem; }
+.bpi-sec { border-top:1px solid #22223a; padding:0.35rem 0; }
+.bpi-sec > summary { cursor:pointer; color:#7ec8e3; font-weight:700; font-size:0.74rem; text-transform:uppercase; letter-spacing:0.06em; padding:0.2rem 0; }
+.bpi-kv { display:flex; gap:0.6rem; padding:1px 0; min-width:0; }
+.bpi-kv > span { color:#77779a; min-width:7.5rem; flex-shrink:0; }
+.bpi-kv > code { color:#e0e0f0; font-family:'Courier New',monospace; overflow-wrap:anywhere; }
+.bpi-flags { display:flex; gap:0.4rem; }
+.bpi-flag { font-family:'Courier New',monospace; padding:1px 6px; border:1px solid #30304b; border-radius:3px; color:#777994; }
+.bpi-flag.on { border-color:#daa520; color:#daa520; }
+.bpi-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px 0.6rem; }
+.bpi-reg { background:#0d0d18; border:1px solid #1f1f34; border-radius:3px; padding:2px 6px; }
+.bpi-reg[open] { border-color:#3a3a5a; grid-column:1 / -1; }
+.bpi-reg > summary { cursor:pointer; font-family:'Courier New',monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.bpi-reg > summary b { color:#daa520; display:inline-block; min-width:2.6rem; }
+.bpi-reg > summary span { color:#a5b4fc; }
+@media (max-width:700px) { .bpi-context, .bpi-grid { grid-template-columns:1fr; } }

@@ -251,6 +251,7 @@
                 if(booting && typeof root._bootLoadCR15BreakpointBeforeNextInstruction==='function' &&
                         root._bootLoadCR15BreakpointBeforeNextInstruction()) {
                     root._reportBootLoadCR15BreakpointPause();
+                    if(root.BreakpointInspector) root.BreakpointInspector.open(machine,{kind:'boot'});
                     message='Breakpoint at B:00 — LOAD CR15 (paused before execution).';
                     paused=true; break;
                 }
@@ -258,6 +259,7 @@
                     const address=root._breakpointBeforeNextInstruction();
                     if(address!==null) {
                         root._reportBreakpointPause(address);
+                        if(root.BreakpointInspector) root.BreakpointInspector.open(machine,{kind:'instruction',address:address>>>0});
                         message='Breakpoint at 0x'+(address>>>0).toString(16).toUpperCase()+' (paused before execution).';
                         paused=true; break;
                     }

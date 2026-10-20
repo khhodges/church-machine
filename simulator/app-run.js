@@ -2390,6 +2390,7 @@ function _reportBootLoadCR15BreakpointPause() {
         pipelineViz.setNIA(_bootNIARows(sim.bootStep));
         pipelineViz.render();
     }
+    if (window.BreakpointInspector && sim) window.BreakpointInspector.open(sim, {kind: 'boot'});
 }
 
 function setBootLoadCR15Breakpoint(enabled) {
@@ -2412,6 +2413,10 @@ function setBootLoadCR15Breakpoint(enabled) {
 
 function _reportBreakpointPause(addr) {
     _consumeOneShotBreakpoint(addr);
+    // Read-only snapshot; never resumes or mutates the paused machine.
+    if (window.BreakpointInspector && sim) {
+        window.BreakpointInspector.open(sim, {kind: 'instruction', address: addr >>> 0});
+    }
     const con = document.getElementById('editorConsole');
     if (!con) return;
     con.textContent += `\n[BP] Breakpoint at 0x${(addr >>> 0).toString(16).toUpperCase().padStart(4,'0')}`;

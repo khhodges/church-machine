@@ -18,6 +18,16 @@ necessarily the legacy slot-label map. Distinguish the NewLayout profile
 from the stored Namespace SELF label (which may still be Boot.NS).
 Resolve the method from the executed binary; do not hardcode Run.
 
+Breakpoint inspection should expose machine state and CALL from/to pet names
+without executing the pending instruction.
+
+**Why:** The user requested quick register and call-context inspection when
+a breakpoint is reached.
+
+**How to apply:** Capture read-only pause evidence; closing the inspector must
+leave execution paused. Indexed CALL targets are C-list entries, not the
+instruction's destination register.
+
 **Why:** This Phase 1 architecture was explicitly approved on 2026-09-15. It preserves the Church/Turing split and gives capability-bearing state meaningful identity without requiring CLOOMC++ dataflow metadata for ordinary values.
 
 **How to apply:** IDE register displays, traces, and disassembly should resolve CR-held GTs to petnames when identity is known. Use `Self` for the currently executing abstraction and forms such as `Self.c-list` or `Self.code` when the role needs clarification. Display DRs by register number and value only.
