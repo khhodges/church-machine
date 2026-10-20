@@ -248,7 +248,20 @@ Use the permissionless Inform Thread GT required by CHANGE, with slot 2 and
 version 0. This is not a LUMP issue number. Do not copy an older differently
 numbered boot profile or replace version 0 with a live descriptor's version.
 
-## General fault attribution: GT in the faulting CR
+## SWITCH Namespace responsibility — later review decision
+
+Before SWITCH's Namespace-load midpoint, the initial Namespace is at fault;
+from the midpoint onward, the target Namespace is at fault.
+
+**Why:** The user explicitly requested simple directional responsibility,
+superseding the earlier faulting-CR rule for selecting the responsible
+Namespace during SWITCH.
+
+**How to apply:** Use this boundary in Phase 1.1 review and subsequent approved
+incorporation. Do not reopen faulting-CR-based selection between the two
+Namespaces. This review decision does not itself authorize implementation.
+
+## General fault attribution: GT in the faulting CR (earlier rule)
 
 The user first corrected the proposed outgoing-Thread-only handoff policy:
 “The Namespace is blacklisted.” They then clarified the general rule:
@@ -261,10 +274,12 @@ currently running Thread is always the target.
 
 **How to apply:** Follow the GT in the faulting CR to identify the corresponding
 NS entry for software-managed blacklisting; hardware must not change its
-version. This applies to all faults, including combined Namespace SWITCH.
+version. For Namespace responsibility during SWITCH, the later midpoint
+decision above supersedes this earlier rule.
 A Namespace GT identifies the
 Namespace to blacklist; do not select source, destination, both Namespaces,
-or the current Thread merely by instruction phase or numerical similarity.
+or the current Thread merely by numerical similarity. The SWITCH midpoint
+rule above is the explicit exception to the earlier phase-independent rule.
 Preserve the faulting GT and its proper resolution context rather than
 attributing the fault from registers after recovery has replaced them.
 

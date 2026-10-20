@@ -181,9 +181,10 @@ or encoding faults. The remaining malformed-encoding versus predication
 ordering is governed by the ISA's explicit rules and unresolved oracle items,
 not newly decided by this paragraph.
 
-Fault attribution follows the GT in the faulting CR, not a blanket choice of
-outgoing Namespace, incoming Namespace or current Thread. Hardware never
-changes version numbers. Authorized software management performs version-based
+SWITCH fault responsibility is directional: before its Namespace-load
+midpoint, the initial Namespace is at fault; from the midpoint onward, the
+target Namespace is at fault. Hardware never changes version numbers.
+Authorized software management performs version-based
 blacklisting; an already-stale GT does not cause another slot-version change.
 
 ### Recovery decision kept separate
@@ -198,14 +199,18 @@ double-error fallback to first Genesis and Genesis as the default for
 unfinished or unspecified behavior. Before replacing the purgatory sentence,
 the review must specify:
 
-- How the faulting-CR attribution identifies the responsible Namespace,
-  including failures before and after CR15 installation.
 - What constitutes a double error, and how first Genesis is identified.
 - The recovery entry and authority, with first-fault evidence retained and
   outstanding accepted writes completed before recovery writes begin.
 
 These are recovery-contract questions, not permission to add fallback targets
 inside SWITCH. The two-Namespace integration demonstration remains Phase 2.
+
+**Namespace responsibility — approved review decision:** Before SWITCH's
+Namespace-load midpoint, responsibility belongs to the initial Namespace.
+Once SWITCH reaches that midpoint, responsibility belongs to the target
+Namespace. This replaces the earlier faulting-CR-based Namespace selection
+in this draft; incorporation into the Master remains separate.
 
 ### Review limits
 

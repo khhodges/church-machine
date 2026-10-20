@@ -32,6 +32,14 @@ alignment is separate work; the review does not authorize it.
 
 ## Recovery reconciliation
 
+### SWITCH responsibility — approved
+
+Fault responsibility is directional. Before SWITCH's Namespace-load midpoint,
+the initial Namespace is at fault. From the midpoint onward, the target
+Namespace is at fault. No faulting-CR lookup is needed to choose between them.
+This decision updates the review draft; it does not itself change the Master
+or implementation.
+
 The recent Namespace-local reboot, double-error Genesis fallback and Genesis
 default directions are recorded as discussion inputs in the review. Their
 precise incorporation into Phase 1 fault wording remains to be worked through.
