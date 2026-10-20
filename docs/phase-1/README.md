@@ -8,6 +8,10 @@
 
 ## Software review scope
 
+**ISA refinement work:** [Phase 1.1 review](phase-1.1/README.md) keeps new
+findings and decisions separate from the authoritative Master ISA. Phase 2
+is a compatibility consideration, not an added Phase 1 acceptance dependency.
+
 - **[Amobea V1 — Thread abstraction](Amobea-V1.md)** — Phase 1 tuple storage
   and IDE support; continuation capture without `CHANGE`, with rollback and
   CR0 bootstrap binding still TBD.

@@ -1298,3 +1298,17 @@ mtime_ms = 1792512241702
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/f621aa1d-8395-472e-9378-549ca2755b21/76bac65d-f406-42ce-ad54-d97cc5e6057e"
 storage_version_token = "1792512264296219"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "ph0rvnJqwn-2uc0MVj7nM"
+uri = "file://docs/phase-1/phase-1.1/isa-review.md"
+type = "text"
+title = "Phase 1.1 — ISA Review"
+description = "Moved into the Phase 1.1 review folder alongside scope and decisions. The existing Master ISA remains authoritative; all document links passed validation."
+logical_id = "b92d6d9c-4004-4f00-92ae-d82458271ea6"
+content_hash = "sha256:bdd3896201815e719376c4518c5649037b8a024a01b26aba6c7311092eb2a052"
+size = 7674
+mtime_ms = 1792512729122
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b92d6d9c-4004-4f00-92ae-d82458271ea6/c2730e6f-0c61-4870-99f1-a2aa5b5d4a95"
+storage_version_token = "1792512753253955"
+content_type = "text/markdown"

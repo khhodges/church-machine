@@ -6,6 +6,17 @@ description: User-requested ISA-first organization and single-source preservatio
 Keep the related Phase 1 architecture and release documents together in one
 shared collection, starting with the ISA.
 
+The user approved a Phase 1.1 review subfolder inside Phase 1, with scope,
+the single substantive ISA review and a decisions record. The old review
+location should forward to it rather than maintain a competing copy.
+
+**Why:** Keep refinement work distinct from the current Master ISA without
+starting Phase 2 or fragmenting the review across competing documents.
+
+**How to apply:** The Master remains authoritative until explicit approval and
+incorporation. Label live-code comparisons separately from the Phase 1 RTL
+snapshot and physical evidence; folder organization is not ISA-change approval.
+
 Phase 1 Namespace design is entirely RESIDENT; no Lazy placements.
 
 **Why:** The user explicitly corrected the proposed Lazy restoration of slots 16
