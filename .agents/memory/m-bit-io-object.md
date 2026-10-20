@@ -53,6 +53,15 @@ policy. Exact method signatures remain proposals, not approved implementation.
 The C-list used to specify or construct a Namespace is not necessarily the
 constructing abstraction's E-list. They may coincide but are distinct roles.
 
+Namespace memory capacity must be a variable parameter of its abstraction.
+A captured instance's capacity must not become a fixed abstraction constant.
+
+**Why:** The user explicitly corrected the concrete Namespace definition to
+require variable memory size.
+
+**How to apply:** Distinguish requested capacity, authorized allocation and
+actual validated extent. This does not itself specify live resizing.
+
 **Why:** The user explicitly corrected the assumption that Namespace membership
 must come from the abstraction's own execution list.
 

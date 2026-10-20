@@ -12,7 +12,8 @@ preceding simulation discussion, not the legacy Namespace or a hardware snapshot
 - Source SHA-256: `09b29da4e736715f730803ecf334e9210df61356a00213d4e77c4d05a3e77e10`
 - Namespace name retained: `Boot.NS`
 - Format: `ascending-nst-metadata-slot0-v1`
-- Capacity: 16,384 words
+- Current instance capacity: 16,384 words; supplied through the variable
+  `capacityWords`, not fixed by the abstraction.
 - Table: 64 slots
 - Selected output profile: `api`
 
@@ -23,18 +24,29 @@ schema. `CurrentNamespaceDefinition` is a name for this supplied construction
 C-list and its layout annotations, not a newly issued GT.
 
 ```text
-Namespace abstraction Boot.NS
+Namespace abstraction Boot.NS(capacityWords)
     definition: CurrentNamespaceDefinition
-    capacity:   16384 words
+    capacity:   capacityWords
     slots:      64
     entry:      Boot.Thread at NS[2]
     startup:    ide.CapabilityTest, exact saved revision 4
 
     PrepareTable()
         construct or supply the table described by definition
-        return its exact reference and extent for Regulator validation
+        validate that the table and resident layout fit capacityWords
+        return its exact reference and actual allocated extent for Regulator validation
         do not activate CR15 or grant M authority
 ```
+
+The current instance supplies `capacityWords = 16384`. Other instances may
+supply a different capacity within the machine's supported geometry and their
+authorized memory allocation. A requested size is not itself allocation
+authority. Preparation must reject insufficient or unsupported capacity rather
+than silently change membership or residency. The Regulator validates the
+actual allocated extent, not merely the requested number.
+
+This parameterization does not define live resizing of an active Namespace.
+The table's slot count is a separate dimension from memory capacity.
 
 `PrepareTable` is a proposed method, not an existing service. The concrete method
 ABI, constructor implementation identity and execution E-list remain undefined.
