@@ -21,3 +21,13 @@
 .bpi-reg > summary b { color:#daa520; display:inline-block; min-width:2.6rem; }
 .bpi-reg > summary span { color:#a5b4fc; }
 @media (max-width:700px) { .bpi-context, .bpi-grid { grid-template-columns:1fr; } }
+.bpi-actions { display:flex; gap:0.4rem; flex-shrink:0; }
+.bpi-empty { padding:1.4rem 0.6rem; color:#888; text-align:center; border:1px dashed #2a2a4a; border-radius:4px; }
+.bpi-empty-title { font-family:Georgia,serif; color:#daa520; font-size:0.95rem; margin-bottom:0.3rem; }
+.bpi-history { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:3px; }
+.bpi-hist-item { display:flex; gap:0.7rem; align-items:flex-start; width:100%; text-align:left; background:#0d0d18; border:1px solid #1f1f34; border-radius:3px; color:#d0d0e8; padding:0.4rem 0.6rem; cursor:pointer; font:inherit; }
+.bpi-hist-item:hover, .bpi-hist-item:focus { border-color:#daa520; outline:none; }
+.bpi-hist-ord { color:#daa520; font-family:'Courier New',monospace; min-width:2.4rem; }
+.bpi-hist-main { display:flex; flex-direction:column; min-width:0; }
+.bpi-hist-top code { color:#7ec8e3; font-family:'Courier New',monospace; }
+.bpi-hist-meta { color:#77779a; font-size:0.72rem; overflow-wrap:anywhere; }

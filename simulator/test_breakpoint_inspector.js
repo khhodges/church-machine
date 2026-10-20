@@ -54,4 +54,35 @@ assert(/function _reportBootLoadCR15BreakpointPause[\s\S]{0,500}BreakpointInspec
 assert.equal((ds.match(/BreakpointInspector\.open\(machine/g)||[]).length,2);
 const src=fs.readFileSync(__dirname+'/breakpoint-inspector.js','utf8');assert(/removeEventListener\('keydown'/.test(src)&&/returnFocus/.test(src)&&/'Tab'/.test(src));
 assert(!/mLoad|\.step\(|\.run\(|fetch\(/.test(fs.readFileSync(__dirname+'/breakpoint-inspector.js','utf8')));
+// ---- history ring ----
+(async()=>{
+BI._resetForTest();
+const hm=machine(undefined);
+const a=BI.open(hm,{kind:'instruction',address:10});
+assert.equal(BI.open(hm,{kind:'instruction',address:10}),a,'dual hook same tick deduped');
+assert.equal(BI.history().length,1);
+await Promise.resolve();
+const b=BI.open(hm,{kind:'instruction',address:10});
+assert.notEqual(a,b);assert.equal(BI.history().length,2,'repeated address on a distinct stop is retained');
+const hm2=machine(undefined);
+BI.open(hm2,{kind:'instruction',address:10});assert.equal(BI.history().length,3,'replaced machine same tick is distinct');
+assert.equal(BI.history()[0].snapshot.dr.length,16);assert(BI.history()[0].ordinal>BI.history()[1].ordinal,'newest first');
+for(let i=0;i<25;i++){await Promise.resolve();BI.open(hm,{kind:'instruction',address:i});}
+const h=BI.history();assert.equal(h.length,20,'ring holds 20');assert.equal(h[0].snapshot.address,24);assert.equal(h[19].snapshot.address,5);
+assert(Object.isFrozen(h[0])&&Object.isFrozen(h[0].snapshot)&&Object.isFrozen(h[0].snapshot.cr[3]));
+h.length=0;assert.equal(BI.history().length,20,'returned copy cannot mutate ring');
+hm.dr[3]=777;hm.cr[3].word0=0;
+const old=BI.showEntry(19);assert.equal(old,BI.history()[19].snapshot,'reopens captured snapshot');assert.equal(old.dr[3],3,'not live');
+assert.equal(BI.history().length,20);assert.equal(BI.history()[0].snapshot.address,24,'reopen does not re-record');
+assert.equal(BI.showEntry(99),null);
+const markup=BI.render(old,true);assert(/Back to history/.test(markup)&&/captured/.test(markup));
+assert(/History \(20\)/.test(BI.render(old,false)));
+assert.equal(BI.showHistory().length,20);
+BI.clearHistory();assert.equal(BI.history().length,0);
+BI.close();assert.equal(hm.running,undefined,'close has no machine effect');
+const html=fs.readFileSync(__dirname+'/index.html','utf8');
+assert(/id="dashMenu-bpHistory"[^>]*BreakpointInspector\.showHistory\(\)/.test(html),'dashboard menu entry wired');
+assert(/No breakpoints recorded yet/.test(src));
+console.log('PASS breakpoint history: ring of 20, dedup, repeats, immutable, reopen, clear, menu');
+})().catch(e=>{console.error(e);process.exit(1);});
 console.log('PASS breakpoint inspector: immutable snapshot, escaping, close-no-resume, private/legacy hooks');

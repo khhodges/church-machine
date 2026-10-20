@@ -14,7 +14,10 @@
         }
         return value;
     }
-    let lastKey = null, openSnapshot = null, returnFocus = null;
+    let lastKey = null, lastMachine = null, keyArmed = false, openSnapshot = null, returnFocus = null;
+    // Browser-session ring of the last 20 pauses, newest first. In memory only.
+    const HISTORY_LIMIT = 20;
+    let history = [], ordinal = 0;
 
     // Pet name only from the admitted preparedRows (exact slot/seq/location) or,
     // for legacy machines without a configuration, the machine's own NS labels.
@@ -150,12 +153,16 @@
     function row(label, value) {
         return '<div class="bpi-kv"><span>' + esc(label) + '</span><code>' + esc(value) + '</code></div>';
     }
-    function render(s) {
+    function render(s, fromHistory) {
         const where = s.kind === 'boot' ? 'B:00 — LOAD CR15' : s.address !== null ? hex(s.address, 4) : 'unknown address';
-        let html = '<div class="bpi-head"><div><div class="bpi-title">Breakpoint paused · ' + esc(where) + '</div>' +
+        const entry = history.find(item => item.snapshot === s);
+        let html = '<div class="bpi-head"><div><div class="bpi-title">' + (fromHistory ? 'Breakpoint #' + (entry ? entry.ordinal : '?') + ' (captured)' : 'Breakpoint paused') + ' · ' + esc(where) + '</div>' +
             '<div class="bpi-sub">' + esc(s.source === 'private' ? 'Private ' + (s.profile === 'ascending' ? 'NewLayout' : (s.profile || 'design')) + ' simulation' : 'Simulator') +
             ' · read-only snapshot · execution remains paused</div></div>' +
-            '<button type="button" class="bpi-close" data-bpi-close aria-label="Close inspector (execution stays paused)">Close</button></div>';
+            '<div class="bpi-actions">' + (fromHistory
+                ? '<button type="button" class="bpi-close" data-bpi-history>Back to history</button>'
+                : '<button type="button" class="bpi-close" data-bpi-history>History (' + history.length + ')</button>') +
+            '<button type="button" class="bpi-close" data-bpi-close aria-label="Close inspector (execution stays paused)">Close</button></div></div>';
         html += '<div class="bpi-context">' + row('Code method', s.code) + row('Abstraction', s.abstraction) +
             row('Thread', s.thread) + row('Namespace', s.namespace) + '</div>';
         html += '<details class="bpi-sec" open><summary>Current instruction</summary>' +
@@ -204,36 +211,97 @@
         if (!overlay) { document.removeEventListener('keydown', onKey, true); return; }
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
         if (event.key !== 'Tab') return;
-        const items = Array.from(overlay.querySelectorAll('button, summary, [tabindex]:not([tabindex="-1"])'));
+        const items = Array.from(overlay.querySelectorAll('button, summary, [tabindex]:not([tabindex="-1"])'))
+            .filter(el => !el.closest('details:not([open]) > :not(summary)'));
         if (!items.length) return;
         const first = items[0], last = items[items.length - 1], active = document.activeElement;
         if (event.shiftKey && (active === first || !overlay.contains(active))) { event.preventDefault(); last.focus(); }
         else if (!event.shiftKey && (active === last || !overlay.contains(active))) { event.preventDefault(); first.focus(); }
     }
+    function where(s) {
+        return s.kind === 'boot' ? 'B:00 — LOAD CR15' : s.address !== null ? hex(s.address, 4) : 'unknown address';
+    }
+    function callSummary(s) {
+        if (!s.call) return 'no pending CALL';
+        return 'CALL ' + (s.call.targetLabel || '?') + ' → ' + (s.call.targetName || 'unresolved') +
+            (s.call.targetMethod ? '.' + s.call.targetMethod : '');
+    }
+    function renderHistory() {
+        let html = '<div class="bpi-head"><div><div class="bpi-title">Breakpoint history</div>' +
+            '<div class="bpi-sub">Last ' + HISTORY_LIMIT + ' pauses this browser session, newest first · captured snapshots, read-only</div></div>' +
+            '<div class="bpi-actions">' + (history.length ? '<button type="button" class="bpi-close" data-bpi-clear>Clear</button>' : '') +
+            '<button type="button" class="bpi-close" data-bpi-close aria-label="Close history (execution unaffected)">Close</button></div></div>';
+        if (!history.length) {
+            return html + '<div class="bpi-empty"><div class="bpi-empty-title">No breakpoints recorded yet</div>' +
+                'Set a breakpoint and Run or Step. Each pause is captured here, up to the last ' + HISTORY_LIMIT + '.</div>';
+        }
+        html += '<ol class="bpi-history">' + history.map((item, i) => {
+            const s = item.snapshot;
+            return '<li><button type="button" class="bpi-hist-item" data-bpi-entry="' + i + '">' +
+                '<span class="bpi-hist-ord">#' + item.ordinal + '</span>' +
+                '<span class="bpi-hist-main"><span class="bpi-hist-top"><code>' + esc(where(s)) + '</code> ' +
+                esc(s.code) + ' · ' + esc(s.abstraction) + '</span>' +
+                '<span class="bpi-hist-meta">' + esc(item.time) + ' · ' + esc(s.source === 'private' ? 'private' : 'simulator') +
+                ' · ' + esc(s.thread) + ' · ' + esc(callSummary(s)) + '</span></span></button></li>';
+        }).join('') + '</ol>';
+        return html;
+    }
+    function record(snapshot) {
+        const d = new Date();
+        const time = [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+        history.unshift(Object.freeze({ordinal: ++ordinal, time, snapshot}));
+        if (history.length > HISTORY_LIMIT) history.length = HISTORY_LIMIT;
+    }
+    function show(markup, label) {
+        if (typeof document === 'undefined' || !document.body) return;
+        let overlay = document.getElementById('breakpointInspector');
+        if (!overlay) {
+            const active = document.activeElement;
+            returnFocus = active && active !== document.body ? active : null;
+            overlay = document.createElement('div');
+            overlay.id = 'breakpointInspector';
+            overlay.className = 'bpi-overlay';
+            overlay.addEventListener('click', onClick);
+            document.body.appendChild(overlay);
+            document.addEventListener('keydown', onKey, true);
+        }
+        overlay.innerHTML = '<div class="bpi-modal" role="dialog" aria-modal="true" aria-label="' + esc(label) + '">' + markup + '</div>';
+        const focus = overlay.querySelector('[data-bpi-entry]') || overlay.querySelector('[data-bpi-history]') || overlay.querySelector('[data-bpi-close]');
+        if (focus && focus.focus) focus.focus();
+    }
+    function onClick(event) {
+        const overlay = event.currentTarget, t = event.target;
+        const pick = sel => t.closest ? t.closest(sel) : null;
+        if (t === overlay || pick('[data-bpi-close]')) return close();
+        if (pick('[data-bpi-clear]')) { clearHistory(); return showHistory(); }
+        if (pick('[data-bpi-history]')) return showHistory();
+        const entry = pick('[data-bpi-entry]');
+        if (entry) showEntry(Number(entry.getAttribute('data-bpi-entry')));
+    }
+    function showHistory() { show(renderHistory(), 'Breakpoint history'); return history.slice(); }
+    // Reopen a captured snapshot: never re-captures the live machine or records.
+    function showEntry(index) {
+        const item = history[index];
+        if (!item) return null;
+        show(render(item.snapshot, true), 'Captured breakpoint');
+        return item.snapshot;
+    }
+    function clearHistory() { history = []; }
     function open(machine, info) {
         const snapshot = capture(machine, info);
         if (!snapshot) return null;
         const key = [snapshot.kind, snapshot.address, snapshot.physicalPC, snapshot.bootStep].join('|');
-        if (openSnapshot && lastKey === key) return openSnapshot; // both hooks fire for one pause
-        lastKey = key; openSnapshot = snapshot;
-        if (typeof document === 'undefined' || !document.body) return snapshot;
-        const replacing = !!document.getElementById('breakpointInspector');
-        const previous = replacing ? returnFocus : document.activeElement;
-        returnFocus = null; close(); openSnapshot = snapshot;
-        returnFocus = previous && previous !== document.body ? previous : null;
-        const overlay = document.createElement('div');
-        overlay.id = 'breakpointInspector';
-        overlay.className = 'bpi-overlay';
-        overlay.innerHTML = '<div class="bpi-modal" role="dialog" aria-modal="true" aria-label="Breakpoint inspector">' + render(snapshot) + '</div>';
-        overlay.addEventListener('click', event => {
-            if (event.target === overlay || (event.target.closest && event.target.closest('[data-bpi-close]'))) close();
-        });
-        document.body.appendChild(overlay);
-        document.addEventListener('keydown', onKey, true);
-        const button = overlay.querySelector('[data-bpi-close]');
-        if (button && button.focus) button.focus();
+        // Both hooks fire synchronously for one pause; a later stop is distinct
+        // even at the same address, and a replaced machine is always distinct.
+        if (keyArmed && lastKey === key && lastMachine === machine && openSnapshot) return openSnapshot;
+        lastKey = key; lastMachine = machine; keyArmed = true;
+        Promise.resolve().then(() => { keyArmed = false; });
+        openSnapshot = snapshot;
+        record(snapshot);
+        show(render(snapshot, false), 'Breakpoint inspector');
         return snapshot;
     }
     root.BreakpointInspector = {capture, open, close, render, current:() => openSnapshot,
-        _resetForTest:() => { lastKey = null; openSnapshot = null; }};
+        history:() => history.slice(), showHistory, showEntry, clearHistory, HISTORY_LIMIT,
+        _resetForTest:() => { lastKey = null; lastMachine = null; keyArmed = false; openSnapshot = null; history = []; ordinal = 0; }};
 })(typeof window !== 'undefined' ? window : globalThis);

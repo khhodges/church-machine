@@ -28,6 +28,14 @@ a breakpoint is reached.
 leave execution paused. Indexed CALL targets are C-list entries, not the
 instruction's destination register.
 
+Retain the last 20 breakpoint snapshots for quick historical inspection.
+
+**Why:** The user requested a separate popup trace of recent breakpoints.
+
+**How to apply:** Reopening a historical stop must show its captured registers
+and call names, not recapture live state or add another stop. History is
+inspection only, never execution rollback.
+
 **Why:** This Phase 1 architecture was explicitly approved on 2026-09-15. It preserves the Church/Turing split and gives capability-bearing state meaningful identity without requiring CLOOMC++ dataflow metadata for ordinary values.
 
 **How to apply:** IDE register displays, traces, and disassembly should resolve CR-held GTs to petnames when identity is known. Use `Self` for the currently executing abstraction and forms such as `Self.c-list` or `Self.code` when the role needs clarification. Display DRs by register number and value only.
