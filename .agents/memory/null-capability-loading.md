@@ -16,3 +16,14 @@ authority; access checks on the source and architectural destination restriction
 still apply. This does not approve a new immediate encoding, alter the GT format,
 or imply global revocation of other copies. Verify simulator and hardware
 conformance separately; this clarification alone is not evidence either works.
+
+Do not assume a dedicated NULL C-list row per abstraction is an acceptable
+solution for explicit capability clearing.
+
+**Why:** The user rejected that per-abstraction cost and proposed ISA acceptance
+of all-zero NULL directly instead.
+
+**How to apply:** Distinguish the existing NULL GT representation from a proposed
+direct-NULL LOAD encoding. Discuss a non-colliding encoding before implementing;
+ordinary row zero must not silently acquire a new meaning. No exact direct-NULL
+instruction encoding has yet been selected.
