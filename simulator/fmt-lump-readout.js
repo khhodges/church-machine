@@ -62,7 +62,14 @@
         };
     }
 
-    function renderProfileStats(profile, c, sourceText) {
+    function renderProfileStats(profile, c, sourceText, editorText) {
+        if (typeof editorText === 'string' && editorText !== sourceText) {
+            return '<span class="fmt-profile-stats" data-stale="true">' +
+                '<span class="fmt-stat-source">Source changed — compiled size is out of date. ' +
+                'Build the current source successfully and reopen Save LUMP to update these counts.</span>' +
+                '<span class="fmt-stat-source">Current editor: ' + num(utf8Len(editorText)) +
+                ' B plaintext. No new binary size is available yet.</span></span>';
+        }
         var L = layout(c), T = layoutText(L), S = sourceInfo(profile, c.frame, sourceText);
         return '<span class="fmt-profile-stats">' +
             '<span class="fmt-stat"><span class="fmt-stat-k">Content</span><span class="fmt-stat-v" data-used="' + L.usedWords + '">' + T.content + '</span></span>' +
@@ -70,6 +77,25 @@
             '<span class="fmt-stat"><span class="fmt-stat-k">Block</span><span class="fmt-stat-v" data-allocated="' + L.allocatedWords + '">' + T.allocation + '</span></span>' +
             '<span class="fmt-stat"><span class="fmt-stat-k">Padding</span><span class="fmt-stat-v" data-padding="' + L.paddingWords + '">' + T.padding + '</span></span>' +
             '<span class="fmt-stat-source">' + esc(S.text) + '</span></span>';
+    }
+
+    // Update presentation only. Never mutate the frozen candidate/save snapshot.
+    function bindEditorReadouts(container, editor, pending) {
+        if (!container || !editor || !editor.addEventListener) return;
+        if (container._disposeSourceReadouts) container._disposeSourceReadouts();
+        function refresh() {
+            container.querySelectorAll('[data-fmt-profile]').forEach(function(el) {
+                var profile = el.getAttribute('data-fmt-profile');
+                var candidate = pending.candidates[profile];
+                if (candidate) el.innerHTML = renderProfileStats(
+                    profile, candidate, pending.sourceText, editor.value);
+            });
+        }
+        editor.addEventListener('input', refresh);
+        container._disposeSourceReadouts = function() {
+            editor.removeEventListener('input', refresh);
+        };
+        refresh();
     }
 
     var ALLOCATION_NOTE = 'Blocks are allocated in power-of-two sizes (minimum 64 words), so the unused tail is padding. ' +
@@ -108,7 +134,8 @@
     }
 
     var api = { layout: layout, layoutText: layoutText, sourceInfo: sourceInfo,
-        renderProfileStats: renderProfileStats, renderIdentity: renderIdentity,
+        renderProfileStats: renderProfileStats, bindEditorReadouts: bindEditorReadouts,
+        renderIdentity: renderIdentity,
         identity: identity, knownRevision: knownRevision, ALLOCATION_NOTE: ALLOCATION_NOTE };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.FmtLumpReadout = api;

@@ -1453,6 +1453,25 @@
         "age_basis": "file_mtime",
         "age_timestamp": 1788788890.7309115
       }
+    },
+    {
+      "version": 95,
+      "filename": "SelfTest_v95.lump",
+      "binary_hash": "7ccc640c7f6d3d9158d7f04deef28aa58e2642c37f794b5a16f8fdc52574c1f4",
+      "deleted_at": 1792599193.483742,
+      "compiled_at": 1789906251.602,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1789906251.602
+      }
     }
   ],
   "4a000007": [

@@ -9685,9 +9685,13 @@ function _renderFormatLumpCandidate(pending) {
                 '" ' + (disabled ? 'disabled' : 'onclick="_selectFormatLumpProfile(\'' + profile + '\')"') + '>' +
                 '<span class="fmt-output-profile-title">' + info.title + '</span>' +
                 '<span class="fmt-output-profile-detail">' + detail + '</span>' +
-                '<span class="fmt-output-profile-size">' + size + '</span></button>';
+                '<span class="fmt-output-profile-size" data-fmt-profile="' + profile + '">' + size + '</span></button>';
         }).join('') + (window.FmtLumpReadout
             ? '<div class="fmt-alloc-note">' + window.FmtLumpReadout.ALLOCATION_NOTE + '</div>' : '');
+        if (window.FmtLumpReadout && window.FmtLumpReadout.bindEditorReadouts) {
+            window.FmtLumpReadout.bindEditorReadouts(
+                _profilesEl, document.getElementById('asmEditor'), pending);
+        }
     }
 
     var _warning = document.getElementById('fmtOutputWarning');
