@@ -82,6 +82,55 @@ for (const size of [8, 64, 256]) {
 }
 
 // Slot writes remain isolated from binding/exclusion and issuance. Test
+// Native allocator evidence: state and pool authority come from Mint's C-list,
+// never caller CR7/CR8. Provisioning remains disposable, not a live installation.
+const allocationText = fragment('create_data_allocate', 'create_data_publish');
+const allocationStops = [...new Set([...allocationText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];
+for (const scenario of ['success', 'pool-full', 'slots-full', 'bad-cursor', 'pool-bounds']) {
+    const {s, labels, token} = fixture(allocationText +
+        '\ncreate_data_publish:\nHALT\n' +
+        allocationStops.map(label => label + ':\nLOAD CR0, CR6, #9').join('\n'), 64);
+    const STATE = 0x4000;
+    s.withNamespaceWrite('TEST ONLY: allocator state', () =>
+        s.writeNSEntry(43, STATE, 63, 0, 0, 1, 0, 0, 0));
+    s.memory[STATE] = s.packLumpHeader(0, 0, 1, 0);
+    s.memory.set([8, 64, 5, 7, 39, 38], STATE + 1);
+    if (scenario === 'pool-full') s.memory[STATE + 1] = 60;
+    if (scenario === 'slots-full') s.memory[STATE + 3] = 7;
+    if (scenario === 'bad-cursor') s.memory[STATE + 1] = 65;
+    if (scenario === 'pool-bounds') s.memory.set([64, 128], STATE + 1);
+    const beforeState = Array.from(s.memory.slice(STATE, STATE + 64));
+    const header = s.parseLumpHeader(s.memory[CODE]);
+    s.memory[CODE] = s.packLumpHeader(2, header.cw, 4, 0);
+    s.cr[6].word1 = CODE + 252;
+    s.memory.set([s.cr[6].word0, token(43, 'RW'), token(43, 'L'), token(41, 'RW')], CODE + 252);
+    s.dr[6] = 8;
+    s.dr[5] = 0x12345678;
+    s.cr[7] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
+    s.cr[8] = {...s.cr[7]};
+    let steps = 0;
+    while (!s.halted && s.pc !== labels.create_data_publish && steps++ < 1000) s.step();
+    assert.ok(steps < 1000);
+    assert.equal(s.dr[5], 0x12345678, 'allocator must preserve heap DR5');
+    if (scenario === 'success') {
+        assert.equal(s.halted, false, JSON.stringify(s.faultLog));
+        assert.equal(s.pc, labels.create_data_publish);
+        assert.equal(s.dr[7], 39);
+        assert.equal(s.dr[8], 8);
+        assert.equal(s.memory[STATE + 1], 16);
+        assert.equal(s.memory[STATE + 3], 6);
+        assert.deepEqual(Array.from(s.memory.slice(DATA + 8, DATA + 16)), Array(8).fill(0));
+        assert.equal(s.memory[DATA + 7], 0xdeadbeef);
+        assert.equal(s.memory[DATA + 16], 0xdeadbeef);
+    } else {
+        assert.equal(s.halted, true, scenario);
+        assert.deepEqual(Array.from(s.memory.slice(STATE, STATE + 64)), beforeState);
+        assert.equal(s.memory[DATA + 8], 0xdeadbeef);
+    }
+}
+console.log('PASS: native bounded pool/slot reservation, exact zeroing, exhaustion and DR5 preservation.');
+
+// Slot writes remain isolated from binding/exclusion and issuance. Test
 // provisioning supplies an empty target and an internally consistent descriptor.
 const slotText = fragment('create_data_slot_offset', 'create_data_slot_return');
 const stops = [...new Set([...slotText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];

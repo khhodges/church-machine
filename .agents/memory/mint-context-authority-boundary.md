@@ -18,16 +18,18 @@ and capability provisioning from an ISA encoding limitation. Do not call the
 whole path impossible merely because a source-level label or GT literal is not
 an existing instruction operand. Preserve the ordinary execution requirement.
 
-Local-label spelling is not entry authority. An existing X capability must
-supply the entry address; source aliases must not manufacture capabilities or
-turn an unverified debug-label table into control-flow authority.
+The local Mint Lambda branches to its label under the existing CR14 code
+authority. Do not require a separately provisioned X capability in CR9 or
+another register for this local transfer.
 
-**Why:** The user requires label-based Mint code while explicitly preserving
-all instruction operand encodings and rejecting protected-profile shortcuts.
+**Why:** The user explicitly reaffirmed the agreed local-label branch using
+existing CR14 after the agent incorrectly reintroduced a separate X-capability
+binding requirement. This supersedes that earlier interpretation.
 
-**How to apply:** Keep source naming separate from capability provisioning and
-verify body entry as well as RETURN. A successful inline return alone does not
-prove that a labeled body was entered.
+**How to apply:** Preserve CR14 and the same Mint context; verify actual labeled
+body entry and return, not just an inline RETURN. Preserve existing instruction
+encodings. If implementation cannot express the approved transfer, report
+the exact gap rather than substituting a separate capability requirement.
 
 Mint owns the memory pool and free-slot list. Phase 1 code is single-threaded.
 The Lambda name is a label in Mint's code block; it executes with the same

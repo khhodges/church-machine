@@ -50,7 +50,7 @@
 ; explicit unresolved gates, not silently assumed to pass.
 
 abstraction ide.Mint {
-capabilities { SELF E, ide.MintState RW, ide.MintState L }
+capabilities { SELF E, ide.MintState RW, ide.MintState L, ide.MintPool RW }
 
 method CREATE {
 CREATE_inputs:
@@ -69,19 +69,19 @@ create_data_passkey_escape:
     ; the caller. Its sole c-list row is scratch at the last LUMP word.
     LOAD CR8, CR6, #1
     LOAD CR7, CR6, #2
-    DREAD DR5, CR8, #0
-    BFEXT DR5, DR5, #23, #4
+    DREAD DR9, CR8, #0
+    BFEXT DR9, DR9, #23, #4
     IADD DR10, DR0, #64
 create_data_state_size:
-    MCMP DR5, #0
+    MCMP DR9, #0
     BRANCHEQ create_data_escape_reference
     SHL DR10, DR10, #1
-    ISUB DR5, DR5, #1
+    ISUB DR9, DR9, #1
     BRANCH create_data_state_size
 create_data_escape_reference:
     ISUB DR10, DR10, #1
-    ISUB DR5, DR0, #1
-    DWRITE DR5, CR8, #0, DR10
+    ISUB DR9, DR0, #1
+    DWRITE DR9, CR8, #0, DR10
     LOAD CR11, CR7, #0
     ; Existing EXACT instruction: only the exact all-ones CR2 escapes.
     ; No proof read or CR3 requirement on this Phase 1 testing path.
@@ -125,14 +125,47 @@ create_data_authorize:
     ; Preserve decoded DR6. Non-NULL is never authorization.
     BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE
 create_data_allocate:
-    ; Service binding missing: reserve DR6 words and a slot/generation;
-    ; obtain private DATA RW authority in CR8 to a separate allocation.
-    ; Preserve DR6. Caller-supplied CR8 is NOT allocation authority.
-    BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA
+    ; Mint-owned state payload (word 0 remains the LUMP header):
+    ; 1 pool cursor, 2 exclusive pool end, 3 free-slot queue cursor,
+    ; 4 exclusive queue end, 5.. queue entries (Namespace slot indices).
+    ; Pool offsets are relative to MintPool's RW view, not physical addresses.
+    ; Provisioning must exclude pool metadata from [cursor,end).
+    ; Single-threaded bump allocation; no reclamation policy is implied.
+    ; All checks/reads precede reservation writes. Exhaustion is a hard fault.
+    LOAD CR7, CR6, #1
+    LOAD CR8, CR6, #3
+    DREAD DR8, CR7, #1
+    DREAD DR10, CR7, #2
+    MCMP DR8, DR10
+    BRANCHGT TODO_CREATE_ALLOCATOR_STATE
+    ISUB DR10, DR10, DR8
+    MCMP DR6, DR10
+    BRANCHGT TODO_CREATE_POOL_EXHAUSTED
+    DREAD DR9, CR7, #3
+    MCMP DR9, #5
+    BRANCHLT TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR10, CR7, #4
+    MCMP DR9, DR10
+    BRANCHGE TODO_CREATE_SLOTS_EXHAUSTED
+    DREAD DR7, CR7, #0, DR9
+    MCMP DR7, #2
+    BRANCHLT TODO_CREATE_ALLOCATOR_STATE
+    ; Probe the complete pool interval before advancing either cursor.
+    ; DR6 is already checked nonzero; available-space subtraction above
+    ; prevents cursor addition overflow for valid unsigned state.
+    IADD DR10, DR8, DR6
+    ISUB DR11, DR10, #1
+    DREAD DR4, CR8, #0, DR8
+    DREAD DR4, CR8, #0, DR11
+    IADD DR9, DR9, #1
+    DWRITE DR10, CR7, #1
+    DWRITE DR9, CR7, #3
 create_data_zero_begin:
-    IADD DR9, DR0, #0
+    ; DR8 is the reserved pool-relative start, DR6 is its size.
+    IADD DR10, DR8, DR6
+    IADD DR9, DR8, #0
 create_data_zero_loop:
-    MCMP DR9, DR6
+    MCMP DR9, DR10
     BRANCHEQ create_data_publish
     DWRITE DR0, CR8, #0, DR9
     IADD DR9, DR9, #1
