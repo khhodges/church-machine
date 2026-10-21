@@ -16,9 +16,18 @@ Data CREATE blocker review.
 **How to apply:** Implement the scoped happy path around Mint-owned allocation
 and a same-context local Lambda. Preserve Lambda-return CRs. Keep outward CALL
 boundary checks separate. This does not approve hardware changes or the
-previously declined protected-profile shortcut. The requested Phase 1 all-ones
-verification shortcut is test-only; its GT-versus-proof scope must be clarified
-before changing validation.
+previously declined protected-profile shortcut.
+
+The Phase 1 test credential is exactly the Passkey GT in CR2, `0xFFFFFFFF`.
+The user explicitly selected the GT only, not the four-word proof at CR3.
+This is a scoped Mint testing exception, not general GT validity or a grant
+of memory/Namespace access to that word.
+
+**Why:** The user clarified “The Passkey GT” when offered GT, proof, or both.
+
+**How to apply:** Do not require an all-ones CR3 proof, weaken general GT
+validation, or import the isolated protected-profile shortcut. Keep the
+testing exception distinct from real credential verification.
 
 New layout must retain ordinary execution semantics for the requested Mint
 Data CREATE path. Do not connect it to the isolated protected Mint profile

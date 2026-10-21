@@ -18,6 +18,28 @@ authority. It zeros every allocated word before publication. This removes
 payload exposure during creation; post-return confidentiality also requires
 controlling retained allocator authority and is not proven by this fragment.
 
+## Superseding Phase 1 happy-path decisions
+
+The programmer has resolved these design questions for Phase 1:
+
+- Mint owns the memory pool and free-slot list.
+- Phase 1 code is single-threaded.
+- The LAMBDA name denotes a label in Mint's own code block. It executes
+  with Mint's authority and uses Mint's NS/RW capability.
+- This internal LAMBDA return preserves Mint's capabilities; the draft's
+  requirement to erase them merely to return to Mint is superseded.
+  Outward CALL-boundary behavior remains separate.
+- The test Passkey GT is **CR2 = 0xFFFFFFFF**. The programmer explicitly
+  selected the GT only, not an all-ones proof referenced by CR3.
+  This is a Mint-specific Phase 1 testing exception, not an ordinary valid
+  GT, storage authority, or production credential-verification policy.
+
+These decisions supersede conflicting design blockers below. They record
+approved intent, not completed compiler/runtime integration. The source still
+contains unresolved branches. No executable Namespace selection or hardware
+change follows merely from recording this agreement. Ordinary execution must
+not be replaced with the isolated protected Mint profile.
+
 ## Working inputs
 
 | Input | Meaning |
