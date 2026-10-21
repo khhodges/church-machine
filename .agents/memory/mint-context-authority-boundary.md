@@ -62,7 +62,20 @@ and a same-context local Lambda. Preserve Lambda-return CRs. Keep outward CALL
 boundary checks separate. This does not approve hardware changes or the
 previously declined protected-profile shortcut.
 
-The Phase 1 test credential is exactly the Passkey GT in CR2, `0xFFFFFFFF`.
+## Phase 1 PkVerify decision
+
+For Phase 1, PkVerify always returns APPROVED.
+
+**Why:** The user explicitly clarified this scope when real credential/proof
+verification was presented as the next Mint blocker.
+
+**How to apply:** Treat PkVerify as an unconditional Phase 1 approval stub.
+Do not require a trusted credential record, proof verification or a particular
+GT value to obtain its APPROVED result. Keep this scoped to Phase 1; it does
+not change machine capability checks or prove real authentication. Do not
+infer a separate allowance-accounting policy from this result.
+
+The earlier Phase 1 test credential is exactly the Passkey GT in CR2, `0xFFFFFFFF`.
 The user explicitly selected the GT only, not the four-word proof at CR3.
 This is a scoped Mint testing exception, not general GT validity or a grant
 of memory/Namespace access to that word.
