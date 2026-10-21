@@ -1326,3 +1326,17 @@ mtime_ms = 1792585251642
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b2410447-ba9d-425c-817f-387053779053/90dcb7ab-0b05-4cf0-8a0a-02269cfaf3d5"
 storage_version_token = "1792585283031332"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Muue7z00apxyXB4ZRlOGh"
+uri = "file://reports/isa-ide-rtl-amaranth-audit.md"
+type = "text"
+title = "ISA, IDE, RTL and Amaranth audit"
+description = "Prioritized findings, exact test results, limitations, and correction requirements."
+logical_id = "bf13f86f-22f9-4fc6-9d0d-bca3f1ad7de7"
+content_hash = "sha256:985e680f42b9c44169f3d4936cfe7d11fe9020ca2823d7b465dee9e44c7e9948"
+size = 11201
+mtime_ms = 1792587875697
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/bf13f86f-22f9-4fc6-9d0d-bca3f1ad7de7/e97893d6-6382-4390-9a52-22f7a786a296"
+storage_version_token = "1792587882088416"
+content_type = "text/markdown"
