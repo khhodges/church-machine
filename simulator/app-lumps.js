@@ -3754,7 +3754,8 @@ function _ddRenderSource(modal, detail, navSlot, navName) {
                 ['api', 'API only'], ['compact', 'Share compact source'], ['full', 'Full source']]) {
                 const a = document.createElement('a');
                 a.href = bundle.variants[profile].url;
-                a.textContent = title + ' (' + bundle.variants[profile].bytes + ' B)';
+                const variant = bundle.variants[profile];
+                a.textContent = title + ' (' + variant.file_bytes + ' B gzip; ' + variant.bytes + ' B decoded)';
                 a.download = '';
                 a.style.marginRight = '12px';
                 links.appendChild(a);

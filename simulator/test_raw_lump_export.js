@@ -67,6 +67,7 @@ const context = {
     },
 };
 context.window.CapabilityTokens = strictCapabilityTokens;
+context.window.LumpContentFrame = require('./lump-content-frame.js');
 vm.createContext(context);
 vm.runInContext(source, context, { filename: 'app-lump-editor.js' });
 
@@ -83,11 +84,12 @@ const candidate = {
         token: serviceGT,
     }],
 };
-const result = context.window.buildLumpFromAssembly(candidate);
+(async () => {
+const result = await context.window.buildLumpFromAssembly(candidate);
 if (!result || !result.ok) throw new Error(`raw export failed: ${result && result.error}`);
 if (!downloaded) throw new Error('raw export did not create a downloadable byte payload');
 
-const bytes = downloaded.parts[0];
+const bytes = require('zlib').gunzipSync(downloaded.parts[0]);
 const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 const header = view.getUint32(0, false);
 const cw = (header >>> 10) & 0x1FFF;
@@ -129,3 +131,4 @@ if (result.token === candidate.token) {
 }
 
 console.log('raw LUMP export GT materialization regression: PASS');
+})().catch(error => { console.error(error); process.exitCode = 1; });

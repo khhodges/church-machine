@@ -11,7 +11,7 @@ from tests.server.test_lump_save_endpoint import app_module, _words_with_source,
 
 
 def test_bundle_roundtrip_and_exact_source(tmp_path):
-    source = "; @abstraction VariantExample\n; retained comment\nRETURN\n"
+    source = "abstraction ide.VariantExample {\ncapabilities { SELF E }\nmethod Run() {\n; retained comment\nRETURN\n}\n}\n"
     words = _words_with_source(source)
     words[2] |= 0x030000  # this fixture retains full source, not compact source
     raw = struct.pack(f">{len(words)}I", *words)
@@ -21,6 +21,8 @@ def test_bundle_roundtrip_and_exact_source(tmp_path):
     primary = bundle["bundle_id"]
     (tmp_path / (primary + ".variants.json")).write_text(json.dumps(bundle))
     assert set(summary(bundle)) == {"api", "compact", "full"}
+    assert bundle["schema"] == 3
+    assert all(item["encoding"] == "gzip" for item in bundle["profiles"].values())
     for profile in ("api", "compact", "full"):
         data, _ = read_variant(tmp_path, primary, profile)
         w = struct.unpack(f">{len(data)//4}I", data)
@@ -40,7 +42,7 @@ def test_bundle_roundtrip_and_exact_source(tmp_path):
 
 
 def test_variant_routes_and_exact_editor_source(tmp_path, monkeypatch):
-    source = "; @abstraction VariantExample\nRETURN\n"
+    source = "abstraction ide.VariantExample {\ncapabilities { SELF E }\nmethod Run() {\nRETURN\n}\n}\n"
     words = _words_with_source(source)
     words[2] |= 0x030000
     raw = struct.pack(f">{len(words)}I", *words)
@@ -58,6 +60,13 @@ def test_variant_routes_and_exact_editor_source(tmp_path, monkeypatch):
             response = client.get(f"/api/lump-variants/{primary}/{profile}")
             assert response.status_code == 200
             assert hashlib.sha256(response.data).hexdigest() == bundle["profiles"][profile]["sha256"]
+            from server.lump_file import unpack_lump
+            packaged = client.get(summary(bundle)[profile]["url"])
+            assert packaged.status_code == 200
+            assert packaged.data[:2] == b"\x1f\x8b"
+            assert unpack_lump(packaged.data) == response.data
+            assert len(packaged.data) == summary(bundle)[profile]["file_bytes"]
+            assert "Content-Encoding" not in packaged.headers
     result = {}
     app_module._attach_unverified_exact_source(result, str(path), {"variant_bundle_id": primary})
     assert result["editing_source"] == source
@@ -73,7 +82,7 @@ def test_variant_routes_and_exact_editor_source(tmp_path, monkeypatch):
 @pytest.mark.parametrize("primary_tier", [None, 0])
 def test_compile_plan_and_atomic_bundle_save(isolated_lumps, monkeypatch, fail_bundle_write, browser_candidate, primary_tier):
     monkeypatch.setenv("COMPILER_SIGNING_SECRET", "isolated-variant-test-key-" + "x" * 40)
-    source = "// full source comment\nabstraction VariantExample {\nmethod Read() {\nreturn(7);\n}\n}"
+    source = "// full source comment\nabstraction ide.VariantExample {\nmethod Read() {\nreturn(7);\n}\n}"
     with app_module.app.test_client() as client:
         compile_request = {"source": source, "language": "javascript"}
         if primary_tier is not None:
@@ -82,7 +91,7 @@ def test_compile_plan_and_atomic_bundle_save(isolated_lumps, monkeypatch, fail_b
         assert compiled["ok"], compiled
         record = compiled["compiler_record"]
         payload = {"binary": compiled["words"], "metadata": {
-            "abstraction": "VariantExample", "language": "javascript",
+            "abstraction": "ide.VariantExample", "language": "javascript",
             "artifact_only": True, "content_type": "code", "grants": ["E"],
             "capabilities": compiled["capabilities"], "submitted_source":
                 app_module._parse_intrinsic_lump_content(compiled["words"])["source"],
@@ -125,9 +134,9 @@ def test_compile_plan_and_atomic_bundle_save(isolated_lumps, monkeypatch, fail_b
         else:
             assert response.status_code == 200, response.get_json()
             assert len(list(isolated_lumps.glob("*.variants.json"))) == 1
-            latest = client.get('/api/lumps/latest-primary/VariantExample')
+            latest = client.get('/api/lumps/latest-primary/ide.VariantExample')
             assert latest.status_code == 200, latest.json
             assert latest.json["source"] == source
             assert latest.json["verified_bundle_source"] is True
-            assert latest.json["intrinsic_source"] is False
+            assert latest.json["intrinsic_source"] is (primary_tier is None)
             assert latest.json["words"] == payload["binary"]

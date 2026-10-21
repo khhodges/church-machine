@@ -10,6 +10,14 @@ from pathlib import Path
 import re
 import struct
 import subprocess
+from server.lump_file import pack_lump, unpack_lump
+
+
+def _stored_profile(data):
+    packed = pack_lump(data)
+    return {"sha256": digest(data), "bytes": len(data), "encoding": "gzip",
+            "stored_bytes": len(packed),
+            "data": base64.b64encode(packed).decode()}
 
 
 def digest(data):
@@ -55,13 +63,11 @@ process.stdout.write(JSON.stringify(out));
         cw, cc = (words[0] >> 10) & 8191, words[0] & 255
         if array[1:1 + cw] != words[1:1 + cw] or (cc and array[-cc:] != words[-cc:]):
             raise ValueError("Variant executable or C-List changed during packaging")
-        profiles[profile] = {"sha256": digest(data), "bytes": len(data),
-                             "data": base64.b64encode(data).decode()}
+        profiles[profile] = _stored_profile(data)
     # Preserve the submitted approved representation exactly, including compression.
     primary_profile = ("api", "compact", "full")[frame["tier"]]
-    profiles[primary_profile] = {"sha256": digest(binary), "bytes": len(binary),
-                                 "data": base64.b64encode(binary).decode()}
-    bundle = {"schema": 2, "primary_sha256": digest(binary),
+    profiles[primary_profile] = _stored_profile(binary)
+    bundle = {"schema": 3, "primary_sha256": digest(binary),
             "source_sha256": source_hash, "primary_profile": primary_profile,
             "compact_rebuild": verification,
             "profiles": profiles}
@@ -79,6 +85,12 @@ def read_variant(directory, primary_hash, profile):
         raise ValueError("Variant bundle identity mismatch")
     item = bundle["profiles"][profile]
     data = base64.b64decode(item["data"], validate=True)
+    if item.get("encoding") == "gzip":
+        if len(data) != item.get("stored_bytes") or data[:2] != b"\x1f\x8b":
+            raise ValueError("Variant stored bytes do not match their encoding")
+        data = unpack_lump(data)
+    elif item.get("encoding") not in (None, "raw"):
+        raise ValueError("Unsupported variant encoding")
     if digest(data) != item["sha256"] or len(data) != item["bytes"]:
         raise ValueError("Variant bytes fail their retained hash")
     return data, bundle
@@ -86,5 +98,17 @@ def read_variant(directory, primary_hash, profile):
 
 def summary(bundle):
     return {profile: {"sha256": item["sha256"], "bytes": item["bytes"],
-                      "url": f'/api/lump-variants/{bundle["bundle_id"]}/{profile}'}
+                      "file_bytes": (item["stored_bytes"] if item.get("encoding") == "gzip"
+                                     else len(pack_lump(read_profile_bytes(item)))),
+                      "encoding": "gzip",
+                      "url": f'/api/lump-variants/{bundle["bundle_id"]}/{profile}?compressed=1'}
             for profile, item in bundle["profiles"].items()}
+
+
+def read_profile_bytes(item):
+    data = base64.b64decode(item["data"], validate=True)
+    if item.get("encoding") == "gzip":
+        return unpack_lump(data)
+    if item.get("encoding") not in (None, "raw"):
+        raise ValueError("Unsupported variant encoding")
+    return data

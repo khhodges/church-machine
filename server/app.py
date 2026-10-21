@@ -18496,10 +18496,14 @@ def download_lump_variant(primary_hash, profile):
         return jsonify({"error": "This exact revision has no saved variant bundle"}), 404
     except (ValueError, KeyError, OSError) as exc:
         return jsonify({"error": str(exc)}), 409
-    response = make_response(raw)
+    from server.lump_file import pack_lump
+    compressed = request.args.get("compressed") == "1"
+    response = make_response(pack_lump(raw) if compressed else raw)
     response.headers["Content-Type"] = "application/octet-stream"
     response.headers["Content-Disposition"] = f'attachment; filename="{primary_hash}.{profile}.lump"'
     response.headers["X-Lump-SHA256"] = bundle["profiles"][profile]["sha256"]
+    response.headers["X-Lump-File-Encoding"] = "gzip" if compressed else "raw"
+    response.headers["X-Lump-Decoded-Bytes"] = str(len(raw))
     return response
 
 
@@ -18770,7 +18774,7 @@ def import_lump():
 
 @app.route("/api/lumps/upload-lump", methods=["POST"])
 def upload_lump_file():
-    """Store an exact raw LUMP as an unapproved artifact."""
+    """Decode a packaged or legacy LUMP, then retain it as unapproved."""
     import base64 as _b64, hashlib as _hl
     payload = request.get_json(force=True, silent=True)
     if not payload:
@@ -18780,9 +18784,15 @@ def upload_lump_file():
     data_b64 = payload.get("data_b64") or ""
 
     try:
-        raw_bytes = _b64.b64decode(data_b64)
+        raw_bytes = _b64.b64decode(data_b64, validate=True)
     except Exception:
         return jsonify({"error": "Invalid base64 data"}), 400
+
+    from server.lump_file import unpack_lump
+    try:
+        raw_bytes = unpack_lump(raw_bytes)
+    except ValueError as exc:
+        return jsonify({"error": str(exc), "committed": False}), 400
 
     if len(raw_bytes) < 4:
         return jsonify({"error": "File too small to be a valid LUMP (< 4 bytes)"}), 400

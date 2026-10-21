@@ -230,15 +230,9 @@ async function lumpBuildContentFrame(apiObj, srcText, options) {
     var _srcBytes = null;
     var _compressed = false;
 
-    if (_srcRaw) {
-        try {
-            _srcBytes   = await lumpFrameDeflateRaw(_srcRaw);
-            _compressed = true;
-        } catch (_ce) {
-            _srcBytes   = _srcRaw;   // uncompressed fallback
-            _compressed = false;
-        }
-    }
+    // New files compress the complete binary once at the file boundary.
+    // The decoder below still accepts legacy source-DEFLATE flags 0x05/0x07.
+    if (_srcRaw) _srcBytes = _srcRaw;
 
     var _srcWds  = _srcBytes ? lumpFramePackBE(_srcBytes) : null;
     var _flags   = 0x00;
@@ -548,7 +542,20 @@ async function lumpDecodeContentFrame(serverWords) {
 }
 
 // ── Module export (Node.js) / browser global ──────────────────────────────────
+async function lumpPackFile(bytes) {
+    bytes = new Uint8Array(bytes);
+    if (bytes.byteLength < 4 || bytes.byteLength > 8388608)
+        throw new Error('Invalid LUMP file length');
+    var header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false);
+    if ((header >>> 27) !== 31 || bytes.byteLength !== 4 * (2 ** (((header >>> 23) & 15) + 6)))
+        throw new Error('LUMP header/allocation does not match its bytes');
+    // No silent raw fallback: an export advertised as compressed must be so.
+    var stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
 var _lcfExports = {
+    lumpPackFile,
     LUMP_FORMAT_LIMITS,
     lumpCandidateLayout,
     lumpFrameUtf8Bytes:    lumpFrameUtf8Bytes,

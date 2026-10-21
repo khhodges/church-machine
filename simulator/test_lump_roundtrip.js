@@ -504,13 +504,23 @@ const {
 // into a properly-headered LUMP binary, and returns the complete word array.
 // The binary is the direct input to lumpDecodeContentFrame (the same object
 // openLumpInEditor receives from the server).
-async function buildTestLumpBinary(codeWords, apiObj, srcText, profile) {
+async function buildTestLumpBinary(codeWords, apiObj, srcText, profile, legacyCompressed = false) {
     const _svCC = 0;
     const _svCW = codeWords.length;
 
     // Build frame via the production helper.
     const options = profile === undefined ? undefined : { profile };
-    const { frameWords, flags: builtFlags } = await lumpBuildContentFrame(apiObj, srcText, options);
+    let { frameWords, flags: builtFlags } = await lumpBuildContentFrame(apiObj, srcText, options);
+    if (legacyCompressed) {
+        // Historical source-DEFLATE fixture. New production frames deliberately
+        // leave source plain; compression now wraps the entire LUMP file.
+        const apiWords = Math.ceil((frameWords[0] & 65535) / 4);
+        const compressed = require('zlib').deflateRawSync(Buffer.from(srcText));
+        frameWords = frameWords.slice(0, 1 + apiWords).concat(
+            [compressed.length], lumpFramePackBE(Array.from(compressed)));
+        builtFlags |= 4;
+        frameWords[0] = (frameWords[0] | (4 << 16)) >>> 0;
+    }
 
     // Compute minimum lump size: header + codeWords + frame + c-list.
     const _fsStart = 1 + _svCW;
@@ -577,7 +587,7 @@ async function buildTestLumpBinary(codeWords, apiObj, srcText, profile) {
     // inflate it and return the original source exactly.
     console.log('\n--- T-RT-FS01: production compressed roundtrip (flags=0x07) ---');
     try {
-        const { binary, flags, fsStart } = await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT);
+        const { binary, flags, fsStart } = await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT, undefined, true);
         const recovered = await lumpDecodeContentFrame(binary);
 
         check('T-RT-FS01a: lumpBuildContentFrame produced flags=0x07 (compressed)',
@@ -642,7 +652,7 @@ async function buildTestLumpBinary(codeWords, apiObj, srcText, profile) {
     try {
         // Compressed binary (normal path — CompressionStream available).
         const { binary: binC, flags: flagsC, fsStart: fsC } =
-            await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT);
+            await buildTestLumpBinary(CODE_WORDS, API_OBJ, SOURCE_TEXT, undefined, true);
 
         // Uncompressed binary (CompressionStream shadowed).
         const _savedCS2 = global.CompressionStream;

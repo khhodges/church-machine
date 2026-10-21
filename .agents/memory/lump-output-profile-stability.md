@@ -89,6 +89,8 @@ validation, linking, and execution.
 padding without changing the recovered executable binary. This reduces file
 size, not runtime memory allocation.
 
-**How to apply:** Treat this as an agreed design direction, not permission to
-rewrite immutable saved artifacts or change the machine's word-addressable
-runtime format. Keep stored/transfer sizes distinct from runtime allocation.
+**How to apply:** The user authorized adoption while retaining old decompression.
+Use whole-file compression for newly packaged LUMPs; keep legacy raw and
+source-compressed files readable. Do not rewrite immutable history or change
+the machine's word-addressable runtime format. Canonical execution storage and
+hardware transport stay decoded. Keep file sizes distinct from runtime allocation.

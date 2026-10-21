@@ -2197,7 +2197,7 @@
     //         Every non-NULL c-list row is the exact validated GT carried by
     //         the candidate; cc=0 leaves the ambient boot c-list in use.
     // typ=0 — standard code lump, not a Thread or Namespace header.
-    window.buildLumpFromAssembly = function (candidate) {
+    window.buildLumpFromAssembly = async function (candidate) {
         const activeCandidate = candidate || (window.IDEActionState &&
             window.IDEActionState.get().candidate);
         if (activeCandidate && activeCandidate.isaProfile === 'IDX1') {
@@ -2219,8 +2219,9 @@
                 _candidateView.setUint32(index * 4, word >>> 0, false);
             });
             var _candidateToken = _crc32Bytes(_candidateBuf);
+            var _candidateFile = await window.LumpContentFrame.lumpPackFile(_candidateBuf);
             var _candidateUrl = URL.createObjectURL(new Blob(
-                [_candidateBuf], { type: 'application/octet-stream' }));
+                [_candidateFile], { type: 'application/octet-stream' }));
             var _candidateLink = document.createElement('a');
             _candidateLink.href = _candidateUrl;
             _candidateLink.download = _candidateToken + '.lump';
@@ -2302,7 +2303,8 @@
         var token = _crc32Bytes(buf);
 
         var filename = token + '.lump';
-        var blob     = new Blob([buf], { type: 'application/octet-stream' });
+        var packedFile = await window.LumpContentFrame.lumpPackFile(buf);
+        var blob     = new Blob([packedFile], { type: 'application/octet-stream' });
         var url      = URL.createObjectURL(blob);
         var a        = document.createElement('a');
         a.href       = url;

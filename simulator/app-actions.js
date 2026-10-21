@@ -338,7 +338,7 @@
         }
         let exported;
         try {
-            exported = buildLumpFromAssembly(built);
+            exported = await buildLumpFromAssembly(built);
         } catch (error) {
             return {
                 ok: false,
