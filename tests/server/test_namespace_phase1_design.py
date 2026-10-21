@@ -1,6 +1,8 @@
 import ast
 import copy
 import json
+import os
+import re
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -20,7 +22,9 @@ def test_phase1_table_and_members(tmp_path):
     rows = {r["slot"]: r for r in p["rows"]}
     assert rows[1]["limit"] == 1023
     assert rows[2]["location"] == 1024
-    assert len(rows) == 17
+    assert set(rows) == set(range(1, 18)) - {6}
+    assert len(rows) == 16
+    assert "SelfTest" not in {r["name"] for r in rows.values()}
     assert [rows[i]["name"] for i in (16, 17)] == ["ide.Alice", "ide.Mallory"]
     assert [rows[i]["name"] for i in (9, 14, 15)] == ["ide.Mint", "nstab", "pkverify"]
     assert not p["activationAllowed"] and not p["buildReady"]
@@ -70,7 +74,8 @@ def design_http(tmp_path):
     """
     source = Path(__file__).resolve().parents[2] / "server/app.py"
     names = {"namespace_design_v1", "_change_confirmation_paths",
-             "_describe_protected_change"}
+             "_describe_protected_change", "_is_ide_design_request",
+             "_ide_origin_is_same_site"}
     nodes = [node for node in ast.parse(source.read_text()).body
              if isinstance(node, ast.FunctionDef) and node.name in names]
     assert {node.name for node in nodes} == names
@@ -88,13 +93,15 @@ def design_http(tmp_path):
              "phase1": drafts / "phase1.json"}
     paths["ascending"].write_text(json.dumps(seed({})))
     paths["phase1"].write_text(json.dumps(phase1_seed()))
-    scope = dict(app=app, request=request, jsonify=jsonify,
+    scope = dict(app=app, request=request, jsonify=jsonify, os=os, re=re,
                  __file__=str(tmp_path / "server/app.py"),
                  NS_STATE_PATH=str(state), LUMPS_DIR=str(lumps),
                  _LUMP_LEASE_REGISTRY="leases.json")
     for name in ("BOOT_CONFIG_PATH", "LUMPS_MANIFEST_PATH", "BOOT_IMAGE_PATH",
                  "BOOT_IMAGE_PROVENANCE_PATH"):
         scope[name] = str(tmp_path / name)
+        paths[name] = Path(scope[name])
+        paths[name].write_bytes(b"installed-state-sentinel")
     exec(compile(ast.Module(body=nodes, type_ignores=[]), str(source), "exec"), scope)
     app.add_url_rule("/api/namespace/design-v1",
                      view_func=scope["namespace_design_v1"], methods=["GET", "PUT"])
@@ -145,6 +152,7 @@ def test_http_phase1_review_save_reload_and_single_use(design_http, existing):
     after = design_snapshot(paths)
     assert after["ascending"] == before["ascending"]
     assert after["state"] == before["state"]
+    assert all(after[key] == before[key] for key in paths if key != "phase1")
     assert_review_rejected(design_put(client, payload, token=token), "missing_or_used")
     assert design_snapshot(paths) == after
 
@@ -238,6 +246,25 @@ def test_http_new_review_does_not_bypass_stale_design_fingerprint(design_http):
     assert response.status_code == 409, response.json
     assert "another tab" in response.json["error"]
     assert response.json["dataChanged"] is False
+    assert design_snapshot(paths) == before
+
+
+@pytest.mark.parametrize("headers", [
+    {},
+    {"X-Requested-With": "NamespaceDesign", "Sec-Fetch-Site": "cross-site"},
+])
+def test_http_review_does_not_bypass_design_authorization(design_http, headers):
+    client, paths = design_http
+    payload = design_payload(client)
+    before = design_snapshot(paths)
+    # Review binds the payload, but must not replace the route's authorization.
+    response = client.put(design_url("phase1"), json=payload, headers=headers)
+    assert response.status_code == 428, response.json
+    headers = {**headers, "X-Change-Confirmation":
+               response.json["change_confirmation"]["id"]}
+    response = client.put(design_url("phase1"), json=payload, headers=headers)
+    assert response.status_code == 403, response.json
+    assert response.json["error"] == "Expected a same-origin IDE design request"
     assert design_snapshot(paths) == before
 
 
