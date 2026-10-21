@@ -54,7 +54,7 @@ for (const [label, a, expect] of [
     assert.deepStrictEqual(sb.dependencies.map(d => [d.name, d.relocation_row, d.symbolic_self]),
         [['SELF', 0, true], ['ide.SelfTest', 1, false], ['ide.WukongCallHome', 2, false]]);
     const cc = a.words[0] & 255;
-    assert.strictEqual(a.words[a.words.length - cc] >>> 0, 0xFEED5E1F, 'canonical SELF placeholder');
+    assert.strictEqual(a.words[a.words.length - cc] >>> 0, 0, 'canonical unresolved NULL SELF');
     for (let i = 1; i < cc; i++) assert.strictEqual(a.words[a.words.length - cc + i], 0, 'external rows zero');
     // Integrity-covered: decoded from exact bytes, strict contract, compact round trip.
     const decoded = lumpDecodeContentFrameApi(a.words);
@@ -183,7 +183,7 @@ function run(words, steps) {
     const cc = native.words[0] & 255;
     const local = native.words.slice(); local[local.length - cc + 1] = 0x4A010005;
     assert.throws(() => guard.validate(local), /destination-local/);
-    const self = native.words.slice(); self[self.length - cc] = 0;
+    const self = native.words.slice(); self[self.length - cc] = 0x4a000006;
     assert.throws(() => guard.validate(self), /SELF/);
     const patched = native.words.slice(); patched[native.api.symbolic_binding.calls[0].word_offset] = 0x17030021;
     assert.throws(() => guard.validate(patched), /placeholder/);

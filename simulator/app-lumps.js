@@ -4491,18 +4491,21 @@ function _savedGtDecodeHtml(word, row) {
     const e = _fmtEscape;
     const hex = word.toString(16).padStart(8, '0').toUpperCase();
     let html = '<h3 id="savedGtTitle">GT decode — C-list row ' + e(row) + '</h3><p><code>0x' + hex + '</code></p>';
-    if (word === 0xFEED5E1F || word === 0xFEEDDA7A) {
-        return html + '<p><strong>' + (word === 0xFEED5E1F ? 'SELF' : 'Private-data') +
-            ' allocation placeholder</strong></p><p>This is a compiler sentinel, not a live GT. It does not encode usable permissions, a Namespace slot, or a generation.</p>';
+    if (Number(row) === 0) {
+        html += '<p>Declared role: SELF — expected bound owner Inform E-only GT, B=0, with the exact destination slot/generation.</p>';
+        if ((word & 0xFE000000) >>> 0 !== 0x4A000000)
+            html += '<p>Role/encoding mismatch: these bits are not a bound SELF GT.</p>';
     }
+    if (word === 0xFEED5E1F || word === 0xFEEDDA7A)
+        html += '<p>Legacy implementation encoding; decoded below without exemption. This is not proof of owner authority.</p>';
     if (word === 0) return html + '<p>Zero / NULL word. This saved row has no localized GT. Consult the declared C-list name for its symbolic target.</p>';
     const parsed = ChurchSimulator.prototype.parseGT(word);
     let fields;
     if (parsed.type === 3) {
         const a = ChurchSimulator.prototype.parseAbstractGT(word);
         fields = [['Type [26:25]', 'Abstract'], ['Abstract type [31:27]', a.ab_type],
-            ['Read [26]', a.R], ['Write [25]', a.W],
-            ['Generation [24:16]', a.gt_seq], ['Abstract data [15:0]', a.ab_data]];
+            ['Read [24]', a.R], ['Write [23]', a.W],
+            ['Generation [22:16]', a.gt_seq], ['Abstract data [15:0]', a.ab_data]];
     } else {
         fields = [['Type [26:25]', parsed.typeName], ['B flag [31]', word >>> 31],
             ['Domain [27]', (word >>> 27) & 1 ? 'Church' : 'Turing'],
@@ -11356,13 +11359,26 @@ async function _loadLumpBinaryIntoSim(token, name, btn, nsSlot, caps) {
             // Only this compiler-owned relocation may be symbolized, after
             // exact saved-envelope/source validation; never rewrite the file.
             const row = _savedMetadata.capabilities[0];
-            const parsed = sim.parseGT(rawWords[rawWords.length - _runHeader.cc]);
+            const selfWord = rawWords[rawWords.length - _runHeader.cc] >>> 0;
+            const parsed = sim.parseGT(selfWord);
+            const api = LumpContentFrame.lumpDecodeContentFrameApi(rawWords);
+            const expanded = api && typeof LumpApiCodec !== 'undefined'
+                ? LumpApiCodec.expand(api, rawWords) : api;
+            const declared = expanded && expanded.capabilities && expanded.capabilities[0];
+            const unresolvedSelf = selfWord === 0 && declared &&
+                ['SELF', '__SELF__'].includes(declared.name) &&
+                JSON.stringify(declared.rights) === '["E"]';
+            if (unresolvedSelf) _savedMetadata.apiDefinition = expanded;
             if (!_runHeader.cc || !row || row.compiler_owned_self !== true ||
                     !['SELF', '__SELF__'].includes(String(row.name).toUpperCase()) ||
-                    parsed.type !== 1 || parsed.permissions.E !== 1 ||
-                    ['R', 'W', 'X', 'L', 'S'].some(right => parsed.permissions[right]))
+                    (!unresolvedSelf && (parsed.type !== 1 || parsed.malformed ||
+                    parsed.permissions.B || parsed.permissions.E !== 1 ||
+                    ['R', 'W', 'X', 'L', 'S'].some(right => parsed.permissions[right]))))
                 throw new Error('IDX1 saved SELF is not a canonical compiler-owned E capability');
-            installWords[installWords.length - _runHeader.cc] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
+            // Preserve authenticated NULL relocation; historical concrete
+            // owner words use the existing trusted installation adapter.
+            if (!unresolvedSelf)
+                installWords[installWords.length - _runHeader.cc] = ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER;
         }
         const _savedCaps = _validateSavedLumpClist(installWords, _runHeader, _savedMetadata, sim);
         const _savedSelfName = String(_savedCaps[0] && _savedCaps[0].name || '').toUpperCase();

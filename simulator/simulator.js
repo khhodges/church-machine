@@ -2101,6 +2101,8 @@ class ChurchSimulator {
     // Architectural c-lists are explicit exceptions: Thread/Namespace bodies,
     // Outforms, hardware entries, and callers that pass { architectural: true }.
     // Those layouts are owned by their respective boot/hardware contracts.
+    // Historical compiler encoding only. New producers emit NULL plus an
+    // integrity-covered SELF relocation, never this Abstract word.
     static get SELF_CAPABILITY_PLACEHOLDER() { return 0xFEED5E1F; }
 
     static get PRIVATE_DATA_CAPABILITY_PLACEHOLDER() { return 0xFEEDDA7A; }
@@ -2264,8 +2266,8 @@ class ChurchSimulator {
         const sourceSlot = Number(opts.sourceSelfSlot);
         const sourceSeq = Number(opts.sourceSelfSeq);
         const sourceIdentityProven = opts.remintCompilerOwnedSelf === true &&
-            Number.isInteger(sourceSlot) && sourceSlot >= 0 &&
-            Number.isInteger(sourceSeq) && sourceSeq >= 0;
+            Number.isInteger(sourceSlot) && sourceSlot >= 0 && sourceSlot <= 65535 &&
+            Number.isInteger(sourceSeq) && sourceSeq >= 0 && sourceSeq <= 511;
         const expectedSourceSelf = sourceIdentityProven
             ? this.createGT(sourceSeq, sourceSlot,
                 { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0
@@ -2303,7 +2305,7 @@ class ChurchSimulator {
             // escape hatch for corrupt or stale binaries.
             if (!(expectedSourceSelf !== null && supplied === expectedSourceSelf)) {
                 return fail('IDENTITY_SELF',
-                    `c-list row 0 is 0x${supplied.toString(16).padStart(8, '0')}; expected compiler placeholder, destination self E-GT 0x${expectedSelf.toString(16).padStart(8, '0')}, or proven source self identity`);
+                    `c-list row 0 is 0x${supplied.toString(16).padStart(8, '0')}; expected declared unresolved SELF, destination self E-GT 0x${expectedSelf.toString(16).padStart(8, '0')}, or proven source self identity`);
             }
         }
 

@@ -75,6 +75,8 @@ def validate_portable_binding(binding, cc=None):
         self_row = (raw.get("symbolic_self") is True or
                     raw.get("compiler_owned_self") is True or
                     str(raw.get("name", "")).upper() in {"SELF", "__SELF__"})
+        if self_row and _rights(raw.get("rights", raw.get("grants", ["E"]))) != ["E"]:
+            raise ValueError("symbolic SELF requires exactly E right")
         dep_dot, dep_issue = _name(f"{dot}#{issue}" if self_row else
                                    raw.get("N") or raw.get("universal_name") or
                                    raw.get("identity_string") or raw.get("name"))
@@ -134,8 +136,8 @@ def validate_unresolved_clist(contract, lump_words):
     for dep in contract["dependencies"]:
         word = int(lump_words[start + dep["relocation_row"]]) & 0xffffffff
         if dep["symbolic_self"]:
-            if word != 0xFEED5E1F:
-                raise ValueError("portable Self row 0 must contain canonical 0xFEED5E1F marker")
+            if word not in (0, 0xFEED5E1F):
+                raise ValueError("portable SELF row 0 must be unresolved NULL (or authenticated historical encoding)")
         elif word != 0 and (word & 0xffff0000) != 0xfeed0000:
             raise ValueError(
                 f"portable external row {dep['relocation_row']} contains an embedded local GT")
@@ -175,6 +177,9 @@ def verify_candidate(dep, candidate, lump_bytes):
 
 def mint_gt(sequence, slot, rights, capability_type):
     """Destination-local v2 GT packing."""
+    if (type(sequence) is not int or not 0 <= sequence <= 511
+            or type(slot) is not int or not 0 <= slot <= 65535):
+        raise ValueError("Destination slot and sequence must be exact")
     church = any(r in rights for r in "LSE")
     perm = ((4 if "E" in rights else 0) | (2 if "S" in rights else 0) | (1 if "L" in rights else 0)
             if church else (4 if "X" in rights else 0) | (2 if "W" in rights else 0) | (1 if "R" in rights else 0))

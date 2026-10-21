@@ -3,6 +3,7 @@ import json
 import struct
 import tempfile
 import unittest
+import os
 from unittest import mock
 from pathlib import Path
 
@@ -19,6 +20,11 @@ def _lump(cc=1):
 
 
 class PortableBindingTests(unittest.TestCase):
+    def setUp(self):
+        patch = mock.patch.dict(os.environ, {"COMPILER_SIGNING_SECRET": "portable-test-only-" + "x" * 40})
+        patch.start()
+        self.addCleanup(patch.stop)
+
     def test_boot_generation_rejects_empty_approval_ledger(self):
         cfg = {"step1": {"totalNamespaceWords": 16384,
                          "namespaceLumpWords": 1024,
@@ -39,6 +45,8 @@ class PortableBindingTests(unittest.TestCase):
                 "abstractions": [{
                     "name": "SelfTest", "slot": 6, "token": "00000600",
                     "filename": filename, "resident": True,
+                    "binary_hash": hashlib.sha256(raw).hexdigest(),
+                    "boot": True, "seq": 0,
                 }],
             }))
             (root / "approvals.json").write_text(json.dumps({
@@ -51,7 +59,7 @@ class PortableBindingTests(unittest.TestCase):
     def test_locator_only_manifest_boot_path_localizes_exact_approval(self):
         raw = _lump(1)
         words = list(struct.unpack(">64I", raw))
-        words[-1] = 0xFEED5E1F
+        words[-1] = 0  # New portable artifacts use NULL plus SELF relocation.
         raw = struct.pack(">64I", *words)
         digest = hashlib.sha256(raw).hexdigest()
         dot, issue = "Owner.Program", 1
@@ -91,12 +99,24 @@ class PortableBindingTests(unittest.TestCase):
                     "filename": selftest_name, "lump_version": 76}]))
                 (root / owner_filename).write_bytes(raw)
                 (root / "ns-state.json").write_text(json.dumps({
-                    "abstractions": [{
+                    "abstractions": [
+                        *[dict(name=name, slot=slot, seq=0,
+                               location=boot_image._MMIO_SLOT_SPECS[slot][0] if slot in boot_image._MMIO_SLOT_SPECS else location,
+                               type="Data", load_policy="Resident")
+                          for slot, name, location in [
+                              (2, "UART_DEV", 0xFFF00000), (3, "LED_DEV", 0xFFF00010),
+                              (4, "BTN_DEV", 0xFFF00020), (5, "TIMER_DEV", 0xFFF00030),
+                              (10, "CapabilityTest", 6144)]],
+                        {
                         "name": dot, "slot": 18, "token": token,
                         "filename": owner_filename,
-                        "resident": True,
+                        "resident": True, "seq": 0, "type": "Inform", "location": 4096,
+                        "limit": 63, "load_policy": "Resident",
+                        "binary_hash": digest,
                     }, {"name": "SelfTest", "slot": 6, "token": "00000600",
-                        "filename": selftest_name, "resident": True}],
+                        "filename": selftest_name, "resident": True,
+                        "location": 8192, "type": "Inform", "load_policy": "Resident",
+                        "binary_hash": hashlib.sha256(selftest_raw).hexdigest(), "boot": True, "seq": 0}],
                 }))
                 records = {} if approval is None else {digest: approval}
                 selftest_digest = hashlib.sha256(selftest_raw).hexdigest()
@@ -106,6 +126,13 @@ class PortableBindingTests(unittest.TestCase):
                     "issue_n": 1,
                     "identity_hash": hashlib.sha256(b"SelfTest#1").hexdigest(),
                 }
+                from server.lump_approvals import configured_compiler_tcb_key, sign_compiler_record
+                for record in records.values():
+                    record.update(trust_origin="trusted-home-ide",
+                                  compiler_identity="fixture", compiler_version="1")
+                    record["compiler_record"] = sign_compiler_record(
+                        {"binary_hash": record["binary_hash"]},
+                        signing_key=configured_compiler_tcb_key())
                 (root / "approvals.json").write_text(json.dumps({
                     "version": 1, "algorithm": "sha256", "approvals": records,
                 }))
@@ -125,9 +152,21 @@ class PortableBindingTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "approval required"):
             generate(None)
-        mismatched = dict(approved, identity_hash="f" * 64)
+        mismatched = dict(approved, dot_name="Wrong.Owner")
         with self.assertRaisesRegex(ValueError, "approval required"):
             generate(mismatched)
+
+        # Raw authenticated executables without a declared C-list remain
+        # supported; type-0 alone does not imply compiler-owned SELF.
+        raw = _lump(0)
+        digest = hashlib.sha256(raw).hexdigest()
+        token = compute_number(dot, raw)
+        owner_filename = f"{dot}.{issue}.{token}.lump"
+        cfg["step2"]["lumps"][0]["lumpToken"] = token
+        no_self = dict(binary_hash=digest, filename=owner_filename,
+                       dot_name=dot, issue_n=issue, identity_hash=identity,
+                       grants=["E"], capability_type="inform")
+        assert generate(no_self) == struct.unpack(">64I", raw)
 
     def test_strong_external_dependency_requires_identity_hash(self):
         with self.assertRaisesRegex(ValueError, "requires authoritative identity_hash"):

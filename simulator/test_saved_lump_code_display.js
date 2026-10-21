@@ -31,13 +31,26 @@ const selectorSource = [
 const context = vm.createContext({
     assembler: { disassemble: word => 'OP_' + (word >>> 0).toString(16) },
 });
+
 vm.runInContext(selectorSource, context);
 vm.runInContext(extractFunction('_renderSavedLumpIdentity'), context);
 vm.runInContext(extractFunction('_savedGtButton'), context);
 vm.runInContext(extractFunction('_savedGtDecodeHtml'), context);
 context._fmtEscape = s => String(s == null ? '' : s).replace(/</g, '&lt;');
-assert(context._savedGtDecodeHtml(0xFEED5E1F, 0).includes('SELF allocation placeholder'));
-assert(context._savedGtDecodeHtml(0xFEEDDA7A, 1).includes('Private-data allocation placeholder'));
+context.ChurchSimulator = require('./simulator.js');
+for (const word of [0xFEED5E1F, 0xFEEDDA7A]) {
+    const html = context._savedGtDecodeHtml(word, 0);
+    assert(html.includes('Abstract'));
+    assert(html.includes('Read [24]') && html.includes('Write [23]'));
+    assert(html.includes('Generation [22:16]'));
+    assert(html.includes('Role/encoding mismatch'));
+    assert(!html.includes('allocation placeholder'));
+    assert.equal(html, context._savedGtDecodeHtml(word | 0, 0));
+}
+assert(context._savedGtDecodeHtml(0x4bff1234, 0).includes('511'));
+assert(!context._savedGtDecodeHtml(0x4bff1234, 0).includes('mismatch'));
+assert(context._savedGtDecodeHtml(0x4c000001, 1).includes('Outform'));
+assert(context._savedGtDecodeHtml(0x8a000001, 0).includes('mismatch'));
 assert(context._savedGtDecodeHtml(0, 1).includes('Zero / NULL'));
 context.LumpContentFrame = { lumpDecodeContentFrameApi: () => ({
     name: 'ide.AliceDriver',

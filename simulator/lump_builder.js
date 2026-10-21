@@ -153,10 +153,10 @@ function buildLump(result, opts) {
     for (let i = 0; i < cc; i++) {
         words[clistStart + i] = 0;
     }
-    // church.symbolic-lump-binding/v1 canonical C-list: SELF placeholder,
+    // church.symbolic-lump-binding/v1 canonical C-list: unresolved NULL SELF,
     // external rows zero. Destination GTs exist only in bound derivatives.
     if (cc > 0 && buildSymbolicBinding(result)) {
-        words[clistStart] = 0xFEED5E1F;
+        words[clistStart] = 0;
     }
 
     return { words, header, cw, cc, lumpSize, clistStart };

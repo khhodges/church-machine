@@ -13543,8 +13543,7 @@ def save_lump():
                 "owner": f"{_portable_dot_name(f'{_petname}.{abs_name}' if _petname else abs_name)}#{_issue_number}",
                 "dependencies": _declared_caps_raw,
             }, _sl_cc2)
-            if _trusted_input and _sl_words[_clist_row0_idx] == 0:
-                _sl_words[_clist_row0_idx] = _SELF_CAPABILITY_PLACEHOLDER
+            # Preserve exact NULL relocation bytes, including their signature.
             metadata = dict(metadata, portable_binding=_portable_binding)
         except ValueError as exc:
             return jsonify(error=f"Portable artifact binding required: {exc}",

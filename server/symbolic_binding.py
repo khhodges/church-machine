@@ -59,12 +59,10 @@ def validate(contract, cc=None, words=None):
         cw = (words[0] >> 10) & 8191
         if cc_words != len(deps):
             raise ValueError("Symbolic C-list extent differs from bytes")
-        # Compact publication uses zero for SELF; original compiler pairs may
-        # retain the historical inert marker. Neither word grants authority.
-        # Expanded historical APIs still require their explicit SELF marker.
-        compact = isinstance(embedded_api(words, expand=False).get("methods"), dict)
+        # NULL plus the integrity-covered relocation is the pre-binding form.
+        # Historical compiler bytes remain supported without rewriting evidence.
         for row in range(cc_words):
-            allowed = ({0, 0xFEED5E1F} if compact else {0xFEED5E1F}) if row == 0 else {0}
+            allowed = {0, 0xFEED5E1F} if row == 0 else {0}
             if words[len(words) - cc_words + row] not in allowed:
                 raise ValueError("Canonical symbolic C-list must remain unresolved")
         for call in calls:

@@ -1,6 +1,6 @@
 (function(root){
     'use strict';
-    var layer=null, bar=null, wins=[], z=10, STEP=28;
+    var layer=null, bar=null, wins=[], z=10, STEP=28, currentReport=null;
     function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=String(text);return e;}
     function hex(v){
         if(typeof v==='number'&&Number.isFinite(v)) return '0x'+(v>>>0).toString(16).toUpperCase().padStart(8,'0');
@@ -64,6 +64,12 @@
         var b=el('div','nsbw-body');
         if(list.filename) b.appendChild(el('p','nsbw-meta','File: '+list.filename));
         if(list.reason) b.appendChild(el('p','nsbw-reason',list.reason));
+        if(Array.isArray(list.boundWords) && typeof root._openBoundLumpInspection==='function'){
+            var inspect=el('button','nsbw-btn','Inspect exact bound / original LUMP');
+            inspect.type='button';
+            inspect.addEventListener('click',function(){root._openBoundLumpInspection(list);});
+            b.appendChild(inspect);
+        }
         var rows=Array.isArray(list.rows)?list.rows:[];
         if(!rows.length) b.appendChild(el('p','nsbw-meta','No binding rows. No artifact was produced for this entry.'));
         else{
@@ -116,6 +122,7 @@
     }
     function show(report){
         closeAll(); report=report||{};
+        currentReport=report;
         layer=el('div','nsbw-layer'); layer.setAttribute('aria-label','Namespace binding results');
         bar=el('div','nsbw-bar'); bar.setAttribute('role','region'); bar.setAttribute('aria-label','Binding results controls');
         bar.appendChild(el('strong',null,'Design binding results — not activated'));
@@ -131,6 +138,19 @@
         if(wins.length) wins[wins.length-1].focus(); else bar.appendChild(el('span',null,'No C-lists in report.'));
         return wins.length;
     }
-    root.NamespaceBindingWindows={show:show,closeAll:closeAll,cascade:cascade,_hex:hex};
+    function invalidate(){
+        currentReport=null; closeAll();
+        var preview=document.getElementById('lumpHistoryPreviewModal');
+        if(preview && preview.dataset.bindingInspection==='true' &&
+                typeof root._closeLumpHistoryPreviewModal==='function')
+            root._closeLumpHistoryPreviewModal();
+    }
+    root.NamespaceBindingWindows={show:show,closeAll:closeAll,cascade:cascade,_hex:hex,
+        invalidate:invalidate,
+        exact:function(filename,hash){
+            return currentReport ? currentReport.lists.filter(function(l){
+                return l.filename===filename && l.sourceHash===hash && Array.isArray(l.boundWords);
+            }) : [];
+        }};
     if(root.addEventListener) root.addEventListener('resize',function(){if(wins.length)cascade();});
 })(typeof window!=='undefined'?window:globalThis);

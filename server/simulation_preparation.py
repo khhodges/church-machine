@@ -74,7 +74,7 @@ def artifact_bindings(rows, directory):
             validate_unresolved_clist(contract, words)
             binding["portableBinding"] = contract
             binding["approvalHash"] = digest(approval)
-        elif words[0] & 255 and words[-(words[0] & 255)] == 0xFEED5E1F:
+        elif words[0] & 255 and words[-(words[0] & 255)] in (0, 0xFEED5E1F):
             from server.boot_image import materialize_compiler_self
             materialize_compiler_self(raw, row, directory, f"NS[{row['slot']}] {filename}")
             # Approval and activation must recheck the exact evidence reviewed,
@@ -111,7 +111,9 @@ def _localize_portable(raw, binding, rows, bindings, directory):
                 if ok:
                     candidates.append(next(row for row in rows if row["slot"] == candidate["slot"]))
             if len(candidates) != 1:
-                raise ValueError(f"Portable dependency {dep['N']} requires one exact selected assignment")
+                # Missing imports confer no authority and fault only on use.
+                words[start + dep["relocation_row"]] = 0
+                continue
             target = candidates[0]
         sequence = target.get("seq")
         if type(sequence) is not int or not 0 <= sequence <= 511:
@@ -150,6 +152,16 @@ def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=Fals
         if record.get("key") != snapshot_key or hashlib.sha256(data).hexdigest() != record.get("hash"):
             raise ValueError("Saved binding snapshot failed integrity validation; bind again")
         result = _validate_body(data)
+        from server.portable_binding import mint_gt
+        owner = next(r for r in rows if r["slot"] == binding["slot"])
+        start = len(result) - (result[0] & 255)
+        expected = mint_gt(owner["seq"], owner["slot"], ["E"], 1)
+        report_rows = record.get("report", {}).get("rows", [])
+        if (result[start] != expected or len(report_rows) != (result[0] & 255)
+                or any(r.get("index") != i or
+                       (r.get("newGT") if r.get("status") == "bound" else 0) != result[start + i]
+                       for i, r in enumerate(report_rows))):
+            raise ValueError("Saved binding snapshot SELF/report differs from destination bytes; bind again")
         binding["symbolicReport"] = record["report"]
         return data, result[len(result) - (result[0] & 255)]
     targets = []

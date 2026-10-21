@@ -193,7 +193,7 @@
         if (simClass && simClass.SELF_CAPABILITY_PLACEHOLDER !== undefined) {
             return Number(simClass.SELF_CAPABILITY_PLACEHOLDER) >>> 0;
         }
-        return 0xFEED5E1F;
+        return 0;
     }
 
     function _validTarget(value) {
@@ -638,7 +638,7 @@
                 continue;
             }
             if (resolvedCaps[i].symbolic_self === true) {
-                words[clistStart + i] = 0xFEED5E1F;
+                words[clistStart + i] = 0;
                 continue;
             }
             if (resolvedCaps[i].pending === true) {

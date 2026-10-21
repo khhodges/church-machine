@@ -55,13 +55,12 @@ Passing the audit alone did not prove that saving worked.
 imports through both publication checks, alongside identity, permissions,
 row-count and injected-GT rejection. Keep destination validation strict.
 
-Compact symbolic publication uses zero SELF, while original compiler pairs
-can retain the inert SELF marker. Validate both representations without
-rewriting historical evidence; neither permits a destination GT.
+All new compiler/save profiles use NULL (zero) plus integrity-covered row-zero
+SELF E relocation. Historical compiler markers remain readable under their
+existing authenticated provenance; they are not architectural SELF tokens.
 
-**Why:** The browser's compact formatting and the compiler pair reached different
-SELF representations, so legacy marker-only server validation blocked saving
-after the client preflight was corrected.
+**Why:** SELF is the owner GT. Before placement, existing NULL relocation rules
+express the lack of destination authority without inventing a slot or sentinel.
 
 **How to apply:** Check browser and server symbolic guards together, including
 the real isolated approval/publication path and injected-GT negative cases.

@@ -1163,8 +1163,7 @@ function _materializeLumpCapabilities(caps, words, clistStart, context) {
             words[clistStart] = context.sim.createGT(seq, bootstrapSlot,
                 { R: 0, W: 0, X: 0, L: 0, S: 0, E: 1 }, 1) >>> 0;
         } else {
-            words[clistStart] = (typeof ChurchSimulator !== 'undefined'
-                ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+            words[clistStart] = 0; // NULL until destination SELF relocation
         }
     }
     const materialized = CapabilityTokens.materialize(userCaps, words, writeStart, context);
@@ -1204,8 +1203,7 @@ function _serializePortableLumpCapabilities(caps, words, clistStart) {
         item.nsIndex = null;
         item.identity_contract = 'portable';
         if (_isCompilerSelfCapability(item)) {
-            words[clistStart + row] = (typeof ChurchSimulator !== 'undefined'
-                ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+            words[clistStart + row] = 0;
             item.placeholder = true;
         } else {
             words[clistStart + row] = 0;

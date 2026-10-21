@@ -169,7 +169,8 @@ async function main() {
     }
     // Model only the destination-local SELF finalization, not a repository.
     const slot = 43;
-    durableWords[durableWords.length - 1] = sim.createGT(1, slot, { E: 1 }, 1);
+    durableWords[durableWords.length - 1] = process.argv.includes('--null-self')
+        ? 0 : sim.createGT(1, slot, { E: 1 }, 1);
     const fields = await IDE.savedFields(durableWords, snapshot.executionLayout);
     const metadata = { ...fields, source, abstraction: 'SavedIDX1',
         compiler_verified_source: source,

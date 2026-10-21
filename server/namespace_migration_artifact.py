@@ -89,7 +89,8 @@ def _validate_lump(raw, label):
     return words, cc
 
 
-def _localized_lump(raw, source_row, target_row, source_by_slot, target_by_source):
+def _localized_lump(raw, source_row, target_row, source_by_slot, target_by_source,
+                    approval=None):
     """Relocalize only the private derivative's c-list from verified source GTs."""
     from server.boot_image import create_gt
 
@@ -104,7 +105,21 @@ def _localized_lump(raw, source_row, target_row, source_by_slot, target_by_sourc
     target_seq = _int(target_row["sequence"], f"{label} destination sequence")
     expected_source_self = create_gt(source_seq, source_slot, {"E": 1}, 1)
     expected_target_self = create_gt(target_seq, target_slot, {"E": 1}, 1)
-    if words[start] not in (0xFEED5E1F, expected_source_self):
+    if words[start] == 0:
+        from server.lump_approvals import (
+            is_trusted_compiler_record, compiler_record_verification_key)
+        from server.symbolic_binding import embedded_api
+        try:
+            key = compiler_record_verification_key((approval or {}).get("compiler_record"))
+            trusted = is_trusted_compiler_record(approval, binary=raw, signing_key=key)
+        except RuntimeError:
+            trusted = False
+        caps = embedded_api(words).get("capabilities", [])
+        if (not trusted or len(caps) != cc or not isinstance(caps[0], dict)
+                or caps[0].get("name") not in ("SELF", "__SELF__")
+                or caps[0].get("rights") != ["E"]):
+            raise ValueError(f"{label}: NULL SELF requires authenticated embedded SELF E relocation")
+    elif words[start] not in (0xFEED5E1F, expected_source_self):
         raise ValueError(f"{label}: row zero is not its canonical or exact source SELF")
 
     localized = []
@@ -201,7 +216,9 @@ def _target_state(review, source_state, config, inputs, output_lumps):
                     f"{descriptor['name']}: selected source artifact differs from frozen review")
             derivative, clist = _localized_lump(
                 source_raw, source_by_slot[old_slot], descriptor,
-                source_by_slot, target_by_source)
+                source_by_slot, target_by_source,
+                approval=json.loads(inputs.get("lumps/approvals.json", b"{}")).get(
+                    "approvals", {}).get(_sha(source_raw)))
             filename = f"{descriptor['name']}.ascending-migration.lump"
             if filename in output_lumps:
                 raise ValueError("Duplicate localized candidate filename")

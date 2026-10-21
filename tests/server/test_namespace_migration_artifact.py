@@ -1,6 +1,7 @@
 import hashlib
 import json
 import struct
+from pathlib import Path
 
 import pytest
 
@@ -54,8 +55,32 @@ def _fixture():
 
 
 def _make_review(tmp_path, *, stale_gt=False, unresolved_gt=False,
-                 outform_binding=None):
+                 outform_binding=None, null_self=False, tamper_approval=False):
     state, config, artifacts = _fixture()
+    approvals = {}
+    if null_self:
+        import subprocess
+        from server.lump_approvals import sign_compiler_record, configured_compiler_tcb_key
+        result = json.loads(subprocess.run(["node", "server/compile_worker.js"],
+            input=json.dumps({"source": "abstraction ide.SelfTest {\nmethod Run() {\nRETURN\n}\n}",
+                              "language": "javascript", "tier": 2}),
+            text=True, capture_output=True, check=True).stdout)
+        assert result["ok"], result
+        words = result["words"]
+        assert words[-(words[0] & 255)] == 0
+        raw = struct.pack(f">{len(words)}I", *words)
+        row = next(r for r in state["abstractions"] if r["name"] == "SelfTest")
+        artifacts[row["filename"]] = raw
+        digest = hashlib.sha256(raw).hexdigest()
+        row["binary_hash"] = digest
+        row["limit"] = len(words) - 1
+        record = dict(binary_hash=digest, trust_origin="trusted-home-ide",
+                      compiler_identity="fixture", compiler_version="1")
+        record["compiler_record"] = sign_compiler_record(
+            {"binary_hash": digest}, signing_key=configured_compiler_tcb_key())
+        if tamper_approval:
+            record["compiler_record"]["binary_hash"] = "f" * 64
+        approvals[digest] = record
     if stale_gt or unresolved_gt or outform_binding is not None:
         raw = bytearray(artifacts["WukongCallHome.lump"])
         if stale_gt:
@@ -82,11 +107,34 @@ def _make_review(tmp_path, *, stale_gt=False, unresolved_gt=False,
     config_path.write_text(json.dumps(config))
     for filename, raw in artifacts.items():
         (live / filename).write_bytes(raw)
+    if null_self:
+        (live / "approvals.json").write_text(json.dumps(
+            dict(version=1, algorithm="sha256", approvals=approvals)))
     root = tmp_path / "generated-artifacts"
     review_dir = root / "review"
     review = prepare_review(live, config_path, review_dir, staging_root=root)
     before = {str(path): path.read_bytes() for path in (config_path, *live.iterdir())}
     return root, review_dir, review, before
+
+
+@pytest.mark.parametrize("tamper", [False, True])
+def test_new_null_self_migrates_only_with_authenticated_declaration(tmp_path, monkeypatch, tamper):
+    monkeypatch.setenv("COMPILER_SIGNING_SECRET", "migration-fixture-only-" + "x" * 40)
+    root, review, _, before = _make_review(tmp_path, null_self=True, tamper_approval=tamper)
+    output = root / "migration"
+    if tamper:
+        with pytest.raises(ValueError, match="authenticated embedded SELF"):
+            prepare_migration(review, output, staging_root=root)
+        assert not output.exists()
+    else:
+        result = prepare_migration(review, output, staging_root=root)
+        owner = next(r for r in result["localizedResidents"] if r["name"] == "SelfTest")
+        assert owner["clist"][0]["sourceGT"] == "00000000"
+        assert owner["destinationCListVerified"]
+        raw = (output / "localized-lumps" / owner["filename"]).read_bytes()
+        words = struct.unpack(f">{len(raw)//4}I", raw)
+        assert f"{words[-(words[0]&255)]:08x}" == owner["clist"][0]["destinationGT"]
+    assert all(Path(path).read_bytes() == raw for path, raw in before.items())
 
 
 def test_migration_package_localizes_private_residents_and_preserves_saved_design(tmp_path):

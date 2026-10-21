@@ -7,7 +7,7 @@ const Compiler = require('./cloomc_compiler.js');
 const compile = declaration => JSON.parse(execFileSync('node',
     ['server/compile_worker.js'], {input: JSON.stringify({
         language: 'assembly',
-        source: `; Abstraction: Owner\ncapabilities { ${declaration}, NewIdea RW }\nRETURN`
+        source: `abstraction ide.Owner {\ncapabilities { ${declaration}, ide.NewIdea RW }\nmethod Run {\nRETURN\n}\n}`
     }), encoding: 'utf8'}));
 for (const self of ['SELF', 'SELF E', '__SELF__']) {
     const result = compile(self);

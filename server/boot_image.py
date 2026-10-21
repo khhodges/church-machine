@@ -691,6 +691,9 @@ def localize_portable_lump_body(lump_words, portable_binding, candidates):
         if dep["symbolic_self"] and candidate is None:
             candidate = candidates.get(contract["owner"]) if isinstance(candidates, dict) else None
         raw = candidate.get("lump_bytes") if isinstance(candidate, dict) else None
+        if candidate is None and not dep["symbolic_self"]:
+            output[size - cc + dep["relocation_row"]] = 0
+            continue
         ok, reason = verify_candidate(dep, candidate, raw)
         if not ok:
             raise ValueError(f"portable localization {dep['N']}: {reason}")
@@ -1874,7 +1877,7 @@ def materialize_compiler_self(raw, binding, lumps_dir, label):
         raise ValueError(f"{label}: requires a complete SELF row zero")
     if words[-cc] == expected:
         return raw, expected
-    if words[-cc] != 0xFEED5E1F:
+    if words[-cc] not in (0, 0xFEED5E1F):
         raise ValueError(
             f"{label}: immutable SELF differs from destination GT. "
             "Select an artifact bound to this slot/sequence or recompile it; "
@@ -1897,6 +1900,13 @@ def materialize_compiler_self(raw, binding, lumps_dir, label):
                 approval, binary=raw,
                 signing_key=compiler_record_verification_key(approval.get("compiler_record"))):
             raise ValueError("intrinsic SELF requires authenticated compiler evidence")
+        if words[-cc] == 0:
+            from server.symbolic_binding import embedded_api
+            caps = embedded_api(words).get("capabilities", [])
+            if (len(caps) != cc or not isinstance(caps[0], dict)
+                    or caps[0].get("name") not in ("SELF", "__SELF__")
+                    or caps[0].get("rights") != ["E"]):
+                raise ValueError("NULL SELF requires an embedded row-zero SELF E declaration")
     except (ValueError, RuntimeError, OSError) as exc:
         raise ValueError(
             f"{label}: cannot materialize compiler SELF: {exc}. "
@@ -3682,8 +3692,19 @@ def _generate_boot_image(cfg, lumps_dir, boot_entry_slot,
         _header = mem[_loc]
         _size = 1 << (((_header >> 23) & 15) + 6)
         _cc = _header & 255
-        if not _cc or mem[_loc + _size - _cc] != 0xFEED5E1F:
+        if ((_header >> 8) & 3) != 0:
             continue
+        _base = total - (_slot + 1) * NS_ENTRY_WORDS
+        _expected_self = create_gt(_ns_word1_get(mem[_base + 1], "gt_seq"), _slot, {"E": 1}, 1)
+        if not _cc:
+            # Authenticated raw/architectural executables may have no C-list.
+            # Header type alone does not establish compiler-owned SELF.
+            continue
+        _stored_self = mem[_loc + _size - _cc]
+        if _stored_self == _expected_self:
+            continue
+        if _stored_self not in (0, 0xFEED5E1F):
+            raise ValueError(f"NS[{_slot}] SELF differs from exact destination slot/generation; explicitly select a corrected revision")
         _exact = executable_validator(
             os.path.join(lumps_dir, _binding["filename"]), lumps_dir,
             f"compiler SELF NS[{_slot}]", _binding)

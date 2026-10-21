@@ -1,7 +1,7 @@
 'use strict';
 // Browser/Node guard for church.symbolic-lump-binding/v1 canonical bytes.
 // Validates only what the integrity-covered words themselves state: the
-// embedded symbolic_binding, the canonical C-list (SELF 0xFEED5E1F, external
+// embedded symbolic_binding, the canonical C-list (NULL SELF, external
 // rows 0) and every recorded CALL site holding its conditional INVALID_OP
 // placeholder. It never resolves, binds, or accepts a client sidecar as
 // authority; a supplied plan contract must equal the embedded one exactly.
@@ -50,11 +50,8 @@
                 !Array.isArray(contract.calls))
             throw new Error('Symbolic LUMP contract geometry is invalid');
         const start = size - cc;
-        const api = decodeApi(binary);
-        const compact = api && api.methods && !Array.isArray(api.methods);
-        // Retain original compiler markers without rewriting historical bytes.
-        // Compact publication also permits the inert zero SELF representation.
-        if (binary[start] !== SELF_MARKER && !(compact && binary[start] === 0))
+        // Legacy compiler encodings remain inspectable; new output uses NULL.
+        if (binary[start] !== SELF_MARKER && binary[start] !== 0)
             throw new Error('Symbolic LUMP SELF row 0 must be an unresolved canonical placeholder');
         for (let row = 1; row < cc; row++) {
             if (binary[start + row] !== 0)
@@ -64,6 +61,8 @@
         contract.dependencies.forEach((dep, row) => {
             if (!dep || dep.relocation_row !== row || dep.symbolic_self !== (row === 0))
                 throw new Error(`Symbolic dependency row ${row} is invalid`);
+            if (row === 0 && JSON.stringify(dep.rights) !== '["E"]')
+                throw new Error('Symbolic SELF requires E only');
             if (caps && row > 0 && caps[row]) {
                 const declared = String(caps[row].canonical_leaf || caps[row].name || '');
                 const rights = v => [...new Set(Array.isArray(v) ? v : [])].sort().join('');

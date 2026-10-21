@@ -200,8 +200,7 @@ function _materializeRunCapabilities(capabilities, actionLabel) {
     const userCaps = hasSelf ? caps.slice(1) : caps;
     const tokenWords = new Array(caps.length).fill(0);
     if (hasSelf) {
-        tokenWords[0] = (typeof ChurchSimulator !== 'undefined'
-            ? ChurchSimulator.SELF_CAPABILITY_PLACEHOLDER : 0xFEED5E1F) >>> 0;
+        tokenWords[0] = 0;
     }
     const materialized = CapabilityTokens.materialize(
         userCaps, tokenWords, hasSelf ? 1 : 0,
@@ -16934,7 +16933,7 @@ function _validateFinalLumpSaveBinary(words, capabilities, plan) {
             }
             seen.add(row);
             const word = words[start + row] >>> 0;
-            if (row === 0 ? word !== 0xFEED5E1F :
+            if (row === 0 ? word !== 0 && word !== 0xFEED5E1F :
                     word !== 0 && (word >>> 16) !== 0xFEED) {
                 throw new Error('Save plan portable c-list contains a destination-local capability');
             }

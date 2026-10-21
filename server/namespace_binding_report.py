@@ -84,6 +84,10 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
                 localized, _ = _localize_symbolic(
                     bodies[item["slot"]], binding, rows, candidates, directory,
                     bind_now=bind_now, require_snapshot=not bind_now)
+                if bind_now:
+                    localized, _ = _localize_symbolic(
+                        bodies[item["slot"]], binding, rows, candidates, directory,
+                        require_snapshot=True)
             else:
                 # Portable bindings predate symbolic snapshots. Persist their exact
                 # result too; inspection must never invoke the linker.
@@ -118,9 +122,15 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
             cc = words[0] & 255
             for row in item["rows"]:
                 gt = words[len(words)-cc+row["index"]]
-                row.update(newGT=gt, word=gt, targetSlot=gt & 65535, status="bound")
+                row.update(newGT=gt, word=gt, targetSlot=(gt & 65535) if gt else None,
+                           status="bound" if gt else "unresolved")
             item.update(status="bound", words=words, derivativeHash=hashlib.sha256(localized).hexdigest(),
+                        boundWords=words, namespaceFingerprint=fingerprint,
+                        sequence=item["generation"],
                         reason="Freshly bound for this design only; not activated.")
+            if not symbolic and any(row["status"] == "unresolved" for row in item["rows"]):
+                item.update(status="unresolved",
+                            reason="Private derivative retains unresolved NULL references; they HardFault only if executed. Not activated.")
             if symbolic:
                 report = binding["symbolicReport"]
                 for row, resolved in zip(item["rows"], report["rows"]):

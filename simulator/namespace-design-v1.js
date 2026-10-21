@@ -237,6 +237,7 @@
     }
     let previewEpoch = 0;
     function invalidatePreview() {
+        if(root.NamespaceBindingWindows) root.NamespaceBindingWindows.invalidate();
         ++previewEpoch;
         const modal = document.getElementById('lumpHistoryPreviewModal');
         if (modal && modal.dataset.namespaceBindingPreview) {
