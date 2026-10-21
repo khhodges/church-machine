@@ -31,6 +31,24 @@ the archive is gone.
 
 Approval registries are audit evidence, not artifact-retention roots.
 
+A pending save candidate's own output identity is not an input dependency.
+Preserve its exact input filenames, hashes, editor-base and repair-destination
+references, but do not let its proposed output token pin an unrelated old revision.
+
+**Why:** Historical output-token reuse made old save plans falsely protect
+otherwise-expired archives.
+
+History selection and deletion must agree on the exact inspected
+filename/revision pair, including artifacts retained across token changes.
+Never infer membership solely from a newer artifact's stem or an older
+manifest's revision number.
+
+**Why:** Valid rows displayed by History were rejected by deletion as
+“not part of this history,” stopping the entire expiration pass.
+
+**How to apply:** Revalidate exact History membership under the transition
+lock while retaining independent live-file, reference and filesystem guards.
+
 The same distinction applies to retained archived-revision metadata, completed
 save records/candidates, committed or expired image-refresh records, and derived
 binding caches. Keep the evidence without letting it pin every old binary.

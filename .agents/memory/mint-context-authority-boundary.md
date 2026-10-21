@@ -3,6 +3,17 @@ name: Mint context authority boundary
 description: Keep synthetic context evidence distinct from granting Mint access to protected Thread state.
 ---
 
+New layout must retain ordinary execution semantics for the requested Mint
+Data CREATE path. Do not connect it to the isolated protected Mint profile
+as a shortcut; resolve the ISA/interface questions first.
+
+**Why:** The user explicitly declined using those protected interfaces in
+New layout's private simulation and requested a problem list instead.
+
+**How to apply:** Earlier isolated-profile approval remains scoped there.
+Separate missing CLOOMC implementation and provisioning from actual ISA
+changes; do not assume every missing binding requires a new instruction.
+
 The programmer clarified: “The RETURN from LAMBDA should NOT CLEAR any CRs
 that is a security rule that only applies to CALL packets.”
 Lambda returns to the saved stack address in the existing context.

@@ -29,6 +29,990 @@
         }
       ],
       "accepted_stale_evidence": "boot-image input inventories; completed-save audit records retained"
+    },
+    {
+      "version": 403,
+      "filename": "Adder_v403.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592270.6596127,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 402,
+      "filename": "Adder_v402.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592271.875077,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 401,
+      "filename": "Adder_v401.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592272.4014375,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 400,
+      "filename": "Adder_v400.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592272.922796,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 399,
+      "filename": "Adder_v399.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592273.4917543,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 398,
+      "filename": "Adder_v398.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592274.0108757,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 397,
+      "filename": "Adder_v397.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592274.5123718,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 396,
+      "filename": "Adder_v396.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592275.005553,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 395,
+      "filename": "Adder_v395.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592275.6262586,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 394,
+      "filename": "Adder_v394.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592276.1780581,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 393,
+      "filename": "Adder_v393.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592276.6971583,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 392,
+      "filename": "Adder_v392.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592277.2405362,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 391,
+      "filename": "Adder_v391.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592277.767524,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 390,
+      "filename": "Adder_v390.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592278.3767166,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 389,
+      "filename": "Adder_v389.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592278.963294,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 388,
+      "filename": "Adder_v388.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592279.5743895,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 387,
+      "filename": "Adder_v387.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592280.2023065,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 386,
+      "filename": "Adder_v386.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592281.0251808,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 385,
+      "filename": "Adder_v385.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592281.6175992,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 384,
+      "filename": "Adder_v384.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592282.2129402,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 383,
+      "filename": "Adder_v383.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592282.8253736,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 382,
+      "filename": "Adder_v382.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592283.4588525,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 381,
+      "filename": "Adder_v381.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592284.0349064,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 380,
+      "filename": "Adder_v380.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592284.56021,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 379,
+      "filename": "Adder_v379.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592285.0566604,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 378,
+      "filename": "Adder_v378.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592285.5748038,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 377,
+      "filename": "Adder_v377.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592286.1222336,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 376,
+      "filename": "Adder_v376.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592286.6291459,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 375,
+      "filename": "Adder_v375.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592287.1341774,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 374,
+      "filename": "Adder_v374.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592287.6389458,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 373,
+      "filename": "Adder_v373.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592288.1356244,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 372,
+      "filename": "Adder_v372.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592288.6129017,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 371,
+      "filename": "Adder_v371.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592289.1252308,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 370,
+      "filename": "Adder_v370.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592289.6740398,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 369,
+      "filename": "Adder_v369.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592290.1626227,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 368,
+      "filename": "Adder_v368.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592290.6679313,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 367,
+      "filename": "Adder_v367.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592291.237556,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 366,
+      "filename": "Adder_v366.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592291.7185981,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 365,
+      "filename": "Adder_v365.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592292.738058,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 364,
+      "filename": "Adder_v364.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592293.2214296,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 363,
+      "filename": "Adder_v363.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592293.7048526,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 362,
+      "filename": "Adder_v362.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592294.1564415,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 361,
+      "filename": "Adder_v361.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592294.6646106,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 360,
+      "filename": "Adder_v360.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592295.1440659,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 359,
+      "filename": "Adder_v359.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592295.6118195,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 358,
+      "filename": "Adder_v358.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592296.0638976,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 357,
+      "filename": "Adder_v357.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592296.5171127,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 356,
+      "filename": "Adder_v356.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592296.9721658,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 355,
+      "filename": "Adder_v355.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592297.4341958,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 354,
+      "filename": "Adder_v354.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592297.9265175,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 353,
+      "filename": "Adder_v353.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592298.3865216,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 352,
+      "filename": "Adder_v352.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592298.8677113,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 351,
+      "filename": "Adder_v351.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592299.3432643,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 350,
+      "filename": "Adder_v350.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592299.8073006,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 349,
+      "filename": "Adder_v349.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592300.3613899,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 348,
+      "filename": "Adder_v348.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592300.8163023,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 347,
+      "filename": "Adder_v347.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592301.2682056,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 346,
+      "filename": "Adder_v346.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592301.7265167,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 345,
+      "filename": "Adder_v345.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592302.183617,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 344,
+      "filename": "Adder_v344.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592302.6269698,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 343,
+      "filename": "Adder_v343.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592303.1289823,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 342,
+      "filename": "Adder_v342.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592303.5850613,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 341,
+      "filename": "Adder_v341.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592304.074496,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 340,
+      "filename": "Adder_v340.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592304.602458,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 339,
+      "filename": "Adder_v339.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592305.1672132,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 338,
+      "filename": "Adder_v338.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592305.6317332,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 337,
+      "filename": "Adder_v337.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592306.0876393,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 336,
+      "filename": "Adder_v336.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592306.5322373,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 335,
+      "filename": "Adder_v335.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592306.9930148,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 334,
+      "filename": "Adder_v334.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592307.4149907,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 333,
+      "filename": "Adder_v333.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592307.8192937,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 332,
+      "filename": "Adder_v332.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592308.2731283,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 331,
+      "filename": "Adder_v331.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592309.1323273,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 330,
+      "filename": "Adder_v330.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592309.5827649,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 329,
+      "filename": "Adder_v329.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592310.045027,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 328,
+      "filename": "Adder_v328.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592310.5843403,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 327,
+      "filename": "Adder_v327.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592311.0207074,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 326,
+      "filename": "Adder_v326.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592311.4613001,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 325,
+      "filename": "Adder_v325.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592311.9140136,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 324,
+      "filename": "Adder_v324.lump",
+      "binary_hash": "eeea573238f90ff4d67959fb0c3a0f9b0d4fc9a5b798c759bb2ace1b4d03fcca",
+      "deleted_at": 1792592312.3709786,
+      "compiled_at": 1789578886.7549489,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 323,
+      "filename": "Adder_v323.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592312.820235,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 322,
+      "filename": "Adder_v322.lump",
+      "binary_hash": "0ce8213c13afb43932941aa0551444f40409ea96af69cfa315ec59c19325c14b",
+      "deleted_at": 1792592313.2779233,
+      "compiled_at": 1789578889.6666176,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
     }
   ],
   "4a00000a": [
@@ -62,6 +1046,126 @@
       "trigger": "explicit-user-approved-history-deletion",
       "previously_listed": true,
       "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 32,
+      "filename": "CapabilityTest_v32.lump",
+      "binary_hash": "5ade31ec3dff80e622242d889566d24ce301a43ce69c6597669fa9bff9e0e4d3",
+      "deleted_at": 1792592330.726955,
+      "compiled_at": 1789840006.1047335,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 30,
+      "filename": "CapabilityTest_v30.lump",
+      "binary_hash": "2fc18b2411234ab1b41f9749bbc5b25bea8e8d39798f4312853ab99eb7fb6c68",
+      "deleted_at": 1792592331.2437289,
+      "compiled_at": 1789744084.135208,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 28,
+      "filename": "CapabilityTest.2.aac8cfa9.lump",
+      "binary_hash": "03492fe1498f76f26547a800331e1da72424772b9dbfad3d8599f834908bc09c",
+      "deleted_at": 1792592331.7471051,
+      "compiled_at": 1789591328.5251067,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 28,
+      "filename": "CapabilityTest.2.35647a26.lump",
+      "binary_hash": "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc",
+      "deleted_at": 1792592332.163588,
+      "compiled_at": 1789591328.5251067,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 26,
+      "filename": "CapabilityTest.1.83320494.lump",
+      "binary_hash": "a8345236e95b6f964b142f99bce09f53826b3e129d9ad91549af36a50a0c85a4",
+      "deleted_at": 1792592332.7489994,
+      "compiled_at": 1789424987.2815309,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 24,
+      "filename": "CapabilityTest.1.6c161823.lump",
+      "binary_hash": "d349714f7fd348ff3e17d7128582b56dc65c74e1c0990081d37b55c36d949dba",
+      "deleted_at": 1792592333.1966693,
+      "compiled_at": 1788912747.7964437,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 12,
+      "filename": "CapabilityTest.1.b49e8eca.lump",
+      "binary_hash": "26865648dfb48ecb712b7d455895afd48c9324ecf55145da8c3bf23d86cb7ff9",
+      "deleted_at": 1792592333.6222236,
+      "compiled_at": 1788187484.6248598,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 3,
+      "filename": "CapabilityTest.2.5e701b59.lump",
+      "binary_hash": "1ee2b6d937936d5261e3b00932bea2b8302fccd1ecb33011a98c998eb0cff26b",
+      "deleted_at": 1792592334.0362015,
+      "compiled_at": 1789126189.4050355,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 2,
+      "filename": "CapabilityTest.2.225da6fc.lump",
+      "binary_hash": "7f36b8a385f82a7b1548deb37b7b25999492b58934b0905fadf06b83d3f659f0",
+      "deleted_at": 1792592334.4380019,
+      "compiled_at": 1788187312.1902559,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 2,
+      "filename": "CapabilityTest.2.c2194804.lump",
+      "binary_hash": "194f6ffcb1a37b5ee275099671d02cd2914baead018904d6c915844b056e0088",
+      "deleted_at": 1792592335.0229201,
+      "compiled_at": 1789591328.5251067,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
     }
   ],
   "4a000006": [
@@ -118,6 +1222,66 @@
       "trigger": "explicit-user-approved-history-deletion",
       "previously_listed": false,
       "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 87,
+      "filename": "SelfTest_v87.lump",
+      "binary_hash": "ce48ae00625861fbb9f7ccec53c5dbf8efe3509afd00af8ea14295b66eca247f",
+      "deleted_at": 1792592320.7028518,
+      "compiled_at": 1789514842.4015205,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 85,
+      "filename": "SelfTest.1.a6d49276.lump",
+      "binary_hash": "3b142893afc59b9e2ec2561f5afc19c303fac9bd1b8bd7f752d0294f60601aea",
+      "deleted_at": 1792592321.4565732,
+      "compiled_at": 1789231503.3886263,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 80,
+      "filename": "SelfTest.1.8ab7765f.lump",
+      "binary_hash": "8bcabcd5297eb69deb27f6be5dec271d0d42ddaa26f4481f639862a4b9c969a2",
+      "deleted_at": 1792592321.9676554,
+      "compiled_at": 1788822614.159658,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 80,
+      "filename": "SelfTest.1.b5182a3d.lump",
+      "binary_hash": "e655c01275799838cbaca5e84c0899a93eb42b42119392b63829bda85d5feba4",
+      "deleted_at": 1792592322.3599641,
+      "compiled_at": 1788985689.2249203,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 78,
+      "filename": "SelfTest.1.199d8c30.lump",
+      "binary_hash": "3aafdc4c0950f853a2d9fee4bfd5c9410b7531d26b4b44c55418bce1c287d58f",
+      "deleted_at": 1792592323.2358828,
+      "compiled_at": 1787782122.8900723,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
     }
   ],
   "4a000007": [
@@ -138,6 +1302,30 @@
       "trigger": "explicit-user-approved-history-deletion",
       "previously_listed": true,
       "accepted_stale_evidence": "boot-image provenance input inventories retained unchanged"
+    },
+    {
+      "version": 11,
+      "filename": "WukongCallHome.1.74c8ff97.lump",
+      "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
+      "deleted_at": 1792592149.7020288,
+      "compiled_at": 1789515145.740632,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
+    },
+    {
+      "version": 7,
+      "filename": "WukongCallHome.1.2fa83c3d.lump",
+      "binary_hash": "f3e684ca009fb0a3d8ecb0e627421ef0cd45841f65ce987d800d37ffddd1d049",
+      "deleted_at": 1792592150.3713734,
+      "compiled_at": 1787142997.7081983,
+      "trigger": "explicit",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3
+      }
     }
   ]
 }

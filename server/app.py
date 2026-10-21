@@ -17910,7 +17910,21 @@ def _delete_lump_history_revision(token, version, payload, *, retention_entry=No
                     "error": "The live LUMP cannot be deleted from History"
                 }), 409
             if archive_filename not in candidate_filenames and len(archived_matches) != 1:
-                return jsonify({"error": "Archived revision is not part of this history"}), 404
+                # History includes exact immutable artifacts across token changes
+                # and reports the inspected revision, which can differ from an
+                # old manifest's version. Use that same authoritative membership
+                # rather than rejecting a row the History UI just offered.
+                history_response = app.make_response(get_lump_history(token))
+                history_rows = (history_response.get_json() or {}).get("history", [])
+                exact_rows = [
+                    row for row in history_rows
+                    if not row.get("current")
+                    and row.get("archive_filename") == archive_filename
+                    and row.get("version") == version
+                    and row.get("binary_available") is True
+                ] if history_response.status_code == 200 else []
+                if len(exact_rows) != 1:
+                    return jsonify({"error": "Archived revision is not part of this history"}), 404
             selected_filename = archive_filename
         else:
             existing_candidates = [

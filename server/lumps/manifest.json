@@ -189,16 +189,6 @@
     "archived": true
   },
   {
-    "token": "46738c7a",
-    "abstraction": "WukongCallHome",
-    "filename": "WukongCallHome.1.2fa83c3d.lump",
-    "version": "",
-    "lump_version": 7,
-    "compiled_at": 1787142997.7081983,
-    "variant_group": "WukongCallHome",
-    "archived": true
-  },
-  {
     "token": "8f7520e5",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.9089ba84.lump",
@@ -260,30 +250,12 @@
     "compiled_at": 1787756643.8760083
   },
   {
-    "token": "56096905",
-    "abstraction": "SelfTest",
-    "filename": "SelfTest.1.199d8c30.lump",
-    "version": "",
-    "lump_version": 78,
-    "compiled_at": 1787782122.8900723,
-    "archived": true
-  },
-  {
     "token": "13812cdf",
     "abstraction": "Church Machine Post-Flash Exhaustive Self-Test v1.1",
     "filename": "Church.Machine.Post-Flash.Exhaustive.Self-Test.v1.1.1.777cc8d3.lump",
     "version": "2026.08.29",
     "lump_version": 3,
     "compiled_at": 1788014967.3553412
-  },
-  {
-    "token": "c7657c2d",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.b49e8eca.lump",
-    "version": "",
-    "lump_version": 12,
-    "compiled_at": 1788187484.6248598,
-    "archived": true
   },
   {
     "token": "072454a8",
@@ -317,14 +289,6 @@
     "filename": "SelfTest.79.eceee227.lump",
     "variant_group": "selftest-history",
     "lump_version": 79,
-    "archived": true
-  },
-  {
-    "token": "d2572a73",
-    "abstraction": "SelfTest",
-    "filename": "SelfTest.1.8ab7765f.lump",
-    "lump_version": 80,
-    "compiled_at": 1788822614.159658,
     "archived": true
   },
   {
@@ -367,14 +331,6 @@
     "archived": true
   },
   {
-    "token": "c1972022",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.6c161823.lump",
-    "lump_version": 24,
-    "compiled_at": 1788912747.7964437,
-    "archived": true
-  },
-  {
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.9bf03976.lump",
@@ -389,35 +345,11 @@
     "compiled_at": 1789115235.6156342
   },
   {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.5e701b59.lump",
-    "lump_version": 3,
-    "compiled_at": 1789126189.4050355,
-    "archived": true
-  },
-  {
-    "token": "3b466efc",
-    "abstraction": "SelfTest",
-    "filename": "SelfTest.1.a6d49276.lump",
-    "lump_version": 85,
-    "compiled_at": 1789231503.3886263,
-    "archived": true
-  },
-  {
     "token": "0965e265",
     "abstraction": "CapabilityTest",
     "filename": "CapabilityTest.1.ba638038.lump",
     "lump_version": 25,
     "compiled_at": 1789232842.4801483,
-    "archived": true
-  },
-  {
-    "token": "7ccff26f",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.1.83320494.lump",
-    "lump_version": 26,
-    "compiled_at": 1789424987.2815309,
     "archived": true
   },
   {
@@ -445,79 +377,10 @@
     "archived": true
   },
   {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.225da6fc.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 2,
-    "compiled_at": 1788187312.1902559,
-    "archived": true
-  },
-  {
-    "token": "3b466efc",
-    "abstraction": "SelfTest",
-    "filename": "SelfTest.1.b5182a3d.lump",
-    "lump_version": 80,
-    "compiled_at": 1788985689.2249203,
-    "archived": true
-  },
-  {
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.8965def2.lump",
     "lump_version": 1,
-    "archived": true
-  },
-  {
-    "token": "4a000007",
-    "abstraction": "WukongCallHome",
-    "filename": "WukongCallHome.1.74c8ff97.lump",
-    "lump_version": 11,
-    "compiled_at": 1789515145.740632,
-    "dot_name": "WukongCallHome",
-    "issue_n": 1,
-    "petname": "",
-    "content_profile": 2,
-    "output_profile": 2,
-    "capabilities": [
-      {
-        "name": "__SELF__",
-        "rights": [
-          "E"
-        ],
-        "grants": [
-          "E"
-        ],
-        "nsIndex": null,
-        "compiler_owned_self": true,
-        "placeholder": true
-      },
-      {
-        "name": "LED0",
-        "rights": [
-          "R",
-          "W"
-        ],
-        "grants": [
-          "R",
-          "W"
-        ],
-        "nsIndex": 3
-      },
-      {
-        "name": "UART_TX",
-        "rights": [
-          "W"
-        ],
-        "grants": [
-          "R",
-          "W"
-        ],
-        "nsIndex": 2
-      }
-    ],
-    "binary_hash": "3a77d0cf1ec8d4df96f877c4fc240ae1c8e94dc490bc266f49db2e07726bd086",
-    "operation_id": "021684cb-3084-469b-aa65-7dcb1c1640c3",
     "archived": true
   },
   {
@@ -676,37 +539,10 @@
     "archived": true
   },
   {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.c2194804.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 2,
-    "compiled_at": 1789591328.5251067,
-    "archived": true
-  },
-  {
     "token": "4a000007",
     "abstraction": "WukongCallHome",
     "filename": "WukongCallHome.1.658e6ba8.lump",
     "lump_version": 1,
-    "archived": true
-  },
-  {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.aac8cfa9.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 28,
-    "compiled_at": 1789591328.5251067,
-    "archived": true
-  },
-  {
-    "token": "4a00000a",
-    "abstraction": "CapabilityTest",
-    "filename": "CapabilityTest.2.35647a26.lump",
-    "variant_group": "capabilitytest-history",
-    "lump_version": 28,
-    "compiled_at": 1789591328.5251067,
     "archived": true
   },
   {

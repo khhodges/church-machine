@@ -49,6 +49,15 @@ def archive_references(root, *, frozen_root=None, reference_paths=()):
             del documents[name]
         elif path.parent.name == "save-candidates" and path.stem in completed_candidates:
             del documents[name]
+        elif path.parent.name == "save-candidates" and isinstance(value, dict):
+            # The candidate's own token identifies the proposed output, not an
+            # input archive. Keep exact filenames/hashes and dependency tokens:
+            # an unfinished plan may genuinely require those saved inputs.
+            payload = value.get("payload")
+            metadata = payload.get("metadata") if isinstance(payload, dict) else None
+            if isinstance(metadata, dict):
+                metadata.pop("token", None)
+                documents[name] = json.dumps(value)
         elif ".image-refresh" in path.parts and isinstance(value, dict):
             expiry = value.get("expires")
             if value.get("status") == "committed" or (
