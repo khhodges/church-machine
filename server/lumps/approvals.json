@@ -2473,7 +2473,7 @@
       "issue_n": 1,
       "abstraction": "ide.Alice",
       "filename": "ide.Alice.1.9d996919.lump",
-      "compiled_at": 1792577468.0854716,
+      "compiled_at": 1792580731.5957847,
       "portable_binding": {
         "calls": [],
         "dependencies": [
@@ -2508,7 +2508,7 @@
         "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
         "compact_compile_context": {
-          "compiler_sha256": "16c2df1a86da244f0d5db570e1a467e2a84faa7fc2b44a8f7e22e1517ac77abd",
+          "compiler_sha256": "6cbaa6a571754119254cc531fb4587b79c4fd62e6815cb8ae0829cd9c8703598",
           "inputs": {
             "language": "auto",
             "_ide_hierarchy": {
@@ -2527,7 +2527,7 @@
         },
         "signing_scheme": "church-compiler-hmac-sha256/v2",
         "signing_key_id": "compiler-signing-secret/v1",
-        "signature": "fc7a23bd0aef4311dbb47d1a9d616b40b44d9550a2af9e5803d2d934d0158092"
+        "signature": "34f09e23c9683695ab8b8ea4cff1126721b864fbca7f8f91c93b1b0de46d09c2"
       },
       "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843"
     },
