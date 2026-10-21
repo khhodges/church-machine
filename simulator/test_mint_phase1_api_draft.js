@@ -43,7 +43,7 @@ for (const [, name, body] of methods) {
     for (const [, label] of body.matchAll(/^\s*BRANCH\s+(TODO_\w+)/gm))
         assert.doesNotMatch(body, new RegExp(`^${label}:`, 'm'));
 }
-assert.equal(faultCount, 38, 'All 38 reviewed failure cases use the agreed HARDFAULT standard');
+assert.equal(faultCount, 39, 'Reviewed failures and PkVerify rejection use HARDFAULT');
 
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
@@ -76,7 +76,8 @@ for (const [, name, body] of methods) {
 const create = methods[0][2], destroy = methods[1][2];
 assert.doesNotMatch(create, /12-word|#257|CR4, #11|CR4, #10/);
 assert.match(create, /BFEXT DR4, DR2, #0, #3/);
-assert.match(create, /BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE/);
+assert.match(create, /LOAD CR1, CR6, #4\s+CALL CR1, #0/);
+assert.match(create, /BRANCH TODO_CREATE_ALLOWANCE/);
 assert.match(create, /TPERM CR4, NULL\s+BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL/);
 assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy/);
 assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
@@ -120,7 +121,7 @@ function walk(start, dr, destination=[], namespace=[], corruptRead=-1) {
         if(line==='create_data_slot_return:') return 'create_data_slot_return';
         // Scalar validation ends here; real native tests exercise the escape
         // comparison. This small walker must not pretend to verify Passkeys.
-        if(line==='create_data_authorize:') return 'TODO_CREATE_PKVERIFY_AND_ALLOWANCE';
+        if(line==='create_data_authorize:') return 'create_data_authorize';
         if(line.endsWith(':')) continue;
         const [op,...args]=line.replace(/,/g,'').split(/\s+/);
         const value=s=>s.startsWith('#')?Number(s.slice(1)):dr[s];
@@ -165,7 +166,7 @@ function requestGate(packed, permission=3) {
 for(let power=3;power<=31;power++) {
     const size=2**power;
     const {gate,dr}=requestGate(size+4);
-    assert.equal(gate,'TODO_CREATE_PKVERIFY_AND_ALLOWANCE');
+    assert.equal(gate,'create_data_authorize');
     assert.equal(dr.DR6,size,'accounting gets decoded allocation, not packed DR2');
     assert.equal(dr.DR2,size+4);
     assert.equal(dr.DR3,3);
@@ -220,3 +221,4 @@ for (const mask of [0, 2]) {
 console.log('PASS: four draft APIs, native input/result guards, explicit unresolved gates, no success stub');
 // Include the Phase 1 verifier in the existing Mint validation workflow.
 require('./test_pkverify_phase1');
+require('./test_mint_pkverify_call');

@@ -34,7 +34,7 @@
 ; MakeOutform / MakeInform are proposed additional entries, indices 2 / 3.
 ; Their CR7 target convention is a draft for review, not a deployed ABI.
 ; Common input: CR2 credential, CR3 DATA R proof (four words at offset zero).
-; PkVerify must establish credential type/authority; non-NULL is NOT validity.
+; Phase 1 PkVerify always approves; real credential/proof verification is deferred.
 ; Common output: DR1=1 only after completed body, never assigned by a wrapper.
 ; CR1 is a non-NULL result GT except DESTROY, which requires architectural NULL.
 ; Preserve CR5/DR5 and architectural CR12..15 rules.
@@ -48,14 +48,14 @@
 ; LAMBDA-frame RETURN preserves ALL CRs, regardless of mask: same context,
 ; not a CALL security boundary. It CANNOT implement any early cleanup helper.
 ; Early result/proof/private-authority clearing still needs a legal mechanism.
-; LOAD of NULL faults; zero-permission attenuation is still a non-NULL GT.
+; LOAD CRd, NULL discards authority; zero-permission attenuation does not.
 ; Do not replace these gates with TPERM CLEAR, host writes or an invented opcode.
 ; This draft checks available NULL/permission/scalar shapes only. Exact GT
 ; type, residency, provenance, proof and object-specific output checks are
 ; explicit unresolved gates, not silently assumed to pass.
 
 abstraction ide.Mint {
-capabilities { SELF E, ide.MintState RW, ide.MintState L, ide.MintPool RW }
+capabilities { SELF E, ide.MintState RW, ide.MintState L, ide.MintPool RW, ide.PkVerify E }
 
 method CREATE {
 CREATE_inputs:
@@ -66,7 +66,7 @@ CREATE_inputs:
     ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
     ; Other cases/permissions remain unsupported, never silently become Data.
     ; TPERM CLEAR tests presence; it does NOT erase a capability.
-Lo    BRANCH TODO_CREATE_CLEAR_RESULT_AUTHORITY
+    LOAD CR1, NULL
 create_data_inputs_after_clear:
     IADD DR1, DR0, #0
 create_data_passkey_escape:
@@ -123,12 +123,16 @@ create_data_power_loop:
     SHR DR7, DR7, #1
     BRANCH create_data_power_loop
 create_data_authorize:
-    TPERM CR2, EXACT, CR11
-    BRANCHEQ create_data_allocate
-    ; Service binding missing: verify all four proof words, credential authority,
-    ; and remaining allowance >= DR6 before allocation or destination writes.
-    ; Preserve decoded DR6. Non-NULL is never authorization.
-    BRANCH TODO_CREATE_PKVERIFY_AND_ALLOWANCE
+    ; Call Verify through Mint's own E capability, including the Phase 1
+    ; test-credential path. Source method 0 uses CALL selector 1.
+    LOAD CR1, CR6, #4
+    CALL CR1, #0
+    MCMP DR1, #1
+    BRANCHNE TODO_CREATE_PKVERIFY_NOT_APPROVED
+    ; Verifier approval is not completed CREATE and does not account quota.
+    ; PkVerify preserves requested size DR6 and credential/proof CR2/CR3.
+    IADD DR1, DR0, #0
+    BRANCH TODO_CREATE_ALLOWANCE
 create_data_allocate:
     ; Mint-owned state payload (word 0 remains the LUMP header):
     ; 1 pool cursor, 2 exclusive pool end, 3 free-slot queue cursor,
@@ -252,6 +256,8 @@ create_data_slot_return:
     BRANCH create_data_slot_after_clear
 
 ; Resolved failure cases. No result issuance and no promised rollback.
+TODO_CREATE_PKVERIFY_NOT_APPROVED:
+    HARDFAULT "Mint.CREATE: PkVerify did not return APPROVED"
 TODO_CREATE_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.CREATE: missing Passkey"
 TODO_CREATE_INPUT_PROOF_READ:
