@@ -43,7 +43,7 @@ for (const [, name, body] of methods) {
     for (const [, label] of body.matchAll(/^\s*BRANCH\s+(TODO_\w+)/gm))
         assert.doesNotMatch(body, new RegExp(`^${label}:`, 'm'));
 }
-assert.equal(faultCount, 39, 'Reviewed failures and PkVerify rejection use HARDFAULT');
+assert.equal(faultCount, 41, 'Reviewed failures, verifier rejection and descriptor guards use HARDFAULT');
 
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
@@ -187,7 +187,7 @@ for(const size of [24,40,56,72,0xfffffff8]) {
 for(const size of [8,16,64,256,1024]) {
     const output=Array(size+2).fill(0xdeadbeef);
     assert.equal(walk('create_data_zero_begin',{DR6:size,DR8:0,DR9:0xffffffff},output),
-        'TODO_CREATE_PREPARE_SLOT_DESCRIPTOR');
+        'TODO_CREATE_BIND_DESCRIPTOR_INPUTS');
     assert.deepEqual(output,[...Array(size).fill(0),0xdeadbeef,0xdeadbeef]);
 }
 
@@ -223,3 +223,4 @@ console.log('PASS: four draft APIs, native input/result guards, explicit unresol
 // Include the Phase 1 verifier in the existing Mint validation workflow.
 require('./test_pkverify_phase1');
 require('./test_mint_pkverify_call');
+require('./test_mint_slot_descriptor');

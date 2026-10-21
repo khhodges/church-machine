@@ -108,9 +108,10 @@ to reuse the slot's version unchanged: “The typical case is current # +1”.
 
 **How to apply:** Use this rule for the normal native Mint CREATE design,
 not the older retained-version/no-increment proposal. This is explicit
-software management, not an automatic hardware version change. First-use,
-exhaustion and coordination with release are separate lifecycle cases; do
-not invent their rules from this correction or silently double-increment.
+software management, not an automatic hardware version change. The completed
+field review also approved first use at zero, 509→510 usable, 510→511 retired,
+and 511 remaining retired, without wrapping. Coordination with release must
+not silently introduce another increment.
 
 ## Agreed Phase 1 F/G initialization
 
@@ -137,6 +138,31 @@ contract during the field-by-field Mint review.
 Namespace writes or authority issuance to this calculation. Implement using
 approved native encodings and agreed local-transfer conventions; agreement on
 the formula does not by itself prove a CLOOMC implementation or board execution.
+
+## Agreed non-networked W3
+
+For this Phase 1 DATA RW CREATE, W3 is the same Inform DATA RW B=1 GT being
+created, with the selected slot and new sequence, not a content hash.
+
+**Why:** The user approved T === GT and then approved coding the complete
+field package.
+
+**How to apply:** Calculate these bits privately for descriptor preparation.
+Do not expose the GT in CR1 until slot publication has been confirmed.
+W3 remains excluded from W2 integrity.
+
+## Native helper scratch hazards
+
+Review actual assembler lowering when preserving live scratch registers
+across comparisons; do not assume source-level immediate comparisons are
+register-preserving.
+
+**Why:** Native descriptor tests against the FPGA reference exposed immediate
+MCMP lowering overwriting the live integrity constant in DR15. Register-form
+comparison avoids that implicit scratch use.
+
+**How to apply:** Use register-form comparisons when DR15 is live, and keep
+independent reference tests for the complete native instruction sequence.
 
 ## Phase 1 PkVerify decision
 

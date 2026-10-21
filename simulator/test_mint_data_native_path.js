@@ -309,4 +309,4 @@ for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xffff
     }
 }
 console.log('PASS: only CR2=0xFFFFFFFF skips the proof checks, without granting memory authority.');
-console.log('BLOCKED: saved-design provisioning, descriptor preparation and issuance remain incomplete. No complete CREATE claim.');
+console.log('BLOCKED: saved-design provisioning, descriptor input binding and issuance remain incomplete. No complete CREATE claim.');

@@ -181,11 +181,131 @@ create_data_zero_loop:
     IADD DR9, DR9, #1
     BRANCH create_data_zero_loop
 create_data_publish:
-    ; Descriptor preparation remains missing; local entry needs no extra GT.
-    ; Freeze reserved slot in DR7 and its four prepared descriptor words DR8..11.
-    ; Inputs come from the verified reservation, never caller-supplied registers.
-    ; DR6 remains the allocation size; the zeroed destination stays private.
-    BRANCH TODO_CREATE_PREPARE_SLOT_DESCRIPTOR
+    ; The native descriptor package below is implemented. Bind its inputs from
+    ; the FPGA allocator/slot history, not from caller-controlled scratch:
+    ; DR8 physical BYTE address (the old allocator above still has an offset),
+    ; DR6 word count, DR7 slot, DR2 current version, DR3 never-used (0 or 1).
+    ; Then BRANCH create_descriptor_prepare. Do not guess base/history here.
+    BRANCH TODO_CREATE_BIND_DESCRIPTOR_INPUTS
+create_data_descriptor_ready:
+    MCMP DR12, #1
+    BRANCHNE TODO_CREATE_DESCRIPTOR_RETIRED
+    IADD DR1, DR0, #0
+    BRANCH create_data_set_slot
+
+; BEGIN NATIVE SLOT PACKAGE -- private same-context blocks, no extra GT.
+; Inputs: DR8 physical byte address, DR6 nonzero word count, DR7 slot >= 2,
+;         DR2 current 9-bit version, DR3 never-used boolean from slot history.
+; Success: DR8..11 = W0..3, DR12 = 1. DR1 remains CREATE-incomplete (0).
+; Retired: DR12 = 0, DR4 = 511, W1..3 = 0; no storage retirement is performed.
+; Preserves DR5 (heap), DR6, DR7, DR8 and ALL CRs. Other DRs/flags are scratch.
+; No memory writes, Namespace reads, CALL, CHANGE, SWITCH or opcode-7 frame.
+create_descriptor_prepare:
+    IADD DR1, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    MCMP DR6, #0
+    BRANCHEQ TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    ISUB DR9, DR6, #1
+    BFEXT DR4, DR9, #21, #11
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BFEXT DR4, DR8, #0, #2
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    MCMP DR7, #2
+    BRANCHLT TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BFEXT DR4, DR2, #9, #23
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    MCMP DR3, #1
+    BRANCHGT TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BRANCH create_descriptor_next_sequence
+
+create_descriptor_after_sequence:
+    BFINS DR9, DR4, #21, #9
+    BFINS DR9, DR0, #30, #2
+    ; T === issued GT: slot[15:0], seq[24:16], Inform=01, dom=0,
+    ; DATA RW=011, B=1. The high seven bits are therefore 0b1011001.
+    IADD DR11, DR7, #0
+    BFINS DR11, DR4, #16, #9
+    IADD DR12, DR0, #89
+    BFINS DR11, DR12, #25, #7
+    BRANCH create_descriptor_integrity
+
+create_descriptor_after_integrity:
+    IADD DR1, DR0, #0
+    IADD DR12, DR0, #1
+    BRANCH create_descriptor_done
+
+; Private sequence Lambda: one local invocation, fixed local continuation.
+create_descriptor_next_sequence:
+    MCMP DR2, #510
+    BRANCHGE create_descriptor_retired
+    MCMP DR3, #0
+    BRANCHNE create_descriptor_first_use
+    IADD DR4, DR2, #1
+    BRANCH create_descriptor_after_sequence
+create_descriptor_first_use:
+    ; A never-used slot has initial version zero, never an arbitrary history.
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    IADD DR4, DR0, #0
+    BRANCH create_descriptor_after_sequence
+create_descriptor_retired:
+    IADD DR4, DR0, #511
+    IADD DR9, DR0, #0
+    BRANCH create_descriptor_done
+
+; Private integrity Lambda: W0/W1 unchanged; W2 in DR10.
+; ROL32(W0,7), using only existing shift/bitfield instructions.
+create_descriptor_integrity:
+    BFEXT DR12, DR8, #25, #7
+    SHL DR13, DR8, #7
+    BFINS DR13, DR12, #0, #7
+    ; ROL32(W1 & 0x3FFFFFFF,13).
+    IADD DR14, DR9, #0
+    BFINS DR14, DR0, #30, #2
+    BFEXT DR12, DR14, #19, #13
+    SHL DR14, DR14, #13
+    BFINS DR14, DR12, #0, #13
+    ; Construct 0xDEADBEEF without a new large-immediate instruction.
+    IADD DR15, DR0, #222
+    SHL DR15, DR15, #8
+    IADD DR15, DR15, #173
+    SHL DR15, DR15, #8
+    IADD DR15, DR15, #190
+    SHL DR15, DR15, #8
+    IADD DR15, DR15, #239
+    IADD DR10, DR0, #0
+    IADD DR4, DR0, #32
+create_descriptor_xor_bits:
+    ; XOR of three bits is their sum modulo two. No invented XOR opcode.
+    BFEXT DR1, DR13, #0, #1
+    BFEXT DR2, DR14, #0, #1
+    BFEXT DR3, DR15, #0, #1
+    IADD DR1, DR1, DR2
+    IADD DR1, DR1, DR3
+    SHR DR10, DR10, #1
+    BFINS DR10, DR1, #31, #1
+    SHR DR13, DR13, #1
+    SHR DR14, DR14, #1
+    SHR DR15, DR15, #1
+    ISUB DR4, DR4, #1
+    ; Register-form MCMP preserves live DR15. Immediate MCMP lowering uses
+    ; DR15 as scratch and would corrupt the remaining XOR constant bits.
+    MCMP DR4, DR0
+    BRANCHNE create_descriptor_xor_bits
+    BRANCH create_descriptor_after_integrity
+create_descriptor_done:
+    BRANCH create_data_descriptor_ready
+; END NATIVE SLOT PACKAGE
+
 create_data_set_slot:
     ; Single local call site: ordinary branches use the unchanged CR14.
     ; No separate X GT, CALL frame, LAMBDA frame or new operand encoding.
@@ -259,6 +379,10 @@ create_data_slot_return:
 ; Resolved failure cases. No result issuance and no promised rollback.
 TODO_CREATE_PKVERIFY_NOT_APPROVED:
     HARDFAULT "Mint.CREATE: PkVerify did not return APPROVED"
+TODO_CREATE_DESCRIPTOR_INPUT_INVALID:
+    HARDFAULT "Mint.CREATE: invalid allocator or slot-history input for descriptor"
+TODO_CREATE_DESCRIPTOR_RETIRED:
+    HARDFAULT "Mint.CREATE: selected slot is retired and cannot be allocated"
 TODO_CREATE_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.CREATE: missing Passkey"
 TODO_CREATE_INPUT_PROOF_READ:
