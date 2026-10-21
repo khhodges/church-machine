@@ -123,6 +123,21 @@ Phase 1.
 **How to apply:** Clear F and G while preparing the slot authority word,
 preserving limit and sequence. This approval does not decide later GC behavior.
 
+## Agreed FPGA slot integrity calculation
+
+Prepare W2 as ROL32(W0, 7) XOR ROL32(W1 AND 0x3FFFFFFF, 13)
+XOR 0xDEADBEEF, using 32-bit operations. F/G are excluded; W3 is not an input.
+The user approved this calculation as a private, same-context LAMBDA with
+W0/W1 inputs, W2 output and no side effects.
+
+**Why:** The user agreed to the FPGA's existing exact formula and pure helper
+contract during the field-by-field Mint review.
+
+**How to apply:** Preserve the agreed formula and caller inputs; do not add
+Namespace writes or authority issuance to this calculation. Implement using
+approved native encodings and agreed local-transfer conventions; agreement on
+the formula does not by itself prove a CLOOMC implementation or board execution.
+
 ## Phase 1 PkVerify decision
 
 For Phase 1, PkVerify always returns APPROVED.
