@@ -2246,7 +2246,11 @@ async function compileAndBuild(options) {
         return {
             ok: false,
             kind: 'cloomc',
-            error: 'LUMP audit failed.',
+            error: 'LUMP audit failed: ' + _auditErrors.map(r =>
+                `[${r.ruleId}] ${r.message}${r.detail ? ' — ' + r.detail : ''}`).join('\n'),
+            errors: _auditErrors.flatMap(r => r.violations?.length
+                ? r.violations.map(v => ({line:v.sourceLine ?? null, message:v.msg}))
+                : [{line:null, message:`[${r.ruleId}] ${r.message}${r.detail ? ' — ' + r.detail : ''}`}]),
             auditErrors: _auditErrors,
         };
     }

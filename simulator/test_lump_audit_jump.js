@@ -174,9 +174,14 @@ function freshContainer() {
     const outOfRange = words.slice();
     outOfRange[1] = new Assembler().assemble('LOAD CR1, CR6, #6').words[0];
     const errors = lumpAudit(outOfRange);
-    assert.equal(errors.find(row => row.ruleId === 'RCI').severity, 'error');
+    assert.equal(errors.find(row => row.ruleId === 'CAP_RANGE').severity, 'warn');
     const mixed = lumpAuditRenderPanel(freshContainer(), errors, {startOpen:true});
-    assert.equal(mixed.hasErrors, true, 'binding information never suppresses real errors');
+    assert.equal(mixed.hasErrors, false, 'intentional missing-row access remains an authored program');
+    assert.equal(mixed.hasWarnings, true);
+    const badBranch = words.slice();
+    badBranch[1] = new Assembler().assemble('BRANCH #32767').words[0];
+    assert.equal(lumpAuditHasErrors(lumpAudit(badBranch)), true,
+        'out-of-code branch remains blocking');
     console.log('PASS non-blocking binding status, eight expandable references, and preserved structural errors');
 }
 

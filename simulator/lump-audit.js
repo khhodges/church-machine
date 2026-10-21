@@ -612,6 +612,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
         const _rciOpName    = { 0: 'LOAD', 1: 'SAVE', 8: 'ELOADCALL', 9: 'XLOADLAMBDA' };
         const _rciBranchOp  = 23;  // v2.0 ISA: BRANCH is opcode 23 (opcode 17 = DWRITE)
         const _rciViolations = [];
+        const _capRangeWarnings = [];
         const _rncViolations = [];  // RNC — NULL GT in a valid c-list slot (warning)
 
         // Build capability-name context for violation messages (e.g. "[0]='SlideRule'")
@@ -653,10 +654,8 @@ function lumpAudit(words, manifest, lineNums, opts) {
                     _rncViolations.push({ msg: _nullMsg, sourceLine: _nullSrcLine, slot, wordIndex: codeIdx });
                 }
             } else if (_rciChurchOps.has(op) && crSrc === 6 && cc > 0 && slot >= cc) {
-                // Slot is beyond the declared c-list (slot >= cc) — always a structural error.
-                // Accessing a slot index >= cc is invalid regardless of what physical memory
-                // happens to contain at that address; the c-list header declares cc as the
-                // authoritative bound and the runtime enforces it.
+                // The instruction is structurally valid. The runtime enforces
+                // the declared bound, including deliberately authored faults.
                 const _capName = _rciPetNames[String(slot)] ||
                     (manifest && Array.isArray(manifest.capabilities) &&
                      manifest.capabilities[slot] && manifest.capabilities[slot].name) || null;
@@ -670,7 +669,7 @@ function lumpAudit(words, manifest, lineNums, opts) {
                 const _rciMsg = `Instruction ${wi} (${_rciOpName[op]}) tries to access capability slot ${slot}` +
                     `, but this lump only has ${cc} capability slot${cc !== 1 ? 's' : ''}${_slotNameHint}.${_fixHint}`;
                 const _rciSrcLine = lineNums && lineNums[wi] != null ? lineNums[wi] : null;
-                _rciViolations.push({ msg: _rciMsg, sourceLine: _rciSrcLine, slot, wordIndex: codeIdx });
+                _capRangeWarnings.push({ msg: _rciMsg, sourceLine: _rciSrcLine, slot, wordIndex: codeIdx });
             }
 
             if (op === _rciBranchOp) {
@@ -686,6 +685,15 @@ function lumpAudit(words, manifest, lineNums, opts) {
             }
         }
 
+        if (_capRangeWarnings.length) {
+            results.push({
+                ruleId: 'CAP_RANGE',
+                severity: 'warn',
+                message: 'Capability access will fault if executed',
+                detail: _capRangeWarnings.map(v => v.msg).join('\n'),
+                violations: _capRangeWarnings,
+            });
+        }
         if (_rciViolations.length === 0) {
             const _rciDetail = cc === 0
                 ? `All ${cw} instruction${cw !== 1 ? 's' : ''} checked \u2014 no private capability list (ambient slots used at runtime) \u2713`
