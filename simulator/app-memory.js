@@ -1851,7 +1851,8 @@ function updateCRDetail() {
             const _w = _codeWords[i] >>> 0;
             if (((_w >>> 27) & 0x1F) !== 23) continue;
             const _rawImm = _w & 0x7FFF;
-            const _soff = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
+            if ((_w >>> 19) & 15) continue;
+            const _soff = (_w & 0x3FFFF) * (_w & 0x40000 ? -1 : 1);
             const _tgt = i + _soff;
             if (_tgt >= 0 && _tgt < _codeWords.length) _brTargetSet.add(_tgt);
         }
@@ -1962,9 +1963,9 @@ function updateCRDetail() {
             let decoded;
             if (word === 0) {
                 decoded = 'NOP / HALT';
-            } else if (((word >>> 27) & 0x1F) === 23) {
+            } else if (((word >>> 27) & 0x1F) === 23 && !((word >>> 19) & 15)) {
                 const _rawImm = word & 0x7FFF;
-                const _soff = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
+                const _soff = (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
                 const _tgt = w + _soff;
                 const _condCode = (word >>> 23) & 0xF;
                 const _condAbbr = _brLabelCondNames[_condCode];

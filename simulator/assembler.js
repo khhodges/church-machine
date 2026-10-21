@@ -1468,8 +1468,8 @@ class ChurchAssembler {
         for (let i = 0; i < words.length; i++) {
             const w = words[i] >>> 0;
             if (((w >>> 27) & 0x1F) !== 23) continue;   // not a BRANCH instruction (v2.0: opcode 23)
-            const rawImm = w & 0x7FFF;
-            const signedOffset = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
+            if ((w >>> 19) & 15) continue; // dynamic target is checked at runtime
+            const signedOffset = (words[i] & 0x3FFFF) * (words[i] & 0x40000 ? -1 : 1);
             const target = i + signedOffset;
             if (target < 0 || target > totalWords) {
                 const condCode = (w >>> 23) & 0xF;
@@ -1887,8 +1887,8 @@ class ChurchAssembler {
             const w1 = ((op << 27) | (cond << 23) | (a << 19) | (b << 15) | imm) >>> 0;
             return codec.encodePacket({ w1, role0, role1 });
         }
-        if (op === 23 && (imm < -16384 || imm > 16383))
-            throw new Error('IDX1 branch displacement out of range');
+        if (op === 23)
+            return [((op << 27) | (cond << 23) | (imm < 0 ? 0x40000 : 0) | Math.abs(imm)) >>> 0];
         return [((op << 27) | (cond << 23) | (a << 19) | (b << 15) | (imm & 0x7FFF)) >>> 0];
     }
 
@@ -2881,11 +2881,23 @@ class ChurchAssembler {
                 //                         e.g. BRANCH EQ, done — same as BRANCHEQ done
                 //                         Single-token form BRANCH EQ (no target) → offset 0
                 let branchTarget = (parts[1] || '').replace(/,/g, '').trim();
+                let branchTargetIndex = 1;
                 if (branchTarget && this.conditions[branchTarget.toUpperCase()] !== undefined) {
                     cond = this.conditions[branchTarget.toUpperCase()];
                     branchTarget = (parts[2] || '').replace(/,/g, '').trim();
+                    branchTargetIndex = 2;
                 }
-                if (!branchTarget) {
+                const indexed = branchTarget.match(/^DR(\d+)$/i);
+                let branchRegister = 0;
+                if (indexed) {
+                    branchRegister = Number(indexed[1]);
+                    const expression = parts.slice(branchTargetIndex + 1).join(' ').replace(/,/g, '').trim();
+                    imm = expression ? Number(expression.replace(/\s/g, '')) : 0;
+                    if (branchRegister > 15) {
+                        this.errors.push({line: lineNum, message: 'BRANCH index must be DR0–DR15'});
+                        return 0;
+                    }
+                } else if (!branchTarget) {
                     imm = 0;
                 } else if (/^[a-zA-Z_]/.test(branchTarget)) {
                     // Identifier-like token → treat as label name
@@ -2897,9 +2909,14 @@ class ChurchAssembler {
                     }
                 } else {
                     // Numeric literal (decimal, hex, binary, or signed integer)
-                    imm = this._parseImm(branchTarget, lineNum);
+                    imm = Number(branchTarget.replace(/^#/, ''));
                 }
-                break;
+                if (!Number.isInteger(imm) || Math.abs(imm) > 0x3FFFF) {
+                    this.errors.push({line: lineNum, message: 'BRANCH displacement must be -262143..262143 words'});
+                    return 0;
+                }
+                return ((23 << 27) | (cond << 23) | (branchRegister << 19) |
+                    (imm < 0 ? 0x40000 : 0) | Math.abs(imm)) >>> 0;
             }
             case 24: {
                 crDst = this._parseDR(parts[1], lineNum);
@@ -3358,8 +3375,8 @@ class ChurchAssembler {
         for (let i = 0; i < trimmedWords.length; i++) {
             const w = trimmedWords[i] >>> 0;
             if (((w >>> 27) & 0x1F) !== 23) continue;
-            const rawImm = w & 0x7FFF;
-            const soff = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
+            if ((w >>> 19) & 15) continue;
+            const soff = (w & 0x3FFFF) * (w & 0x40000 ? -1 : 1);
             const target = i + soff;
             if (target >= 0 && target < trimmedWords.length) {
                 branchTargetSet.add(target);
@@ -3376,9 +3393,8 @@ class ChurchAssembler {
             if (labelMap.has(i)) {
                 lines.push(labelMap.get(i) + ':');
             }
-            if (((word >>> 27) & 0x1F) === 23) {  // BRANCH = opcode 23 in v2.0
-                const rawImm = word & 0x7FFF;
-                const soff = (rawImm & 0x4000) ? (rawImm | 0xFFFF8000) : rawImm;
+            if (((word >>> 27) & 0x1F) === 23 && !((word >>> 19) & 15)) {
+                const soff = (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
                 const target = i + soff;
                 const condCode = (word >>> 23) & 0xF;
                 const mnemonic = 'BRANCH' + _condNames[condCode];
@@ -3622,7 +3638,8 @@ class ChurchAssembler {
             case 22: return (imm & 0x4000) ? `${mnemonic}  DR${crDst}, DR${crSrc}, #${imm & 0x3FFF}` : `${mnemonic}  DR${crDst}, DR${crSrc}, DR${imm & 0xF}`;
             // BRANCH soff  — PC-relative conditional jump
             case 23: {
-                const soff = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
+                const soff = (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
+                if (crDst) return `${mnemonic}  DR${crDst} ${soff < 0 ? '-' : '+'} ${Math.abs(soff)}`;
                 return `${mnemonic}  ${soff >= 0 ? '+' : ''}${soff}`;
             }
             // SHL DRd, DRs, shamt

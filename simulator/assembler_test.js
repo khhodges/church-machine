@@ -1188,8 +1188,8 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
         a.errors.map(e => e.message).join('; '));
     assert('BL1 backward label: 2 words', r.words.length === 2, `len=${r.words.length}`);
     // loop_top=0, BRANCHNE at addr=1 → offset = 0-1 = -1 → encoded as 0x7FFF in 15-bit signed
-    const bImm = r.words[1] & 0x7FFF;
-    assert('BL1 backward label: offset = -1 (0x7FFF)', bImm === 0x7FFF, `imm=0x${bImm.toString(16)}`);
+    const bImm = r.words[1] & 0x7FFFF;
+    assert('BL1 backward label: subtract one', bImm === 0x40001, `imm=0x${bImm.toString(16)}`);
 }
 
 // BL2: forward branch label — BRANCH AL done where done: is after
@@ -1249,9 +1249,9 @@ const SALVATION_NS_SYMBOLS = { 'Salvation': 4 };
     ].join('\n'));
     assert('BL5 two labels: no errors', a.errors.length === 0,
         a.errors.map(e => e.message).join('; '));
-    assert('BL5 alpha branch offset = -1', (r.words[1] & 0x7FFF) === 0x7FFF,
+    assert('BL5 alpha branch offset = -1', (r.words[1] & 0x7FFFF) === 0x40001,
         `got 0x${(r.words[1]&0x7FFF).toString(16)}`);
-    assert('BL5 beta branch offset = -1',  (r.words[3] & 0x7FFF) === 0x7FFF,
+    assert('BL5 beta branch offset = -1',  (r.words[3] & 0x7FFFF) === 0x40001,
         `got 0x${(r.words[3]&0x7FFF).toString(16)}`);
 }
 

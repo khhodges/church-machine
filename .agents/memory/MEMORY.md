@@ -36,8 +36,6 @@
 - [Single delivery record needs client command lock](single-slot-delivery-watch-lock.md) — hold busy until watcher terminal; record replaced after consumed = likely delivered, not superseded
 - [Single-slot command ack correlation](single-slot-cmd-ack-correlation.md) — correlate queue/consume/ack/confirm stages by monotonic id, never by command letter; no time-window heuristics
 - [Wukong dev/production event relay](wukong-dev-production-relay.md) — local simulator previews need the production relay when the physical bridge is attached to lab.cloomc.org
-- [Wukong poll rejection containment](wukong-poll-rejection-containment.md) — async hardware polling must contain state-update failures, not only fetch failures
-- [Hardware snapshot separation](hardware-snapshot-separation.md) — hardware NIA/cursor and stored thread context must stay separate from simulator PC, live CR12, and breakpoints
 - [ns-state snapshot vs raw binary](ns-state-snapshot-vs-raw.md) — ns-state.json fields can be stale vs boot-image.bin; use the endpoint `committed` raw-words block for hex display and fault checks
 - [Sidecar spec vs implementation](sidecar-spec-vs-implementation.md) — mechanical-cache rule is future-normative; verify field/writer claims against server/app.py before spec edits
 - [Freespace validation zone per typ](freespace-validation-zone-per-typ.md) — freespace scans must branch on lump typ: Thread uses the collision zone, Namespace skips; generic cw/cc bounds reject valid Threads
@@ -90,7 +88,6 @@
 - [Saved LUMP binary authority](saved-lump-binary-authority.md) — after save, evict code-only memory words so the immutable server binary supplies embedded source
 - [Saved-LUMP browser authorization E2E](saved-lump-browser-auth-e2e.md) — use the real Load into Sim control with a canonical binary fixture while isolating stale boot-image availability
 - [Starter handoff must be acyclic](starter-handoff-acyclic.md) — startup SelfTest hands off once; Starter must continue onward, never call SelfTest back
-- [Trace row correlation](trace-row-correlation.md) — combine NIA symbols and raw words only after identity validation; conflicts must remain visibly unresolved
 - [Pending compile ownership](pending-compile-ownership.md) — delayed simulator loads consume the exact immutable compile snapshot that initiated them, never mutable registry selection
 - [Namespace header boot fallback](namespace-header-boot-fallback.md) — a missing selected dynamic boot slot must not crash reset; header falls back to a resident canonical entry
 - [Resident image binding validation](resident-image-binding-validation.md) — compare immutable artifact payload plus slot/sequence/allocation; c-list rows are destination-localized
@@ -98,7 +95,6 @@
 - [Editor source authority](editor-source-authority.md) — preserve owned drafts; authority refresh is advisory and replacement requires explicit preview and acceptance
 - [C-list row zero SELF boundary](clist-row-zero-advisory-self.md) — compiler output must establish SELF at row zero; immutable historical bytes remain inspectable without rewriting
 - [Explicit LUMP selection](latest-saved-lump-selection.md) — selected Namespace and programmer choices outrank automatic latest-revision defaults; freshness stays advisory.
-- [Trace-symbol preview isolation](trace-symbol-preview-isolation.md) — invalid factory artifacts must block hardware builds without taking down the web IDE’s fallback trace labels
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate
 - [Archived bootstrap identity](archived-bootstrap-identity.md) — keep historical bytes immutable, but audit and restore them against the live destination GT by abstraction ancestry
@@ -144,7 +140,6 @@
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
-- [Fault saved-artifact comparisons](fault-saved-comparison.md) — compare historical bytes and identity explicitly; one matching word never proves artifact identity.
 - [Relay hosting decision](relay-hosting-decision.md) — user approved Reserved VM for the next publish; keep stateful relay deployment separate from artifact repair.
 - [Namespace handoff authority](namespace-handoff-evidence.md) — no hidden caches; entry GT version 0; faulting CR identifies software blacklisting; hardware never changes versions.
 - [Ascending-v1 candidate boundary](ascending-v1-candidate-boundary.md) — profile approval is separate from Header V2 approval and never authorizes installation, activation, or hardware programming.
@@ -157,3 +152,4 @@
 - [Intentional capability faults](intentional-capability-fault-publication.md) — absent-row accesses remain authored programs; publication diagnostics must not replace runtime checks.
 - [Namespace public names](namespace-public-names.md) — exact dropdown names govern IDE profile labels and reports; internal keys are not public names.
 - [Native dialog keyboard ownership](native-dialog-keyboard-ownership.md) — native modals must own Escape and Tab ahead of the shared overlay capture handler.
+- [Mint RTL replay boundary](mint-rtl-replay-boundary.md) — exact-byte tests must not translate instructions; encoding corrections cover every emitter and execution profile.

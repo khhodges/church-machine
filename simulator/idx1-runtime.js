@@ -145,7 +145,11 @@
         else {
             const imm = words[at] & 0x7fff, op = words[at] >>> 27;
             let register = 0, magnitude = imm, subtract = false;
-            if (op === 23 && (imm & 0x4000)) { magnitude = 0x8000 - imm; subtract = true; }
+            if (op === 23) {
+                register = (words[at] >>> 19) & 15;
+                magnitude = words[at] & 0x3ffff;
+                subtract = !!(words[at] & 0x40000);
+            }
             if (op === 18 || op === 19) magnitude = (imm >>> 5) & 31;
             if (op === 16 || op === 17) {
                 if (imm & 0x4000) magnitude = imm & 0x3fff;
@@ -168,7 +172,13 @@
             fail('UNSUPPORTED_PROFILE', 'Unsupported indexed operation');
         const registers = sim.dr.slice();
         if (packet.opcode === 23) {
-            const target = at + codec.evaluateDescriptor(packet.role0, registers, true);
+            // Ordinary words use the core's unsigned DR index; prefixed IDX1
+            // packets retain their explicitly defined descriptor semantics.
+            const displacement = prefixed
+                ? codec.evaluateDescriptor(packet.role0, registers, true)
+                : (registers[packet.role0.register] >>> 0) +
+                    packet.role0.magnitude * (packet.role0.subtract ? -1 : 1);
+            const target = at + displacement;
             requireStart(accepted, target);
             sim.pc = target - 1;
             return { ...result, desc: 'IDX1 BRANCH' };

@@ -49,6 +49,14 @@ async function fixture(expression = 'DR11', source = null, rights = { R: 1 }, op
     return { sim, selected, base, slot, dataBase, envelope };
 }
 async function main() {
+    const backward = await fixture('DR11', 'loop:\nBRANCH loop');
+    assert.equal(backward.sim.step().desc, 'IDX1 BRANCH');
+    assert.equal(backward.sim.pc, 0);
+    const back = await fixture('DR11', 'HALT\nBRANCH -1', {R: 1}, {fastEntry: 2});
+    back.sim.pc = 1;
+    assert.equal(back.sim.step().desc, 'IDX1 BRANCH');
+    assert.equal(back.sim.pc, 0);
+    assert.equal(back.sim.step().opName, 'HALT');
     const f = await fixture();
     const result = f.sim.step();
     assert(result, JSON.stringify(f.sim.faultLog));

@@ -38,6 +38,23 @@ print(json.dumps({"digest": e.execution_digest, "starts": e.instruction_starts,
     assert.deepEqual(server.dispatch,
         framed.dispatch.map(entry => [entry.selector, entry.word, entry.kind, entry.target]));
 
+    const loop = new Assembler().assemble('HALT\nBRANCH -1', {
+        profile: 'IDX1', sourceLayout: {fastEntry: 2, dispatch: []},
+    });
+    assert.deepEqual(loop.errors, []);
+    const loopPayload = Buffer.alloc(256);
+    loopPayload.writeUInt32BE(((31 << 27) | (loop.words.length << 10)) >>> 0);
+    loop.words.forEach((word, i) => loopPayload.writeUInt32BE(word, 4 * (i + 1)));
+    const loopFrame = await Envelope.frame(loopPayload, loop.layout);
+    assert.deepEqual(loopFrame.warnings, []);
+    const loopWarnings = JSON.parse(execFileSync('python3', ['-c', `
+import json, sys
+from server.idx1_profile import parse_envelope
+e = parse_envelope(bytes.fromhex(sys.stdin.read()))
+print(json.dumps(e.warnings))
+`], {input: Buffer.from(loopFrame.bytes).toString('hex'), encoding: 'utf8'}));
+    assert.deepEqual(loopWarnings, []);
+
     // Untrusted bytes cannot alter a validated snapshot during an async hash.
     const race = Uint8Array.from(framed.bytes);
     const pending = Envelope.parse(race);

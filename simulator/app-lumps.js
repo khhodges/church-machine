@@ -6450,7 +6450,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
         const _cw2 = _lumpCodeWords[_ci];
         if (((_cw2 >>> 27) & 0x1F) !== 23) continue;
         const _rawImm = _cw2 & 0x7FFF;
-        const _soff   = (_rawImm & 0x4000) ? (_rawImm | 0xFFFF8000) : _rawImm;
+        if ((_cw2 >>> 19) & 15) continue;
+        const _soff = (_cw2 & 0x3FFFF) * (_cw2 & 0x40000 ? -1 : 1);
         const _tgt    = _ci + _soff;
         if (_tgt >= 0 && _tgt < _lumpCodeWords.length) _lumpBrTargetSet.add(_tgt);
     }
@@ -6656,8 +6657,8 @@ function _renderLumpCodeContent(bodyEl, lump, words, token, binaryHash, identity
             let disHtml = null;
 
             // BRANCH: replace raw PC-offset text with symbolic label (L0, L1, …)
-            if (op === 23) {
-                const _bsoff   = (imm & 0x4000) ? (imm | 0xFFFF8000) : imm;
+            if (op === 23 && !((w >>> 19) & 15)) {
+                const _bsoff = (w & 0x3FFFF) * (w & 0x40000 ? -1 : 1);
                 const _btgt    = _lumpCi + _bsoff;
                 const _blabel  = _lumpBrLabelMap.get(_btgt);
                 if (_blabel !== undefined) {
@@ -8655,7 +8656,7 @@ async function openLumpInEditor(token, options) {
                             var entry = trimmed[i] >>> 0;
                             if (((entry >>> 27) & 0x1F) === BRANCH_OP) {
                                 var raw = entry & 0x7FFF;
-                                var soff = (raw & 0x4000) ? (raw | 0xFFFF8000) : raw;
+                                var soff = (entry & 0x3FFFF) * (entry & 0x40000 ? -1 : 1);
                                 return i + soff;
                             }
                             return entry - 1;

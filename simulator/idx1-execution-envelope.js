@@ -147,7 +147,7 @@
         const warnings = [], dispatch = [];
         let previous = 0;
         const targetOfBranch = (at, word) =>
-            at + ((word & 0x4000) ? (word & 0x7fff) - 0x8000 : word & 0x7fff);
+            at + (word & 0x3ffff) * (word & 0x40000 ? -1 : 1);
         for (const entry of layout.dispatch) {
             fields(entry, ['selector', 'word', 'kind'], 'dispatch');
             const selector = uint(entry.selector, 'selector'), at = uint(entry.word, 'dispatch word');
@@ -157,7 +157,7 @@
             let target;
             if (entry.kind === 'branch') {
                 if (!starts.includes(at) || word >>> 27 !== 23 || ((word >>> 23) & 15) !== 14 ||
-                        (word & 0x7f8000)) fail('Dispatch branch must be one-word unconditional BRANCH');
+                        (word & 0x780000)) fail('Dispatch branch must be one-word unconditional BRANCH');
                 target = targetOfBranch(at, word);
             } else if (entry.kind === 'private' || entry.kind === 'offset') {
                 if (!layout.extents.some(e => e.kind === 'data' && at >= e.startWord && at < e.endWord))
@@ -172,7 +172,7 @@
         for (const at of starts) {
             const word = words[at];
             let target;
-            if (word >>> 27 === 23) target = targetOfBranch(at, word);
+            if (word >>> 27 === 23 && !((word >>> 19) & 15)) target = targetOfBranch(at, word);
             else if (word >>> 27 === 10 && words[at + 1] >>> 27 === 23 && !((word >>> 20) & 15))
                 target = at + ((word & 0x1000000) ? -(word & 0xfffff) : word & 0xfffff);
             if (target !== undefined && !starts.includes(target))

@@ -120,7 +120,9 @@ function buildLump(result, opts) {
             //    srcBodyStart already equals N + sum(prev body lengths))
             const branchLumpPC = srcBodyStart + ref.addr;
             const relOffset    = targetBodyStart - branchLumpPC;
-            allCode[branchLumpPC] = (allCode[branchLumpPC] & ~0x7FFF) | (relOffset & 0x7FFF);
+            if (Math.abs(relOffset) > 0x3FFFF) throw new Error('Private branch displacement out of range');
+            allCode[branchLumpPC] = (allCode[branchLumpPC] & ~0x7FFFFF) |
+                (relOffset < 0 ? 0x40000 : 0) | Math.abs(relOffset);
             allCode[branchLumpPC] = allCode[branchLumpPC] >>> 0;
         }
     }

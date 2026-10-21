@@ -140,9 +140,9 @@ def _packet(words, at, end):
 
 
 def _branch_target(word, instruction):
-    displacement = instruction & 0x7FFF
-    if displacement & 0x4000:
-        displacement -= 0x8000
+    displacement = instruction & 0x3FFFF
+    if instruction & 0x40000:
+        displacement = -displacement
     return word + displacement
 
 
@@ -150,6 +150,8 @@ def _known_branch_target(words, at):
     """Only literal BRANCH or DR0 descriptor targets are predictable here."""
     first = words[at]
     if first >> 27 == 23:
+        if (first >> 19) & 15:
+            return None
         return _branch_target(at, first)
     if first >> 27 != 10 or words[at + 1] >> 27 != 23:
         return None
@@ -303,7 +305,7 @@ def parse_envelope(raw):
         if kind == "branch":
             instruction = words[word]
             if (word not in start_set or instruction >> 27 != 23 or
-                    (instruction >> 23) & 15 != 14 or instruction & 0x7F8000):
+                    (instruction >> 23) & 15 != 14 or instruction & 0x780000):
                 _reject("branch dispatch requires one-word unconditional BRANCH")
             target = _branch_target(word, instruction)
         elif kind in ("offset", "private"):

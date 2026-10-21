@@ -10714,7 +10714,10 @@ class ChurchSimulator {
     }
 
     _execBranch(d) {
-        const soff = (d.imm & 0x4000) ? (d.imm | 0xFFFF8000) : d.imm;
+        const word = d.raw >>> 0;
+        const index = (word >>> 19) & 15;
+        const soff = (index ? this.dr[index] >>> 0 : 0) +
+            (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
         const target = this.pc + soff;
         if (target < 0 || target >= this.memory.length) {
             this.fault('BOUNDS', `BRANCH: target PC=${target} out of range`);

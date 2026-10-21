@@ -295,6 +295,12 @@ class CLOOMCCompiler {
     }
 
     encode(opcode, cond, dst, src, imm) {
+        if (opcode === 23) {
+            if (!Number.isInteger(imm) || Math.abs(imm) > 0x3FFFF)
+                throw new Error('BRANCH displacement must be -262143..262143 words');
+            return ((23 << 27) | ((cond & 15) << 23) |
+                (imm < 0 ? 0x40000 : 0) | Math.abs(imm)) >>> 0;
+        }
         // Compiler-generated LOAD/SAVE indices are immediate-only (DR0).
         if (opcode === 0 || opcode === 1) {
             if (!Number.isInteger(imm) || Math.abs(imm) > 1023)
@@ -2113,11 +2119,11 @@ class CLOOMCCompiler {
                 errors.push({ line: ref.lineNum, message: `Undefined label: ${ref.label}`, ...CLOOMCCompiler._tokenCols(ref.rawLine, ref.label) });
             } else {
                 const relOffset = target - ref.addr;
-                if (relOffset < -16384 || relOffset > 16383) {
-                    errors.push({ line: ref.lineNum, message: `Branch to "${ref.label}" is out of range (-16384..16383 words).` });
+                if (Math.abs(relOffset) > 0x3FFFF) {
+                    errors.push({ line: ref.lineNum, message: `Branch to "${ref.label}" is out of range (-262143..262143 words).` });
                     continue;
                 }
-                code[ref.addr] = (code[ref.addr] & ~0x7FFF) | (relOffset & 0x7FFF);
+                code[ref.addr] = this.encode(23, (code[ref.addr] >>> 23) & 15, 0, 0, relOffset);
                 code[ref.addr] = code[ref.addr] >>> 0;
             }
         }
@@ -2291,9 +2297,9 @@ class CLOOMCCompiler {
             code.push(this.encode(this.opcodes.IADD, 14, accDR, accDR, leftDR));
             code.push(this.encode(this.opcodes.ISUB, 14, cntDR, cntDR, oneDR));
             const backOff = loopStart - code.length;
-            code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, backOff & 0x7FFF));
+            code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, backOff));
             const fwdOff = code.length - branchIdx;
-            code[branchIdx] = this.encode(this.opcodes.BRANCH, 0, 0, 0, fwdOff & 0x7FFF);
+            code[branchIdx] = this.encode(this.opcodes.BRANCH, 0, 0, 0, fwdOff);
             return accDR;
         }
 
@@ -2976,7 +2982,7 @@ class CLOOMCCompiler {
                     const loopStart = labels['__while_loop_' + loopIdx];
                     if (loopStart !== undefined) {
                         const backOffset = loopStart - code.length;
-                        code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, backOffset & 0x7FFF));
+                        code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, backOffset));
                         manifest.push({ src: stmt.lineNum, addr: code.length - 1, desc: 'loop back to while' });
                     }
                     labels[innermost.label] = code.length;
@@ -3684,7 +3690,7 @@ class CLOOMCCompiler {
                         const branchPos = code.length;
                         const soff = -branchPos;  // target=0, this.pc=branchPos at execution
                         manifest.push({ src: lineNum, addr: code.length, desc: `BRANCH AL (self-tail-call → ${ctx.name})` });
-                        code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, soff & 0x7FFF));
+                        code.push(this.encode(this.opcodes.BRANCH, this.conditions.AL, 0, 0, soff));
                         return ctx.params[0];  // dummy result; branch diverges so this value is dead
                     }
                 }
@@ -3805,9 +3811,9 @@ class CLOOMCCompiler {
                         code.push(this.encode(this.opcodes.BRANCH, this.conditions.EQ, 0, 0, 0));
                         code.push(this.encode(this.opcodes.IADD, 14, dr, dr, leftReg));
                         code.push(this.encode(this.opcodes.ISUB, 14, cntReg, cntReg, 0x4001));
-                        code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, (loopAddr - code.length) & 0x7FFF));
+                        code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, loopAddr - code.length));
                         const exitTarget = code.length;
-                        code[exitAddr] = (code[exitAddr] & ~0x7FFF) | ((exitTarget - exitAddr) & 0x7FFF);
+                        code[exitAddr] = this.encode(23, (code[exitAddr] >>> 23) & 15, 0, 0, exitTarget - exitAddr);
                         code[exitAddr] = code[exitAddr] >>> 0;
                         break;
                     }
@@ -3823,9 +3829,9 @@ class CLOOMCCompiler {
                         code.push(this.encode(this.opcodes.BRANCH, this.conditions.LT, 0, 0, 0));
                         code.push(this.encode(this.opcodes.ISUB, 14, remDR, remDR, rightReg));
                         code.push(this.encode(this.opcodes.IADD, 14, dr, dr, 0x4001));
-                        code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, (divLoop - code.length) & 0x7FFF));
+                        code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, divLoop - code.length));
                         const divExitTarget = code.length;
-                        code[divExit] = (code[divExit] & ~0x7FFF) | ((divExitTarget - divExit) & 0x7FFF);
+                        code[divExit] = this.encode(23, (code[divExit] >>> 23) & 15, 0, 0, divExitTarget - divExit);
                         code[divExit] = code[divExit] >>> 0;
                         break;
                     }
@@ -3840,9 +3846,9 @@ class CLOOMCCompiler {
                         code.push(this.encode(this.opcodes.BRANCH, this.conditions.LT, 0, 0, 0));
                         code.push(this.encode(this.opcodes.ISUB, 14, modRemDR, modRemDR, rightReg));
                         code.push(this.encode(this.opcodes.IADD, 14, dr, dr, 0x4001));
-                        code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, (modLoop - code.length) & 0x7FFF));
+                        code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, modLoop - code.length));
                         const modExitTarget = code.length;
-                        code[modExit] = (code[modExit] & ~0x7FFF) | ((modExitTarget - modExit) & 0x7FFF);
+                        code[modExit] = this.encode(23, (code[modExit] >>> 23) & 15, 0, 0, modExitTarget - modExit);
                         code[modExit] = code[modExit] >>> 0;
                         code.push(this.encode(this.opcodes.IADD, 14, dr, modRemDR, 0));
                         break;
@@ -3863,10 +3869,10 @@ class CLOOMCCompiler {
                         const skipFalse = code.length;
                         code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, 0));
                         const falseAddr = code.length;
-                        code[skipTrue] = ((code[skipTrue] & ~0x7FFF) | ((falseAddr - skipTrue) & 0x7FFF)) >>> 0;
+                        code[skipTrue] = this.encode(23, (code[skipTrue] >>> 23) & 15, 0, 0, falseAddr - skipTrue);
                         code.push(this.encode(this.opcodes.IADD, 14, dr, 0, 0));
                         const doneAddr = code.length;
-                        code[skipFalse] = ((code[skipFalse] & ~0x7FFF) | ((doneAddr - skipFalse) & 0x7FFF)) >>> 0;
+                        code[skipFalse] = this.encode(23, (code[skipFalse] >>> 23) & 15, 0, 0, doneAddr - skipFalse);
                         break;
                     }
                     default:
@@ -3917,7 +3923,7 @@ class CLOOMCCompiler {
                         code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, 0));
                         endLabels.push(jumpEnd);
 
-                        code[skipAddr] = (code[skipAddr] & ~0x7FFF) | (code.length & 0x7FFF);
+                        code[skipAddr] = this.encode(23, (code[skipAddr] >>> 23) & 15, 0, 0, code.length - skipAddr);
                         code[skipAddr] = code[skipAddr] >>> 0;
 
                     } else if (branch.pattern.type === 'varPat') {
@@ -3946,7 +3952,7 @@ class CLOOMCCompiler {
 
                 const endAddr = code.length;
                 for (const addr of endLabels) {
-                    code[addr] = (code[addr] & ~0x7FFF) | (endAddr & 0x7FFF);
+                    code[addr] = this.encode(23, (code[addr] >>> 23) & 15, 0, 0, endAddr - addr);
                     code[addr] = code[addr] >>> 0;
                 }
 
@@ -3966,13 +3972,13 @@ class CLOOMCCompiler {
                 const skipElse = code.length;
                 code.push(this.encode(this.opcodes.BRANCH, 14, 0, 0, 0));
 
-                code[skipThen] = (code[skipThen] & ~0x7FFF) | ((code.length - skipThen) & 0x7FFF);
+                code[skipThen] = this.encode(23, (code[skipThen] >>> 23) & 15, 0, 0, code.length - skipThen);
                 code[skipThen] = code[skipThen] >>> 0;
 
                 const elseReg = this._emitHaskellExpr(node.elseBranch, code, locals, rom, capNames, errors, manifest, lineNum, exprOffset);
                 code.push(this.encode(this.opcodes.IADD, 14, resultDR, elseReg, 0));
 
-                code[skipElse] = (code[skipElse] & ~0x7FFF) | ((code.length - skipElse) & 0x7FFF);
+                code[skipElse] = this.encode(23, (code[skipElse] >>> 23) & 15, 0, 0, code.length - skipElse);
                 code[skipElse] = code[skipElse] >>> 0;
 
                 return resultDR;
@@ -4662,7 +4668,7 @@ class CLOOMCCompiler {
                 manifest.push({ line: lineNum, instr: `MCMP DR${loop.counterDR}, DR0`, comment: `compare ${loop.counterName} with 0` });
                 const branchIdx = code.length;
                 const soff = loop.loopStart - branchIdx;
-                code.push(this.encode(this.opcodes.BRANCH, this.conditions.GT, 0, 0, soff & 0x7FFF));
+                code.push(this.encode(this.opcodes.BRANCH, this.conditions.GT, 0, 0, soff));
                 manifest.push({ line: lineNum, instr: `BRANCH GT, ${soff}`, comment: `loop back if ${loop.counterName} > 0` });
                 continue;
             }
