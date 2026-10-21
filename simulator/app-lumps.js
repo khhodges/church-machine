@@ -8647,7 +8647,7 @@ async function openLumpInEditor(token, options) {
     // Its outgoing draft was preserved above under its own owner. Only an
     // overwrite of the same owned document needs the replacement comparison.
     if (options && options.confirmReplacement &&
-            (options.namespaceAssignedOnly || _sameLumpToken(window._editorOpenLumpToken, token))) {
+            _sameLumpToken(window._editorOpenLumpToken, token)) {
         var _reviewEditor = document.getElementById('asmEditor');
         var _reviewSource = _navigationBuffer && _editableSourceAvailable &&
             _navigationBuffer.original === _recoveredSource

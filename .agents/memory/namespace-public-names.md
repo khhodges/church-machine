@@ -23,3 +23,8 @@ and explicitly approved independent files only through File Open.
 **How to apply:** Ignore historical authoring associations for label navigation
 without deleting those files or rewriting saved assignments. Preserve drafts
 and keep navigation separate from compilation, simulation, and hardware.
+
+Switching between assigned LUMPs is document navigation, not a source
+replacement comparison. Preserve the outgoing draft under its owner.
+**Why:** Showing SelfTest versus Alice's absent source as a deletion diff
+misrepresented a label click. Empty-editor checks do not cover this case.
