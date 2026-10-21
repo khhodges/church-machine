@@ -78,3 +78,17 @@ evidence that the correct hardware footprint has been selected.
 binary before freezing the map. Recalculate allocations, placements, bounds
 and localized bindings from API-only bytes; keep source variants in the IDE.
 Thread runtime allocations remain separate from executable content profiles.
+
+## Whole-binary storage compression
+
+The user agreed that a single lossless compression pass over the complete
+LUMP makes sense for storage and transfer, with exact decompression before
+validation, linking, and execution.
+
+**Why:** One outer compression mechanism can cover code, API, source, and
+padding without changing the recovered executable binary. This reduces file
+size, not runtime memory allocation.
+
+**How to apply:** Treat this as an agreed design direction, not permission to
+rewrite immutable saved artifacts or change the machine's word-addressable
+runtime format. Keep stored/transfer sizes distinct from runtime allocation.
