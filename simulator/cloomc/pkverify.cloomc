@@ -1,0 +1,13 @@
+; PHASE 1 ONLY: unconditional approval, not real credential authentication.
+; API: Verify (source method 0, CALL selector 1).
+; CR2 credential and CR3 proof are accepted but never inspected or dereferenced.
+; Result: DR1 = 1 (APPROVED). All other DRs, including DR6, are unchanged.
+; RETURN keeps CR2/CR3; other CRs follow the ordinary CALL/RETURN convention.
+; No allocation, allowance accounting, memory writes or external service calls.
+abstraction ide.PkVerify {
+    capabilities { SELF E }
+    method Verify() {
+        IADD DR1, DR0, #1
+        RETURNAL #12
+    }
+}

@@ -110,6 +110,12 @@ not executable implementations.
   not proved by four DWRITEs. No watchdog/reset exemption or promised rollback.
 - All faults hard-fault, not recoverable rejection returns. Use the approved
   HARDFAULT/fault-map direction in the master; exact lowering remains unverified.
+- **Phase 1 PkVerify exception:** `ide.PkVerify.Verify` unconditionally returns
+  APPROVED (`DR1 = 1`), including for NULL or invalid credentials/proofs.
+  It does not read proof memory or perform allowance accounting. Other DRs,
+  including Mint's requested size in DR6, are preserved; RETURN keeps CR2/CR3.
+  This is an explicit Phase 1 stub, not evidence of real authentication.
+  The credential-verification requirements below apply to the real verifier.
 - Mint forges the PassKey GT **and separate 128-bit proof at forging time**.
   Genesis defines/approves the permitted sharing structure and approved-GT list.
   Mint enforces it rather than choosing recipients. pkverify requires both GT

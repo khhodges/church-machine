@@ -218,3 +218,5 @@ for (const mask of [0, 2]) {
     assert.equal(r.words[0] & 0xfff, mask);
 }
 console.log('PASS: four draft APIs, native input/result guards, explicit unresolved gates, no success stub');
+// Include the Phase 1 verifier in the existing Mint validation workflow.
+require('./test_pkverify_phase1');
