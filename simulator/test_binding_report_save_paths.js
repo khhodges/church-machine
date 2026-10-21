@@ -19,16 +19,30 @@ const {JSDOM}=require('jsdom');
     const completeReport=JSON.parse(JSON.stringify(result.bindingReport));
     let writes=0,shows=0,fail=false,nodeSaved=true;
     w.fetch=async(url,options)=>{
+        assert.equal(url,'/api/namespace/design-v1','binding only saves the design; never activates an image');
         assert.equal(options.method,'PUT');
         writes++;
         if(fail) throw Error('Namespace design changed in another tab');
         return {ok:true,json:async()=>JSON.parse(JSON.stringify(result))};
     };
     w.NamespaceIdeNode={savePending:async()=>nodeSaved};
-    w.eval(fs.readFileSync(__dirname+'/namespace-binding-windows.js','utf8'));
+    // Load the real browser dependencies in served order, including the
+    // profile labels used when the save button is rendered again.
+    const dependencies=new Set([
+        'namespace-profile-names.js','namespace-binding-windows.js','namespace-design-v1.js'
+    ]);
+    const html=fs.readFileSync(__dirname+'/index.html','utf8');
+    const scripts=[...html.matchAll(/<script\b[^>]*src="([^"?]+)(?:\?[^"]*)?"/g)]
+        .map(match=>match[1]).filter(name=>dependencies.has(name));
+    for(const name of dependencies) assert(scripts.includes(name),`${name} missing from served manifest`);
+    assert(scripts.indexOf('namespace-profile-names.js')<scripts.indexOf('namespace-design-v1.js'),
+        'profile helpers must be served before the design editor');
+    for(const name of scripts) w.eval(fs.readFileSync(__dirname+'/'+name,'utf8'));
     const show=w.NamespaceBindingWindows.show;
-    w.NamespaceBindingWindows.show=report=>{shows++;return show(report);};
-    w.eval(fs.readFileSync(__dirname+'/namespace-design-v1.js','utf8'));
+    w.NamespaceBindingWindows.show=report=>{
+        assert.equal(report.installed,false,'binding reports must not claim activation');
+        shows++;return show(report);
+    };
     const api=w.NamespaceDesignV1;
     Object.assign(api.state,{document:{rows},fingerprint:'old',dirty:false});
     function assertWindows(){
