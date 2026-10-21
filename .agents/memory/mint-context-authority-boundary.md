@@ -3,6 +3,23 @@ name: Mint context authority boundary
 description: Keep synthetic context evidence distinct from granting Mint access to protected Thread state.
 ---
 
+## Phase 1 Mint ownership and local Lambda decision
+
+Mint owns the memory pool and free-slot list. Phase 1 code is single-threaded.
+The Lambda name is a label in Mint's code block; it executes with the same
+authority as Mint and uses Mint's NS/RW capability. Do not model it as a
+separate service or demand removal of Mint's authority on this internal return.
+
+**Why:** The user explicitly supplied these architectural decisions after the
+Data CREATE blocker review.
+
+**How to apply:** Implement the scoped happy path around Mint-owned allocation
+and a same-context local Lambda. Preserve Lambda-return CRs. Keep outward CALL
+boundary checks separate. This does not approve hardware changes or the
+previously declined protected-profile shortcut. The requested Phase 1 all-ones
+verification shortcut is test-only; its GT-versus-proof scope must be clarified
+before changing validation.
+
 New layout must retain ordinary execution semantics for the requested Mint
 Data CREATE path. Do not connect it to the isolated protected Mint profile
 as a shortcut; resolve the ISA/interface questions first.
@@ -25,8 +42,9 @@ CALL boundary cleanup to same-context Lambda return.
 
 **How to apply:** Never propose a Lambda-return mask as an erasure mechanism.
 Preserve current CRs rather than restoring snapshots or reconstructing CR6.
-Keep Mint's pre-return cleanup gates unresolved until a separate legal
-mechanism is established. Separate entry failures from continuation loss.
+For returns across an authority boundary, require a legal cleanup mechanism.
+The same-authority local Phase 1 Lambda described above is not such a boundary.
+Separate entry failures from continuation loss.
 Do not substitute host redirection or claim hardware alignment from simulator
 tests. The master ISA carries the normative rule.
 
