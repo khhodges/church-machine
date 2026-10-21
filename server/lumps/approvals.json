@@ -2735,7 +2735,7 @@
       "issue_n": 1,
       "abstraction": "ide.SelfTest",
       "filename": "ide.SelfTest.1.c01f5b7c.lump",
-      "compiled_at": 1792599049.3685312,
+      "compiled_at": 1792602465.6058593,
       "portable_binding": {
         "schema": "church.portable-lump-binding/v1",
         "owner": "ide.SelfTest#1",
@@ -2768,7 +2768,7 @@
         "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
         "compact_compile_context": {
-          "compiler_sha256": "aecbbc096a7f469ae5cb64bd56de8f2b43b7052f11d852815091820ddbe20098",
+          "compiler_sha256": "7d89658dd7003334069414baa4139d3c715190cf0c8e134307bfad82fbaee632",
           "inputs": {
             "language": "auto",
             "_ide_hierarchy": {
@@ -2787,7 +2787,7 @@
         },
         "signing_scheme": "church-compiler-hmac-sha256/v2",
         "signing_key_id": "compiler-signing-secret/v1",
-        "signature": "57197adb068dbad8e6b3821ebd72c816a43fdfdadbede4132b56b48e1b74a4ac"
+        "signature": "052fa7125554ed123525dfe9f96125da00cdf4a1afb7e2add836d80ba37dce5a"
       },
       "identity_hash": "5f5c24e4bd54935a518921b5715544c720dff7a59542e1261305ec92f3a6124c"
     }
