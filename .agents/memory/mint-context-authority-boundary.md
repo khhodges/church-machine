@@ -72,8 +72,17 @@ verification was presented as the next Mint blocker.
 **How to apply:** Treat PkVerify as an unconditional Phase 1 approval stub.
 Do not require a trusted credential record, proof verification or a particular
 GT value to obtain its APPROVED result. Keep this scoped to Phase 1; it does
-not change machine capability checks or prove real authentication. Do not
-infer a separate allowance-accounting policy from this result.
+not change machine capability checks or prove real authentication.
+
+For Phase 1 CREATE, use PkVerify APPROVED as allocation approval; do not add
+a separate allowance/quota blocker.
+
+**Why:** The user explicitly directed “Use PkVerify for approval” after a
+separate allowance blocker was retained behind the completed verification call.
+
+**How to apply:** On APPROVED, continue to allocation with existing pool/slot
+capacity checks intact. Approval is not completed CREATE and must not publish
+a successful result before the remaining operation completes.
 
 The earlier Phase 1 test credential is exactly the Passkey GT in CR2, `0xFFFFFFFF`.
 The user explicitly selected the GT only, not the four-word proof at CR3.

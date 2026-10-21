@@ -129,10 +129,11 @@ create_data_authorize:
     CALL CR1, #0
     MCMP DR1, #1
     BRANCHNE TODO_CREATE_PKVERIFY_NOT_APPROVED
-    ; Verifier approval is not completed CREATE and does not account quota.
+    ; Phase 1 uses PkVerify APPROVED as allocation approval: no separate quota gate.
+    ; Approval is not completed CREATE; pool/slot capacity checks still follow.
     ; PkVerify preserves requested size DR6 and credential/proof CR2/CR3.
     IADD DR1, DR0, #0
-    BRANCH TODO_CREATE_ALLOWANCE
+    BRANCH create_data_allocate
 create_data_allocate:
     ; Mint-owned state payload (word 0 remains the LUMP header):
     ; 1 pool cursor, 2 exclusive pool end, 3 free-slot queue cursor,

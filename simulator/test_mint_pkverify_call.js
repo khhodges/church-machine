@@ -1,6 +1,7 @@
 'use strict';
 // Isolated execution of the exact CREATE authorization block, not a complete
-// Mint service. The unresolved allowance boundary is a test-only stop.
+// Mint service. Allocation entry is a test-only stop; allocator tests cover
+// the subsequent real pool/slot capacity checks.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const {fixture} = require('../tests/simulator/cr6_contract_fixture');
@@ -12,6 +13,8 @@ const rejection = mint.match(/^TODO_CREATE_PKVERIFY_NOT_APPROVED:\n\s*(HARDFAULT
 assert.match(mint, /ide\.MintPool RW, ide\.PkVerify E/);
 assert.doesNotMatch(block, /EXACT|BRANCHEQ create_data_allocate/);
 assert.doesNotMatch(mint, /TODO_CREATE_PKVERIFY_AND_ALLOWANCE/);
+assert.doesNotMatch(mint, /TODO_CREATE_ALLOWANCE/);
+assert.match(block, /BRANCH create_data_allocate/);
 const verifierSource = fs.readFileSync(`${__dirname}/cloomc/pkverify.cloomc`, 'utf8');
 const verified = new Compiler().compile(verifierSource, []);
 assert.deepEqual(verified.errors, []);
@@ -23,7 +26,7 @@ for (const approved of [true, false]) {
     const verifier = approved ? install(32, assembled.buf.slice(1))
         : compile(32, 'IADD DR1, DR0, #0\nRETURNAL #12');
     const caller = compile(30, `${block.replace(/^\s*;.*$/gm, '')}
-TODO_CREATE_ALLOWANCE:
+create_data_allocate:
     IADD DR7, DR0, #99
     HALT
 TODO_CREATE_PKVERIFY_NOT_APPROVED:
@@ -50,10 +53,10 @@ TODO_CREATE_PKVERIFY_NOT_APPROVED:
     assert.equal(sim.dr[1], 0, 'verification must not report CREATE completion');
     if (approved) {
         assert.equal(fault, null);
-        assert.equal(sim.dr[7], 99, 'approved call reaches allowance boundary');
+        assert.equal(sim.dr[7], 99, 'approved call reaches allocation');
     } else {
         assert(fault, 'non-approved response must fault');
-        assert.equal(sim.dr[7], 0, 'rejected call cannot reach allowance boundary');
+        assert.equal(sim.dr[7], 0, 'rejected call cannot reach allocation');
     }
 }
 console.log('PASS: Mint CREATE calls PkVerify, resumes with DR6 intact, rejects non-approval');

@@ -77,7 +77,8 @@ const create = methods[0][2], destroy = methods[1][2];
 assert.doesNotMatch(create, /12-word|#257|CR4, #11|CR4, #10/);
 assert.match(create, /BFEXT DR4, DR2, #0, #3/);
 assert.match(create, /LOAD CR1, CR6, #4\s+CALL CR1, #0/);
-assert.match(create, /BRANCH TODO_CREATE_ALLOWANCE/);
+assert.match(create, /BRANCH create_data_allocate/);
+assert.doesNotMatch(create, /TODO_CREATE_ALLOWANCE/);
 assert.match(create, /TPERM CR4, NULL\s+BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL/);
 assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy/);
 assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,

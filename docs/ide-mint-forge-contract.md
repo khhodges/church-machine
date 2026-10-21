@@ -112,7 +112,9 @@ not executable implementations.
   HARDFAULT/fault-map direction in the master; exact lowering remains unverified.
 - **Phase 1 PkVerify exception:** `ide.PkVerify.Verify` unconditionally returns
   APPROVED (`DR1 = 1`), including for NULL or invalid credentials/proofs.
-  It does not read proof memory or perform allowance accounting. Other DRs,
+  Its APPROVED result is sufficient approval for Phase 1 CREATE allocation;
+  Mint must not add a separate allowance/quota gate. Pool capacity and free-slot
+  checks still apply. It does not read proof memory or perform allowance accounting. Other DRs,
   including Mint's requested size in DR6, are preserved; RETURN keeps CR2/CR3.
   This is an explicit Phase 1 stub, not evidence of real authentication.
   The credential-verification requirements below apply to the real verifier.
