@@ -230,7 +230,7 @@
             {...state.document.rows.find(r=>r.slot===slot), entryWord:slot*4,
                 ...(!state.dirty ? {proposedDescriptor:state.projection.rows.find(r=>r.slot===slot)} : {})};
         dialog(`Namespace slot ${slot} — design inspection`,
-            `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${slot?`<button class="btn" onclick="NamespaceDesignV1.authoring(${slot})">Edit authoring target</button>`:''}${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button><button class="btn" onclick="NamespaceDesignV1.assigned(${slot})">Open assigned LUMP</button>`:''}`);
+            `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button><button class="btn" onclick="NamespaceDesignV1.assigned(${slot})">Open assigned LUMP</button>`:''}`);
     }
     let sourceRequest = 0;
     function thread(slot) {
@@ -265,7 +265,7 @@
                 <dt>Sequence</dt><dd>${esc(row.sequence)}</dd><dt>Policy</dt><dd>${esc(row.policy)}</dd></dl>
                 <p>This label targets the hardware mapping, not a compiled LUMP.
                 Opening it does not read or write the device.</p>`;
-        } else if(row.authoring?.kind==='namespace-table' || row.kind==='namespace') {
+        } else if(row.kind==='namespace') {
             content+=`<h4>Namespace table target</h4><p>${slotCount()} slots; four words per
                 entry. Metadata: ${metadata().map(hex).join(' · ')}.</p>
                 <table><thead><tr><th>Slot</th><th>Target</th><th>Kind</th><th>Policy</th></tr></thead><tbody>${
@@ -283,14 +283,12 @@
             content+=`<h4>Namespace entry definition</h4><pre>${esc(JSON.stringify(row,null,2))}</pre>
                 <p>This entry definition is not executable source.</p>`;
         }
-        dialog(`${row.name} — Namespace target`,content+
-            `<button class="btn" onclick="NamespaceDesignV1.authoring(${row.slot})">Edit authoring target</button>`);
+        dialog(`${profileLabel()} · NS[${row.slot}] · ${row.name}`,content);
     }
     function missingTarget(row, detail) {
-        dialog(`${row.name} — authoring target unresolved`,
+        dialog(`${profileLabel()} · NS[${row.slot}] · ${row.name}`,
             `<p>${esc(detail)} No catalog or name-based replacement was selected. The editor and assigned artifact are unchanged.</p>
-            <button class="btn" onclick="NamespaceDesignV1.authoring(${row.slot})">Choose authoring target</button>
-            ${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.assigned(${row.slot})">Open assigned LUMP</button>`:''}`);
+            ${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${row.slot})">Select assigned LUMP</button>`:''}`);
     }
     async function source(slot, assignedArtifact=false) {
         const row=state.document.rows.find(r=>r.slot===slot);
@@ -303,30 +301,15 @@
         const requestId=++sourceRequest;
         const profile=state.profile, documentAtStart=state.document;
         const rowAtStart=JSON.stringify(row);
-        const target=assignedArtifact?{kind:'assigned-artifact'}:row.authoring;
-        if(!target) return missingTarget(row,'This Namespace entry has no authoring association.');
-        if(target.kind==='entry' || target.kind==='namespace-table')
-            return definitionTarget(row);
-        if(row.kind!=='lump' || !['source','assigned-artifact'].includes(target.kind))
-            return missingTarget(row,'The Namespace authoring association is invalid.');
+        if(row.kind!=='lump') return definitionTarget(row);
+        if(!row.selection || !row.selection.filename)
+            return missingTarget(row,'No LUMP assigned.');
         root._explicitEditorNavigationClaimed=true;
         const guard=root._captureEditorWriteGuard('open Namespace target: '+row.name);
         const accepts=()=>requestId===sourceRequest && state.active && state.profile===profile &&
             state.document===documentAtStart && state.document.rows.includes(row) &&
             JSON.stringify(row)===rowAtStart && guard.accepts();
         try {
-            if(target.kind==='source') {
-                if(!sourcePathValid(target.path)) throw Error('Invalid local .cloomc source path.');
-                if(typeof root.openSourceFile!=='function') throw Error('Source editor is unavailable.');
-                return await root.openSourceFile(target.path,
-                    {accepts,writeGuard:guard,showEditor:true,propagateError:true,
-                        savedBinary:row.selection && row.selection.filename ? {
-                            token:row.selection.token,filename:row.selection.filename,
-                            binary_hash:row.selection.binaryHash,lump_version:row.selection.revision,
-                            abstraction:row.name,authoring_source_path:target.path,
-                        } : null,
-                        reason:`NS[${slot}] ${row.name} explicitly targets ${target.path}. Review the source before replacing the editor; the label and source declaration may differ. The assigned Namespace LUMP is unchanged.`});
-            }
             const selected=row.selection || {};
             if(!/^[0-9a-f]{8}$/i.test(selected.token || '') ||
                 !/^[^/\\]+\.lump$/.test(selected.filename || '') || selected.filename.includes('..') ||
@@ -337,43 +320,13 @@
         } catch(error) {
             if(!accepts()) return;
             state.error='Open Namespace target failed: '+error.message+
-                ' Editor and Namespace placement were not replaced. Check the entry’s authoring target and retry.';
+                ' Editor and Namespace placement were not replaced. Check the assigned artifact and retry.';
             render();
         }
     }
     function assigned(slot) { return source(slot,true); }
     function authoring(slot) {
-        if(state.saving) return;
-        ++sourceRequest;
-        const row=state.document.rows.find(r=>r.slot===slot);
-        if(!row) return;
-        const documentAtStart=state.document, profile=state.profile, before=JSON.stringify(row);
-        const overlay=dialog(`${row.name} — edit authoring target`,
-            `<p>Choose what this Namespace label opens. This does not change its assigned LUMP, placement or running image.</p>
-            <label>Target <select id="nsAuthoringKind"><option value="">Unresolved (no association)</option>
-            ${row.kind==='lump'?'<option value="source">Editable source file (may be unfinished)</option><option value="assigned-artifact">Exact assigned LUMP</option>':''}
-            ${['lump','namespace'].includes(row.kind)?'<option value="namespace-table">This Namespace table</option>':''}
-            <option value="entry">This entry definition (MMIO / Thread / design)</option></select></label>
-            <p><label>Source path <input id="nsAuthoringPath" maxlength="512" style="width:100%" placeholder="simulator/examples/my_source.cloomc" value="${esc(row.authoring?.path || '')}"></label></p>
-            <p>Apply updates the draft only. Use Bind Namespace Design to review and persist it. Source files need not compile or have a saved LUMP.</p>
-            <p id="nsAuthoringError" role="alert"></p><button class="btn" id="nsAuthoringApply">Apply to draft</button>`);
-        const kind=overlay.querySelector('#nsAuthoringKind'), path=overlay.querySelector('#nsAuthoringPath');
-        kind.value=row.authoring?.kind || '';
-        kind.onchange=()=>{path.disabled=kind.value!=='source';};
-        kind.onchange();
-        overlay.querySelector('#nsAuthoringApply').onclick=()=>{
-            const error=overlay.querySelector('#nsAuthoringError');
-            if(state.saving || !state.active || state.profile!==profile || state.document!==documentAtStart ||
-                    !state.document.rows.includes(row) || JSON.stringify(row)!==before) {
-                error.textContent='The Namespace entry changed. Close and reopen this dialog before applying.';return;
-            }
-            if(kind.value==='source' && !sourcePathValid(path.value.trim())) {
-                error.textContent='Use a local simulator/*.cloomc path without traversal, URL parameters or fragments.';return;
-            }
-            if(kind.value) row.authoring={kind:kind.value,...(kind.value==='source'?{path:path.value.trim()}:{})};
-            else delete row.authoring;
-            overlay.remove();changed();
-        };
+        return source(slot);
     }
     function clear(slot) {
         if(state.saving) return;

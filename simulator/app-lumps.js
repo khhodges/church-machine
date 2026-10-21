@@ -8628,8 +8628,10 @@ async function openLumpInEditor(token, options) {
     // Resolve the actual editor bytes before asking a Namespace caller's
     // replacement consent. Exact binary inspection remains separate from an
     // owned navigation draft; neither may change underneath that review.
-    var _recoveredSource = _sourceResolution.source;
-    if (!_recoveredSource && Array.isArray(_sourceResolution.inspectionSources)) {
+    var _recoveredSource = options && options.namespaceAssignedOnly
+        ? (_browserFrameSource || '') : _sourceResolution.source;
+    if (!(options && options.namespaceAssignedOnly) &&
+            !_recoveredSource && Array.isArray(_sourceResolution.inspectionSources)) {
         var _draftSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
             return item && typeof item.source === 'string' && item.source.length > 0;
         });
@@ -8645,7 +8647,7 @@ async function openLumpInEditor(token, options) {
     // Its outgoing draft was preserved above under its own owner. Only an
     // overwrite of the same owned document needs the replacement comparison.
     if (options && options.confirmReplacement &&
-            _sameLumpToken(window._editorOpenLumpToken, token)) {
+            (options.namespaceAssignedOnly || _sameLumpToken(window._editorOpenLumpToken, token))) {
         var _reviewEditor = document.getElementById('asmEditor');
         var _reviewSource = _navigationBuffer && _editableSourceAvailable &&
             _navigationBuffer.original === _recoveredSource
@@ -8928,9 +8930,9 @@ async function openLumpInEditor(token, options) {
                 asmEd.parentNode.insertBefore(_sourceIntegrityBanner, asmEd);
             }
         } else if (!_sourceRestored) {
-            var _hasUnverifiedFallback =
+            var _hasUnverifiedFallback = !(options && options.namespaceAssignedOnly) &&
                 _sourceResolution.origin === 'unverified-fallback';
-            var _hasReconstructedSource =
+            var _hasReconstructedSource = !(options && options.namespaceAssignedOnly) &&
                 _sourceResolution.origin === 'reconstructed-source';
             asmEd.readOnly = !_editableSourceAvailable;
             asmEd.classList.toggle('cm-editor-sealed', !_editableSourceAvailable);
@@ -8944,17 +8946,19 @@ async function openLumpInEditor(token, options) {
                         '. This is an editable draft, not embedded artifact source, and is not proven to match this binary.'
                     : (_hasReconstructedSource
                         ? _sourceResolution.provenanceWarning
-                        : 'No authorized source or reconstructable exact code bytes are available. The source editor is sealed and empty.');
+                        : (options && options.namespaceAssignedOnly
+                            ? 'Source not included. The source editor is empty; Disassembly shows the exact assigned LUMP.'
+                            : 'No authorized source or reconstructable exact code bytes are available. The source editor is sealed and empty.'));
             var _sourceMissingParent = asmEd.parentNode && asmEd.parentNode.parentNode;
             if (_sourceMissingParent) _sourceMissingParent.insertBefore(_sourceMissingBanner, asmEd.parentNode);
             else if (asmEd.parentNode) asmEd.parentNode.insertBefore(_sourceMissingBanner, asmEd);
         }
-        if (_exactSelection && !_editableSourceAvailable) {
+        if (_exactSelection && !_editableSourceAvailable && !(options && options.namespaceAssignedOnly)) {
             var _noSourceBanner = document.getElementById('_lumpSourceIntegrityBanner') ||
                 document.getElementById('_lumpSourceMissingBanner');
             if (_noSourceBanner) {
                 _noSourceBanner.appendChild(document.createTextNode(
-                    ' The exact saved artifact has no editable source. You can create ' +
+                    ' Source not included. The exact saved artifact has no embedded editable source. You can create ' +
                     'a separate new source without installing or modifying these bytes. '));
                 var _newSourceButton = document.createElement('button');
                 _newSourceButton.className = 'btn btn-sm';

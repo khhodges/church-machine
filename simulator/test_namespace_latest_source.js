@@ -1,86 +1,64 @@
 'use strict';
-// Despite the historical filename, "latest" is NOT navigation authority.
-const assert=require('node:assert/strict'), fs=require('node:fs'), vm=require('node:vm');
+const assert=require('node:assert/strict'), fs=require('node:fs');
 const {JSDOM}=require('jsdom');
 const dom=new JSDOM('<textarea id="asmEditor"></textarea>',{runScripts:'outside-only'});
 const w=dom.window, editor=w.document.getElementById('asmEditor');
-let epoch=0, allow=true, pending, confirmations=0, paths=[], opens=[];
-const presentations=[];
-w._fetchAndPresentCommittedLump=async(...args)=>presentations.push(args);
+const opens=[];
+w.NamespaceProfileNames=require('./namespace-profile-names');
 w.updateNamespace=()=>{};
-w._captureEditorWriteGuard=()=>{
-    const mine=++epoch,text=editor.value;
-    return {accepts:()=>epoch===mine && editor.value===text};
-};
-w.confirmSourceReplacement=async()=>{confirmations++;return allow;};
-w.closeOpenFileDialog=()=>{};
-w.switchView=()=>{};
+w._captureEditorWriteGuard=()=>{const text=editor.value;return {accepts:()=>editor.value===text};};
 w._nsOpenDesignSelection=async(...args)=>opens.push(args);
-w.fetch=async url=>{
-    assert.ok(url.startsWith('/simulator/'), 'label navigation must not query a catalog');
-    paths.push(url);
-    if(pending) await pending;
-    return {ok:true,text:async()=>'unfinished source bytes'};
-};
-const shell=fs.readFileSync(__dirname+'/app-shell.js','utf8');
-w.eval(shell.slice(shell.indexOf('function openSourceFile(path, options)'),
-    shell.indexOf('// ── Save Source File')));
+w.openSourceFile=()=>{throw Error('Namespace must not open standalone files');};
 w.eval(fs.readFileSync(__dirname+'/namespace-design-v1.js','utf8'));
 const api=w.NamespaceDesignV1;
 api.state.projection={rows:[],warnings:[]};
-const selected={token:'4a000006',filename:'Old.lump',binaryHash:'a'.repeat(64),revision:98};
-api.state.document={rows:[{slot:6,name:'SelfTest',kind:'lump',selection:selected,
-    authoring:{kind:'source',path:'simulator/examples/custom_unfinished.cloomc'}}]};
-const row=api.state.document.rows[0], before=JSON.stringify(api.state.document);
+const selection={token:'4a000006',filename:'Old.lump',binaryHash:'a'.repeat(64),revision:98};
 (async()=>{
-    editor.value='owned draft'; allow=false;
-    await api.source(6);
-    assert.equal(editor.value,'owned draft','consent rejection must preserve the draft');
-    assert.equal(epoch,1,'one guard handed to real source opener');
-    assert.equal(presentations.length,0,'declined source replacement never attaches binary evidence');
-    allow=true;await api.source(6);
-    assert.equal(editor.value,'unfinished source bytes');
-    assert.equal(paths.at(-1),'/simulator/examples/custom_unfinished.cloomc',
-        'Namespace path wins even for known names and absent catalog entries');
-    assert.equal(confirmations,2);
-    assert.equal(presentations.length,1);
-    assert.equal(presentations[0][1].filename,selected.filename);
-    assert.equal(presentations[0][1].lump_version,98);
-    assert.equal(presentations[0][1].authoring_source_path,row.authoring.path);
-    assert.equal(presentations[0][2].source,editor.value);
-    await api.assigned(6);
-    assert.equal(opens[0][0].selection.filename,'Old.lump');
-    assert.equal(opens[0][0].selection.binaryHash,selected.binaryHash);
-    assert.equal(opens[0][2].accepts(),true);
-    assert.equal(JSON.stringify(api.state.document),before,'navigation preserves the exact placement');
-    for(const invalidate of [
-        ()=>{editor.value='typing during fetch';},
-        ()=>{row.authoring.path='simulator/examples/changed.cloomc';},
-        ()=>api.setProfile('legacy'),
-        ()=>api.inspect(6),
-        ()=>{api.state.document=JSON.parse(before);},
-    ]) {
-        api.state.active=true;api.state.profile='ascending';
-        api.state.document={rows:[row]};row.authoring.path='simulator/examples/custom_unfinished.cloomc';
-        editor.value='race draft';
-        let release;pending=new Promise(resolve=>release=resolve);
-        const opening=api.source(6);invalidate();
-        const held=editor.value, n=confirmations;release();await opening;pending=null;
-        assert.equal(editor.value,held);assert.equal(confirmations,n,'stale requests never ask to overwrite');
+    for(const profile of ['ascending','phase1']) {
+        api.state.profile=profile;
+        api.state.document={rows:[{slot:6,name:'SelfTest',kind:'lump',selection,
+            authoring:{kind:'source',path:'simulator/examples/other.cloomc'}}]};
+        editor.value='owned draft';
+        await api.source(6);
+        assert.equal(opens.at(-1)[0].selection.filename,'Old.lump');
+        assert.equal(opens.at(-1)[2].confirmReplacement,true);
+        assert.equal(opens.at(-1)[2].accepts(),true);
+        editor.value='later edit';
+        assert.equal(opens.at(-1)[2].accepts(),false);
+        assert.equal(editor.value,'later edit');
+        delete api.state.document.rows[0].authoring;
+        await api.assigned(6);
+        assert.equal(opens.at(-1)[0].selection.revision,98);
+        api.state.document.rows[0].selection={};
+        await api.source(6);
+        assert.match(w.document.body.textContent,/No LUMP assigned/);
+        assert.doesNotMatch(w.document.body.textContent,/Choose authoring target/);
+        api.state.document.rows=[{slot:2,name:'Boot.Thread',kind:'thread',words:256}];
+        await api.source(2);
+        assert.match(w.document.body.textContent,/Thread target/);
     }
-    api.state.document={rows:[row]};
-    delete row.authoring;
-    const n=paths.length;
-    await api.source(6);
-    assert.match(w.document.body.textContent,/no authoring association/);
-    assert.equal(paths.length,n,'saved rows without associations never infer a source');
-    row.authoring={kind:'assigned-artifact'};
-    await api.source(6);
-    assert.equal(opens.at(-1)[0].selection.filename,'Old.lump');
-    row.selection={};
-    await api.source(6);
-    assert.match(w.document.body.textContent,/lacks a complete/);
-    assert.equal(paths.length,n,'missing exact identity never falls back to catalog');
+    // Independent source files still use File Open, without any LUMP lookup.
+    let confirmed=0;
+    w.confirmSourceReplacement=async()=>{confirmed++;return true;};
+    w.closeOpenFileDialog=()=>{};
+    w.fetch=async()=>({ok:true,text:async()=>'; independent file'});
+    const shell=fs.readFileSync(__dirname+'/app-shell.js','utf8');
+    w.eval(shell.slice(shell.indexOf('function openSourceFile(path, options)'),
+        shell.indexOf('// ── Save Source File')));
+    await w.openSourceFile('simulator/examples/alice.cloomc');
+    assert.equal(editor.value,'; independent file');
+    assert.equal(confirmed,1);
+    const memory=fs.readFileSync(__dirname+'/app-memory.js','utf8');
+    w.eval(memory.slice(memory.indexOf('function _nsLabelOpen('),
+        memory.indexOf('// Dedicated read-only popup')));
+    api.state.active=false;
+    w._nsState={abstractions:[{slot:16,name:'ide.Alice',token:'12345678',
+        filename:'Alice.old.lump',binary_hash:'b'.repeat(64),lump_version:3}]};
+    w.openLumpInEditor=(token,options)=>{opens.push([token,options]);};
+    w._nsLabelOpen(16);
+    assert.equal(opens.at(-1)[1].exactSavedArtifact.filename,'Alice.old.lump');
+    assert.equal(opens.at(-1)[1].namespaceAssignedOnly,true);
+    assert.equal(opens.at(-1)[1].confirmReplacement,true);
     dom.window.close();
-    console.log('PASS Namespace-owned targets, real replacement consent, exact selections, no catalog and navigation races');
-})().catch(error=>{dom.window.close();console.error(error);process.exitCode=1;});
+    console.log('PASS exact Namespace label targets, missing assignments, draft guards, and independent File Open');
+})().catch(e=>{dom.window.close();console.error(e);process.exitCode=1;});

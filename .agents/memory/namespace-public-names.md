@@ -11,3 +11,15 @@ then explicitly requested standardization on the dropdown names.
 
 **How to apply:** Keep storage keys and saved selections unchanged. Reuse the
 shared public labels and test them against the dropdown options.
+
+Namespace labels and version links open the exact assigned LUMP, never a
+separately associated source file or a newer library revision. Non-LUMP labels
+open their object definitions. Missing assignments and missing embedded source
+must be explicit. Standalone .cloomc files remain accessible through File Open.
+
+**Why:** The user rejected competing source-file and saved-LUMP label meanings,
+and explicitly approved independent files only through File Open.
+
+**How to apply:** Ignore historical authoring associations for label navigation
+without deleting those files or rewriting saved assignments. Preserve drafts
+and keep navigation separate from compilation, simulation, and hardware.

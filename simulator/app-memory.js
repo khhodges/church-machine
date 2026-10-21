@@ -180,36 +180,11 @@ function _nsExactSavedVersionIdentity(assigned) {
 window._nsExactSavedVersionIdentity = _nsExactSavedVersionIdentity;
 
 function _nsOpenSavedVersion(slot) {
-    // Slot zero has no ordinary saved-LUMP version.  Some legacy Namespace
-    // state contains token 00000000/version metadata; never turn that into a
-    // binary lookup or present it as artifact identity.
-    if (Number(slot) === 0) {
-        _showBootROMInspector();
+    if (window.NamespaceDesignV1?.state.active) {
+        window.NamespaceDesignV1.source(Number(slot));
         return true;
     }
-    const design = window.NamespaceDesignV1;
-    const designActive = design && design.state.active;
-    const rows = designActive
-        ? (design.state.document?.rows || []).map(row => ({
-            ...row,
-            token: row.selection?.token,
-            filename: row.selection?.filename,
-            binary_hash: row.selection?.binaryHash,
-            lump_version: row.selection?.revision,
-        }))
-        : window._nsState && Array.isArray(window._nsState.abstractions)
-        ? window._nsState.abstractions : [];
-    const assigned = rows.find(function(row) {
-        return row && Number(row.slot) === Number(slot);
-    });
-    const identity = _nsExactSavedVersionIdentity(assigned);
-    if (!identity || typeof window._openSavedLumpVersionDetails !== 'function') {
-        return false;
-    }
-    // This existing read-only navigation validates filename + binary hash and
-    // opens this exact committed revision; it never follows the token to latest.
-    window._openSavedLumpVersionDetails(identity);
-    return true;
+    return _nsLabelOpen(Number(slot));
 }
 window._nsOpenSavedVersion = _nsOpenSavedVersion;
 
@@ -6380,12 +6355,38 @@ window._nsTableSave = async function(btn) {
 // Installed LUMPs retain their existing detail popup. Labels without an
 // implementation start the canonical assembler proforma under that name.
 function _nsLabelOpen(slotIdx) {
+    if (window.NamespaceDesignV1?.state.active) {
+        return window.NamespaceDesignV1.source(Number(slotIdx));
+    }
+    const assigned = window._nsState?.abstractions?.find(row => Number(row.slot) === Number(slotIdx));
+    if (assigned && (assigned.filename || assigned.lump_version != null)) {
+        return _nsOpenDesignSelection({
+            name: assigned.name,
+            selection: {token:assigned.token,filename:assigned.filename,
+                binaryHash:assigned.binary_hash,revision:assigned.lump_version},
+        }, slotIdx, {confirmReplacement:true});
+    }
     if (!sim) return;
     // This check deliberately precedes symbolic/catalog/source lookup.  NS[0]
     // is Namespace-table data; the executable shown for it is the separate
     // fixed boot ROM, which has no saved token-zero binary to fetch.
     if (Number(slotIdx) === 0) {
-        _showBootROMInspector();
+        const old = document.getElementById('_nsLumpModalOverlay');
+        if (old) old.remove();
+        const overlay = document.createElement('div');
+        overlay.id = '_nsLumpModalOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:#000b;z-index:10001;display:grid;place-items:center;';
+        const panel = document.createElement('div');
+        panel.style.cssText = 'background:#12121f;color:#ddd;padding:24px;max-width:80vw;max-height:80vh;overflow:auto;';
+        const title = document.createElement('h3');
+        title.textContent = window.NamespaceProfileNames.label('legacy') + ' · NS[0] · Boot.NS';
+        const definition = document.createElement('pre');
+        definition.textContent = JSON.stringify(assigned || sim.readNSEntry(slotIdx), null, 2);
+        const close = document.createElement('button');
+        close.textContent = 'Close';
+        close.onclick = () => overlay.remove();
+        panel.append(title, definition, close); overlay.append(panel);
+        document.body.append(overlay);
         return;
     }
     const e = sim.readNSEntry(slotIdx);
@@ -6396,32 +6397,17 @@ function _nsLabelOpen(slotIdx) {
         ? sim.symbolicEntryAt(slotIdx)
         : null;
     if (symbolic && symbolic.implementationMissing) {
-        if (symbolic.selection) {
-            return _nsOpenDesignSelection(symbolic, slotIdx);
-        }
-        if (typeof newAbstraction === 'function') newAbstraction(symbolic.name || rawLabel);
-        else if (typeof switchView === 'function') switchView('editor');
-        return;
+        return _nsOpenDesignSelection(symbolic, slotIdx);
     }
     if (_isThreadNamespaceSlot(slotIdx, e)) {
         _showNSThreadModal(slotIdx);
-        return;
-    }
-    const srcLump = typeof _findSrcLump === 'function'
-        ? _findSrcLump(slotIdx, rawLabel)
-        : null;
-    if (srcLump && srcLump.token) {
-        const options = srcLump._simulationBound ? {exactSavedArtifact:srcLump} : undefined;
-        if (typeof openLumpInEditor === 'function') openLumpInEditor(srcLump.token, options);
-        else if (window.openLumpInEditor) window.openLumpInEditor(srcLump.token, options);
         return;
     }
     if (e && e.gtType === 1) {
         _showNSLumpModal(slotIdx, e);
         return;
     }
-    if (typeof newAbstraction === 'function') newAbstraction(rawLabel);
-    else if (typeof switchView === 'function') switchView('editor');
+    return _nsOpenDesignSelection({name:rawLabel,selection:{}},slotIdx);
 }
 
 function _nsOpenDesignSelection(symbolic, slot, options) {
@@ -6436,6 +6422,7 @@ function _nsOpenDesignSelection(symbolic, slot, options) {
         // Filename and digest pin the revision even when a token is reused.
         return openLumpInEditor(selection.token, {
             ...options,
+            namespaceAssignedOnly: true,
             exactSavedArtifact: {
                 token: selection.token,
                 filename: selection.filename,
@@ -6454,19 +6441,12 @@ function _nsOpenDesignSelection(symbolic, slot, options) {
     const detail = document.createElement('p');
     detail.textContent = selection.filename
         ? `The selected saved artifact ${selection.filename} has no complete filename/token/SHA-256 identity, so a different revision cannot safely be opened. ${selection.diagnostic}`
-        : `No saved artifact is bound. ${selection.diagnostic}`;
-    const create = document.createElement('button');
-    create.className = 'btn';
-    create.textContent = 'Create source in New editor';
-    create.onclick = async () => {
-        if (typeof newAbstraction === 'function' &&
-                await newAbstraction(symbolic.name)) overlay.remove();
-    };
+        : 'No LUMP assigned.';
     const close = document.createElement('button');
     close.className = 'btn';
     close.textContent = 'Keep current editor';
     close.onclick = () => overlay.remove();
-    panel.append(heading, detail, create, close);
+    panel.append(heading, detail, close);
     overlay.appendChild(panel);
     document.body.appendChild(overlay);
 }

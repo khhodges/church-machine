@@ -56,6 +56,11 @@ context.window._nsState = { abstractions: [assigned] };
 context.window._openSavedLumpVersionDetails = identity => {
     openedIdentity = identity;
 };
+context._nsLabelOpen = slot => {
+    openedIdentity = context._nsExactSavedVersionIdentity(
+        context.window._nsState.abstractions.find(row=>row.slot===slot));
+    return !!openedIdentity;
+};
 assert.strictEqual(context._nsOpenSavedVersion(7), true);
 assert.deepStrictEqual(JSON.parse(JSON.stringify(openedIdentity)), {
     slot: 7,
@@ -73,6 +78,11 @@ for (const profile of ['ascending', 'phase1']) {
             token:'abcdef12',filename:'Alice.v9.lump',binaryHash:'9'.repeat(64),revision:9,
         },
     }]}}};
+    context.window.NamespaceDesignV1.source = slot => {
+        const row = context.window.NamespaceDesignV1.state.document.rows.find(r=>r.slot===slot);
+        openedIdentity = row ? {filename:row.selection.filename,lump_version:row.selection.revision,
+            abstraction:row.name} : null;
+    };
     assert.strictEqual(context._nsOpenSavedVersion(7), true);
     assert.equal(openedIdentity.filename, 'Alice.v9.lump');
     assert.equal(openedIdentity.lump_version, 9);
@@ -82,8 +92,8 @@ for (const profile of ['ascending', 'phase1']) {
         binary_hash:'9'.repeat(64),lump_version:9,
     },null,7).includes('>v9</a>'));
     context.window.NamespaceDesignV1.state.document.rows = [];
-    assert.strictEqual(context._nsOpenSavedVersion(7), false,
-        'missing design selection must not fall back to the legacy Namespace');
+    context._nsOpenSavedVersion(7);
+    assert.equal(openedIdentity,null,'missing design selection must not fall back to legacy');
 }
 delete context.window.NamespaceDesignV1;
 
