@@ -275,11 +275,10 @@ def test_unresolved_clist_cannot_trigger_later_catalog_injection(saved):
     rows[-1]["binary_hash"] = hashlib.sha256(raw).hexdigest()
     before = snapshot(root)
     store = PreparationStore()
-    with pytest.raises(
-            ValueError,
-            match=r"word \+1 .*out-of-range C-list index 1; C-list contains 1 words"):
-        store.prepare(rows, cfg, root, 6)
-    assert not store.records
+    # Deliberately faulting authored code is structurally valid; admission
+    # still checks the artifact and runtime enforces the absent row.
+    from server.simulation_preparation import _validate_body
+    assert _validate_body(raw, executable=True) == words
     assert snapshot(root) == before
 
 

@@ -1,0 +1,17 @@
+; Runs only in Alice's prepared Thread. CR1 starts with ide.Alice E.
+abstraction ide.AliceDriver {
+    capabilities { SELF E, ide.Alice E, Boot.Thread }
+    method Run() {
+        IADD DR1, DR0, #731
+        CALL CR1, #0
+        LOAD CR1, CR6, #1
+        IADD DR1, DR0, #0
+        CALL CR1, #1
+        ISUB DR3, DR1, #731
+        BRANCHNE Failed
+        LOAD CR2, CR6, #2
+        CHANGE CR2
+    Failed:
+        HALT
+    }
+}

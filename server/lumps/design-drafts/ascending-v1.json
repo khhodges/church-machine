@@ -1,0 +1,260 @@
+{
+  "capacityWords": 16384,
+  "format": "ascending-nst-metadata-slot0-v1",
+  "outputProfile": "api",
+  "rows": [
+    {
+      "authoring": {
+        "kind": "namespace-table"
+      },
+      "kind": "namespace",
+      "name": "Boot.NS",
+      "policy": "Resident",
+      "sequence": 0,
+      "slot": 1
+    },
+    {
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "thread",
+      "name": "Boot.Thread",
+      "policy": "Resident",
+      "sequence": 0,
+      "slot": 2,
+      "words": 256
+    },
+    {
+      "address": 1073741824,
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "mmio",
+      "limit": 4,
+      "name": "LED_DEV",
+      "policy": "Hardware",
+      "sequence": 0,
+      "slot": 3
+    },
+    {
+      "address": 1073741864,
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "mmio",
+      "limit": 0,
+      "name": "BTN_DEV",
+      "policy": "Hardware",
+      "sequence": 0,
+      "slot": 4
+    },
+    {
+      "address": 1073741868,
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "mmio",
+      "limit": 4,
+      "name": "TIMER_DEV",
+      "policy": "Hardware",
+      "sequence": 0,
+      "slot": 5
+    },
+    {
+      "authoring": {
+        "kind": "assigned-artifact"
+      },
+      "boot": false,
+      "kind": "lump",
+      "name": "ide.WukongCallHome",
+      "policy": "Resident",
+      "selection": {
+        "binaryHash": "6af835f829b21b37e2074fcb0cb45a8d77e9c18e4cde1b653c5dd7d16d091f89",
+        "filename": "ide.WukongCallHome.1.8d0a25eb.lump",
+        "revision": 1,
+        "token": "eca30d09"
+      },
+      "sequence": 0,
+      "slot": 7
+    },
+    {
+      "address": 1073741844,
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "mmio",
+      "limit": 2,
+      "name": "UART_DEV",
+      "policy": "Hardware",
+      "sequence": 1,
+      "slot": 8
+    },
+    {
+      "authoring": {
+        "kind": "assigned-artifact"
+      },
+      "boot": false,
+      "kind": "lump",
+      "name": "ide.CapabilityTest",
+      "policy": "Resident",
+      "selection": {
+        "binaryHash": "d60fd9a9e708e78c11e8fb68df35cbabf4fcf939e4bc050f55b0aaf374fbfc2a",
+        "filename": "ide.CapabilityTest.1.210178c8.lump",
+        "revision": 6,
+        "token": "a77ae025"
+      },
+      "sequence": 0,
+      "slot": 10
+    },
+    {
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "thread",
+      "name": "Thread.2",
+      "policy": "Resident",
+      "sequence": 0,
+      "slot": 11,
+      "words": 256,
+      "preparedThread": {
+        "entrySlot": 18,
+        "actorSlot": 16
+      }
+    },
+    {
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "thread",
+      "name": "Thread.3",
+      "policy": "Resident",
+      "sequence": 0,
+      "slot": 12,
+      "words": 256,
+      "preparedThread": {
+        "entrySlot": 19,
+        "actorSlot": 17
+      }
+    },
+    {
+      "address": 4294967068,
+      "authoring": {
+        "kind": "entry"
+      },
+      "kind": "mmio",
+      "limit": 0,
+      "name": "M_BIT_DEV",
+      "policy": "Hardware",
+      "sequence": 0,
+      "slot": 13
+    },
+    {
+      "authoring": {
+        "kind": "assigned-artifact"
+      },
+      "kind": "lump",
+      "name": "SelfTest",
+      "policy": "Resident",
+      "selection": {
+        "binaryHash": "7063b718007e06115755042a302d957c0d85a7c941085c3837d66955caec3f02",
+        "filename": "SelfTest.1.fcf2c79d.lump",
+        "revision": 99,
+        "token": "bb1e4bed"
+      },
+      "sequence": 0,
+      "slot": 6,
+      "boot": false
+    },
+    {
+      "slot": 16,
+      "name": "ide.Alice",
+      "kind": "lump",
+      "policy": "Resident",
+      "sequence": 0,
+      "authoring": {
+        "kind": "source",
+        "path": "simulator/examples/alice.cloomc"
+      },
+      "selection": {
+        "filename": "ide.Alice.1.d5125806.lump",
+        "binaryHash": "8731f955d27511124420a4f51e54edbf87be6c155dbac83c994707d299723beb",
+        "token": "07eae44c",
+        "revision": 3
+      },
+      "boot": false
+    },
+    {
+      "slot": 17,
+      "name": "ide.Mallory",
+      "kind": "lump",
+      "policy": "Resident",
+      "sequence": 0,
+      "authoring": {
+        "kind": "source",
+        "path": "simulator/examples/mallory.cloomc"
+      },
+      "selection": {
+        "filename": "ide.Mallory.1.32e361e7.lump",
+        "binaryHash": "48f7dfad015b6b4919140e7c652b6dace935caa4cc0bf09a715ee4ffb4931556",
+        "token": "81c3e0ab",
+        "revision": 2
+      },
+      "boot": false
+    },
+    {
+      "slot": 18,
+      "name": "ide.AliceDriver",
+      "kind": "lump",
+      "policy": "Resident",
+      "sequence": 0,
+      "authoring": {
+        "kind": "source",
+        "path": "simulator/examples/alice_driver.cloomc"
+      },
+      "selection": {
+        "filename": "ide.AliceDriver.1.947b2f4e.lump",
+        "binaryHash": "e90f75619d7e12971ee6aed5f6942b298c054c912a2428717f56f00dfbfccc1b",
+        "token": "a14e4cc4",
+        "revision": 1
+      },
+      "boot": false
+    },
+    {
+      "slot": 19,
+      "name": "ide.MalloryDriver",
+      "kind": "lump",
+      "policy": "Resident",
+      "sequence": 0,
+      "authoring": {
+        "kind": "source",
+        "path": "simulator/examples/mallory_driver.cloomc"
+      },
+      "selection": {
+        "filename": "ide.MalloryDriver.1.eecf23b5.lump",
+        "binaryHash": "64683b9012337ed469d896c6b0ea5679bea23e67be5f6a2a9ad0b74349393b2e",
+        "token": "e130670b",
+        "revision": 1
+      },
+      "boot": false
+    },
+    {
+      "slot": 20,
+      "name": "ide.ActorManager",
+      "kind": "lump",
+      "policy": "Resident",
+      "sequence": 0,
+      "authoring": {
+        "kind": "source",
+        "path": "simulator/examples/actor_manager.cloomc"
+      },
+      "selection": {
+        "filename": "ide.ActorManager.1.b3c47cab.lump",
+        "binaryHash": "ae8785cd0c6b27d4f978825619102ec23f8d42a92b2743cdf4fc0245d7e4f2f3",
+        "token": "27e9e494",
+        "revision": 1
+      },
+      "boot": true
+    }
+  ],
+  "slotCount": 64
+}

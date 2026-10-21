@@ -1,0 +1,8 @@
+; Runs only in Mallory's prepared Thread. CR1 starts with ide.Mallory E.
+abstraction ide.MalloryDriver {
+    capabilities { SELF E }
+    method Run() {
+        CALL CR1, #0
+        HALT
+    }
+}

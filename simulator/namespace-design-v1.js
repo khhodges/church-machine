@@ -233,6 +233,27 @@
             `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${slot?`<button class="btn" onclick="NamespaceDesignV1.authoring(${slot})">Edit authoring target</button>`:''}${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button><button class="btn" onclick="NamespaceDesignV1.assigned(${slot})">Open assigned LUMP</button>`:''}`);
     }
     let sourceRequest = 0;
+    function thread(slot) {
+        const row=state.document.rows.find(r=>r.slot===slot);
+        if(!row || row.kind!=='thread' || slot===2 || state.saving) return;
+        const options=selected=>state.document.rows.filter(r=>r.kind==='lump' && r.policy==='Resident' && r.selection)
+            .map(r=>`<option value="${r.slot}" ${r.slot===selected?'selected':''}>${esc(r.name)} · NS[${r.slot}]</option>`).join('');
+        dialog(`${row.name} — prepared continuation`,
+            `<p>Choose the driver resumed in CR0 and the actor E capability placed in CR1. This changes only the draft; Save design before preparing simulation.</p>
+            <label>Driver <select id="preparedThreadDriver">${options(row.preparedThread?.entrySlot)}</select></label>
+            <label>Actor <select id="preparedThreadActor">${options(row.preparedThread?.actorSlot)}</select></label>
+            <button class="btn" onclick="NamespaceDesignV1.setThread(${slot})">Use these bindings</button>`);
+    }
+    function setThread(slot) {
+        const row=state.document.rows.find(r=>r.slot===slot);
+        if(!row || row.kind!=='thread' || slot===2 || state.saving) return;
+        const entrySlot=Number(document.getElementById('preparedThreadDriver').value);
+        const actorSlot=Number(document.getElementById('preparedThreadActor').value);
+        if(!entrySlot || !actorSlot) return;
+        row.preparedThread={entrySlot,actorSlot};
+        document.getElementById('namespaceDesignDialog').remove();
+        changed();
+    }
     const sourcePathValid = path => typeof path==='string' && path.length<=512 &&
         /^simulator\/(?:[A-Za-z0-9_-][A-Za-z0-9_.-]*\/)*[A-Za-z0-9_-][A-Za-z0-9_.-]*\.cloomc$/.test(path);
     function definitionTarget(row) {
@@ -255,7 +276,9 @@
         } else if(row.kind==='thread') {
             content+=`<h4>Thread target</h4><p>Allocation: ${esc(row.words)} words.
                 Sequence: ${esc(row.sequence)}. Policy: ${esc(row.policy)}.</p>
-                <p>This is a configured Thread object, not an executable abstraction's source.</p>`;
+                <p>This is a configured Thread object, not an executable abstraction's source.</p>
+                ${row.preparedThread?`<p>Driver: NS[${row.preparedThread.entrySlot}] · Actor E in CR1: NS[${row.preparedThread.actorSlot}]</p>`:''}
+                ${row.slot!==2?`<button class="btn" onclick="NamespaceDesignV1.thread(${row.slot})">Prepare driver and actor</button>`:''}`;
         } else {
             content+=`<h4>Namespace entry definition</h4><pre>${esc(JSON.stringify(row,null,2))}</pre>
                 <p>This entry definition is not executable source.</p>`;
@@ -502,7 +525,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision};
+    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');

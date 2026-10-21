@@ -261,13 +261,13 @@ def _decode_gt(word):
 
 
 def build_fresh_thread_lump(*, allocation_words, stack_words, entry_slot,
-                            entry_sequence):
+                            entry_sequence, actor_slot=None, actor_sequence=0):
     """Build a zero-initialized Thread with an explicit fresh entry continuation."""
     size = _integer(allocation_words, "Thread allocationWords")
     stack = _integer(stack_words, "Thread stackWords")
     target_slot = _integer(entry_slot, "Thread entry slot")
     target_sequence = _integer(entry_sequence, "Thread entry sequence")
-    if target_slot == 0 or target_sequence > 511:
+    if not 0 < target_slot <= 65535 or target_sequence > 511:
         raise ValueError("Fresh Thread entry binding is outside the GT fields")
     layout = boot.thread_layout(size, stack)
     if not layout["valid"]:
@@ -281,6 +281,12 @@ def build_fresh_thread_lump(*, allocation_words, stack_words, entry_slot,
     resume_sto = root_sto - 2
     words[boot.THREAD_STO_OFFSET] = (1 << 12) | resume_sto
     words[layout["caps_start"]] = entry_gt
+    if actor_slot is not None:
+        actor_slot = _integer(actor_slot, "Thread actor slot")
+        actor_sequence = _integer(actor_sequence, "Thread actor sequence")
+        if not 0 < actor_slot <= 65535 or actor_sequence > 511:
+            raise ValueError("Prepared Thread actor binding is outside the GT fields")
+        words[layout["caps_start"] + 1] = boot.create_gt(actor_sequence, actor_slot, {"E": 1}, 1)
     # STO is the next free stack word. CHANGE reads its two-word resume
     # frame at STO+1/STO+2, just as CALL/RETURN do.
     words[resume_sto + 1] = entry_gt
@@ -306,6 +312,11 @@ def _fresh_thread_words(raw, label):
         raise ValueError(f"{label}: fresh Thread image has invalid private layout")
     entry_gt = words[layout["caps_start"]]
     fields = _decode_gt(entry_gt)
+    actor_gt = words[layout["caps_start"] + 1]
+    actor = _decode_gt(actor_gt) if actor_gt else None
+    if actor and (actor_gt >> 31 or actor["type"] != 1 or actor["domain"] != 1
+                  or actor["permissions"] != 0b100):
+        raise ValueError(f"{label}: prepared Thread CR1 is not an executable Inform GT")
     if (entry_gt >> 31 or fields["type"] != 1 or fields["domain"] != 1
             or fields["permissions"] != 0b100):
         raise ValueError(f"{label}: fresh Thread CR0 is not an executable Inform GT")
@@ -313,7 +324,9 @@ def _fresh_thread_words(raw, label):
         f">{len(words)}I",
         build_fresh_thread_lump(
             allocation_words=len(words), stack_words=stack_words,
-            entry_slot=fields["slot"], entry_sequence=fields["sequence"]))
+            entry_slot=fields["slot"], entry_sequence=fields["sequence"],
+            actor_slot=actor["slot"] if actor else None,
+            actor_sequence=actor["sequence"] if actor else 0))
     if tuple(words) != expected:
         raise ValueError(f"{label}: Thread image is not a zero-state fresh continuation")
     return words, fields, layout
@@ -440,12 +453,26 @@ def validate_image(image, *, image_format):
             if (target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0
                     or target_cw == 0 or destination["location"] + target_size > total):
                 raise ValueError(f"NS[{slot}] fresh Thread continuation target is not executable code")
+            actor_gt = body[layout["caps_start"] + 1]
+            actor_fields = _decode_gt(actor_gt) if actor_gt else None
+            if actor_fields:
+                actor = live.get(actor_fields["slot"])
+                if (not actor or actor_fields["slot"] < 3
+                        or actor["sequence"] != actor_fields["sequence"]
+                        or actor["location"] >= total):
+                    raise ValueError(f"NS[{slot}] prepared Thread actor does not bind to a live destination")
+                actor_header = words[actor["location"]]
+                if (actor_header >> 27 != 31 or ((actor_header >> 8) & 3) != 0
+                        or not ((actor_header >> 10) & 8191)):
+                    raise ValueError(f"NS[{slot}] prepared Thread actor is not executable code")
             thread_rows.append({
                 "slot": slot, "sequence": entry["sequence"],
                 "entrySlot": target_fields["slot"],
                 "entrySequence": target_fields["sequence"],
                 "allocationWords": size,
                 "stackWords": layout["stack_words"],
+                **({"actorSlot": actor_fields["slot"], "actorSequence": actor_fields["sequence"]}
+                   if actor_fields else {}),
             })
             body_ranges.append((location, location + size, f"NS[{slot}] fresh Thread"))
             continue
@@ -558,7 +585,8 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
             binding = row.get("freshThreadImage")
             if not isinstance(binding, dict):
                 raise ValueError(f"NS[{slot}] Thread requires an explicit fresh image binding")
-            if (binding.get("format") != "fresh-thread-continuation-v1"
+            explicit = binding.get("format") == "prepared-thread-actor-v2"
+            if (binding.get("format") not in ("fresh-thread-continuation-v1", "prepared-thread-actor-v2")
                     or _integer(binding.get("destinationSlot"), "Thread destination slot") != slot
                     or _integer(binding.get("destinationSequence"), "Thread destination sequence") != sequence):
                 raise ValueError(f"NS[{slot}] fresh Thread image does not bind to its exact destination identity")
@@ -566,7 +594,7 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
             expected_entry_name = (
                 "CapabilityTest" if ordinal_text.isdigit() and int(ordinal_text) <= 3
                 else "SelfTest")
-            if binding.get("entryName") not in (expected_entry_name, "ide." + expected_entry_name):
+            if not explicit and binding.get("entryName") not in (expected_entry_name, "ide." + expected_entry_name):
                 raise ValueError(
                     f"NS[{slot}] fresh Thread must explicitly target {expected_entry_name}")
             captest = next((candidate for candidate in by_slot.values()
@@ -580,10 +608,17 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
                     or _integer(binding.get("entrySequence"), "Thread entry sequence") != entry_sequence):
                 raise ValueError(
                     f"NS[{slot}] fresh Thread has a stale {expected_entry_name} binding")
+            actor = by_slot.get(binding.get("actorSlot")) if explicit else None
+            if explicit and (not actor or actor.get("type") not in ("Inform", "Resident")
+                    or actor.get("name") != binding.get("actorName")
+                    or actor.get("seq") != binding.get("actorSequence")):
+                raise ValueError(f"NS[{slot}] prepared Thread has a stale actor binding")
             expected = build_fresh_thread_lump(
                 allocation_words=_integer(row.get("allocationWords"), "Thread allocationWords"),
                 stack_words=_integer(row.get("stackWords"), "Thread stackWords"),
-                entry_slot=entry_slot, entry_sequence=entry_sequence)
+                entry_slot=entry_slot, entry_sequence=entry_sequence,
+                actor_slot=actor["slot"] if actor else None,
+                actor_sequence=actor["seq"] if actor else 0)
             actual = struct.pack(f">{len(body)}I", *body)
             if typ != 2 or actual != expected or _sha(actual) != binding.get("sha256"):
                 raise ValueError(f"NS[{slot}] Thread bytes do not match the fresh destination initializer")

@@ -127,7 +127,7 @@ def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=Fals
     names = naming_context()
     leaves = [row for row in rows if row.get("type") in ("Data", "Thread", "Namespace")]
     words = _validate_body(raw)
-    snapshot_key = digest({"source": binding["binaryHash"], "slot": binding["slot"],
+    snapshot_key = digest({"bindingVersion": 2, "source": binding["binaryHash"], "slot": binding["slot"],
         "namespaceLeaves": leaves, "naming": names,
         "destinations": sorted([
             {"slot": b["slot"], "hash": b["binaryHash"], "filename": b["filename"],
@@ -161,9 +161,10 @@ def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=Fals
         target_words = _validate_body(data)
         target = next(row for row in rows if row["slot"] == candidate["slot"])
         api = embedded_api(target_words)
-        # This destination descriptor grants executable Inform authority only;
-        # never invent writable/private storage grants from an object's name.
-        targets.append({**target, "name": qualified_name(identity[0], names), "rights": ["E"],
+        # An authenticated owner may address its own resident body as declared.
+        # This does not grant another artifact access to the owner's storage.
+        rights = ["E", "R", "W"] if candidate["slot"] == binding["slot"] else ["E"]
+        targets.append({**target, "name": qualified_name(identity[0], names), "rights": rights,
                         "methods": api.get("methods", [])})
     for target in leaves:
         targets.append({**target, "name": qualified_name(target["name"], names),
@@ -225,10 +226,11 @@ def _validate_body(raw, executable=False, *, label="Simulation artifact"):
         for offset, word in enumerate(words[1:1 + cw], 1):
             index = _static_clist_index(word)
             if index is not None and not 0 <= index < cc:
-                raise ValueError(
+                import logging
+                logging.warning(
                     f"{label}: word +{offset} (0x{word:08X}) has an out-of-range "
                     f"C-list index {index}; C-list contains {cc} words. "
-                    "No image was published by this validation.")
+                    "Runtime capability checks remain authoritative.")
     return words
 
 

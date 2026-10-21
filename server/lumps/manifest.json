@@ -1906,5 +1906,45 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "36ecf9fea24fe7c3d539241238524c054a92a7cae7ec2f76250dfaf72a11eb55"
     }
+  },
+  {
+    "token": "07eae44c",
+    "abstraction": "ide.Alice",
+    "filename": "ide.Alice.1.d5125806.lump",
+    "lump_version": 3,
+    "compiled_at": 1792541082.9121666,
+    "operation_id": "bddf1dfb65db4cdf82bcbbf2dfee134f"
+  },
+  {
+    "token": "81c3e0ab",
+    "abstraction": "ide.Mallory",
+    "filename": "ide.Mallory.1.32e361e7.lump",
+    "lump_version": 2,
+    "compiled_at": 1792541085.532333,
+    "operation_id": "541f95f5ab204168b4db611a68e58b34"
+  },
+  {
+    "token": "a14e4cc4",
+    "abstraction": "ide.AliceDriver",
+    "filename": "ide.AliceDriver.1.947b2f4e.lump",
+    "lump_version": 1,
+    "compiled_at": 1792541087.2895026,
+    "operation_id": "a3fb140f74944557abff83bbe87eaef2"
+  },
+  {
+    "token": "e130670b",
+    "abstraction": "ide.MalloryDriver",
+    "filename": "ide.MalloryDriver.1.eecf23b5.lump",
+    "lump_version": 1,
+    "compiled_at": 1792541088.4785292,
+    "operation_id": "40c9b2aff5ba4bccb97b9187159b9614"
+  },
+  {
+    "token": "27e9e494",
+    "abstraction": "ide.ActorManager",
+    "filename": "ide.ActorManager.1.b3c47cab.lump",
+    "lump_version": 1,
+    "compiled_at": 1792541089.9350557,
+    "operation_id": "3e7d5786615b4635877cb14f9f6b6ee5"
   }
 ]

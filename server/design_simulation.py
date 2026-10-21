@@ -140,18 +140,23 @@ def stage(cfg, document, directory, entry_slot):
         else:
             row.update(type="Thread", allocationWords=item["words"], stackWords=32, limit=item["words"]-1)
             if slot != 2:
+                explicit = item.get("preparedThread")
                 # This is the existing codec's fresh-thread contract, not an
                 # inferred arbitrary continuation or Amobea implementation.
                 ordinal = item["name"].removeprefix("Thread.")
-                if not ordinal.isdigit():
+                if not explicit and not ordinal.isdigit():
                     raise ValueError(f"NS[{slot}]: unsupported fresh Thread name; keep this design unexecuted.")
-                entry_name = "CapabilityTest" if int(ordinal) <= 3 else "SelfTest"
-                targets = [r for r in rows if r["name"] in (entry_name, "ide." + entry_name)]
+                entry_name = "explicit driver" if explicit else ("CapabilityTest" if int(ordinal) <= 3 else "SelfTest")
+                targets = ([by_slot[explicit["entrySlot"]]] if explicit else
+                           [r for r in rows if r["name"] in (entry_name, "ide." + entry_name)])
                 if len(targets) != 1:
                     raise ValueError(f"NS[{slot}]: fresh Thread requires one exact {entry_name} assignment.")
                 target = targets[0]
+                actor = by_slot[explicit["actorSlot"]] if explicit else None
                 raw = build_fresh_thread_lump(allocation_words=item["words"], stack_words=32,
-                                             entry_slot=target["slot"], entry_sequence=target["seq"])
+                                             entry_slot=target["slot"], entry_sequence=target["seq"],
+                                             actor_slot=actor["slot"] if actor else None,
+                                             actor_sequence=actor["seq"] if actor else 0)
                 filename = f"private-thread-{slot}.lump"
                 artifacts[filename] = raw
                 row.update(filename=filename, binary_hash=hashlib.sha256(raw).hexdigest(),
@@ -159,6 +164,9 @@ def stage(cfg, document, directory, entry_slot):
                                destinationSlot=slot, destinationSequence=row["seq"],
                                entryName=target["name"], entrySlot=target["slot"],
                                entrySequence=target["seq"], sha256=hashlib.sha256(raw).hexdigest()))
+                if actor:
+                    row["freshThreadImage"].update(format="prepared-thread-actor-v2",
+                        actorSlot=actor["slot"], actorSequence=actor["seq"], actorName=actor["name"])
         prepared.append(row)
     image, _ = generate_image(dict(namespaceFormat=FORMAT, abstractions=prepared), cfg, directory,
                               image_format=FORMAT, artifacts=artifacts)

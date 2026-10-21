@@ -144,7 +144,7 @@ def validate(document):
     for row in rows:
         if not isinstance(row, dict) or set(row) - {
             "slot", "name", "kind", "policy", "sequence", "selection", "boot",
-            "words", "address", "limit", "authoring",
+            "words", "address", "limit", "authoring", "preparedThread",
         }:
             raise ValueError("Unexpected Namespace row fields")
         slot, name = row.get("slot"), row.get("name")
@@ -169,6 +169,12 @@ def validate(document):
             raise ValueError("Architectural objects retain their residency")
         if kind == "thread" and row.get("words") != 256:
             raise ValueError("Thread design allocation must remain 256 words")
+        if "preparedThread" in row:
+            binding = row["preparedThread"]
+            if (kind != "thread" or slot == 2 or not isinstance(binding, dict)
+                    or set(binding) != {"entrySlot", "actorSlot"}
+                    or any(type(binding[k]) is not int for k in binding)):
+                raise ValueError("Prepared Thread requires explicit driver and actor slots on a non-entry Thread")
         if kind == "mmio":
             if any(type(row.get(k)) is not int or not 0 <= row[k] <= 0xffffffff for k in ("address", "limit")):
                 raise ValueError("Invalid MMIO address/limit")
@@ -188,6 +194,11 @@ def validate(document):
                 if value and (not isinstance(value, str) or not re.fullmatch(rf"[0-9a-fA-F]{{{width}}}", value)):
                     raise ValueError(f"Invalid selection {field}")
     by_slot = {r["slot"]: r for r in rows}
+    for row in rows:
+        for slot in row.get("preparedThread", {}).values():
+            target = by_slot.get(slot, {})
+            if target.get("kind") != "lump" or target.get("policy") != "Resident" or not target.get("selection"):
+                raise ValueError("Prepared Thread driver and actor must select exact Resident LUMPs")
     if (by_slot.get(1, {}).get("name"), by_slot.get(1, {}).get("kind"),
         by_slot.get(2, {}).get("name"), by_slot.get(2, {}).get("kind"),
         by_slot.get(2, {}).get("sequence")) != ("Boot.NS", "namespace", "Boot.Thread", "thread", 0):

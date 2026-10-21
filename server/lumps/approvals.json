@@ -2076,6 +2076,332 @@
         "signature": "36ecf9fea24fe7c3d539241238524c054a92a7cae7ec2f76250dfaf72a11eb55"
       },
       "identity_hash": "e34d95a87b1d5de3ea01d7c44b37f0801dbe44b7ff791d2a976640f61157e97e"
+    },
+    "8731f955d27511124420a4f51e54edbf87be6c155dbac83c994707d299723beb": {
+      "binary_hash": "8731f955d27511124420a4f51e54edbf87be6c155dbac83c994707d299723beb",
+      "dot_name": "ide.Alice",
+      "issue_n": 1,
+      "abstraction": "ide.Alice",
+      "filename": "ide.Alice.1.d5125806.lump",
+      "compiled_at": 1792541082.9121666,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.Alice",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.Alice",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "8731f955d27511124420a4f51e54edbf87be6c155dbac83c994707d299723beb",
+        "source_hash": "1579afcb3ecc4ffe2030f4925f29f637907868a0c696e7ab1a88a4c8d3e3d6b9",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "fe103d44e5ab37bde20b68621860aa62b46384edf4f03b34d03c4431927bbbee",
+          "inputs": {
+            "_ide_hierarchy": {
+              "aliases": {
+                "Boot.Thread": "ide.BootThread",
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3"
+              },
+              "definitions": {},
+              "node": "ide"
+            },
+            "_resolved_call_api_authorities": {},
+            "language": "assembly"
+          }
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "01af6066af9692c3070579b58e01bfc22314a4e3eb2e77b9c7606115e249a552"
+      },
+      "identity_hash": "3987f739f1b7714fcfb3c0543c5031f05cab115c1f5b7fc861e6e22642868843"
+    },
+    "48f7dfad015b6b4919140e7c652b6dace935caa4cc0bf09a715ee4ffb4931556": {
+      "binary_hash": "48f7dfad015b6b4919140e7c652b6dace935caa4cc0bf09a715ee4ffb4931556",
+      "dot_name": "ide.Mallory",
+      "issue_n": 1,
+      "abstraction": "ide.Mallory",
+      "filename": "ide.Mallory.1.32e361e7.lump",
+      "compiled_at": 1792541085.532333,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.Mallory",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.Mallory",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "48f7dfad015b6b4919140e7c652b6dace935caa4cc0bf09a715ee4ffb4931556",
+        "source_hash": "ba30c58a83fb121d5c33cd3c5f0f4434d00588557c4cbdded860dc8bfef0de98",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "fe103d44e5ab37bde20b68621860aa62b46384edf4f03b34d03c4431927bbbee",
+          "inputs": {
+            "_ide_hierarchy": {
+              "aliases": {
+                "Boot.Thread": "ide.BootThread",
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3"
+              },
+              "definitions": {},
+              "node": "ide"
+            },
+            "_resolved_call_api_authorities": {},
+            "language": "assembly"
+          }
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "5d0af84d9d065184a4106b015ec594f61db357c902739219d96d966c215ed0a4"
+      },
+      "identity_hash": "f3b48e1b7403b0e77da69bc18f7b60db71061bfc1b9c0bc672e2ff282d11d1fe"
+    },
+    "e90f75619d7e12971ee6aed5f6942b298c054c912a2428717f56f00dfbfccc1b": {
+      "binary_hash": "e90f75619d7e12971ee6aed5f6942b298c054c912a2428717f56f00dfbfccc1b",
+      "dot_name": "ide.AliceDriver",
+      "issue_n": 1,
+      "abstraction": "ide.AliceDriver",
+      "filename": "ide.AliceDriver.1.947b2f4e.lump",
+      "compiled_at": 1792541087.2895026,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.Alice",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.BootThread",
+            "rights": [],
+            "relocation_row": 2,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.AliceDriver",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "e90f75619d7e12971ee6aed5f6942b298c054c912a2428717f56f00dfbfccc1b",
+        "source_hash": "d0a26e446fc4ae6bb448fe7332355e3fa1ea2ba3906e267e90c3ca5715777575",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "fe103d44e5ab37bde20b68621860aa62b46384edf4f03b34d03c4431927bbbee",
+          "inputs": {
+            "_ide_hierarchy": {
+              "aliases": {
+                "Boot.Thread": "ide.BootThread",
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3"
+              },
+              "definitions": {},
+              "node": "ide"
+            },
+            "_resolved_call_api_authorities": {},
+            "language": "assembly"
+          }
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "811a72208fbb08717ba9ba0c4be108bdfcb265ba0a9b60bd15a88ddc90b654cc"
+      },
+      "identity_hash": "65315777c7652f491ec2c2273ce1ee904dfa783ea38094dac5b6c58ef1de2b75"
+    },
+    "64683b9012337ed469d896c6b0ea5679bea23e67be5f6a2a9ad0b74349393b2e": {
+      "binary_hash": "64683b9012337ed469d896c6b0ea5679bea23e67be5f6a2a9ad0b74349393b2e",
+      "dot_name": "ide.MalloryDriver",
+      "issue_n": 1,
+      "abstraction": "ide.MalloryDriver",
+      "filename": "ide.MalloryDriver.1.eecf23b5.lump",
+      "compiled_at": 1792541088.4785292,
+      "portable_binding": {
+        "schema": "church.portable-lump-binding/v1",
+        "owner": "ide.MalloryDriver#1",
+        "dependencies": [
+          {
+            "N": "ide.MalloryDriver#1",
+            "dot_name": "ide.MalloryDriver",
+            "issue_n": 1,
+            "T": null,
+            "binary_hash": null,
+            "identity_hash": null,
+            "rights": [
+              "E"
+            ],
+            "capability_type": 1,
+            "relocation_row": 0,
+            "symbolic_self": true
+          }
+        ],
+        "compatibility": "strong",
+        "canonical_gt_words": "unresolved"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "64683b9012337ed469d896c6b0ea5679bea23e67be5f6a2a9ad0b74349393b2e",
+        "source_hash": "f7458830be841df1b4f65e09c191122b2d5e7c1a4fffca7f4a66ff50484fe43e",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "fe103d44e5ab37bde20b68621860aa62b46384edf4f03b34d03c4431927bbbee",
+          "inputs": {
+            "_ide_hierarchy": {
+              "aliases": {
+                "Boot.Thread": "ide.BootThread",
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3"
+              },
+              "definitions": {},
+              "node": "ide"
+            },
+            "_resolved_call_api_authorities": {},
+            "language": "assembly"
+          }
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "a641297f65cd47c6950ba4863bf8fa2352e999f4a5e516f3390f9c8e2711ee89"
+      },
+      "identity_hash": "f5cbad620417f7746693b8c50a06a0160ab937342096e895e7c54797722eae98"
+    },
+    "ae8785cd0c6b27d4f978825619102ec23f8d42a92b2743cdf4fc0245d7e4f2f3": {
+      "binary_hash": "ae8785cd0c6b27d4f978825619102ec23f8d42a92b2743cdf4fc0245d7e4f2f3",
+      "dot_name": "ide.ActorManager",
+      "issue_n": 1,
+      "abstraction": "ide.ActorManager",
+      "filename": "ide.ActorManager.1.b3c47cab.lump",
+      "compiled_at": 1792541089.9350557,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.Thread2",
+            "rights": [],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread3",
+            "rights": [],
+            "relocation_row": 2,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.ActorManager",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "ae8785cd0c6b27d4f978825619102ec23f8d42a92b2743cdf4fc0245d7e4f2f3",
+        "source_hash": "988f0d1f14c9610f75257d32807c8a0672f6146112991a6032709f5d2ec23354",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "fe103d44e5ab37bde20b68621860aa62b46384edf4f03b34d03c4431927bbbee",
+          "inputs": {
+            "_ide_hierarchy": {
+              "aliases": {
+                "Boot.Thread": "ide.BootThread",
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3"
+              },
+              "definitions": {},
+              "node": "ide"
+            },
+            "_resolved_call_api_authorities": {},
+            "language": "assembly"
+          }
+        },
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "ad52dd6c9aa620c305a8d08136bff40255a9e50b4338567ae020ec670c987367"
+      },
+      "identity_hash": "8bab4488e3189b64ec248dfa557f16d76be99790db09c8376d093eb7fee867c1"
     }
   }
 }
