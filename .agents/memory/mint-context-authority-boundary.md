@@ -5,6 +5,16 @@ description: Keep synthetic context evidence distinct from granting Mint access 
 
 ## Phase 1 Mint ownership and local Lambda decision
 
+Use only existing instruction encodings for the Mint happy path. Report what
+cannot be expressed; do not propose or assign new encodings as a workaround.
+
+**Why:** The user explicitly rejected the proposed encoding/interface expansion.
+
+**How to apply:** Distinguish missing assembler syntax, runtime implementation,
+and capability provisioning from an ISA encoding limitation. Do not call the
+whole path impossible merely because a source-level label or GT literal is not
+an existing instruction operand. Preserve the ordinary execution requirement.
+
 Mint owns the memory pool and free-slot list. Phase 1 code is single-threaded.
 The Lambda name is a label in Mint's code block; it executes with the same
 authority as Mint and uses Mint's NS/RW capability. Do not model it as a
