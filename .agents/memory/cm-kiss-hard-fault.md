@@ -3,6 +3,24 @@ name: CM KISS and hard-fault default
 description: Prefer first-fault detection and correction over recovery strategies or hidden continuation mechanisms.
 ---
 
+## Current software integration approval
+
+The user authorized the shared HARDFAULT compiler/save/load/IDE integration
+after the Mint fault cases were written. This supersedes the historical
+software-emission gate below, not physical FPGA acceptance.
+
+**Why:** The user explicitly approved connecting the existing agreed encoding
+and exact-artifact diagnostic maps rather than leaving Mint's fault sites gated.
+
+**How to apply:** Use the existing server compiler attestation authority for
+saved-site authentication, not a new production Ed25519 trust pin or test key.
+Require exact captured bytes and site matching; missing/untrusted metadata
+must leave raw diagnostics. Re-sign static sites with final saved-artifact
+identity. Keep private runtime state out of attribution requests.
+
+The older disabled-emission and detached-map approval notes below document
+the prior investigation; do not reintroduce that software gate.
+
 KISS is a confirmed standing CM design rule, not a pending review proposal.
 Every instruction must stand alone and execute as the ISA-specified fail-safe
 operation. Do not add implicit CALLs, initialization, preparation APIs, or

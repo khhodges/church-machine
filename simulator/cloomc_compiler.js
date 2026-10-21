@@ -601,7 +601,7 @@ class CLOOMCCompiler {
         if (errors.length === 0) {
             const _bodyIndex = new Map();
             for (const m of methods) {
-                if (m.aliasOf) continue;
+                if (m.aliasOf || m.code.includes(0xf7000000)) continue;
                 const fp = m.code.join(',');
                 if (_bodyIndex.has(fp)) {
                     m.aliasOf = _bodyIndex.get(fp);
@@ -663,7 +663,7 @@ class CLOOMCCompiler {
         if (errors.length === 0) {
             const _bodyIndex = new Map();
             for (const m of methods) {
-                if (m.aliasOf) continue;
+                if (m.aliasOf || m.code.includes(0xf7000000)) continue;
                 const fp = m.code.join(',');
                 if (_bodyIndex.has(fp)) {
                     m.aliasOf = _bodyIndex.get(fp);
@@ -3015,12 +3015,18 @@ class CLOOMCCompiler {
             return;
         }
 
-        // Recognize the agreed pseudo-instruction in method bodies without
-        // bypassing the assembler's exact-artifact map/integration gate.
+        // Static diagnostics are compiler output, never runtime register data.
         if (/^HARDFAULT\b/i.test(text)) {
-            errors.push({line: stmt.lineNum,
-                message: 'HARDFAULT emission is disabled pending approval of exact-artifact map binding and target integration.',
-                ...CLOOMCCompiler._tokenCols(stmt.rawLine, text.split(/\s+/)[0])});
+            const argument = text.replace(/^HARDFAULT\s*/i, '').trim();
+            const quoted = /^"[^"\x00-\x1f\x7f]{1,512}"$/.test(argument);
+            if (!quoted && !/^[A-Z][A-Z0-9_]{0,63}$/.test(argument)) {
+                errors.push({line: stmt.lineNum, message: 'HARDFAULT requires a reason identifier or a quoted static explanation'});
+                return;
+            }
+            manifest.push({src: stmt.lineNum, addr: code.length, desc: text,
+                hardfault: {reason: quoted ? 'EXPLICIT_FAULT' : argument,
+                    explanation: quoted ? argument.slice(1, -1) : argument}});
+            code.push(0xf7000000);
             return;
         }
 
@@ -3078,7 +3084,7 @@ class CLOOMCCompiler {
         if (errors.length === 0) {
             const _bodyIndex = new Map();
             for (const m of methods) {
-                if (m.aliasOf) continue;
+                if (m.aliasOf || m.code.includes(0xf7000000)) continue;
                 const fp = m.code.join(',');
                 if (_bodyIndex.has(fp)) {
                     m.aliasOf = _bodyIndex.get(fp);
@@ -4778,7 +4784,7 @@ class CLOOMCCompiler {
         if (errors.length === 0) {
             const _bodyIndex = new Map();
             for (const m of methods) {
-                if (m.aliasOf) continue;
+                if (m.aliasOf || m.code.includes(0xf7000000)) continue;
                 const fp = m.code.join(',');
                 if (_bodyIndex.has(fp)) {
                     m.aliasOf = _bodyIndex.get(fp);

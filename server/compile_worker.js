@@ -341,6 +341,20 @@ if (isMainThread) {
         static_validated: true,
     };
 
+    const hardfault_sites = [];
+    let faultBodyOffset = (compileResult.methods || []).length + 1;
+    for (const method of compileResult.methods || []) {
+        if (method.aliasOf) continue;
+        const mapping = (compileResult.manifest || []).find(entry => entry.name === method.name);
+        for (const entry of mapping && mapping.mapping || []) {
+            if (!entry.hardfault) continue;
+            const offset = faultBodyOffset + entry.addr;
+            if (words[offset] !== 0xf7000000) throw new Error('HARDFAULT map does not match emitted bytes');
+            hardfault_sites.push({offset, ...entry.hardfault,
+                method: method.name, sourceLine: entry.src});
+        }
+        faultBodyOffset += (method.code || []).length;
+    }
     const methods = (compileResult.methods || []).map(m => ({
         name:       m.name,
         visibility: m.visibility || 'public',
@@ -362,6 +376,7 @@ if (isMainThread) {
         language:        compileResult.language || language,
         abstractionName: compileResult.abstractionName || '',
         methods,
+        hardfault_sites,
         capabilities,
         words:           Array.from(words),
         lump_binary,

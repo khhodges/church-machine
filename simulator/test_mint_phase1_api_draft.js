@@ -20,8 +20,7 @@ assert.deepEqual(methods.map(m => m[1]),
 
 const compiled = new Compiler().compile(source, []);
 assert.ok(compiled.errors.length > 0, 'Unfinished draft must not compile as runnable Mint');
-const allowedDraftError = message => /^Undefined label: TODO_/.test(message) ||
-    /^HARDFAULT emission is disabled/.test(message);
+const allowedDraftError = message => /^Undefined label: TODO_/.test(message);
 assert.ok(compiled.errors.every(e => allowedDraftError(e.message)),
     JSON.stringify(compiled.errors.filter(e => !allowedDraftError(e.message))));
 assert.equal(compiled.methods.length, 0, 'No partly valid method may escape as a successful draft');

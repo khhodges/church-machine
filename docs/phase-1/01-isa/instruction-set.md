@@ -630,7 +630,11 @@ Genesis selected **`0xF7000000`** following isolated verification, not a new exe
 It must remain non-executable in future ISA revisions; HALT is not a substitute.
 
 See verification evidence and remaining gates.
-Compiler emission remains disabled; physical behavior is not verified.
+Compiler emission and saved-artifact simulator attribution are enabled.
+Static sites are covered by the existing compiler attestation and re-bound
+to exact final bytes at approved save. The IDE asks the server to authenticate
+the captured artifact/site; missing or mismatched evidence shows the raw fault.
+This software integration does not establish physical FPGA acceptance.
 
 The compiler records an exact-artifact map:
 `instruction offset → reason, method, source line, explanation`.

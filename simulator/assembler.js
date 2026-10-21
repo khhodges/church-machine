@@ -1918,13 +1918,16 @@ class ChurchAssembler {
         if (parts.length === 0) return null;
 
         let mnemonic = parts[0].toUpperCase();
-        // Selected word is not permission to emit intentional sites. All
-        // compiler backends using this assembler retain the approval gate.
+        // Intentional fault: fixed non-executable word, never a new opcode.
+        // Attribution is separate and requires exact-artifact compiler evidence.
         if (mnemonic === 'HARDFAULT') {
-            this.errors.push({ line: lineNum,
-                ...this._tokenCols(this._currentLineText, parts[0]),
-                message: 'HARDFAULT emission is disabled pending approval of exact-artifact map binding and target integration.' });
-            return null;
+            const argument = line.replace(/^HARDFAULT\s*/i, '').trim();
+            if (!/^[A-Z][A-Z0-9_]{0,63}$/.test(argument) &&
+                    !/^"[^"\x00-\x1f\x7f]{1,512}"$/.test(argument)) {
+                this.errors.push({line: lineNum, message: 'HARDFAULT requires a reason identifier or a quoted static explanation'});
+                return null;
+            }
+            return 0xf7000000;
         }
         let opcode = null;
         let cond = 14;

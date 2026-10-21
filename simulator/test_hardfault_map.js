@@ -32,8 +32,8 @@ const hash = ws => createHash('sha256').update(maps.wordBytes(ws)).digest('hex')
     assert.deepEqual(await verify({ ...input, offset: 3, capturedOffset: 3 }), map.sites[1]);
     assert.equal(await verify({ ...input, offset: 2, capturedOffset: 2 }), null,
         'accidental identical WORD must remain unclassified');
-    assert.equal(await maps.verify(input), null, 'production pins are empty');
-    assert.equal(maps.emissionEnabled, false);
+    assert.equal(await maps.verify(input), null, 'no reachable saved-artifact verifier means raw diagnostics');
+    assert.equal(maps.emissionEnabled, true);
     const reject = async (label, mutate) => {
         const bad = clone(input);
         mutate(bad);
@@ -133,10 +133,21 @@ const hash = ws => createHash('sha256').update(maps.wordBytes(ws)).digest('hex')
     vm.runInContext(fs.readFileSync('simulator/hardfault-map.js', 'utf8'), browser);
     assert.equal(browser.ChurchHardfaultMap.createVerifier, undefined);
     assert.equal(await browser.ChurchHardfaultMap.verify(input), null);
+    let sent;
+    browser.fetch = async (url, options) => {
+        assert.equal(url, '/api/hardfault/verify');
+        sent = JSON.parse(options.body);
+        return {ok: true, json: async () => ({site: map.sites[0]})};
+    };
+    assert.deepEqual(await browser.ChurchHardfaultMap.verify({...input, privateProof: [1,2,3,4]}),
+        map.sites[0]);
+    assert.equal(sent.privateProof, undefined);
+    assert.equal(sent.envelope, undefined, 'do not send an untrusted diagnostic map');
+    browser.fetch = async () => {throw new Error('offline');};
+    assert.equal(await browser.ChurchHardfaultMap.verify(input), null);
     const Assembler = require('./assembler.js');
     const asm = new Assembler();
-    assert.match(asm.assemble('HARDFAULT PASSKEY_MISMATCH').errors[0].message,
-        /emission is disabled/);
+    assert.deepEqual(asm.assemble('HARDFAULT PASSKEY_MISMATCH').words, [0xf7000000]);
     assert.equal(asm._assembleLine('WORD 0x07000000', 1, 0), 0xf7000000);
     console.log('HARDFAULT maps: authenticated sites, rejection paths, async UI, browser gate PASS');
 })().catch(error => { console.error(error); process.exitCode = 1; });

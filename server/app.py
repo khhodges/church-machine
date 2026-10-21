@@ -11420,6 +11420,7 @@ def _attest_idx1_browser_candidate(metadata, words, execution=None):
         "language": language, "compiler_identity": "Trusted Home IDE compiler",
         "compiler_version": "server-compile-v1",
         "compact_compile_context": compact_context,
+        "hardfault_sites": compiled.get("hardfault_sites", []),
         **({"isa_profile": "IDX1", "execution_digest": execution.execution_digest}
            if execution is not None else {}),
         "capability_rows": compiled["capabilities"],
@@ -14090,6 +14091,7 @@ def save_lump():
             "compiler_identity": _incoming_record.get("compiler_identity"),
             "compiler_version": _incoming_record.get("compiler_version"),
             "compact_compile_context": _incoming_record.get("compact_compile_context"),
+            "hardfault_sites": _incoming_record.get("hardfault_sites", []),
             **{key: metadata[key] for key in ("isa_profile", "execution_digest")
                if key in metadata},
         }
@@ -14824,6 +14826,7 @@ def save_lump():
                     "compiler_identity": _incoming.get("compiler_identity"),
                     "compiler_version": _incoming.get("compiler_version"),
                     "compact_compile_context": _incoming.get("compact_compile_context"),
+                    "hardfault_sites": _incoming.get("hardfault_sites", []),
                     **{key: metadata[key] for key in ("isa_profile", "execution_digest")
                        if key in metadata},
                 }, signing_key=_compiler_attestation_key())
@@ -18462,6 +18465,54 @@ def get_lump_version_words(token, version):
     }
     _attach_unverified_exact_source(response, lump_path_v, _manifest_entry_v)
     return jsonify(response)
+
+
+@app.route("/api/hardfault/verify", methods=["POST"])
+def verify_hardfault_site():
+    """Read-only attribution using authenticated compiler metadata, never text supplied by a caller."""
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify(site=None)
+    words = body.get("artifactWords")
+    captured = body.get("capturedCodeWords")
+    identity = body.get("capturedIdentity") or {}
+    offset = body.get("offset")
+    if (not isinstance(words, list) or not 2 <= len(words) <= 1048576
+            or any(type(w) is not int or not 0 <= w <= 0xffffffff for w in words)
+            or type(offset) is not int or body.get("capturedOffset") != offset
+            or body.get("rawWord") != 0xf7000000 or body.get("faultType") != "INVALID_OP"
+            or not isinstance(identity, dict) or identity.get("secure") is not True
+            or not isinstance(body.get("occurrence"), str) or not body["occurrence"]):
+        return jsonify(site=None)
+    cw = (words[0] >> 10) & 8191
+    if (words[0] >> 27 != 31 or not 1 <= offset <= cw or cw >= len(words)
+            or captured != words[:cw + 1] or words[offset] != 0xf7000000):
+        return jsonify(site=None)
+    digest = hashlib.sha256(struct.pack(f">{len(words)}I", *words)).hexdigest()
+    if identity.get("binaryHash") != digest:
+        return jsonify(site=None)
+    approval = _matching_lump_approval(LUMPS_DIR, digest)
+    if not approval or not _trusted_compile_metadata(approval, digest, words):
+        return jsonify(site=None)
+    record = approval.get("compiler_record") or {}
+    sites = record.get("hardfault_sites") or []
+    if not isinstance(sites, list) or len(sites) > 8191:
+        return jsonify(site=None)
+    # A signed malformed map is not sufficient: check every site against bytes.
+    previous = 0
+    for site in sites:
+        if (not isinstance(site, dict)
+                or set(site) != {"offset", "reason", "method", "sourceLine", "explanation"}
+                or type(site["offset"]) is not int or not previous < site["offset"] <= cw
+                or words[site["offset"]] != 0xf7000000
+                or not re.fullmatch(r"[A-Z][A-Z0-9_]{0,63}", str(site["reason"]))
+                or type(site["sourceLine"]) is not int or site["sourceLine"] < 1
+                or any(not isinstance(site[k], str) or not 1 <= len(site[k]) <= limit
+                       or re.search(r"[\x00-\x1f\x7f]", site[k])
+                       for k, limit in (("method", 128), ("explanation", 512)))):
+            return jsonify(site=None)
+        previous = site["offset"]
+    return jsonify(site=next((s for s in sites if s["offset"] == offset), None))
 
 
 @app.route("/api/lump-variants/<primary_hash>")
@@ -22182,6 +22233,7 @@ def api_compile():
             "compiler_identity": "Trusted Home IDE compiler",
             "compiler_version": "server-compile-v1",
             "compact_compile_context": _compact_compile_context,
+            "hardfault_sites": result.get("hardfault_sites", []),
             **{key: result[key] for key in ("isa_profile", "execution_digest")
                if key in result},
         }

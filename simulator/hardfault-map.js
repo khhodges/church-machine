@@ -83,11 +83,27 @@
             }
         };
     }
-    // Binding proposal has NOT been approved. No production trust pins, no
-    // browser configuration/setter, and no compiler emitter are supplied.
+    // Saved compiler records use the existing server attestation authority.
+    // The server authenticates the exact artifact; no new browser trust pins.
+    async function verifySavedCompilerSite(input) {
+        try {
+            if (typeof root.fetch !== 'function') return null;
+            const snapshot = JSON.parse(JSON.stringify(Object.fromEntries(
+                ['artifactWords', 'capturedCodeWords', 'offset', 'capturedOffset',
+                    'rawWord', 'faultType', 'occurrence'].map(key => [key, input[key]]))));
+            snapshot.capturedIdentity = {secure: input.capturedIdentity && input.capturedIdentity.secure,
+                binaryHash: input.capturedIdentity && input.capturedIdentity.binaryHash};
+            const response = await root.fetch('/api/hardfault/verify', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(snapshot), cache: 'no-store'
+            });
+            if (!response.ok) return null;
+            return (await response.json()).site || null;
+        } catch (_) { return null; }
+    }
     const api = Object.freeze({
-        emissionEnabled: false,
-        verify: createVerifier(root.crypto && root.crypto.subtle, {})
+        emissionEnabled: true,
+        verify: verifySavedCompilerSite
     });
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = { ...api, createVerifier, signingBytes, normalize, wordBytes };

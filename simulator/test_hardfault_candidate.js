@@ -1,5 +1,5 @@
 'use strict';
-// Selected encoding only: compiler lowering remains disabled pending map/integration gates.
+// Shared encoding: compiler emission is enabled; FPGA acceptance remains separate.
 const assert = require('assert');
 const Simulator = require('./simulator.js');
 const Assembler = require('./assembler.js');
@@ -8,8 +8,8 @@ let navigationFault;
 const asm = new Assembler();
 assert.strictEqual(asm._assembleLine('WORD 0x07000000', 1, 0), CANDIDATE);
 assert.strictEqual(asm.disassemble(CANDIDATE), 'WORD 0x7000000');
-assert(new Assembler().assemble('HARDFAULT PASSKEY_MISMATCH').errors.length,
-    'this investigation must not enable pseudo-instruction emission');
+assert.deepStrictEqual(new Assembler().assemble('HARDFAULT PASSKEY_MISMATCH').words,
+    [CANDIDATE], 'approved pseudo-instruction emits exactly one non-executable word');
 
 for (let bits = 0; bits < 16; bits++) {
     const sim = new Simulator();

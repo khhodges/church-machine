@@ -26,8 +26,8 @@
 ; Their names are retained to match the reviewed pseudocode.
 ; Operation TODOs still have no destination: compilation MUST fail until
 ; the corresponding implementation has been reviewed and supplied.
-; HARDFAULT uses the agreed static-reason standard; compiler/map integration
-; remains gated. Never substitute HALT, a reporting CALL or a new opcode.
+; HARDFAULT emits the agreed word with signed compiler-site metadata for
+; exact saved-artifact attribution. Never substitute HALT or a reporting CALL.
 ; No default success, no private MINT opcode, no live Namespace installation.
 ;
 ; CREATE / DESTROY retain source indices 0 / 1.
