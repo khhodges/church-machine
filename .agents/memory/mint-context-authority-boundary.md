@@ -87,6 +87,17 @@ review, explicitly rejecting IDE prototype conventions as the design basis.
 a pool-relative offset or require an IDE lookup. Register assignments and the
 remaining descriptor fields are separate decisions.
 
+## Agreed FPGA slot limit
+
+W1 limit_offset is the inclusive word offset: allocated_word_count minus one.
+Reject zero size and a result that does not fit 21 bits; never truncate.
+
+**Why:** The user approved this rule in the FPGA-first field review. Location
+uses byte addresses, but FPGA access bounds use word offsets.
+
+**How to apply:** Keep address units distinct from limit units when preparing
+the native Mint descriptor. Register assignments remain a separate decision.
+
 ## Phase 1 PkVerify decision
 
 For Phase 1, PkVerify always returns APPROVED.
