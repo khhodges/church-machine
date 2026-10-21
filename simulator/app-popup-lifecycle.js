@@ -131,6 +131,9 @@
     }
 
     document.addEventListener('keydown', function (event) {
+        // Native modal dialogs own focus and keyboard dismissal above overlays.
+        // Do not send their Escape/Tab keys to an underlying LUMP preview.
+        if (document.querySelector('dialog[open]')) return;
         var modal = topModal();
         if (modal) {
             if (event.key === 'Escape') {

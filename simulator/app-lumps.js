@@ -4485,6 +4485,66 @@ function _closeLumpHistoryPreviewModal() {
     overlay.remove();
 }
 
+function _savedGtDecodeHtml(word, row) {
+    word = word >>> 0;
+    const e = _fmtEscape;
+    const hex = word.toString(16).padStart(8, '0').toUpperCase();
+    let html = '<h3 id="savedGtTitle">GT decode — C-list row ' + e(row) + '</h3><p><code>0x' + hex + '</code></p>';
+    if (word === 0xFEED5E1F || word === 0xFEEDDA7A) {
+        return html + '<p><strong>' + (word === 0xFEED5E1F ? 'SELF' : 'Private-data') +
+            ' allocation placeholder</strong></p><p>This is a compiler sentinel, not a live GT. It does not encode usable permissions, a Namespace slot, or a generation.</p>';
+    }
+    if (word === 0) return html + '<p>Zero / NULL word. This saved row has no localized GT. Consult the declared C-list name for its symbolic target.</p>';
+    const parsed = ChurchSimulator.prototype.parseGT(word);
+    let fields;
+    if (parsed.type === 3) {
+        const a = ChurchSimulator.prototype.parseAbstractGT(word);
+        fields = [['Type [26:25]', 'Abstract'], ['Abstract type [31:27]', a.ab_type],
+            ['Read [26]', a.R], ['Write [25]', a.W],
+            ['Generation [24:16]', a.gt_seq], ['Abstract data [15:0]', a.ab_data]];
+    } else {
+        fields = [['Type [26:25]', parsed.typeName], ['B flag [31]', word >>> 31],
+            ['Domain [27]', (word >>> 27) & 1 ? 'Church' : 'Turing'],
+            ['Permissions [30:28]', Object.keys(parsed.permissions).filter(k => k !== 'B' && parsed.permissions[k]).join('') || 'None'],
+            ['Generation [24:16]', parsed.gt_seq], ['Namespace slot [15:0]', parsed.index]];
+    }
+    html += '<table class="lump-hex-table"><tbody>' + fields.map(pair =>
+        '<tr><th>' + e(pair[0]) + '</th><td>' + e(pair[1]) + '</td></tr>').join('') + '</tbody></table>';
+    if (parsed.malformed) html += '<p>Malformed: ' + e(parsed.malformedReason) + '</p>';
+    return html + '<p>Decoded from saved bits only. This does not establish runtime validity or resolve the slot against today’s Namespace.</p>';
+}
+
+function _openSavedGtDecode(word, row) {
+    document.getElementById('savedGtDecode')?.remove();
+    const dialog = document.createElement('dialog');
+    dialog.id = 'savedGtDecode';
+    dialog.className = 'saved-gt-decode';
+    dialog.setAttribute('aria-labelledby', 'savedGtTitle');
+    dialog.innerHTML = _savedGtDecodeHtml(word, row) +
+        '<form method="dialog"><button class="btn btn-primary" autofocus>Close</button></form>';
+    dialog.addEventListener('keydown', event => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            dialog.close();
+        }
+    });
+    dialog.addEventListener('close', () => dialog.remove());
+    dialog.addEventListener('click', event => {
+        const rect = dialog.getBoundingClientRect();
+        if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right ||
+                event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+    });
+    document.body.appendChild(dialog);
+    dialog.showModal();
+}
+
+function _savedGtButton(word, row, label) {
+    return '<button type="button" class="saved-gt-word" title="Decode saved GT, C-list row ' +
+        row + '" onclick="_openSavedGtDecode(' + (word >>> 0) + ',' + row + ')">' +
+        _fmtEscape(label) + '</button>';
+}
+
 function _renderSavedLumpIdentity(data, words, version) {
     const e = _fmtEscape;
     let api = null, error = '';
@@ -4512,7 +4572,7 @@ function _renderSavedLumpIdentity(data, words, version) {
         const word = words[words.length - cc + row] >>> 0;
         html += '<tr><td>' + row + '</td><td>' + e(declared === 'SELF' ? 'SELF — ' + name : declared) +
             '</td><td>' + e(Array.isArray(rights) ? rights.join('') || 'None' : rights) +
-            '</td><td>0x' + word.toString(16).padStart(8, '0').toUpperCase() +
+            '</td><td>' + _savedGtButton(word, row, '0x' + word.toString(16).padStart(8, '0').toUpperCase()) +
             '</td><td>' + (word === 0 && declared !== 'Not declared in saved definition'
                 ? 'Symbolic / not localized' : word === 0 ? 'Zero' : 'Stored token') + '</td></tr>';
     }
@@ -5059,12 +5119,14 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                     const archVal = words[i] >>> 0;
                     const curVal  = i < curWords.length ? (curWords[i] >>> 0) : null;
                     const changed = !curFetchFailed && (curVal === null || archVal !== curVal);
+                    const savedWordHtml = i >= numWords - cc
+                        ? _savedGtButton(archVal, i - (numWords - cc), hexw(archVal)) : hexw(archVal);
                     if (changed) {
                         rowHasChange = true;
                         const curDisplay = curVal === null ? '<span class="lump-hex-diff-absent">(absent)</span>' : hexw(curVal);
-                        rowHex += `<td class="lump-hex-diff-changed"><span class="lump-hex-diff-arch">${hexw(archVal)}</span><span class="lump-hex-diff-cur">${curDisplay}</span></td>`;
+                        rowHex += `<td class="lump-hex-diff-changed"><span class="lump-hex-diff-arch">${savedWordHtml}</span><span class="lump-hex-diff-cur">${curDisplay}</span></td>`;
                     } else {
-                        rowHex += `<td>${hexw(archVal)}</td>`;
+                        rowHex += `<td>${savedWordHtml}</td>`;
                     }
                     rowAscArch += pack4ascii(archVal);
                     rowAscCur  += curVal !== null ? pack4ascii(curVal) : '.'.repeat(4);

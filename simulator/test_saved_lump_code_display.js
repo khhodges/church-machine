@@ -33,7 +33,12 @@ const context = vm.createContext({
 });
 vm.runInContext(selectorSource, context);
 vm.runInContext(extractFunction('_renderSavedLumpIdentity'), context);
+vm.runInContext(extractFunction('_savedGtButton'), context);
+vm.runInContext(extractFunction('_savedGtDecodeHtml'), context);
 context._fmtEscape = s => String(s == null ? '' : s).replace(/</g, '&lt;');
+assert(context._savedGtDecodeHtml(0xFEED5E1F, 0).includes('SELF allocation placeholder'));
+assert(context._savedGtDecodeHtml(0xFEEDDA7A, 1).includes('Private-data allocation placeholder'));
+assert(context._savedGtDecodeHtml(0, 1).includes('Zero / NULL'));
 context.LumpContentFrame = { lumpDecodeContentFrameApi: () => ({
     name: 'ide.AliceDriver',
     capabilities: [{name:'SELF',rights:['E']}, {name:'ide.Alice',rights:['E']},

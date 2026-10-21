@@ -414,6 +414,21 @@
     margin: 1rem 0 0.65rem;
 }
 .lump-preview-clist { overflow-x: auto; }
+.saved-gt-word {
+    font: inherit; color: #7effea; background: none; border: 0;
+    padding: 0.15rem; text-decoration: underline dotted; cursor: pointer;
+}
+.saved-gt-word:focus-visible { outline: 2px solid #e9bb4b; }
+.saved-gt-decode {
+    width: min(540px, calc(100vw - 32px)); box-sizing: border-box;
+    max-height: 85vh; overflow: auto; padding: 1.4rem;
+    background: #172639; color: #e5e7eb;
+    border: 1px solid #69809b; border-radius: 8px;
+    font-size: 0.9rem; line-height: 1.5;
+}
+.saved-gt-decode::backdrop { background: rgba(0,0,0,0.6); }
+.saved-gt-decode th, .saved-gt-decode td { font-size: 0.85rem; padding: 0.4rem; }
+.saved-gt-decode form { margin-top: 1rem; text-align: right; }
 .lump-preview-clist .lump-hex-table { font-size: 0.85rem; }
 .lump-preview-clist .lump-hex-table th { font-size: 0.75rem; }
 .lump-preview-clist .lump-hex-table td,

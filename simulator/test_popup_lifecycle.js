@@ -41,4 +41,12 @@ const help = doc.getElementById('helpDropdown');
 check('help uses menu role', help.getAttribute('role') === 'menu');
 check('help items use menuitem role', help.querySelector('button').getAttribute('role') === 'menuitem');
 
+const nativeDialog = doc.createElement('dialog');
+nativeDialog.setAttribute('open', '');
+doc.body.appendChild(nativeDialog);
+let nativeKeyReached = false;
+nativeDialog.addEventListener('keydown', () => { nativeKeyReached = true; });
+const nativeEscape = new dom.window.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true});
+nativeDialog.dispatchEvent(nativeEscape);
+check('native dialog keeps its keyboard event', nativeKeyReached && !nativeEscape.defaultPrevented);
 console.log('PASS: ' + passed + ' popup lifecycle checks');
