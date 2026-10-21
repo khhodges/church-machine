@@ -1608,7 +1608,7 @@ async function _populateLumpSourceTab(lump, targetId) {
                 rawTailHex: data.raw_tail_hex || ''
             });
 
-        if (selectedCode.kind === 'embedded') {
+        if (selectedCode.kind === 'embedded' || selectedCode.kind === 'revision-source') {
             const src = selectedCode.text;
             if (_isRawISASource(src)) {
                 // Source exists but is raw ISA / Church Machine Assembly — show it
@@ -8238,7 +8238,8 @@ async function openLumpInEditor(token, options) {
         });
     var _sourceResolution = _diagnosticSource !== null
         ? _resolveSavedLumpEditorSource(_diagnosticSource, null)
-        : _wordsResponse && typeof _wordsResponse.editing_source === 'string'
+        : _wordsResponse && !_wordsResponse.variant_error &&
+            typeof _wordsResponse.editing_source === 'string'
         ? {
             source: _wordsResponse.editing_source,
             restored: true,
@@ -8629,7 +8630,9 @@ async function openLumpInEditor(token, options) {
     // replacement consent. Exact binary inspection remains separate from an
     // owned navigation draft; neither may change underneath that review.
     var _recoveredSource = options && options.namespaceAssignedOnly
-        ? (_browserFrameSource || '') : _sourceResolution.source;
+        ? (_sourceResolution.origin === 'exact-revision-source-bundle'
+            ? _sourceResolution.source : (_browserFrameSource || ''))
+        : _sourceResolution.source;
     if (!(options && options.namespaceAssignedOnly) &&
             !_recoveredSource && Array.isArray(_sourceResolution.inspectionSources)) {
         var _draftSourceRecord = _sourceResolution.inspectionSources.find(function(item) {
@@ -11838,6 +11841,15 @@ if (typeof window !== 'undefined') window.showLumpDetail = showLumpDetail;
 function _selectSavedLumpCodeDisplay(payload, inspection, words, details) {
     payload = payload && typeof payload === 'object' ? payload : {};
     details = details || {};
+    if (payload.variant_error) {
+        return { kind: 'unavailable', text: '',
+            warning: 'Exact-revision source bundle failed verification: ' + payload.variant_error,
+            readOnly: true };
+    }
+    if (typeof payload.editing_source === 'string' && payload.editing_source.length > 0) {
+        return { kind: 'revision-source', text: payload.editing_source,
+            provenance: 'exact-revision-source-bundle', warning: '', readOnly: false };
+    }
     var embedded = typeof payload.source === 'string' && payload.source.length > 0
         ? payload.source
         : (inspection && typeof inspection.source === 'string' &&

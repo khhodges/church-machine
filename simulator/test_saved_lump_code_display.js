@@ -38,6 +38,15 @@ const words = [
     0x18000000,
 ];
 
+const linked = context._selectSavedLumpCodeDisplay({
+    editing_source: 'exact saved source', unverified_source: 'unrelated source'
+}, null, [], {});
+assert.equal(linked.kind, 'revision-source');
+assert.equal(linked.text, 'exact saved source');
+assert.equal(linked.readOnly, false);
+assert.equal(context._selectSavedLumpCodeDisplay({
+    editing_source: 'invalid source', variant_error: 'hash mismatch'
+}, null, [], {}).kind, 'unavailable');
 const embedded = context._selectSavedLumpCodeDisplay(
     { source: 'exact embedded', unverified_source: 'legacy' },
     null, words, { abstraction: 'V0', token: '00000000' });

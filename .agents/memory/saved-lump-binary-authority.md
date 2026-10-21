@@ -97,6 +97,15 @@ keep draft text untouched while fetching binary-only presentation.
 Saved artifact summaries must survive canonical re-rendering, not only initial
 open.
 
+Exact Namespace selection permits verified full-source siblings bound to that
+same saved revision, not just source embedded in its execution binary.
+
+**Why:** The user approved loading the retained source of API-only saves; an
+embedded-only restriction incorrectly made intact saved source appear lost.
+
+**How to apply:** Keep exact artifact selection and source verification intact.
+Never substitute latest-by-name source or an unrelated workspace file.
+
 **Why:** Word usage added only to an initial reconstructed heading disappeared
 when the canonical saved-word renderer replaced it after reload.
 
