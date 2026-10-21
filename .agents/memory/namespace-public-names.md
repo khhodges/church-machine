@@ -28,3 +28,10 @@ Switching between assigned LUMPs is document navigation, not a source
 replacement comparison. Preserve the outgoing draft under its owner.
 **Why:** Showing SelfTest versus Alice's absent source as a deletion diff
 misrepresented a label click. Empty-editor checks do not cover this case.
+
+Every LUMP preview must identify the exact LUMP and show its declared named
+C-list; a revision number and raw hex alone are not an adequate LUMP display.
+**Why:** The user explicitly reiterated, “A LUMP is a LUMP always show it correctly.”
+**How to apply:** Decode names from the selected artifact, distinguish naming
+Namespace from runtime placement, and distinguish symbolic rows from localized
+tokens. Historical previews must not borrow current-state identities.

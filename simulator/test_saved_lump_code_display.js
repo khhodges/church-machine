@@ -32,6 +32,22 @@ const context = vm.createContext({
     assembler: { disassemble: word => 'OP_' + (word >>> 0).toString(16) },
 });
 vm.runInContext(selectorSource, context);
+vm.runInContext(extractFunction('_renderSavedLumpIdentity'), context);
+context._fmtEscape = s => String(s == null ? '' : s).replace(/</g, '&lt;');
+context.LumpContentFrame = { lumpDecodeContentFrameApi: () => ({
+    name: 'ide.AliceDriver',
+    capabilities: [{name:'SELF',rights:['E']}, {name:'ide.Alice',rights:['E']},
+        {name:'ide.BootThread',rights:[]}]
+}) };
+const identityHtml = context._renderSavedLumpIdentity(
+    {filename:'exact.lump',binary_hash:'abc'}, [3,0,0,0], 2);
+assert(identityHtml.includes('ide.AliceDriver — v2'));
+assert(identityHtml.includes('SELF — ide.AliceDriver'));
+assert(identityHtml.includes('ide.Alice</td>'));
+assert(identityHtml.includes('ide.BootThread'));
+assert.equal((identityHtml.match(/Symbolic \/ not localized/g) || []).length, 3);
+context.LumpContentFrame.lumpDecodeContentFrameApi = () => null;
+assert(context._renderSavedLumpIdentity({}, [1,0], 1).includes('Not declared in saved definition'));
 
 const words = [
     ((0x1f << 27) | (1 << 10)) >>> 0,

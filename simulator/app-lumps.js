@@ -4485,6 +4485,40 @@ function _closeLumpHistoryPreviewModal() {
     overlay.remove();
 }
 
+function _renderSavedLumpIdentity(data, words, version) {
+    const e = _fmtEscape;
+    let api = null, error = '';
+    try {
+        api = LumpContentFrame.lumpDecodeContentFrameApi(words);
+        if (api && typeof LumpApiCodec !== 'undefined') api = LumpApiCodec.expand(api, words);
+    } catch (err) { error = err.message; }
+    const name = api && api.name || data.dot_name || data.abstraction || 'Name unavailable';
+    const namespace = name.includes('.') ? name.slice(0, name.lastIndexOf('.')) : 'Not declared';
+    const cc = words.length ? words[0] & 255 : 0;
+    const caps = api && Array.isArray(api.capabilities) ? api.capabilities : [];
+    const dependencies = api && api.symbolic_binding && api.symbolic_binding.dependencies || [];
+    let html = '<section class="lump-detail-section"><h3>' + e(name) + ' — v' + e(version) + '</h3>' +
+        '<div>Pet Name: <strong>' + e(name) + '</strong> · Naming Namespace: <strong>' + e(namespace) + '</strong></div>' +
+        '<div>Saved artifact: ' + e(data.filename || 'Unavailable') + '</div>' +
+        '<div style="overflow-wrap:anywhere">Binary SHA-256: ' + e(data.binary_hash || 'Unavailable') + '</div>' +
+        '<p>Exact saved artifact. Runtime Namespace placement is not inferred from the current simulator.</p>' +
+        '<h4>C-list — ' + cc + ' rows</h4>';
+    if (error) html += '<p>Definition could not be decoded: ' + e(error) + '</p>';
+    html += '<table class="lump-hex-table"><thead><tr><th>Row</th><th>Declared dot-name</th><th>Rights</th><th>Saved word</th><th>Binding</th></tr></thead><tbody>';
+    for (let row = 0; row < cc; row++) {
+        const cap = dependencies.find(d => d.relocation_row === row) || caps[row] || {};
+        const declared = cap.canonical_leaf || cap.name || 'Not declared in saved definition';
+        const rights = cap.rights || cap.grants || [];
+        const word = words[words.length - cc + row] >>> 0;
+        html += '<tr><td>' + row + '</td><td>' + e(declared === 'SELF' ? 'SELF — ' + name : declared) +
+            '</td><td>' + e(Array.isArray(rights) ? rights.join('') || 'None' : rights) +
+            '</td><td>0x' + word.toString(16).padStart(8, '0').toUpperCase() +
+            '</td><td>' + (word === 0 && declared !== 'Not declared in saved definition'
+                ? 'Symbolic / not localized' : word === 0 ? 'Zero' : 'Stored token') + '</td></tr>';
+    }
+    return html + '</tbody></table></section>';
+}
+
 function _showLumpHistoryPreviewModal(version, bodyHtml) {
     _closeLumpHistoryPreviewModal();
     const overlay = document.createElement('div');
@@ -4907,7 +4941,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             ? data.raw_tail_hex : '';
         const numWords = words.length;
         const inspection = _lumpBinaryInspection(data);
-        if (exactIdentity && words.length) {
+        if (words.length) {
             cw = (words[0] >>> 10) & 0x1fff;
             cc = words[0] & 0xff;
             lumpSize = words.length;
@@ -5018,8 +5052,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             const baseAddr = (baseIdx * 4).toString(16).toUpperCase().padStart(6, '0');
             let rowHex = '', rowAscArch = '', rowAscCur = '', rowHasChange = false, rowClass = '';
             if (baseIdx === 0)                            rowClass = 'lump-hex-hdr-row';
-            else if (cc > 0 && baseIdx >= lumpSize - cc)  rowClass = 'lump-hex-clist-row';
-            else if (baseIdx >= cw + 1)                    rowClass = 'lump-hex-pad-row';
+            else if (cc > 0 && baseIdx + COLS > lumpSize - cc) rowClass = 'lump-hex-clist-row';
             for (let c = 0; c < COLS; c++) {
                 const i = baseIdx + c;
                 if (i < numWords) {
@@ -5070,7 +5103,8 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             '</details>';
         if (document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
         _showLumpHistoryPreviewModal(
-            version, issueSummary + repairControls + sourcePreview + methodApiPreview + t
+            version, _renderSavedLumpIdentity(data, words, version) +
+                issueSummary + repairControls + sourcePreview + methodApiPreview + t
         );
         if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
         const openEditorButton = document.querySelector(
