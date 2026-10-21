@@ -9486,8 +9486,10 @@ function _renderFormatLumpCandidate(pending) {
                     : 'Requires saved source')
                 : info.detail + (sourceRequired ? ' · Saved together' : '');
             var size = disabled ? 'Unavailable' :
-                item.frame.frameWords.length + ' frame words · ' +
-                item.lumpSize + ' words / ' + _fmtLumpByteSize(item.lumpSize * 4);
+                (window.FmtLumpReadout
+                    ? window.FmtLumpReadout.renderProfileStats(profile, item, pending.sourceText)
+                    : item.frame.frameWords.length + ' frame words · ' +
+                      item.lumpSize + ' words / ' + _fmtLumpByteSize(item.lumpSize * 4));
             return '<button type="button" class="fmt-output-profile' +
                 (pending.selectedProfile === profile ? ' is-selected' : '') +
                 '" role="radio" aria-checked="' + (pending.selectedProfile === profile ? 'true' : 'false') +
@@ -9495,7 +9497,8 @@ function _renderFormatLumpCandidate(pending) {
                 '<span class="fmt-output-profile-title">' + info.title + '</span>' +
                 '<span class="fmt-output-profile-detail">' + detail + '</span>' +
                 '<span class="fmt-output-profile-size">' + size + '</span></button>';
-        }).join('');
+        }).join('') + (window.FmtLumpReadout
+            ? '<div class="fmt-alloc-note">' + window.FmtLumpReadout.ALLOCATION_NOTE + '</div>' : '');
     }
 
     var _warning = document.getElementById('fmtOutputWarning');
@@ -9909,7 +9912,13 @@ window.showFormatLump = async function() {
         var _fmtDotName  = _fmtPetname
             ? (_fmtPetname + '.' + _fmtBaseName + '#' + _fmtIssue)
             : (_fmtBaseName + '#' + _fmtIssue);
-        _refEl.innerHTML =
+        if (window.FmtLumpReadout) {
+            _refEl.innerHTML = window.FmtLumpReadout.renderIdentity({
+                petname: _fmtPetname, name: _fmtBaseName, issue: _fmtIssue,
+                revision: window.FmtLumpReadout.knownRevision(_regEntry !== indexedView ? _regEntry : null),
+                token: _fmtTok
+            });
+        } else _refEl.innerHTML =
             '<span class="fmt-ref-doname">' + _fmtEscape(_fmtDotName) + '</span>' +
             (_fmtTok
                 ? '<span class="fmt-ref-hash">\u00b7\u00a0' + _fmtEscape(_fmtTok) + '</span>'
