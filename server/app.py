@@ -18580,9 +18580,23 @@ def list_source_files():
             if rel_dir == '.':
                 rel_dir = ''
             stem = fname[:-len('.cloomc')]
+            # Discovery metadata only, never identity or compilation authority.
+            abstraction = ''
+            try:
+                with open(abs_f, encoding='utf-8') as source_file:
+                    source_head = source_file.read(65536)
+                source_head = re.sub(r'/\*[\s\S]*?\*/', '', source_head)
+                declaration = re.search(
+                    r'(?m)^\s*abstraction\s+([A-Za-z_][A-Za-z0-9_.]*)\s*\{',
+                    source_head)
+                if declaration:
+                    abstraction = declaration.group(1)
+            except (OSError, UnicodeError):
+                app.logger.warning('Could not read source catalog metadata: %s', rel_f)
             results.append({
                 'path': rel_f,
                 'name': stem,
+                'abstraction': abstraction,
                 'dir': rel_dir,
                 'modified_at': os.path.getmtime(abs_f),
             })

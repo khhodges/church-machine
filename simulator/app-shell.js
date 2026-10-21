@@ -895,7 +895,8 @@ function _loadOpenFileCatalog() {
         });
         files.forEach(function(f) {
             entries.push({kind:'file', name:f.name, language:'CLOOMC++',
-                path:f.path, detail:f.dir || 'simulator', date:f.modified_at || 0});
+                path:f.path, detail:(f.abstraction ? f.abstraction + ' · ' : '') +
+                    (f.dir || 'simulator'), date:f.modified_at || 0});
         });
         lumps.filter(function(l) { return l.archived !== true && l.current !== false; })
         .forEach(function(l) {
