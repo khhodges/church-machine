@@ -39,11 +39,12 @@
 ; CR1 is a non-NULL result GT except DESTROY, which requires architectural NULL.
 ; Preserve CR5/DR5 and architectural CR12..15 rules.
 ; CREATE consumes packed DR2 and permission mask DR3 before using scratch.
-; TODO_<Method>_FINISH must clear other caller-clobbered CRs/DRs before entering
-; each *_result label; retain result CR1 and completion DR1 for checking.
+; FINISH enters final result validation before erasing its working evidence.
+; After validation, each *_return clears DR2..4 and DR6..15 with IADD from DR0.
+; DR1 is the completion output; preserve DR5 (Thread heap pointer) and DR0.
 ; CALL-frame RETURN keep masks erase CR0..4/CR7..11 (and their Thread homes):
 ; #2 retains only CR1; #0 retains none. CR5 is preserved, CR6 reconstructed.
-; This is exit cleanup, NOT a binding for the earlier *_CLEAR_* / FINISH gates.
+; These masks complete outward capability cleanup, not the early *_CLEAR_* gates.
 ; LAMBDA-frame RETURN preserves ALL CRs, regardless of mask: same context,
 ; not a CALL security boundary. It CANNOT implement any early cleanup helper.
 ; Early result/proof/private-authority clearing still needs a legal mechanism.
@@ -192,8 +193,7 @@ create_data_account_and_issue:
     ; Only completed publication may set DR1=1. No rollback is promised.
     BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE
 create_finish:
-    ; Clear proof references, private destination and caller-clobbered scratch.
-    BRANCH TODO_CREATE_FINISH
+    ; Validate the result before erasing descriptor/accounting evidence.
 create_result:
     MCMP DR1, #1
     BRANCHNE TODO_CREATE_RESULT_COMPLETION
@@ -204,6 +204,19 @@ create_result:
     ; Verify Inform DATA, B=1, and exact committed allocation identity.
     BRANCH TODO_CREATE_RESULT_TYPE
 create_return:
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
     RETURNAL #2
 
 create_data_slot_lambda:
@@ -301,12 +314,26 @@ destroy_body:
     ; zero storage before reuse and update shared Mint/GC records once.
     BRANCH TODO_DESTROY_BODY
 destroy_finish:
-    BRANCH TODO_DESTROY_FINISH
+    ; Validate completion and NULL result before outward cleanup.
 destroy_result:
     MCMP DR1, #1
     BRANCHNE TODO_DESTROY_RESULT_COMPLETION
     TPERM CR1, NULL
     BRANCHNE TODO_DESTROY_RESULT_NOT_NULL
+destroy_return:
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
     RETURNAL #0
 
 TODO_DESTROY_INPUT_CREDENTIAL_NULL:
@@ -348,7 +375,7 @@ outform_body:
     ; Preserve identity and backing representation before any local release.
     BRANCH TODO_MakeOutform_BODY
 outform_finish:
-    BRANCH TODO_MakeOutform_FINISH
+    ; Validate identity before erasing the working evidence.
 outform_result:
     MCMP DR1, #1
     BRANCHNE TODO_MakeOutform_RESULT_COMPLETION
@@ -356,6 +383,19 @@ outform_result:
     BRANCHEQ TODO_MakeOutform_RESULT_NULL
     BRANCH TODO_MakeOutform_RESULT_TYPE_AND_IDENTITY
 outform_return:
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
     RETURNAL #2
 
 TODO_MakeOutform_INPUT_CREDENTIAL_NULL:
@@ -397,7 +437,7 @@ inform_body:
     ; Resolve live object, bind retained destination generation, register GC.
     BRANCH TODO_MakeInform_BODY
 inform_finish:
-    BRANCH TODO_MakeInform_FINISH
+    ; Validate identity before erasing the working evidence.
 inform_result:
     MCMP DR1, #1
     BRANCHNE TODO_MakeInform_RESULT_COMPLETION
@@ -405,6 +445,19 @@ inform_result:
     BRANCHEQ TODO_MakeInform_RESULT_NULL
     BRANCH TODO_MakeInform_RESULT_TYPE_AND_IDENTITY
 inform_return:
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
     RETURNAL #2
 
 TODO_MakeInform_INPUT_CREDENTIAL_NULL:

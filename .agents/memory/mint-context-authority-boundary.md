@@ -40,6 +40,15 @@ branches provide the agreed label transfer under CR14 without a separate GT,
 new operand encoding, or return-stack protocol. Do not generalize this fixed
 continuation to a multiply-called or recursive routine.
 
+Outward completion cleanup follows final result validation; do not erase
+descriptor/identity evidence before those checks. Preserve the completion
+result and Thread heap pair. This does not authorize erasure on the local
+branch continuation or bypass the unresolved early-entry clearing gates.
+
+**Why:** Result validation still needs working evidence. Ordinary data
+instructions can erase scratch values afterward, while the existing CALL
+return mask performs the outward capability cleanup.
+
 Mint owns the memory pool and free-slot list. Phase 1 code is single-threaded.
 The Lambda name is a label in Mint's code block; it executes with the same
 authority as Mint and uses Mint's NS/RW capability. Do not model it as a

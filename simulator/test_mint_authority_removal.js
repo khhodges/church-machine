@@ -13,10 +13,14 @@ const {Sim, fixture, checkContext} = require('../tests/simulator/cr6_contract_fi
 const source = fs.readFileSync(path.join(__dirname, 'cloomc/mint.cloomc'), 'utf8');
 const controlled = [0, 1, 2, 3, 4, 7, 8, 9, 10, 11];
 const zero = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
+const dataScratch = [2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 for (const method of ['CREATE', 'DESTROY', 'MakeOutform', 'MakeInform']) {
     const body = source.match(new RegExp(`method ${method} \\{([\\s\\S]*?)^\\}`, 'm'))[1];
-    const returnInstruction = body.match(/^\s*RETURNAL #\d+/m)[0].trim();
+    const returnBlock = body.match(/^(?:create|destroy|outform|inform)_return:\s*\n([\s\S]*?RETURNAL #\d+)/m)[1];
+    assert.doesNotMatch(body, /TODO_\w+_FINISH/);
+    for (const reg of dataScratch)
+        assert.match(returnBlock, new RegExp(`IADD DR${reg}, DR0, #0`));
     const mask = method === 'DESTROY' ? 0 : 2;
     const previousCount = global.window.bootConfig.step1.threadCount;
     global.window.bootConfig.step1.threadCount = 2;
@@ -36,8 +40,9 @@ for (const method of ['CREATE', 'DESTROY', 'MakeOutform', 'MakeInform']) {
         : [1, 3].includes(reg) ? gt({R: 1}) : data.gt);
     const loads = controlled.map((reg, i) => `LOAD CR${reg}, CR6, #${i + 1}`).join('\n');
     const callee = compile(31, `${loads}
+${dataScratch.map(reg => `IADD DR${reg}, DR0, #${512 + reg}`).join('\n')}
 IADD DR1, DR0, #77
-${returnInstruction}`, values);
+${returnBlock}`, values);
     const caller = compile(30, `${loads}
 LOAD CR11, CR6, #11
 CALL CR11, #0
@@ -70,7 +75,7 @@ HALT`, [...values, callee.gt]);
     const namespace = {...sim.cr[15], m: 0};
     const threadBase = sim._activeThreadBase();
     const layout = sim._threadLayoutAtBase(threadBase);
-    let returned = false, called = false;
+    let returned = false, called = false, heapPointer;
     for (let budget = 80; budget > 0 && !returned; budget--) {
         const before = sim.cr.map(cr => ({...cr}));
         const result = sim.step();
@@ -78,6 +83,7 @@ HALT`, [...values, callee.gt]);
         assert.ok(result, 'instruction must retire');
         if (result.instr.opcode === 2) {
             called = true;
+            heapPointer = sim.dr[5];
             for (const reg of controlled) assert.notEqual(before[reg].word0, 0);
         }
         if (result.instr.opcode !== 3) continue;
@@ -93,6 +99,9 @@ HALT`, [...values, callee.gt]);
             }
         });
         assert.equal(sim.dr[1], 77, 'RETURN mask is not data-register scrubbing');
+        for (const reg of dataScratch)
+            assert.equal(sim.dr[reg], 0, `${method}: scratch DR${reg} erased by actual source instructions`);
+        assert.equal(sim.dr[5], heapPointer, 'DR5 heap pointer survives cleanup');
         assert.deepEqual(sim.cr[5], heap);
         assert.deepEqual(sim.cr[12], thread);
         assert.deepEqual(sim.cr[13], reserved);
