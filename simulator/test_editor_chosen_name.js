@@ -37,4 +37,14 @@ ctx._editorActionIdentity = () => '';
 ctx._refreshEditorActionIdentity('Source.File');
 assert.equal(elements.editorArtifactIdentity, undefined);
 assert.equal(heading.textContent, 'Source.File');
+ctx.window._editorSourceFilePath = 'simulator/examples/alice.cloomc';
+ctx.window._editorSavedBinaryReceipt = {
+    token:'abcdef12',lump_version:5,
+    authoring_source_path:'simulator/examples/alice.cloomc',
+};
+ctx._refreshEditorActionIdentity('alice');
+assert.equal(heading.textContent, 'alice · Namespace LUMP v5');
+ctx.window._editorSourceFilePath = 'simulator/examples/other.cloomc';
+ctx._refreshEditorActionIdentity('other');
+assert.equal(heading.textContent, 'other', 'another source must not inherit Alice’s version');
 console.log('PASS the compact toolbar keeps the program name separate from LUMP identity');

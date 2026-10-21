@@ -5,6 +5,8 @@ const {JSDOM}=require('jsdom');
 const dom=new JSDOM('<textarea id="asmEditor"></textarea>',{runScripts:'outside-only'});
 const w=dom.window, editor=w.document.getElementById('asmEditor');
 let epoch=0, allow=true, pending, confirmations=0, paths=[], opens=[];
+const presentations=[];
+w._fetchAndPresentCommittedLump=async(...args)=>presentations.push(args);
 w.updateNamespace=()=>{};
 w._captureEditorWriteGuard=()=>{
     const mine=++epoch,text=editor.value;
@@ -35,11 +37,17 @@ const row=api.state.document.rows[0], before=JSON.stringify(api.state.document);
     await api.source(6);
     assert.equal(editor.value,'owned draft','consent rejection must preserve the draft');
     assert.equal(epoch,1,'one guard handed to real source opener');
+    assert.equal(presentations.length,0,'declined source replacement never attaches binary evidence');
     allow=true;await api.source(6);
     assert.equal(editor.value,'unfinished source bytes');
     assert.equal(paths.at(-1),'/simulator/examples/custom_unfinished.cloomc',
         'Namespace path wins even for known names and absent catalog entries');
     assert.equal(confirmations,2);
+    assert.equal(presentations.length,1);
+    assert.equal(presentations[0][1].filename,selected.filename);
+    assert.equal(presentations[0][1].lump_version,98);
+    assert.equal(presentations[0][1].authoring_source_path,row.authoring.path);
+    assert.equal(presentations[0][2].source,editor.value);
     await api.assigned(6);
     assert.equal(opens[0][0].selection.filename,'Old.lump');
     assert.equal(opens[0][0].selection.binaryHash,selected.binaryHash);

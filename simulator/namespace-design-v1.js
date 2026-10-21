@@ -320,6 +320,11 @@
                 if(typeof root.openSourceFile!=='function') throw Error('Source editor is unavailable.');
                 return await root.openSourceFile(target.path,
                     {accepts,writeGuard:guard,showEditor:true,propagateError:true,
+                        savedBinary:row.selection && row.selection.filename ? {
+                            token:row.selection.token,filename:row.selection.filename,
+                            binary_hash:row.selection.binaryHash,lump_version:row.selection.revision,
+                            abstraction:row.name,authoring_source_path:target.path,
+                        } : null,
                         reason:`NS[${slot}] ${row.name} explicitly targets ${target.path}. Review the source before replacing the editor; the label and source declaration may differ. The assigned Namespace LUMP is unchanged.`});
             }
             const selected=row.selection || {};

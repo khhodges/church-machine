@@ -2595,7 +2595,8 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
         window._editorSavedBinaryReceipt = {
             token: descriptor.token, filename: descriptor.filename,
             binary_hash: descriptor.binary_hash, abstraction: descriptor.abstraction,
-            lump_version: descriptor.lump_version
+            lump_version: descriptor.lump_version,
+            authoring_source_path: descriptor.authoring_source_path || null
         };
         window._editorCompiledDisasm = text;
         window._savedLumpDisassemblyBeforeCompile = text;
@@ -2605,6 +2606,12 @@ function _showCanonicalSavedLumpBesideSource(text, descriptor, unavailable) {
             descriptor && descriptor.token, !unavailable && descriptor && descriptor.words);
     }
     _syncSavedLumpIdentityVisibility();
+    if (descriptor && descriptor.authoring_source_path) {
+        window._savedLumpEditorMode = false;
+        _setDisassemblyPresentationStatus(unavailable ? 'Assigned Namespace binary unavailable.' :
+            'Exact Namespace-selected LUMP — the editable source file may differ from these saved bytes.');
+    }
+    if (typeof _refreshEditorActionIdentity === 'function') _refreshEditorActionIdentity();
 }
 
 async function _fetchAndPresentCommittedLump(resp, descriptor, frozen) {

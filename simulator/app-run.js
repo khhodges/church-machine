@@ -12769,8 +12769,10 @@ function _refreshEditorActionIdentity(name) {
     if (identityName) {
         const openMeta = window._editorOpenLumpMeta;
         const receipt = window._editorSavedBinaryReceipt;
-        const ownedReceipt = receipt && window._editorOpenLumpToken &&
-            receipt.token === window._editorOpenLumpToken ? receipt : null;
+        const associatedReceipt = receipt && receipt.authoring_source_path &&
+            receipt.authoring_source_path === window._editorSourceFilePath;
+        const ownedReceipt = receipt && (associatedReceipt || (window._editorOpenLumpToken &&
+            receipt.token === window._editorOpenLumpToken)) ? receipt : null;
         const savedRevision = ownedReceipt && Number.isInteger(ownedReceipt.lump_version)
             ? ownedReceipt.lump_version
             : openMeta && openMeta.token === window._editorOpenLumpToken &&
@@ -12779,7 +12781,8 @@ function _refreshEditorActionIdentity(name) {
             : tab && Number.isInteger(tab.sourceRevision)
             ? tab.sourceRevision
             : null;
-        const revisionKind = Number.isInteger(savedRevision) ? 'Saved LUMP' : 'Source';
+        const revisionKind = associatedReceipt ? 'Namespace LUMP' :
+            Number.isInteger(savedRevision) ? 'Saved LUMP' : 'Source';
         identityName.textContent = chosenName +
             (Number.isInteger(revision) ? ` · ${revisionKind} v${revision}` : '');
         identityName.title = chosenName

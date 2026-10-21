@@ -1129,6 +1129,13 @@ function openSourceFile(path, options) {
             if (typeof updateLineNumbers === 'function') updateLineNumbers();
             if (typeof updateSavePseudoBtn === 'function') updateSavePseudoBtn();
             if (options.showEditor && typeof switchView === 'function') switchView('editor');
+            // Keep file ownership and editable source intact. The assigned
+            // Namespace binary is separate evidence, not compiled draft bytes.
+            if (options.savedBinary && typeof window._fetchAndPresentCommittedLump === 'function') {
+                await window._fetchAndPresentCommittedLump(
+                    {token:options.savedBinary.token}, options.savedBinary,
+                    {source:code,epoch:window._editorNavigationEpoch || 0});
+            }
             // Show brief confirmation
             var outEl = document.getElementById('assemblyOutput');
             if (outEl) {
