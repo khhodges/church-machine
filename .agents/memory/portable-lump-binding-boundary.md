@@ -5,6 +5,16 @@ description: Security boundary between portable unresolved artifacts and destina
 
 ## Simulator binding lifecycle
 
+Bound inspection must read an already-persisted derivative, never run the linker
+as a read-time convenience. Original saved bytes remain a distinct inspectable mode.
+
+**Why:** A report of successful binding alongside a preview of original words
+misled users into treating unresolved source words as evidence of failed binding.
+Re-linking during inspection would instead change the evidence being inspected.
+
+**How to apply:** Tie C-list words, hex and decoding to one hash-verified snapshot;
+reject stale destination context without hiding the original immutable revision.
+
 Resolve declared dot-names afresh when Bind Namespace Design is clicked; never
 assume existing destination GTs are still correct. Run, Step and Walk must not
 trigger rebinding or change the established bindings.

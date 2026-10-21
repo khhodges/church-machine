@@ -38,6 +38,7 @@
         return data;
     }
     function accept(data) {
+        invalidatePreview();
         state.document = clone(data.document);
         state.fingerprint = data.fingerprint;
         state.projection = data.projection;
@@ -53,6 +54,7 @@
         finally { state.loading = false; render(); }
     }
     function setProfile(value) {
+        invalidatePreview();
         if(root.DesignSimulation) root.DesignSimulation.stop();
         if(typeof root.stopSim==='function') root.stopSim();
         if (!['ascending','phase1','legacy'].includes(value)) return;
@@ -85,6 +87,7 @@
         root.updateNamespace();
     }
     function changed() {
+        invalidatePreview();
         if(root.DesignSimulation) root.DesignSimulation.stop();
         ++sourceRequest; state.dirty=true; state.error=''; render();
     }
@@ -230,7 +233,48 @@
             {...state.document.rows.find(r=>r.slot===slot), entryWord:slot*4,
                 ...(!state.dirty ? {proposedDescriptor:state.projection.rows.find(r=>r.slot===slot)} : {})};
         dialog(`Namespace slot ${slot} — design inspection`,
-            `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button><button class="btn" onclick="NamespaceDesignV1.assigned(${slot})">Open assigned LUMP</button>`:''}`);
+            `<pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(JSON.stringify(row,null,2))}</pre><p>Design evidence only; not runtime memory or executable approval.</p>${row.kind==='lump'?`<button class="btn" onclick="NamespaceDesignV1.edit(${slot})">Edit placement</button><button class="btn" onclick="NamespaceDesignV1.preview(${slot})">Preview saved / bound bytes</button><button class="btn" onclick="NamespaceDesignV1.assigned(${slot})">Open assigned LUMP</button>`:''}`);
+    }
+    let previewEpoch = 0;
+    function invalidatePreview() {
+        ++previewEpoch;
+        const modal = document.getElementById('lumpHistoryPreviewModal');
+        if (modal && modal.dataset.namespaceBindingPreview) {
+            if (typeof root._closeLumpHistoryPreviewModal === 'function') root._closeLumpHistoryPreviewModal();
+            const decode = document.getElementById('savedGtDecode');
+            if (decode) decode.remove();
+        }
+    }
+    async function bindingPreview(exact) {
+        if (!state.active || !state.document) return null;
+        const matches = state.document.rows.filter(row => row.kind === 'lump' &&
+            row.selection?.filename === exact.filename && row.selection?.binaryHash === exact.binary_hash &&
+            (exact.namespaceSlot == null || row.slot === exact.namespaceSlot));
+        if (!matches.length) return null;
+        if (matches.length !== 1) return {reason:'This revision has multiple placements. Open Preview from the desired Namespace slot.'};
+        const row = matches[0], epoch = previewEpoch, profile = state.profile;
+        const fingerprint = state.fingerprint, documentText = JSON.stringify(state.document);
+        const accepts = () => epoch === previewEpoch && state.active && state.profile === profile &&
+            state.fingerprint === fingerprint && JSON.stringify(state.document) === documentText;
+        const context = {slot:row.slot, generation:row.sequence, profile:profileLabel(), fingerprint, accepts};
+        if (state.dirty) return {...context, reason:'Namespace has unsaved changes. Bind this design explicitly to inspect its derivative.'};
+        const response = await fetch(endpoint + '?binding_preview=1&profile=' + encodeURIComponent(profile), {cache:'no-store'});
+        const result = await response.json();
+        if (!accepts()) throw Error('Namespace selection changed while opening preview. Reopen the selected slot.');
+        if (!response.ok || !result.ok) throw Error(result.error || 'Binding inspection failed');
+        if (result.fingerprint !== fingerprint)
+            return {...context, reason:'Saved Namespace changed. Reload the design and reopen this preview.'};
+        const item = result.bindingReport?.lists.find(item => item.slot === row.slot);
+        return {...context, item, reason:item?.reason || 'Binding evidence unavailable. Bind explicitly first.'};
+    }
+    function preview(slot) {
+        const row = state.document.rows.find(row => row.slot === slot);
+        if (!row?.selection) return missingTarget(row, 'No exact saved revision selected.');
+        document.getElementById('namespaceDesignDialog')?.remove();
+        const s = row.selection;
+        return root._lumpHistoryPreview(s.token, s.revision, 0, 0, 0, s.token,
+            false, s.token, s.filename, true, {token:s.token, filename:s.filename,
+                binary_hash:s.binaryHash, abstraction:row.name, namespaceSlot:slot});
     }
     let sourceRequest = 0;
     function thread(slot) {
@@ -483,7 +527,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision};
+    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');

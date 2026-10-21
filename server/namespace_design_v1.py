@@ -306,8 +306,14 @@ class DesignStore:
         return dict(ok=True, document=document, fingerprint=digest(document),
                     persisted=self.path.exists(), projection=project(document, self.lumps))
 
-    def read(self):
-        return self.response(self.read_document())
+    def read(self, binding_preview=False):
+        document = self.read_document()
+        response = self.response(document)
+        if binding_preview:
+            from server.namespace_binding_report import binding_report
+            response["bindingReport"] = binding_report(
+                document, self.lumps, response["fingerprint"], bind_now=False)
+        return response
 
     def save(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"fingerprint", "document"}:

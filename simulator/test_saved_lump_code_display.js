@@ -156,7 +156,7 @@ console.log('PASS shared saved-LUMP code display: embedded, editable v0 fallback
         const exactSource = '  historical source\r\n\tRETURN\r\n';
         const historyContext = vm.createContext({
             data: { [field]: exactSource, binary_valid: false, approved: false, trusted: false },
-            inspection: null, words: [], exactIdentity: null, token: '00112233', rawTailHex: '',
+            inspection: null, words: [], exactIdentity: null, token: '00112233', rawTailHex: '', boundView:false,
             _selectSavedLumpCodeDisplay: context._selectSavedLumpCodeDisplay,
         });
         vm.runInContext(selection + '\nthis.editable = editablePreviewSource;', historyContext);

@@ -4479,6 +4479,7 @@ function _lumpHistorySelectRow(rowEl, token, version, cw, cc, lumpSize, tk, hist
 }
 
 function _closeLumpHistoryPreviewModal() {
+    document.getElementById('savedGtDecode')?.remove();
     const overlay = document.getElementById('lumpHistoryPreviewModal');
     if (!overlay) return;
     if (overlay._escHandler) document.removeEventListener('keydown', overlay._escHandler);
@@ -4511,7 +4512,7 @@ function _savedGtDecodeHtml(word, row) {
     html += '<table class="lump-hex-table"><tbody>' + fields.map(pair =>
         '<tr><th>' + e(pair[0]) + '</th><td>' + e(pair[1]) + '</td></tr>').join('') + '</tbody></table>';
     if (parsed.malformed) html += '<p>Malformed: ' + e(parsed.malformedReason) + '</p>';
-    return html + '<p>Decoded from saved bits only. This does not establish runtime validity or resolve the slot against today’s Namespace.</p>';
+    return html + '<p>Decoded from the inspected bytes only. This does not establish runtime validity or activation.</p>';
 }
 
 function _openSavedGtDecode(word, row) {
@@ -4521,6 +4522,7 @@ function _openSavedGtDecode(word, row) {
     dialog.className = 'saved-gt-decode';
     dialog.setAttribute('aria-labelledby', 'savedGtTitle');
     dialog.innerHTML = _savedGtDecodeHtml(word, row) +
+        '<p>' + _fmtEscape(document.getElementById('lumpHistoryPreviewModal')?.dataset.byteProvenance || 'Original saved revision') + '</p>' +
         '<form method="dialog"><button class="btn btn-primary" autofocus>Close</button></form>';
     dialog.addEventListener('keydown', event => {
         if (event.key === 'Escape') {
@@ -4540,7 +4542,7 @@ function _openSavedGtDecode(word, row) {
 }
 
 function _savedGtButton(word, row, label) {
-    return '<button type="button" class="saved-gt-word" title="Decode saved GT, C-list row ' +
+    return '<button type="button" class="saved-gt-word" title="Decode inspected GT, C-list row ' +
         row + '" onclick="_openSavedGtDecode(' + (word >>> 0) + ',' + row + ')">' +
         _fmtEscape(label) + '</button>';
 }
@@ -4559,12 +4561,14 @@ function _renderSavedLumpIdentity(data, words, version) {
     const dependencies = api && api.symbolic_binding && api.symbolic_binding.dependencies || [];
     let html = '<section class="lump-detail-section"><h3>' + e(name) + ' — v' + e(version) + '</h3>' +
         '<div>Pet Name: <strong>' + e(name) + '</strong> · Naming Namespace: <strong>' + e(namespace) + '</strong></div>' +
-        '<div>Saved artifact: ' + e(data.filename || 'Unavailable') + '</div>' +
+        '<div>' + (data.boundPreview ? 'Source artifact: ' : 'Saved artifact: ') + e(data.filename || 'Unavailable') + '</div>' +
         '<div style="overflow-wrap:anywhere">Binary SHA-256: ' + e(data.binary_hash || 'Unavailable') + '</div>' +
-        '<p>Exact saved artifact. Runtime Namespace placement is not inferred from the current simulator.</p>' +
+        '<p>' + (data.boundPreview ? 'Exact bound derivative — not installed or activated.' :
+            'Exact saved artifact. Runtime Namespace placement is not inferred from the current simulator.') + '</p>' +
         '<h4 class="lump-preview-section-title">C-list — ' + cc + ' rows</h4>';
     if (error) html += '<p>Definition could not be decoded: ' + e(error) + '</p>';
-    html += '<div class="lump-preview-clist"><table class="lump-hex-table"><thead><tr><th>Row</th><th>Declared dot-name</th><th>Rights</th><th>Saved word</th><th>Binding</th></tr></thead><tbody>';
+    html += '<div class="lump-preview-clist"><table class="lump-hex-table"><thead><tr><th>Row</th><th>Declared dot-name</th><th>Rights</th><th>' +
+        (data.boundPreview ? 'Bound word' : 'Saved word') + '</th><th>Binding</th></tr></thead><tbody>';
     for (let row = 0; row < cc; row++) {
         const cap = dependencies.find(d => d.relocation_row === row) || caps[row] || {};
         const declared = cap.canonical_leaf || cap.name || 'Not declared in saved definition';
@@ -4573,7 +4577,8 @@ function _renderSavedLumpIdentity(data, words, version) {
         html += '<tr><td>' + row + '</td><td>' + e(declared === 'SELF' ? 'SELF — ' + name : declared) +
             '</td><td>' + e(Array.isArray(rights) ? rights.join('') || 'None' : rights) +
             '</td><td>' + _savedGtButton(word, row, '0x' + word.toString(16).padStart(8, '0').toUpperCase()) +
-            '</td><td>' + (word === 0 && declared !== 'Not declared in saved definition'
+            '</td><td>' + (data.boundPreview ? e(data.boundPreview.rows[row]?.status || 'Unavailable') :
+                word === 0 && declared !== 'Not declared in saved definition'
                 ? 'Symbolic / not localized' : word === 0 ? 'Zero' : 'Stored token') + '</td></tr>';
     }
     return html + '</tbody></table></div></section>';
@@ -4939,7 +4944,29 @@ window._openSavedLumpVersionDetails = function (identity) {
         Object.assign({}, identity));
 };
 
-async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename, isCurrent, exactIdentity) {
+async function _verifyBoundPreview(item, saved) {
+    if (!item || !['bound', 'unresolved'].includes(item.status) || !Array.isArray(item.words)) return false;
+    if (item.filename !== saved.filename || item.sourceHash !== saved.binary_hash ||
+            !Array.isArray(item.sourceWords) || item.sourceWords.length !== saved.words.length ||
+            item.sourceWords.some((word, i) => word !== saved.words[i]))
+        throw Error('Bound snapshot does not match the exact saved source.');
+    const bytes = new ArrayBuffer(item.words.length * 4), view = new DataView(bytes);
+    item.words.forEach((word, i) => {
+        if (!Number.isInteger(word) || word < 0 || word > 0xffffffff) throw Error('Invalid bound word.');
+        view.setUint32(i * 4, word, false);
+    });
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
+        b => b.toString(16).padStart(2, '0')).join('');
+    if (hash !== item.derivativeHash) throw Error('Bound snapshot SHA-256 mismatch.');
+    const cc = item.words[0] & 255;
+    if (item.rows.length !== cc || item.rows.some((row, i) =>
+        row.index !== i || row.word !== item.words[item.words.length - cc + i] ||
+        (row.status === 'bound' && row.newGT !== row.word)))
+        throw Error('Binding report disagrees with the derivative bytes.');
+    return true;
+}
+
+async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord, currentToken, archiveFilename, isCurrent, exactIdentity, previewMode) {
     const previewEl = document.getElementById(`lumpHistoryHexPreview_${tk}`);
     if (!previewEl && !exactIdentity) return;
     const e = _escHtml;
@@ -4989,12 +5016,37 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             _noPreview(error.message, 'Reload History, then select this revision again.');
             return;
         }
-        const data = await archResp.json();
+        let data = await archResp.json();
         if (exactIdentity && document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
         if (exactIdentity && (data.filename !== exactIdentity.filename ||
                 data.binary_hash !== exactIdentity.binary_hash)) {
             _noPreview('Saved artifact identity does not match the requested revision');
             return;
+        }
+        let bindingContext = null, boundAvailable = false, boundView = false;
+        const bindingIdentity = exactIdentity || {token:data.token || token, filename:data.filename,
+            binary_hash:data.binary_hash, abstraction:data.abstraction};
+        if (bindingIdentity.filename && window.NamespaceDesignV1?.bindingPreview) {
+            try {
+                bindingContext = await window.NamespaceDesignV1.bindingPreview(bindingIdentity);
+            } catch (error) {
+                bindingContext = {reason:'Bound inspection unavailable: ' + error.message};
+            }
+            if (document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
+            if (bindingContext) {
+                exactIdentity = bindingIdentity;
+                isCurrent = true; // Exact source/bound modes, never a current-catalog diff.
+                pendingModal.dataset.namespaceBindingPreview = 'true';
+                try {
+                    boundAvailable = await _verifyBoundPreview(bindingContext.item, data);
+                } catch (error) {
+                    bindingContext.reason = error.message + ' Original saved bytes remain available. Bind explicitly to replace invalid evidence.';
+                }
+                boundView = boundAvailable && previewMode !== 'saved';
+                if (boundView) data = {...data, words:bindingContext.item.words,
+                    inspection:undefined, binary_inspection:undefined,
+                    binary_hash:bindingContext.item.derivativeHash, boundPreview:bindingContext.item};
+            }
         }
         const words = data.words || [];
         const rawTailHex = typeof data.raw_tail_hex === 'string'
@@ -5022,7 +5074,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                     ? inspection.api_definition.methods.length : 0
             });
         // Editing a separate draft does not approve or mutate this artifact.
-        const editablePreviewSource =
+        const editablePreviewSource = !boundView &&
             selectedCode.kind !== 'unavailable' ? selectedCode.text : '';
         let sourcePreview = '';
         if (selectedCode.kind !== 'unavailable') {
@@ -5041,7 +5093,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `<div class="lump-stored-src-meta-bar lump-stored-src-meta">` +
                 `<span class="lump-stored-src-lang-badge">${sourceLabel}</span>` +
                 (selectedCode.kind === 'embedded'
-                    ? `<span class="lump-stored-src-ts">Embedded in the ${exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} binary</span>`
+                    ? `<span class="lump-stored-src-ts">Embedded in the ${boundView ? 'bound derivative' : exactIdentity ? 'selected saved' : isCurrent ? 'current' : 'archived'} binary</span>`
                     : `<span class="lump-source-unverified-warning" role="status">${e(selectedCode.warning)}</span>`) +
                 (editablePreviewSource
                     ? `<button type="button" class="btn lump-history-open-editor" title="Open this preview text as a new editable draft. The immutable LUMP and boot selection are unchanged.">Open in Editor</button>`
@@ -5062,7 +5114,7 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 `</div>`;
         }
 
-        const repairControls = _lumpBootstrapRepairControls(
+        const repairControls = boundView ? '' : _lumpBootstrapRepairControls(
             data, currentToken || token, version, archiveFilename, tk,
             historicalRecord, isCurrent
         );
@@ -5091,9 +5143,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
 
         const COLS = 8;
         const rowCount = Math.ceil(numWords / COLS);
-        let t = `<div class="lump-detail-section"><div class="lump-section-title">${isCurrent ? 'Hex' : 'Hex Diff'} \u2014 v${version}${exactIdentity ? ' (exact saved revision)' : isCurrent ? ' (current)' : ' vs current'}</div>`;
+        let t = `<div class="lump-detail-section"><div class="lump-section-title">${isCurrent ? 'Hex' : 'Hex Diff'} \u2014 v${version}${boundView ? ' (exact bound derivative)' : exactIdentity ? ' (exact saved revision)' : isCurrent ? ' (current)' : ' vs current'}</div>`;
         if (exactIdentity) {
-            t += '<div class="lump-hex-diff-summary">Read-only saved revision details. Editor text and Namespace are unchanged.</div>';
+            t += '<div class="lump-hex-diff-summary">Read-only ' + (boundView ? 'bound derivative' : 'saved revision') + ' details. Editor text and Namespace are unchanged.</div>';
         } else if (isCurrent) {
             t += '<div class="lump-hex-diff-summary lump-hex-diff-summary--none">Viewing the current live binary.</div>';
         } else if (curFetchFailed) {
@@ -5168,10 +5220,33 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                 : '<p>Saved method API viewer unavailable. No catalog fallback is used.</p>') +
             '</section>';
         if (document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
+        if (bindingContext?.accepts && !bindingContext.accepts()) return;
+        const bindingBar = bindingContext ? `<section class="lump-detail-section" style="overflow-wrap:anywhere">
+            <h3>${boundView ? 'Bound derivative' : 'Original saved revision'} — read-only</h3>
+            <p>Source: ${e(exactIdentity.filename)} · token ${e(exactIdentity.token)}<br>Source SHA-256: ${e(exactIdentity.binary_hash)}</p>
+            <p>Selected Namespace: ${e(bindingContext.profile || 'Ambiguous placement')} · ${e(bindingContext.fingerprint || '')}<br>
+            Destination: NS[${e(bindingContext.slot)}] · generation ${e(bindingContext.generation)}<br>
+            Bound SHA-256: ${e(boundAvailable ? bindingContext.item.derivativeHash : 'Unavailable')}<br>
+            Status: ${e(bindingContext.item?.status || 'unavailable')} — ${e(bindingContext.reason)}</p>
+            <button class="btn" id="lumpPreviewSaved">Original saved revision</button>
+            <button class="btn" id="lumpPreviewBound" ${boundAvailable ? '' : 'disabled'}>Bound derivative</button>
+            <p>Inspection does not compile, bind, install, activate, or operate hardware.</p></section>` : '';
         _showLumpHistoryPreviewModal(
-            version, _renderSavedLumpIdentity(data, words, version) +
+            version, bindingBar + _renderSavedLumpIdentity(data, words, version) +
                 issueSummary + repairControls + methodApiPreview + sourcePreview + t
         );
+        if (bindingContext) {
+            document.getElementById('lumpHistoryPreviewModal').dataset.namespaceBindingPreview = 'true';
+            document.getElementById('lumpHistoryPreviewModal').dataset.byteProvenance =
+                (boundView ? 'Bound derivative SHA-256: ' + bindingContext.item.derivativeHash :
+                    'Original saved SHA-256: ' + exactIdentity.binary_hash) +
+                ' · ' + bindingContext.profile + ' · NS[' + bindingContext.slot + '] · generation ' +
+                bindingContext.generation + ' · Not activated';
+            for (const mode of ['saved','bound']) document.getElementById(
+                mode === 'saved' ? 'lumpPreviewSaved' : 'lumpPreviewBound').onclick = () =>
+                _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, historicalRecord,
+                    currentToken, archiveFilename, isCurrent, exactIdentity, mode);
+        }
         if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
         const openEditorButton = document.querySelector(
             '#lumpHistoryPreviewModal .lump-history-open-editor');

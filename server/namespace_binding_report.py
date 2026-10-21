@@ -6,12 +6,14 @@ Legacy local GTs are inspection evidence, never a substitute for declared locks.
 import hashlib
 import json
 import struct
+import os
+import tempfile
 from pathlib import Path
 
 from server.simulation_preparation import artifact_bindings, _localize_portable, _validate_body
 
 
-def binding_report(document, directory, fingerprint):
+def binding_report(document, directory, fingerprint, *, bind_now=True):
     directory = Path(directory)
     lists, candidates, rows, bodies = [], [], [], {}
     for placement in document["rows"]:
@@ -19,7 +21,9 @@ def binding_report(document, directory, fingerprint):
             continue
         selection = placement.get("selection") or {}
         item = dict(slot=placement["slot"], name=placement["name"],
-                    filename=selection.get("filename"), status="blocked", rows=[])
+                    filename=selection.get("filename"), sourceHash=selection.get("binaryHash"),
+                    sourceToken=selection.get("token"), generation=placement["sequence"],
+                    status="blocked", rows=[])
         lists.append(item)
         row = dict(slot=placement["slot"], name=placement["name"], type="Inform",
                    seq=placement["sequence"], resident=True, boot_resident=True,
@@ -36,6 +40,7 @@ def binding_report(document, directory, fingerprint):
             if hashlib.sha256(raw).hexdigest() != row["binary_hash"]:
                 raise ValueError("Selected artifact hash changed. Review the exact selection and bind again.")
             words = _validate_body(raw)
+            item["sourceWords"] = words
             bodies[row["slot"]] = raw
             cc, cw = words[0] & 255, (words[0] >> 10) & 8191
             # Names are only displayed from the inspected binary. They confer
@@ -77,16 +82,44 @@ def binding_report(document, directory, fingerprint):
             if symbolic:
                 from server.simulation_preparation import _localize_symbolic
                 localized, _ = _localize_symbolic(
-                    bodies[item["slot"]], binding, rows, candidates, directory, bind_now=True)
+                    bodies[item["slot"]], binding, rows, candidates, directory,
+                    bind_now=bind_now, require_snapshot=not bind_now)
             else:
-                localized, _ = _localize_portable(
-                    bodies[item["slot"]], binding, rows, candidates, directory)
+                # Portable bindings predate symbolic snapshots. Persist their exact
+                # result too; inspection must never invoke the linker.
+                from server.namespace_binding_targets import naming_context
+                key = hashlib.sha256(json.dumps(
+                    [document, naming_context(),
+                     [{k: v for k, v in candidate.items() if k != "symbolicReport"}
+                      for candidate in candidates], item["slot"]],
+                    sort_keys=True).encode()).hexdigest()
+                path = directory / ".binding-previews" / (key + ".json")
+                if bind_now:
+                    localized, _ = _localize_portable(
+                        bodies[item["slot"]], binding, rows, candidates, directory)
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    fd, temporary = tempfile.mkstemp(dir=path.parent)
+                    try:
+                        with os.fdopen(fd, "w") as out:
+                            json.dump(dict(bytes=localized.hex(),
+                                hash=hashlib.sha256(localized).hexdigest()), out)
+                        os.replace(temporary, path)
+                    finally:
+                        if os.path.exists(temporary):
+                            os.unlink(temporary)
+                else:
+                    if not path.exists():
+                        raise ValueError("No exact binding snapshot. Bind explicitly first.")
+                    record = json.loads(path.read_text())
+                    localized = bytes.fromhex(record["bytes"])
+                    if hashlib.sha256(localized).hexdigest() != record["hash"]:
+                        raise ValueError("Binding snapshot integrity failed. Bind again.")
             words = _validate_body(localized)
             cc = words[0] & 255
             for row in item["rows"]:
                 gt = words[len(words)-cc+row["index"]]
-                row.update(newGT=gt, targetSlot=gt & 65535, status="bound")
-            item.update(status="bound", derivativeHash=hashlib.sha256(localized).hexdigest(),
+                row.update(newGT=gt, word=gt, targetSlot=gt & 65535, status="bound")
+            item.update(status="bound", words=words, derivativeHash=hashlib.sha256(localized).hexdigest(),
                         reason="Freshly bound for this design only; not activated.")
             if symbolic:
                 report = binding["symbolicReport"]

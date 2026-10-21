@@ -121,7 +121,7 @@ def _localize_portable(raw, binding, rows, bindings, directory):
     return struct.pack(f">{len(words)}I", *words), words[start]
 
 
-def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=False):
+def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=False, require_snapshot=False):
     from server.symbolic_binding import bind, embedded_api
     from server.namespace_binding_targets import naming_context, qualified_name
     names = naming_context()
@@ -136,6 +136,8 @@ def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=Fals
     snapshot = Path(directory) / ".symbolic-bindings" / (snapshot_key + ".json")
     if not bind_now:
         if not snapshot.exists():
+            if require_snapshot:
+                raise ValueError("No binding snapshot for this exact Namespace selection and generation. Bind explicitly first.")
             # No binding action has occurred: preserve the unresolved program.
             # SELF alone is destination-local identity, not target resolution.
             from server.portable_binding import mint_gt

@@ -55,8 +55,25 @@ def test_missing_target_compiles_and_reaches_signed_save_plan(client, isolated_l
     assert bindings[0]["portableBinding"]["schema"] == "church.symbolic-lump-binding/v1"
     bound, _ = _localize_symbolic(raw, bindings[0], [row], bindings, isolated_lumps, bind_now=True)
     assert bindings[0]["symbolicReport"]["status"] == "unresolved"
+    from server.namespace_binding_report import binding_report
+    document = {"rows": [dict(slot=16, sequence=1, name="test.SymbolicCaller", kind="lump",
+        selection=dict(filename=saved["filename"], token=saved["token"],
+                       binaryHash=hashlib.sha256(raw).hexdigest()))]}
+    report = binding_report(document, isolated_lumps, "selected")
+    assert report["status"] == "unresolved"
+    item = report["lists"][0]
+    assert item["words"] == list(struct.unpack(f">{len(bound)//4}I", bound))
+    assert item["sourceWords"] == words
+    assert item["derivativeHash"] == hashlib.sha256(bound).hexdigest()
     monkeypatch.setattr("server.symbolic_binding.bind",
                         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("Unexpected rebind")))
     loaded, _ = _localize_symbolic(raw, bindings[0], [row], bindings, isolated_lumps)
     assert loaded == bound
+    reopened = binding_report(document, isolated_lumps, "selected", bind_now=False)
+    assert reopened == report
+    document["rows"][0]["sequence"] = 2
+    stale = binding_report(document, isolated_lumps, "changed", bind_now=False)
+    assert stale["status"] == "blocked"
+    assert "words" not in stale["lists"][0]
+    assert "No binding snapshot" in stale["lists"][0]["reason"]
     assert (isolated_lumps / saved["filename"]).read_bytes() == raw

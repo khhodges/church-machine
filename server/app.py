@@ -5166,7 +5166,7 @@ def namespace_design_v1():
             if not _is_ide_design_request():
                 return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
             return jsonify(store.save(request.get_json(silent=True)))
-        return jsonify(store.read())
+        return jsonify(store.read(binding_preview=request.args.get("binding_preview") == "1"))
     except (OSError, ValueError, TypeError, KeyError) as exc:
         return jsonify(ok=False, error=str(exc), dataChanged=False), 409
 

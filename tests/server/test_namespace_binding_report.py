@@ -45,7 +45,19 @@ def test_fresh_portable_linker_result_uses_new_sequence(tmp_path, monkeypatch):
     row = dict(slot=16, name="ide.Test", kind="lump", sequence=2,
                selection=dict(filename="self.lump", binaryHash=hashlib.sha256(raw).hexdigest()))
     first = binding_report({"rows": [row]}, tmp_path, "one")
+    monkeypatch.setattr(module, "_localize_portable",
+                        lambda *args: (_ for _ in ()).throw(AssertionError("Inspection must not link")))
+    reopened = binding_report({"rows": [row]}, tmp_path, "one", bind_now=False)
+    assert reopened["lists"][0]["words"] == first["lists"][0]["words"]
+    assert reopened["lists"][0]["derivativeHash"] == first["lists"][0]["derivativeHash"]
+    monkeypatch.undo()
+    monkeypatch.setattr(module, "artifact_bindings", lambda rows, directory: [
+        dict(slot=rows[0]["slot"], filename="self.lump",
+             portableBinding=dict(dependencies=[dep]))])
     row["sequence"] = 3
+    stale = binding_report({"rows": [row]}, tmp_path, "two", bind_now=False)
+    assert stale["status"] == "blocked"
+    assert "words" not in stale["lists"][0]
     second = binding_report({"rows": [row]}, tmp_path, "two")
     assert first["status"] == second["status"] == "complete"
     assert first["lists"][0]["rows"][0]["newGT"] == 0x4a020010
