@@ -128,7 +128,7 @@
                     `First fault: ${state.firstFaultEvidence.fault.type}; ${state.firstFaultEvidence.fault.message}\n` +
                     `Data registers unchanged: ${state.malloryRegistersBefore.every((word, i) => word === sim.dr[i])}\n` : '') +
                 'Raw inspection is test-harness observation, not authority granted to Mallory.')
-            : asc ? 'Isolated ascending-layout fixture (not the selected NewLayout image, admission or FPGA proof).\n' +
+            : asc ? 'Isolated ascending-layout fixture (not the selected Namespace image, admission or FPGA proof).\n' +
                 `Thread slots: ${state.threadSlots.map(n => `NS[${n}] ${threadName(n)}`).join(', ')}\n` +
                 `Actors: ${roles.map(r => `${r.name} NS[${r.slot}]`).join(', ')}\n` +
                 `Alice returned: ${state.aliceReturned}; first fault: ${state.firstFaultEvidence
@@ -159,7 +159,7 @@
             }));
             setStatus(AliceMalloryLab.outcome(state) + (state.scenario === 'ascending-actors'
                 ? ' Isolated ascending-layout fixture: preboot fixture provisions CR0 driver continuations and each actor E capability in its own CR1. ' +
-                    'Current Alice/Mallory sources compiled without opcode patches; main CapabilityTest and saved Namespace untouched. Fault-restart retention is not yet verified. Not a saved NewLayout image/admission/FPGA proof.'
+                    'Current Alice/Mallory sources compiled without opcode patches; main CapabilityTest and saved Namespace untouched. Fault-restart retention is not yet verified. Not a saved Namespace image/admission/FPGA proof.'
                 : ' Canonical boot completed in isolation; suspended driver entry prepared. ' +
                 'Pinned historical LOADs adapted only in newly minted RAM fixtures (no saved-file/editor/Namespace write).'));
         } catch (err) {

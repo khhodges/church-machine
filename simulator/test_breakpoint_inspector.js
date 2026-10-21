@@ -1,6 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const ctx={console};ctx.globalThis=ctx;vm.createContext(ctx);
+const ctx={console,NamespaceProfileNames:require('./namespace-profile-names')};ctx.globalThis=ctx;vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(__dirname+'/breakpoint-inspector.js','utf8'),ctx);
 const BI=ctx.BreakpointInspector;
 function machine(config){

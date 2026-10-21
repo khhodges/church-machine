@@ -157,7 +157,7 @@
         const where = s.kind === 'boot' ? 'B:00 — LOAD CR15' : s.address !== null ? hex(s.address, 4) : 'unknown address';
         const entry = history.find(item => item.snapshot === s);
         let html = '<div class="bpi-head"><div><div class="bpi-title">' + (fromHistory ? 'Breakpoint #' + (entry ? entry.ordinal : '?') + ' (captured)' : 'Breakpoint paused') + ' · ' + esc(where) + '</div>' +
-            '<div class="bpi-sub">' + esc(s.source === 'private' ? 'Private ' + (s.profile === 'ascending' ? 'NewLayout' : (s.profile || 'design')) + ' simulation' : 'Simulator') +
+            '<div class="bpi-sub">' + esc(s.source === 'private' ? 'Private simulation · ' + root.NamespaceProfileNames.label(s.profile) : 'Simulator') +
             ' · read-only snapshot · execution remains paused</div></div>' +
             '<div class="bpi-actions">' + (fromHistory
                 ? '<button type="button" class="bpi-close" data-bpi-history>Back to history</button>'

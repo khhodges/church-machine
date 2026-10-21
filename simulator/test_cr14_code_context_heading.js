@@ -6,7 +6,7 @@ const ChurchSimulator = require('./simulator');
 const source = fs.readFileSync(__dirname + '/app-memory.js', 'utf8');
 const helper = source.slice(source.indexOf('function _cr14CodeContextHeading('),
     source.indexOf('function updateCRDetail()'));
-const context = {};
+const context = {window:{NamespaceProfileNames:require('./namespace-profile-names')}};
 vm.runInNewContext(helper, context);
 const machine = new ChurchSimulator();
 const base = 512;
@@ -32,7 +32,7 @@ machine.cr[12] = {word0:0x0200000c,word1:1024};
 machine.cr[15] = {word0:0x02000001,word1:0};
 machine.pc=2;
 assert.strictEqual(context._cr14CodeContextHeading(machine),
-    'Code: Run · Abstraction: CapabilityTest · Thread: T.3 · Namespace: NewLayout (Boot.NS)');
+    'Code: Run · Abstraction: CapabilityTest · Thread: T.3 · Namespace: New layout — ascending table / four-word header (Boot.NS)');
 machine.pc=4;
 assert.match(context._cr14CodeContextHeading(machine), /^Code: Other/);
 machine.cr[12].word0=0;

@@ -14,6 +14,7 @@ function harness(defect) {
         designProfile:profile,sourceNamespaceFingerprint:fingerprint,hardwareCertified:false,
         imageFormat:'ascending-nst-metadata-slot0-v1',slotCount:64,artifactBindings:[{filename:'exact.lump'}]};
     const scope={console,setTimeout,Uint32Array,Uint8Array,ArrayBuffer,DataView,crypto:webcrypto,
+        NamespaceProfileNames:require('./namespace-profile-names'),
         _showStopBtn:show=>toolbar.push(show),
         NamespaceDesignV1:{state:{active:true,profile,fingerprint,document:{rows:[
             {slot:10,boot:true,selection:{token:'961bfee3',filename:'exact.lump',binaryHash:'b'.repeat(64)}}

@@ -106,14 +106,14 @@
             '<p role="status" style="white-space:pre-wrap">'+esc(message)+'</p>'+
             (provenance && !ready ? '<p role="alert">The selected design has changed. These retained bytes are not current; prepare the selected design again before execution.</p>' : '')+
             (provenance ? '<details><summary>Exact simulation identity</summary><pre style="white-space:pre-wrap">'+
-                esc(JSON.stringify({profile:provenance.designProfile, imageHash:provenance.imageHash,
+                esc(JSON.stringify({profile:root.NamespaceProfileNames.label(provenance.designProfile), imageHash:provenance.imageHash,
                     configurationHash:provenance.configurationHash, approvedRevisionId:provenance.approvedRevisionId,
                     artifactBindings:provenance.artifactBindings},null,2))+'</pre></details>':'')+
             (machine ? '<pre style="white-space:pre-wrap">'+esc('Instructions: '+steps+
                 ' · NIA: '+machine.pc+' · DR1: '+(machine.dr[1]>>>0)+
                 (machine.halted?' · stopped':'')+'\n'+(machine.output || '').slice(-4000)+
                 '\n'+(machine.faultLog || []).map(f=>f.message || f.type).join('\n'))+'</pre>':'')+
-            '<small>Main Run, Step, Walk and Reset use this selected design. No legacy-image fallback, hardware certification or installation.</small>';
+            '<small>Main Run, Step, Walk and Reset use this selected design. No fallback to another Namespace design, hardware certification or installation.</small>';
     }
     function render() {
         if (typeof document === 'undefined') return;

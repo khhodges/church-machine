@@ -157,3 +157,4 @@
 - [Mint context authority](mint-context-authority-boundary.md) — synthetic frame evidence grants no service access; approve protected interfaces and Lambda authority before implementation.
 - [Alice/Mallory Threads](alice-mallory-thread-isolation.md) — separate Threads with each actor's entry GT in CR1; distinguish fixture execution from saved-design adoption.
 - [Intentional capability faults](intentional-capability-fault-publication.md) — absent-row accesses remain authored programs; publication diagnostics must not replace runtime checks.
+- [Namespace public names](namespace-public-names.md) — exact dropdown names govern IDE profile labels and reports; internal keys are not public names.

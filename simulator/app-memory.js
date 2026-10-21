@@ -1463,7 +1463,7 @@ function _cr14CodeContextHeading(machine) {
     // Profile display names are not the Namespace's stored SELF-row label.
     // Keep both visible, and never derive them from the mutable design selector.
     const profile = machine.simulationConfiguration && machine.simulationConfiguration.designProfile;
-    const profileName = {ascending: 'NewLayout', phase1: 'Phase 1'}[profile];
+    const profileName = profile && window.NamespaceProfileNames.label(profile);
     const namespaceName = namespace.bound && profileName
         ? `${profileName} (${namespace.name})` : namespace.name;
     const threadName = thread.name.replace(/^Thread[.#](\d+)$/, 'T.$1');
@@ -4262,7 +4262,8 @@ function _namespaceDesignSourceNotice(state) {
     return '<div id="nsDesignSourceNotice" role="note" style="padding:10px;border:1px solid #88703e;background:#302719;color:#f0d79c;font-size:0.8rem;line-height:1.5;">' +
         '<strong>Saved Namespace design — not active CR15 state.</strong> ' +
         'Rows show saved assignments and any unsaved edits, not proof of an installed or running image.' +
-        (legacy ? '<br><strong>Legacy layout — new-format adoption pending.</strong> ' +
+        (legacy ? '<br><strong>' + _escHtml(window.NamespaceProfileNames.label('legacy')) +
+            ' — new-format adoption pending.</strong> ' +
             'This design still assigns Boot.NS to slot 0 and Boot.Thread to slot 1. ' +
             'The approved new layout is: slot 0 metadata/header, slot 1 Namespace self, slot 2 entry Thread. ' +
             'The new-format design has not replaced these saved rows.' : '') +

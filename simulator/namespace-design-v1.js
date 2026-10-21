@@ -113,7 +113,7 @@
             lazy:rows.filter(r=>r.policy==='Lazy').length,garbage:0,free:slotCount()-1-rows.length}};
     }
     function profileLabel() {
-        return state.profile === 'phase1' ? 'Phase 1' : 'Ascending layout';
+        return root.NamespaceProfileNames.label(state.profile);
     }
     function designStatus() {
         const origin = state.persisted === true
@@ -162,7 +162,7 @@
             <td class="ns-entry-actions"><button class="btn btn-xs ns-inspect-btn" onclick="NamespaceDesignV1.inspect(${slot})">Inspect and resolve</button>${r.kind==='lump'?`<button class="btn btn-xs" style="background:#2d4a3e;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35)" onclick="NamespaceDesignV1.assigned(${slot})">Open assigned LUMP</button>`:''}${select}${r.kind==='lump'?`<button class="btn btn-xs ns-identity-btn" style="background:#27233b;color:#c4a7ff;border:1px solid rgba(196,167,255,0.35);margin-left:5px;font-size:0.65rem;padding:1px 5px" onclick="NamespaceDesignV1.identity(${slot})">Identity</button>`:''}</td></tr>`;
         }
         html+='</tbody></table><p id="nsSaveLayoutNote" role="status"></p>';
-        if(state.profile==='phase1') html+=`<p>Phase 1: slot 0 metadata · 1 self · 2 entry Thread · 8 UART · 9 ide.Mint (requested E) · 14 nstab (requested RW) · 15 pkverify (requested E). Requested rights are design intent, not granted capabilities.</p><label>Total slots (including metadata) <input type="number" min="16" max="4096" value="${slotCount()}" onchange="NamespaceDesignV1.capacity(this.value)" ${state.saving?'disabled':''}></label><p>${slotCount()*4} table words / ${slotCount()*16} bytes · CR15 table-only limit ${slotCount()*4-1}. Unfinished placements remain non-executable.</p>`;
+        if(state.profile==='phase1') html+=`<p>${esc(profileLabel())}: slot 0 metadata · 1 self · 2 entry Thread · 8 UART · 9 ide.Mint (requested E) · 14 nstab (requested RW) · 15 pkverify (requested E). Requested rights are design intent, not granted capabilities.</p><label>Total slots (including metadata) <input type="number" min="16" max="4096" value="${slotCount()}" onchange="NamespaceDesignV1.capacity(this.value)" ${state.saving?'disabled':''}></label><p>${slotCount()*4} table words / ${slotCount()*16} bytes · CR15 table-only limit ${slotCount()*4-1}. Unfinished placements remain non-executable.</p>`;
         host.innerHTML=designStatus()+html;
         const saveButton=host.querySelector('#nsSaveBtn');
         saveButton.onclick=save;
@@ -171,7 +171,7 @@
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
         host.querySelector('#nsSaveLayoutNote').textContent=state.saving?'Binding selected Namespace…':state.error ||
-            (state.profile==='phase1'?'Phase 1':'Ascending layout')+' · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
+            profileLabel()+' · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
             p.warnings.join('; ');
         const bolt=host.querySelector('#nsBoltDrag');
         bolt.ondragstart=e=>e.dataTransfer.setData('text/plain','ascending-boot');
