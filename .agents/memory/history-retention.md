@@ -31,6 +31,14 @@ the archive is gone.
 
 Approval registries are audit evidence, not artifact-retention roots.
 
+The same distinction applies to retained archived-revision metadata, completed
+save records/candidates, committed or expired image-refresh records, and derived
+binding caches. Keep the evidence without letting it pin every old binary.
+Unfinished work, current selections and frozen artifact inventories remain roots.
+
+**Why:** Cleanup must not preserve an expired archive solely because retained
+evidence records that the archive once existed or was used by a completed action.
+
 **Why:** Hardware freezes retain the entire approval registry, including
 unselected artifacts. Treating every approval digest as a reference would
 permanently exempt otherwise-expired archives from the approved policy.

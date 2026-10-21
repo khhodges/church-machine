@@ -4391,10 +4391,18 @@ async function _pruneLumpHistory(token, button) {
     if (!confirm('Permanently delete archives older than 30 days AND outside the three newest versions for this LUMP? Current, referenced and undated archives are retained. Deleted binaries cannot be restored.')) return;
     button.disabled = true;
     try {
-        const response = await fetch(`/api/lumps/${token}/history/retention`, {method:'POST'});
+        const response = await fetch(`/api/lumps/${token}/history/retention`, {
+            method:'POST',
+            headers: {'Content-Type':'application/json', 'X-Requested-With':'NamespaceDesign'},
+            body: '{}',
+        });
         const data = await response.json();
         if (!response.ok) throw new Error(`${data.error || 'Retention failed'} ${data.deleted?.length || 0} archives deleted. Reload History before retrying.`);
         appendOutput(`History retention: ${data.deleted.length} archives permanently deleted; ${data.protected.length} eligible archives protected by references.`, 'info');
+        if (!data.eligible) appendOutput('No expired archives: deletion requires a known date older than 30 days AND a version outside the newest three.', 'info');
+        for (const item of data.protectedReasons || []) appendOutput(`${item.filename}: ${item.reason}`, 'info');
+        if (data.bindingCleanup?.ok) appendOutput(`${data.bindingCleanup.deleted.length} obsolete binding snapshots deleted.`, 'info');
+        else if (data.bindingCleanup) appendOutput(`Binding cleanup stopped: ${data.bindingCleanup.reason}`, 'warning');
         const lump = _lumpsCache.find(item => item.token === token);
         if (lump) await _fetchAndShowLumpTimeline(token, lump);
     } catch (error) {

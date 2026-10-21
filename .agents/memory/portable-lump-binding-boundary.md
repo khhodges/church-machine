@@ -5,6 +5,18 @@ description: Security boundary between portable unresolved artifacts and destina
 
 ## Simulator binding lifecycle
 
+Obsolete binding snapshots are disposable derivatives, not immutable LUMP
+history. Delete unreachable snapshots on authorized maintenance; protect exact
+saved designs and retained execution/preparation references, and serialize
+cleanup with snapshot readers and writers. Never recreate a missing binding
+silently during inspection or execution.
+
+**Why:** The user approved throwing away stale binding snapshots instead of
+retaining them indefinitely, separately from the archive age/version policy.
+
+**How to apply:** Determine reachability from exact saved selections, not age;
+keep cleanup failures separate from a successful design save.
+
 Bound inspection must read an already-persisted derivative, never run the linker
 as a read-time convenience. Original saved bytes remain a distinct inspectable mode.
 

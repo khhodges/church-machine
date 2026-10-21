@@ -12,6 +12,7 @@ import time
 import uuid
 
 from server.lump_integrity import parse_canonical_filename
+from server.binding_cleanup import serialized
 
 
 def digest(value):
@@ -123,18 +124,26 @@ def _localize_portable(raw, binding, rows, bindings, directory):
     return struct.pack(f">{len(words)}I", *words), words[start]
 
 
+def symbolic_snapshot_key(binding, rows, bindings):
+    from server.namespace_binding_targets import naming_context
+    names = naming_context()
+    leaves = [row for row in rows if row.get("type") in ("Data", "Thread", "Namespace")]
+    return digest({"bindingVersion": 2, "source": binding["binaryHash"], "slot": binding["slot"],
+        "namespaceLeaves": leaves, "naming": names,
+        "destinations": sorted([
+            {"slot": b["slot"], "hash": b["binaryHash"], "filename": b["filename"],
+             "seq": next(r.get("seq") for r in rows if r["slot"] == b["slot"])}
+            for b in bindings], key=lambda x: x["slot"])})
+
+
+@serialized("directory")
 def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=False, require_snapshot=False):
     from server.symbolic_binding import bind, embedded_api
     from server.namespace_binding_targets import naming_context, qualified_name
     names = naming_context()
     leaves = [row for row in rows if row.get("type") in ("Data", "Thread", "Namespace")]
     words = _validate_body(raw)
-    snapshot_key = digest({"bindingVersion": 2, "source": binding["binaryHash"], "slot": binding["slot"],
-        "namespaceLeaves": leaves, "naming": names,
-        "destinations": sorted([
-            {"slot": b["slot"], "hash": b["binaryHash"], "filename": b["filename"],
-             "seq": next(r.get("seq") for r in rows if r["slot"] == b["slot"])}
-            for b in bindings], key=lambda x: x["slot"])})
+    snapshot_key = symbolic_snapshot_key(binding, rows, bindings)
     snapshot = Path(directory) / ".symbolic-bindings" / (snapshot_key + ".json")
     if not bind_now:
         if not snapshot.exists():

@@ -11,8 +11,10 @@ import tempfile
 from pathlib import Path
 
 from server.simulation_preparation import artifact_bindings, _localize_portable, _validate_body
+from server.binding_cleanup import serialized
 
 
+@serialized("directory")
 def binding_report(document, directory, fingerprint, *, bind_now=True):
     directory = Path(directory)
     lists, candidates, rows, bodies = [], [], [], {}
@@ -80,7 +82,8 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
         try:
             symbolic = binding["portableBinding"].get("schema") == "church.symbolic-lump-binding/v1"
             if symbolic:
-                from server.simulation_preparation import _localize_symbolic
+                from server.simulation_preparation import _localize_symbolic, symbolic_snapshot_key
+                item["snapshotKey"] = symbolic_snapshot_key(binding, rows, candidates)
                 localized, _ = _localize_symbolic(
                     bodies[item["slot"]], binding, rows, candidates, directory,
                     bind_now=bind_now, require_snapshot=not bind_now)
@@ -98,6 +101,7 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
                       for candidate in candidates], item["slot"]],
                     sort_keys=True).encode()).hexdigest()
                 path = directory / ".binding-previews" / (key + ".json")
+                item["snapshotKey"] = key
                 if bind_now:
                     localized, _ = _localize_portable(
                         bodies[item["slot"]], binding, rows, candidates, directory)

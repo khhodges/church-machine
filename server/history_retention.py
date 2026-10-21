@@ -12,8 +12,48 @@ LEDGER = "history-retention.json"
 
 def archive_references(root, *, frozen_root=None, reference_paths=()):
     """Collect all retention roots; approval registries are audit evidence."""
+    root = Path(root)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else []
+    live = {row.get("filename") for row in manifest if row.get("archived") is not True}
+    archived_metadata = {
+        str((root / row["filename"]).with_suffix(".json"))
+        for row in manifest if row.get("archived") is True
+        and row.get("filename") and row["filename"] not in live}
+    ledger_path = root / LEDGER
+    if ledger_path.exists():
+        ledger = json.loads(ledger_path.read_text())
+        if not isinstance(ledger, dict) or any(not isinstance(entries, list) for entries in ledger.values()):
+            raise ValueError("Invalid archive deletion ledger")
+        for entries in ledger.values():
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    raise ValueError("Invalid archive deletion evidence")
+                if entry.get("filename") and entry["filename"] not in live:
+                    archived_metadata.add(str((root / entry["filename"]).with_suffix(".json")))
     documents = reference_documents(
-        root, excluded=("manifest.json", "approvals.json", JOURNAL, LEDGER))
+        root, excluded=("manifest.json", "approvals.json", JOURNAL, LEDGER),
+        excluded_directories=(".symbolic-bindings", ".binding-previews"))
+    completed_candidates = {
+        value.get("candidate_id") for name, text in documents.items()
+        if Path(name).parent.name == "save-operations"
+        and isinstance((value := json.loads(text)), dict)
+        and value.get("outcome") == "committed"}
+    for name, text in list(documents.items()):
+        value = json.loads(text)
+        path = Path(name)
+        # Retained historical metadata is evidence, not an active selection.
+        if name in archived_metadata:
+            del documents[name]
+        elif path.parent.name == "save-operations" and isinstance(value, dict) and "response" in value:
+            del documents[name]
+        elif path.parent.name == "save-candidates" and path.stem in completed_candidates:
+            del documents[name]
+        elif ".image-refresh" in path.parts and isinstance(value, dict):
+            expiry = value.get("expires")
+            if value.get("status") == "committed" or (
+                    isinstance(expiry, (int, float)) and expiry < time.time()):
+                del documents[name]
     if frozen_root:
         documents.update(reference_documents(frozen_root, excluded=("approvals.json",)))
     for path in reference_paths:
@@ -175,7 +215,7 @@ def durable_json(path, value):
         if os.path.exists(temporary):
             os.unlink(temporary)
 
-def reference_documents(root, *, excluded=()):
+def reference_documents(root, *, excluded=(), excluded_directories=()):
     """Unlike rglob, surface unreadable directories rather than skip them."""
     documents = {}
     root = Path(root)
@@ -190,6 +230,7 @@ def reference_documents(root, *, excluded=()):
         raise error
 
     for directory, directories, names in os.walk(root, onerror=fail):
+        directories[:] = [name for name in directories if name not in excluded_directories]
         if any((Path(directory) / name).is_symlink() for name in directories):
             raise ValueError("Linked reference directory cannot be verified")
         for name in names:

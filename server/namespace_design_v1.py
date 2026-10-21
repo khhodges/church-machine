@@ -9,6 +9,7 @@ from pathlib import Path
 import re
 import struct
 import tempfile
+from server.binding_cleanup import serialized
 
 FORMAT = "ascending-nst-metadata-slot0-v1"
 PHASE1_FORMAT = "phase1-nst-metadata-slot0-v1"
@@ -315,6 +316,7 @@ class DesignStore:
                 document, self.lumps, response["fingerprint"], bind_now=False)
         return response
 
+    @serialized("self")
     def save(self, payload):
         if not isinstance(payload, dict) or set(payload) != {"fingerprint", "document"}:
             raise ValueError("Expected reviewed fingerprint and design")

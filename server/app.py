@@ -5165,7 +5165,11 @@ def namespace_design_v1():
         if request.method == "PUT":
             if not _is_ide_design_request():
                 return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
-            return jsonify(store.save(request.get_json(silent=True)))
+            from server.binding_cleanup import binding_lock
+            with _lump_history_transition_lock(LUMPS_DIR), binding_lock(LUMPS_DIR):
+                result = store.save(request.get_json(silent=True))
+                result["bindingCleanup"] = _cleanup_binding_snapshots()
+            return jsonify(result)
         return jsonify(store.read(binding_preview=request.args.get("binding_preview") == "1"))
     except (OSError, ValueError, TypeError, KeyError) as exc:
         return jsonify(ok=False, error=str(exc), dataChanged=False), 409
@@ -17963,7 +17967,21 @@ def _delete_lump_history_revision(token, version, payload, *, retention_entry=No
 @app.route("/api/lumps/<token>/history/retention", methods=["POST"])
 def prune_lump_history(token):
     """Explicit protected write; browsing History never deletes data."""
+    if not _is_ide_design_request():
+        return jsonify(error="Expected a same-origin IDE cleanup request"), 403
     return _prune_lump_history(token, trigger="explicit")
+
+
+def _cleanup_binding_snapshots():
+    from server.binding_cleanup import cleanup_bindings
+    try:
+        return cleanup_bindings(
+            LUMPS_DIR, frozen_root=globals().get("_BUILD_SNAPSHOTS_DIR"),
+            reference_paths=[globals().get(name) for name in (
+                "NS_STATE_PATH", "BOOT_CONFIG_PATH", "BOOT_IMAGE_PROVENANCE_PATH")])
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        logging.warning("Binding snapshot cleanup stopped: %s", exc)
+        return dict(ok=False, deleted=[], reason=str(exc))
 
 
 def _post_save_history_retention(token):
@@ -18001,6 +18019,7 @@ def _prune_lump_history(token, *, trigger):
             return response
         history = response.get_json()["history"]
         root = Path(LUMPS_DIR)
+        binding_cleanup = _cleanup_binding_snapshots()
         manifest = _read_manifest_safe(str(root / "manifest.json"))
         candidates = expired_archives(history, time.time())
         ledger_path = root / LEDGER
@@ -18009,7 +18028,7 @@ def _prune_lump_history(token, *, trigger):
             return jsonify(error="Retention stopped: deletion ledger is invalid. Repair the ledger before retrying cleanup."), 409
         # Preserve any artifact named by another saved object/configuration.
         # Missing dates, symlinks and unreadable references fail closed.
-        deleted, protected = list(recovered), []
+        deleted, protected, protected_reasons = list(recovered), [], []
         try:
             documents = archive_references(
                 root, frozen_root=globals().get("_BUILD_SNAPSHOTS_DIR"),
@@ -18023,8 +18042,9 @@ def _prune_lump_history(token, *, trigger):
                 digest = archive_deletion_evidence(
                     root, filename, manifest, documents,
                     str(response.get_json().get("token") or token))
-            except (OSError, ValueError, RuntimeError):
+            except (OSError, ValueError, RuntimeError) as exc:
                 protected.append(filename)
+                protected_reasons.append(dict(filename=filename, reason=str(exc)))
                 continue
             # Persist intent first. If interrupted after unlink, recovery
             # completes manifest/ledger publication without another deletion.
@@ -18045,6 +18065,9 @@ def _prune_lump_history(token, *, trigger):
                                reason=result.get_json()), 409
             deleted.append(filename)
         return jsonify(ok=True, deleted=deleted, protected=protected,
+                       protectedReasons=protected_reasons,
+                       eligible=len(candidates), inspected=len(history),
+                       bindingCleanup=binding_cleanup,
                        policy={"days": 30, "newest_versions": 3})
 
 

@@ -480,6 +480,10 @@
         } else {
             showBindingFailure('Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.');
         }
+        if (result.bindingCleanup && !result.bindingCleanup.ok) {
+            state.error += ' Design save completed, but obsolete binding cleanup stopped: ' +
+                result.bindingCleanup.reason + '. Retry cleanup from LUMP History.';
+        }
     }
     async function save() {
         if(state.saving || !state.document) return;
