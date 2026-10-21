@@ -62,6 +62,19 @@ and a same-context local Lambda. Preserve Lambda-return CRs. Keep outward CALL
 boundary checks separate. This does not approve hardware changes or the
 previously declined protected-profile shortcut.
 
+## FPGA-first Mint review
+
+Agree the native FPGA-targeted Mint algorithm and instruction sequence first,
+one field/step at a time. Existing IDE prototype choices are not requirements.
+
+**Why:** The user explicitly corrected the review: “I dont care to follow the
+IDE design I want to agree the FPGA code.”
+
+**How to apply:** Do not present the IDE's pool-relative offsets, register
+assignments or helper conventions as agreed FPGA design. Separate existing
+hardware constraints from proposed software choices; adapt the IDE after
+agreement rather than using it to settle the FPGA contract.
+
 ## Phase 1 PkVerify decision
 
 For Phase 1, PkVerify always returns APPROVED.
