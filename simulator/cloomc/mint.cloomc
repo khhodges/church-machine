@@ -47,8 +47,11 @@
 ; These masks complete outward capability cleanup, not the early *_CLEAR_* gates.
 ; LAMBDA-frame RETURN preserves ALL CRs, regardless of mask: same context,
 ; not a CALL security boundary. It CANNOT implement any early cleanup helper.
-; Early result/proof/private-authority clearing still needs a legal mechanism.
-; LOAD of NULL faults; zero-permission attenuation is still a non-NULL GT.
+; Early result/proof/private-authority clearing still needs implementation.
+; ISA: loading NULL must discard destination authority without faulting.
+; Direct NULL LOAD must not cost a C-list row; its encoding is still undecided.
+; The current simulator rejection is a conformance gap, not the ISA rule.
+; Zero-permission attenuation is still a non-NULL GT.
 ; Do not replace these gates with TPERM CLEAR, host writes or an invented opcode.
 ; This draft checks available NULL/permission/scalar shapes only. Exact GT
 ; type, residency, provenance, proof and object-specific output checks are
@@ -225,7 +228,7 @@ create_data_slot_lambda:
     ; Validate frozen Namespace identity, DR7 slot bounds, empty-slot generation
     ; and all four prepared words against the authorized reservation.
     ; Hold the required writer/observer exclusion through read-back and cleanup;
-    ; LAMBDA alone does not provide atomicity. No CALL/CHANGE/SWITCH in interval.
+    ; Local BRANCH alone does not provide atomicity. No CALL/CHANGE/SWITCH in interval.
     BRANCH TODO_CREATE_SLOT_BIND_VALIDATE_AND_EXCLUDE
 create_data_slot_offset:
     SHL DR7, DR7, #2

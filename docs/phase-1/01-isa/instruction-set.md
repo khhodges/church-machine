@@ -8,6 +8,7 @@
 - [BFEXT/BFINS bitfield contract](#bfextbfins-bitfield-contract)
 - [CHANGE: one-GT Thread activation](#change-one-gt-thread-activation)
 - [Uniform indexed operands](#uniform-indexed-operands)
+- [LOAD NULL and capability discard](#load-null-and-capability-discard)
 - [SWITCH: combined Namespace/Thread handoff](#switch-isolated-register-load)
 - [Retired opcodes and reference forms](#retired-opcodes-and-directindirect-reference-forms)
 
@@ -88,7 +89,7 @@ This does not change the separately approved signed-offset/index formats.
 
 | Opcode | Required effect |
 |---|---|
-| 0 LOAD | Load the indexed GT through the source c-list capability into the destination CR using mLoad validation. The CR6 execution-context exception must not become a general permission bypass. |
+| 0 LOAD | Load the indexed GT through the source c-list capability into the destination CR using mLoad validation. An authorized read of a NULL value succeeds and discards destination authority; see LOAD NULL below. Direct NULL loading is approved in direction, with its encoding still open. The CR6 execution-context exception must not become a general permission bypass. |
 | 1 SAVE | Store the source GT through the destination c-list capability; require destination S and source B, with mSave validation. Abstract PassKey policy is separately specified below. |
 | 2 CALL | Validate the selected E-GT and method entry. Save caller E authority and continuation; derive callee CR6/c-list and CR14/code. Never preserve transient L authority as caller E authority. |
 | 3 RETURN | Revalidate saved caller E authority; reconstruct CR6/CR14 and resume the saved continuation. Empty/poison-root return faults STACK_UNDERFLOW; it is not a reset or halt. |
@@ -599,6 +600,53 @@ continues to report `THREAD_PERMISSIONS` (`0x1E`). This does not remap ordinary
 instruction faults outside Thread-context validation, change validation order
 or select priority when distinct checks fail together.
 
+### LOAD NULL and capability discard
+
+**2026-10-21 clarification:** Loading NULL is a valid capability-discard
+operation. Rejecting NULL merely because it is the value being loaded conflicts
+with this contract. Loading a NULL value and using NULL as access authority are
+different operations.
+
+The existing GT type field **bits [26:25] = `00`** denotes NULL.
+`0x00000000` is a NULL GT; NULL-type recognition is not restricted to the
+all-zero word. This clarification does not change the GT format.
+
+**Ordinary indexed LOAD:**
+
+* Validate the source capability, permissions, row calculation and bounds
+  before reading the selected C-list entry.
+* If the retrieved GT has NULL type, loading it into an otherwise permitted
+  destination succeeds. Discard the destination's former capability and any
+  cached authority that could permit its continued use.
+* Do not resolve a target object or require a valid Namespace target for NULL.
+  An actual NULL value must not become a lazy-resolution request merely because
+  of a pet name. Unresolved symbolic references are a separate linking concern;
+  they must not redefine explicit NULL-discard semantics.
+* NULL does not authorize the source read. Attempting to use a NULL capability
+  as access authority still faults, and all architectural destination-register
+  restrictions remain in force.
+
+**Direct NULL LOAD — direction approved, exact encoding open:**
+
+The programmer must be able to discard destination capability authority
+without allocating a dedicated NULL C-list row in every abstraction.
+The intended source spelling is `LOAD CRd, NULL`: load the all-zero NULL GT
+directly, read no C-list row and discard the destination's old cached authority.
+This is a LOAD extension, not a new opcode or a new GT format.
+
+The exact non-colliding instruction bit pattern has **not** been selected.
+Do not treat an all-zero instruction word or indexed operand `#0` as that
+encoding: ordinary row zero retains its existing meaning, including SELF.
+No assembler lowering or simulator/RTL conformance is implied by the proposed
+spelling. Select the encoding and check decoding/condition behavior before
+implementation; no special exemption from the ISA's existing condition and
+destination restrictions is approved.
+
+Discard is local to the destination register. It neither destroys the object
+nor revokes other copies of the GT, changes Namespace versions, or grants new
+authority. Ordinary NULL LOAD conformance and direct-form implementation remain
+to be verified separately in the simulator and hardware.
+
 ### TPERM NULL and EXACT
 
 | Form | Phase 1 behavior |
@@ -618,9 +666,29 @@ simulation. Physical FPGA verification remains outstanding; this change does
 not authorize a bitstream build, flash, or saved-image migration.
 
 F/G are Namespace Word-1 bits 31/30, inspected through authorized reads and
-BFEXT, not new TPERM presets. Within Mint, only the same-scope single-slot
-LAMBDA references NSRW-GT. Setting GT B=true, if required, is a privileged
-function, not a new set-B instruction; its authority/ABI remain TBD.
+BFEXT, not new TPERM presets. Within Mint, only the private same-scope
+single-slot update block may acquire the configured Namespace RW view.
+Its approved single-site entry and continuation use ordinary **BRANCH under
+unchanged CR14**, not a separately provisioned X-GT, CR9 entry capability,
+CALL frame or LAMBDA frame. This corrects the earlier description of that
+block as a LAMBDA; it does not change the general LAMBDA instruction contract.
+Setting GT B=true, if required, is a privileged function, not a new set-B
+instruction; its authority/ABI remain TBD.
+
+**Mint cleanup clarification:** CREATE's early CR1-result discard requirement
+must not be removed merely because the current LOAD implementation rejects
+NULL. Use the NULL-load contract above once its required form is implemented;
+do not assume a per-abstraction NULL C-list row is the solution.
+`TPERM CLEAR` is a test, not an erasure operation.
+Outward FINISH cleanup follows result validation so failure evidence is retained:
+clear DR2–DR4 and DR6–DR15, preserving DR1's result and DR5.
+The existing CALL-frame RETURN masks retain CR1 for CREATE, MakeOutform and
+MakeInform, and retain none of the mask-controlled CRs for DESTROY. Architectural
+preservation/reconstruction rules still apply. A local BRANCH continuation
+does not consume the enclosing CALL frame or perform RETURN cleanup; a
+LAMBDA-frame RETURN is not a substitute for CALL-frame capability erasure.
+These are Mint usage constraints, not new instruction encodings or evidence
+that the remaining Mint operation bodies are complete.
 
 ### Standard software hard fault
 
@@ -641,8 +709,11 @@ The compiler records an exact-artifact map:
 The IDE uses captured origin and loaded artifact identity, or shows the raw
 location if no matching map exists. INVALID_OP alone does not identify an
 intentional site. Start with static diagnostics only: no proof/private-authority
-data, register dumps, runtime message construction, reporting CALL, network
-dependency or diagnostic scratch registers. Tiny LUMPs need not carry strings.
+data, register dumps, runtime message construction, reporting CALL, execution-time
+network dependency or diagnostic scratch registers. IDE reason attribution may
+consult the server, but unavailable verification must leave raw diagnostics and
+must never prevent, delay or reverse the machine's hard fault.
+Tiny LUMPs need not carry strings.
 Verify state preservation and pre-recovery location capture before use.
 
 ### Namespace identity and software lifecycle
