@@ -7,8 +7,11 @@ description: Keep synthetic context evidence distinct from granting Mint access 
 
 Use only existing instruction encodings for the Mint happy path. Report what
 cannot be expressed; do not propose or assign new encodings as a workaround.
+This includes preserving operand encodings: the user explicitly rejected using
+currently unused opcode-7 operand bits for a local-label displacement.
 
-**Why:** The user explicitly rejected the proposed encoding/interface expansion.
+**Why:** The user explicitly rejected both the encoding/interface expansion and
+the subsequent proposal to extend opcode 7's operands.
 
 **How to apply:** Distinguish missing assembler syntax, runtime implementation,
 and capability provisioning from an ISA encoding limitation. Do not call the
