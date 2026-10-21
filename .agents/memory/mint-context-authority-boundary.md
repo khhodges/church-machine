@@ -98,6 +98,20 @@ uses byte addresses, but FPGA access bounds use word offsets.
 **How to apply:** Keep address units distinct from limit units when preparing
 the native Mint descriptor. Register assignments remain a separate decision.
 
+## FPGA CREATE sequence rule
+
+For the typical CREATE case, new_gt_seq = current_gt_seq + 1.
+The slot and newly issued GT must use the same resulting sequence.
+
+**Why:** During the FPGA-first field review, the user corrected the proposal
+to reuse the slot's version unchanged: “The typical case is current # +1”.
+
+**How to apply:** Use this rule for the normal native Mint CREATE design,
+not the older retained-version/no-increment proposal. This is explicit
+software management, not an automatic hardware version change. First-use,
+exhaustion and coordination with release are separate lifecycle cases; do
+not invent their rules from this correction or silently double-increment.
+
 ## Phase 1 PkVerify decision
 
 For Phase 1, PkVerify always returns APPROVED.
