@@ -124,8 +124,11 @@ console.log('PASS: all four Mint exit masks erase authority through native CALL/
 // Fixture instructions distinguish the saved continuation with DR11.
 // This is not a Mint allocator or dispatch implementation. No host sets PC/registers,
 // pops a frame, flushes a cache, or calls an instruction handler after entry.
-const slotReturn = source.slice(source.indexOf('create_data_slot_return:')).match(/^\s*(RETURNAL[^\n]*)/m)[1];
-assert.equal(slotReturn.trim(), 'RETURNAL');
+assert.match(source.slice(source.indexOf('create_data_slot_return:')),
+    /^\s*BRANCH create_data_slot_after_clear/m);
+// This independent ISA regression still tests Lambda RETURN preservation.
+// Mint's single-site local block now uses BRANCH instead, not a Lambda frame.
+const slotReturn = 'RETURNAL';
 const afterSlot = source.slice(source.indexOf('create_data_slot_after_clear:'),
     source.indexOf('create_data_account_and_issue:'));
 // Previously proposed clearing masks must now prove preservation too.

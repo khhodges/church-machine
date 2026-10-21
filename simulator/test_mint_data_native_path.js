@@ -130,6 +130,29 @@ for (const scenario of ['success', 'pool-full', 'slots-full', 'bad-cursor', 'poo
 }
 console.log('PASS: native bounded pool/slot reservation, exact zeroing, exhaustion and DR5 preservation.');
 
+// Exact source entry and exit use ordinary BRANCH under CR14. No X capability
+// is provisioned for the local label, and no caller continuation is consumed.
+const localTransfer = fragment('create_data_set_slot', 'create_data_slot_after_clear') +
+    '\ncreate_data_slot_after_clear:\nHALT\ncreate_data_slot_lambda:\n' +
+    source.slice(source.indexOf('create_data_slot_return:'),
+        source.indexOf('\n}', source.indexOf('create_data_slot_return:')));
+{
+    const {s, labels} = fixture(localTransfer);
+    s.cr[9] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
+    const registers = JSON.parse(JSON.stringify(s.cr));
+    const frames = JSON.parse(JSON.stringify(s.callStack));
+    const sto = s.sto;
+    s.step();
+    assert.equal(s.pc, labels.create_data_slot_lambda);
+    s.step();
+    assert.equal(s.pc, labels.create_data_slot_after_clear);
+    assert.equal(s.halted, false, JSON.stringify(s.faultLog));
+    assert.deepEqual(s.cr, registers);
+    assert.deepEqual(s.callStack, frames);
+    assert.equal(s.sto, sto);
+    assert.equal(s.lambdaActive, false);
+}
+console.log('PASS: exact local BRANCH entry/continuation uses unchanged CR14, with CR9 NULL and no frame changes.');
 // Slot writes remain isolated from binding/exclusion and issuance. Test
 // provisioning supplies an empty target and an internally consistent descriptor.
 const slotText = fragment('create_data_slot_offset', 'create_data_slot_return');
@@ -286,4 +309,4 @@ for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xffff
     }
 }
 console.log('PASS: only CR2=0xFFFFFFFF skips the proof checks, without granting memory authority.');
-console.log('BLOCKED: allocator and saved-design provisioning are still incomplete. No complete CREATE claim.');
+console.log('BLOCKED: saved-design provisioning, descriptor preparation and issuance remain incomplete. No complete CREATE claim.');

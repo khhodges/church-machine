@@ -31,6 +31,15 @@ body entry and return, not just an inline RETURN. Preserve existing instruction
 encodings. If implementation cannot express the approved transfer, report
 the exact gap rather than substituting a separate capability requirement.
 
+For Mint's single-entry local slot-writing block, use ordinary BRANCH entry
+and a fixed BRANCH continuation, not an opcode-7 frame or RETURN that would
+consume the enclosing CALL continuation.
+
+**Why:** This local transfer does not cross an authority boundary, and existing
+branches provide the agreed label transfer under CR14 without a separate GT,
+new operand encoding, or return-stack protocol. Do not generalize this fixed
+continuation to a multiply-called or recursive routine.
+
 Mint owns the memory pool and free-slot list. Phase 1 code is single-threaded.
 The Lambda name is a label in Mint's code block; it executes with the same
 authority as Mint and uses Mint's NS/RW capability. Do not model it as a

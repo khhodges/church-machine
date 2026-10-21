@@ -171,16 +171,15 @@ create_data_zero_loop:
     IADD DR9, DR9, #1
     BRANCH create_data_zero_loop
 create_data_publish:
-    ; Internal binding missing: CR9 = trusted X GT to create_data_slot_lambda.
+    ; Descriptor preparation remains missing; local entry needs no extra GT.
     ; Freeze reserved slot in DR7 and its four prepared descriptor words DR8..11.
     ; Inputs come from the verified reservation, never caller-supplied registers.
     ; DR6 remains the allocation size; the zeroed destination stays private.
-    BRANCH TODO_CREATE_BIND_SLOT_LAMBDA_AND_DESCRIPTOR
+    BRANCH TODO_CREATE_PREPARE_SLOT_DESCRIPTOR
 create_data_set_slot:
-    ; CR9 must be an X view whose location is this local label's address.
-    ; .pet is an existing assembler alias, not a new operand encoding.
-    .pet create_data_slot_lambda CR9
-    LAMBDA create_data_slot_lambda
+    ; Single local call site: ordinary branches use the unchanged CR14.
+    ; No separate X GT, CALL frame, LAMBDA frame or new operand encoding.
+    BRANCH create_data_slot_lambda
 create_data_slot_after_clear:
     ; Same Mint context, single-threaded Phase 1: retain private authority.
 create_data_account_and_issue:
@@ -204,7 +203,7 @@ create_return:
     RETURNAL #2
 
 create_data_slot_lambda:
-    ; Private same-scope X body, NOT a public method or an E-GT CALL.
+    ; Private same-scope local block, NOT a public method or an E-GT CALL.
     ; Only this body may acquire the configured Namespace RW view in CR10.
     ; Validate frozen Namespace identity, DR7 slot bounds, empty-slot generation
     ; and all four prepared words against the authorized reservation.
@@ -231,9 +230,9 @@ create_data_slot_write:
     MCMP DR4, DR11
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
 create_data_slot_return:
-    ; Resume the saved stack continuation in the unchanged context.
-    ; No capability clearing on this SZ=0 return.
-    RETURNAL
+    ; This block has one entry site and a fixed local continuation.
+    ; Do not consume the enclosing CALL frame or clear any CR.
+    BRANCH create_data_slot_after_clear
 }
 
 method DESTROY {

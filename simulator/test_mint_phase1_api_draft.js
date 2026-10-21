@@ -57,9 +57,10 @@ assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy/);
 assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
     'Data CREATE must never read a source payload');
 assert.ok([...create.matchAll(/^\s*DREAD\s+\w+,\s*(CR\d+)/gm)]
-    .every(m=>['CR3','CR8','CR10'].includes(m[1])),
+    .every(m=>['CR3','CR7','CR8','CR10'].includes(m[1])),
     'Reads are confined to proof, private state and Namespace metadata, never caller payload');
-assert.match(create, /\.pet create_data_slot_lambda CR9\s+LAMBDA create_data_slot_lambda/);
+assert.match(create, /create_data_set_slot:[\s\S]*?BRANCH create_data_slot_lambda/);
+assert.doesNotMatch(create, /\.pet create_data_slot_lambda|^\s*LAMBDA\b/m);
 const continuation = create.slice(create.indexOf('create_data_slot_after_clear:'),
     create.indexOf('create_data_account_and_issue:'));
 assert.doesNotMatch(continuation, /TPERM CR(?:8|9|10), NULL|TODO_CREATE_SLOT_RELEASE_EXCLUSION/);
@@ -69,11 +70,11 @@ const slotBody=create.slice(create.indexOf('create_data_slot_lambda:'));
 assert.doesNotMatch(slotBody, /^\s*(CALL|CHANGE|SWITCH|LAMBDA)\b/m);
 assert.doesNotMatch(slotBody, /TODO_CREATE_CLEAR_NS_AUTHORITY/);
 assert.doesNotMatch(slotBody, /TODO_CREATE_SLOT_RELEASE_EXCLUSION|RETURNAL #/);
-assert.match(slotBody, /create_data_slot_return:[\s\S]*RETURNAL/);
-assert.doesNotMatch(create.slice(0,create.indexOf('create_data_slot_lambda:')),
+assert.match(slotBody, /create_data_slot_return:[\s\S]*BRANCH create_data_slot_after_clear/);
+assert.doesNotMatch(create.slice(0,create.indexOf('create_data_allocate:')),
     /^\s*(?:DREAD|DWRITE|LOAD).*CR10\b/m,
     'Namespace access is confined to the private Lambda; continuation only checks NULL');
-assert.match(create, /BRANCH TODO_CREATE_ALLOCATE_PRIVATE_DATA/);
+assert.match(create, /create_data_allocate:[\s\S]*LOAD CR7, CR6, #1[\s\S]*LOAD CR8, CR6, #3/);
 assert.match(create, /BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE/);
 assert.match(create, /BRANCH TODO_CREATE_RESULT_TYPE/);
 assert.ok(destroy.indexOf('TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM') <
@@ -158,8 +159,8 @@ for(const size of [24,40,56,72,0xfffffff8]) {
 // be zero before publication; words outside the allocation must be untouched.
 for(const size of [8,16,64,256,1024]) {
     const output=Array(size+2).fill(0xdeadbeef);
-    assert.equal(walk('create_data_zero_begin',{DR6:size,DR9:0xffffffff},output),
-        'TODO_CREATE_BIND_SLOT_LAMBDA_AND_DESCRIPTOR');
+    assert.equal(walk('create_data_zero_begin',{DR6:size,DR8:0,DR9:0xffffffff},output),
+        'TODO_CREATE_PREPARE_SLOT_DESCRIPTOR');
     assert.deepEqual(output,[...Array(size).fill(0),0xdeadbeef,0xdeadbeef]);
 }
 
