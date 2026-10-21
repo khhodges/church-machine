@@ -48,6 +48,8 @@ assert(identityHtml.includes('ide.BootThread'));
 assert.equal((identityHtml.match(/Symbolic \/ not localized/g) || []).length, 3);
 context.LumpContentFrame.lumpDecodeContentFrameApi = () => null;
 assert(context._renderSavedLumpIdentity({}, [1,0], 1).includes('Not declared in saved definition'));
+assert(source.includes('methodApiPreview + sourcePreview + t'), 'API precedes source');
+assert(source.includes('<section class="lump-detail-section lump-preview-api">'), 'API is not collapsed');
 
 const words = [
     ((0x1f << 27) | (1 << 10)) >>> 0,

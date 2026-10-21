@@ -30,7 +30,7 @@ assert.match(source, /Catalog row, not a verified selector/);
 assert.match(source, /Historical Method Index \(unverified\)/);
 const lumpSource = fs.readFileSync(`${__dirname}/app-lumps.js`, 'utf8');
 assert.match(lumpSource, /_absSavedApiHtml\(await _absSavedApiFromResponse\(data\), \{/);
-assert.match(lumpSource, /sourcePreview \+ methodApiPreview/);
+assert.match(lumpSource, /methodApiPreview \+ sourcePreview/);
 // Exercise the production formatter, not just hand-written outputs fixtures.
 const formatterContext = vm.createContext({
     bootEntrySlot: 12,

@@ -4502,9 +4502,9 @@ function _renderSavedLumpIdentity(data, words, version) {
         '<div>Saved artifact: ' + e(data.filename || 'Unavailable') + '</div>' +
         '<div style="overflow-wrap:anywhere">Binary SHA-256: ' + e(data.binary_hash || 'Unavailable') + '</div>' +
         '<p>Exact saved artifact. Runtime Namespace placement is not inferred from the current simulator.</p>' +
-        '<h4>C-list — ' + cc + ' rows</h4>';
+        '<h4 class="lump-preview-section-title">C-list — ' + cc + ' rows</h4>';
     if (error) html += '<p>Definition could not be decoded: ' + e(error) + '</p>';
-    html += '<table class="lump-hex-table"><thead><tr><th>Row</th><th>Declared dot-name</th><th>Rights</th><th>Saved word</th><th>Binding</th></tr></thead><tbody>';
+    html += '<div class="lump-preview-clist"><table class="lump-hex-table"><thead><tr><th>Row</th><th>Declared dot-name</th><th>Rights</th><th>Saved word</th><th>Binding</th></tr></thead><tbody>';
     for (let row = 0; row < cc; row++) {
         const cap = dependencies.find(d => d.relocation_row === row) || caps[row] || {};
         const declared = cap.canonical_leaf || cap.name || 'Not declared in saved definition';
@@ -4516,7 +4516,7 @@ function _renderSavedLumpIdentity(data, words, version) {
             '</td><td>' + (word === 0 && declared !== 'Not declared in saved definition'
                 ? 'Symbolic / not localized' : word === 0 ? 'Zero' : 'Stored token') + '</td></tr>';
     }
-    return html + '</tbody></table></section>';
+    return html + '</tbody></table></div></section>';
 }
 
 function _showLumpHistoryPreviewModal(version, bodyHtml) {
@@ -5093,18 +5093,22 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
         }
         // API evidence must come from this same archive response, never the
         // current catalog or a second lookup by abstraction/token.
-        const methodApiPreview = '<details class="lump-detail-section"><summary>Saved method API (this exact revision)</summary>' +
+        const savedApi = typeof LumpContentFrame !== 'undefined'
+            ? LumpContentFrame.lumpDecodeContentFrameApi(words) : null;
+        const methodApiPreview = '<section class="lump-detail-section lump-preview-api"><h3 class="lump-preview-section-title">API — exact saved definition</h3>' +
+            (savedApi ? '<pre class="lump-preview-api-json">' + e(JSON.stringify(savedApi, null, 2)) + '</pre>'
+                : '<p>No readable API definition in these saved bytes.</p>') +
             (typeof _absSavedApiHtml === 'function' && typeof _absSavedApiFromResponse === 'function'
                 ? _absSavedApiHtml(await _absSavedApiFromResponse(data), {
                     filename: data.filename || data.archive_filename || archiveFilename || 'Unavailable',
                     binary_hash: inspection && inspection.binary_hash || 'Unavailable'
                 })
                 : '<p>Saved method API viewer unavailable. No catalog fallback is used.</p>') +
-            '</details>';
+            '</section>';
         if (document.getElementById('lumpHistoryPreviewModal') !== pendingModal) return;
         _showLumpHistoryPreviewModal(
             version, _renderSavedLumpIdentity(data, words, version) +
-                issueSummary + repairControls + sourcePreview + methodApiPreview + t
+                issueSummary + repairControls + methodApiPreview + sourcePreview + t
         );
         if (exactIdentity) document.querySelector('#lumpHistoryPreviewModal .lump-history-preview-close')?.focus();
         const openEditorButton = document.querySelector(

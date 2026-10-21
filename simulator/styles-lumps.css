@@ -408,6 +408,28 @@
     padding: 0.75rem;
 }
 
+.lump-preview-section-title {
+    color: var(--church-gold, #e9bb4b);
+    font-size: 1rem;
+    margin: 1rem 0 0.65rem;
+}
+.lump-preview-clist { overflow-x: auto; }
+.lump-preview-clist .lump-hex-table { font-size: 0.85rem; }
+.lump-preview-clist .lump-hex-table th { font-size: 0.75rem; }
+.lump-preview-clist .lump-hex-table td,
+.lump-preview-clist .lump-hex-table th { padding: 0.6rem; }
+.lump-preview-api-json {
+    background: #090e19;
+    color: #dbeafe;
+    padding: 1rem;
+    border: 1px solid var(--border-color, #39445a);
+    border-radius: 5px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .lump-history-preview-body .lump-history-source-pre {
     max-height: 55vh;
     overflow: auto;

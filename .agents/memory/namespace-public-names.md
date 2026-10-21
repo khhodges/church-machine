@@ -35,3 +35,9 @@ C-list; a revision number and raw hex alone are not an adequate LUMP display.
 **How to apply:** Decode names from the selected artifact, distinguish naming
 Namespace from runtime placement, and distinguish symbolic rows from localized
 tokens. Historical previews must not borrow current-state identities.
+
+Give the C-list highest prominence and the API equal importance to source.
+**Why:** The user explicitly stated the API is equally important and the C-list
+even more so.
+**How to apply:** Show decoded named capabilities first, with an always-visible
+saved API before source and raw binary. Do not hide the API behind disclosure.
