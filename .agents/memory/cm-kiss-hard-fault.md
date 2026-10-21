@@ -19,6 +19,16 @@ and its hard-fault conditions; do not repair missing inputs during execution.
 The user directs that faults default to a hard fault rather than initiating
 new recovery strategies.
 
+Use the agreed HARDFAULT standard when describing Mint's fault exits; do not
+present each named fault TODO as a new fault-design decision.
+
+**Why:** The user explicitly reminded the agent that a reusable HardFault
+standard was already agreed when reviewing Mint pseudocode.
+
+**How to apply:** Write HARDFAULT with a static reason for those exits. Keep
+the established standard distinct from any remaining compiler/map integration
+work; this reminder alone does not establish hardware acceptance.
+
 The user subsequently approved Namespace-local reboot for a fault attributable
 to that Namespace: reboot only the Namespace that caused the error, preserving
 other Namespaces. This qualifies the recovery scope, not the instruction's
