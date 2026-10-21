@@ -182,7 +182,7 @@
             if (!advanced) throw Error('This saved LUMP has no Namespace assignment. Select a destination before simulation.');
             if (design && design.state.active) {
                 if (!root.DesignSimulation) throw Error('Validated design simulation admission is unavailable. Reload the IDE and retry; stale execution remains stopped.');
-                await root.DesignSimulation.prepare(true);
+                await root.DesignSimulation.prepare(true, {preserveView:true});
                 // A successful ascending replay does not authorize legacy Run
                 // or silently replace its differently formatted machine.
                 barrier({pending:false,privateReady:true,message:readyMessage});

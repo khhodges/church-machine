@@ -187,7 +187,17 @@ function _nsOpenSavedVersion(slot) {
         _showBootROMInspector();
         return true;
     }
-    const rows = window._nsState && Array.isArray(window._nsState.abstractions)
+    const design = window.NamespaceDesignV1;
+    const designActive = design && design.state.active;
+    const rows = designActive
+        ? (design.state.document?.rows || []).map(row => ({
+            ...row,
+            token: row.selection?.token,
+            filename: row.selection?.filename,
+            binary_hash: row.selection?.binaryHash,
+            lump_version: row.selection?.revision,
+        }))
+        : window._nsState && Array.isArray(window._nsState.abstractions)
         ? window._nsState.abstractions : [];
     const assigned = rows.find(function(row) {
         return row && Number(row.slot) === Number(slot);

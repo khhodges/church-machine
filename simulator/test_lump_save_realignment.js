@@ -163,8 +163,10 @@ function harness(fail, records=[artifact]) {
     await assert.rejects(design.api.realign(response,{}),/Validated design simulation admission/);
     assert.equal(design.context.NamespaceDesignV1.state.document.rows[0].selection.filename,artifact.filename);
     assert(!design.calls.includes('activate'),'no bypass of unapproved design profile boundary');
-    design.context.DesignSimulation={invalidate(){},async prepare(throwOnError){
-        assert.equal(throwOnError,true);design.calls.push('design-admission');return true;
+    design.context.DesignSimulation={invalidate(){},async prepare(throwOnError,options){
+        assert.equal(throwOnError,true);
+        assert.equal(options.preserveView,true,'saving must not navigate to simulation');
+        design.calls.push('design-admission');return true;
     }};
     await design.api.realign(response,{});
     assert(design.calls.includes('design-admission'));

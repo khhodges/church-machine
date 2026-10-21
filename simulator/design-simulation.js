@@ -12,14 +12,14 @@
         return Object.freeze(Array.isArray(value) ? value.map(freezeRecord) :
             Object.fromEntries(Object.entries(value).map(([key, item]) => [key, freezeRecord(item)])));
     }
-    function displayMachine(candidate) {
+    function displayMachine(candidate, options={}) {
         if (typeof sim !== 'undefined') {
             if (!previousSimulator) previousSimulator=sim;
             sim=candidate;
         }
         if (typeof repl !== 'undefined' && repl) repl.sim=candidate;
         if(typeof root.clearTrace==='function') root.clearTrace();
-        if (!candidate.bootComplete && typeof root.switchView === 'function') {
+        if (!options.preserveView && !candidate.bootComplete && typeof root.switchView === 'function') {
             root.switchView('pipeline');
         }
     }
@@ -166,7 +166,7 @@
         }
         return instance;
     }
-    async function prepare(throwOnError=false) {
+    async function prepare(throwOnError=false, options={}) {
         if (busy) {
             if (throwOnError) throw Error('Private simulation preparation is already in progress; retry after it finishes.');
             return false;
@@ -207,7 +207,7 @@
             const candidate=create(active.words,review);
             check();
             machine=candidate; frozenWords=active.words.slice(); owner=selected;
-            displayMachine(machine);
+            displayMachine(machine, options);
             provenance={...review,approvedRevisionId:approved.approvedRevisionId}; steps=0;
             message='Fresh selected design loaded and verified. Use Step or Run here. Historical artifacts, installed image and hardware are unchanged.';
             return true;

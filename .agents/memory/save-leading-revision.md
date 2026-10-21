@@ -5,6 +5,17 @@ description: Successful LUMP saves are explicit authority to advance the matchin
 Saving a new LUMP must realign the IDE to that exact saved revision: repository,
 History, matching Namespace selection, and validated private simulation.
 
+Save must preserve the current view and leave execution stopped. Preparing a
+fresh simulator after save must not navigate to Boot; explicit Run/Step/Walk
+still owns execution and its normal view transitions.
+
+**Why:** The user approved correcting Save's unexpected simulation-screen
+transition, which hid the updated Alice Namespace revision.
+
+**How to apply:** Keep exact revision alignment and History refresh, but separate
+background preparation from execution navigation. Version links must use the
+selected Namespace profile, not the legacy table.
+
 **Why:** The user explicitly rejected a successful save leaving History and
 execution on obsolete artifacts: “the leading edge of progress instead of a
 stale, outof date solution”. This supersedes the earlier artifact-only-save UI

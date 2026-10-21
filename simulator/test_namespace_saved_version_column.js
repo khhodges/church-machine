@@ -66,6 +66,27 @@ assert.deepStrictEqual(JSON.parse(JSON.stringify(openedIdentity)), {
     abstraction: null,
 }, 'click uses the exact committed filename/token/hash/version, not latest freshness');
 
+// The active design must win over a legacy binding at the same slot.
+for (const profile of ['ascending', 'phase1']) {
+    context.window.NamespaceDesignV1 = {state:{active:true,profile,document:{rows:[{
+        slot:7,name:'ide.Alice',selection:{
+            token:'abcdef12',filename:'Alice.v9.lump',binaryHash:'9'.repeat(64),revision:9,
+        },
+    }]}}};
+    assert.strictEqual(context._nsOpenSavedVersion(7), true);
+    assert.equal(openedIdentity.filename, 'Alice.v9.lump');
+    assert.equal(openedIdentity.lump_version, 9);
+    assert.equal(openedIdentity.abstraction, 'ide.Alice');
+    assert(context._nsRenderSavedVersionCell({
+        slot:7,token:'abcdef12',filename:'Alice.v9.lump',
+        binary_hash:'9'.repeat(64),lump_version:9,
+    },null,7).includes('>v9</a>'));
+    context.window.NamespaceDesignV1.state.document.rows = [];
+    assert.strictEqual(context._nsOpenSavedVersion(7), false,
+        'missing design selection must not fall back to the legacy Namespace');
+}
+delete context.window.NamespaceDesignV1;
+
 const current = context._nsAssignedLumpFreshness(
     7, assigned, state([], 'current'));
 const currentCell = context._nsRenderSavedVersionCell(assigned, current);

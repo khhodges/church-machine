@@ -52,6 +52,19 @@ function harness(defect) {
     return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
 }
 (async()=>{
+    const saved = harness('boot');
+    const saveViews = [];
+    saved.scope.switchView = view => saveViews.push(view);
+    await saved.api.prepare(true, {preserveView:true});
+    assert.deepEqual(saveViews, [], 'save preparation preserves the current view');
+    assert.equal(saved.instances[0].bootStep, 0, 'save executes no boot instructions');
+    assert.equal(saved.instances[0].pc, 1);
+    assert.equal(saved.timers.length, 0, 'save schedules no execution');
+    const explicit = harness('boot');
+    const explicitViews = [];
+    explicit.scope.switchView = view => explicitViews.push(view);
+    await explicit.api.prepare(true);
+    assert.deepEqual(explicitViews, ['pipeline'], 'explicit preparation retains boot navigation');
     // The selected runtime must use the existing Boot/Code presentation, not
     // merely append raw machine output. Keep rich listings and step evidence.
     const {JSDOM} = require('jsdom');
