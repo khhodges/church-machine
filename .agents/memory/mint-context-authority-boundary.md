@@ -75,6 +75,18 @@ assignments or helper conventions as agreed FPGA design. Separate existing
 hardware constraints from proposed software choices; adapt the IDE after
 agreement rather than using it to settle the FPGA contract.
 
+## Agreed FPGA slot location
+
+Namespace W0 receives the physical byte address of the allocated block,
+retained by the allocator and used unchanged by Mint.
+
+**Why:** The user approved this rule during the FPGA-first, field-by-field
+review, explicitly rejecting IDE prototype conventions as the design basis.
+
+**How to apply:** Preserve that allocator/descriptor contract. Do not substitute
+a pool-relative offset or require an IDE lookup. Register assignments and the
+remaining descriptor fields are separate decisions.
+
 ## Phase 1 PkVerify decision
 
 For Phase 1, PkVerify always returns APPROVED.
