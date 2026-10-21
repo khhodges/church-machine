@@ -112,6 +112,17 @@ software management, not an automatic hardware version change. First-use,
 exhaustion and coordination with release are separate lifecycle cases; do
 not invent their rules from this correction or silently double-increment.
 
+## Agreed Phase 1 F/G initialization
+
+Initialize Namespace W1 bit 30 (G) and bit 31 (F) to zero for Phase 1.
+
+**Why:** The user explicitly approved “G=0 for Phase 1” during the FPGA-first
+field review, then specified “F is also 0 for Phase 1”. GC behavior is outside
+Phase 1.
+
+**How to apply:** Clear F and G while preparing the slot authority word,
+preserving limit and sequence. This approval does not decide later GC behavior.
+
 ## Phase 1 PkVerify decision
 
 For Phase 1, PkVerify always returns APPROVED.

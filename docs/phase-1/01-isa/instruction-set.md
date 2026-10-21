@@ -751,7 +751,9 @@ software TBD**, not inferred from release. Track used/free blocks per LUMP
 size separately from slot/version availability; ownership, bookkeeping and
 remaining safe-release mechanics are TBD.
 
-**No GC in Phase 1.** Hardware G-bit inversion requires a system GC setting;
+**No GC in Phase 1.** Mint initializes Namespace slot G (W1 bit 30) and F
+(W1 bit 31) to **0** for Phase 1, preserving the limit and sequence fields.
+Hardware G-bit inversion requires a system GC setting;
 its location/control is Phase 2 TBD. No garbage-to-NULL automation is approved.
 
 Retain the existing integrity formula, excluding both F/G and no other fields:
