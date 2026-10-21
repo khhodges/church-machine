@@ -1378,6 +1378,11 @@ window.addEventListener('pagehide', () => { if (typeof activeUserTabId !== 'unde
     let startY = 0;
     let pulling = false;
     let indicator = null;
+    const wideScreen = window.matchMedia('(min-width: 768px), (orientation: landscape)');
+    function refreshDisabled() {
+        return wideScreen.matches ||
+            document.documentElement.classList.contains('sim-executing');
+    }
 
     function getIndicator() {
         if (!indicator) {
@@ -1390,6 +1395,9 @@ window.addEventListener('pagehide', () => { if (typeof activeUserTabId !== 'unde
     }
 
     document.addEventListener('touchstart', function(e) {
+        pulling = false;
+        resetIndicator();
+        if (refreshDisabled() || e.touches.length !== 1) return;
         const activeView = document.querySelector('.view.active');
         if (!activeView || activeView.scrollTop > 5) return;
         const toolbar = document.querySelector('.fixed-toolbar');
@@ -1401,6 +1409,11 @@ window.addEventListener('pagehide', () => { if (typeof activeUserTabId !== 'unde
     }, { passive: true });
 
     document.addEventListener('touchmove', function(e) {
+        if (refreshDisabled() || e.touches.length !== 1) {
+            pulling = false;
+            resetIndicator();
+            return;
+        }
         if (!pulling) return;
         const dy = e.touches[0].clientY - startY;
         if (dy < 0) { pulling = false; return; }
@@ -1424,19 +1437,28 @@ window.addEventListener('pagehide', () => { if (typeof activeUserTabId !== 'unde
 
     function resetIndicator() {
         if (!indicator) return;
+        indicator.classList.remove('ready');
         indicator.style.opacity = '0';
         indicator.style.transform = 'translateX(-50%) translateY(0)';
         setTimeout(() => { if (indicator) indicator.style.display = 'none'; }, 200);
     }
 
     document.addEventListener('touchend', function() {
+        if (refreshDisabled()) {
+            pulling = false;
+            resetIndicator();
+            return;
+        }
         if (!pulling) return;
         pulling = false;
         const ind = indicator;
         if (ind && ind.classList.contains('ready')) {
             ind.querySelector('.pull-refresh-text').textContent = 'Refreshing...';
             ind.querySelector('.pull-refresh-arrow').style.animation = 'pullSpin 0.6s linear infinite';
-            setTimeout(() => location.reload(), 400);
+            setTimeout(() => {
+                if (!refreshDisabled()) location.reload();
+                else resetIndicator();
+            }, 400);
         } else {
             resetIndicator();
         }

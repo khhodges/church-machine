@@ -1,0 +1,7 @@
+/* Prevent viewport pull-to-refresh on wide and landscape IDE screens.
+   Normal scrolling, nested-panel scrolling and pinch zoom remain enabled. */
+@media (min-width: 768px), (orientation: landscape) {
+    html, body {
+        overscroll-behavior-y: none;
+    }
+}
