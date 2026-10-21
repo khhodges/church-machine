@@ -41,6 +41,8 @@ class ChurchMLoad(Elaboratable):
         self.sub_index = Signal(32)
         self.sub_direct = Signal()
         self.sub_direct_gt = Signal(32)
+        # Granted only to explicit direct-NULL LOAD, never CALL/RETURN.
+        self.sub_null_clear = Signal()
         self.sub_m_elevated = Signal()
         # Read-only descriptor check used by the physical scheduler preflight.
         # It executes c-list/direct and Namespace validation but never clears a
@@ -106,6 +108,7 @@ class ChurchMLoad(Elaboratable):
         cr_dst_reg = Signal(4)
         index_reg = Signal(32)
         direct_mode = Signal()
+        null_clear_reg = Signal()
         validate_only_reg = Signal()
         direct_gt_reg = Signal(32)
         m_elevated_reg = Signal()
@@ -188,6 +191,7 @@ class ChurchMLoad(Elaboratable):
                         cr_dst_reg.eq(self.sub_cr_dst),
                         index_reg.eq(self.sub_index),
                         direct_mode.eq(self.sub_direct),
+                        null_clear_reg.eq(self.sub_null_clear),
                         validate_only_reg.eq(self.sub_validate_only),
                         direct_gt_reg.eq(self.sub_direct_gt),
                         m_elevated_reg.eq(self.sub_m_elevated),
@@ -198,7 +202,10 @@ class ChurchMLoad(Elaboratable):
                     m.next = "FETCH_SRC"
 
             with m.State("FETCH_SRC"):
-                with m.If(direct_mode):
+                with m.If(null_clear_reg & direct_mode & (direct_gt_reg == 0)):
+                    m.d.sync += result_cap.eq(0)
+                    m.next = "UPDATE_THREAD"
+                with m.Elif(direct_mode):
                     m.d.sync += result_view.word0_gt.eq(direct_gt_reg)
                     m.next = "CHECK_NS"
                 with m.Else():
@@ -345,7 +352,7 @@ class ChurchMLoad(Elaboratable):
                     m.next = "UPDATE_THREAD"
 
             with m.State("UPDATE_THREAD"):
-                with m.If(cr_dst_reg <= 7):
+                with m.If((cr_dst_reg <= 7) | (null_clear_reg & (cr_dst_reg <= 11))):
                     m.d.comb += [
                         self.thread_wr_en.eq(1),
                         self.thread_wr_idx.eq(cr_dst_reg),

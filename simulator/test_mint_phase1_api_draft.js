@@ -48,7 +48,12 @@ assert.equal(faultCount, 38, 'All 38 reviewed failure cases use the agreed HARDF
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
         'Every table entry must reach its own method input checks first');
-    assert.match(body, new RegExp(`BRANCH TODO_${name}_CLEAR_RESULT_AUTHORITY`));
+    if (name === 'CREATE') {
+        assert.match(body, /LOAD CR1, NULL/);
+        assert.doesNotMatch(body, /TODO_CREATE_CLEAR_RESULT_AUTHORITY/);
+    } else {
+        assert.match(body, new RegExp(`BRANCH TODO_${name}_CLEAR_RESULT_AUTHORITY`));
+    }
     assert.doesNotMatch(body, /^\s*TPERM\s+CR\d+,\s*CLEAR/m,
         'No method may use a permission test as capability erasure');
     assert.match(body, /IADD DR1, DR0, #0/);

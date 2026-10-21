@@ -1977,6 +1977,14 @@ class ChurchAssembler {
             case 0: {
                 crDst = this._parseCR(parts[1], lineNum);
                 this._checkPrivCR(crDst, 'LOAD', lineNum);
+                if (String(parts[2]).toUpperCase() === 'NULL') {
+                    if (parts.length !== 3 || crDst === 6) {
+                        this.errors.push({line: lineNum, message: 'LOAD CRd, NULL requires one writable destination (not CR6) and no row operand.'});
+                    }
+                    crSrc = 0; // Canonical encoding; no source register is read.
+                    imm = 0x4000;
+                    break;
+                }
                 const res0 = this._resolveNSNameBracket(parts[2], parts[3]);
                 if (res0 !== null && (!parts[3] || res0.consumed)) {
                     this._checkCapDeclared(res0.key, lineNum);
@@ -3457,6 +3465,7 @@ class ChurchAssembler {
         switch (opcode) {
             // LOAD CRd, CR6[offset]  — load GT from c-list
             case 0:
+                if (imm === 0x4000) return `${mnemonic}  CR${crDst}, NULL`;
             // SAVE CRd, CR6[offset]  — save GT to c-list
             case 1: {
                 const register = imm & 15;

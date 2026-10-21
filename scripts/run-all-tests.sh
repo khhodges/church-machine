@@ -496,7 +496,7 @@ register_suite "test-check-ila-probe-names" \
     'python3 scripts/test_check_ila_probe_names.py && python3 -m pytest tests/hardware/test_wukong_board_io.py -q'
 
 register_suite "boot-change-validation" \
-    'python3 -m pytest hardware/test_boot_change.py hardware/test_wukong_thread_scheduler_contract.py -q'
+    'node simulator/test_load_null.js && python3 -m pytest hardware/test_boot_change.py hardware/test_wukong_thread_scheduler_contract.py hardware/test_load_null.py -q'
 
 register_suite "wukong-preflight-launcher-tests" \
     'python3 -m pytest scripts/test_hardware_namespace_thread_readiness_launchers.py -v'

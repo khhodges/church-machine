@@ -49,7 +49,7 @@
 ; not a CALL security boundary. It CANNOT implement any early cleanup helper.
 ; Early result/proof/private-authority clearing still needs implementation.
 ; ISA: loading NULL must discard destination authority without faulting.
-; Direct NULL LOAD must not cost a C-list row; its encoding is still undecided.
+; Direct NULL LOAD uses approved operand 0x4000 without costing a C-list row.
 ; The current simulator rejection is a conformance gap, not the ISA rule.
 ; Zero-permission attenuation is still a non-NULL GT.
 ; Do not replace these gates with TPERM CLEAR, host writes or an invented opcode.
@@ -69,7 +69,7 @@ CREATE_inputs:
     ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
     ; Other cases/permissions remain unsupported, never silently become Data.
     ; TPERM CLEAR tests presence; it does NOT erase a capability.
-    BRANCH TODO_CREATE_CLEAR_RESULT_AUTHORITY
+    LOAD CR1, NULL
 create_data_inputs_after_clear:
     IADD DR1, DR0, #0
 create_data_passkey_escape:

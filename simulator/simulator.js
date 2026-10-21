@@ -6971,6 +6971,22 @@ class ChurchSimulator {
     }
 
     _execLoad(d) {
+        if (d.imm === 0x4000) {
+            // Negative-zero operand is direct NULL, not an indexed read.
+            if (d.crDst === 6 || d.crDst >= 12) {
+                this.fault('PRIV_REG', 'LOAD NULL: destination is a protected register');
+                return null;
+            }
+            const oldGT = this.cr[d.crDst].word0 >>> 0;
+            this._clearCR(d.crDst);
+            if (this.halted) return null;
+            this.pc++;
+            const desc = `LOAD CR${d.crDst}, NULL`;
+            this.output += desc + '\n';
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_SHADOW, oldGT);
+            this._emitTrace(this.physicalPC, TRACE_EV_LOAD_NEW, 0);
+            return {pc: this.pc - 1, instr: d, desc};
+        }
         d = this._resolveCompactIndex(d);
         if (!d) return null;
         const clistGT = this.cr[d.crSrc].word0;

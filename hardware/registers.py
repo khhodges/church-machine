@@ -121,6 +121,8 @@ class ChurchRegisters(Elaboratable):
         self.m_bit_device_wr_en = Signal()
         self.m_bit_device_word = Signal(16)
         self.m_bit_device_state = Signal(16)
+        self.null_clear_en = Signal()
+        self.null_clear_addr = Signal(4)
         # Successful SWITCH consumes exactly its accepted destination M bit.
         self.m_switch_consume_en = Signal()
         self.m_switch_consume_target = Signal(2)
@@ -277,4 +279,7 @@ class ChurchRegisters(Elaboratable):
                 Mux(i == 0, 0, data_regs[i])
             )
 
+        # Commit with the zero descriptor: no stale M authority survives.
+        with m.If(self.null_clear_en):
+            m.d.sync += m_bit_regs.bit_select(self.null_clear_addr, 1).eq(0)
         return m

@@ -23,7 +23,16 @@ solution for explicit capability clearing.
 **Why:** The user rejected that per-abstraction cost and proposed ISA acceptance
 of all-zero NULL directly instead.
 
-**How to apply:** Distinguish the existing NULL GT representation from a proposed
-direct-NULL LOAD encoding. Discuss a non-colliding encoding before implementing;
-ordinary row zero must not silently acquire a new meaning. No exact direct-NULL
-instruction encoding has yet been selected.
+**How to apply:** Distinguish the existing NULL GT representation from direct-NULL
+instruction encoding. Ordinary row zero must retain its meaning.
+
+The user subsequently approved repurposing LOAD's redundant negative-zero
+operand for direct NULL in the next build.
+
+**Why:** It avoids a per-abstraction NULL row and keeps the FPGA implementation
+small, without a new opcode or GT type.
+
+**How to apply:** Follow the selected encoding in the master ISA; do not reopen
+it as an undecided proposal. This authorizes preparing the next build, not
+flashing the board or claiming physical acceptance. The ordinary indexed
+NULL-value path is a distinct conformance concern, not proof from direct-form tests.

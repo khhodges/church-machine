@@ -89,7 +89,7 @@ This does not change the separately approved signed-offset/index formats.
 
 | Opcode | Required effect |
 |---|---|
-| 0 LOAD | Load the indexed GT through the source c-list capability into the destination CR using mLoad validation. An authorized read of a NULL value succeeds and discards destination authority; see LOAD NULL below. Direct NULL loading is approved in direction, with its encoding still open. The CR6 execution-context exception must not become a general permission bypass. |
+| 0 LOAD | Load the indexed GT through the source c-list capability into the destination CR using mLoad validation. An authorized read of a NULL value succeeds and discards destination authority; see LOAD NULL below. Operand `0x4000` selects direct NULL discard without a C-list read. The CR6 execution-context exception must not become a general permission bypass. |
 | 1 SAVE | Store the source GT through the destination c-list capability; require destination S and source B, with mSave validation. Abstract PassKey policy is separately specified below. |
 | 2 CALL | Validate the selected E-GT and method entry. Save caller E authority and continuation; derive callee CR6/c-list and CR14/code. Never preserve transient L authority as caller E authority. |
 | 3 RETURN | Revalidate saved caller E authority; reconstruct CR6/CR14 and resume the saved continuation. Empty/poison-root return faults STACK_UNDERFLOW; it is not a reset or halt. |
@@ -626,7 +626,7 @@ all-zero word. This clarification does not change the GT format.
   as access authority still faults, and all architectural destination-register
   restrictions remain in force.
 
-**Direct NULL LOAD — direction approved, exact encoding open:**
+**Direct NULL LOAD — encoding approved for the next build:**
 
 The programmer must be able to discard destination capability authority
 without allocating a dedicated NULL C-list row in every abstraction.
@@ -634,13 +634,25 @@ The intended source spelling is `LOAD CRd, NULL`: load the all-zero NULL GT
 directly, read no C-list row and discard the destination's old cached authority.
 This is a LOAD extension, not a new opcode or a new GT format.
 
-The exact non-colliding instruction bit pattern has **not** been selected.
-Do not treat an all-zero instruction word or indexed operand `#0` as that
-encoding: ordinary row zero retains its existing meaning, including SELF.
-No assembler lowering or simulator/RTL conformance is implied by the proposed
-spelling. Select the encoding and check decoding/condition behavior before
-implementation; no special exemption from the ISA's existing condition and
-destination restrictions is approved.
+The approved operand is **bits [14:0] = `0x4000`**: subtract=1,
+magnitude=0, index=DR0 (the former redundant “negative zero” form).
+Opcode [31:27] remains 0; condition [26:23] and destination [22:19] retain
+their meanings. Source [18:15] is ignored; the assembler emits it as zero.
+For example, unconditional `LOAD CR1, NULL` is `0x07084000`.
+This deliberately repurposes the old raw negative-zero alias; it is not a
+second way to fetch row zero. Ordinary `#0` and `#-0` assemble to operand
+zero and retain row-zero/SELF behavior. SAVE is unchanged.
+
+On a true condition, clear the destination descriptor, its cached authority
+and M bit, and its existing Thread home. No source CR, C-list or Namespace
+target is read or resolved. This ordinary programmer form permits CR0–CR11
+except machine-owned CR6; it must not clear CR12–CR15. False conditions produce
+no clear or destination fault; independent instruction-fetch faults remain.
+Flags and DRs are unchanged. A NULL GT does not require a new type encoding.
+
+Assembler, simulator and FPGA-source support belong to the next build.
+Unit/integration simulation, generated RTL, synthesis/timing and physical
+acceptance are separate evidence; approval does not imply the board has changed.
 
 Discard is local to the destination register. It neither destroys the object
 nor revokes other copies of the GT, changes Namespace versions, or grants new

@@ -9,6 +9,7 @@ class ChurchLoad(Elaboratable):
         self.cr_src = Signal(4)
         self.cr_dst = Signal(4)
         self.index = Signal(32)
+        self.null_clear = Signal()
         self.load_busy = Signal()
         self.load_complete = Signal()
         self.load_fault = Signal()
@@ -37,13 +38,14 @@ class ChurchLoad(Elaboratable):
         cr_src_lat = Signal(4)
         cr_dst_lat = Signal(4)
         index_lat  = Signal(32)
+        null_clear_lat = Signal()
         structural_fault = Signal()
 
         m.d.comb += [
             self.mload_cr_src.eq(cr_src_lat),
             self.mload_cr_dst.eq(cr_dst_lat),
             self.mload_index.eq(index_lat),
-            self.mload_direct.eq(0),
+            self.mload_direct.eq(null_clear_lat),
             self.mload_direct_gt.eq(0),
             self.mload_m_elevated.eq(0),
         ]
@@ -55,6 +57,7 @@ class ChurchLoad(Elaboratable):
                         cr_src_lat.eq(self.cr_src),
                         cr_dst_lat.eq(self.cr_dst),
                         index_lat.eq(self.index),
+                        null_clear_lat.eq(self.null_clear),
                         structural_fault.eq(
                             # CR6 is the sealed c-list capability and CR14
                             # is its machine-owned bound/code context.  The
@@ -62,7 +65,8 @@ class ChurchLoad(Elaboratable):
                             # are explicitly loaded during boot or by normal
                             # working code and are not structural targets.
                             (self.cr_dst == CR_CLIST) |
-                            (self.cr_dst == CR_CLOOMC)
+                            (self.cr_dst == CR_CLOOMC) |
+                            (self.null_clear & (self.cr_dst >= 12))
                         ),
                     ]
                     m.next = "CHECK_STRUCTURAL"

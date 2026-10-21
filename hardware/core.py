@@ -619,6 +619,7 @@ class ChurchCore(Elaboratable):
                 ~boot_microcode_active &
                 (church_op != ChurchOpcode.CHANGE) &
                 (church_op != ChurchOpcode.SWITCH) &
+                ~((church_op == ChurchOpcode.LOAD) & (u_decoder.immediate == 0x4000)) &
                 # NULL and EXACT own their type checks in the TPERM unit.
                 # The generic NULL gate would reject the NULL query itself
                 # and attribute EXACT failures to the wrong pipeline stage.
@@ -893,6 +894,9 @@ class ChurchCore(Elaboratable):
             # M-window set/clear connect to u_regs controls
             u_regs.m_set_en.eq(mwin_m_set_en),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
+            u_regs.null_clear_en.eq(u_load.load_busy & u_load.mload_direct &
+                                   u_shared_mload.cr_wr_en),
+            u_regs.null_clear_addr.eq(u_shared_mload.cr_wr_addr),
             u_regs.m_bit_device_wr_en.eq(
                 u_dwrite.m_bit_wr_en | self.dbg_m_bit_wr_en),
             u_regs.m_bit_device_word.eq(
@@ -1804,6 +1808,7 @@ class ChurchCore(Elaboratable):
             u_load.cr_src.eq(cr_src),
             u_load.cr_dst.eq(cr_dst),
             u_load.index.eq(compact_index[:32]),
+            u_load.null_clear.eq(u_decoder.immediate == 0x4000),
         ]
 
         # Multi-cycle instructions own the fetched instruction and its NIA from
@@ -3005,6 +3010,7 @@ class ChurchCore(Elaboratable):
             ]
         with m.Elif(u_load.load_busy):
             m.d.comb += [
+                u_shared_mload.sub_null_clear.eq(u_load.mload_direct),
                 u_shared_mload.sub_start.eq(u_load.mload_start),
                 u_shared_mload.sub_cr_src.eq(u_load.mload_cr_src),
                 u_shared_mload.sub_cr_dst.eq(u_load.mload_cr_dst),

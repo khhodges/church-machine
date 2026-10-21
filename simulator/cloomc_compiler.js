@@ -2512,7 +2512,7 @@ class CLOOMCCompiler {
             const namedLoad = nativeInstruction.opcode === 'LOAD'
                 ? text.match(/^[A-Za-z][A-Za-z0-9]*\s+(CR(?:1[0-5]|[0-9]))\s*,\s*([A-Za-z_][A-Za-z0-9_.]*)$/i)
                 : null;
-            if (namedLoad) {
+            if (namedLoad && namedLoad[2].toUpperCase() !== 'NULL') {
                 const capName = namedLoad[2];
                 const row = rom[capName.toUpperCase()];
                 if (row === undefined) {

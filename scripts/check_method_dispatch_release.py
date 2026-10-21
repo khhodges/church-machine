@@ -95,6 +95,10 @@ def main():
     try:
         before = source_hashes()
         evidence["source_hashes"] = before
+        # The next build must include the approved direct-NULL LOAD path.
+        run(["node", "simulator/test_load_null.js"], directory / "load-null-simulator.log", 60)
+        run([sys.executable, "-m", "pytest", "hardware/test_load_null.py", "-q"],
+            directory / "load-null-rtl.log", 60)
         candidate = directory / "candidate"
         run(["node", "scripts/build_selftest_lump.js", "--candidate-dir", str(candidate),
              "--ns-slot", "6"], directory / "candidate.log", 60)
