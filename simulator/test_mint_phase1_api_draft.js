@@ -20,10 +20,31 @@ assert.deepEqual(methods.map(m => m[1]),
 
 const compiled = new Compiler().compile(source, []);
 assert.ok(compiled.errors.length > 0, 'Unfinished draft must not compile as runnable Mint');
-assert.ok(compiled.errors.every(e => /^Undefined label: TODO_/.test(e.message)),
-    JSON.stringify(compiled.errors.filter(e => !/^Undefined label: TODO_/.test(e.message))));
+const allowedDraftError = message => /^Undefined label: TODO_/.test(message) ||
+    /^HARDFAULT emission is disabled/.test(message);
+assert.ok(compiled.errors.every(e => allowedDraftError(e.message)),
+    JSON.stringify(compiled.errors.filter(e => !allowedDraftError(e.message))));
 assert.equal(compiled.methods.length, 0, 'No partly valid method may escape as a successful draft');
 assert.equal(compiled.language, 'assembly');
+
+let faultCount = 0;
+for (const [, name, body] of methods) {
+    const branches = new Set([...body.matchAll(/^\s*BRANCH(?:EQ|NE|GT|GE|LT|LE|HI)\s+(TODO_\w+)/gm)]
+        .map(match => match[1]));
+    const faults = [...body.matchAll(/^(TODO_\w+):\s*\n\s*HARDFAULT "([^"\n]+)"/gm)];
+    assert.equal(faults.length, branches.size, `${name}: every failure branch needs one fault site`);
+    for (const [, label, reason] of faults) {
+        assert.ok(branches.delete(label), `${name}: unmatched or duplicate fault ${label}`);
+        assert.ok(reason.startsWith(`Mint.${name}: `), 'Static reason identifies the method');
+        faultCount++;
+    }
+    assert.equal(branches.size, 0, `${name}: unresolved fault branch`);
+    // Unimplemented operations must remain compile blockers, not turn into
+    // unconditional faults disguised as completed service implementations.
+    for (const [, label] of body.matchAll(/^\s*BRANCH\s+(TODO_\w+)/gm))
+        assert.doesNotMatch(body, new RegExp(`^${label}:`, 'm'));
+}
+assert.equal(faultCount, 38, 'All 38 reviewed failure cases use the agreed HARDFAULT standard');
 
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),

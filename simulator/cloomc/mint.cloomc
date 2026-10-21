@@ -22,8 +22,12 @@
 ; Open File -> mint (cloomc/mint.cloomc).
 ; This supersedes the obsolete Encode/Revoke/Transfer source, not the live binary.
 ; Native CLOOMC instruction checks below are real source, not host predicates.
-; TODO_* branches deliberately have no destination: compilation MUST fail
-; until the corresponding implementation has been reviewed and supplied.
+; Fault-only TODO labels below now have explicit HARDFAULT destinations.
+; Their names are retained to match the reviewed pseudocode.
+; Operation TODOs still have no destination: compilation MUST fail until
+; the corresponding implementation has been reviewed and supplied.
+; HARDFAULT uses the agreed static-reason standard; compiler/map integration
+; remains gated. Never substitute HALT, a reporting CALL or a new opcode.
 ; No default success, no private MINT opcode, no live Namespace installation.
 ;
 ; CREATE / DESTROY retain source indices 0 / 1.
@@ -233,6 +237,42 @@ create_data_slot_return:
     ; This block has one entry site and a fixed local continuation.
     ; Do not consume the enclosing CALL frame or clear any CR.
     BRANCH create_data_slot_after_clear
+
+; Resolved failure cases. No result issuance and no promised rollback.
+TODO_CREATE_INPUT_CREDENTIAL_NULL:
+    HARDFAULT "Mint.CREATE: missing Passkey"
+TODO_CREATE_INPUT_PROOF_READ:
+    HARDFAULT "Mint.CREATE: proof capability is not readable"
+TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL:
+    HARDFAULT "Mint.CREATE: DATA source CR4 must be NULL"
+TODO_CREATE_INPUT_CASE_NOT_DATA:
+    HARDFAULT "Mint.CREATE: only DATA case is implemented"
+TODO_CREATE_INPUT_PERMISSIONS_NOT_RW:
+    HARDFAULT "Mint.CREATE: DATA permissions must be READ/WRITE"
+TODO_CREATE_INPUT_ALLOCATION_ZERO:
+    HARDFAULT "Mint.CREATE: allocation size is zero"
+TODO_CREATE_INPUT_SIZE_NOT_POWER_TWO:
+    HARDFAULT "Mint.CREATE: allocation size is not a power of two"
+TODO_CREATE_ALLOCATOR_STATE:
+    HARDFAULT "Mint.CREATE: inconsistent allocator state"
+TODO_CREATE_POOL_EXHAUSTED:
+    HARDFAULT "Mint.CREATE: memory pool exhausted"
+TODO_CREATE_SLOTS_EXHAUSTED:
+    HARDFAULT "Mint.CREATE: free Namespace slots exhausted"
+TODO_CREATE_RESULT_COMPLETION:
+    HARDFAULT "Mint.CREATE: operation did not complete"
+TODO_CREATE_RESULT_NULL:
+    HARDFAULT "Mint.CREATE: result capability is NULL"
+TODO_CREATE_RESULT_NOT_RW:
+    HARDFAULT "Mint.CREATE: result lacks READ/WRITE permissions"
+TODO_CREATE_SLOT_CONFIRM_WORD0:
+    HARDFAULT "Mint.CREATE: Namespace location read-back mismatch"
+TODO_CREATE_SLOT_CONFIRM_WORD1:
+    HARDFAULT "Mint.CREATE: Namespace bounds/version read-back mismatch"
+TODO_CREATE_SLOT_CONFIRM_WORD2:
+    HARDFAULT "Mint.CREATE: Namespace integrity read-back mismatch"
+TODO_CREATE_SLOT_CONFIRM_WORD3:
+    HARDFAULT "Mint.CREATE: Namespace identity read-back mismatch"
 }
 
 method DESTROY {
@@ -268,6 +308,21 @@ destroy_result:
     TPERM CR1, NULL
     BRANCHNE TODO_DESTROY_RESULT_NOT_NULL
     RETURNAL #0
+
+TODO_DESTROY_INPUT_CREDENTIAL_NULL:
+    HARDFAULT "Mint.DESTROY: missing Passkey"
+TODO_DESTROY_INPUT_PROOF_READ:
+    HARDFAULT "Mint.DESTROY: proof capability is not readable"
+TODO_DESTROY_INPUT_TARGET_NULL:
+    HARDFAULT "Mint.DESTROY: target is NULL"
+TODO_DESTROY_INPUT_CR4_NOT_NULL:
+    HARDFAULT "Mint.DESTROY: CR4 must be NULL"
+TODO_DESTROY_INPUT_CR8_NOT_NULL:
+    HARDFAULT "Mint.DESTROY: CR8 must be NULL"
+TODO_DESTROY_RESULT_COMPLETION:
+    HARDFAULT "Mint.DESTROY: operation did not complete"
+TODO_DESTROY_RESULT_NOT_NULL:
+    HARDFAULT "Mint.DESTROY: result capability must be NULL"
 }
 
 method MakeOutform {
@@ -302,6 +357,21 @@ outform_result:
     BRANCH TODO_MakeOutform_RESULT_TYPE_AND_IDENTITY
 outform_return:
     RETURNAL #2
+
+TODO_MakeOutform_INPUT_CREDENTIAL_NULL:
+    HARDFAULT "Mint.MakeOutform: missing Passkey"
+TODO_MakeOutform_INPUT_PROOF_READ:
+    HARDFAULT "Mint.MakeOutform: proof capability is not readable"
+TODO_MakeOutform_INPUT_TARGET_NULL:
+    HARDFAULT "Mint.MakeOutform: target is NULL"
+TODO_MakeOutform_INPUT_CR4_NOT_NULL:
+    HARDFAULT "Mint.MakeOutform: CR4 must be NULL"
+TODO_MakeOutform_INPUT_CR8_NOT_NULL:
+    HARDFAULT "Mint.MakeOutform: CR8 must be NULL"
+TODO_MakeOutform_RESULT_COMPLETION:
+    HARDFAULT "Mint.MakeOutform: operation did not complete"
+TODO_MakeOutform_RESULT_NULL:
+    HARDFAULT "Mint.MakeOutform: result capability is NULL"
 }
 
 method MakeInform {
@@ -336,5 +406,20 @@ inform_result:
     BRANCH TODO_MakeInform_RESULT_TYPE_AND_IDENTITY
 inform_return:
     RETURNAL #2
+
+TODO_MakeInform_INPUT_CREDENTIAL_NULL:
+    HARDFAULT "Mint.MakeInform: missing Passkey"
+TODO_MakeInform_INPUT_PROOF_READ:
+    HARDFAULT "Mint.MakeInform: proof capability is not readable"
+TODO_MakeInform_INPUT_TARGET_NULL:
+    HARDFAULT "Mint.MakeInform: target is NULL"
+TODO_MakeInform_INPUT_CR4_NOT_NULL:
+    HARDFAULT "Mint.MakeInform: CR4 must be NULL"
+TODO_MakeInform_INPUT_CR8_NOT_NULL:
+    HARDFAULT "Mint.MakeInform: CR8 must be NULL"
+TODO_MakeInform_RESULT_COMPLETION:
+    HARDFAULT "Mint.MakeInform: operation did not complete"
+TODO_MakeInform_RESULT_NULL:
+    HARDFAULT "Mint.MakeInform: result capability is NULL"
 }
 }

@@ -135,7 +135,7 @@ console.log('PASS: native bounded pool/slot reservation, exact zeroing, exhausti
 const localTransfer = fragment('create_data_set_slot', 'create_data_slot_after_clear') +
     '\ncreate_data_slot_after_clear:\nHALT\ncreate_data_slot_lambda:\n' +
     source.slice(source.indexOf('create_data_slot_return:'),
-        source.indexOf('\n}', source.indexOf('create_data_slot_return:')));
+        source.indexOf('TODO_CREATE_INPUT_CREDENTIAL_NULL:'));
 {
     const {s, labels} = fixture(localTransfer);
     s.cr[9] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};

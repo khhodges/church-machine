@@ -3015,6 +3015,15 @@ class CLOOMCCompiler {
             return;
         }
 
+        // Recognize the agreed pseudo-instruction in method bodies without
+        // bypassing the assembler's exact-artifact map/integration gate.
+        if (/^HARDFAULT\b/i.test(text)) {
+            errors.push({line: stmt.lineNum,
+                message: 'HARDFAULT emission is disabled pending approval of exact-artifact map binding and target integration.',
+                ...CLOOMCCompiler._tokenCols(stmt.rawLine, text.split(/\s+/)[0])});
+            return;
+        }
+
         const gotoMatch = text.match(/^goto\s+(\w+)$/);
         if (gotoMatch) {
             const branchAddr = code.length;
