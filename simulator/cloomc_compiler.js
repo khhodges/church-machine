@@ -2398,6 +2398,16 @@ class CLOOMCCompiler {
     _compileStatement(stmt, code, locals, rom, capNames, labels, labelRefs, errors, manifest, method) {
         const text = stmt.text.trim().replace(/;$/, '');
         if (!text || text.startsWith('//')) return;
+        const crAlias = /^\.pet\s+([A-Za-z_]\w*)\s+CR([0-9]|1[01])$/i.exec(text);
+        if (crAlias) {
+            if (!this._methodCRAliases) this._methodCRAliases = new WeakMap();
+            let aliases = this._methodCRAliases.get(labels);
+            if (!aliases) this._methodCRAliases.set(labels, aliases = {});
+            if (Object.hasOwn(aliases, crAlias[1])) {
+                errors.push({line: stmt.lineNum, message: `Duplicate CR alias: ${crAlias[1]}`});
+            } else aliases[crAlias[1]] = Number(crAlias[2]);
+            return;
+        }
 
         // Native-bound dynamic LUMPs may state their post-dispatch result
         // contract as `if (CRn != null)`. The Church Machine ISA deliberately
@@ -2537,7 +2547,10 @@ class CLOOMCCompiler {
             if (typeof asmObj.setLocalClistSlots === 'function') {
                 asmObj.setLocalClistSlots(rom);
             }
-            const asmResult = asmObj.assemble(asmText);
+            const aliases = this._methodCRAliases && this._methodCRAliases.get(labels);
+            const aliasPrefix = Object.entries(aliases || {}).map(
+                ([name, index]) => `.pet ${name} CR${index}`).join('\n');
+            const asmResult = asmObj.assemble(aliasPrefix ? `${aliasPrefix}\n${asmText}` : asmText);
             if (asmResult.errors && asmResult.errors.length > 0) {
                 for (const error of asmResult.errors) {
                     errors.push({

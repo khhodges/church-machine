@@ -50,7 +50,7 @@
 ; explicit unresolved gates, not silently assumed to pass.
 
 abstraction ide.Mint {
-capabilities { SELF E }
+capabilities { SELF E, ide.MintState RW, ide.MintState L }
 
 method CREATE {
 CREATE_inputs:
@@ -64,12 +64,36 @@ CREATE_inputs:
     BRANCH TODO_CREATE_CLEAR_RESULT_AUTHORITY
 create_data_inputs_after_clear:
     IADD DR1, DR0, #0
+create_data_passkey_escape:
+    ; Private state LUMP views come from Mint's own C-list, never from
+    ; the caller. Its sole c-list row is scratch at the last LUMP word.
+    LOAD CR8, CR6, #1
+    LOAD CR7, CR6, #2
+    DREAD DR5, CR8, #0
+    BFEXT DR5, DR5, #23, #4
+    IADD DR10, DR0, #64
+create_data_state_size:
+    MCMP DR5, #0
+    BRANCHEQ create_data_escape_reference
+    SHL DR10, DR10, #1
+    ISUB DR5, DR5, #1
+    BRANCH create_data_state_size
+create_data_escape_reference:
+    ISUB DR10, DR10, #1
+    ISUB DR5, DR0, #1
+    DWRITE DR5, CR8, #0, DR10
+    LOAD CR11, CR7, #0
+    ; Existing EXACT instruction: only the exact all-ones CR2 escapes.
+    ; No proof read or CR3 requirement on this Phase 1 testing path.
+    TPERM CR2, EXACT, CR11
+    BRANCHEQ create_data_source_checks
     TPERM CR2, NULL
     BRANCHEQ TODO_CREATE_INPUT_CREDENTIAL_NULL
     TPERM CR3, R
     BRANCHNE TODO_CREATE_INPUT_PROOF_READ
     ; Probe proof bounds without clobbering packed DR2 or permission DR3.
     DREAD DR4, CR3, #3
+create_data_source_checks:
     TPERM CR4, NULL
     BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL
 create_data_scalar_checks:
@@ -94,6 +118,8 @@ create_data_power_loop:
     SHR DR7, DR7, #1
     BRANCH create_data_power_loop
 create_data_authorize:
+    TPERM CR2, EXACT, CR11
+    BRANCHEQ create_data_allocate
     ; Service binding missing: verify all four proof words, credential authority,
     ; and remaining allowance >= DR6 before allocation or destination writes.
     ; Preserve decoded DR6. Non-NULL is never authorization.
@@ -118,26 +144,12 @@ create_data_publish:
     ; DR6 remains the allocation size; the zeroed destination stays private.
     BRANCH TODO_CREATE_BIND_SLOT_LAMBDA_AND_DESCRIPTOR
 create_data_set_slot:
-    ; Ordinary simulator LAMBDA currently falls through; trusted entry/return
-    ; binding must be resolved before this can execute as the intended call.
-    ; See docs/reviews/mint-phase1/native-lambda-binding.md: an own-object X GT
-    ; identifies the executable, not this private label. Do not import the
-    ; protected profile's host link/PC selection as ordinary CLOOMC semantics.
-    LAMBDA CR9
-    ; LAMBDA RETURN does not erase CR8 or CR9. Do not proceed to release/issue.
-    BRANCH TODO_CREATE_CLEAR_DESTINATION_AND_LAMBDA_AUTHORITY
+    ; CR9 must be an X view whose location is this local label's address.
+    ; .pet is an existing assembler alias, not a new operand encoding.
+    .pet create_data_slot_lambda CR9
+    LAMBDA create_data_slot_lambda
 create_data_slot_after_clear:
-    ; Reach only after a separately established legal cleanup mechanism.
-    ; Verify its postcondition before release; these tests do not erase authority.
-    TPERM CR8, NULL
-    BRANCHNE TODO_CREATE_DESTINATION_AUTHORITY_RETAINED
-    TPERM CR9, NULL
-    BRANCHNE TODO_CREATE_LAMBDA_AUTHORITY_RETAINED
-    TPERM CR10, NULL
-    BRANCHNE TODO_CREATE_NS_AUTHORITY_RETAINED
-    ; Release only after confirmed writes AND private authority removal.
-    ; On a fault, accepted writes are not implicitly rolled back.
-    BRANCH TODO_CREATE_SLOT_RELEASE_EXCLUSION
+    ; Same Mint context, single-threaded Phase 1: retain private authority.
 create_data_account_and_issue:
     ; Service binding missing: finish GC/accounting after confirmed slot writes,
     ; debit exactly DR6 words once, issue Inform DATA RW B=1 in CR1.
@@ -185,9 +197,6 @@ create_data_slot_write:
     DREAD DR4, CR10, #3, DR7
     MCMP DR4, DR11
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
-    ; Namespace authority must be removed before release. LAMBDA RETURN
-    ; preserves CR10 and therefore cannot satisfy this gate.
-    BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY
 create_data_slot_return:
     ; Resume the saved stack continuation in the unchanged context.
     ; No capability clearing on this SZ=0 return.

@@ -120,10 +120,9 @@ HALT`, [...values, callee.gt]);
 }
 console.log('PASS: all four Mint exit masks erase authority through native CALL/RETURN and CHANGE away/back');
 
-// Probe SZ=0 RETURN independently of the unresolved X-target entry binding.
-// Ordinary LAMBDA currently falls through. Explicit *fixture instructions*
-// route to a RETURN once, then distinguish the saved continuation with DR11.
-// This is not a proposed Mint dispatch workaround. No host sets PC/registers,
+// Probe SZ=0 RETURN using an explicitly provisioned successor X view.
+// Fixture instructions distinguish the saved continuation with DR11.
+// This is not a Mint allocator or dispatch implementation. No host sets PC/registers,
 // pops a frame, flushes a cache, or calls an instruction handler after entry.
 const slotReturn = source.slice(source.indexOf('create_data_slot_return:')).match(/^\s*(RETURNAL[^\n]*)/m)[1];
 assert.equal(slotReturn.trim(), 'RETURNAL');
@@ -140,15 +139,17 @@ for (const mask of [0, 2, 2207, 4093, 4095]) {
         // stack-path evidence only; CALL remains forbidden in Mint's update interval.
         const leaf = compile(32, 'IADD DR4, DR0, #0\nRETURNAL #4095');
         const token = rights => sim.createGT(sim.parseGT(leaf.gt).gt_seq, leaf.slot, rights, 1);
-        sim.withNamespaceWrite('TEST ONLY: Lambda cleanup Namespace view', () =>
-            sim.writeNSEntry(34, sim.NS_TABLE_BASE, sim.nsCount * 4 - 1, 0, 0, 1, 0, 0, 0));
+        sim.withNamespaceWrite('TEST ONLY: Lambda cleanup Namespace view', () => {
+            sim.writeNSEntry(34, sim.NS_TABLE_BASE, sim.nsCount * 4 - 1, 0, 0, 1, 0, 0, 0);
+            sim.writeNSEntry(43, leaf.base + 2, 0, 0, 0, 1, 0, 0, 0);
+        });
         const nsGT = sim.createGT(0, 34, {R: 1, W: 1}, 1);
-        const values = controlled.map(reg => reg === 9 ? token({X: 1})
+        const values = controlled.map(reg => reg === 9 ? sim.createGT(0, 43, {X: 1}, 1)
             : reg === 10 ? nsGT : reg === 8 ? token({R: 1, W: 1})
             : [1, 3].includes(reg) ? token({R: 1}) : leaf.gt);
         const loads = controlled.map((reg, i) => `LOAD CR${reg}, CR6, #${i + 1}`).join('\n');
         const stopLabels = [...new Set([...afterSlot.matchAll(/\bTODO_\w+/g)].map(m => m[0]))];
-        const checks = afterSlot + '\n' + stopLabels.map((label, i) =>
+        const checks = afterSlot + '\nHALT\n' + stopLabels.map((label, i) =>
             `${label}:\nIADD DR10, DR0, #${100 + i}\nHALT`).join('\n');
         const domain = compile(30, `${loads}
 IADD DR11, DR0, #0
@@ -163,6 +164,12 @@ LOAD CR6, CR6, #1
 ${mask === 0 ? slotReturn : `RETURNAL #${mask}`}
 finished:
 ${checks}`, values);
+        const lambdaPC = Array.from(sim.memory.slice(domain.base + 1,
+            domain.base + 1 + domain.hdr.cw)).findIndex(word => (word >>> 27) === 7);
+        assert.ok(lambdaPC >= 0);
+        sim.withNamespaceWrite('TEST ONLY: exact successor X entry', () =>
+            sim.writeNSEntry(43, domain.base + 1 + lambdaPC + 1,
+                0, 0, 0, 1, 0, 0, 0));
         activate(domain);
         sim.pc = 1;
         const base = sim._activeThreadBase();
@@ -184,7 +191,7 @@ ${checks}`, values);
                 savedContext = before;
                 frameAddress = sim.lambdaCachedFrame.addr;
                 assert.equal(sim._unpackFrameWord(sim.lambdaCachedFrame.word).returnPC, savedPC);
-                assert.equal(sim.pc, savedPC, 'record the unresolved entry behavior, do not emulate dispatch');
+                assert.equal(sim.pc, savedPC, 'the provisioned X view names this successor');
             }
             if (spill && result.instr?.opcode === 2) {
                 assert.equal(sim.lambdaCachedFrame, null, 'native CALL must flush the cached frame');
@@ -211,10 +218,9 @@ ${checks}`, values);
             }
             if (sim.halted) {
                 assert.ok(returned, `must return before reaching the fixture stop (mask=${mask}, spill=${spill})\n${sim.output}`);
-                // No mask can make Lambda erase private authority. The test-only
-                // boundary marker must identify the first retained-authority gate,
-                // never release or a fabricated Mint success.
-                assert.equal(sim.dr[10], 100 + stopLabels.indexOf('TODO_CREATE_DESTINATION_AUTHORITY_RETAINED'));
+                assert.equal(sim.cr[10].word0, nsGT,
+                    'Same-context continuation retains Mint Namespace authority');
+                assert.equal(sim.dr[11], 1, 'The Lambda body ran before continuation completed');
                 finished = true;
             }
         }
@@ -222,4 +228,4 @@ ${checks}`, values);
     }
 }
 console.log('PASS: Lambda ignores every tested mask, preserves all CRs/homes, and resumes cached or spilled stack continuations');
-console.log('BLOCKED: Lambda RETURN cannot implement Mint early cleanup; legal erasure and X-entry bindings remain unresolved');
+console.log('NOTE: this proves RETURN preservation, not Mint allocation or saved-design provisioning');

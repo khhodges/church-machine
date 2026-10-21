@@ -184,6 +184,17 @@ class ProtectedCore extends combinedLSProfile(Core) {
         }
         return super._execCall(d);
     }
+    _lambdaEntryAddress() {
+        // Preserve this separately provisioned profile's existing checked
+        // entry link. Ordinary execution never imports or uses this profile.
+        // _execLambda validates the link before calling the base instruction;
+        // the base still checks the executable fence and continuation.
+        const st = states.get(this), c = P.context(this, st);
+        const link = st.plan.roles.mint;
+        need(c.stage === 'begun' || c.stage === 'prepared', 'MINT_CONTEXT');
+        return this.cr[14].word1 + 1 +
+            (c.stage === 'begun' ? link.readEntry : link.commitEntry);
+    }
     _execLambda(d) {
         const st = states.get(this), c = P.context(this, st);
         need(!st.continuation && !this.lambdaActive && d.crDst === 9, 'MINT_LEAF');

@@ -1,5 +1,32 @@
 # Native Mint LAMBDA: entry/return reconciliation
 
+## Current implementation qualification
+
+The ordinary simulator now uses the existing LAMBDA register operand's
+validated X-capability location as its entry address. It checks that address
+against the current executable body before accepting a continuation. CR6/CR14
+are not replaced. Native tests enter a separate body and return with all CRs
+and M bits preserved.
+
+The existing `.pet body CR9` alias permits `LAMBDA body` with exactly the same
+instruction word as `LAMBDA CR9`. CLOOMC method compilation now carries this
+explicit alias through to the assembler. It does **not** create an X capability
+or populate a Namespace slot: real entry provisioning is still required.
+
+Mint's editable CREATE source also compares CR2 with an all-ones reference
+constructed through its own state LUMP's RW/L views. Matching CR2 skips proof
+checks, but not Data input checks. Native tests cover the escape with NULL CR3,
+rejection of other proof-less credentials, and absence of memory authority in
+the all-ones word. The state LUMP has one c-list row at its final word,
+located using the header size; writing the reference must not overwrite its
+header or assume a fixed artifact size.
+
+This is **not complete CREATE acceptance**. The source still rejects compilation
+at unresolved allocation, entry provisioning, accounting and completion gates.
+No saved LUMP, New layout selection, frozen image or FPGA was changed. Historical
+observations below are superseded where they describe ordinary LAMBDA
+fall-through or require authority erasure on a same-context Mint return.
+
 **Superseding programmer clarification, 2026-10-19:** RETURN from LAMBDA
 preserves every current CR; capability clearing applies only to CALL packets.
 The [master ISA correction](../../instruction-set.md#return-call-versus-lambda)

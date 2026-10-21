@@ -18,6 +18,17 @@ and capability provisioning from an ISA encoding limitation. Do not call the
 whole path impossible merely because a source-level label or GT literal is not
 an existing instruction operand. Preserve the ordinary execution requirement.
 
+Local-label spelling is not entry authority. An existing X capability must
+supply the entry address; source aliases must not manufacture capabilities or
+turn an unverified debug-label table into control-flow authority.
+
+**Why:** The user requires label-based Mint code while explicitly preserving
+all instruction operand encodings and rejecting protected-profile shortcuts.
+
+**How to apply:** Keep source naming separate from capability provisioning and
+verify body entry as well as RETURN. A successful inline return alone does not
+prove that a labeled body was entered.
+
 Mint owns the memory pool and free-slot list. Phase 1 code is single-threaded.
 The Lambda name is a label in Mint's code block; it executes with the same
 authority as Mint and uses Mint's NS/RW capability. Do not model it as a

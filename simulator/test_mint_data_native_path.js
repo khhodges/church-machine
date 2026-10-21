@@ -98,13 +98,13 @@ slotSim.dr[7] = selected;
 descriptor.forEach((word, i) => { slotSim.dr[8 + i] = word; });
 const before = Array.from(slotSim.memory.slice(slotSim.NS_TABLE_BASE,
     slotSim.NS_TABLE_BASE + slotSim.nsCount * 4));
-runTo(slotSim, slotLabels.TODO_CREATE_CLEAR_NS_AUTHORITY);
+runTo(slotSim, slotLabels.create_data_slot_return);
 const expected = before.slice();
 expected.splice(selected * 4, 4, ...descriptor);
 assert.deepEqual(Array.from(slotSim.memory.slice(slotSim.NS_TABLE_BASE,
     slotSim.NS_TABLE_BASE + slotSim.nsCount * 4)), expected);
 assert.notEqual(slotSim.cr[10].word0, 0,
-    'Authority remains at the unresolved erasure gate; Lambda RETURN must preserve it');
+    'Same-context Lambda RETURN must preserve Mint authority');
 
 const {s: clearSim} = fixture('TPERM CR10, CLEAR\nHALT');
 const retained = {...clearSim.cr[10]};
@@ -112,38 +112,65 @@ clearSim.step();
 assert.equal(clearSim.halted, false, JSON.stringify(clearSim.faultLog));
 assert.deepEqual(clearSim.cr[10], retained, 'TPERM CLEAR must not be modeled as erasure');
 
-// Diagnose the actual ordinary LAMBDA boundary instead of silently adding a
-// host PC redirect, as the separately scoped protected profile does.
+// Labels use an explicit CR alias and the unchanged register-form encoding.
+// Provision the X view before execution, never redirect PC from a host hook.
+function bindEntry(s, labels, name) {
+    const address = CODE + 1 + labels[name];
+    s.withNamespaceWrite('TEST ONLY: local X entry', () =>
+        s.writeNSEntry(43, address, 0, 0, 0, 1, 0, 0, 0));
+    const entry = s.readNSEntry(43);
+    s.cr[9] = {word0: s.createGT(0, 43, {X: 1}, 1),
+        word1: entry.word0_location, word2: entry.word1_limit, word3: 0, m: 0};
+}
 const {s: lambdaSim, labels: lambdaLabels} = fixture(`
-LAMBDA CR9
+.pet intended_body CR9
+LAMBDA intended_body
 continuation:
 HALT
 intended_body:
 IADD DR2, DR0, #777
 RETURNAL
 `);
+bindEntry(lambdaSim, lambdaLabels, 'intended_body');
+assert.equal(lambdaSim.memory[CODE + 1],
+    new Assembler().assemble('LAMBDA CR9').words[0],
+    'Label alias must emit the existing register instruction unchanged');
 lambdaSim.step();
 assert.equal(lambdaSim.halted, false, JSON.stringify(lambdaSim.faultLog));
-assert.equal(lambdaSim.pc, lambdaLabels.continuation,
-    'Ordinary LAMBDA behavior changed: revisit the missing entry binding');
+assert.equal(lambdaSim.pc, lambdaLabels.intended_body);
 assert.equal(lambdaSim.lambdaActive, true);
 assert.equal(lambdaSim.dr[2], 0);
-assert.notEqual(lambdaSim.pc, lambdaLabels.intended_body);
 assert.equal(lambdaSim.mLoad(lambdaSim.cr[9].word0, 'X', 9).ok, true,
-    'The blocker must not be confused with a missing X permission');
+    'Entry must have real X permission');
+lambdaSim.step();
+lambdaSim.step();
+assert.equal(lambdaSim.pc, lambdaLabels.continuation);
+assert.equal(lambdaSim.dr[2], 777);
 
-// Independent RETURN probe, deliberately placed INLINE after LAMBDA. This
-// diagnoses the existing SZ=0 unwind; it is NOT evidence of body entry.
+const {s: outside} = fixture('LAMBDA CR9\nHALT');
+bindEntry(outside, {bad: DATA - CODE - 1}, 'bad');
+const priorSTO = outside._unpackProtectedIndicator(outside.memory[17]).sto;
+const priorFrameWord = outside.memory[priorSTO];
+outside.step();
+assert.equal(outside.halted, true);
+assert.equal(outside.faultLog.at(-1).type, 'BOUNDS');
+assert.equal(outside.lambdaActive, false);
+assert.equal(outside.callStack.length, 0);
+assert.equal(outside.memory[priorSTO], priorFrameWord,
+    'Out-of-body entry must fault before accepting a Lambda frame');
+
+// Independent RETURN probes enter a separate body using an actual X view.
 // No runtime methods are replaced and no PC is redirected after provisioning.
 for (const mask of [0, 4095]) {
-    const {s: ret} = fixture(`LAMBDA CR9\nRETURNAL #${mask}\nHALT`);
+    const {s: ret, labels} = fixture(`LAMBDA CR9\ncontinuation:\nHALT\nbody:\nRETURNAL #${mask}`);
+    bindEntry(ret, labels, 'body');
     const context = ret.cr.map(cr => ({...cr}));
     const indicator = ret._unpackProtectedIndicator(ret.memory[17]);
     const flags = {...ret.flags};
     const namespace = Array.from(ret.memory.slice(ret.NS_TABLE_BASE,
         ret.NS_TABLE_BASE + ret.nsCount * 4));
     ret.step();
-    assert.equal(ret.pc, 1, 'Known fall-through, not successful private entry');
+    assert.equal(ret.pc, labels.body, 'X capability selects the local body');
     assert.equal(ret.lambdaActive, true);
     const frame = ret._readProtectedCallFrame();
     assert.equal(frame.ok, true);
@@ -154,13 +181,13 @@ for (const mask of [0, 4095]) {
     assert.ok(ret.lambdaCachedFrame);
     ret.step();
     assert.equal(ret.halted, false, JSON.stringify(ret.faultLog));
-    assert.equal(ret.pc, 1, 'RETURN restores the saved inline caller NIA');
+    assert.equal(ret.pc, labels.continuation, 'RETURN restores the saved caller NIA');
     assert.equal(ret.physicalPC, CODE + 2);
     assert.equal(ret.lambdaActive, false);
     assert.equal(ret.lambdaCachedFrame, null);
     assert.equal(ret.callStack.length, 0);
     assert.deepEqual(ret._unpackProtectedIndicator(ret.memory[17]),
-        {...indicator, nia: 1}, 'Protected STO/prior SZ restored with current NIA');
+        {...indicator, nia: labels.body}, 'Protected STO/prior SZ restored with current NIA');
     assert.deepEqual(ret.flags, flags);
     assert.deepEqual(ret.cr, context,
         'Lambda RETURN preserves ALL descriptors and M bits; no CR6 reconstruction');
@@ -175,6 +202,39 @@ for (const mask of [0, 4095]) {
     }
 }
 console.log('PASS: native zeroing and exact-slot write/read-back fragments');
-console.log('PASS: isolated inline SZ=0 RETURN resumes the saved context and preserves ALL CRs.');
+console.log('PASS: native SZ=0 RETURN resumes the saved context and preserves ALL CRs.');
 console.log('PASS: TPERM CLEAR is a test, not erasure; only CALL-frame RETURN masks supply erasure.');
-console.log('BLOCKED: ordinary LAMBDA falls through; no private-body entry binding. No complete CREATE claim.');
+console.log('PASS: native label-bound LAMBDA enters its body and returns, without changing instruction encoding.');
+// The all-ones comparison is CLOOMC, not a host predicate or forged success
+// response. Its reference is written through Mint's own RW view and loaded
+// through its separate L view. The caller cannot choose the reference.
+const escapeText = fragment('create_data_passkey_escape', 'create_data_scalar_checks');
+const escapeStops = [...new Set([...escapeText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];
+for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xfffffffe, 0x06000000, 0]) {
+    const {s, labels} = fixture(escapeText + '\ncreate_data_scalar_checks:\nHALT\n' +
+        escapeStops.map(name => `${name}:\nHALT`).join('\n'), stateWords);
+    const header = s.parseLumpHeader(s.memory[CODE]);
+    s.memory[CODE] = s.packLumpHeader(2, header.cw, 3, 0);
+    s.memory[DATA] = s.packLumpHeader(Math.log2(stateWords) - 6, 0, 1, 0);
+    s.cr[6].word1 = CODE + 253;
+    s.memory[CODE + 253] = s.cr[6].word0;
+    s.memory[CODE + 254] = s.cr[8].word0;
+    s.memory[CODE + 255] = s.createGT(0, 41, {L: 1}, 1);
+    s.cr[2] = {word0: credential, word1: 0, word2: 0, word3: 0, m: 0};
+    s.cr[3] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
+    s.cr[4] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
+    let steps = 0;
+    while (!s.halted && s.pc !== labels.create_data_scalar_checks && steps++ < 40) s.step();
+    if (credential === 0xffffffff) {
+        assert.equal(s.halted, false, JSON.stringify(s.faultLog));
+        assert.equal(s.pc, labels.create_data_scalar_checks);
+        assert.equal(s.cr[11].word0 >>> 0, 0xffffffff);
+        assert.equal(s.cr[3].word0, 0, 'Escape must not need a proof capability');
+        assert.equal(s.mLoad(credential, 'R', 2).ok, false, 'Escape is not memory authority');
+    } else {
+        assert.notEqual(s.pc, labels.create_data_scalar_checks,
+            'A non-escape credential without proof must not pass');
+    }
+}
+console.log('PASS: only CR2=0xFFFFFFFF skips the proof checks, without granting memory authority.');
+console.log('BLOCKED: allocator and saved-design provisioning are still incomplete. No complete CREATE claim.');

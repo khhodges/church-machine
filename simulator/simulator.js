@@ -9467,6 +9467,10 @@ class ChurchSimulator {
         return { pc: this.pc - 1, instr: d, desc, pipeline: this._tpermPipeline(d, parsed, hasAll) };
     }
 
+    _lambdaEntryAddress(check) {
+        return check.entry.word0_location;
+    }
+
     _execLambda(d) {
         const crIdx = d.crDst;
         // D-9 idempotent re-entry rule (hardware/core.py nested_lambda_fault):
@@ -9487,6 +9491,27 @@ class ChurchSimulator {
             return null;
         }
 
+        // Existing register-form encoding: the X capability supplies the
+        // physical entry address. LAMBDA keeps the caller's CR14/CR6 scope;
+        // it must not reinterpret a different executable as that scope.
+        const entryAddress = this._lambdaEntryAddress(check);
+        const code = this.cr[14];
+        const header = code && this.parseLumpHeader(this.memory[code.word1]);
+        const targetPC = this.bootComplete ? entryAddress - code.word1 - 1 : entryAddress;
+        if (!Number.isInteger(targetPC) || targetPC < 0 ||
+                (this.bootComplete && (!header.valid || targetPC >= header.cw)) ||
+                entryAddress >= this.memory.length) {
+            this.fault('BOUNDS', 'LAMBDA: X entry is outside the current executable body');
+            return null;
+        }
+        const fetchCheck = this.bootComplete
+            ? this.mLoad(code.word0, 'X', 14, entryAddress)
+            : {ok: true};
+        if (!fetchCheck.ok) {
+            this.fault(fetchCheck.fault, `LAMBDA: current executable: ${fetchCheck.message}`);
+            return null;
+        }
+        const instructionPC = this.pc;
         this._flushLambdaCache();
 
         const lambdaThreadBase = this._activeThreadBase();
@@ -9549,9 +9574,9 @@ class ChurchSimulator {
         const label = this.nsLabels[check.index] || 'reduction';
         const desc = `LAMBDA CR${crIdx} -> ${label} [SZ=0, STO:${savedSTO}->${this.sto}]`;
         this.output += desc + '\n';
-        this.pc++;
+        this.pc = targetPC;
         this._emitTrace(this.physicalPC, TRACE_EV_RESULT, 0);
-        return { pc: this.pc - 1, instr: d, desc, pipeline: this._lambdaPipeline(d, label) };
+        return { pc: instructionPC, instr: d, desc, pipeline: this._lambdaPipeline(d, label) };
     }
 
     _execEloadcall(d) {

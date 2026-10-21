@@ -57,21 +57,17 @@ assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy/);
 assert.doesNotMatch(create, /^\s*DREAD\s+\w+,\s*CR4\b/m,
     'Data CREATE must never read a source payload');
 assert.ok([...create.matchAll(/^\s*DREAD\s+\w+,\s*(CR\d+)/gm)]
-    .every(m=>['CR3','CR10'].includes(m[1])),
-    'Reads are confined to proof and private Namespace metadata, never payload');
-assert.match(create, /LAMBDA CR9[\s\S]*?BRANCH TODO_CREATE_CLEAR_DESTINATION_AND_LAMBDA_AUTHORITY\s+create_data_slot_after_clear:/);
+    .every(m=>['CR3','CR8','CR10'].includes(m[1])),
+    'Reads are confined to proof, private state and Namespace metadata, never caller payload');
+assert.match(create, /\.pet create_data_slot_lambda CR9\s+LAMBDA create_data_slot_lambda/);
 const continuation = create.slice(create.indexOf('create_data_slot_after_clear:'),
     create.indexOf('create_data_account_and_issue:'));
-for (const [reg, role] of [[8, 'DESTINATION'], [9, 'LAMBDA'], [10, 'NS']]) {
-    assert.match(continuation, new RegExp(`TPERM CR${reg}, NULL\\s+BRANCHNE TODO_CREATE_${role}_AUTHORITY_RETAINED`));
-}
-assert.ok(continuation.indexOf('TODO_CREATE_SLOT_RELEASE_EXCLUSION') >
-    continuation.indexOf('TODO_CREATE_NS_AUTHORITY_RETAINED'));
+assert.doesNotMatch(continuation, /TPERM CR(?:8|9|10), NULL|TODO_CREATE_SLOT_RELEASE_EXCLUSION/);
 assert.doesNotMatch(create, /^\s*TPERM\s+CR\d+,\s*CLEAR/m,
     'TPERM CLEAR is a test, never authority erasure');
 const slotBody=create.slice(create.indexOf('create_data_slot_lambda:'));
 assert.doesNotMatch(slotBody, /^\s*(CALL|CHANGE|SWITCH|LAMBDA)\b/m);
-assert.match(slotBody, /BRANCH TODO_CREATE_CLEAR_NS_AUTHORITY\s+create_data_slot_return:/);
+assert.doesNotMatch(slotBody, /TODO_CREATE_CLEAR_NS_AUTHORITY/);
 assert.doesNotMatch(slotBody, /TODO_CREATE_SLOT_RELEASE_EXCLUSION|RETURNAL #/);
 assert.match(slotBody, /create_data_slot_return:[\s\S]*RETURNAL/);
 assert.doesNotMatch(create.slice(0,create.indexOf('create_data_slot_lambda:')),
@@ -96,6 +92,9 @@ function walk(start, dr, destination=[], namespace=[], corruptRead=-1) {
         // This walker does NOT simulate capability erasure or RETURN.
         // Real simulator coverage owns that boundary.
         if(line==='create_data_slot_return:') return 'create_data_slot_return';
+        // Scalar validation ends here; real native tests exercise the escape
+        // comparison. This small walker must not pretend to verify Passkeys.
+        if(line==='create_data_authorize:') return 'TODO_CREATE_PKVERIFY_AND_ALLOWANCE';
         if(line.endsWith(':')) continue;
         const [op,...args]=line.replace(/,/g,'').split(/\s+/);
         const value=s=>s.startsWith('#')?Number(s.slice(1)):dr[s];
@@ -126,7 +125,7 @@ function walk(start, dr, destination=[], namespace=[], corruptRead=-1) {
             assert.notEqual(take,undefined,op);
             if(take) {
                 if(args[0].startsWith('TODO_')) return args[0];
-                assert.ok(labels.has(args[0]),args[0]);pc=labels.get(args[0]);
+                assert.ok(labels.has(args[0]),args[0]);pc=labels.get(args[0])-1;
             }
         } else assert.fail('Unsupported guard instruction '+line);
     }
@@ -174,7 +173,7 @@ for(const slot of [0,1,14,255]) {
     const dr={DR7:slot,DR8:descriptor[0],DR9:descriptor[1],
         DR10:descriptor[2],DR11:descriptor[3]};
     assert.equal(walk('create_data_slot_offset',dr,[],namespace),
-        'TODO_CREATE_CLEAR_NS_AUTHORITY');
+        'create_data_slot_return');
     assert.deepEqual(namespace,expected,'only the selected slot may change');
 }
 for(let word=0;word<4;word++) {

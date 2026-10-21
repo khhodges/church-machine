@@ -2530,6 +2530,16 @@ class ChurchAssembler {
                 break;
             }
             case 7: {
+                // A local label can name an explicitly bound X-capability CR
+                // using the existing .pet directive. Never invent a target
+                // displacement or silently select/clobber a scratch register.
+                if (Object.prototype.hasOwnProperty.call(this.labels, parts[1]) &&
+                        this._crAliases[parts[1]] === undefined &&
+                        this.nsLoaded[parts[1]] === undefined) {
+                    this.errors.push({line: lineNum,
+                        message: `LAMBDA label "${parts[1]}" needs its X-capability register binding: .pet ${parts[1]} CRn. Provision that capability to the label's entry address.`});
+                    break;
+                }
                 crDst = this._parseCR(parts[1], lineNum);
                 this._checkPrivCR(crDst, 'LAMBDA', lineNum);
                 break;

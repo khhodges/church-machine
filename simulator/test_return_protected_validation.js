@@ -29,6 +29,16 @@ function call(s, slot) {
     s.cr[0] = { word0: s.createGT(0, slot, {E: 1}, 1), word1: slot * 256, word2: 63, word3: 0, m: 0 };
     assert.ok(s._execCall({crDst: 0, imm: 0}));
 }
+function bindLambdaEntry(s) {
+    // A LAMBDA X view names an instruction, not the LUMP header. Provision
+    // the successor body explicitly; do not rely on the former fall-through.
+    const address = s.cr[14].word1 + 1 + s.pc + 1;
+    s.withNamespaceWrite('synthetic RETURN Lambda entry', () =>
+        s.writeNSEntry(43, address, 0, 0, 0, 1, 0, 0, 0));
+    const entry = s.readNSEntry(43);
+    s.cr[0] = {word0: s.createGT(0, 43, {X: 1}, 1), word1: address,
+        word2: entry.word1_limit, word3: 0, m: 0};
+}
 function unchangedFault(s, type) {
     const layout = s._threadLayoutAtBase(s.cr[12].word1);
     const homesStart = s.cr[12].word1 + layout.capsStart;
@@ -92,7 +102,7 @@ function unchangedFault(s, type) {
 {
     const s = fixture();
     // A CALL from a LAMBDA saves SZ=0, but the active frame is still CALL.
-    s.cr[0] = {...s.cr[14]};
+    bindLambdaEntry(s);
     assert.ok(s._execLambda({crDst: 0}));
     call(s, 3);
     assert.ok(s._execReturn({imm: 0}));
@@ -104,7 +114,7 @@ function unchangedFault(s, type) {
 }
 {
     const s = fixture();
-    s.cr[0] = {...s.cr[14]};
+    bindLambdaEntry(s);
     assert.ok(s._execLambda({crDst: 0}));
     assert.ok(s._execReturn({imm: 0}));
     assert.equal(s.pc, 2);
@@ -143,7 +153,7 @@ for (const lambda of [false, true]) {
         const heap = {...s.cr[5], m: 0};
         const caller6 = {...s.cr[6], m: 1};
         if (lambda) {
-            s.cr[0] = {...s.cr[14]};
+            bindLambdaEntry(s);
             assert.ok(s._execLambda({crDst: 0}));
         } else call(s, 3);
         for (const i of [0,1,2,3,4,7,8,9,10,11]) {
