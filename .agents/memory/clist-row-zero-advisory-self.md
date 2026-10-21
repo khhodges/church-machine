@@ -15,6 +15,13 @@ The compiler must fail closed if the finalized C-list does not establish `SELF` 
 
 Existing immutable artifacts remain inspectable without rewriting their bytes; inspection and historical evidence are separate from compiler admission.
 
+SELF is a GT, not a separate architectural allocation-placeholder mechanism.
+**Why:** The user explicitly rejected presenting SELF as “not a GT.”
+**How to apply:** Do not elevate an existing implementation sentinel into an
+architectural rule or exempt SELF from GT inspection. Explain any stored
+sentinel as an implementation discrepancy requiring investigation, not as the
+definition of SELF.
+
 **Why:** `SELF` names the owner capability, while the abstraction PetName names the abstraction; substituting one for the other produces misleading C-list metadata. `__SELF__` is only a legacy/internal alias and must not surface in new saves.
 
 **How to apply:** Require exactly one compiler-owned `SELF E` at row zero. Never replace it with the abstraction PetName, and never send it through the external Namespace/device-registry resolver. Reject duplicate or differently named owner rows before candidate publication. Preserve invalid saved artifacts as red-X inspection evidence without rewriting their bytes.
