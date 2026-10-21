@@ -1312,3 +1312,17 @@ mtime_ms = 1792519793181
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b92d6d9c-4004-4f00-92ae-d82458271ea6/c010138b-11f4-4707-a223-e646998cd112"
 storage_version_token = "1792519809066685"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "ekNeoohNLqGJGI1o-01ui"
+uri = "file://reports/self-gt-binding-audit.md"
+type = "text"
+title = "SELF GT and binding audit"
+description = "Evidence, artifact inventory, snapshot checks, test results, and full remediation requirements."
+logical_id = "b2410447-ba9d-425c-817f-387053779053"
+content_hash = "sha256:b81f83ed160b09e6e1c900a01d4ee38bf262625b5f0d29661282a816801fab4a"
+size = 10080
+mtime_ms = 1792585251642
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b2410447-ba9d-425c-817f-387053779053/90dcb7ab-0b05-4cf0-8a0a-02269cfaf3d5"
+storage_version_token = "1792585283031332"
+content_type = "text/markdown"
