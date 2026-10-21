@@ -1,4 +1,4 @@
-"""Conservative, deterministic archive retention; never use filesystem mtime."""
+"""Archive retention with explicit age evidence and conservative reference guards."""
 from datetime import datetime
 import hashlib
 import json
@@ -136,31 +136,53 @@ def recover_pending(root, write_json):
     return recovered
 
 
-def expired_archives(history, now):
-    """Keep the three highest revision numbers (including ties), plus 30 days."""
+def recorded_timestamp(value):
+    try:
+        if isinstance(value, str):
+            date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if date.tzinfo is None:
+                return None
+            value = date.timestamp()
+        if isinstance(value, bool) or value is None:
+            return None
+        value = float(value)
+        return value if 0 < value < float("inf") else None
+    except (ValueError, TypeError, OverflowError):
+        return None
+
+
+def expired_archives(history, now, root=None):
+    """Complete: 30 days/newest three. Incomplete: three days, mtime fallback."""
     versions = sorted({int(row["version"]) for row in history}, reverse=True)
     newest = set(versions[:3])
     result = []
     for row in history:
-        if row.get("current") or int(row["version"]) in newest:
+        if row.get("current"):
             continue
-        timestamp = row.get("compiled_at")
-        try:
-            if isinstance(timestamp, str):
-                date = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                if date.tzinfo is None:
-                    continue
-                timestamp = date.timestamp()
-            if isinstance(timestamp, bool) or timestamp is None:
-                continue
-            timestamp = float(timestamp)
-            if not 0 < timestamp < now - 30 * 86400:
-                continue
-        except (ValueError, TypeError, OverflowError):
+        timestamp = recorded_timestamp(row.get("compiled_at"))
+        incomplete = (timestamp is None or not row.get("abstraction")
+                      or not row.get("binary_hash") or row.get("metadata_only") is True)
+        if not incomplete and int(row["version"]) in newest:
             continue
         filename = row.get("archive_filename") or row.get("record_filename")
-        if filename:
-            result.append(row)
+        if not filename or Path(filename).name != filename:
+            continue
+        basis = "compiled_at"
+        if timestamp is None and root is not None:
+            path = Path(root) / filename
+            if path.is_symlink():
+                continue
+            try:
+                timestamp = path.stat().st_mtime
+                basis = "file_mtime"
+            except FileNotFoundError:
+                continue
+        days = 3 if incomplete else 30
+        if timestamp is not None and 0 < timestamp < now - days * 86400:
+            result.append({**row, "retention_evidence": {
+                "days": days, "incomplete": incomplete, "age_basis": basis,
+                "age_timestamp": timestamp,
+            }})
     return result
 
 def _sync_directory(root):

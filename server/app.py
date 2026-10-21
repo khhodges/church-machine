@@ -18033,9 +18033,10 @@ def _prune_lump_history(token, *, trigger):
             return response
         history = response.get_json()["history"]
         root = Path(LUMPS_DIR)
-        binding_cleanup = _cleanup_binding_snapshots()
+        binding_cleanup = (_cleanup_binding_snapshots() if trigger != "scheduled_policy"
+                           else dict(ok=True, deleted=[]))
         manifest = _read_manifest_safe(str(root / "manifest.json"))
-        candidates = expired_archives(history, time.time())
+        candidates = expired_archives(history, time.time(), root)
         ledger_path = root / LEDGER
         ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {}
         if not isinstance(ledger, dict) or any(not isinstance(v, list) for v in ledger.values()):
@@ -18043,6 +18044,10 @@ def _prune_lump_history(token, *, trigger):
         # Preserve any artifact named by another saved object/configuration.
         # Missing dates, symlinks and unreadable references fail closed.
         deleted, protected, protected_reasons = list(recovered), [], []
+        if not candidates:
+            return jsonify(ok=True, deleted=deleted, protected=[], protectedReasons=[],
+                           eligible=0, inspected=len(history), bindingCleanup=binding_cleanup,
+                           policy={"days": 30, "newest_versions": 3, "incomplete_days": 3})
         try:
             documents = archive_references(
                 root, frozen_root=globals().get("_BUILD_SNAPSHOTS_DIR"),
@@ -18066,7 +18071,8 @@ def _prune_lump_history(token, *, trigger):
                 "version": int(row["version"]), "filename": filename,
                 "binary_hash": digest, "deleted_at": time.time(),
                 "compiled_at": row.get("compiled_at"), "trigger": trigger,
-                "policy": {"days": 30, "newest_versions": 3},
+                "policy": {"days": 30, "newest_versions": 3, "incomplete_days": 3},
+                "age_evidence": row["retention_evidence"],
             }
             # Reuse the existing exact-archive deletion validation and lock.
             result = app.make_response(_delete_lump_history_revision(
@@ -18082,7 +18088,7 @@ def _prune_lump_history(token, *, trigger):
                        protectedReasons=protected_reasons,
                        eligible=len(candidates), inspected=len(history),
                        bindingCleanup=binding_cleanup,
-                       policy={"days": 30, "newest_versions": 3})
+                       policy={"days": 30, "newest_versions": 3, "incomplete_days": 3})
 
 
 def _apply_history_retention_after_save(saved):
@@ -28423,6 +28429,9 @@ _install_change_confirmation(
 
 
 if __name__ == "__main__":
+    from server.retention_maintenance import start_maintenance
+    start_maintenance(app, LUMPS_DIR, _prune_lump_history,
+                      _LUMP_SAVE_DIAGNOSTIC_LOCK, _BUILD_SNAPSHOTS_DIR)
     _port = int(os.environ.get("E2E_PORT", 5000))
     logging.info("Starting Church Machine server on port %d", _port)
     _bind_with_retry(_port)

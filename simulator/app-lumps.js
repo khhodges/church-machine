@@ -4141,7 +4141,7 @@ async function _fetchAndShowLumpTimeline(token, lump) {
 
         let html = '<div class="lump-detail-section">';
         html += '<div class="lump-section-title">Version History</div>';
-        html += `<div class="lump-history-retention">After each approved save, keep 30 days and the three newest versions. Current, referenced and undated archives are retained. ` +
+        html += `<div class="lump-history-retention">Complete archives: keep 30 days and the three newest versions. Incomplete records expire after 3 days (file modification date if undated), including older top-three revisions. Current and referenced artifacts stay protected. Cleanup runs hourly and after approved saves. ` +
             `<button class="btn" onclick="_pruneLumpHistory('${e(token)}',this)">Delete expired archives…</button></div>`;
         html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:0.5rem;">';
         html += 'Current saved identifies the catalog record, not the running hardware or execution approval. Selecting an eligible archive creates a new approved live revision; it does not rewrite the archive. Click a row to preview its source and hex.';
@@ -4388,7 +4388,7 @@ async function _promptUpgradeLump(absName, fromToken, fromVersion, toToken, toVe
 }
 
 async function _pruneLumpHistory(token, button) {
-    if (!confirm('Permanently delete archives older than 30 days AND outside the three newest versions for this LUMP? Current, referenced and undated archives are retained. Deleted binaries cannot be restored.')) return;
+    if (!confirm('Permanently delete complete archives older than 30 days AND outside the newest three, and incomplete archives older than 3 days (using file modification date when undated)? Current and referenced artifacts are protected. Deleted binaries cannot be restored.')) return;
     button.disabled = true;
     try {
         const response = await fetch(`/api/lumps/${token}/history/retention`, {
@@ -4399,7 +4399,7 @@ async function _pruneLumpHistory(token, button) {
         const data = await response.json();
         if (!response.ok) throw new Error(`${data.error || 'Retention failed'} ${data.deleted?.length || 0} archives deleted. Reload History before retrying.`);
         appendOutput(`History retention: ${data.deleted.length} archives permanently deleted; ${data.protected.length} eligible archives protected by references.`, 'info');
-        if (!data.eligible) appendOutput('No expired archives: deletion requires a known date older than 30 days AND a version outside the newest three.', 'info');
+        if (!data.eligible) appendOutput('No eligible expired archives. Complete records keep 30 days/newest three; incomplete records expire after 3 days, using file modification date when undated.', 'info');
         for (const item of data.protectedReasons || []) appendOutput(`${item.filename}: ${item.reason}`, 'info');
         if (data.bindingCleanup?.ok) appendOutput(`${data.bindingCleanup.deleted.length} obsolete binding snapshots deleted.`, 'info');
         else if (data.bindingCleanup) appendOutput(`Binding cleanup stopped: ${data.bindingCleanup.reason}`, 'warning');

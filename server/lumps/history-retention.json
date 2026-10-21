@@ -1282,6 +1282,177 @@
         "days": 30,
         "newest_versions": 3
       }
+    },
+    {
+      "version": 94,
+      "filename": "SelfTest.94.c1e03ab9.lump",
+      "binary_hash": "4268f3b6466e4db6232dd9575275afc48a9df558e7e0a6f8a137b31130241f0d",
+      "deleted_at": 1792593345.8370593,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789739071.0952363
+      }
+    },
+    {
+      "version": 92,
+      "filename": "SelfTest_v92.lump",
+      "binary_hash": "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5",
+      "deleted_at": 1792593346.2933908,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789736233.1423864
+      }
+    },
+    {
+      "version": 90,
+      "filename": "SelfTest_v90.lump",
+      "binary_hash": "dbf3cc91ef70924de94e96307b6254f0e022ebba6359814f0e9333ed5fce87d5",
+      "deleted_at": 1792593346.7525392,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789734828.7925684
+      }
+    },
+    {
+      "version": 83,
+      "filename": "SelfTest.83.c80aeda6.lump",
+      "binary_hash": "aead2856f5557e002534e40828ea463f8bb13248d256e10feecac1787427295f",
+      "deleted_at": 1792593347.1613953,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788824098.568273
+      }
+    },
+    {
+      "version": 82,
+      "filename": "SelfTest.82.4c1b2651.lump",
+      "binary_hash": "592412cc4e1946111c160af05db7ee1c5c754785804251c02698f8c2613e1b75",
+      "deleted_at": 1792593347.6244388,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788823680.6397765
+      }
+    },
+    {
+      "version": 81,
+      "filename": "SelfTest.81.532be597.lump",
+      "binary_hash": "72b7bf26a60e78573be65dae3746b5b048abe66f3b3007585bfb629ce03bd13f",
+      "deleted_at": 1792593348.0165505,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788823389.5918486
+      }
+    },
+    {
+      "version": 79,
+      "filename": "SelfTest.79.eceee227.lump",
+      "binary_hash": "f0b34adb0d54b936778407efafeda8dcf535c351cb0098c38d6873fa2aacac18",
+      "deleted_at": 1792593348.401196,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788790302.363281
+      }
+    },
+    {
+      "version": 78,
+      "filename": "SelfTest_v78.lump",
+      "binary_hash": "5e9e990a14d9c421ad10d902bade71afacd51ec46404b5a94c34902c18c2f65c",
+      "deleted_at": 1792593348.988023,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788790073.1233048
+      }
+    },
+    {
+      "version": 76,
+      "filename": "SelfTest_v76.lump",
+      "binary_hash": "40ae9a9efe1bb1fbbe2c6be234a7996fe3dcb2511e6a87916c6a75c1d0714dbd",
+      "deleted_at": 1792593349.5243785,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7309115
+      }
     }
   ],
   "4a000007": [
@@ -1325,6 +1496,472 @@
       "policy": {
         "days": 30,
         "newest_versions": 3
+      }
+    },
+    {
+      "version": 1,
+      "filename": "WukongCallHome.1.9bf03976.lump",
+      "binary_hash": "dcfe96206305de8503bb6abbc813b4a67911423bd021cc876ec60e0c19b04eef",
+      "deleted_at": 1792593350.395211,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789234372.611484
+      }
+    },
+    {
+      "version": 1,
+      "filename": "WukongCallHome.1.e8cb2017.lump",
+      "binary_hash": "00682247c7536d82f537c9bd26555a752b2215644c1129f76ff6f5fdb35a9224",
+      "deleted_at": 1792593350.7869186,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789460277.8805645
+      }
+    },
+    {
+      "version": 1,
+      "filename": "WukongCallHome.1.8965def2.lump",
+      "binary_hash": "968706ae6010d58966a78ed35345608a8997c2192e86f8e1bfb8d4068983edbc",
+      "deleted_at": 1792593351.167256,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788899192.7611048
+      }
+    }
+  ],
+  "00001f00": [
+    {
+      "version": 0,
+      "filename": "Tunnel_v0.lump",
+      "binary_hash": "25856150f7d363dc853d2986b5c42b2f16a30bf390eff09de50220bfca597708",
+      "deleted_at": 1792593146.7190297,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1790711639.6846077
+      }
+    }
+  ],
+  "17fc5571": [
+    {
+      "version": 29,
+      "filename": "CapabilityTest_v29.lump",
+      "binary_hash": "bda0d44f551a4b5b55a04e1b630fe2889ed024ab4a7dd42d7381c4334f9c92fc",
+      "deleted_at": 1792593258.0451334,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789744084.1497912
+      }
+    },
+    {
+      "version": 24,
+      "filename": "CapabilityTest_v24.lump",
+      "binary_hash": "9ddd954abfbc2e5ecd26c58c8471f886d7467c4aaad0a02de8355f64cf7adc0c",
+      "deleted_at": 1792593258.803625,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788981641.7447212
+      }
+    },
+    {
+      "version": 23,
+      "filename": "CapabilityTest_v23.lump",
+      "binary_hash": "96000fbb7460ffcbc59d46a22bf03e33bd2e84163f1573ac6c64614062fcf5e9",
+      "deleted_at": 1792593259.3767,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788912748.9728394
+      }
+    },
+    {
+      "version": 22,
+      "filename": "CapabilityTest_v22.lump",
+      "binary_hash": "55f07137513625e0749de30f5d67a7d979e3fa4eedfef3b499a67f358f28db32",
+      "deleted_at": 1792593259.9608288,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789591328.5371013
+      }
+    },
+    {
+      "version": 14,
+      "filename": "CapabilityTest.1.b98a03c4.lump",
+      "binary_hash": "917540ff0e2a6920ffa7b2c459aebe26f988c6feca35299fde9d320f1af71ec0",
+      "deleted_at": 1792593260.4703875,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7544901
+      }
+    },
+    {
+      "version": 12,
+      "filename": "CapabilityTest_v12.lump",
+      "binary_hash": "6307914769ff3bb3c5ece2f71eebca35e207c904393943557929c6920493d050",
+      "deleted_at": 1792593261.3562825,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7480273
+      }
+    },
+    {
+      "version": 11,
+      "filename": "CapabilityTest_v11.lump",
+      "binary_hash": "d1e2d484f6703751d4eaf24f7aee6356156b5cd598065e3fd38aadbc0c75e338",
+      "deleted_at": 1792593261.9400253,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7477021
+      }
+    },
+    {
+      "version": 7,
+      "filename": "CapabilityTest_v7.lump",
+      "binary_hash": "dbcb1b07437ccfd352bafcac0a4e1a7e94830f28480c345b3dbed660cd3937bd",
+      "deleted_at": 1792593262.5389025,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7426941
+      }
+    }
+  ],
+  "232f0de4": [
+    {
+      "version": 12,
+      "filename": "WukongCallHome_v12.lump",
+      "binary_hash": "e919f430e7fe00f45335ea0d425dea8bfff15c83eff17a58798c4c0d63f478c0",
+      "deleted_at": 1792593289.7040472,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1790097954.5227718
+      }
+    },
+    {
+      "version": 9,
+      "filename": "WukongCallHome_v9.lump",
+      "binary_hash": "f631e6d24d722ff7f9512beeef75ea9b26361252c485b37c076cda0d9bb515df",
+      "deleted_at": 1792593290.228241,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788909926.8944488
+      }
+    },
+    {
+      "version": 8,
+      "filename": "WukongCallHome_v8.lump",
+      "binary_hash": "9fd1738667d0ad6d41d56377c99baf6e5e88ef9b00fc7294a26b48ef48ae5916",
+      "deleted_at": 1792593290.7532375,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788908347.3532305
+      }
+    },
+    {
+      "version": 8,
+      "filename": "WukongCallHome.1.d54e2115.lump",
+      "binary_hash": "6ef1ecd997d151c0a3fdff9c613b72c673c247414007056f32e5443d1913fb77",
+      "deleted_at": 1792593291.1770668,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788883681.7592156
+      }
+    },
+    {
+      "version": 7,
+      "filename": "WukongCallHome_v7.lump",
+      "binary_hash": "5a2ec522560b8a1de17ad0f5f752091b0f3469aefc41c5bf0d12ce05124a097b",
+      "deleted_at": 1792593291.6973681,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788906225.5899858
+      }
+    },
+    {
+      "version": 6,
+      "filename": "WukongCallHome_v6.lump",
+      "binary_hash": "b596c0af25d983251d555f5ae284bdfd0d06795809087e2dd7733fae058da005",
+      "deleted_at": 1792593292.2409964,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7352161
+      }
+    },
+    {
+      "version": 5,
+      "filename": "WukongCallHome_v5.lump",
+      "binary_hash": "347daaebfcaf1e6a36ac0216ae0aaa36110d6b346f406e80d123811cb98cbb10",
+      "deleted_at": 1792593292.7784672,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788903839.3301702
+      }
+    },
+    {
+      "version": 4,
+      "filename": "WukongCallHome_v4.lump",
+      "binary_hash": "3645bcaf1185317e13328e478f284266148f4255ac5822f74fa6a35854689404",
+      "deleted_at": 1792593293.2780428,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.7343526
+      }
+    },
+    {
+      "version": 1,
+      "filename": "WukongCallHome_v1.lump",
+      "binary_hash": "386399a134b7405b7915958d9333a1320fbd1af6c710f1f13c30baa70cc56725",
+      "deleted_at": 1792593293.8781626,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1788788890.733239
+      }
+    }
+  ],
+  "ab1e86af": [
+    {
+      "version": 2,
+      "filename": "TestAbs_v2.lump",
+      "binary_hash": "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122",
+      "deleted_at": 1792593355.4198163,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789115235.622821
+      }
+    },
+    {
+      "version": 1,
+      "filename": "TestAbs_v1.lump",
+      "binary_hash": "baccca61a25497a7e44c9fbd80d87838472f676b494604e4b5dc9289f52fc122",
+      "deleted_at": 1792593355.8157887,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1789114654.3570912
+      }
+    }
+  ],
+  "b169bba4": [
+    {
+      "version": 0,
+      "filename": "Ethernet_v0.lump",
+      "binary_hash": "a0f1e83804a613773d356c3743840f598f082d8da97e82e8524e44b3a50413db",
+      "deleted_at": 1792593356.792687,
+      "compiled_at": null,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 3,
+        "incomplete": true,
+        "age_basis": "file_mtime",
+        "age_timestamp": 1790711639.6846077
       }
     }
   ]
