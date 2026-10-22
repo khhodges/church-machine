@@ -5,6 +5,15 @@ description: DESTROY releases the object slot and memory, not GT copies.
 DESTROY deals with the Namespace slot and memory release, not GT garbage
 collection.
 
+Current work is focused only on reaching a working Mint V1.
+
+**Why:** The user explicitly requested “stay focused on only that nothing else”
+when requesting the merged-work progress summary on 2026-10-22.
+
+**How to apply:** Do not add catalog/UI improvements, unrelated maintenance or
+other features while pursuing this goal. Keep deferred FPGA acceptance distinct
+from the isolated V1 development scope.
+
 **Why:** The user explicitly clarified this boundary during the Mint method
 review.
 
