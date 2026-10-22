@@ -34,3 +34,15 @@ service rather than complicating Mint's allocation path.
 available for allocation. Define the cleaner handoff before implementing it;
 do not rewind the allocation cursor across live objects or infer GT collection
 as part of this service.
+
+When the advancing allocator cannot satisfy a request, it asks the cleaning
+service for the memory needed rather than handling recycling itself.
+
+**Why:** The user explicitly chose an exhaustion-triggered service call to keep
+allocator complexity hidden.
+
+**How to apply:** Keep ordinary allocation as a cursor advance. Delegate
+recycled-space selection and cleaning to the service on insufficient capacity.
+Its returned memory must meet the request's size/alignment and be safe for
+reuse; the exact call interface and unavailable-memory behavior remain to be
+defined.
