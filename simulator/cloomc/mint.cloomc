@@ -1,4 +1,6 @@
-; MINT PHASE 1 -- CURRENT EDITABLE SOURCE. IMPLEMENTATION IN PROGRESS.
+; MINT PHASE 1 -- CURRENT EDITABLE SOURCE.
+; ISOLATED V1 CREATE/DESTROY DRAFT: NOT END-TO-END VALIDATED OR LIVE AUTHORIZATION.
+; TODO: validate CREATE -> DESTROY -> reuse against an approved byte-addressed execution model.
 ; Language: Assembly
 ;
 ; LUMP START: HEADER, THEN METHOD ROUTING TABLE -- ALWAYS.
@@ -54,7 +56,7 @@
 ; explicit unresolved gates, not silently assumed to pass.
 
 abstraction ide.Mint {
-capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW }
+capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW, ide.MintCleaner E }
 
 method CREATE {
 CREATE_inputs:
@@ -115,8 +117,77 @@ create_data_authorize:
     ; PkVerify preserves requested size DR6 and credential/proof CR2/CR3.
     IADD DR1, DR0, #0
     LOAD CR1, NULL
-    BRANCH create_data_allocate
+    BRANCH create_v1_allocate
+create_v1_allocate:
+    ; V1: Mint owns slots/history, Cleaner owns ALL memory allocation.
+    ; Existing words 1/2/5 in MintState are legacy, not allocator authority.
+    LOAD CR7, CR6, #1
+    DREAD DR9, CR7, #3, DR0
+    MCMP DR9, #7
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR10, CR7, #4, DR0
+    MCMP DR9, DR10
+    BRANCHHS TODO_CREATE_SLOTS_EXHAUSTED
+    DREAD DR4, CR7, #6, DR0
+    MCMP DR10, DR4
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR7, CR7, #0, DR9
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    MCMP DR7, #2
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR9, CR7, #6, DR0
+    IADD DR10, DR9, DR7
+    MCMP DR10, DR9
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR4, DR2, #10, #22
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    BFEXT DR3, DR2, #9, #1
+    BFEXT DR2, DR2, #0, #9
+    MCMP DR2, #511
+    BRANCHHS TODO_CREATE_DESCRIPTOR_RETIRED
+    MCMP DR3, #0
+    BRANCHNE create_v1_check_first
+    MCMP DR2, #0
+    BRANCHEQ TODO_CREATE_ALLOCATOR_STATE
+    BRANCH create_v1_reserve
+create_v1_check_first:
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+create_v1_reserve:
+    ; Reservation precedes the external call. A fault abandons it, never
+    ; permits a second allocation for the same slot.
+    IADD DR4, DR0, #1
+    BFINS DR2, DR4, #10, #1
+    DWRITE DR2, CR7, #0, DR10
+    LOAD CR1, CR6, #6
+    CALL CR1, #0
+    MCMP DR1, #1
+    BRANCHNE TODO_CREATE_RESULT_COMPLETION
+    IADD DR8, DR2, #0
+    LOAD CR7, CR6, #1
+    LOAD CR1, NULL
+    DREAD DR10, CR7, #6, DR0
+    IADD DR10, DR10, DR7
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR2, DR2, #0, #9
+    ; The standalone descriptor helper still accepts "previous version".
+    ; Translate retained release-time version without incrementing it twice.
+    MCMP DR2, #0
+    BRANCHEQ create_v1_first
+    ISUB DR2, DR2, #1
+    IADD DR3, DR0, #0
+    BRANCH create_descriptor_prepare
+create_v1_first:
+    IADD DR3, DR0, #1
+    BRANCH create_descriptor_prepare
+
 create_data_allocate:
+    ; Historical isolated allocator component retained for its regression
+    ; fixtures. Public CREATE uses create_v1_allocate, never this block.
     ; Mint-owned state payload (word 0 remains the LUMP header):
     ; 1 pool cursor, 2 exclusive pool end, 3 free-slot queue cursor,
     ; 4 exclusive queue end, 5 physical BYTE base of MintPool's RW view,
@@ -221,7 +292,25 @@ create_data_descriptor_ready:
     MCMP DR12, #1
     BRANCHNE create_data_retire_slot
     IADD DR1, DR0, #0
-    BRANCH create_data_zero_begin
+    ; Legacy allocator component fixtures have not reserved history yet.
+    ; V1 public CREATE reserves it before calling Cleaner.
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    DREAD DR2, CR7, #0, DR13
+    BFEXT DR3, DR2, #10, #1
+    MCMP DR3, #0
+    BRANCHEQ create_data_zero_begin
+    ; Cleaner has already cleared the entire allocation.
+    DREAD DR13, CR7, #6, DR0
+    IADD DR13, DR13, DR7
+    BFEXT DR2, DR9, #21, #9
+    IADD DR3, DR0, #1
+    BFINS DR2, DR3, #10, #1
+    DWRITE DR2, CR7, #0, DR13
+    DREAD DR15, CR7, #3, DR0
+    IADD DR15, DR15, #1
+    DWRITE DR15, CR7, #3, DR0
+    BRANCH create_data_set_slot
 create_data_retire_slot:
     ; Durable within MintState: retries see 511, never wrap or allocate.
     ; Leave queue/pool cursors and pool bytes unchanged; no auto-skip policy.
@@ -521,32 +610,137 @@ TODO_CREATE_SLOT_CONFIRM_WORD3:
 
 method DESTROY {
 DESTROY_inputs:
-    ; CR7: target. Resident and Outform objects MUST be rejected before mutation.
-    ; CR4/CR8: NULL. Result CR1: NULL; DR1: completed destruction.
-    BRANCH TODO_DESTROY_CLEAR_RESULT_AUTHORITY
+    ; ISOLATED V1 ONLY: private DATA RW allocated by MintCleaner.
+    ; DR2 identifies the target slot; CR7 must match its exact current GT.
+    ; CR2/3 retain the Phase 1 test credential/proof convention.
+    ; Non-DATA, resident/shared-flagged and non-owned allocations are rejected.
+    ; Fixture provisioning excludes active/code/C-list aliases into this pool.
+    ; No general active-use detector or real authorization is claimed.
+    LOAD CR1, NULL
 destroy_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_DESTROY_INPUT_CREDENTIAL_NULL
     TPERM CR3, R
     BRANCHNE TODO_DESTROY_INPUT_PROOF_READ
-    DREAD DR2, CR3, #3
+    DREAD DR4, CR3, #3, DR0
     TPERM CR7, NULL
     BRANCHEQ TODO_DESTROY_INPUT_TARGET_NULL
     TPERM CR4, NULL
     BRANCHNE TODO_DESTROY_INPUT_CR4_NOT_NULL
     TPERM CR8, NULL
     BRANCHNE TODO_DESTROY_INPUT_CR8_NOT_NULL
-    BRANCH TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM
+    BFEXT DR4, DR2, #16, #16
+    MCMP DR4, #0
+    BRANCHNE destroy_v1_bad
+    MCMP DR2, #2
+    BRANCHLO destroy_v1_bad
+    IADD DR7, DR2, #0
+    SHL DR13, DR7, #2
+    LOAD CR10, CR6, #5
+    DREAD DR11, CR10, #3, DR13
+    BFEXT DR4, DR11, #25, #7
+    MCMP DR4, #89
+    BRANCHNE destroy_v1_bad
+    BFEXT DR4, DR11, #0, #16
+    MCMP DR4, DR7
+    BRANCHNE destroy_v1_bad
+    DREAD DR9, CR10, #1, DR13
+    BFEXT DR4, DR9, #30, #2
+    MCMP DR4, #0
+    BRANCHNE destroy_v1_bad
+    BFEXT DR6, DR9, #0, #21
+    IADD DR6, DR6, #1
+    BFEXT DR9, DR9, #21, #9
+    MCMP DR9, #511
+    BRANCHHS destroy_v1_bad
+    BFEXT DR4, DR11, #16, #9
+    MCMP DR4, DR9
+    BRANCHNE destroy_v1_bad
+    LOAD CR8, CR6, #1
+    DREAD DR12, CR8, #6, DR0
+    IADD DR12, DR12, DR7
+    DREAD DR4, CR8, #0, DR12
+    IADD DR3, DR9, #1024
+    MCMP DR4, DR3
+    BRANCHNE destroy_v1_bad
+    ; Materialize only this exact current token through private scratch.
+    DREAD DR3, CR8, #0, DR0
+    BFEXT DR3, DR3, #23, #4
+    IADD DR4, DR0, #64
+destroy_v1_size:
+    MCMP DR3, #0
+    BRANCHEQ destroy_v1_compare
+    SHL DR4, DR4, #1
+    ISUB DR3, DR3, #1
+    BRANCH destroy_v1_size
+destroy_v1_compare:
+    ISUB DR4, DR4, #1
+    DWRITE DR11, CR8, #0, DR4
+    LOAD CR9, CR6, #2
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR8, #0, DR4
+    TPERM CR7, EXACT, CR11
+    BRANCHNE destroy_v1_bad
+    DREAD DR8, CR10, #0, DR13
 destroy_authorize:
-    BRANCH TODO_DESTROY_PKVERIFY_AND_ACTIVE_USE
+    LOAD CR1, CR6, #4
+    CALL CR1, #0
+    MCMP DR1, #1
+    BRANCHNE destroy_v1_bad
+    LOAD CR1, CR6, #6
+    CALL CR1, #2
+    MCMP DR1, #1
+    BRANCHNE destroy_v1_bad
 destroy_body:
-    ; Kill eligible object; retain issued version on release (CREATE increments),
-    ; zero storage before reuse and update shared Mint/GC records once.
-    BRANCH TODO_DESTROY_BODY
+    ; Validate slot/history and free queue BEFORE invalidation. Single-thread
+    ; fixture only: no CALL/yield during descriptor writes.
+    LOAD CR7, CR6, #1
+    LOAD CR10, CR6, #5
+    DREAD DR12, CR7, #6, DR0
+    IADD DR12, DR12, DR7
+    DREAD DR9, CR7, #0, DR12
+    BFEXT DR4, DR9, #10, #22
+    MCMP DR4, #1
+    BRANCHNE destroy_v1_bad
+    BFEXT DR9, DR9, #0, #9
+    IADD DR9, DR9, #1
+    MCMP DR9, #511
+    BRANCHHI destroy_v1_bad
+    DREAD DR14, CR7, #3, DR0
+    MCMP DR14, #7
+    BRANCHLS destroy_v1_bad
+    DREAD DR15, CR7, #4, DR0
+    MCMP DR14, DR15
+    BRANCHHI destroy_v1_bad
+    SHL DR13, DR7, #2
+    DREAD DR4, CR10, #1, DR13
+    BFINS DR4, DR9, #21, #9
+    ; Version first: old tokens fail before storage is made reusable.
+    DWRITE DR4, CR10, #1, DR13
+    DWRITE DR9, CR7, #0, DR12
+    DWRITE DR0, CR10, #0, DR13
+    DWRITE DR0, CR10, #2, DR13
+    DWRITE DR0, CR10, #3, DR13
+    DWRITE DR0, CR10, #1, DR13
+    LOAD CR1, CR6, #6
+    CALL CR1, #1
+    MCMP DR1, #1
+    BRANCHNE destroy_v1_bad
+    LOAD CR7, CR6, #1
+    DREAD DR12, CR7, #6, DR0
+    IADD DR12, DR12, DR7
+    DREAD DR9, CR7, #0, DR12
+    MCMP DR9, #511
+    BRANCHEQ destroy_finish
+    DREAD DR14, CR7, #3, DR0
+    ISUB DR14, DR14, #1
+    DWRITE DR7, CR7, #0, DR14
+    DWRITE DR14, CR7, #3, DR0
 destroy_finish:
     ; Validate completion and NULL result before outward cleanup.
 destroy_result:
+    LOAD CR1, NULL
     MCMP DR1, #1
     BRANCHNE TODO_DESTROY_RESULT_COMPLETION
     TPERM CR1, NULL
@@ -567,11 +761,9 @@ destroy_return:
     IADD DR15, DR0, #0
     RETURNAL #0
 
-TODO_DESTROY_CLEAR_RESULT_AUTHORITY:
-TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM:
-TODO_DESTROY_PKVERIFY_AND_ACTIVE_USE:
-TODO_DESTROY_BODY:
-    HARDFAULT "Mint.DESTROY: not implemented in Phase 1 CREATE package"
+destroy_v1_bad:
+    HARDFAULT "Mint.DESTROY V1: invalid, protected or non-owned target/state"
+
 TODO_DESTROY_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.DESTROY: missing Passkey"
 TODO_DESTROY_INPUT_PROOF_READ:

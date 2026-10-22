@@ -1,0 +1,212 @@
+; ISOLATED V1 ONLY. Caller is Mint; no public/user service capability.
+; Private CleanerState: [0 header, 1 cursor(words), 2 end(exclusive),
+; 3 pool physical byte base, 4 record count, then four words per record:
+; offset, capacity, owning slot, status (0 unused,1 live,2 released)].
+; Trusted test provisioning owns state/pool, disjoint from all code/Threads.
+; All calls: DR7 slot, DR6 size(words). Allocate returns DR2 physical bytes.
+; ValidateRelease/Release also take DR8; preserve DR6..8 and DR5.
+; Single-threaded fixture only. No activation or production authorization.
+abstraction ide.MintCleaner {
+capabilities { SELF E, ide.CleanerState RW, ide.CleanerPool RW }
+method Allocate {
+    IADD DR1, DR0, #0
+    LOAD CR7, CR6, #1
+    LOAD CR8, CR6, #2
+    DREAD DR2, CR7, #4, DR0
+    MCMP DR7, #2
+    BRANCHLO clean_bad
+    BFEXT DR3, DR7, #16, #16
+    MCMP DR3, #0
+    BRANCHNE clean_bad
+    MCMP DR6, #0
+    BRANCHEQ clean_bad
+    BFEXT DR3, DR6, #21, #11
+    MCMP DR3, #0
+    BRANCHNE clean_bad
+    IADD DR10, DR0, #0
+clean_check_owners:
+    MCMP DR10, DR2
+    BRANCHHS clean_search
+    SHL DR11, DR10, #2
+    IADD DR11, DR11, #5
+    DREAD DR3, CR7, #3, DR11
+    MCMP DR3, #2
+    BRANCHHI clean_bad
+    MCMP DR3, #1
+    BRANCHNE clean_owner_next
+    DREAD DR3, CR7, #2, DR11
+    MCMP DR3, DR7
+    BRANCHEQ clean_bad
+clean_owner_next:
+    IADD DR10, DR10, #1
+    BRANCH clean_check_owners
+clean_search:
+    ; Prefer released storage, including releases associated with other slots.
+    IADD DR10, DR0, #0
+    IADD DR9, DR0, #0
+clean_scan:
+    MCMP DR10, DR2
+    BRANCHHS clean_bump
+    SHL DR11, DR10, #2
+    IADD DR11, DR11, #5
+    DREAD DR3, CR7, #3, DR11
+    MCMP DR3, #0
+    BRANCHNE clean_fit
+    IADD DR9, DR11, #0
+    BRANCH clean_next
+clean_fit:
+    MCMP DR3, #2
+    BRANCHNE clean_next
+    DREAD DR12, CR7, #1, DR11
+    MCMP DR12, DR6
+    BRANCHLO clean_next
+    DREAD DR8, CR7, #0, DR11
+    IADD DR9, DR11, #0
+    BRANCH clean_bounds
+clean_next:
+    IADD DR10, DR10, #1
+    BRANCH clean_scan
+clean_bump:
+    MCMP DR9, #0
+    BRANCHEQ clean_records_full
+    DREAD DR8, CR7, #1, DR0
+    DREAD DR3, CR7, #2, DR0
+    MCMP DR8, DR3
+    BRANCHHI clean_bad
+    ISUB DR4, DR3, DR8
+    MCMP DR6, DR4
+    BRANCHHI clean_oom
+    IADD DR12, DR6, #0
+    IADD DR11, DR0, #0
+clean_bounds:
+    DREAD DR3, CR7, #2, DR0
+    MCMP DR8, DR3
+    BRANCHHI clean_bad
+    ISUB DR4, DR3, DR8
+    MCMP DR12, DR4
+    BRANCHHI clean_bad
+    IADD DR13, DR8, DR12
+    ISUB DR4, DR13, #1
+    DREAD DR3, CR8, #0, DR8
+    DREAD DR3, CR8, #0, DR4
+    DREAD DR14, CR7, #3, DR0
+    BFEXT DR3, DR14, #0, #2
+    MCMP DR3, #0
+    BRANCHNE clean_bad
+    BFEXT DR3, DR4, #30, #2
+    MCMP DR3, #0
+    BRANCHNE clean_bad
+    SHL DR4, DR4, #2
+    IADD DR4, DR4, DR14
+    MCMP DR4, DR14
+    BRANCHLO clean_bad
+    ; Consume the released record or bump interval before zeroing.
+    ; Interruption leaks the reservation, never makes dirty memory available.
+    MCMP DR11, #0
+    BRANCHEQ clean_advance
+    DWRITE DR0, CR7, #3, DR11
+    BRANCH clean_reserve
+clean_advance:
+    DWRITE DR13, CR7, #1, DR0
+clean_reserve:
+    DWRITE DR8, CR7, #0, DR9
+    DWRITE DR12, CR7, #1, DR9
+    DWRITE DR7, CR7, #2, DR9
+    IADD DR3, DR0, #1
+    DWRITE DR3, CR7, #3, DR9
+    IADD DR10, DR8, #0
+clean_zero:
+    MCMP DR10, DR13
+    BRANCHHS clean_done
+    DWRITE DR0, CR8, #0, DR10
+    IADD DR10, DR10, #1
+    BRANCH clean_zero
+clean_done:
+    SHL DR8, DR8, #2
+    IADD DR8, DR8, DR14
+    IADD DR2, DR8, #0
+    IADD DR1, DR0, #1
+    RETURNAL #12
+clean_oom:
+    HARDFAULT "No free memory of the size required"
+clean_bad:
+    HARDFAULT "MintCleaner: invalid allocation state or request"
+clean_records_full:
+    HARDFAULT "MintCleaner: allocation record capacity exhausted"
+}
+method Release {
+    ; Caller invalidates the Namespace slot BEFORE this method.
+    LOAD CR7, CR6, #1
+    IADD DR1, DR0, #0
+    DREAD DR2, CR7, #4, DR0
+    IADD DR10, DR0, #0
+release_find:
+    MCMP DR10, DR2
+    BRANCHHS release_bad
+    SHL DR9, DR10, #2
+    IADD DR9, DR9, #5
+    DREAD DR3, CR7, #3, DR9
+    MCMP DR3, #1
+    BRANCHNE release_next
+    DREAD DR3, CR7, #2, DR9
+    MCMP DR3, DR7
+    BRANCHEQ release_found
+release_next:
+    IADD DR10, DR10, #1
+    BRANCH release_find
+release_found:
+    DREAD DR3, CR7, #1, DR9
+    MCMP DR6, DR3
+    BRANCHHI release_bad
+    MCMP DR6, #0
+    BRANCHEQ release_bad
+    DREAD DR2, CR7, #0, DR9
+    SHL DR2, DR2, #2
+    DREAD DR3, CR7, #3, DR0
+    IADD DR2, DR2, DR3
+    MCMP DR2, DR8
+    BRANCHNE release_bad
+    IADD DR2, DR0, #2
+    DWRITE DR2, CR7, #3, DR9
+    IADD DR1, DR0, #1
+    RETURNAL #12
+release_bad:
+    HARDFAULT "MintCleaner: release does not name a live allocation"
+}
+method ValidateRelease {
+    LOAD CR7, CR6, #1
+    IADD DR1, DR0, #0
+    DREAD DR2, CR7, #4, DR0
+    IADD DR10, DR0, #0
+validate_find:
+    MCMP DR10, DR2
+    BRANCHHS validate_bad
+    SHL DR9, DR10, #2
+    IADD DR9, DR9, #5
+    DREAD DR3, CR7, #3, DR9
+    MCMP DR3, #1
+    BRANCHNE validate_next
+    DREAD DR3, CR7, #2, DR9
+    MCMP DR3, DR7
+    BRANCHEQ validate_found
+validate_next:
+    IADD DR10, DR10, #1
+    BRANCH validate_find
+validate_found:
+    DREAD DR3, CR7, #1, DR9
+    MCMP DR6, DR3
+    BRANCHHI validate_bad
+    MCMP DR6, #0
+    BRANCHEQ validate_bad
+    DREAD DR2, CR7, #0, DR9
+    SHL DR2, DR2, #2
+    DREAD DR3, CR7, #3, DR0
+    IADD DR2, DR2, DR3
+    MCMP DR2, DR8
+    BRANCHNE validate_bad
+    IADD DR1, DR0, #1
+    RETURNAL #12
+validate_bad:
+    HARDFAULT "MintCleaner: target is not a live owned DATA allocation"
+}
+}

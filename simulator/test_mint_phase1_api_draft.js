@@ -28,7 +28,6 @@ for (const [, name, body] of methods) {
     const branches = new Set([...body.matchAll(/^\s*BRANCH(?:EQ|NE|GT|GE|LT|LE|HI|LO|HS)\s+(TODO_\w+)/gm)]
         .map(match => match[1]));
     if (name === 'CREATE') branches.add('TODO_CREATE_DESCRIPTOR_RETIRED');
-    if (name === 'DESTROY') branches.add('TODO_DESTROY_BODY');
     if (name === 'MakeOutform') branches.add('TODO_MakeOutform_RESULT_TYPE_AND_IDENTITY');
     if (name === 'MakeInform') branches.add('TODO_MakeInform_RESULT_TYPE_AND_IDENTITY');
     const faults = [...body.matchAll(/^(TODO_\w+):\s*\n\s*HARDFAULT "([^"\n]+)"/gm)];
@@ -45,12 +44,12 @@ for (const [, name, body] of methods) {
         assert.match(body, new RegExp(`^${label}:`, 'm'));
     }
 }
-assert.equal(faultCount, 47, 'Reviewed failures and unsupported methods use HARDFAULT');
+assert.equal(faultCount, 46, 'Reviewed failures and remaining unsupported methods use HARDFAULT');
 
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
         'Every table entry must reach its own method input checks first');
-    if (name === 'CREATE') {
+    if (name === 'CREATE' || name === 'DESTROY') {
         assert.match(body, /LOAD CR1, NULL/);
         assert.doesNotMatch(body, /TODO_CREATE_CLEAR_RESULT_AUTHORITY/);
     } else {
@@ -66,7 +65,7 @@ for (const [, name, body] of methods) {
     }
     assert.match(body, new RegExp(`TPERM CR2, NULL\\s+BRANCHEQ TODO_${name}_INPUT_CREDENTIAL_NULL`));
     assert.match(body, new RegExp(`TPERM CR3, R\\s+BRANCHNE TODO_${name}_INPUT_PROOF_READ`));
-    assert.match(body, new RegExp(`DREAD DR${name === 'CREATE' ? 4 : 2}, CR3, #3`));
+    assert.match(body, new RegExp(`DREAD DR${['CREATE','DESTROY'].includes(name) ? 4 : 2}, CR3, #3`));
     assert.match(body, new RegExp(`MCMP DR1, #1\\s+BRANCHNE TODO_${name}_RESULT_COMPLETION`));
     const result = body.slice(body.indexOf(`${name === 'CREATE' ? 'create' :
         name === 'DESTROY' ? 'destroy' : name === 'MakeOutform' ? 'outform' : 'inform'}_result:`));
@@ -80,7 +79,7 @@ const create = methods[0][2], destroy = methods[1][2];
 assert.doesNotMatch(create, /12-word|#257|CR4, #11|CR4, #10/);
 assert.match(create, /BFEXT DR4, DR2, #0, #3/);
 assert.match(create, /LOAD CR1, CR6, #4\s+CALL CR1, #0/);
-assert.match(create, /BRANCH create_data_allocate/);
+assert.match(create, /BRANCH create_v1_allocate/);
 assert.doesNotMatch(create, /TODO_CREATE_ALLOWANCE/);
 assert.match(create, /TPERM CR4, NULL\s+BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL/);
 assert.doesNotMatch(create, /SOURCE_EXTENT|SOURCE_EXCEEDS|create_data_copy/);
@@ -107,8 +106,8 @@ assert.doesNotMatch(create.slice(0,create.indexOf('create_data_allocate:')),
 assert.match(create, /create_data_allocate:[\s\S]*LOAD CR7, CR6, #1[\s\S]*LOAD CR8, CR6, #3/);
 assert.match(create, /LOAD CR1, CR9, #0/);
 assert.match(create, /BRANCHNE TODO_CREATE_RESULT_TYPE/);
-assert.ok(destroy.indexOf('TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM') <
-    destroy.indexOf('destroy_body:'));
+assert.ok(destroy.indexOf('TPERM CR7, EXACT, CR11') >= 0);
+assert.ok(destroy.indexOf('TPERM CR7, EXACT, CR11') < destroy.indexOf('destroy_body:'));
 
 // Walk the actual draft's scalar/zeroing instructions, NOT unresolved services.
 // Native syntax is independently checked above. This is not full Mint acceptance.

@@ -8,13 +8,13 @@ const {fixture} = require('../tests/simulator/cr6_contract_fixture');
 const Compiler = require('./cloomc_compiler');
 const {assembleLump} = require('./lump_assembler');
 const mint = fs.readFileSync(`${__dirname}/cloomc/mint.cloomc`, 'utf8');
-const block = mint.match(/^create_data_authorize:\n([\s\S]*?)^create_data_allocate:/m)[1];
+const block = mint.match(/^create_data_authorize:\n([\s\S]*?)^create_v1_allocate:/m)[1];
 const rejection = mint.match(/^TODO_CREATE_PKVERIFY_NOT_APPROVED:\n\s*(HARDFAULT "[^"]+")/m)[1];
 assert.match(mint, /ide\.MintPool RW, ide\.PkVerify E/);
 assert.doesNotMatch(block, /EXACT|BRANCHEQ create_data_allocate/);
 assert.doesNotMatch(mint, /TODO_CREATE_PKVERIFY_AND_ALLOWANCE/);
 assert.doesNotMatch(mint, /TODO_CREATE_ALLOWANCE/);
-assert.match(block, /BRANCH create_data_allocate/);
+assert.match(block, /BRANCH create_v1_allocate/);
 const verifierSource = fs.readFileSync(`${__dirname}/cloomc/pkverify.cloomc`, 'utf8');
 const verified = new Compiler().compile(verifierSource, []);
 assert.deepEqual(verified.errors, []);
@@ -26,7 +26,7 @@ for (const approved of [true, false]) {
     const verifier = approved ? install(32, assembled.buf.slice(1))
         : compile(32, 'IADD DR1, DR0, #0\nRETURNAL #12');
     const caller = compile(30, `${block.replace(/^\s*;.*$/gm, '')}
-create_data_allocate:
+create_v1_allocate:
     IADD DR7, DR0, #99
     HALT
 TODO_CREATE_PKVERIFY_NOT_APPROVED:

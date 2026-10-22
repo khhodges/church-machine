@@ -40,3 +40,24 @@ service interface. Advancing into unused space versus selecting and cleaning
 released space is internal to the service. Returned memory must meet the
 request's size/alignment and be safe for reuse. The exact call interface and
 unavailable-memory behavior remain to be defined.
+
+The user authorized the existing always-approve verifier only for isolated V1
+DESTROY development and tests, together with minimum cleaning-service support.
+
+**Why:** Real destruction authorization is not yet defined and must not be
+silently replaced by a test approval.
+
+**How to apply:** Keep V1 source/fixture work separate from saved LUMP
+publication, Namespace installation and hardware. Do not describe isolated
+acceptance as authorized live destruction.
+
+Changing only a simulator fixture's Namespace slot ordering is not enough to
+validate Mint's byte-addressed descriptor profile.
+
+**Why:** The isolated V1 attempt reached CREATE's DATA permission check, where
+the legacy simulator treated the byte address as a word address. Bypassing that
+check or moving test memory just to pass would conceal a profile mismatch.
+
+**How to apply:** Use a compatible approved execution model for lifecycle
+acceptance. Keep passing service/component tests distinct from unproven
+CREATE/DESTROY end-to-end behavior.
