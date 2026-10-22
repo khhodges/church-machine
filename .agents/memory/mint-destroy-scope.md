@@ -12,3 +12,13 @@ review.
 and safe memory reclamation. Do not add GT tracing, copy removal, or a
 requirement to prove no outstanding GTs remain. Stale-GT rejection is distinct
 from collecting those GTs.
+
+The agreed destruction sequence increments the slot version before returning
+the slot and memory to their free pools. Terminal version 511 retires the slot;
+memory must be cleared before reuse.
+
+**Why:** The user accepted this release model while reviewing DESTROY.
+
+**How to apply:** Reconcile CREATE's existing allocation-time increment and
+allocator bookkeeping with release-time version advancement; do not preserve
+the conflicting draft comment as authority.
