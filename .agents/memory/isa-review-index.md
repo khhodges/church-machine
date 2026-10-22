@@ -4,6 +4,7 @@ description: User decisions on scope, compatibility, encoding validation and fau
 ---
 
 - [ISA boundary](isa-implementation-boundary.md): observable architecture, not implementation mechanisms.
+- [Abstract GT uses](abstract-gt-use-decisions.md): explicitly accepted roles, without adopting conflicting historical encodings.
 - [Namespace capacity](namespace-capacity-review.md): configurable slot count; 64 slots is not an ISA restriction.
 - [Hardwired recovery and security](hardwired-recovery-security-authority.md): reserved CR13, hardwired recovery/CR15, first CHANGE prerequisite and SecurityRegulator M authority.
 - [Compatibility](fpga-liftoff-compatibility.md): none required before first FPGA release; case-by-case afterward.
