@@ -3059,5 +3059,124 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "b53c26b1358a2b16f70dc1a0848a58ae518a9cf63c9394c050a481f6fc407ce1"
     }
+  },
+  {
+    "token": "911cb019",
+    "abstraction": "ide.AbstractGTManager",
+    "filename": "ide.AbstractGTManager.1.13c1217f.lump",
+    "lump_version": 1,
+    "compiled_at": 1792711954.7392588,
+    "operation_id": "6900a4c9-33eb-4371-8753-9f0f4c4c39b8",
+    "output_variants": {
+      "api": {
+        "sha256": "fb4be110252a1c558808f97f56c95281d79fcb44a4f2b5d91ad81e4acae004f4",
+        "bytes": 2048,
+        "file_bytes": 718,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/d4e4f228f445a3af306506e93abe355a46c1af40b86a2eaf06b278507a1aa537/api?compressed=1"
+      },
+      "compact": {
+        "sha256": "28d98c5f5185864de11c04eb1bc6ebf1874064a3c86e9e69bbfc7e7d014513d7",
+        "bytes": 8192,
+        "file_bytes": 1777,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/d4e4f228f445a3af306506e93abe355a46c1af40b86a2eaf06b278507a1aa537/compact?compressed=1"
+      },
+      "full": {
+        "sha256": "cbb1c9da4ffa6d19d2d33cfc27a356da883fca046478ca591bdfd2f6b688e834",
+        "bytes": 8192,
+        "file_bytes": 2557,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/d4e4f228f445a3af306506e93abe355a46c1af40b86a2eaf06b278507a1aa537/full?compressed=1"
+      }
+    },
+    "variant_primary_hash": "fb4be110252a1c558808f97f56c95281d79fcb44a4f2b5d91ad81e4acae004f4",
+    "variant_bundle_id": "d4e4f228f445a3af306506e93abe355a46c1af40b86a2eaf06b278507a1aa537",
+    "variant_compiler_record": {
+      "binary_hash": "fb4be110252a1c558808f97f56c95281d79fcb44a4f2b5d91ad81e4acae004f4",
+      "source_hash": "c3f179f6a84bd35811991aeb0ba461f6e7aa27ebffe04b76c38c24b5ffb2b97c",
+      "language": "assembly",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "2004ea3b953c13e33d9611f5c47ba38bc6119f3832bf5ceffc91ebdcb9ea2967",
+        "inputs": {
+          "language": "auto",
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "assembly"
+      },
+      "hardfault_sites": [
+        {
+          "offset": 60,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.Constant: name length must be 1..31",
+          "method": "Constant",
+          "sourceLine": 91
+        },
+        {
+          "offset": 61,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.Constant: unknown constant name",
+          "method": "Constant",
+          "sourceLine": 93
+        },
+        {
+          "offset": 62,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.Constant: invalid provisioned catalogue",
+          "method": "Constant",
+          "sourceLine": 95
+        },
+        {
+          "offset": 166,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.NewProof: name must be 1..31 printable non-space ASCII characters",
+          "method": "NewProof",
+          "sourceLine": 216
+        },
+        {
+          "offset": 167,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.NewProof: name already exists. Existing proof unchanged",
+          "method": "NewProof",
+          "sourceLine": 218
+        },
+        {
+          "offset": 168,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.NewProof: proof catalogue full",
+          "method": "NewProof",
+          "sourceLine": 220
+        },
+        {
+          "offset": 169,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.NewProof: private random input exhausted. No proof created",
+          "method": "NewProof",
+          "sourceLine": 222
+        },
+        {
+          "offset": 170,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "AbstractGTManager.NewProof: invalid provisioned state",
+          "method": "NewProof",
+          "sourceLine": 224
+        }
+      ],
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "4d19f04dda7946a9da0f70b1191a5f96dac66e3e1068578bd32f36ac878575eb"
+    }
   }
 ]
