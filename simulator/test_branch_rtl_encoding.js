@@ -83,3 +83,4 @@ Return n`, []);
 assert.deepEqual(english.errors, []);
 assert.equal(runGenerated(english.methods[0].code).dr[1], 0);
 console.log('PASS: shared BRANCH encoding, compiler equality, disassembly, limits and native loop');
+require('./test_factory_branch_encoding');

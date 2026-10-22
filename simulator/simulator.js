@@ -10720,7 +10720,7 @@ class ChurchSimulator {
             (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
         const target = this.pc + soff;
         if (target < 0 || target >= this.memory.length) {
-            this.fault('BOUNDS', `BRANCH: target PC=${target} out of range`);
+            this.fault('BOUNDS', `BRANCH: target PC=${target} out of range. Legacy signed-15-bit branch binaries must be explicitly recompiled from source; saved bytes are not converted.`);
             return null;
         }
         const desc = `BRANCH ${soff >= 0 ? '+' : ''}${soff} -> PC=${target}`;

@@ -153,6 +153,21 @@ W3 remains excluded from W2 integrity.
 
 ## Native helper scratch hazards
 
+Allocator address/cursor comparisons must use unsigned branch conditions.
+Keep physical byte-base provisioning and persistent slot history as explicit
+trusted software-state obligations, not inferred from empty Namespace words.
+Reserve history before cursor mutation; a later fault may lose capacity but
+must never make a reserved slot available again. Release retains the issued
+version; CREATE performs the single increment.
+
+**Why:** Native integration exposed signed comparison accepting physical
+address wraparound. The agreed CREATE increment also rules out incrementing
+once again on release. Fail-closed reservation is preferable to invented rollback.
+
+**How to apply:** Test high-bit addresses, duplicate queue entries, and repeated
+retirement attempts in disposable native execution. Do not treat fixture
+provisioning as production authority or reboot-persistence evidence.
+
 Review actual assembler lowering when preserving live scratch registers
 across comparisons; do not assume source-level immediate comparisons are
 register-preserving.

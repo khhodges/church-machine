@@ -137,29 +137,46 @@ create_data_authorize:
 create_data_allocate:
     ; Mint-owned state payload (word 0 remains the LUMP header):
     ; 1 pool cursor, 2 exclusive pool end, 3 free-slot queue cursor,
-    ; 4 exclusive queue end, 5.. queue entries (Namespace slot indices).
-    ; Pool offsets are relative to MintPool's RW view, not physical addresses.
-    ; Provisioning must exclude pool metadata from [cursor,end).
+    ; 4 exclusive queue end, 5 physical BYTE base of MintPool's RW view,
+    ; 6 history-table offset; queue starts at >=7 and ends before history.
+    ; history[slot]: bits 0..8 current sequence, bit9 never-used,
+    ; bit10 reserved (reject reuse), all higher bits zero.
+    ; Trusted provisioning must bind word5 to the actual pool capability,
+    ; exclude pool metadata and supply authoritative history, not infer it
+    ; from an empty Namespace entry. No caller-supplied base/history.
     ; Single-threaded bump allocation; no reclamation policy is implied.
     ; All checks/reads precede reservation writes. Exhaustion is a hard fault.
     LOAD CR7, CR6, #1
     LOAD CR8, CR6, #3
+    IADD DR1, DR0, #0
+    MCMP DR6, #0
+    BRANCHEQ TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    ISUB DR4, DR6, #1
+    BFEXT DR4, DR4, #21, #11
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
     DREAD DR8, CR7, #1
     DREAD DR10, CR7, #2
     MCMP DR8, DR10
-    BRANCHGT TODO_CREATE_ALLOCATOR_STATE
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
     ISUB DR10, DR10, DR8
     MCMP DR6, DR10
-    BRANCHGT TODO_CREATE_POOL_EXHAUSTED
+    BRANCHHI TODO_CREATE_POOL_EXHAUSTED
     DREAD DR9, CR7, #3
-    MCMP DR9, #5
-    BRANCHLT TODO_CREATE_ALLOCATOR_STATE
+    MCMP DR9, #7
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
     DREAD DR10, CR7, #4
     MCMP DR9, DR10
-    BRANCHGE TODO_CREATE_SLOTS_EXHAUSTED
+    BRANCHHS TODO_CREATE_SLOTS_EXHAUSTED
+    DREAD DR4, CR7, #6
+    MCMP DR10, DR4
+    BRANCHHI TODO_CREATE_ALLOCATOR_STATE
     DREAD DR7, CR7, #0, DR9
+    BFEXT DR4, DR7, #16, #16
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
     MCMP DR7, #2
-    BRANCHLT TODO_CREATE_ALLOCATOR_STATE
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
     ; Probe the complete pool interval before advancing either cursor.
     ; DR6 is already checked nonzero; available-space subtraction above
     ; prevents cursor addition overflow for valid unsigned state.
@@ -167,31 +184,69 @@ create_data_allocate:
     ISUB DR11, DR10, #1
     DREAD DR4, CR8, #0, DR8
     DREAD DR4, CR8, #0, DR11
-    IADD DR9, DR9, #1
-    DWRITE DR10, CR7, #1
-    DWRITE DR9, CR7, #3
+    ; Validate physical end (inclusive last word), without shift/add wrap.
+    BFEXT DR4, DR11, #30, #2
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #5
+    BFEXT DR4, DR2, #0, #2
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    SHL DR11, DR11, #2
+    IADD DR11, DR11, DR2
+    MCMP DR11, DR2
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    SHL DR8, DR8, #2
+    IADD DR8, DR8, DR2
+    ; History indexed by slot, NOT by free-queue position. Duplicate queue
+    ; entries cannot turn a reserved slot back into a never-used slot.
+    DREAD DR9, CR7, #6
+    IADD DR10, DR9, DR7
+    MCMP DR10, DR9
+    BRANCHLO TODO_CREATE_ALLOCATOR_STATE
+    DREAD DR2, CR7, #0, DR10
+    BFEXT DR4, DR2, #10, #22
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_ALLOCATOR_STATE
+    BFEXT DR3, DR2, #9, #1
+    BFEXT DR2, DR2, #0, #9
+    BRANCH create_data_publish
 create_data_zero_begin:
-    ; DR8 is the reserved pool-relative start, DR6 is its size.
-    IADD DR10, DR8, DR6
-    IADD DR9, DR8, #0
+    ; Package succeeded. Consume history before advancing either cursor:
+    ; a later fault may leak a reservation, never reuse its authority.
+    DREAD DR13, CR7, #6
+    IADD DR13, DR13, DR7
+    BFEXT DR2, DR9, #21, #9
+    IADD DR3, DR0, #1
+    BFINS DR2, DR3, #10, #1
+    DWRITE DR2, CR7, #0, DR13
+    DREAD DR13, CR7, #1
+    IADD DR14, DR13, DR6
+    DWRITE DR14, CR7, #1
+    DREAD DR15, CR7, #3
+    IADD DR15, DR15, #1
+    DWRITE DR15, CR7, #3
 create_data_zero_loop:
-    MCMP DR9, DR10
-    BRANCHEQ create_data_publish
-    DWRITE DR0, CR8, #0, DR9
-    IADD DR9, DR9, #1
+    MCMP DR13, DR14
+    BRANCHEQ create_data_set_slot
+    DWRITE DR0, CR8, #0, DR13
+    IADD DR13, DR13, #1
     BRANCH create_data_zero_loop
 create_data_publish:
-    ; The native descriptor package below is implemented. Bind its inputs from
-    ; the FPGA allocator/slot history, not from caller-controlled scratch:
-    ; DR8 physical BYTE address (the old allocator above still has an offset),
-    ; DR6 word count, DR7 slot, DR2 current version, DR3 never-used (0 or 1).
-    ; Then BRANCH create_descriptor_prepare. Do not guess base/history here.
-    BRANCH TODO_CREATE_BIND_DESCRIPTOR_INPUTS
+    ; Inputs now come from the native allocator and Mint-owned history.
+    BRANCH create_descriptor_prepare
 create_data_descriptor_ready:
     MCMP DR12, #1
-    BRANCHNE TODO_CREATE_DESCRIPTOR_RETIRED
+    BRANCHNE create_data_retire_slot
     IADD DR1, DR0, #0
-    BRANCH create_data_set_slot
+    BRANCH create_data_zero_begin
+create_data_retire_slot:
+    ; Durable within MintState: retries see 511, never wrap or allocate.
+    ; Leave queue/pool cursors and pool bytes unchanged; no auto-skip policy.
+    DREAD DR13, CR7, #6
+    IADD DR13, DR13, DR7
+    DWRITE DR4, CR7, #0, DR13
+    BRANCH TODO_CREATE_DESCRIPTOR_RETIRED
 
 ; BEGIN NATIVE SLOT PACKAGE -- private same-context blocks, no extra GT.
 ; Inputs: DR8 physical byte address, DR6 nonzero word count, DR7 slot >= 2,
@@ -224,7 +279,7 @@ create_descriptor_prepare:
     MCMP DR4, #0
     BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
     MCMP DR3, #1
-    BRANCHGT TODO_CREATE_DESCRIPTOR_INPUT_INVALID
+    BRANCHHI TODO_CREATE_DESCRIPTOR_INPUT_INVALID
     BRANCH create_descriptor_next_sequence
 
 create_descriptor_after_sequence:
@@ -441,7 +496,7 @@ destroy_inputs_after_clear:
 destroy_authorize:
     BRANCH TODO_DESTROY_PKVERIFY_AND_ACTIVE_USE
 destroy_body:
-    ; Kill eligible object, increment released-slot version before freeing,
+    ; Kill eligible object; retain issued version on release (CREATE increments),
     ; zero storage before reuse and update shared Mint/GC records once.
     BRANCH TODO_DESTROY_BODY
 destroy_finish:

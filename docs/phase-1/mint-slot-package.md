@@ -103,10 +103,78 @@ failures and 37 passes. No catalog or approval files were repaired or fabricated
 to bypass those checks. The broad assembler suite also has an independently
 reproduced pre-change constructor failure.
 
-The old Mint allocator still supplies a pool-relative offset rather than
-the agreed physical byte address, and does not yet supply trusted version
-and never-used inputs. `TODO_CREATE_BIND_DESCRIPTOR_INPUTS` intentionally
-blocks that connection. Once those inputs are supplied, enter
-`create_descriptor_prepare`; its continuation checks DR12 before entering
-the slot-write path. Later Namespace eligibility/publication and GT issuance
-remain separate unfinished steps. No live LUMP or boot image is changed here.
+## Native allocator binding
+
+`create_data_allocate` now reaches the package directly through ordinary native
+instructions. It loads MintState RW and MintPool RW from Mint's own C-list;
+caller scratch never supplies address or history. This is FPGA-targeted CLOOMC,
+not a host allocator hook or an RTL change.
+
+MintState's private software layout is:
+
+| Word | Meaning |
+|---|---|
+| 0 | LUMP header |
+| 1 | Pool word-offset cursor |
+| 2 | Exclusive pool word-offset end |
+| 3 | Free-slot queue cursor (at least 7) |
+| 4 | Exclusive free-slot queue end |
+| 5 | Physical **byte** base matching MintPool RW's offset-zero address |
+| 6 | Word offset of the slot-indexed history table |
+| 7 onward | Queue of slot numbers; queue end must not overlap history |
+| history base + slot | Bits 0–8 current version; bit 9 never-used; bit 10 reserved; higher bits zero |
+
+Trusted provisioning must bind the physical base to the actual capability,
+exclude metadata from the allocation interval, and initialize authoritative
+history. This is an explicit provisioning obligation, not a new machine
+interface or a claim that ordinary native code can inspect a CR's cached base.
+Empty Namespace words do **not** establish never-used history. State must not
+alias the pool, executable, Thread homes or public writable objects. The final
+MintState c-list scratch word used for the Phase 1 credential comparison must
+also remain outside queue/history storage.
+
+Before reservation writes, the native allocator checks size, capacity, queue
+geometry, slot width, history bounds/flags and actual pool bounds through
+DREAD. It checks byte-address alignment and shift/add overflow, then produces
+DR8 = base + cursor * 4 and reads DR2/DR3 from history. All ordering comparisons
+on addresses/cursors are unsigned. DR6 and DR7 retain size and slot.
+
+The real package continuation checks DR12. Success records the resulting
+version with reserved=1 and never-used=0, advances the two cursors, then zeros
+exactly the reserved interval while preserving W0–W3. Recording reservation
+before cursor mutation prevents duplicate queue entries or retry after a
+later fault from issuing the same slot twice. A fault can leak a reservation;
+no rollback or recovery is promised.
+
+For 510→511 or already-511, the continuation persists 511 and hard-faults.
+Pool bytes and both cursors remain unchanged; repeated attempts still fault.
+It neither wraps nor silently skips retired slots. Release must retain the
+issued version and clear the reserved flag only after lawful destruction:
+CREATE owns the next increment, not both release and CREATE.
+
+`node simulator/test_mint_allocator_descriptor.js` runs the contiguous native
+allocator, package, reservation and zero loop in disposable RAM with real
+C-list loads and memory instructions. It checks first use, used-zero, 509→510,
+retirement retries, duplicate slots, malformed state, exhaustion and unchanged
+unallocated bytes. The existing native-path suite includes this regression.
+Test setup provisions capabilities and private state; it does not prove legal
+production provisioning or modify a running service.
+
+Remaining blockers are explicit: trusted saved-design provisioning and durable
+history lifecycle across reboot/release; Namespace eligibility, exact reservation
+binding and writer/observer exclusion; publication/read-back; accounting,
+lawful CR1 issuance and final result validation. Full Mint compilation still
+fails on the unresolved operation labels. No live LUMP, Namespace assignment,
+boot image, simulator instruction semantics or hardware is changed.
+
+### Branch-format compatibility
+
+Current compiler and Python factory/ROM emitters use RTL bit 18 for subtraction
+and bits 17:0 for magnitude. Historical signed-15-bit backward branches are
+incompatible: saved binaries and images must remain immutable and require
+explicit source recompilation and approval before execution with this toolchain.
+There is no automatic binary conversion or guess based on an operand's bits.
+The simulator's out-of-range branch fault explains this requirement.
+`simulator/test_factory_branch_encoding.js` executes exact Python-emitted
+CallHome/demo loop edges and the boot return guard, and rejects the old -1
+encoding. These are disposable instruction checks, not a live boot or flash.

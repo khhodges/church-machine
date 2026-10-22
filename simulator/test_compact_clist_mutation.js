@@ -33,6 +33,24 @@ function fixture(code) {
     return {context, sim, memory, writes, editor};
 }
 (async () => {
+    for (const action of ['zeroAllUnrefSlots', 'applyPOLA']) {
+        const code = 'top:\nLOAD CR2, CR1, #3\nLOAD CR1, CR6, #1\nBRANCH top';
+        const {context, memory} = fixture(code);
+        const refs = context._computeReferencedCListSlots(65, 3);
+        assert(refs.indirect.has(3), 'back edge carries CR1 alias to earlier row access');
+        await context.window[action](20);
+        assert(Array.from(memory.slice(124, 128)).includes(0x4A000016),
+            `${action} must preserve the indirectly referenced capability`);
+    }
+    for (const branch of ['BRANCH DR1 + 0', 'BRANCHNE DR2 - 2']) {
+        const {context, memory, writes} = fixture(branch);
+        const before = memory.slice();
+        assert(context._computeReferencedCListSlots(65, 1).dynamicIndices);
+        context.window.zeroAllUnrefSlots(20);
+        await context.window.applyPOLA(20);
+        assert.deepEqual(memory, before, 'unknown branch target blocks destructive analysis');
+        assert.deepEqual(writes, []);
+    }
     for (const op of ['LOAD', 'SAVE']) {
         const {context, memory} = fixture(`${op} CR1, CR6, #1`);
         const refs = context._computeReferencedCListSlots(65, 1);

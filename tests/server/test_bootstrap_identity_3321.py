@@ -54,6 +54,25 @@ def _select_fixture_boot_marker(lumps: Path, *, slot: int) -> None:
 _select_fixture_boot_marker(Path(os.environ["CHURCH_TEST_LUMPS_DIR"]), slot=10)
 select_bootstrap_residents(Path(os.environ["CHURCH_TEST_LUMPS_DIR"]))
 
+# Synthetic historical record: the property under test is a stale manifest
+# token versus a sealed bootstrap SELF, not the contents of a deleted archive.
+# Copy known bootstrap bytes in PRIVATE storage only; never restore live history.
+def _seed_legacy_snapshot_fixture(lumps):
+    from scripts.migrate_bootstrap_residents import CURRENT_CAPABILITY
+    path = lumps / "manifest.json"
+    manifest = json.loads(path.read_text())
+    filename = "CapabilityTest.1.83320494.lump"
+    (lumps / filename).write_bytes((lumps / CURRENT_CAPABILITY["filename"]).read_bytes())
+    manifest = [row for row in manifest if row.get("token") != "7ccff26f"]
+    manifest.append({
+        "token": "7ccff26f", "abstraction": "CapabilityTest",
+        "filename": filename, "lump_version": 26, "archived": True,
+    })
+    path.write_text(json.dumps(manifest))
+
+
+_seed_legacy_snapshot_fixture(Path(os.environ["CHURCH_TEST_LUMPS_DIR"]))
+
 from server import app as app_module
 from server.bootstrap_identity import (
     bootstrap_identity_record,

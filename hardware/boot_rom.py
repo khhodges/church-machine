@@ -35,10 +35,16 @@ def encode_turing(opcode, cond=CondCode.AL, dr_dst=0, dr_src=0, imm=0,
       By default ``imm`` is a 14-bit unsigned immediate and this helper sets
       the imm[14] immediate marker. With ``register_operand=True``, ``imm`` is
       the second source DR index encoded in imm[3:0].
-    For BRANCH:    dr_dst/dr_src unused (0), imm = 15-bit signed word offset from current PC.
+    For BRANCH: dr_dst/dr_src unused (0); imm is a signed word offset.
+      RTL uses bit18 subtract and bits17:0 magnitude, not signed imm15.
     For DWRITE:    dr_dst = DR index to read (value), dr_src = CR index (capability), imm = word offset.
     For DREAD:     dr_dst = DR index to write (destination), dr_src = CR index (capability), imm = word offset.
     """
+    if opcode == TuringOpcode.BRANCH:
+        if dr_dst or dr_src or register_operand or not -(2**18 - 1) <= imm <= 2**18 - 1:
+            raise ValueError("BRANCH requires a signed 18-bit-magnitude immediate offset")
+        return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23) | \
+               ((1 if imm < 0 else 0) << 18) | abs(imm)
     if opcode in (TuringOpcode.IADD, TuringOpcode.ISUB):
         imm = (imm & 0xF) if register_operand else (0x4000 | (imm & 0x3FFF))
     return ((opcode & 0x1F) << 27) | ((cond & 0xF) << 23) | \
@@ -147,13 +153,7 @@ while len(BOOT_PROGRAM) < 256:
 #  16  BRANCH AL, #-14        — → index 2 (loop: LED0 on again)
 # ---------------------------------------------------------------------------
 
-# BRANCH imm = signed word offset from current instruction's address.
-# branch_target = nia_reg + sign_extend(imm) * 4
-# Inner back-edge (on phase):  target=5,  branch at 6  → -1  → 0x7FFF
-# Outer back-edge (on phase):  target=4,  branch at 8  → -4  → 0x7FFC
-# Inner back-edge (off phase): target=12, branch at 13 → -1  → 0x7FFF
-# Outer back-edge (off phase): target=11, branch at 15 → -4  → 0x7FFC
-# Top-of-loop:                 target=2,  branch at 16 → -14 → 0x7FF2
+# BRANCH uses a subtract bit plus unsigned word magnitude from current PC.
 
 NUC_PROGRAM = [
     # 0: load LED_DEV capability into CR3 from c-list slot 5 (via CR6)
@@ -171,11 +171,11 @@ NUC_PROGRAM = [
     # 5: DR2 -= 1  ← inner-loop-top
     encode_turing(TuringOpcode.ISUB, CondCode.AL, dr_dst=2, dr_src=2, imm=1),
     # 6: branch to index 5 if DR2 != 0
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-1),
     # 7: DR3 -= 1
     encode_turing(TuringOpcode.ISUB, CondCode.AL, dr_dst=3, dr_src=3, imm=1),
     # 8: branch to index 4 if DR3 != 0
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-4),
     # ── LED0 OFF phase ─────────────────────────────────────────────────────────
     # 9: LED0 = 0
     encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=0, dr_src=3, imm=0),
@@ -186,13 +186,13 @@ NUC_PROGRAM = [
     # 12: DR2 -= 1  ← inner-loop-top
     encode_turing(TuringOpcode.ISUB, CondCode.AL, dr_dst=2, dr_src=2, imm=1),
     # 13: branch to index 12 if DR2 != 0
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-1),
     # 14: DR3 -= 1
     encode_turing(TuringOpcode.ISUB, CondCode.AL, dr_dst=3, dr_src=3, imm=1),
     # 15: branch to index 11 if DR3 != 0
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-4),
     # 16: unconditional branch back to index 2 (LED0 on); offset = 2-16 = -14 words
-    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-14) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=-14),
 ]
 
 # Assemble full ROM: BOOT_PROGRAM (256 words) + NUC_PROGRAM (padded to 256 words)
@@ -276,7 +276,7 @@ for _idx, _off in enumerate(_sr_offsets):
     _SR_DISPATCH.append(encode_turing(TuringOpcode.ISUB, CondCode.AL, dr_dst=2, dr_src=3, imm=_idx))
     _branch_pos = _idx * 2 + 1
     _branch_offset = _off - _branch_pos
-    _SR_DISPATCH.append(encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=_branch_offset & 0x7FFF))
+    _SR_DISPATCH.append(encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=_branch_offset))
 
 SLIDERULE_CODE = list(_SR_DISPATCH)
 for _m in _SR_METHODS:
@@ -1032,7 +1032,7 @@ def _uart_send_byte(char_val):
         encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=5, dr_src=4, imm=0),
         encode_turing(TuringOpcode.DREAD,  CondCode.AL, dr_dst=6, dr_src=4, imm=1),
         encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=7, dr_src=6, imm=1),
-        encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=(-2) & 0x7FFF),
+        encode_turing(TuringOpcode.BRANCH, CondCode.EQ, imm=-2),
     ]
 
 _WUKONG_BANNER = b"CM:WUKONG\r\n"
@@ -1066,11 +1066,11 @@ WUKONG_NUC_PROGRAM += [
     # 61: inner decrement  ← inner-on-top
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=2, dr_src=2, imm=1),
     # 62: BRANCH NE → inner-on-top (61)   offset = 61-62 = -1
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-1),
     # 63: outer decrement
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=3, dr_src=3, imm=1),
     # 64: BRANCH NE → outer-on-top (60)   offset = 60-64 = -4
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-4),
     # 65: LED0 = off
     encode_turing(TuringOpcode.DWRITE, CondCode.AL, dr_dst=0, dr_src=3, imm=0),
     # 66: off-phase outer count
@@ -1080,13 +1080,13 @@ WUKONG_NUC_PROGRAM += [
     # 68: inner decrement  ← inner-off-top
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=2, dr_src=2, imm=1),
     # 69: BRANCH NE → inner-off-top (68)  offset = 68-69 = -1
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-1) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-1),
     # 70: outer decrement
     encode_turing(TuringOpcode.ISUB,   CondCode.AL, dr_dst=3, dr_src=3, imm=1),
     # 71: BRANCH NE → outer-off-top (67)  offset = 67-71 = -4
-    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=(-4) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.NE, imm=-4),
     # 72: BRANCH AL → loop top (3)        offset = 3-72 = -69
-    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-69) & 0x7FFF),
+    encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=-69),
 ]
 
 assert len(WUKONG_NUC_PROGRAM) == 73, f"WUKONG_NUC_PROGRAM length = {len(WUKONG_NUC_PROGRAM)}, expected 73"
@@ -1099,9 +1099,7 @@ assert len(WUKONG_NUC_PROGRAM) == 73, f"WUKONG_NUC_PROGRAM length = {len(WUKONG_
 _WUKONG_BRANCH_INDEX = len(WUKONG_NUC_PROGRAM) - 1  # currently 72
 _expected_branch_offset = _WUKONG_LOOP_TOP - _WUKONG_BRANCH_INDEX  # currently -69
 _branch_word = WUKONG_NUC_PROGRAM[_WUKONG_BRANCH_INDEX]
-_encoded_imm15 = _branch_word & 0x7FFF
-# Sign-extend 15-bit two's-complement value (bit 14 is the sign bit).
-_decoded_branch_offset = _encoded_imm15 if _encoded_imm15 < 0x4000 else _encoded_imm15 - 0x8000
+_decoded_branch_offset = (_branch_word & 0x3FFFF) * (-1 if _branch_word & (1 << 18) else 1)
 assert _decoded_branch_offset == _expected_branch_offset, (
     f"WUKONG_NUC_PROGRAM[{_WUKONG_BRANCH_INDEX}] loop-back branch offset "
     f"{_decoded_branch_offset} != {_expected_branch_offset} "

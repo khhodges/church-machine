@@ -5,6 +5,19 @@ description: Isolated boot tests must redirect every persistence input coupled t
 
 When boot tests use a temporary LUMP library, redirect the saved boot configuration and any other persistence paths read during image regeneration to the same private test session.
 
+Historical bootstrap tests must seed their own historical records rather than
+depend on retention keeping a particular archive in the active library.
+Scope unrelated approval history out of disposable migration fixtures, but
+never relax production approval/deletion validation to make those fixtures pass.
+
+**Why:** A mutable production catalog is not a stable historical test fixture;
+unrelated retention changes must not prevent a transaction test from reaching
+the publication behavior it is intended to exercise.
+
+**How to apply:** Use explicit synthetic historical labels over known sealed
+fixture bytes for identity-mismatch tests. Keep retention evidence tests separate
+and assert that tracked live artifacts remain unchanged.
+
 **Why:** Boot-image generation consumes both the LUMP catalog and saved boot configuration. Isolating only one lets a test avoid LUMP drift while still overwrite or restore a user's active IDE configuration.
 
 **How to apply:** Before exercising a boot save, upload, or regeneration path, copy the needed runtime state into the test area and patch both server settings and already-imported test path constants. Restore those settings after the session.

@@ -174,7 +174,7 @@ WUKONG_THREAD_SCHEDULER_MIN_BUILD = 18
 # WukongCallHome remains in the namespace at slot 7 as a selectable abstraction
 # but is no longer the hardwired default CALL target.
 # The WukongCallHome LUMP body is placed in dmem_init below at byte 0x1200.
-_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=-1)
 _WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [_BRANCH_MINUS_1] + [0] * (1024 - 4)
 _WUKONG_BOOT_WINDOW_BYTES = 4 * 4
 

@@ -58,6 +58,16 @@ def select_bootstrap_residents(lumps):
     """
     assert lumps.resolve() != (Path(__file__).resolve().parents[2] / "server/lumps").resolve(), \
         "Bootstrap fixture selection must never change the live library"
+    # Scope this disposable catalog to approvals for bytes actually present.
+    # Production retention/alias evidence is tested separately; it is not an
+    # input to historical migration transaction tests.
+    approvals_path = lumps / "approvals.json"
+    envelope = json.loads(approvals_path.read_text())
+    present = {hashlib.sha256(p.read_bytes()).hexdigest()
+               for p in lumps.glob("*.lump") if p.is_file()}
+    envelope["approvals"] = {key: value for key, value in envelope["approvals"].items()
+                             if key in present}
+    approvals_path.write_text(json.dumps(envelope))
     state_path = lumps / "ns-state.json"
     state = json.loads(state_path.read_text())
     manifest = json.loads((lumps / "manifest.json").read_text())

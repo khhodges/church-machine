@@ -7785,6 +7785,10 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
     for (let w = 0; w < codeCount; w++) {
         const word = sim.memory[codeBase + w] >>> 0;
         if ((word >>> 27) <= 1 && (word & 0x400F)) dynamicIndices = true;
+        // A DR-dependent target can reach any block. Never remove capabilities
+        // on the strength of a CFG with an unknown runtime successor.
+        if ((word >>> 27) === BRANCH_OPCODE && ((word >>> 19) & 15))
+            dynamicIndices = true;
     }
 
     // ── Phase 1: Collect basic-block entry points ─────────────────────────────
@@ -7799,8 +7803,7 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
         const opcode = (word >>> 27) & 0x1F;
         if (opcode === BRANCH_OPCODE) {
             if (w + 1 < codeCount) blockStartSet.add(w + 1);
-            let off = word & 0x7FFF;
-            if (off & 0x4000) off = off - 0x8000; // sign-extend 15-bit
+            const off = (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
             const target = w + off;
             if (target >= 0 && target < codeCount) blockStartSet.add(target);
         }
@@ -7837,8 +7840,7 @@ function _computeReferencedCListSlots(codeBase, codeCount) {
                     if (ft !== -1 && !successors[bi].includes(ft)) successors[bi].push(ft);
                 }
                 // Branch-target successor.
-                let off = word & 0x7FFF;
-                if (off & 0x4000) off = off - 0x8000;
+                const off = (word & 0x3FFFF) * (word & 0x40000 ? -1 : 1);
                 const target = w + off;
                 if (target >= 0 && target < codeCount) {
                     const tb = wordToBlock[target];

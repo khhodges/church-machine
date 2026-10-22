@@ -73,9 +73,11 @@ function runTo(s, end, limit = 10000) {
 // verbatim. Ending at the next service boundary is NOT service completion.
 for (const size of [8, 64, 256]) {
     const {s, labels} = fixture(
-        fragment('create_data_zero_begin', 'create_data_publish') +
-        '\ncreate_data_publish:\nHALT', size);
-    runTo(s, labels.create_data_publish);
+        fragment('create_data_zero_loop', 'create_data_publish') +
+        '\ncreate_data_set_slot:\nHALT', size);
+    s.dr[13] = 0;
+    s.dr[14] = size;
+    runTo(s, labels.create_data_set_slot);
     assert.deepEqual(Array.from(s.memory.slice(DATA, DATA + size)), Array(size).fill(0));
     assert.equal(s.memory[DATA + size], 0xdeadbeef);
     assert.equal(s.memory[DATA + size + 1], 0xdeadbeef);
@@ -84,7 +86,7 @@ for (const size of [8, 64, 256]) {
 // Slot writes remain isolated from binding/exclusion and issuance. Test
 // Native allocator evidence: state and pool authority come from Mint's C-list,
 // never caller CR7/CR8. Provisioning remains disposable, not a live installation.
-const allocationText = fragment('create_data_allocate', 'create_data_publish');
+const allocationText = fragment('create_data_allocate', 'create_data_zero_begin');
 const allocationStops = [...new Set([...allocationText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];
 for (const scenario of ['success', 'pool-full', 'slots-full', 'bad-cursor', 'pool-bounds']) {
     const {s, labels, token} = fixture(allocationText +
@@ -94,9 +96,10 @@ for (const scenario of ['success', 'pool-full', 'slots-full', 'bad-cursor', 'poo
     s.withNamespaceWrite('TEST ONLY: allocator state', () =>
         s.writeNSEntry(43, STATE, 63, 0, 0, 1, 0, 0, 0));
     s.memory[STATE] = s.packLumpHeader(0, 0, 1, 0);
-    s.memory.set([8, 64, 5, 7, 39, 38], STATE + 1);
+    s.memory.set([8, 64, 7, 9, DATA * 4, 16, 39, 38], STATE + 1);
+    s.memory[STATE + 16 + 39] = 512;
     if (scenario === 'pool-full') s.memory[STATE + 1] = 60;
-    if (scenario === 'slots-full') s.memory[STATE + 3] = 7;
+    if (scenario === 'slots-full') s.memory[STATE + 3] = 9;
     if (scenario === 'bad-cursor') s.memory[STATE + 1] = 65;
     if (scenario === 'pool-bounds') s.memory.set([64, 128], STATE + 1);
     const beforeState = Array.from(s.memory.slice(STATE, STATE + 64));
@@ -116,10 +119,12 @@ for (const scenario of ['success', 'pool-full', 'slots-full', 'bad-cursor', 'poo
         assert.equal(s.halted, false, JSON.stringify(s.faultLog));
         assert.equal(s.pc, labels.create_data_publish);
         assert.equal(s.dr[7], 39);
-        assert.equal(s.dr[8], 8);
-        assert.equal(s.memory[STATE + 1], 16);
-        assert.equal(s.memory[STATE + 3], 6);
-        assert.deepEqual(Array.from(s.memory.slice(DATA + 8, DATA + 16)), Array(8).fill(0));
+        assert.equal(s.dr[8], (DATA + 8) * 4);
+        assert.equal(s.dr[2], 0);
+        assert.equal(s.dr[3], 1);
+        assert.equal(s.memory[STATE + 1], 8);
+        assert.equal(s.memory[STATE + 3], 7);
+        assert.deepEqual(Array.from(s.memory.slice(DATA + 8, DATA + 16)), Array(8).fill(0xdeadbeef));
         assert.equal(s.memory[DATA + 7], 0xdeadbeef);
         assert.equal(s.memory[DATA + 16], 0xdeadbeef);
     } else {
@@ -309,4 +314,7 @@ for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xffff
     }
 }
 console.log('PASS: only CR2=0xFFFFFFFF skips the proof checks, without granting memory authority.');
-console.log('BLOCKED: saved-design provisioning, descriptor input binding and issuance remain incomplete. No complete CREATE claim.');
+require('./test_mint_allocator_descriptor');
+require('./test_factory_branch_encoding');
+require('./test_compact_clist_mutation');
+console.log('BLOCKED: saved-design provisioning, Namespace publication and issuance remain incomplete. No complete CREATE claim.');

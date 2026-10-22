@@ -62,7 +62,7 @@ _IL_PATH = os.path.join(
 
 
 # Expected BRANCH AL, #-1 encoding — must match the constant in wukong_top.py.
-_EXPECTED_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+_EXPECTED_BRANCH_MINUS_1 = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=-1)
 _LUMPS_DIR = Path(__file__).resolve().parents[2] / "server" / "lumps"
 
 

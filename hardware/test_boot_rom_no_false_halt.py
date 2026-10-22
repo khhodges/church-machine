@@ -175,7 +175,7 @@ def _build_nested_call_dmem():
 
 # ROM: BOOT_PROGRAM[0..2] + the post-RETURN BRANCH -1 guard + zeros.
 _BRANCH_MINUS_1 = encode_turing(
-    TuringOpcode.BRANCH, CondCode.AL, imm=(-1) & 0x7FFF)
+    TuringOpcode.BRANCH, CondCode.AL, imm=-1)
 _WUKONG_ROM = list(BOOT_PROGRAM[:3]) + [_BRANCH_MINUS_1] + [0] * (1024 - 4)
 _WUKONG_BOOT_WINDOW_BYTES = 4 * 4
 
