@@ -1748,6 +1748,25 @@
         "age_basis": "file_mtime",
         "age_timestamp": 1788788890.7426941
       }
+    },
+    {
+      "version": 33,
+      "filename": "CapabilityTest_v33.lump",
+      "binary_hash": "68a4971ba81f9158bad4a2b0351d11b946852f1e516087c179dff21ab75f2be6",
+      "deleted_at": 1792706000.1078181,
+      "compiled_at": 1790113197.088158,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1790113197.088158
+      }
     }
   ],
   "232f0de4": [
