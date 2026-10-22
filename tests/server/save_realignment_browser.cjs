@@ -205,7 +205,7 @@ async function main() {
         await assertHistory(result.saved);
         await assertBlocked();
         await page.evaluate(() => { window._nsTableDirty = false; });
-        await page.getByRole('button', {name:'Retry saved-revision alignment', exact:true}).click();
+        await page.getByRole('button', {name:'Retry simulation preparation', exact:true}).click();
         await page.waitForFunction(() => window._savedLumpRealignment === null);
         await assertActivated(result.saved, 44);
 
@@ -220,7 +220,7 @@ async function main() {
         await control('restart');
         await load();
         assert.equal(await page.evaluate(() => SimulationPreparation.checkExecutionFreshness()), false);
-        await page.getByRole('button', {name:'Retry saved-revision alignment', exact:true}).click();
+        await page.getByRole('button', {name:'Retry simulation preparation', exact:true}).click();
         await page.waitForFunction(() => window._savedLumpRealignment === null);
         await assertActivated(result.saved, 45);
 
@@ -256,7 +256,7 @@ async function main() {
         const status = page.locator('#savedLumpRealignmentStatus');
         assert(await status.isVisible(), 'alignment failure must be visible');
         const visibleMessage = await status.innerText();
-        assert.match(visibleMessage, /LUMP saved; realignment incomplete/);
+        assert.match(visibleMessage, /LUMP saved successfully\. Simulation preparation incomplete\./);
         assert(visibleMessage.includes(conflict.message), 'visible status explains the conflict and how to proceed');
         assert.deepEqual(await snapshot(), beforeConflict);
         const conflictedRows = await namespace();
@@ -268,7 +268,7 @@ async function main() {
         assert.equal(calls.filter(([path]) => path === '/api/namespace/save-table').length,
             namespaceWritesBeforeConflict + 1, 'no silent retry of the rejected Namespace write');
         await page.unroute('**/api/boot-image/ns-state');
-        await page.getByRole('button', {name:'Retry saved-revision alignment', exact:true}).click();
+        await page.getByRole('button', {name:'Retry simulation preparation', exact:true}).click();
         await page.waitForFunction(() => window._savedLumpRealignment === null);
         await assertActivated(result.saved, 46);
         assert.equal((await namespace()).find(row => row.slot === 14).label, 'concurrent engineer edit',

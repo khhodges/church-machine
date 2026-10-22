@@ -1,4 +1,7 @@
 'use strict';
+// Historical diagnostic: this legacy word-addressed model cannot execute the
+// byte-addressed descriptor contract. It is intentionally NOT a passing gate.
+// Lifecycle acceptance: python -m pytest tests/hardware/test_mint_destroy_core.py -q
 // Disposable single-thread V1 evidence only. Always-approve test verifier.
 // The fixture selects ascending Namespace geometry to match Mint's declared
 // Namespace view. No instruction, CALL, mLoad or fault checks are replaced.

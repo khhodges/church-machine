@@ -1,6 +1,6 @@
 ; MINT PHASE 1 -- CURRENT EDITABLE SOURCE.
-; ISOLATED V1 CREATE/DESTROY DRAFT: NOT END-TO-END VALIDATED OR LIVE AUTHORIZATION.
-; TODO: validate CREATE -> DESTROY -> reuse against an approved byte-addressed execution model.
+; ISOLATED V1 CREATE/DESTROY: lifecycle exercised on byte-addressed ChurchCore.
+; Not live authorization, saved-artifact acceptance, or hardware validation.
 ; Language: Assembly
 ;
 ; LUMP START: HEADER, THEN METHOD ROUTING TABLE -- ALWAYS.
@@ -676,7 +676,12 @@ destroy_v1_size:
     BRANCH destroy_v1_size
 destroy_v1_compare:
     ISUB DR4, DR4, #1
-    DWRITE DR11, CR8, #0, DR4
+    ; CALL clears B on passed argument capabilities. Compare the exact
+    ; domain-crossed token, not the B=1 issuance token stored in W3.
+    ; Keep all identity/version/type/permission bits and the descriptor intact.
+    IADD DR3, DR11, #0
+    BFINS DR3, DR0, #31, #1
+    DWRITE DR3, CR8, #0, DR4
     LOAD CR9, CR6, #2
     LOAD CR11, CR9, #0
     DWRITE DR0, CR8, #0, DR4

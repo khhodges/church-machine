@@ -20,5 +20,15 @@ exact saved candidate, not a freshly rebuilt equivalent from a different
 builder: the legacy dispatch-table emitter can fail before Mint entry even
 when canonical-builder entry probes reach the scratch LOAD.
 
+Lifecycle tests must acquire their stale token only after native issuance,
+not pre-seed it into a boot-validated caller C-list.
+
+**Why:** Strict boot validates the caller's declared capabilities before CREATE;
+an unissued target fails there and never tests the intended lifecycle.
+
+**How to apply:** Use a disposable caller-owned scratch row to capture the actual
+issued token. Keep hard-fault branches in separate runs rather than bypassing a
+fault to continue into reuse.
+
 **Why:** Static geometry and pinned instruction hashes do not prove CALL can
 decode a table entry; silently switching builders conceals that distinction.
