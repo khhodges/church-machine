@@ -90,3 +90,18 @@ change to Inform/Outform layout. Exact placement remains unspecified.
 Use collision-checked secure generation for credential identifiers; random
 bits alone are not authority or a large cryptographic secret. Authority comes
 from approved provisioning and ISA enforcement, not a claim of unguessability.
+
+## Named AbstractGTManager interface proposal
+
+The user proposes AbstractGTManager as a function abstraction and
+NewProof(Mint) as a named creation interface: each named item can be matched
+against a name.
+
+**Why:** The user wants named constants and proofs rather than anonymous
+generated tokens.
+
+**How to apply:** Preserve the name-to-token association in the proposed
+manager design. Name matching identifies the record; Mint authorization
+remains EXACT against its approved token. Do not infer that knowing a name
+grants its proof, or silently choose duplicate-name/replacement semantics.
+This remains a design proposal, not implementation authorization.
