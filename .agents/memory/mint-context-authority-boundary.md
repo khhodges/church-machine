@@ -15,14 +15,16 @@ always-approve stub.
 argument validation, function execution and success reporting. This scope
 agreement does not itself choose the approval evidence or verification mechanism.
 
-The user defines PkVerify's proof as an immutable, untransferable Abstract GT.
+The user defines PkVerify's proof as an immutable, untransferable Abstract GT,
+with B=0 defining its non-transferability.
 
 **Why:** This is the stated proof requirement, not ordinary writable proof data.
 
-**How to apply:** Do not retain the four-word DATA proof as the intended design.
-Distinguish this requirement from a verified ISA guarantee: immutability alone
-does not establish non-transferability. Establish the existing ISA mechanism
-before claiming that another caller cannot acquire or use the approval.
+**How to apply:** Do not retain the four-word DATA proof as the intended design
+or invent another non-transferability mechanism. Use the stated Abstract GT,
+B=0 contract and verify simulator behavior against the ISA. The user clarified
+B=0 after the agent incorrectly left the architectural mechanism unresolved;
+implementation conformance remains a separate verification question.
 
 ## Phase 1 Mint ownership and local Lambda decision
 
