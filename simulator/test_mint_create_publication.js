@@ -113,3 +113,4 @@ for (const opts of [{occupied: true}, {seq: 510, fresh: 0},
     assert.notEqual(f.sim.cr[14].word1, f.caller.base, 'fault never returned');
 }
 console.log('PASS: complete source compiles; isolated native issuance/RETURN; legacy geometry mismatch and unsupported methods fault without returning');
+module.exports = {setup, run, source, compiled, assembled, STATE, POOL, SLOT, HISTORY};
