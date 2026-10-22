@@ -61,3 +61,23 @@ check or moving test memory just to pass would conceal a profile mismatch.
 **How to apply:** Use a compatible approved execution model for lifecycle
 acceptance. Keep passing service/component tests distinct from unproven
 CREATE/DESTROY end-to-end behavior.
+
+Instruction-boundary RAM-stop/re-entry tests prove only service reservation
+containment, not durable restart safety or the caller's prior invalidation.
+
+**Why:** A direct private Cleaner call can pass all clearing/reuse checks
+without executing DESTROY's Namespace/history/queue sequence at all.
+
+**How to apply:** Require separate full-path and persistence evidence. Do not
+equate an interrupted service's internal DR1 with successful outward RETURN,
+or treat a fresh fixture as retained issuance history.
+
+The user approved closing isolated destruction-safety development with the
+unfinished full-path acceptance checks deferred until FPGA testing.
+
+**Why:** The user explicitly chose that testing stage rather than continuing
+to block development closure on compatible-model lifecycle acceptance.
+
+**How to apply:** Preserve the unproven gates for FPGA testing; do not reopen
+development merely because those gates remain unproven, and never equate
+administrative closure with safety acceptance or live-use authorization.

@@ -35,7 +35,7 @@ function setup() {
     const cleaner=install(28,'mint_cleaner',[gt(46,'RW'),gt(44,'RW')]);
     const mint=install(30,'mint',[gt(43,'RW'),gt(43,'L'),gt(44,'RW'),verify.gt,gt(45,'RW'),cleaner.gt]);
     const callers=new Map();
-    function invoke(domain,method,inputs={},caps={}) {
+    function invoke(domain,method,inputs={},caps={},afterStep=null) {
         const key=domain.slot+':'+method;
         if(!callers.has(key)) callers.set(key,f.compile(31+callers.size,
             `LOAD CR1, CR6, #1\nCALL CR1, #${method}\nHALT`,[domain.gt]));
@@ -49,7 +49,16 @@ function setup() {
         let fault=null,steps=0;
         s.fault=(type,message)=>{fault={type,message,pc:s.pc,dr:Array.from(s.dr),
             codeBase:s.cr[14].word1,trace:s.output.slice(-2200)};s.halted=true;};
-        while(!s.halted && steps++<12000)s.step();
+        while(!s.halted && steps++<12000) {
+            const outputStart=s.output.length;
+            s.step();
+            // Observation only: stop after a retired instruction; never replace
+            // execution, permission checks or a service result.
+            if(afterStep && afterStep(s,s.output.slice(outputStart))) {
+                s.halted=true;
+                return {type:'TEST_CUT',steps};
+            }
+        }
         assert(steps<12000,'bounded native execution');
         return fault;
     }
