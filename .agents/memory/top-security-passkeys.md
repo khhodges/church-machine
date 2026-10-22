@@ -3,6 +3,20 @@ name: Top-security passkey credentials
 description: Security rule for programmer-defined protected objects and their passkeys.
 ---
 
+## Scope correction: Mint authorization
+
+The older independent-128-bit-proof requirement below does **not** govern the
+current Mint PkVerify design. The user's subsequent explicit design is a
+Genesis-approved immutable Abstract GT with B=0, installed in the authorized
+caller and compared EXACT against Mint's trusted reference.
+
+**Why:** The user defined this as the complete Mint authorization scheme, with
+no additional proof data or authentication mechanism.
+
+**How to apply:** Follow [Mint authorization](mint-context-authority-boundary.md)
+for Mint. Do not silently reintroduce this older requirement there or assume
+the clarification automatically changes unrelated protected-object contracts.
+
 An object-scoped GT identifies a top-security passkey but must not be accepted as
 the sole authority. Protected operations require the issued GT **and** its
 independent 128-bit cryptographic proof before any protected handler executes.
