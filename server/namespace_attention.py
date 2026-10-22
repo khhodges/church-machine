@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from server.lump_file import unpack_lump
+from server.namespace_binding_targets import naming_context, qualified_name
 
 
 MARKER = re.compile(
@@ -39,6 +40,8 @@ def attention_report(document, directory, sources, parse_content, profile):
     directory, sources = Path(directory), Path(sources)
     rows = document["rows"]
     placed = {row["name"] for row in rows}
+    context = naming_context()
+    placed_targets = {qualified_name(name, context) for name in placed}
     items, seen = [], set()
 
     def add(name, category, detail, evidence, next_step):
@@ -57,7 +60,9 @@ def attention_report(document, directory, sources, parse_content, profile):
                 "methods, then compile and save a new revision. Explicitly select the reviewed "
                 "revision in this Namespace and save before the next build. If a marker is "
                 "outdated, verify the implementation before correcting it.")
-        missing = sorted(dependencies(source, api) - placed - {name})
+        missing = sorted(target for target in dependencies(source, api)
+                         if qualified_name(target, context) not in
+                         placed_targets | {qualified_name(name, context)})
         if missing:
             add(name, "missing resource",
                 "Missing dependencies: " + ", ".join(missing) +
@@ -89,9 +94,10 @@ def attention_report(document, directory, sources, parse_content, profile):
             raw = unpack_lump((directory / filename).read_bytes())
             if len(raw) % 4:
                 raise ValueError("Artifact byte length is not word aligned")
-            content = parse_content(list(struct.unpack(f"<{len(raw)//4}I", raw))) or {}
+            # Serialized LUMPs use big-endian words, unlike runtime image dumps.
+            content = parse_content(list(struct.unpack(f">{len(raw)//4}I", raw))) or {}
             source = content.get("source") or ""
-            if not source:
+            if content.get("source") is None:
                 add(name, "inspection warning",
                     "No embedded source available; implementation completeness cannot be inspected.",
                     evidence,

@@ -1,4 +1,10 @@
 import json
+import ast
+import struct
+import zlib
+from pathlib import Path
+
+import pytest
 
 from server.namespace_attention import attention_report, source_findings
 
@@ -36,8 +42,8 @@ def test_fresh_sources_bindings_and_no_writes(tmp_path):
 
 def test_latest_revision_and_exact_selected_history(tmp_path, monkeypatch):
     monkeypatch.setattr("server.namespace_attention.unpack_lump", lambda raw: raw)
-    (tmp_path / "old.lump").write_bytes(b"\x01\0\0\0")
-    (tmp_path / "new.lump").write_bytes(b"\x02\0\0\0")
+    (tmp_path / "old.lump").write_bytes(b"\0\0\0\x01")
+    (tmp_path / "new.lump").write_bytes(b"\0\0\0\x02")
     (tmp_path / "manifest.json").write_text(json.dumps([
         dict(abstraction="A", filename="old.lump", compiled_at=1, lump_version=1),
         dict(abstraction="A", filename="new.lump", compiled_at=2, lump_version=2),
@@ -91,3 +97,53 @@ def test_unassigned_sources_and_catalog_are_excluded(tmp_path):
     placed = {"rows": [dict(name="Unassigned", slot=3, kind="mmio")]}
     assert attention_report(placed, tmp_path, tmp_path, lambda _: {}, "phase1")["items"]
     assert attention_report({"rows": []}, tmp_path, tmp_path, lambda _: {}, "ascending")["items"] == []
+
+
+@pytest.mark.parametrize("compressed", [False, True])
+@pytest.mark.parametrize("source", ["abstraction CallHome { method Run { RETURN } }", ""])
+def test_real_embedded_source_parser_has_no_false_warning(tmp_path, compressed, source):
+    # Use the production parser without importing the app and its startup jobs.
+    app = Path(__file__).resolve().parents[2] / "server" / "app.py"
+    function = next(n for n in ast.parse(app.read_text()).body
+                    if isinstance(n, ast.FunctionDef) and n.name == "_parse_intrinsic_lump_content")
+    namespace = {"json": json, "_struct": struct}
+    exec(compile(ast.Module(body=[function], type_ignores=[]), str(app), "exec"), namespace)
+    parse = namespace[function.name]
+    api = json.dumps({"abstraction": "CallHome", "capabilities": [], "methods": []}).encode()
+    encoded = source.encode()
+    if compressed:
+        compressor = zlib.compressobj(wbits=-15)
+        encoded = compressor.compress(encoded) + compressor.flush()
+    def words(raw):
+        padded = raw + b"\0" * (-len(raw) % 4)
+        return list(struct.unpack(f">{len(padded)//4}I", padded))
+    # 256-word LUMP with one code word, followed by API/source frame.
+    body = [0xf9000400, 0, 0xab000000 | ((5 if compressed else 1) << 16) | len(api)]
+    body += words(api) + [len(encoded)] + words(encoded)
+    body += [0] * (256 - len(body))
+    assert parse(body)["source"] == source
+    raw = struct.pack(">256I", *body)
+    from server.lump_file import pack_lump
+    (tmp_path / "callhome.lump").write_bytes(pack_lump(raw) if compressed else raw)
+    doc = {"rows": [dict(name="CallHome", slot=7, kind="lump",
+                        selection={"filename": "callhome.lump"})]}
+    assert attention_report(doc, tmp_path, tmp_path, parse, "ascending")["items"] == []
+
+
+def test_dependency_names_use_linker_naming_context(tmp_path, monkeypatch):
+    monkeypatch.setattr("server.namespace_attention.naming_context",
+                        lambda: {"node": "ide", "aliases": {"console": "ide.UART_DEV"}})
+    monkeypatch.setattr("server.namespace_attention.unpack_lump", lambda raw: raw)
+    (tmp_path / "callhome.lump").write_bytes(b"\0\0\0\x01")
+    source = "abstraction ide.CallHome { capabilities { SELF E, ide.LED_DEV RW, console RW } }"
+    doc = {"rows": [
+        dict(name="ide.CallHome", slot=7, kind="lump", selection={"filename": "callhome.lump"}),
+        dict(name="LED_DEV", slot=3, kind="mmio"),
+        dict(name="UART_DEV", slot=8, kind="mmio")]}
+    parse = lambda _: {"source": source}
+    assert attention_report(doc, tmp_path, tmp_path, parse, "ascending")["items"] == []
+    doc["rows"].pop()
+    result = attention_report(doc, tmp_path, tmp_path, parse, "ascending")
+    assert len(result["items"]) == 1
+    assert "console" in result["items"][0]["detail"]
+    assert "ide.LED_DEV" not in result["items"][0]["detail"]
