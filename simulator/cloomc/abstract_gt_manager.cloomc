@@ -13,18 +13,123 @@
 ; row 1 State RW: header,count,capacity,entropyCursor,scratch,reserved,records...
 ; row 2 Catalogue R: header,count,records...
 ; row 3 Scratch L: one-word view of State[4], never caller-owned.
-; row 4 Random R: header,count,secure random words...
+; Random input is embedded below as 100 preformatted Abstract proof words.
 ; Record = length,token,31 character words (33 words).
 ; Capacity <=1024; state size must cover 6+33*capacity words.
 ; Calls are serialized by Genesis; no CALL/CHANGE inside either method.
+; Retain the cursor and records with this exact table across restarts.
 ; The source never replaces an existing name or recycles consumed randomness.
 ; B[31]=0, subtype[30:29]=00 constant / 01 proof, type[26:25]=11.
 ; Payload low25 -> bits24:0; payload high2 -> bits28:27.
 ;
 abstraction ide.AbstractGTManager {
-capabilities { SELF E, ide.AbstractGTState RW, ide.AbstractGTCatalogue R, ide.AbstractGTScratch L, ide.AbstractGTRandom R }
+capabilities { SELF E, ide.AbstractGTState RW, ide.AbstractGTCatalogue R, ide.AbstractGTScratch L }
 
 method Constant {
+    ; Fixed prefix: header + two method entries + this branch = pool offset 4.
+    ; Raw words are DATA, never executable instructions.
+    BRANCH constant_entry
+proof_pool:
+    .word 0x3f6ccfe8
+    .word 0x3e4dad67
+    .word 0x374ab3cc
+    .word 0x3f7e9082
+    .word 0x268777fa
+    .word 0x37ed7000
+    .word 0x261fca62
+    .word 0x2e95410c
+    .word 0x26f79512
+    .word 0x3efeda3f
+    .word 0x3fa8ae8c
+    .word 0x2fb7d4ce
+    .word 0x3606d83a
+    .word 0x273f9411
+    .word 0x363388f2
+    .word 0x362d5b68
+    .word 0x2e0b6c83
+    .word 0x27531258
+    .word 0x260364fe
+    .word 0x27680ebf
+    .word 0x37ed9464
+    .word 0x364c9275
+    .word 0x36ce6bb3
+    .word 0x3e74eeaf
+    .word 0x3ece46d4
+    .word 0x2f2f21c1
+    .word 0x3f75ca7c
+    .word 0x3705873f
+    .word 0x2712f7fd
+    .word 0x3f08fa90
+    .word 0x2e47b4c5
+    .word 0x2f4b8b7c
+    .word 0x3f8b9a3c
+    .word 0x3699d31f
+    .word 0x276a05f8
+    .word 0x2ff23cc5
+    .word 0x36fa6747
+    .word 0x378a7ace
+    .word 0x26b714a2
+    .word 0x369a0341
+    .word 0x264c660d
+    .word 0x274b1fc4
+    .word 0x2651c103
+    .word 0x3e34a12b
+    .word 0x3ebaf20f
+    .word 0x3ffa9f61
+    .word 0x3f92e4ba
+    .word 0x2e4111fb
+    .word 0x3f06e0fd
+    .word 0x368079f9
+    .word 0x2e16a471
+    .word 0x260074fd
+    .word 0x26098d51
+    .word 0x2e92151b
+    .word 0x2fa21db2
+    .word 0x27e31c27
+    .word 0x3f9f9b92
+    .word 0x3f2f8bee
+    .word 0x2721e920
+    .word 0x3ef8fc58
+    .word 0x37315685
+    .word 0x3fcbf772
+    .word 0x3657b5ca
+    .word 0x36af5317
+    .word 0x3711c031
+    .word 0x3e5fbda5
+    .word 0x26819d82
+    .word 0x3ec32b51
+    .word 0x36d441c5
+    .word 0x3fa0477e
+    .word 0x3ef8ac39
+    .word 0x26436320
+    .word 0x36345cd7
+    .word 0x3e0e281b
+    .word 0x3721e7ac
+    .word 0x37c6f710
+    .word 0x3e74ea2b
+    .word 0x266c9a45
+    .word 0x3ee7c6b6
+    .word 0x374ac960
+    .word 0x2747fadf
+    .word 0x3736a0dd
+    .word 0x37d3bb89
+    .word 0x3e349b6f
+    .word 0x3f4cdce3
+    .word 0x3fc9fb90
+    .word 0x26a897df
+    .word 0x2f090fd3
+    .word 0x3f330f8d
+    .word 0x2f8aed7a
+    .word 0x2ee1b955
+    .word 0x375dee92
+    .word 0x3f216769
+    .word 0x368884a8
+    .word 0x2f4a3c3a
+    .word 0x2e9467b8
+    .word 0x2f0cac77
+    .word 0x3e4592b2
+    .word 0x2eee1009
+    .word 0x366dc09e
 constant_entry:
     IADD DR1, DR0, #0
     DREAD DR6, CR2, #1, DR0
@@ -117,7 +222,6 @@ proof_validate_name:
 proof_load_state:
     LOAD CR7, CR6, #1
     LOAD CR9, CR6, #3
-    LOAD CR10, CR6, #4
     DREAD DR7, CR7, #1, DR0
     ; MCMP immediate expands through DR15: never keep capacity there.
     DREAD DR14, CR7, #2, DR0
@@ -153,20 +257,18 @@ proof_capacity:
     BRANCHHS proof_full
 proof_random:
     DREAD DR14, CR7, #3, DR0
-    DREAD DR11, CR10, #1, DR0
-    MCMP DR14, DR11
+    MCMP DR14, #100
     BRANCHHI proof_bad_state
     BRANCHEQ proof_no_random
-    DREAD DR12, CR10, #2, DR14
+    DREAD DR13, CR14, #4, DR14
+    BFEXT DR11, DR13, #29, #3
+    MCMP DR11, #1
+    BRANCHNE proof_bad_pool
+    BFEXT DR11, DR13, #25, #2
+    MCMP DR11, #3
+    BRANCHNE proof_bad_pool
     IADD DR14, DR14, #1
     DWRITE DR14, CR7, #3, DR0
-    BFEXT DR13, DR12, #0, #25
-    BFEXT DR11, DR12, #25, #2
-    BFINS DR13, DR11, #27, #2
-    IADD DR11, DR0, #3
-    BFINS DR13, DR11, #25, #2
-    IADD DR11, DR0, #1
-    BFINS DR13, DR11, #29, #2
     IADD DR8, DR0, #6
     IADD DR9, DR0, #0
 proof_collision:
@@ -219,8 +321,10 @@ proof_duplicate:
 proof_full:
     HARDFAULT "AbstractGTManager.NewProof: proof catalogue full"
 proof_no_random:
-    HARDFAULT "AbstractGTManager.NewProof: private random input exhausted. No proof created"
+    HARDFAULT "AbstractGTManager.NewProof: embedded proof pool exhausted. No proof created"
 proof_bad_state:
     HARDFAULT "AbstractGTManager.NewProof: invalid provisioned state"
+proof_bad_pool:
+    HARDFAULT "AbstractGTManager.NewProof: invalid embedded Abstract proof word"
 }
 }

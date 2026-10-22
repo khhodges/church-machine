@@ -2477,6 +2477,20 @@ class CLOOMCCompiler {
         // Keep the assembler as the single owner of instruction syntax/encoding,
         // but resolve the convenient two-operand named LOAD form against this
         // abstraction's C-List before handing the statement over.
+        // The assembler's raw-data directive is also valid inside a method.
+        // Unlike WORD, .word preserves all 32 bits and adds no opcode tag.
+        if (/^\.word\b/i.test(text)) {
+            const literal = text.replace(/^\.word\s*/i, '').trim();
+            const value = /^(?:0x[0-9a-f]{1,8}|\d+)$/i.test(literal)
+                ? Number(literal) : NaN;
+            if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff) {
+                errors.push({line: stmt.lineNum, message: '.word requires an unsigned 32-bit literal'});
+                return;
+            }
+            manifest.push({src: stmt.lineNum, addr: code.length, desc: text});
+            code.push(value >>> 0);
+            return;
+        }
         const nativeInstruction = this._nativeMnemonic(text);
         const highLevelCall = /^CALL\s+\w+\.\w+\s*\(/i.test(text);
         if (nativeInstruction && !highLevelCall) {

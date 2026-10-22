@@ -3,8 +3,9 @@
 ## Authority and scope
 
 The user approved the two-method named interface, the 100-entry constants
-catalogue, duplicate proof-name rejection, the bit layout below and a private
-Genesis-supplied random-input buffer. This implementation is a new editable
+catalogue, duplicate proof-name rejection and the bit layout below. The later
+Phase 1 approval replaces the separate random-input buffer with 100 embedded
+preformatted proof tokens. This implementation is a new editable
 CLOOMC abstraction, not an installed Namespace service.
 
 Source: `simulator/cloomc/abstract_gt_manager.cloomc`.
@@ -58,8 +59,9 @@ without that externally provisioned capability boundary.
 The constant implementation assigns payload IDs 1..100 in approved catalogue
 order. These are identity labels, not numeric approximations. PHI uses the
 GOLDEN_RATIO token. TRUE and FALSE are not aliases for ONE and ZERO.
-The low 27 bits of each secure random input word supply a proof payload;
-the two high payload bits are repositioned as above.
+The original 100 secure random 27-bit values are formatted once into proof GTs
+and embedded with `.word`, which preserves the exact 32-bit value. The tagged
+`WORD` instruction is not used for these raw GT words.
 
 ## Private provisioning contract
 
@@ -68,7 +70,6 @@ The method's C-list contains SELF followed by:
 1. `ide.AbstractGTState RW`
 2. `ide.AbstractGTCatalogue R`
 3. `ide.AbstractGTScratch L`
-4. `ide.AbstractGTRandom R`
 
 All data offsets are ISA word offsets. Objects must fit their declared bounds.
 
@@ -76,7 +77,7 @@ All data offsets are ISA word offsets. Objects must fit their declared bounds.
 |---|---|
 | State | header, issued count, capacity, random cursor, scratch, reserved, records |
 | Catalogue | header, record count (101), records |
-| Random | header, random word count, random words |
+| Embedded pool | 100 preformatted B=0 proof words inside the manager's code LUMP |
 | Scratch | One-word L view of State word 4 |
 | Record | name length, token, 31 character words |
 
@@ -85,26 +86,31 @@ valid DATA headers/bounds. Capacity is 1..1024 records. `stateImage()` and
 `catalogueImage()` reserve word zero for that header; they are not complete
 installable LUMPs by themselves.
 
-`randomImage()` uses the operating system's secure random generator and
-throws on failure. Production callers cannot provide deterministic test
-words through this helper. Fixtures deliberately supply known random words
-to force collision and exhaustion paths.
+There is no external random buffer or runtime random-generation helper.
+The first method starts with a branch over the embedded pool. With the header
+and two method-table entries, the pool starts at LUMP word 4. Native DREAD
+through CR14 reads the pool; a compiled-layout test guards this offset.
+Tests compile separate source variants to force collisions; normal execution
+uses the exact 100 approved words, not an executable-RAM patch.
 
-The source scans existing names before consuming randomness. It then scans
+The source scans existing names before consuming a pool entry. It then scans
 existing proof tokens for each candidate; collisions consume another word.
 The count is published only after the record and result have been formed.
 A full catalogue or duplicate name leaves state unchanged. Exhaustion after
 collisions retains the advanced cursor but publishes no new record.
 
-Genesis must serialize calls and retain State, catalogue and the associated
-random buffer/cursor together across restarts. Never reset issued history
+Genesis must serialize calls and retain State, catalogue and the exact
+embedded-pool artifact/cursor together across restarts. Never reset issued history
 while its proofs remain provisioned. An interrupted partial tail record is
 not published; a hard fault still requires explicit recovery, not an automatic
-retry. No persistence service or random-buffer refill operation is implemented.
+retry. No persistence service, pool refill or automatic regeneration is implemented.
+The pool is internal data, not a secret from someone who can inspect the
+source or binary. Genesis capability provisioning remains the authority boundary.
 
 ## Evidence and boundaries
 
-The checks compile the complete source and run it through ordinary simulated
+The checks compile the complete source, issue all 100 embedded proofs and
+reject the 101st without wrapping, and run it through ordinary simulated
 CALL/RETURN, LOAD, DREAD/DWRITE and arithmetic. They check every canonical
 constant, alias identity, random collisions, duplicate and case-sensitive
 names, maximum-length names, full/exhausted inputs, corrupted metadata,
@@ -115,6 +121,8 @@ are not installed in this fixture, so negative tests assert the actual
 HARDFAULT instruction site rather than the runtime's generic placeholder
 message. This is simulator software evidence, not hardware acceptance.
 
+The compiler now accepts the assembler's existing `.word` directive inside
+method bodies, validating unsigned 32-bit literals. No new opcode is introduced.
 No ISA instruction, simulator implementation, old manager, live manifest,
 boot image, Namespace or board was changed. The new source still requires
 explicit Genesis provisioning before it can be called in an installed design.

@@ -9,12 +9,34 @@ const { fixture } = require('../tests/simulator/cr6_contract_fixture');
 const Compiler = require('./cloomc_compiler');
 const { assembleLump } = require('./lump_assembler');
 const api = require('./abstract_gt_phase1');
+global.window.bootConfig.step1.totalNamespaceWords = 32768;
 
 const compiled = new Compiler().compile(api.source(), []);
+for (const literal of ['-1', '0x100000000', '4294967296', 'bogus']) {
+    const invalid = new Compiler().compile(
+        `abstraction test.Raw {\ncapabilities { SELF E }\nmethod Run {\n.word ${literal}\n}\n}`, []);
+    assert(invalid.errors.some(e => /\.word requires/.test(e.message)), `reject invalid raw word ${literal}`);
+}
+const raw = new Compiler().compile(
+    'abstraction test.Raw {\ncapabilities { SELF E }\nmethod Run {\n.word 0xffffffff\n.word 0\nRETURNAL\n}\n}', []);
+assert.deepEqual(raw.errors, []);
+assert.deepEqual(raw.methods[0].code.slice(0, 2), [0xffffffff, 0]);
 assert.deepEqual(compiled.errors, []);
 assert.deepEqual(compiled.methods.map(m => m.name), ['Constant', 'NewProof']);
 const lump = assembleLump(compiled.methods.map(m => m.code));
 assert.deepEqual(lump.errors || [], []);
+const embedded = [...api.source().matchAll(/^\s*\.word (0x[0-9a-f]+)$/gm)]
+    .map(m => Number(m[1]));
+assert.equal(embedded.length, 100);
+assert.equal(new Set(embedded).size, 100);
+assert.deepEqual(Array.from(lump.buf.slice(4, 104)), embedded,
+    'fixed header/table/branch prefix places the exact raw pool at word 4');
+assert.doesNotMatch(api.source(), /ide\.AbstractGTRandom/);
+for (const token of embedded) {
+    assert.equal(token >>> 31, 0);
+    assert.equal((token >>> 29) & 3, 1);
+    assert.equal((token >>> 25) & 3, 3);
+}
 // RAM-only fixture has no signed diagnostic sidecar. Assert the actual
 // HARDFAULT instruction site instead of relying on its generic runtime text.
 const faultSites = new Map();
@@ -43,14 +65,11 @@ assert.throws(() => api.encodeName('A'.repeat(32)), RangeError);
 assert.throws(() => api.encodeName('a b'), RangeError);
 assert.throws(() => api.stateImage(0), RangeError);
 assert.throws(() => api.packAbstract(2, 0), RangeError);
-const secure = api.randomImage(16);
-assert.equal(secure.length, 18);
-assert.equal(secure[1], 16);
 
-function setup(randomWords = [1, 2, 3], capacity = 4) {
+function setup(randomWords = null, capacity = 4) {
     const f = fixture(true);
     const s = f.sim;
-    const STATE = 0x2400, RANDOM = 0x2500, NAME = 0x2540, CATALOGUE = 0x2800;
+    const STATE = 0x5000, NAME = 0x2540, CATALOGUE = 0x2800;
     function data(slot, base, words, size, rights) {
         s.memory.fill(0, base, base + size);
         s.memory.set(words, base);
@@ -59,15 +78,27 @@ function setup(randomWords = [1, 2, 3], capacity = 4) {
             s.writeNSEntry(slot, base, size - 1, 0, 0, 1, 0, 0, 0));
         return s.createGT(0, slot, rights, 1);
     }
-    const state = data(43, STATE, api.stateImage(capacity), 256, {R: 1, W: 1});
+    const stateSize = 2 ** Math.ceil(Math.log2(6 + capacity * api.RECORD_WORDS));
+    const state = data(43, STATE, api.stateImage(capacity), Math.max(64, stateSize), {R: 1, W: 1});
     const catalogue = data(44, CATALOGUE, api.catalogueImage(), 4096, {R: 1});
     s.withNamespaceWrite('TEST ONLY private one-word scratch L view', () =>
         s.writeNSEntry(45, STATE + 4, 0, 0, 0, 1, 0, 0, 0));
     const scratch = s.createGT(0, 45, {L: 1}, 1);
-    const random = data(46, RANDOM, Uint32Array.from([0, randomWords.length, ...randomWords]),
-        64, {R: 1});
     const name = data(47, NAME, api.encodeName('PI'), 64, {R: 1});
-    const manager = f.install(32, lump.buf.slice(1), [state, catalogue, scratch, random]);
+    // Compile test-only source variants to force collision paths. Never patch
+    // executable RAM or bypass artifact integrity/normal CALL validation.
+    let executable = lump;
+    if (randomWords && randomWords.length) {
+        let index = 0;
+        const testSource = api.source().replace(/^\s*\.word 0x[0-9a-f]+$/gm, () =>
+            '    .word 0x' + api.packAbstract(1,
+                randomWords[Math.min(index++, randomWords.length - 1)] & 0x7ffffff).toString(16));
+        const variant = new Compiler().compile(testSource, []);
+        assert.deepEqual(variant.errors, []);
+        executable = assembleLump(variant.methods.map(m => m.code));
+    }
+    const manager = f.install(32, executable.buf.slice(1), [state, catalogue, scratch]);
+    if (randomWords && !randomWords.length) s.memory[STATE + 3] = 100;
     const callers = [0, 1].map((selector, i) => f.compile(30 + i, `
         LOAD CR2, CR6, #1
         LOAD CR0, CR6, #2
@@ -89,7 +120,7 @@ function setup(randomWords = [1, 2, 3], capacity = 4) {
         return {fault, faultSite: fault && faultSites.get(s.pc),
             gt: s.cr[1].word0 >>> 0, status: s.dr[1]};
     }
-    return {s, invoke, STATE, RANDOM, NAME, CATALOGUE, manager};
+    return {s, invoke, STATE, NAME, CATALOGUE, manager};
 }
 
 const constants = setup();
@@ -145,7 +176,7 @@ const collisionExhaustion = setup([12, 12], 2);
 assert.equal(collisionExhaustion.invoke(1, 'Mint').fault, null);
 expectFault(collisionExhaustion.invoke(1, 'Other'), 'proof_no_random');
 assert.equal(collisionExhaustion.s.memory[collisionExhaustion.STATE + 1], 1);
-assert.equal(collisionExhaustion.s.memory[collisionExhaustion.STATE + 3], 2);
+assert.equal(collisionExhaustion.s.memory[collisionExhaustion.STATE + 3], 100);
 const malformed = setup();
 expectFault(malformed.invoke(1, [0, 1, 32]), 'proof_bad_name');
 assert.equal(malformed.s.memory[malformed.STATE + 3], 0);
@@ -163,7 +194,7 @@ const wrongSubtype = setup();
 wrongSubtype.s.memory[wrongSubtype.CATALOGUE + 3] = api.packAbstract(1, 1);
 expectFault(wrongSubtype.invoke(0, 'ZERO'), 'constant_bad_catalogue');
 const badCursor = setup();
-badCursor.s.memory[badCursor.STATE + 3] = 100;
+badCursor.s.memory[badCursor.STATE + 3] = 101;
 expectFault(badCursor.invoke(1, 'Mint'), 'proof_bad_state');
 // Removing the manager's supplied executable invalidates the ordinary CALL.
 // No host dispatcher or entry bypass is available to complete the request.
@@ -171,4 +202,14 @@ const noAuthority = setup();
 noAuthority.s.memory[noAuthority.manager.base] = 0;
 assert(noAuthority.invoke(1, 'Mint').fault);
 assert.equal(noAuthority.s.memory[noAuthority.STATE + 1], 0);
+// Exact production source: all 100 original embedded tokens are issued once.
+const wholePool = setup(null, 101);
+for (let i = 0; i < 100; i++) {
+    const issued = wholePool.invoke(1, `Proof${i}`);
+    assert.equal(issued.fault, null, JSON.stringify(issued.fault));
+    assert.equal(issued.gt, embedded[i]);
+    assert.equal(wholePool.s.memory[wholePool.STATE + 3], i + 1);
+}
+expectFault(wholePool.invoke(1, 'Proof100'), 'proof_no_random');
+assert.equal(wholePool.s.memory[wholePool.STATE + 1], 100);
 console.log('AbstractGTManager: 100 constants, alias, native proof creation, collision retry, duplicate/full/exhausted/malformed rejection passed.');

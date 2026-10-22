@@ -68,6 +68,17 @@ Lambda authority to issue them.
 
 ## Proposed Abstract subtype field
 
+**Latest Phase 1 pool decision:** Embed the same 100 generated values as
+preformatted Abstract proof `.word` data inside AbstractGTManager, with a
+retained consumption cursor. This supersedes the separate random-input buffer.
+
+**Why:** The user proposed internal assembler data words and explicitly approved
+proceeding for Phase 1 after clarification.
+
+**How to apply:** Do not reintroduce an external random buffer or silently
+regenerate the pool. Preserve issued-name history/cursor with the exact artifact;
+exhaustion faults rather than wrapping. Internal data is not source/binary secrecy.
+
 **Subsequent approval:** The user approved B at bit 31, Abstract type at
 bits 26..25 and subtype at bits 30..29 (00 constants, 01 proofs).
 Remaining bits carry the 27-bit payload. The user also approved

@@ -3,7 +3,6 @@
 // Genesis-side image preparation only. This module does NOT execute manager
 // methods, grant callers authority, install Namespace entries, or dispatch CALL.
 // All name lookup, proof allocation and collision retries execute in CLOOMC.
-const { randomFillSync } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -74,19 +73,9 @@ function stateImage(capacity = 64) {
     return words;
 }
 
-function randomImage(count = 256) {
-    if (!Number.isInteger(count) || count < 1 || count > 1048576) {
-        throw new RangeError('Random input count must be 1..1048576');
-    }
-    const words = new Uint32Array(count + 2);
-    words[1] = count;
-    randomFillSync(words.subarray(2)); // throws on failure; never Math.random
-    return words;
-}
-
 function source() {
     return fs.readFileSync(path.join(__dirname, 'cloomc/abstract_gt_manager.cloomc'), 'utf8');
 }
 
 module.exports = { NAMES, ALIASES, RECORD_WORDS, MAX_NAME, packAbstract,
-    encodeName, catalogueImage, stateImage, randomImage, source };
+    encodeName, catalogueImage, stateImage, source };
