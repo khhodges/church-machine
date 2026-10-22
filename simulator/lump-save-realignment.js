@@ -4,6 +4,7 @@
     const storageKey = 'savedLumpRealignment';
     const dismissalKey = 'savedLumpRealignmentDismissedNotice';
     const readyMessage = 'Saved revision ready. Use Run or Step in Namespace.';
+    const unassignedMessage = 'LUMP saved successfully. Not prepared for simulation: no destination Namespace slot selected. Select a destination in Namespace before preparing for simulation.';
     let retryInput = null;
     let dismissedNotice = null;
     try { dismissedNotice = root.sessionStorage.getItem(dismissalKey); } catch (_) {}
@@ -36,9 +37,10 @@
         host.style.borderColor = state.pending ? '#93c5fd' : '#e0a055';
         host.style.background = '#29344c';
         host.append(document.createTextNode(state.message+' '));
-        if (!state.pending && retryInput) {
+        if (!state.pending && retryInput && state.reason !== 'namespace-unassigned') {
             const button=document.createElement('button');
-            button.textContent='Retry saved-revision alignment';
+            button.textContent='Retry simulation preparation';
+            button.title='Update the existing Namespace assignment to this saved revision and prepare the simulator. Does not compile, save another LUMP, or run the program.';
             button.onclick=()=>realign(retryInput.response,retryInput.metadata).catch(()=>{});
             host.append(button);
         }
@@ -73,6 +75,11 @@
             // Refresh the wording of already-persisted successful statuses too.
             if (root._savedLumpRealignment.privateReady === true) {
                 root._savedLumpRealignment.message = readyMessage;
+            }
+            if (root._savedLumpRealignment.reason === 'namespace-unassigned' ||
+                    root._savedLumpRealignment.message?.includes('This saved LUMP has no Namespace assignment.')) {
+                root._savedLumpRealignment.reason = 'namespace-unassigned';
+                root._savedLumpRealignment.message = unassignedMessage;
             }
         }
     } catch (_) {}
@@ -179,7 +186,11 @@
             if (typeof renderLumps === 'function') await renderLumps();
             if (typeof showLumpDetail === 'function') showLumpDetail(artifact.token,{assignedLump:artifact});
             if (typeof _switchLumpTab === 'function') await _switchLumpTab(_lumpTokenIdentity(artifact.token),'history');
-            if (!advanced) throw Error('This saved LUMP has no Namespace assignment. Select a destination before simulation.');
+            if (!advanced) {
+                const error = Error(unassignedMessage);
+                error.code = 'namespace-unassigned';
+                throw error;
+            }
             if (design && design.state.active) {
                 if (!root.DesignSimulation) throw Error('Validated design simulation admission is unavailable. Reload the IDE and retry; stale execution remains stopped.');
                 await root.DesignSimulation.prepare(true, {preserveView:true});
@@ -199,7 +210,9 @@
             barrier(null);
             return artifact;
         } catch (error) {
-            barrier({pending:false,message:`LUMP saved; realignment incomplete. ${error.message}`});
+            barrier({pending:false,reason:error.code,
+                message:error.code === 'namespace-unassigned' ? unassignedMessage :
+                    `LUMP saved successfully. Simulation preparation incomplete. ${error.message}`});
             // A display refresh must not disguise a committed artifact as a
             // failed save or clear the stale-execution barrier.
             throw error;

@@ -145,9 +145,14 @@ function harness(fail, records=[artifact]) {
         assert.equal(retained.pending,false);
         assert.equal(retained.retryInput.response.lump_version,artifact.lump_version,
             'retry must not adopt a later unchanged save sharing the filename/hash');
-        assert.match(retained.message,/LUMP saved; realignment incomplete/);
+        assert.match(retained.message,/LUMP saved successfully. Simulation preparation incomplete/);
     }
     const legacy=harness();
+    const unassigned=harness();
+    await assert.rejects(unassigned.api.realign(response,{save_as_copy:true}), /no destination Namespace slot selected/);
+    assert.equal(unassigned.context._savedLumpRealignment.reason,'namespace-unassigned');
+    assert(!unassigned.calls.includes('prepare'));
+    assert(!unassigned.calls.includes('/api/namespace/save-table'));
     const {lump_version,...legacyResponse}=response;
     await legacy.api.realign(legacyResponse,{});
     assert.equal(legacy.context._savedLumpRealignment,null);

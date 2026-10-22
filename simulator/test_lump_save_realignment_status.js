@@ -74,13 +74,25 @@ assert.equal(newRevision.host.hidden, true, 'another successful revision also ne
 const failed = mount({pending:false, message:'LUMP saved; realignment incomplete. Connection failed.', retryInput});
 assert.equal(failed.host.attributes['data-state'], 'error');
 assert.match(failed.host.children[0].textContent, /Connection failed/);
-assert.equal(failed.host.children[1].textContent, 'Retry saved-revision alignment');
+assert.equal(failed.host.children[1].textContent, 'Retry simulation preparation');
+assert.match(failed.host.children[1].title, /Does not compile/);
 assert.equal(typeof failed.host.children[1].onclick, 'function');
 dismissAndCheck(failed);
 failed.context.LumpSaveRealignment.begin();
 assert.equal(failed.host.hidden, false, 'a new operation displays its own status');
 assert.equal(failed.host.attributes['data-state'], 'pending');
-assert.equal(failed.host.children.filter(n => n.textContent === 'Retry saved-revision alignment').length, 0);
+assert.equal(failed.host.children.filter(n => n.textContent === 'Retry simulation preparation').length, 0);
 dismissAndCheck(failed);
 assert.equal(mount(null).host.hidden, true);
+for (const state of [
+    {pending:false, reason:'namespace-unassigned', message:'old wording', retryInput},
+    {pending:false, message:'LUMP saved; realignment incomplete. This saved LUMP has no Namespace assignment. Select a destination before simulation.', retryInput},
+]) {
+    const unassigned = mount(state);
+    assert.match(unassigned.host.children[0].textContent, /LUMP saved successfully/);
+    assert.match(unassigned.host.children[0].textContent, /no destination Namespace slot selected/);
+    assert.deepEqual(unassigned.host.children.filter(n => n.tag === 'button').map(n => n.textContent), ['Close']);
+    assert.equal(unassigned.context._savedLumpRealignment.reason, 'namespace-unassigned');
+    dismissAndCheck(unassigned);
+}
 console.log('PASS saved-revision notices: no success popup even without dismissal storage; pending/error dismissal, retry and execution state preserved');
