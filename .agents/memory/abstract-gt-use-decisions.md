@@ -28,3 +28,15 @@ during the five-case review.
 **How to apply:** Do not add separate cryptographic proof data, a credential
 service or historical Lambda issuance/revocation methods. Follow the detailed
 Mint authorization boundary in mint-context-authority-boundary.md.
+
+## Device and I/O access — rejected as a separate Abstract GT role
+
+Keep the existing MMIO capability mechanism; do not add a separate Abstract GT
+device scheme.
+
+**Why:** The user noted that MMIO works without this and explicitly rejected
+the proposed use during the five-case review.
+
+**How to apply:** Do not reinstate historical Abstract device categories or
+their conflicting encoding as a requirement. This review decision does not
+authorize changing live device bindings or programming hardware.
