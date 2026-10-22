@@ -15,6 +15,15 @@ always-approve stub.
 argument validation, function execution and success reporting. This scope
 agreement does not itself choose the approval evidence or verification mechanism.
 
+The user defines PkVerify's proof as an immutable, untransferable Abstract GT.
+
+**Why:** This is the stated proof requirement, not ordinary writable proof data.
+
+**How to apply:** Do not retain the four-word DATA proof as the intended design.
+Distinguish this requirement from a verified ISA guarantee: immutability alone
+does not establish non-transferability. Establish the existing ISA mechanism
+before claiming that another caller cannot acquire or use the approval.
+
 ## Phase 1 Mint ownership and local Lambda decision
 
 Use only existing instruction encodings for the Mint happy path. Report what
