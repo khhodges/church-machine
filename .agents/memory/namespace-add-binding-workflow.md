@@ -22,3 +22,13 @@ view rather than a static chat list.
 
 **How to apply:** Recompute on each opening, identify the saved profile and source
 of evidence, and keep this advisory inspection read-only.
+
+Issues should form a top-to-bottom next-build review list with collapsible
+details and an “Ignore for now” choice.
+
+**Why:** The user wants to reduce detail and defer issues without losing the
+remaining work list.
+
+**How to apply:** Ignoring is a browser-local, profile-specific review choice,
+not resolution or a build-check exemption. Keep ignored issues restorable and
+return changed evidence to the active list.
