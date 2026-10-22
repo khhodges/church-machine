@@ -1,4 +1,5 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
+- [Attention compilation provenance](attention-compilation-provenance.md) — compilation date/time must be visible; inspection time is not binary freshness.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.
 - [NULL capability loading](null-capability-loading.md) — loading NULL must discard destination authority; distinguish NULL as loaded data from NULL used to authorize access.
 - [CHANGE operand authority](change-programmer-access.md) — indexed CR6 lookup is now explicitly approved for the simulator; still one Thread GT, no scratch LOAD, no FPGA approval.

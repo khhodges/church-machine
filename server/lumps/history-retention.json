@@ -1921,6 +1921,25 @@
         "age_basis": "file_mtime",
         "age_timestamp": 1788788890.733239
       }
+    },
+    {
+      "version": 15,
+      "filename": "WukongCallHome_v15.lump",
+      "binary_hash": "5ceb0eafe823710de8c682e3399fc5aed3313ad5f00ebc5e2f3b290b1b19ef01",
+      "deleted_at": 1792701008.9397364,
+      "compiled_at": 1790103441.587299,
+      "trigger": "scheduled_policy",
+      "policy": {
+        "days": 30,
+        "newest_versions": 3,
+        "incomplete_days": 3
+      },
+      "age_evidence": {
+        "days": 30,
+        "incomplete": false,
+        "age_basis": "compiled_at",
+        "age_timestamp": 1790103441.587299
+      }
     }
   ],
   "ab1e86af": [

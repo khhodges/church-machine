@@ -31,7 +31,7 @@
     }
     function issueKey(item) {
         // Changed evidence must return to the queue, not inherit an old dismissal.
-        return JSON.stringify([item.name, item.category, item.detail, item.evidence]);
+        return JSON.stringify([item.name, item.category, item.detail, item.evidence, item.compiledAt, item.origin]);
     }
     function ignoreStore(prof) {
         return 'church.namespace.attention.ignored.v1.' + prof;
@@ -42,7 +42,7 @@
         scope.appendChild(el('summary', 'About this check'));
         scope.appendChild(el('p', data.scope || 'Scope unspecified'));
         body.appendChild(scope);
-        body.appendChild(el('p', 'Checked: ' + (data.checkedAt || 'unknown time') +
+        body.appendChild(el('p', 'Report checked (not compiled): ' + (data.checkedAt || 'unknown time') +
             ' · Profile: ' + (data.profile || 'unknown')));
         const items = Array.isArray(data.items) ? data.items : [];
         let ignored = new Set();
@@ -79,6 +79,15 @@
             summary.style.cursor = 'pointer';
             summary.appendChild(el('strong', item.name || '(unnamed)'));
             summary.appendChild(el('small', ' — ' + (item.category || 'Inspection warning')));
+            const timestamp = item.compiledAt && new Date(item.compiledAt);
+            const compilationText = item.origin === 'editable'
+                ? 'Editable source — not a compiled artifact'
+                : timestamp && Number.isFinite(timestamp.getTime())
+                    ? 'Compiled: ' + timestamp.toISOString().replace('T', ' ').replace('Z', ' UTC')
+                    : 'Compilation date/time unknown — freshness cannot be established';
+            const compilation = el('small', compilationText, {'data-attention-compiled':'1'});
+            compilation.style.display = 'block';
+            summary.appendChild(compilation);
             details.appendChild(summary);
             const detail = el('div', item.detail || '');
             detail.style.whiteSpace = 'pre-wrap';

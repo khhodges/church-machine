@@ -56,6 +56,8 @@ def test_latest_revision_and_exact_selected_history(tmp_path, monkeypatch):
     result = attention_report(doc, tmp_path, tmp_path, parse, "phase1")
     assert len(result["items"]) == 1
     assert result["items"][0]["evidence"] == "Saved LUMP: old.lump"
+    assert result["items"][0]["compiledAt"] == "1970-01-01T00:00:01+00:00"
+    assert result["items"][0]["origin"] == "saved"
 
 
 def test_missing_artifact_is_visible(tmp_path):

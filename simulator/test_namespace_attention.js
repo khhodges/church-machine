@@ -47,6 +47,12 @@ const ui=scope.window.NamespaceAttention;
     function find(attr) { return descendants(body).find(e=>e.attrs[attr]); }
     function checkbox() { return descendants(body).find(e=>e.tag==='input'); }
     ui.renderReport(body,data);
+    assert(find('data-attention-compiled').textContent.includes('unknown'));
+    ui.renderReport(body,{...data,items:[{...item,origin:'editable'}]});
+    assert(find('data-attention-compiled').textContent.includes('not a compiled artifact'));
+    ui.renderReport(body,{...data,items:[{...item,compiledAt:'2026-10-22T15:30:45Z',origin:'saved'}]});
+    assert(find('data-attention-compiled').textContent.includes('2026-10-22 15:30:45.000 UTC'));
+    ui.renderReport(body,data);
     assert.equal(find('data-attention-item').tag,'details');
     assert(!find('data-attention-item').open, 'issue details start collapsed');
     assert(find('data-attention-next-step').children.some(e=>e.textContent===item.nextStep),

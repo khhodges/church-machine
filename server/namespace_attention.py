@@ -1,5 +1,6 @@
 """Read-only, on-demand advisory inventory. Never links or provisions resources."""
 import re
+import json
 import struct
 from datetime import datetime, timezone
 from pathlib import Path
@@ -43,13 +44,28 @@ def attention_report(document, directory, sources, parse_content, profile, sourc
     context = naming_context()
     placed_targets = {qualified_name(name, context) for name in placed}
     items, seen = [], set()
+    # Only exact filenames supply compilation provenance; never use latest-by-name
+    # or file modification time as a substitute.
+    try:
+        manifest = json.loads((directory / "manifest.json").read_text())
+        if not isinstance(manifest, list):
+            manifest = []
+    except (OSError, ValueError):
+        manifest = []
+    compilation = {}
+    for record in manifest:
+        if isinstance(record, dict) and record.get("filename"):
+            compilation.setdefault(record["filename"], []).append(record.get("compiled_at"))
+    current_compilation = None
+    current_origin = "unselected"
 
     def add(name, category, detail, evidence, next_step):
         key = (name, category, detail, evidence)
         if key not in seen:
             seen.add(key)
             items.append(dict(name=name, category=category, detail=detail,
-                              evidence=evidence, nextStep=next_step))
+                              evidence=evidence, nextStep=next_step,
+                              compiledAt=current_compilation, origin=current_origin))
 
     def inspect(name, source, evidence, api=None):
         findings = source_findings(source)
@@ -87,6 +103,16 @@ def attention_report(document, directory, sources, parse_content, profile, sourc
                 "and save the Namespace. If no suitable revision exists, compile and save it first.")
     for record in records:
         name, filename = record["abstraction"], record.get("filename")
+        current_origin = "saved"
+        current_compilation = None
+        times = compilation.get(filename, [])
+        if times and all(t == times[0] for t in times):
+            try:
+                if isinstance(times[0], bool):
+                    raise ValueError("Invalid compilation timestamp")
+                current_compilation = datetime.fromtimestamp(float(times[0]), timezone.utc).isoformat()
+            except (ValueError, TypeError, OverflowError, OSError):
+                pass
         evidence = f"Saved LUMP: {filename}"
         try:
             if not filename or Path(filename).name != filename or (directory / filename).is_symlink():
@@ -121,6 +147,8 @@ def attention_report(document, directory, sources, parse_content, profile, sourc
                 "Restore that exact artifact from a trusted copy, or explicitly select a "
                 "verified replacement revision in the Namespace and save. Reopen Needs attention.")
     # Editable source is separately labelled: it is not proof of saved bytes.
+    current_compilation = None
+    current_origin = "editable"
     for path in sorted(sources.rglob("*.cloomc")):
         if path.is_symlink():
             continue
