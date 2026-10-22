@@ -41,3 +41,13 @@ review.
 **How to apply:** Use exact selected artifacts, not latest catalog revisions.
 Attach absent-dependency details to the placed owner, never show absent
 resources or unrelated source files as standalone items.
+
+Every attention finding must include a concrete next step, including inspection
+warnings.
+
+**Why:** The user specifically called out missing-source warnings that explained
+the limitation but not how to proceed.
+
+**How to apply:** Give issue-specific actions. Missing source requires exact-
+revision source evidence or an explicitly reviewed replacement, not a claim
+that the binary is broken or that same-named editable source proves its contents.

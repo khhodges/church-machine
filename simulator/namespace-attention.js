@@ -83,6 +83,11 @@
             const detail = el('div', item.detail || '');
             detail.style.whiteSpace = 'pre-wrap';
             details.appendChild(detail);
+            const nextStep = el('p', null, {'data-attention-next-step':'1'});
+            nextStep.appendChild(el('strong', 'Next step required: '));
+            nextStep.appendChild(el('span', item.nextStep ||
+                'Reopen Needs attention to request updated action guidance for this issue.'));
+            details.appendChild(nextStep);
             if (item.evidence != null && item.evidence !== '') {
                 details.appendChild(el('small', 'Evidence: ' + (typeof item.evidence === 'string'
                     ? item.evidence : JSON.stringify(item.evidence))));

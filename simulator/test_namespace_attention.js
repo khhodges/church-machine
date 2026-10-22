@@ -40,7 +40,8 @@ const ui=scope.window.NamespaceAttention;
     assert.equal(calls[1].url,'/api/namespace/attention?profile=legacy');
     assert(calls.every(c=>!c.options.method || c.options.method==='GET'));
     const body = element('div');
-    const item = {name:'Mint',category:'unfinished implementation',detail:'not implemented',evidence:'source'};
+    const item = {name:'Mint',category:'unfinished implementation',detail:'not implemented',evidence:'source',
+        nextStep:'Review <source> and save a new revision.'};
     const data = {profile:'phase1',items:[item]};
     function descendants(e) { return [e,...e.children.flatMap(descendants)]; }
     function find(attr) { return descendants(body).find(e=>e.attrs[attr]); }
@@ -48,6 +49,8 @@ const ui=scope.window.NamespaceAttention;
     ui.renderReport(body,data);
     assert.equal(find('data-attention-item').tag,'details');
     assert(!find('data-attention-item').open, 'issue details start collapsed');
+    assert(find('data-attention-next-step').children.some(e=>e.textContent===item.nextStep),
+        'next step renders safely as text inside issue details');
     assert.equal(find('data-attention-queue').children.length,1);
     checkbox().checked=true;
     checkbox().onchange();

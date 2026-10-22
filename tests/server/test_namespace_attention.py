@@ -25,6 +25,7 @@ def test_fresh_sources_bindings_and_no_writes(tmp_path):
     result = attention_report(doc, lumps, sources, lambda _: {}, "legacy")
     assert snapshot() == before
     assert {x["name"] for x in result["items"]} == {"ide.Mint"}
+    assert all(x["nextStep"] for x in result["items"])
     assert any("ide.Pool" in x["detail"] for x in result["items"])
     doc["rows"].append({"name": "ide.Pool", "slot": 4, "kind": "mmio"})
     result = attention_report(doc, lumps, sources, lambda _: {}, "legacy")
@@ -59,6 +60,25 @@ def test_missing_artifact_is_visible(tmp_path):
                         selection={"filename": "absent.lump"})]}
     report = attention_report(doc, tmp_path, tmp_path, lambda _: {}, "ascending")
     assert report["items"][0]["category"] == "inspection warning"
+    assert "absent.lump" in report["items"][0]["nextStep"]
+
+
+def test_missing_source_has_exact_revision_next_step(tmp_path, monkeypatch):
+    monkeypatch.setattr("server.namespace_attention.unpack_lump", lambda raw: raw)
+    (tmp_path / "callhome.lump").write_bytes(b"\x01\0\0\0")
+    doc = {"rows": [dict(name="ide.WukongCallHome", slot=7, kind="lump",
+                        selection={"filename": "callhome.lump"})]}
+    report = attention_report(doc, tmp_path, tmp_path, lambda _: {}, "ascending")
+    step = report["items"][0]["nextStep"]
+    assert "callhome.lump" in step
+    assert "verified source companion" in step
+    assert "does not mean the binary is defective" in step
+
+
+def test_unselected_placement_has_action(tmp_path):
+    doc = {"rows": [dict(name="Unselected", slot=5, kind="lump")]}
+    item = attention_report(doc, tmp_path, tmp_path, lambda _: {}, "legacy")["items"][0]
+    assert "slot 5" in item["nextStep"]
 
 
 def test_unassigned_sources_and_catalog_are_excluded(tmp_path):

@@ -41,23 +41,31 @@ def attention_report(document, directory, sources, parse_content, profile):
     placed = {row["name"] for row in rows}
     items, seen = [], set()
 
-    def add(name, category, detail, evidence):
+    def add(name, category, detail, evidence, next_step):
         key = (name, category, detail, evidence)
         if key not in seen:
             seen.add(key)
-            items.append(dict(name=name, category=category, detail=detail, evidence=evidence))
+            items.append(dict(name=name, category=category, detail=detail,
+                              evidence=evidence, nextStep=next_step))
 
     def inspect(name, source, evidence, api=None):
         findings = source_findings(source)
         if findings:
             add(name, "unfinished implementation",
-                "\n".join(f"Line {line}: {text}" for line, text in findings), evidence)
+                "\n".join(f"Line {line}: {text}" for line, text in findings), evidence,
+                f"Review the cited source lines for {name}. Complete and test any unfinished "
+                "methods, then compile and save a new revision. Explicitly select the reviewed "
+                "revision in this Namespace and save before the next build. If a marker is "
+                "outdated, verify the implementation before correcting it.")
         missing = sorted(dependencies(source, api) - placed - {name})
         if missing:
             add(name, "missing resource",
                 "Missing dependencies: " + ", ".join(missing) +
                 ". No placements with these exact names exist in the selected saved Namespace.",
-                evidence)
+                evidence,
+                "Add or correct Namespace placements for: " + ", ".join(missing) +
+                f". If a name is wrong in {name}, correct its capability declaration and save "
+                "a new revision instead. Save the Namespace and rerun binding checks.")
 
     records = []
     # Namespace membership and exact selections are authoritative, not catalog
@@ -69,7 +77,9 @@ def attention_report(document, directory, sources, parse_content, profile):
             records.append(dict(abstraction=row["name"], filename=filename))
         elif row.get("kind") == "lump" and not filename:
             add(row["name"], "missing resource", "Placement has no exact saved LUMP selected.",
-                f"Saved Namespace slot {row['slot']}")
+                f"Saved Namespace slot {row['slot']}",
+                f"Edit Namespace slot {row['slot']}, select the intended saved LUMP revision, "
+                "and save the Namespace. If no suitable revision exists, compile and save it first.")
     for record in records:
         name, filename = record["abstraction"], record.get("filename")
         evidence = f"Saved LUMP: {filename}"
@@ -84,10 +94,19 @@ def attention_report(document, directory, sources, parse_content, profile):
             if not source:
                 add(name, "inspection warning",
                     "No embedded source available; implementation completeness cannot be inspected.",
-                    evidence)
+                    evidence,
+                    f"Obtain the original source or a verified source companion for the exact "
+                    f"selected file {filename}, and review it. A same-named or newer source file "
+                    "does not prove what this binary contains. If no matching source is available, "
+                    "rebuild from reviewed source, save a new revision, and explicitly select it "
+                    "in this Namespace before the next build. Missing source alone does not mean "
+                    "the binary is defective.")
             inspect(name, source, evidence, content.get("api_definition"))
         except (OSError, ValueError, TypeError, KeyError, struct.error) as exc:
-            add(name, "inspection warning", f"Could not inspect artifact: {exc}", evidence)
+            add(name, "inspection warning", f"Could not inspect artifact: {exc}", evidence,
+                f"Check that the selected file {filename} is present and is a valid LUMP. "
+                "Restore that exact artifact from a trusted copy, or explicitly select a "
+                "verified replacement revision in the Namespace and save. Reopen Needs attention.")
     # Editable source is separately labelled: it is not proof of saved bytes.
     for path in sorted(sources.rglob("*.cloomc")):
         if path.is_symlink():
