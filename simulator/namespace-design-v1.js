@@ -446,7 +446,7 @@
             const response=await fetch('/api/lumps/list');
             if(!response.ok) throw Error('Saved LUMP list unavailable; name-only placement remains available');
             const data=await response.json();
-            records=Array.isArray(data)?data:(data.lumps || []);
+            records=root._nsLatestPlacementLumps(Array.isArray(data)?data:(data.lumps || []));
             records.forEach((r,i)=>{
                 const option=document.createElement('option');
                 option.value=String(i); option.textContent=(r.abstraction || r.name || r.filename)+' — '+r.filename;

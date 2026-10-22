@@ -4916,6 +4916,29 @@ function _nsDeclaredPrivateDataRows(words, hdr, inspection, savedDeclaration) {
 }
 /* ---- NS_SLOT_PERSIST_UNIT_TEST_EXPORT_END ---- */
 
+// New placements offer one latest saved artifact per declared abstraction.
+// Keep exact existing placements and History independent of this picker.
+function _nsLatestPlacementLumps(list) {
+    const latest = new Map();
+    const timestamp = row => {
+        const value = row.compiled_at;
+        const numeric = Number(value);
+        return Number.isFinite(numeric) ? numeric : (Date.parse(value) / 1000 || 0);
+    };
+    const revision = row => Number(row.lump_version || row.revision) || 0;
+    for (const row of list) {
+        if (row.archived === true || row.current === false) continue;
+        const name = row.abstraction || row.dot_name || row.name || row.filename || row.token;
+        const previous = latest.get(name);
+        if (!previous || timestamp(row) > timestamp(previous) ||
+                (timestamp(row) === timestamp(previous) && revision(row) > revision(previous))) {
+            latest.set(name, row);
+        }
+    }
+    // Invalid latest artifacts remain visible; do not substitute older bytes.
+    return Array.from(latest.values());
+}
+
 function _nsTableAdd() {
     if (!sim) return;
     const _existing = document.getElementById('_nsAddModalOverlay');
@@ -4963,7 +4986,7 @@ function _nsTableAdd() {
             // The saved library is a picker, not an execution-validity filter.
             // Keep even invalid entries visible for inspection; materialization
             // remains subject to the normal identity and Namespace gates.
-            const _available = list;
+            const _available = _nsLatestPlacementLumps(list);
 
             window._nsAddAvailableList = _available;
 

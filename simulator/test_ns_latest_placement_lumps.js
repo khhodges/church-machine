@@ -1,0 +1,34 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(`${__dirname}/app-memory.js`, 'utf8');
+const begin = source.indexOf('function _nsLatestPlacementLumps(');
+const end = source.indexOf('\nfunction _nsTableAdd()', begin);
+const context = {};
+vm.runInNewContext(source.slice(begin, end), context);
+const select = context._nsLatestPlacementLumps;
+const old = {abstraction:'ide.Mint', token:'old', compiled_at:10, lump_version:1};
+const latest = {...old, token:'new', compiled_at:20, lump_version:2};
+const other = {abstraction:'ide.PkVerify', token:'verify', compiled_at:15};
+const rows = [old, latest, other];
+const before = JSON.stringify(rows);
+assert.deepEqual(Array.from(select(rows)), [latest, other]);
+assert.deepEqual(Array.from(select([latest, old])), [latest]);
+assert.equal(JSON.stringify(rows), before, 'never mutate catalog or pinned records');
+assert.equal(select([old, {...latest, binary_valid:false}])[0].binary_valid, false,
+    'invalid newest must not fall back to older artifact');
+assert.equal(select([latest, {...old, lump_version:99}])[0], latest, 'date precedes revision');
+const tied = {...latest, lump_version:3, token:'third'};
+assert.equal(select([latest, tied])[0], tied);
+assert.equal(select([latest, {...tied, archived:true}])[0], latest);
+assert.equal(select([latest, {...tied, current:false}])[0], latest);
+assert.equal(select([{...old, compiled_at:'2026-10-21T12:00:00Z'},
+    {...latest, compiled_at:'2026-10-22T12:00:00Z'}])[0].token, 'new');
+assert.equal(select([{...old, compiled_at:undefined}, {...latest, compiled_at:undefined}])[0].token, 'new');
+assert.equal(select([{filename:'unnamed-a'}, {filename:'unnamed-b'}]).length, 2);
+assert.match(source, /const _available = _nsLatestPlacementLumps\(list\)/);
+const design = fs.readFileSync(`${__dirname}/namespace-design-v1.js`, 'utf8');
+assert.match(design, /records=root\._nsLatestPlacementLumps\(/);
+assert.match(design, /Keep selected revision/, 'editing preserves already assigned exact revisions');
+console.log('PASS latest-only Namespace pickers: one revision, exact row identity, no older fallback, existing placements retained');

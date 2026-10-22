@@ -17,6 +17,17 @@ program was being inspected.
 Library metadata only locates that exact artifact. Keep live execution evidence
 separate if the image differs from the selected assignment. Missing or invalid
 selected bytes require an explicit unavailable/error state, not a substitute.
+
+New Add-to-Namespace choices must show only the latest saved LUMP per
+abstraction, not multiple revisions. Older revisions remain in History.
+
+**Why:** The user rejected duplicate Mint entries: “only the latest Lump should
+count.” This is a new-placement choice rule, not permission to update existing
+Namespace assignments.
+
+**How to apply:** Group by declared abstraction; order by saved compilation
+date, then revision. Keep an invalid latest artifact visible rather than
+silently choosing an older one. Preserve exact existing selections.
 Namespace authority is not permission to navigate without a programmer action:
 with no running program or explicit Namespace choice, keep the current editor
 document. Preserve deliberate library/history browsing when leaving and returning
