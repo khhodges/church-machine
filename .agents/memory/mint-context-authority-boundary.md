@@ -64,6 +64,17 @@ previously declined protected-profile shortcut.
 
 ## FPGA-first Mint review
 
+For Phase 1 CREATE, a faulted request never returns a result GT. Leave its
+consumed reservation or partially written slot unused; do not introduce rollback
+or recovery as a prerequisite for the happy path.
+
+**Why:** The user explicitly accepts abandoned faulted requests, conditional on
+the seal rejecting invalid descriptors and the caller never receiving an invalid GT.
+
+**How to apply:** Keep result issuance after successful publication and validation.
+Do not turn this fault-path decision into an unverified claim that every partial
+descriptor fails its seal or that concurrent access is safe.
+
 Agree the native FPGA-targeted Mint algorithm and instruction sequence first,
 one field/step at a time. Existing IDE prototype choices are not requirements.
 
