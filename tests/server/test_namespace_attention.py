@@ -87,6 +87,26 @@ def test_unselected_placement_has_action(tmp_path):
     assert "slot 5" in item["nextStep"]
 
 
+def test_exact_companion_source_and_verification_errors(tmp_path, monkeypatch):
+    monkeypatch.setattr("server.namespace_attention.unpack_lump", lambda raw: raw)
+    (tmp_path / "selected.lump").write_bytes(b"\0\0\0\x01")
+    doc = {"rows": [dict(name="A", slot=3, kind="lump", selection={"filename": "selected.lump"})]}
+    calls = []
+    def companion(filename):
+        calls.append(filename)
+        return {"editing_source": "abstraction A {}"}
+    assert attention_report(doc, tmp_path, tmp_path, lambda _: {}, "ascending", companion)["items"] == []
+    assert calls == ["selected.lump"]
+    for response in ({"unverified_source": "abstraction A {}"},
+                     {"variant_error": "hash mismatch", "editing_source": "abstraction A {}"}):
+        report = attention_report(doc, tmp_path, tmp_path, lambda _: {}, "ascending", lambda _: response)
+        assert report["items"][0]["category"] == "inspection warning"
+    report = attention_report(doc, tmp_path, tmp_path, lambda _: {}, "ascending",
+                              lambda _: {"editing_source": "abstraction A {\n; not implemented\n}"})
+    assert report["items"][0]["category"] == "unfinished implementation"
+    assert "verified exact-revision" in report["items"][0]["evidence"]
+
+
 def test_unassigned_sources_and_catalog_are_excluded(tmp_path):
     (tmp_path / "other.cloomc").write_text(
         "abstraction Unassigned {\n; not implemented\n}")

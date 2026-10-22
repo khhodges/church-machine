@@ -51,3 +51,12 @@ the limitation but not how to proceed.
 **How to apply:** Give issue-specific actions. Missing source requires exact-
 revision source evidence or an explicitly reviewed replacement, not a claim
 that the binary is broken or that same-named editable source proves its contents.
+
+Attention inspection must recognize both intrinsic source and the LUMP view's
+verified exact-revision source companions; unverified sidecar text is not enough.
+
+**Why:** Checking only the primary binary falsely flagged eight abstractions
+whose verified source was already available in the LUMP view.
+
+**How to apply:** Reuse the view's verification path rather than independently
+inferring source absence; preserve genuine companion verification failures.

@@ -36,7 +36,7 @@ def dependencies(source, api=None):
     return names - {"SELF", "NULL"}
 
 
-def attention_report(document, directory, sources, parse_content, profile):
+def attention_report(document, directory, sources, parse_content, profile, source_companion=None):
     directory, sources = Path(directory), Path(sources)
     rows = document["rows"]
     placed = {row["name"] for row in rows}
@@ -96,8 +96,15 @@ def attention_report(document, directory, sources, parse_content, profile):
                 raise ValueError("Artifact byte length is not word aligned")
             # Serialized LUMPs use big-endian words, unlike runtime image dumps.
             content = parse_content(list(struct.unpack(f">{len(raw)//4}I", raw))) or {}
-            source = content.get("source") or ""
-            if content.get("source") is None:
+            source = content.get("source")
+            if source is None and source_companion is not None:
+                companion = source_companion(filename)
+                if companion.get("variant_error"):
+                    raise ValueError("Source companion verification failed: " + companion["variant_error"])
+                if isinstance(companion.get("editing_source"), str):
+                    source = companion["editing_source"]
+                    evidence += " — verified exact-revision source companion"
+            if source is None:
                 add(name, "inspection warning",
                     "No embedded source available; implementation completeness cannot be inspected.",
                     evidence,
@@ -107,7 +114,7 @@ def attention_report(document, directory, sources, parse_content, profile):
                     "rebuild from reviewed source, save a new revision, and explicitly select it "
                     "in this Namespace before the next build. Missing source alone does not mean "
                     "the binary is defective.")
-            inspect(name, source, evidence, content.get("api_definition"))
+            inspect(name, source or "", evidence, content.get("api_definition"))
         except (OSError, ValueError, TypeError, KeyError, struct.error) as exc:
             add(name, "inspection warning", f"Could not inspect artifact: {exc}", evidence,
                 f"Check that the selected file {filename} is present and is a valid LUMP. "

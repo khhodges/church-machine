@@ -5194,9 +5194,23 @@ def namespace_attention():
                                     ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
                                     LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
                 document = store.read_document()
+            def source_companion(filename):
+                # Reuse the LUMP view's exact-revision validation, never its
+                # explicitly unverified sidecar/catalog source fallback.
+                with open(os.path.join(LUMPS_DIR, "manifest.json"), encoding="utf-8") as file:
+                    records = json.load(file)
+                matches = [r for r in records if r.get("filename") == filename]
+                bundles = {r.get("variant_bundle_id") for r in matches if r.get("variant_bundle_id")}
+                if len(bundles) > 1:
+                    return {"variant_error": "Conflicting source bundles for the selected artifact"}
+                record = next((r for r in matches if r.get("variant_bundle_id")), {})
+                result = {}
+                _attach_unverified_exact_source(result, os.path.join(LUMPS_DIR, filename), record)
+                return result
+
             result = attention_report(document, LUMPS_DIR,
                                       Path(__file__).resolve().parent.parent / "simulator" / "cloomc",
-                                      _parse_intrinsic_lump_content, profile)
+                                      _parse_intrinsic_lump_content, profile, source_companion)
         response = jsonify(result)
         response.headers["Cache-Control"] = "no-store"
         return response
