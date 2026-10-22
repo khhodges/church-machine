@@ -26,8 +26,8 @@ assert(shell.includes("_renderOpenFileList((document.getElementById('openFileSea
 // siblings, never nested interactive buttons.
 assert(shell.includes("html += '<div class=\"of-item'"));
 assert(!shell.includes("'<button class=\"of-item'"));
-assert(shell.includes("var groups = { 'LUMPs': [], 'Code Examples': [] }"));
-assert(shell.includes("f.kind === 'lump' ? 'LUMPs' : 'Code Examples'"));
+assert(shell.includes('_groupOpenFileEntries(_openFileCache, query)'));
+assert(shell.includes('<details class="of-group">'));
 assert(shell.includes("(Number(b.date) || 0) - (Number(a.date) || 0)"));
 assert(shell.includes("date:l.compiled_at || 0"));
 assert(shell.includes("date:f.modified_at || 0"));
@@ -35,7 +35,7 @@ assert(shell.includes('f.name, f.language, f.path'));
 assert(html.includes('class="of-item-date"') || html.includes('.of-item-date'));
 assert(run.includes('window._activeBuiltInKey'));
 assert(run.includes("return { type: 'example', id: window._activeBuiltInKey }"));
-assert(run.includes('Restore Draft') && run.includes('Discard Draft'));
+assert(run.includes('Restore Draft') && run.includes('Keep Current'));
 
 // These are the five names whose display spelling carries product meaning.
 [
@@ -56,3 +56,24 @@ assert(!html.includes('id="exampleSearchBox"'));
 assert(!html.includes('onclick="scrollExamples('));
 
 console.log('Open File catalog contracts: PASS');
+
+const vm = require('vm');
+const context = {};
+vm.createContext(context);
+vm.runInContext(shell.slice(shell.indexOf('function _groupOpenFileEntries('),
+    shell.indexOf('function _renderOpenFileList(')), context);
+const entries = [
+    {kind:'lump',name:'ide.Mint',abstraction:'ide.Mint',path:'a'},
+    {kind:'lump',name:'ide.Mint',abstraction:'ide.Mint',path:'b'},
+    {kind:'file',name:'mint',abstraction:'ide.Mint',path:'cloomc/mint.cloomc'},
+    {kind:'file',name:'mint_cleaner',abstraction:'ide.MintCleaner',path:'cloomc/mint_cleaner.cloomc'},
+];
+const grouped = context._groupOpenFileEntries(entries, 'ide.Mint');
+assert.equal(grouped.length, 2);
+assert.equal(grouped[0].entries.length, 3);
+assert.equal(grouped[1].name, 'ide.MintCleaner');
+assert.equal(context._groupOpenFileEntries(entries, 'cloomc/mint.cloomc')[0].entries.length, 3);
+assert.equal(context._catalogDateText({kind:'lump'}), 'Compilation date/time unknown');
+assert(context._catalogDateText({kind:'lump', date:1792677600}).includes('2026-10-22 14:00:00.000 UTC'));
+assert(context._catalogDateText({kind:'file', date:1792677600}).startsWith('Source modified:'));
+console.log('PASS exact identity grouping, related-name separation, search context and full timestamp labels');

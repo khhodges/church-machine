@@ -1,5 +1,4 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
-- [Attention compilation provenance](attention-compilation-provenance.md) — compilation date/time must be visible; inspection time is not binary freshness.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.
 - [NULL capability loading](null-capability-loading.md) — loading NULL must discard destination authority; distinguish NULL as loaded data from NULL used to authorize access.
 - [CHANGE operand authority](change-programmer-access.md) — indexed CR6 lookup is now explicitly approved for the simulator; still one Thread GT, no scratch LOAD, no FPGA approval.
@@ -96,7 +95,7 @@
 - [Localized c-list provenance](localized-clist-provenance.md) — bind generated images to both selected artifact hashes and resulting localized capability rows
 - [Editor source authority](editor-source-authority.md) — preserve owned drafts; authority refresh is advisory and replacement requires explicit preview and acceptance
 - [C-list row zero SELF boundary](clist-row-zero-advisory-self.md) — compiler output must establish SELF at row zero; immutable historical bytes remain inspectable without rewriting
-- [Explicit LUMP selection](latest-saved-lump-selection.md) — selected Namespace and programmer choices outrank automatic latest-revision defaults; freshness stays advisory.
+- [LUMP selection and catalog](latest-saved-lump-selection.md) — explicit choices outrank latest defaults; links to catalog grouping and compilation-time safety rules.
 - [Actionable error reports](actionable-error-reporting.md) — visible errors must state what failed, the real reason, whether data changed, and a concrete next action
 - [Bootstrap migration validation boundary](bootstrap-migration-validation-boundary.md) — validate staged catalog and boot graph before swap; published RTL freshness is a separate release gate
 - [Archived bootstrap identity](archived-bootstrap-identity.md) — keep historical bytes immutable, but audit and restore them against the live destination GT by abstraction ancestry

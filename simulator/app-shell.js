@@ -894,7 +894,7 @@ function _loadOpenFileCatalog() {
             });
         });
         files.forEach(function(f) {
-            entries.push({kind:'file', name:f.name, language:'CLOOMC++',
+            entries.push({kind:'file', name:f.name, abstraction:f.abstraction, language:'CLOOMC++',
                 path:f.path, detail:(f.abstraction ? f.abstraction + ' · ' : '') +
                     (f.dir || 'simulator'), date:f.modified_at || 0});
         });
@@ -905,7 +905,9 @@ function _loadOpenFileCatalog() {
                 l.sourceLanguage || l.content_language || 'Assembly';
             var revision = l.lump_version == null ? '' : ' · v' + l.lump_version;
             entries.push({kind:'lump', name:name, language:lumpLanguage,
-                path:'LUMP ' + (l.token || '') + revision, token:l.token,
+                path:'LUMP ' + (l.filename || l.token || '') + revision, token:l.token,
+                abstraction:name, filename:l.filename, binary_hash:l.binary_hash,
+                revision:l.lump_version,
                 detail:l.binary_valid === false ? 'binary unavailable' :
                     (l.has_source ? 'source embedded' : 'binary only'),
                 date:l.compiled_at || 0,
@@ -942,6 +944,30 @@ function closeOpenFileDialog() {
     _openFileTrigger = null;
 }
 
+function _groupOpenFileEntries(entries, query) {
+    var groups = new Map();
+    entries.forEach(function(f) {
+        // Exact declared identity only: MintCleaner is never part of Mint.
+        var key = f.abstraction || (f.kind === 'lump' ? f.name : f.kind + ':' + f.path);
+        if (!groups.has(key)) groups.set(key, {name:f.abstraction || f.name, entries:[]});
+        groups.get(key).entries.push(f);
+    });
+    var q = (query || '').trim().toLowerCase();
+    return Array.from(groups.values()).filter(function(group) {
+        return !q || group.entries.some(function(f) {
+            return [f.name, f.language, f.path, f.detail || '', f.abstraction || '']
+                .join(' ').toLowerCase().includes(q);
+        });
+    });
+}
+function _catalogDateText(f) {
+    var label = f.kind === 'lump' ? 'Compiled' : 'Source modified';
+    var date = new Date(Number(f.date) * 1000);
+    if (!f.date || !Number.isFinite(date.getTime())) {
+        return f.kind === 'lump' ? 'Compilation date/time unknown' : '';
+    }
+    return label + ': ' + date.toISOString().replace('T', ' ').replace('Z', ' UTC');
+}
 function _renderOpenFileList(query) {
     var list = document.getElementById('openFileList');
     if (!list) return;
@@ -949,30 +975,19 @@ function _renderOpenFileList(query) {
         list.innerHTML = '<div class="of-empty">Loading\u2026</div>';
         return;
     }
-    var q = (query || '').trim().toLowerCase();
-    var files = _openFileCache.filter(function(f) {
-        return !q || [f.name, f.language, f.path, f.detail || ''].join(' ').toLowerCase().includes(q);
-    });
-    if (!files.length) {
+    var groups = _groupOpenFileEntries(_openFileCache, query);
+    if (!groups.length) {
         list.innerHTML = '<div class="of-empty">No files match.</div>';
         return;
     }
-    // Keep saved LUMPs separate from every editable/built-in code example.
-    var groups = { 'LUMPs': [], 'Code Examples': [] };
-    files.forEach(function(f) {
-        var g = f.kind === 'lump' ? 'LUMPs' : 'Code Examples';
-        groups[g].push(f);
-    });
     var html = '<div class="of-catalog-actions"><button class="btn btn-sm" onclick="showNewTabDialog()">+ New Program</button></div>';
-    ['LUMPs', 'Code Examples'].forEach(function(g) {
-        if (!groups[g].length) return;
-        html += '<section class="of-group" aria-labelledby="of-' +
-            g.toLowerCase().replace(/[^a-z]+/g, '-') + '">' +
-            '<div class="of-group-title" id="of-' +
-            g.toLowerCase().replace(/[^a-z]+/g, '-') + '">' +
-            '<span>' + _escHtml(g) + '</span><span class="of-group-count">' +
-            groups[g].length + '</span></div>';
-        groups[g].forEach(function(f) {
+    groups.forEach(function(group) {
+        var revisions = group.entries.filter(function(f) { return f.kind === 'lump'; });
+        html += '<details class="of-group"><summary class="of-group-title" style="cursor:pointer;display:list-item;margin-left:16px">' +
+            _escHtml(group.name) + ' <span class="of-group-count">' +
+            revisions.length + ' saved revisions · ' + (group.entries.length - revisions.length) +
+            ' source entries</span></summary>';
+        group.entries.forEach(function(f) {
             var active = ((_catalogActiveIdentity === f.path) ||
                 (window._editorSourceFilePath === f.path)) ? ' of-item-active' : '';
             var encoded = encodeURIComponent(JSON.stringify(f)).replace(/'/g, '%27');
@@ -980,14 +995,18 @@ function _renderOpenFileList(query) {
                 f.kind === 'lump' ? 'openCatalogLump' :
                 f.kind === 'personal' ? 'openCatalogPersonal' : 'openCatalogFile';
             var disabled = f.binaryOnly ? ' title="Binary-only LUMP: opens with an explicit source-unavailable state"' : '';
-            var dateText = f.date ? new Date(Number(f.date) * 1000).toLocaleDateString(
-                undefined, {year:'numeric', month:'short', day:'numeric'}) : '';
+            var dateText = _catalogDateText(f);
+            var entryLabel = f.kind === 'lump'
+                ? 'Saved revision' + (f.revision == null ? '' : ' v' + f.revision)
+                : (f.kind === 'builtin' ? 'Built-in example · ' : 'Editable source · ') + f.name;
+            var identity = f.kind === 'lump' ? (f.filename || f.token || 'Identity unavailable') : f.path;
             html += '<div class="of-item' + active + '"' + disabled + '>' +
                 '<button type="button" class="of-item-open" onclick="' + action + '(decodeURIComponent(\'' + encoded + '\'))">' +
-                '<span class="of-item-main"><span class="of-item-name">' + _escHtml(f.name) +
+                '<span class="of-item-main"><span class="of-item-name">' + _escHtml(entryLabel) +
                 '</span><span class="of-item-meta">' + _escHtml(f.language || '') +
-                (f.detail ? ' · ' + _escHtml(f.detail) : '') + '</span></span>' +
-                (dateText ? '<time class="of-item-date">' + _escHtml(dateText) + '</time>' : '') +
+                (f.detail ? ' · ' + _escHtml(f.detail) : '') + '</span>' +
+                '<span class="of-item-meta" style="overflow-wrap:anywhere">' + _escHtml(identity) + '</span>' +
+                (dateText ? '<span class="of-item-date" style="display:block">' + _escHtml(dateText) + '</span>' : '') + '</span>' +
                 '</button>' +
                 (f.kind === 'personal' ? '<span class="of-item-actions">' +
                   '<button type="button" onclick="event.stopPropagation();renameUserTab(\'' +
@@ -996,7 +1015,7 @@ function _renderOpenFileList(query) {
                   f.id + '\')" title="Delete program">Delete</button></span>' : '') +
                 '</div>';
         });
-        html += '</section>';
+        html += '</details>';
     });
     list.innerHTML = html;
 }
@@ -1011,7 +1030,9 @@ async function openCatalogBuiltin(raw) {
 function openCatalogFile(raw) { var e = _catalogArg(raw); openSourceFile(e.path); }
 async function openCatalogLump(raw) {
     var e = _catalogArg(raw); if (e.token && typeof openLumpInEditor === 'function') {
-        if (!await openLumpInEditor(e.token)) return;
+        var options = e.filename && e.binary_hash ? {exactSavedArtifact:{
+            token:e.token, filename:e.filename, binary_hash:e.binary_hash}} : undefined;
+        if (!await openLumpInEditor(e.token, options)) return;
         closeOpenFileDialog();
         _catalogActiveIdentity = e.path;
     }

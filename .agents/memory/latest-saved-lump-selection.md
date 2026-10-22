@@ -3,6 +3,9 @@ name: Explicit LUMP selection versus latest revisions
 description: Namespace assignments and explicit artifact choices outrank automatic latest-revision selection.
 ---
 
+Related: [Catalog grouping and compilation provenance](attention-compilation-provenance.md)
+records the approved expandable source/revision grouping and date/time requirements.
+
 The user's 2026-10-19 clarification supersedes earlier automatic-latest defaults:
 “the selected Namespace list is the master list NOT some unseen catalog.”
 Namespace navigation follows its exact assigned artifact, never a catalog-selected
