@@ -1,0 +1,226 @@
+; AbstractGTManager -- Phase 1, Genesis-owned function abstraction.
+; Language: Assembly
+; Both entries are callable only by holders of the Genesis-controlled E GT.
+; No live installation, host dispatch, custom opcode or random fallback.
+;
+; ABI: CR2 = name DATA R: header, length (1..31), one ASCII character per word.
+; Returns CR1 = Abstract GT, DR1 = 1. Faults never return success.
+; Constant source index 0 / CALL selector 1; NewProof index 1 / selector 2.
+; Constants: exact case-sensitive catalogue names (PHI aliases GOLDEN_RATIO).
+; All DREAD/DWRITE offsets below are ISA WORD offsets.
+;
+; Private bindings (Genesis provisions disjoint DATA objects and persists them):
+; row 1 State RW: header,count,capacity,entropyCursor,scratch,reserved,records...
+; row 2 Catalogue R: header,count,records...
+; row 3 Scratch L: one-word view of State[4], never caller-owned.
+; row 4 Random R: header,count,secure random words...
+; Record = length,token,31 character words (33 words).
+; Capacity <=1024; state size must cover 6+33*capacity words.
+; Calls are serialized by Genesis; no CALL/CHANGE inside either method.
+; The source never replaces an existing name or recycles consumed randomness.
+; B[31]=0, subtype[30:29]=00 constant / 01 proof, type[26:25]=11.
+; Payload low25 -> bits24:0; payload high2 -> bits28:27.
+;
+abstraction ide.AbstractGTManager {
+capabilities { SELF E, ide.AbstractGTState RW, ide.AbstractGTCatalogue R, ide.AbstractGTScratch L, ide.AbstractGTRandom R }
+
+method Constant {
+constant_entry:
+    IADD DR1, DR0, #0
+    DREAD DR6, CR2, #1, DR0
+    MCMP DR6, #1
+    BRANCHLO constant_bad_name
+    MCMP DR6, #31
+    BRANCHHI constant_bad_name
+    LOAD CR7, CR6, #1
+    LOAD CR8, CR6, #2
+    LOAD CR9, CR6, #3
+    DREAD DR7, CR8, #1, DR0
+    MCMP DR7, #101
+    BRANCHNE constant_bad_catalogue
+    IADD DR8, DR0, #2
+    IADD DR9, DR0, #0
+constant_find:
+    MCMP DR9, DR7
+    BRANCHHS constant_unknown
+    DREAD DR11, CR8, #0, DR8
+    MCMP DR11, DR6
+    BRANCHNE constant_next
+    IADD DR10, DR0, #0
+constant_chars:
+    MCMP DR10, DR6
+    BRANCHHS constant_found
+    DREAD DR11, CR2, #2, DR10
+    IADD DR12, DR8, DR10
+    DREAD DR12, CR8, #2, DR12
+    MCMP DR11, DR12
+    BRANCHNE constant_next
+    IADD DR10, DR10, #1
+    BRANCH constant_chars
+constant_next:
+    IADD DR9, DR9, #1
+    IADD DR8, DR8, #33
+    BRANCH constant_find
+constant_found:
+    DREAD DR13, CR8, #1, DR8
+    BFEXT DR11, DR13, #29, #3
+    MCMP DR11, #0
+    BRANCHNE constant_bad_catalogue
+    BFEXT DR11, DR13, #25, #2
+    MCMP DR11, #3
+    BRANCHNE constant_bad_catalogue
+    DWRITE DR13, CR7, #4, DR0
+    LOAD CR1, CR9, #0
+    DWRITE DR0, CR7, #4, DR0
+    IADD DR1, DR0, #1
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
+    RETURNAL #2
+constant_bad_name:
+    HARDFAULT "AbstractGTManager.Constant: name length must be 1..31"
+constant_unknown:
+    HARDFAULT "AbstractGTManager.Constant: unknown constant name"
+constant_bad_catalogue:
+    HARDFAULT "AbstractGTManager.Constant: invalid provisioned catalogue"
+}
+
+method NewProof {
+proof_entry:
+    IADD DR1, DR0, #0
+    DREAD DR6, CR2, #1, DR0
+    MCMP DR6, #1
+    BRANCHLO proof_bad_name
+    MCMP DR6, #31
+    BRANCHHI proof_bad_name
+    IADD DR10, DR0, #0
+proof_validate_name:
+    MCMP DR10, DR6
+    BRANCHHS proof_load_state
+    DREAD DR11, CR2, #2, DR10
+    MCMP DR11, #33
+    BRANCHLO proof_bad_name
+    MCMP DR11, #126
+    BRANCHHI proof_bad_name
+    IADD DR10, DR10, #1
+    BRANCH proof_validate_name
+proof_load_state:
+    LOAD CR7, CR6, #1
+    LOAD CR9, CR6, #3
+    LOAD CR10, CR6, #4
+    DREAD DR7, CR7, #1, DR0
+    ; MCMP immediate expands through DR15: never keep capacity there.
+    DREAD DR14, CR7, #2, DR0
+    MCMP DR14, #1024
+    BRANCHHI proof_bad_state
+    MCMP DR7, DR14
+    BRANCHHI proof_bad_state
+    IADD DR8, DR0, #6
+    IADD DR9, DR0, #0
+proof_find:
+    MCMP DR9, DR7
+    BRANCHHS proof_capacity
+    DREAD DR11, CR7, #0, DR8
+    MCMP DR11, DR6
+    BRANCHNE proof_next
+    IADD DR10, DR0, #0
+proof_chars:
+    MCMP DR10, DR6
+    BRANCHHS proof_duplicate
+    DREAD DR11, CR2, #2, DR10
+    IADD DR12, DR8, DR10
+    DREAD DR12, CR7, #2, DR12
+    MCMP DR11, DR12
+    BRANCHNE proof_next
+    IADD DR10, DR10, #1
+    BRANCH proof_chars
+proof_next:
+    IADD DR9, DR9, #1
+    IADD DR8, DR8, #33
+    BRANCH proof_find
+proof_capacity:
+    MCMP DR7, DR14
+    BRANCHHS proof_full
+proof_random:
+    DREAD DR14, CR7, #3, DR0
+    DREAD DR11, CR10, #1, DR0
+    MCMP DR14, DR11
+    BRANCHHI proof_bad_state
+    BRANCHEQ proof_no_random
+    DREAD DR12, CR10, #2, DR14
+    IADD DR14, DR14, #1
+    DWRITE DR14, CR7, #3, DR0
+    BFEXT DR13, DR12, #0, #25
+    BFEXT DR11, DR12, #25, #2
+    BFINS DR13, DR11, #27, #2
+    IADD DR11, DR0, #3
+    BFINS DR13, DR11, #25, #2
+    IADD DR11, DR0, #1
+    BFINS DR13, DR11, #29, #2
+    IADD DR8, DR0, #6
+    IADD DR9, DR0, #0
+proof_collision:
+    MCMP DR9, DR7
+    BRANCHHS proof_store
+    DREAD DR11, CR7, #1, DR8
+    MCMP DR11, DR13
+    BRANCHEQ proof_random
+    IADD DR9, DR9, #1
+    IADD DR8, DR8, #33
+    BRANCH proof_collision
+proof_store:
+    ; Count is the publication boundary; incomplete tail records stay private.
+    IADD DR10, DR0, #0
+proof_copy:
+    MCMP DR10, DR6
+    BRANCHHS proof_issue
+    DREAD DR11, CR2, #2, DR10
+    IADD DR12, DR8, DR10
+    DWRITE DR11, CR7, #2, DR12
+    IADD DR10, DR10, #1
+    BRANCH proof_copy
+proof_issue:
+    DWRITE DR6, CR7, #0, DR8
+    DWRITE DR13, CR7, #1, DR8
+    DWRITE DR13, CR7, #4, DR0
+    LOAD CR1, CR9, #0
+    DWRITE DR0, CR7, #4, DR0
+    IADD DR7, DR7, #1
+    DWRITE DR7, CR7, #1, DR0
+    IADD DR1, DR0, #1
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
+    RETURNAL #2
+proof_bad_name:
+    HARDFAULT "AbstractGTManager.NewProof: name must be 1..31 printable non-space ASCII characters"
+proof_duplicate:
+    HARDFAULT "AbstractGTManager.NewProof: name already exists. Existing proof unchanged"
+proof_full:
+    HARDFAULT "AbstractGTManager.NewProof: proof catalogue full"
+proof_no_random:
+    HARDFAULT "AbstractGTManager.NewProof: private random input exhausted. No proof created"
+proof_bad_state:
+    HARDFAULT "AbstractGTManager.NewProof: invalid provisioned state"
+}
+}

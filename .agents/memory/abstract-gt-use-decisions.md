@@ -68,6 +68,18 @@ Lambda authority to issue them.
 
 ## Proposed Abstract subtype field
 
+**Subsequent approval:** The user approved B at bit 31, Abstract type at
+bits 26..25 and subtype at bits 30..29 (00 constants, 01 proofs).
+Remaining bits carry the 27-bit payload. The user also approved
+Genesis-supplied random words in a private buffer for native CLOOMC consumption.
+
+**Why:** These were explicitly presented as the missing Phase 1 implementation
+contracts and both were accepted.
+
+**How to apply:** The earlier unspecified-layout notes below are historical.
+Use the approved layout and private randomness, never the older Abstract
+device encoding or an invented random opcode. Installation remains separate.
+
 The user proposed a two-bit field to distinguish the two accepted roles
 (constants/mathematical values and credentials/proofs), leaving headroom.
 

@@ -131,6 +131,10 @@ approved for Phase 1. Its approval covers exact named values and aliases,
 not token encodings or implementation. It does not adopt historical Lambda
 services or change unrelated contracts in this review package.
 
+The subsequent [AbstractGTManager implementation](abstract-gt-manager.md)
+records the separately approved encoding and random-input contract, the native
+CLOOMC API, private provisioning requirements and simulator evidence.
+
 ## Glossary
 
 | Term | Meaning here |
