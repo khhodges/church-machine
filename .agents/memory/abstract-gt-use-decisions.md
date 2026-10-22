@@ -40,3 +40,15 @@ the proposed use during the five-case review.
 **How to apply:** Do not reinstate historical Abstract device categories or
 their conflicting encoding as a requirement. This review decision does not
 authorize changing live device bindings or programming hardware.
+
+## Special machine-control scheme — rejected
+
+Do not introduce a separate Abstract GT category for direct M elevation or
+special SWITCH PassKeys. Keep existing ISA control mechanisms.
+
+**Why:** The user explicitly rejected the separate machine-control scheme
+during the five-case review.
+
+**How to apply:** Preserve SecurityRegulator's protected control role and the
+ISA-defined SWITCH checks. An Abstract credential authorizing a protected
+function is case 2, not a distinct machine-control token scheme.
