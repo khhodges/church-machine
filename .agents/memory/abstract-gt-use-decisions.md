@@ -108,3 +108,16 @@ existing name on NewProof rather than silently replacing its proof; creation
 is distinct from lookup. Mint authorization remains EXACT against its approved
 token. Knowing a name does not grant its proof. This is an agreed design,
 not implementation authorization.
+
+## Phase 1 constants catalogue approval
+
+The user explicitly approved the proposed 100 mathematical constants for
+Phase 1, including exact-value names, shared tokens for aliases, and keeping
+logical TRUE/FALSE distinct from numerical ONE/ZERO.
+
+**Why:** The user said "OK for Phase 1 approved" in response to the complete
+catalogue.
+
+**How to apply:** Use docs/reviews/mint-phase1/abstract-constants.md as the
+approved list. Its numbering is not an encoding assignment. Approval does
+not establish implementation, bit placement or numerical evaluation behavior.

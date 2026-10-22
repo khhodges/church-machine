@@ -124,6 +124,13 @@ bounded gaps; they do not convert this endorsement into runtime acceptance.
 7. Do not approve software release until open safety gates have evidence, or
    record a specific Genesis override as an override, never PASS.
 
+## Later scoped approval: AbstractGTManager constants
+
+The [100-entry mathematical constants catalogue](abstract-constants.md) is
+approved for Phase 1. Its approval covers exact named values and aliases,
+not token encodings or implementation. It does not adopt historical Lambda
+services or change unrelated contracts in this review package.
+
 ## Glossary
 
 | Term | Meaning here |
