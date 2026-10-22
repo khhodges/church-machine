@@ -16,7 +16,7 @@ def test_fresh_sources_bindings_and_no_writes(tmp_path):
     source = sources / "mint.cloomc"
     source.write_text("abstraction ide.Mint {\ncapabilities { SELF E, ide.Pool RW }\n"
                       '; implementation in progress\n}')
-    doc = {"rows": []}
+    doc = {"rows": [{"name": "ide.Mint", "slot": 3, "kind": "mmio"}]}
 
     def snapshot():
         return {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
@@ -24,7 +24,8 @@ def test_fresh_sources_bindings_and_no_writes(tmp_path):
     before = snapshot()
     result = attention_report(doc, lumps, sources, lambda _: {}, "legacy")
     assert snapshot() == before
-    assert {x["name"] for x in result["items"]} == {"ide.Mint", "ide.Pool"}
+    assert {x["name"] for x in result["items"]} == {"ide.Mint"}
+    assert any("ide.Pool" in x["detail"] for x in result["items"])
     doc["rows"].append({"name": "ide.Pool", "slot": 4, "kind": "mmio"})
     result = attention_report(doc, lumps, sources, lambda _: {}, "legacy")
     assert not any(x["category"] == "missing resource" for x in result["items"])
@@ -54,5 +55,19 @@ def test_missing_artifact_is_visible(tmp_path):
     (tmp_path / "manifest.json").write_text(json.dumps([
         dict(abstraction="Broken", filename="absent.lump")
     ]))
-    report = attention_report({"rows": []}, tmp_path, tmp_path, lambda _: {}, "ascending")
+    doc = {"rows": [dict(name="Broken", slot=7, kind="lump",
+                        selection={"filename": "absent.lump"})]}
+    report = attention_report(doc, tmp_path, tmp_path, lambda _: {}, "ascending")
     assert report["items"][0]["category"] == "inspection warning"
+
+
+def test_unassigned_sources_and_catalog_are_excluded(tmp_path):
+    (tmp_path / "other.cloomc").write_text(
+        "abstraction Unassigned {\n; not implemented\n}")
+    (tmp_path / "manifest.json").write_text(json.dumps([
+        dict(abstraction="Unassigned", filename="absent.lump")
+    ]))
+    assert attention_report({"rows": []}, tmp_path, tmp_path, lambda _: {}, "legacy")["items"] == []
+    placed = {"rows": [dict(name="Unassigned", slot=3, kind="mmio")]}
+    assert attention_report(placed, tmp_path, tmp_path, lambda _: {}, "phase1")["items"]
+    assert attention_report({"rows": []}, tmp_path, tmp_path, lambda _: {}, "ascending")["items"] == []

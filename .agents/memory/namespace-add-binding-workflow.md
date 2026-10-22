@@ -32,3 +32,12 @@ remaining work list.
 **How to apply:** Ignoring is a browser-local, profile-specific review choice,
 not resolution or a build-check exemption. Keep ignored issues restorable and
 return changed evidence to the active list.
+
+Only items occupying slots in the selected Namespace belong in this list.
+
+**Why:** The user explicitly excluded library-only abstractions from next-build
+review.
+
+**How to apply:** Use exact selected artifacts, not latest catalog revisions.
+Attach absent-dependency details to the placed owner, never show absent
+resources or unrelated source files as standalone items.
