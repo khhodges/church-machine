@@ -2275,5 +2275,397 @@
       "signing_key_id": "compiler-signing-secret/v1",
       "signature": "c126b7a1b0f59598a44f3065df8abb024d5ed8f1456d68ed96b17cc51501db0d"
     }
+  },
+  {
+    "token": "f615f5d4",
+    "abstraction": "ide.Mint",
+    "filename": "ide.Mint.1.ed6c76f6.lump",
+    "lump_version": 1,
+    "compiled_at": 1792673343.7823567,
+    "operation_id": "1f069301-fe00-42ae-a35b-ea59827c5d1f",
+    "output_variants": {
+      "api": {
+        "sha256": "f2ece5b45f3d96a87e23b3a432b903ba2dc4fe34ac1ff0f87dd07f43fe0865fc",
+        "bytes": 4096,
+        "file_bytes": 1336,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/852b6fde0a484c591c718a4e89765956a4cfada44173877282b1fcf046ce1a82/api?compressed=1"
+      },
+      "compact": {
+        "sha256": "5d12755aef092bb9c620ae88f5dcf81233fc558aaafe03de5c0cc432f7f0fb0c",
+        "bytes": 32768,
+        "file_bytes": 4635,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/852b6fde0a484c591c718a4e89765956a4cfada44173877282b1fcf046ce1a82/compact?compressed=1"
+      },
+      "full": {
+        "sha256": "5c3cf8a2850b2bf086b069723a2f8f1605635ea9c364cb0db026324fa5b598e8",
+        "bytes": 32768,
+        "file_bytes": 9120,
+        "encoding": "gzip",
+        "url": "/api/lump-variants/852b6fde0a484c591c718a4e89765956a4cfada44173877282b1fcf046ce1a82/full?compressed=1"
+      }
+    },
+    "variant_primary_hash": "f2ece5b45f3d96a87e23b3a432b903ba2dc4fe34ac1ff0f87dd07f43fe0865fc",
+    "variant_bundle_id": "852b6fde0a484c591c718a4e89765956a4cfada44173877282b1fcf046ce1a82",
+    "variant_compiler_record": {
+      "binary_hash": "f2ece5b45f3d96a87e23b3a432b903ba2dc4fe34ac1ff0f87dd07f43fe0865fc",
+      "source_hash": "cacadb5f489ccd7b8bd25769587703b75ab5896541978019e7603bc86b056623",
+      "language": "assembly",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compact_compile_context": {
+        "compiler_sha256": "a005f022648784d3f064da02a09559bf1293f7370fe7a773e287c68c2365b42f",
+        "inputs": {
+          "language": "auto",
+          "_ide_hierarchy": {
+            "node": "ide",
+            "aliases": {
+              "Thread.2": "ide.Thread2",
+              "Thread.3": "ide.Thread3",
+              "ide.Thread.2": "ide.Thread2",
+              "ide.Thread.3": "ide.Thread3",
+              "Boot.Thread": "ide.BootThread"
+            },
+            "definitions": {}
+          }
+        },
+        "source_language": "assembly"
+      },
+      "hardfault_sites": [
+        {
+          "offset": 312,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: result identity does not match the published DATA RW GT",
+          "method": "CREATE",
+          "sourceLine": 492
+        },
+        {
+          "offset": 313,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: slot history does not match the reserved sequence",
+          "method": "CREATE",
+          "sourceLine": 494
+        },
+        {
+          "offset": 314,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: reserved Namespace slot is not empty",
+          "method": "CREATE",
+          "sourceLine": 496
+        },
+        {
+          "offset": 315,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: PkVerify did not return APPROVED",
+          "method": "CREATE",
+          "sourceLine": 498
+        },
+        {
+          "offset": 316,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: invalid allocator or slot-history input for descriptor",
+          "method": "CREATE",
+          "sourceLine": 500
+        },
+        {
+          "offset": 317,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: selected slot is retired and cannot be allocated",
+          "method": "CREATE",
+          "sourceLine": 502
+        },
+        {
+          "offset": 318,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: missing Passkey",
+          "method": "CREATE",
+          "sourceLine": 504
+        },
+        {
+          "offset": 319,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: proof capability is not readable",
+          "method": "CREATE",
+          "sourceLine": 506
+        },
+        {
+          "offset": 320,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: DATA source CR4 must be NULL",
+          "method": "CREATE",
+          "sourceLine": 508
+        },
+        {
+          "offset": 321,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: only DATA case is implemented",
+          "method": "CREATE",
+          "sourceLine": 510
+        },
+        {
+          "offset": 322,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: DATA permissions must be READ/WRITE",
+          "method": "CREATE",
+          "sourceLine": 512
+        },
+        {
+          "offset": 323,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: allocation size is zero",
+          "method": "CREATE",
+          "sourceLine": 514
+        },
+        {
+          "offset": 324,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: allocation size is not a power of two",
+          "method": "CREATE",
+          "sourceLine": 516
+        },
+        {
+          "offset": 325,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: inconsistent allocator state",
+          "method": "CREATE",
+          "sourceLine": 518
+        },
+        {
+          "offset": 326,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: memory pool exhausted",
+          "method": "CREATE",
+          "sourceLine": 520
+        },
+        {
+          "offset": 327,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: free Namespace slots exhausted",
+          "method": "CREATE",
+          "sourceLine": 522
+        },
+        {
+          "offset": 328,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: operation did not complete",
+          "method": "CREATE",
+          "sourceLine": 524
+        },
+        {
+          "offset": 329,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: result capability is NULL",
+          "method": "CREATE",
+          "sourceLine": 526
+        },
+        {
+          "offset": 330,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: result lacks READ/WRITE permissions",
+          "method": "CREATE",
+          "sourceLine": 528
+        },
+        {
+          "offset": 331,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace location read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 530
+        },
+        {
+          "offset": 332,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace bounds/version read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 532
+        },
+        {
+          "offset": 333,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace integrity read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 534
+        },
+        {
+          "offset": 334,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.CREATE: Namespace identity read-back mismatch",
+          "method": "CREATE",
+          "sourceLine": 536
+        },
+        {
+          "offset": 370,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: not implemented in Phase 1 CREATE package",
+          "method": "DESTROY",
+          "sourceLine": 591
+        },
+        {
+          "offset": 371,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: missing Passkey",
+          "method": "DESTROY",
+          "sourceLine": 593
+        },
+        {
+          "offset": 372,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: proof capability is not readable",
+          "method": "DESTROY",
+          "sourceLine": 595
+        },
+        {
+          "offset": 373,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: target is NULL",
+          "method": "DESTROY",
+          "sourceLine": 597
+        },
+        {
+          "offset": 374,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: CR4 must be NULL",
+          "method": "DESTROY",
+          "sourceLine": 599
+        },
+        {
+          "offset": 375,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: CR8 must be NULL",
+          "method": "DESTROY",
+          "sourceLine": 601
+        },
+        {
+          "offset": 376,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: operation did not complete",
+          "method": "DESTROY",
+          "sourceLine": 603
+        },
+        {
+          "offset": 377,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.DESTROY: result capability must be NULL",
+          "method": "DESTROY",
+          "sourceLine": 605
+        },
+        {
+          "offset": 413,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: not implemented in Phase 1 CREATE package",
+          "method": "MakeOutform",
+          "sourceLine": 658
+        },
+        {
+          "offset": 414,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: missing Passkey",
+          "method": "MakeOutform",
+          "sourceLine": 660
+        },
+        {
+          "offset": 415,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: proof capability is not readable",
+          "method": "MakeOutform",
+          "sourceLine": 662
+        },
+        {
+          "offset": 416,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: target is NULL",
+          "method": "MakeOutform",
+          "sourceLine": 664
+        },
+        {
+          "offset": 417,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: CR4 must be NULL",
+          "method": "MakeOutform",
+          "sourceLine": 666
+        },
+        {
+          "offset": 418,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: CR8 must be NULL",
+          "method": "MakeOutform",
+          "sourceLine": 668
+        },
+        {
+          "offset": 419,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: operation did not complete",
+          "method": "MakeOutform",
+          "sourceLine": 670
+        },
+        {
+          "offset": 420,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeOutform: result capability is NULL",
+          "method": "MakeOutform",
+          "sourceLine": 672
+        },
+        {
+          "offset": 456,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: not implemented in Phase 1 CREATE package",
+          "method": "MakeInform",
+          "sourceLine": 725
+        },
+        {
+          "offset": 457,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: missing Passkey",
+          "method": "MakeInform",
+          "sourceLine": 727
+        },
+        {
+          "offset": 458,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: proof capability is not readable",
+          "method": "MakeInform",
+          "sourceLine": 729
+        },
+        {
+          "offset": 459,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: target is NULL",
+          "method": "MakeInform",
+          "sourceLine": 731
+        },
+        {
+          "offset": 460,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: CR4 must be NULL",
+          "method": "MakeInform",
+          "sourceLine": 733
+        },
+        {
+          "offset": 461,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: CR8 must be NULL",
+          "method": "MakeInform",
+          "sourceLine": 735
+        },
+        {
+          "offset": 462,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: operation did not complete",
+          "method": "MakeInform",
+          "sourceLine": 737
+        },
+        {
+          "offset": 463,
+          "reason": "EXPLICIT_FAULT",
+          "explanation": "Mint.MakeInform: result capability is NULL",
+          "method": "MakeInform",
+          "sourceLine": 739
+        }
+      ],
+      "signing_scheme": "church-compiler-hmac-sha256/v2",
+      "signing_key_id": "compiler-signing-secret/v1",
+      "signature": "d787a668c4ba66854370e07e65db592160dfa33ee70ce0ed01b4d20f2c1a195b"
+    }
   }
 ]

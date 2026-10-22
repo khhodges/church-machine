@@ -64,6 +64,19 @@ previously declined protected-profile shortcut.
 
 ## FPGA-first Mint review
 
+The user's CREATE DATA fault-injection acceptance criterion permits leaked
+reservations, never recycling after a hard cut and authorized restart setup.
+It also requires no delivered GT without completed publication/read-back and
+no caller-readable private authority after a fault.
+
+**Why:** The user's review explicitly distinguishes non-return on a live fault
+from safe state after reset/power loss and asks for per-store cut fixtures.
+
+**How to apply:** Treat restart persistence, partial-entry visibility and
+private result containment as separate proof obligations. Do not infer them
+from passing arithmetic, normal RETURN cleanup or component issuance tests.
+This criterion does not itself authorize a new interlock or rollback mechanism.
+
 For Phase 1 CREATE, a faulted request never returns a result GT. Leave its
 consumed reservation or partially written slot unused; do not introduce rollback
 or recovery as a prerequisite for the happy path.
