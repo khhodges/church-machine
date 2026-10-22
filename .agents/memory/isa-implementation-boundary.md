@@ -3,6 +3,19 @@ name: ISA versus implementation boundary
 description: Keep implementation mechanisms out of normative ISA wording.
 ---
 
+The ISA alone defines required behavior for hardware, FPGA and simulator.
+Implement the simulator in whichever straightforward way faithfully reproduces
+the ISA, hiding internal byte/word representation conversions.
+
+**Why:** On 2026-10-22 the user explicitly reaffirmed this after RTL was
+incorrectly presented as a prerequisite to completing Mint software.
+
+**How to apply:** Validate Mint CLOOMC against the approved ISA model. Correct
+simulator mismatches rather than impose implementation-specific conversions on
+Mint or require RTL/FPGA work for software completion. Preserve ISA-defined
+address units and observable behavior; only internal representations are free.
+RTL is an implementation to check against the ISA, not an alternate authority.
+
 The user requires: "the existing ISA must not change in any way" for IDE
 auditing and simplification.
 

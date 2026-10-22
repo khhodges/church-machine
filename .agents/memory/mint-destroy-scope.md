@@ -14,6 +14,15 @@ when requesting the merged-work progress summary on 2026-10-22.
 other features while pursuing this goal. Keep deferred FPGA acceptance distinct
 from the isolated V1 development scope.
 
+Mint software completion requires CLOOMC execution against a faithful approved
+ISA model, not RTL or FPGA acceptance.
+
+**Why:** The user clarified that only the ISA defines the implementations;
+byte/word implementation differences must be hidden by the simulator.
+
+**How to apply:** Follow [ISA implementation boundary](isa-implementation-boundary.md).
+The earlier use of RTL was diagnostic evidence, not a continuing software gate.
+
 **Why:** The user explicitly clarified this boundary during the Mint method
 review.
 
