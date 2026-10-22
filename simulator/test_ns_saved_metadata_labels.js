@@ -1,0 +1,26 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(`${__dirname}/app-memory.js`, 'utf8');
+const start = source.indexOf('function _nsSavedMetadataLabels(');
+const end = source.indexOf('// ── Render the metadata panel', start);
+const context = {};
+vm.runInNewContext(source.slice(start, end), context);
+const labels = context._nsSavedMetadataLabels;
+const record = {binary_hash:'exact-hash', lump_version:2, issue_n:1,
+    variant_compiler_record:{binary_hash:'exact-hash',language:'assembly'}};
+assert.equal(labels(record, {}, null).language, 'Assembly');
+assert.equal(labels(record, {version:'authored version'}, null).revision, '2');
+assert.equal(labels({...record, lump_version:7}, {}, null).revision, '7');
+assert.equal(labels({...record, binary_hash:'different'}, {}, null).language, '—');
+assert.equal(labels({}, {language:'haskell'}, null).language, 'Haskell');
+assert.equal(labels({}, {}, {apiDefinition:{language:'assembly'}}).language, 'Assembly');
+assert.equal(labels({source_language:'english'}, {}, null).language, 'English');
+assert.equal(labels({issue_n:1}, {version:'v9'}, null).revision, '—');
+assert.equal(labels({}, {}, null).language, '—');
+assert.match(source, /_nsSavedMetadataLabels\(approval, displayMetadata, artifactDetail\)/);
+assert.match(source, />Saved revision<\/span>/);
+assert.match(source, /esc\(savedLabels.language\)/);
+assert.match(source, /esc\(savedLabels.revision\)/);
+console.log('PASS Namespace metadata: exact compiler language, saved revision, no issue/version substitution');

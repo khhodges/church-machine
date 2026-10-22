@@ -5193,6 +5193,22 @@ async function _nsDefineSymbolicConfirm() {
     }
 }
 
+function _nsSavedMetadataLabels(record, approved, detail) {
+    const compiler = record.variant_compiler_record;
+    const compilerLanguage = compiler && record.binary_hash &&
+        compiler.binary_hash === record.binary_hash ? compiler.language : null;
+    const language = compilerLanguage || approved.language ||
+        (detail && detail.apiDefinition && detail.apiDefinition.language) ||
+        record.source_language || record.language;
+    const labels = {assembly:'Assembly', javascript:'CLOOMC++', cloomc:'CLOOMC++',
+        haskell:'Haskell', english:'English', symbolic:'Symbolic Math', lambda:'Lambda Calculus'};
+    return {
+        language: language ? (labels[language] || language) : '—',
+        // Saved revision is not an authored version string or canonical issue.
+        revision: record.lump_version == null ? '—' : String(record.lump_version),
+    };
+}
+
 // ── Render the metadata panel below the LUMP dropdown ─────────────────────────
 // Called on initial render and every time the dropdown changes.
 // Performs a real per-selection fetch of /api/lump/<token>/words to get
@@ -5332,6 +5348,7 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
 
     // Approved fields are presentation hints only; Namespace owns placement.
     const displayMetadata = approvedMetadata || {};
+    const savedLabels = _nsSavedMetadataLabels(approval, displayMetadata, artifactDetail);
     const bootResident  = !!(displayMetadata.boot_resident);
     const phase1Design = window.NamespaceDesignV1?.state.active &&
         window.NamespaceDesignV1.state.profile === 'phase1';
@@ -5443,9 +5460,9 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
                 <div><span style="${sLabel}">Grants</span>
                      <span style="${sRoVal}">${grants}</span></div>
                 <div><span style="${sLabel}">Language</span>
-                     <span style="${sRoVal}">${esc(displayMetadata.language || (artifactDetail && artifactDetail.apiDefinition && artifactDetail.apiDefinition.language) || '—')}</span></div>
-                <div><span style="${sLabel}">Version</span>
-                     <span style="${sRoVal}">${esc(displayMetadata.version || '—')}</span></div>
+                     <span style="${sRoVal}">${esc(savedLabels.language)}</span></div>
+                <div><span style="${sLabel}">Saved revision</span>
+                     <span style="${sRoVal}">${esc(savedLabels.revision)}</span></div>
                 <div><span style="${sLabel}">Author</span>
                      <span style="${sRoVal}">${esc(displayMetadata.author || '—')}</span></div>
                 ${displayMetadata.profile ? `<div><span style="${sLabel}">Profile</span>
