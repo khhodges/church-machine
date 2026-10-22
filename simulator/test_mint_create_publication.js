@@ -59,9 +59,9 @@ function setup({method = 0, occupied = false, seq = 0, fresh = 1, issueOnly = fa
     sim.pc = 1;
     sim.dr[2] = 8 | 4;
     sim.dr[3] = 3;
-    sim.cr[2] = {word0: 0xffffffff, word1: 0, word2: 0, word3: 0, m: 0};
-    sim.cr[3] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
-    sim.cr[4] = {...sim.cr[3]};
+    sim.cr[2] = {word0: gt(43, 'R'), word1: STATE, word2: 127, word3: 0, m: 0};
+    sim.cr[3] = {...sim.cr[2]};
+    sim.cr[4] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
     return {sim, caller, mint};
 }
 function run(f, hook = () => {}) {

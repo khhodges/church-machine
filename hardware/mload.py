@@ -44,6 +44,8 @@ class ChurchMLoad(Elaboratable):
         # Granted only to explicit direct-NULL LOAD, never CALL/RETURN.
         self.sub_null_clear = Signal()
         self.sub_m_elevated = Signal()
+        # CR6.M grants L access to its bounded c-list, not Namespace elevation.
+        self.sub_cr6_l = Signal()
         # Read-only descriptor check used by the physical scheduler preflight.
         # It executes c-list/direct and Namespace validation but never clears a
         # G-bit or writes a CR/thread row.
@@ -112,6 +114,7 @@ class ChurchMLoad(Elaboratable):
         validate_only_reg = Signal()
         direct_gt_reg = Signal(32)
         m_elevated_reg = Signal()
+        cr6_l_reg = Signal()
         src_cap = Signal(CAP_REG_LAYOUT)
         result_cap = Signal(CAP_REG_LAYOUT)
         fault_type_reg = Signal(5)  # 5 bits: FaultType values up to 0x18
@@ -195,6 +198,7 @@ class ChurchMLoad(Elaboratable):
                         validate_only_reg.eq(self.sub_validate_only),
                         direct_gt_reg.eq(self.sub_direct_gt),
                         m_elevated_reg.eq(self.sub_m_elevated),
+                        cr6_l_reg.eq(self.sub_cr6_l & (self.sub_cr_src == 6)),
                         result_cap.eq(0),
                         fault_type_reg.eq(FaultType.NONE),
                         rd_armed.eq(0),
@@ -224,7 +228,7 @@ class ChurchMLoad(Elaboratable):
                     # NULL_CAP check is suppressed for M-elevated accesses.
                     m.d.sync += fault_type_reg.eq(FaultType.NULL_CAP)
                     m.next = "FAULT"
-                with m.Elif(~has_l_perm & ~self.sub_m_elevated):
+                with m.Elif(~has_l_perm & ~cr6_l_reg & ~self.sub_m_elevated):
                     m.d.sync += fault_type_reg.eq(FaultType.PERM_L)
                     m.next = "FAULT"
                 with m.Else():

@@ -1,18 +1,30 @@
-# Isolated Mint private-binding candidate
+# Historical Mint private-binding candidate — not reproducible from current source
+
+**Historical record only.** The current Mint source has intentionally removed
+the all-ones credential escape and declares `ide.MintScratch L` instead of
+`ide.MintState L`. The generator below retains the old exact-code pins and
+binding inventory and therefore rejects the current source. Do not update its
+pins automatically or interpret this candidate as approval of current Mint.
+
+Regeneration requires a separately reviewed descriptor/pin rebuild and correction
+of the legacy dispatch-table emitter. The old bytes also fail ChurchCore CALL
+before entering Mint. Current full-source RTL acceptance and its limits are
+documented in `tests/hardware/MINT_CREATE_REPLAY.md`.
 
 This is a **fresh disposable saved design**, not a revision of the live Namespace,
 the full Phase 1 baseline, or a bootable release. It supplies the five private
-C-list grants declared by the current Mint source using existing GT encodings.
+C-list grants declared by the historical Mint source using existing GT encodings.
 It does not authorize installation, simulator activation, publishing or flashing.
 
-## Reproduce
+## Historical reproduction commands (currently fail closed)
 
 ```
 python3 scripts/prepare_mint_fpga_trial.py
 python3 -m pytest scripts/test_prepare_mint_fpga_trial.py -q
 ```
 
-The generator creates a new `generated-artifacts/mint-fpga-trial-*` directory:
+With the original reviewed source only, the generator created a new
+`generated-artifacts/mint-fpga-trial-*` directory:
 
 - `saved-design.json`: exact private layout, source hashes and explicit history origin.
 - `candidate.bin`: 16,384 big-endian 32-bit words, with physical-byte descriptors.
@@ -45,7 +57,8 @@ the verifier never substitutes newly compiled bytes for saved bytes.
 
 No catalog, manifest, approval store, saved live configuration or board is read
 or written. Generated binary output is excluded from Git and deployment. The
-tracked generator and tests are the reproducible deliverable. This deliberately
+tracked generator and tests describe the historical deliverable, not a
+reproducible candidate for the corrected current source. This deliberately
 uses a distinct candidate format: it must not be passed to the legacy simulator,
 Header V2 installers or the generic ascending-image approval endpoint. No signed
 compiler attestation or canonical published-LUMP identity is claimed for this

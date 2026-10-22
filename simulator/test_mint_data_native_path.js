@@ -282,10 +282,8 @@ console.log('PASS: native zeroing and exact-slot write/read-back fragments');
 console.log('PASS: native SZ=0 RETURN resumes the saved context and preserves ALL CRs.');
 console.log('PASS: TPERM CLEAR is a test, not erasure; only CALL-frame RETURN masks supply erasure.');
 console.log('PASS: native label-bound LAMBDA enters its body and returns, without changing instruction encoding.');
-// The all-ones comparison is CLOOMC, not a host predicate or forged success
-// response. Its reference is written through Mint's own RW view and loaded
-// through its separate L view. The caller cannot choose the reference.
-const escapeText = fragment('create_data_passkey_escape', 'create_data_scalar_checks');
+// Every credential now requires proof; the unsupported all-ones escape is gone.
+const escapeText = fragment('create_data_credentials', 'create_data_scalar_checks');
 const escapeStops = [...new Set([...escapeText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];
 for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xfffffffe, 0x06000000, 0]) {
     const {s, labels} = fixture(escapeText + '\ncreate_data_scalar_checks:\nHALT\n' +
@@ -302,18 +300,10 @@ for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xffff
     s.cr[4] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
     let steps = 0;
     while (!s.halted && s.pc !== labels.create_data_scalar_checks && steps++ < 40) s.step();
-    if (credential === 0xffffffff) {
-        assert.equal(s.halted, false, JSON.stringify(s.faultLog));
-        assert.equal(s.pc, labels.create_data_scalar_checks);
-        assert.equal(s.cr[11].word0 >>> 0, 0xffffffff);
-        assert.equal(s.cr[3].word0, 0, 'Escape must not need a proof capability');
-        assert.equal(s.mLoad(credential, 'R', 2).ok, false, 'Escape is not memory authority');
-    } else {
-        assert.notEqual(s.pc, labels.create_data_scalar_checks,
-            'A non-escape credential without proof must not pass');
-    }
+    assert.notEqual(s.pc, labels.create_data_scalar_checks,
+        'No credential, including all-ones, may skip the proof check');
 }
-console.log('PASS: only CR2=0xFFFFFFFF skips the proof checks, without granting memory authority.');
+console.log('PASS: no credential bypasses the proof checks.');
 require('./test_mint_allocator_descriptor');
 require('./test_mint_create_publication');
 require('./test_factory_branch_encoding');

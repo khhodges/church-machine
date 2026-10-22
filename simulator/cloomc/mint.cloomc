@@ -54,7 +54,7 @@
 ; explicit unresolved gates, not silently assumed to pass.
 
 abstraction ide.Mint {
-capabilities { SELF E, ide.MintState RW, ide.MintState L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW }
+capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW }
 
 method CREATE {
 CREATE_inputs:
@@ -65,38 +65,20 @@ CREATE_inputs:
     ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
     ; Other cases/permissions remain unsupported, never silently become Data.
     ; TPERM CLEAR tests presence; it does NOT erase a capability.
+    ; Spell constant data offsets as #offset, DR0: this uses the shared
+    ; indexed encoding supported by both RTL and the simulator. The legacy
+    ; three-operand immediate encoding is not part of this acceptance image.
     LOAD CR1, NULL
 create_data_inputs_after_clear:
     IADD DR1, DR0, #0
-create_data_passkey_escape:
-    ; Private state LUMP views come from Mint's own C-list, never from
-    ; the caller. Its sole c-list row is scratch at the last LUMP word.
-    LOAD CR8, CR6, #1
-    LOAD CR7, CR6, #2
-    DREAD DR9, CR8, #0
-    BFEXT DR9, DR9, #23, #4
-    IADD DR10, DR0, #64
-create_data_state_size:
-    MCMP DR9, #0
-    BRANCHEQ create_data_escape_reference
-    SHL DR10, DR10, #1
-    ISUB DR9, DR9, #1
-    BRANCH create_data_state_size
-create_data_escape_reference:
-    ISUB DR10, DR10, #1
-    ISUB DR9, DR0, #1
-    DWRITE DR9, CR8, #0, DR10
-    LOAD CR11, CR7, #0
-    ; Existing EXACT instruction: only the exact all-ones CR2 escapes.
-    ; No proof read or CR3 requirement on this Phase 1 testing path.
-    TPERM CR2, EXACT, CR11
-    BRANCHEQ create_data_source_checks
+create_data_credentials:
+    ; Normal credential/proof checks only. No all-ones token escape.
     TPERM CR2, NULL
     BRANCHEQ TODO_CREATE_INPUT_CREDENTIAL_NULL
     TPERM CR3, R
     BRANCHNE TODO_CREATE_INPUT_PROOF_READ
     ; Probe proof bounds without clobbering packed DR2 or permission DR3.
-    DREAD DR4, CR3, #3
+    DREAD DR4, CR3, #3, DR0
 create_data_source_checks:
     TPERM CR4, NULL
     BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL
@@ -122,8 +104,8 @@ create_data_power_loop:
     SHR DR7, DR7, #1
     BRANCH create_data_power_loop
 create_data_authorize:
-    ; Call Verify through Mint's own E capability, including the Phase 1
-    ; test-credential path. Source method 0 uses CALL selector 1.
+    ; Call Verify through Mint's own E capability after the ordinary
+    ; credential/proof checks. Source method 0 uses CALL selector 1.
     LOAD CR1, CR6, #4
     CALL CR1, #0
     MCMP DR1, #1
@@ -155,20 +137,20 @@ create_data_allocate:
     BFEXT DR4, DR4, #21, #11
     MCMP DR4, #0
     BRANCHNE TODO_CREATE_DESCRIPTOR_INPUT_INVALID
-    DREAD DR8, CR7, #1
-    DREAD DR10, CR7, #2
+    DREAD DR8, CR7, #1, DR0
+    DREAD DR10, CR7, #2, DR0
     MCMP DR8, DR10
     BRANCHHI TODO_CREATE_ALLOCATOR_STATE
     ISUB DR10, DR10, DR8
     MCMP DR6, DR10
     BRANCHHI TODO_CREATE_POOL_EXHAUSTED
-    DREAD DR9, CR7, #3
+    DREAD DR9, CR7, #3, DR0
     MCMP DR9, #7
     BRANCHLO TODO_CREATE_ALLOCATOR_STATE
-    DREAD DR10, CR7, #4
+    DREAD DR10, CR7, #4, DR0
     MCMP DR9, DR10
     BRANCHHS TODO_CREATE_SLOTS_EXHAUSTED
-    DREAD DR4, CR7, #6
+    DREAD DR4, CR7, #6, DR0
     MCMP DR10, DR4
     BRANCHHI TODO_CREATE_ALLOCATOR_STATE
     DREAD DR7, CR7, #0, DR9
@@ -188,7 +170,7 @@ create_data_allocate:
     BFEXT DR4, DR11, #30, #2
     MCMP DR4, #0
     BRANCHNE TODO_CREATE_ALLOCATOR_STATE
-    DREAD DR2, CR7, #5
+    DREAD DR2, CR7, #5, DR0
     BFEXT DR4, DR2, #0, #2
     MCMP DR4, #0
     BRANCHNE TODO_CREATE_ALLOCATOR_STATE
@@ -200,7 +182,7 @@ create_data_allocate:
     IADD DR8, DR8, DR2
     ; History indexed by slot, NOT by free-queue position. Duplicate queue
     ; entries cannot turn a reserved slot back into a never-used slot.
-    DREAD DR9, CR7, #6
+    DREAD DR9, CR7, #6, DR0
     IADD DR10, DR9, DR7
     MCMP DR10, DR9
     BRANCHLO TODO_CREATE_ALLOCATOR_STATE
@@ -214,18 +196,18 @@ create_data_allocate:
 create_data_zero_begin:
     ; Package succeeded. Consume history before advancing either cursor:
     ; a later fault may leak a reservation, never reuse its authority.
-    DREAD DR13, CR7, #6
+    DREAD DR13, CR7, #6, DR0
     IADD DR13, DR13, DR7
     BFEXT DR2, DR9, #21, #9
     IADD DR3, DR0, #1
     BFINS DR2, DR3, #10, #1
     DWRITE DR2, CR7, #0, DR13
-    DREAD DR13, CR7, #1
+    DREAD DR13, CR7, #1, DR0
     IADD DR14, DR13, DR6
-    DWRITE DR14, CR7, #1
-    DREAD DR15, CR7, #3
+    DWRITE DR14, CR7, #1, DR0
+    DREAD DR15, CR7, #3, DR0
     IADD DR15, DR15, #1
-    DWRITE DR15, CR7, #3
+    DWRITE DR15, CR7, #3, DR0
 create_data_zero_loop:
     MCMP DR13, DR14
     BRANCHEQ create_data_set_slot
@@ -243,7 +225,7 @@ create_data_descriptor_ready:
 create_data_retire_slot:
     ; Durable within MintState: retries see 511, never wrap or allocate.
     ; Leave queue/pool cursors and pool bytes unchanged; no auto-skip policy.
-    DREAD DR13, CR7, #6
+    DREAD DR13, CR7, #6, DR0
     IADD DR13, DR13, DR7
     DWRITE DR4, CR7, #0, DR13
     BRANCH TODO_CREATE_DESCRIPTOR_RETIRED
@@ -369,9 +351,10 @@ create_data_slot_after_clear:
     ; Same Mint context, single-threaded Phase 1: retain private authority.
 create_data_account_and_issue:
     ; Allocation cursors/history were already consumed once. No second debit.
-    ; Use the same private scratch C-list row as the entry credential check.
-    ; Provisioning must keep this row disjoint from queue/history storage.
-    DREAD DR2, CR7, #0
+    ; MintScratch is an explicit one-word L view of the final MintState word.
+    ; Provisioning must keep this row disjoint from queue/history storage;
+    ; RTL LOAD does not automatically reduce a whole-object L capability.
+    DREAD DR2, CR7, #0, DR0
     BFEXT DR2, DR2, #23, #4
     IADD DR3, DR0, #64
 create_issue_state_size:
@@ -441,7 +424,7 @@ create_data_slot_lambda:
     BFEXT DR2, DR7, #16, #16
     MCMP DR2, #0
     BRANCHNE TODO_CREATE_SLOT_RESERVATION
-    DREAD DR2, CR7, #6
+    DREAD DR2, CR7, #6, DR0
     IADD DR2, DR2, DR7
     DREAD DR3, CR7, #0, DR2
     BFEXT DR2, DR9, #21, #9

@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Fresh, inert Mint binding fixture; no live catalog, approval or installation IO."""
+"""Historical pinned Mint trial; intentionally rejects corrected current source.
+
+The old inventory has MintState L, not the approved explicit MintScratch L
+binding. Do not refresh pins automatically. A separately reviewed trial rebuild
+is required; see docs/phase-1/mint-private-fpga-trial.md. No live installation IO.
+Saved-file validation remains available and fails closed on stale inputs.
+"""
 import argparse
 import hashlib
 import json

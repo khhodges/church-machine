@@ -538,7 +538,8 @@ class ChurchCore(Elaboratable):
                                      Mux(u_xloadlambda.busy, u_xloadlambda.cr_rd_addr,
                                          Mux(u_dread.busy, u_dread.cr_rd_addr,
                                              Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
-                                                 cr_src))))
+                                                 Mux(is_church_op & (church_op == ChurchOpcode.TPERM),
+                                                     cr_dst, cr_src)))))
             cr_rd_addr_inner = Mux(u_change.change_busy, u_change.cr_rd_addr,
                                    Mux(u_switch.switch_busy, u_switch.cr_rd_addr,
                                        cr_rd_addr_default))
@@ -553,7 +554,8 @@ class ChurchCore(Elaboratable):
         else:
             cr_rd_addr_default = Mux(u_dread.busy, u_dread.cr_rd_addr,
                                      Mux(u_dwrite.busy, u_dwrite.cr_rd_addr,
-                                         cr_src))
+                                         Mux(is_church_op & (church_op == ChurchOpcode.TPERM),
+                                             cr_dst, cr_src)))
             m.d.comb += u_regs.cr_rd_addr.eq(
                 Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
                     Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
@@ -3024,6 +3026,12 @@ class ChurchCore(Elaboratable):
                 ),
                 u_shared_mload.sub_validate_only.eq(0),
             ]
+        # Ordinary LOAD may use the established CR6.M L permission, but must
+        # still pass every c-list bound and Namespace validation gate.
+        m.d.comb += u_shared_mload.sub_cr6_l.eq(
+            u_load.load_busy & ~u_call.call_busy & ~u_return.busy &
+            (u_load.mload_cr_src == CR_CLIST) &
+            u_regs.m_bit_device_state[CR_CLIST])
 
         # Grant-qualified handshake feedback.  The shared mload's busy/done/
         # fault outputs are broadcast; each master must only see them while it
