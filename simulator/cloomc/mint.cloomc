@@ -24,8 +24,7 @@
 ; Native CLOOMC instruction checks below are real source, not host predicates.
 ; Fault-only TODO labels below now have explicit HARDFAULT destinations.
 ; Their names are retained to match the reviewed pseudocode.
-; Operation TODOs still have no destination: compilation MUST fail until
-; the corresponding implementation has been reviewed and supplied.
+; Unimplemented methods explicitly HARDFAULT; they never report completion.
 ; HARDFAULT emits the agreed word with signed compiler-site metadata for
 ; exact saved-artifact attribution. Never substitute HALT or a reporting CALL.
 ; No default success, no private MINT opcode, no live Namespace installation.
@@ -55,7 +54,7 @@
 ; explicit unresolved gates, not silently assumed to pass.
 
 abstraction ide.Mint {
-capabilities { SELF E, ide.MintState RW, ide.MintState L, ide.MintPool RW, ide.PkVerify E }
+capabilities { SELF E, ide.MintState RW, ide.MintState L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW }
 
 method CREATE {
 CREATE_inputs:
@@ -133,6 +132,7 @@ create_data_authorize:
     ; Approval is not completed CREATE; pool/slot capacity checks still follow.
     ; PkVerify preserves requested size DR6 and credential/proof CR2/CR3.
     IADD DR1, DR0, #0
+    LOAD CR1, NULL
     BRANCH create_data_allocate
 create_data_allocate:
     ; Mint-owned state payload (word 0 remains the LUMP header):
@@ -368,10 +368,28 @@ create_data_set_slot:
 create_data_slot_after_clear:
     ; Same Mint context, single-threaded Phase 1: retain private authority.
 create_data_account_and_issue:
-    ; Service binding missing: finish GC/accounting after confirmed slot writes,
-    ; debit exactly DR6 words once, issue Inform DATA RW B=1 in CR1.
-    ; Only completed publication may set DR1=1. No rollback is promised.
-    BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE
+    ; Allocation cursors/history were already consumed once. No second debit.
+    ; Use the same private scratch C-list row as the entry credential check.
+    ; Provisioning must keep this row disjoint from queue/history storage.
+    DREAD DR2, CR7, #0
+    BFEXT DR2, DR2, #23, #4
+    IADD DR3, DR0, #64
+create_issue_state_size:
+    MCMP DR2, #0
+    BRANCHEQ create_issue_scratch
+    SHL DR3, DR3, #1
+    ISUB DR2, DR2, #1
+    BRANCH create_issue_state_size
+create_issue_scratch:
+    ISUB DR3, DR3, #1
+    DWRITE DR11, CR7, #0, DR3
+    LOAD CR9, CR6, #2
+    LOAD CR1, CR9, #0
+    ; Exact comparison to the just-loaded private row, plus scalar identity
+    ; checks below. LOAD performs the ordinary machine capability checks.
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR7, #0, DR3
+    IADD DR1, DR0, #1
 create_finish:
     ; Validate the result before erasing descriptor/accounting evidence.
 create_result:
@@ -381,8 +399,18 @@ create_result:
     BRANCHEQ TODO_CREATE_RESULT_NULL
     TPERM CR1, RW
     BRANCHNE TODO_CREATE_RESULT_NOT_RW
-    ; Verify Inform DATA, B=1, and exact committed allocation identity.
-    BRANCH TODO_CREATE_RESULT_TYPE
+    TPERM CR1, EXACT, CR11
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+    BFEXT DR2, DR11, #25, #7
+    MCMP DR2, #89
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+    BFEXT DR2, DR11, #0, #16
+    MCMP DR2, DR7
+    BRANCHNE TODO_CREATE_RESULT_TYPE
+    BFEXT DR2, DR11, #16, #9
+    BFEXT DR3, DR9, #21, #9
+    MCMP DR2, DR3
+    BRANCHNE TODO_CREATE_RESULT_TYPE
 create_return:
     IADD DR2, DR0, #0
     IADD DR3, DR0, #0
@@ -402,28 +430,56 @@ create_return:
 create_data_slot_lambda:
     ; Private same-scope local block, NOT a public method or an E-GT CALL.
     ; Only this body may acquire the configured Namespace RW view in CR10.
-    ; Validate frozen Namespace identity, DR7 slot bounds, empty-slot generation
-    ; and all four prepared words against the authorized reservation.
-    ; Hold the required writer/observer exclusion through read-back and cleanup;
-    ; LAMBDA alone does not provide atomicity. No CALL/CHANGE/SWITCH in interval.
-    BRANCH TODO_CREATE_SLOT_BIND_VALIDATE_AND_EXCLUDE
+    ; Trusted provisioning binds this private RW view to the active NS table,
+    ; offset zero = slot zero. No caller-supplied Namespace authority.
+    ; Single-threaded Phase 1: no CALL/CHANGE/SWITCH here, no rollback on fault.
+    ; Four writes are not atomic; no new exclusion mechanism is claimed.
+    LOAD CR10, CR6, #5
+    LOAD CR1, NULL
+    MCMP DR7, #2
+    BRANCHLO TODO_CREATE_SLOT_RESERVATION
+    BFEXT DR2, DR7, #16, #16
+    MCMP DR2, #0
+    BRANCHNE TODO_CREATE_SLOT_RESERVATION
+    DREAD DR2, CR7, #6
+    IADD DR2, DR2, DR7
+    DREAD DR3, CR7, #0, DR2
+    BFEXT DR2, DR9, #21, #9
+    IADD DR4, DR0, #1
+    BFINS DR2, DR4, #10, #1
+    MCMP DR2, DR3
+    BRANCHNE TODO_CREATE_SLOT_RESERVATION
+    ; The allocator/package reach this block directly with no intervening call.
+    ; History is authoritative; emptiness alone never means never-used.
 create_data_slot_offset:
-    SHL DR7, DR7, #2
+    SHL DR13, DR7, #2
+    DREAD DR4, CR10, #0, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+    DREAD DR4, CR10, #1, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+    DREAD DR4, CR10, #2, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
+    DREAD DR4, CR10, #3, DR13
+    MCMP DR4, #0
+    BRANCHNE TODO_CREATE_SLOT_OCCUPIED
 create_data_slot_write:
-    DWRITE DR8, CR10, #0, DR7
-    DWRITE DR9, CR10, #1, DR7
-    DWRITE DR10, CR10, #2, DR7
-    DWRITE DR11, CR10, #3, DR7
-    DREAD DR4, CR10, #0, DR7
+    DWRITE DR8, CR10, #0, DR13
+    DWRITE DR9, CR10, #1, DR13
+    DWRITE DR10, CR10, #2, DR13
+    DWRITE DR11, CR10, #3, DR13
+    DREAD DR4, CR10, #0, DR13
     MCMP DR4, DR8
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD0
-    DREAD DR4, CR10, #1, DR7
+    DREAD DR4, CR10, #1, DR13
     MCMP DR4, DR9
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD1
-    DREAD DR4, CR10, #2, DR7
+    DREAD DR4, CR10, #2, DR13
     MCMP DR4, DR10
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD2
-    DREAD DR4, CR10, #3, DR7
+    DREAD DR4, CR10, #3, DR13
     MCMP DR4, DR11
     BRANCHNE TODO_CREATE_SLOT_CONFIRM_WORD3
 create_data_slot_return:
@@ -432,6 +488,12 @@ create_data_slot_return:
     BRANCH create_data_slot_after_clear
 
 ; Resolved failure cases. No result issuance and no promised rollback.
+TODO_CREATE_RESULT_TYPE:
+    HARDFAULT "Mint.CREATE: result identity does not match the published DATA RW GT"
+TODO_CREATE_SLOT_RESERVATION:
+    HARDFAULT "Mint.CREATE: slot history does not match the reserved sequence"
+TODO_CREATE_SLOT_OCCUPIED:
+    HARDFAULT "Mint.CREATE: reserved Namespace slot is not empty"
 TODO_CREATE_PKVERIFY_NOT_APPROVED:
     HARDFAULT "Mint.CREATE: PkVerify did not return APPROVED"
 TODO_CREATE_DESCRIPTOR_INPUT_INVALID:
@@ -522,6 +584,11 @@ destroy_return:
     IADD DR15, DR0, #0
     RETURNAL #0
 
+TODO_DESTROY_CLEAR_RESULT_AUTHORITY:
+TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM:
+TODO_DESTROY_PKVERIFY_AND_ACTIVE_USE:
+TODO_DESTROY_BODY:
+    HARDFAULT "Mint.DESTROY: not implemented in Phase 1 CREATE package"
 TODO_DESTROY_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.DESTROY: missing Passkey"
 TODO_DESTROY_INPUT_PROOF_READ:
@@ -584,6 +651,11 @@ outform_return:
     IADD DR15, DR0, #0
     RETURNAL #2
 
+TODO_MakeOutform_CLEAR_RESULT_AUTHORITY:
+TODO_MakeOutform_INPUT_TYPE_AND_AUTHORITY:
+TODO_MakeOutform_BODY:
+TODO_MakeOutform_RESULT_TYPE_AND_IDENTITY:
+    HARDFAULT "Mint.MakeOutform: not implemented in Phase 1 CREATE package"
 TODO_MakeOutform_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.MakeOutform: missing Passkey"
 TODO_MakeOutform_INPUT_PROOF_READ:
@@ -646,6 +718,11 @@ inform_return:
     IADD DR15, DR0, #0
     RETURNAL #2
 
+TODO_MakeInform_CLEAR_RESULT_AUTHORITY:
+TODO_MakeInform_REQUIRE_OUTFORM_AND_AUTHORITY:
+TODO_MakeInform_BODY:
+TODO_MakeInform_RESULT_TYPE_AND_IDENTITY:
+    HARDFAULT "Mint.MakeInform: not implemented in Phase 1 CREATE package"
 TODO_MakeInform_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.MakeInform: missing Passkey"
 TODO_MakeInform_INPUT_PROOF_READ:

@@ -160,12 +160,39 @@ unallocated bytes. The existing native-path suite includes this regression.
 Test setup provisions capabilities and private state; it does not prove legal
 production provisioning or modify a running service.
 
-Remaining blockers are explicit: trusted saved-design provisioning and durable
-history lifecycle across reboot/release; Namespace eligibility, exact reservation
-binding and writer/observer exclusion; publication/read-back; accounting,
-lawful CR1 issuance and final result validation. Full Mint compilation still
-fails on the unresolved operation labels. No live LUMP, Namespace assignment,
-boot image, simulator instruction semantics or hardware is changed.
+### CREATE publication and issuance
+
+The complete editable Mint source now compiles. The native CREATE continuation
+loads the private `ide.MintNamespace RW` binding, checks reserved history and
+an empty destination, writes and compares W0–W3, then materializes CR1 through
+MintState's existing private scratch C-list row and ordinary LOAD. The scratch
+row is erased after loading. It validates exact result identity, DATA RW, B=1,
+slot and sequence before outward cleanup/RETURN. Allocation is not debited twice.
+
+The Namespace capability must name the actual FPGA ascending table, offset zero
+at slot zero, with an appropriate bound. It is an explicit trusted provisioning
+obligation, not a binding installed by this source edit. Four writes are not
+atomic. A fault never returns a result; the consumed reservation and any partial
+entry remain abandoned, with no rollback or recovery machinery.
+
+DESTROY, MakeOutform and MakeInform explicitly HARDFAULT as unsupported. Their
+labels no longer prevent CREATE compilation, but they are not implemented.
+
+`node simulator/test_mint_create_publication.js` checks compilation, isolated
+native result issuance through real CALL/RETURN, retirement/occupied-destination
+faults and unsupported-method rejection. Earlier native fragment tests exercise
+publication/read-back. This is **not** complete CREATE FPGA acceptance.
+
+The legacy simulator uses descending Namespace slots and word-valued locations,
+unlike this FPGA-targeted ascending/byte-address path. Its full CREATE replay
+therefore cannot establish acceptance: the regression records the mismatch
+without rewriting native instructions or redirecting memory accesses. Isolated
+issuance fixtures provision an already-committed legacy-table entry and do not
+prove subsequent access reaches the allocated physical bytes.
+
+Still outstanding: saved-design provisioning, durable history across
+reboot/release, and full-path RTL/physical execution. No live LUMP, Namespace
+assignment, boot image, simulator semantics or hardware is changed.
 
 ### Branch-format compatibility
 

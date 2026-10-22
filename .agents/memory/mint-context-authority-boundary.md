@@ -164,6 +164,19 @@ W3 remains excluded from W2 integrity.
 
 ## Native helper scratch hazards
 
+Native FPGA CREATE acceptance must not be inferred from the legacy simulator:
+its Namespace slots descend and its locations are word-valued, while the scoped
+native publication path uses ascending slots and physical byte locations.
+
+**Why:** End-to-end testing exposed ordinary LOAD consulting a different entry
+from native publication. Even pre-provisioning that other entry can mask the
+mismatch and return authority to unrelated storage.
+
+**How to apply:** Keep component issuance tests explicitly isolated; never
+redirect stores, mirror entries, or translate instructions to claim acceptance.
+Require consistent FPGA memory wiring for complete CREATE evidence. Do not
+install the candidate into the legacy execution profile.
+
 Allocator address/cursor comparisons must use unsigned branch conditions.
 Keep physical byte-base provisioning and persistent slot history as explicit
 trusted software-state obligations, not inferred from empty Namespace words.

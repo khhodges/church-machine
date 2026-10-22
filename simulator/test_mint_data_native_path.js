@@ -315,6 +315,7 @@ for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xffff
 }
 console.log('PASS: only CR2=0xFFFFFFFF skips the proof checks, without granting memory authority.');
 require('./test_mint_allocator_descriptor');
+require('./test_mint_create_publication');
 require('./test_factory_branch_encoding');
 require('./test_compact_clist_mutation');
-console.log('BLOCKED: saved-design provisioning, Namespace publication and issuance remain incomplete. No complete CREATE claim.');
+console.log('BOUNDARY: component execution is not full FPGA CREATE acceptance; legacy Namespace geometry differs.');

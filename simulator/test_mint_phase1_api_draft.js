@@ -19,11 +19,8 @@ assert.deepEqual(methods.map(m => m[1]),
     ['CREATE', 'DESTROY', 'MakeOutform', 'MakeInform']);
 
 const compiled = new Compiler().compile(source, []);
-assert.ok(compiled.errors.length > 0, 'Unfinished draft must not compile as runnable Mint');
-const allowedDraftError = message => /^Undefined label: TODO_/.test(message);
-assert.ok(compiled.errors.every(e => allowedDraftError(e.message)),
-    JSON.stringify(compiled.errors.filter(e => !allowedDraftError(e.message))));
-assert.equal(compiled.methods.length, 0, 'No partly valid method may escape as a successful draft');
+assert.deepEqual(compiled.errors, [], 'CREATE source must compile');
+assert.equal(compiled.methods.length, 4);
 assert.equal(compiled.language, 'assembly');
 
 let faultCount = 0;
@@ -31,6 +28,9 @@ for (const [, name, body] of methods) {
     const branches = new Set([...body.matchAll(/^\s*BRANCH(?:EQ|NE|GT|GE|LT|LE|HI|LO|HS)\s+(TODO_\w+)/gm)]
         .map(match => match[1]));
     if (name === 'CREATE') branches.add('TODO_CREATE_DESCRIPTOR_RETIRED');
+    if (name === 'DESTROY') branches.add('TODO_DESTROY_BODY');
+    if (name === 'MakeOutform') branches.add('TODO_MakeOutform_RESULT_TYPE_AND_IDENTITY');
+    if (name === 'MakeInform') branches.add('TODO_MakeInform_RESULT_TYPE_AND_IDENTITY');
     const faults = [...body.matchAll(/^(TODO_\w+):\s*\n\s*HARDFAULT "([^"\n]+)"/gm)];
     assert.equal(faults.length, branches.size, `${name}: every failure branch needs one fault site`);
     for (const [, label, reason] of faults) {
@@ -39,14 +39,13 @@ for (const [, name, body] of methods) {
         faultCount++;
     }
     assert.equal(branches.size, 0, `${name}: unresolved fault branch`);
-    // Unimplemented operations must remain compile blockers, not turn into
-    // unconditional faults disguised as completed service implementations.
+    // Other methods explicitly reject execution; they are not implemented.
     for (const [, label] of body.matchAll(/^\s*BRANCH\s+(TODO_\w+)/gm)) {
         if (label === 'TODO_CREATE_DESCRIPTOR_RETIRED') continue;
-        assert.doesNotMatch(body, new RegExp(`^${label}:`, 'm'));
+        assert.match(body, new RegExp(`^${label}:`, 'm'));
     }
 }
-assert.equal(faultCount, 41, 'Reviewed failures, verifier rejection and descriptor guards use HARDFAULT');
+assert.equal(faultCount, 47, 'Reviewed failures and unsupported methods use HARDFAULT');
 
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
@@ -60,7 +59,8 @@ for (const [, name, body] of methods) {
     assert.doesNotMatch(body, /^\s*TPERM\s+CR\d+,\s*CLEAR/m,
         'No method may use a permission test as capability erasure');
     assert.match(body, /IADD DR1, DR0, #0/);
-    assert.doesNotMatch(body, /IADD DR1, DR0, #1\b/, 'Wrapper must not manufacture success');
+    if (name !== 'CREATE') assert.doesNotMatch(body, /IADD DR1, DR0, #1\b/,
+        'Unsupported methods must not manufacture success');
     for (const label of body.match(/TODO_\w+/g) || []) {
         assert.ok(label.startsWith(`TODO_${name}_`), `${label} must identify API method ${name}`);
     }
@@ -105,8 +105,8 @@ assert.doesNotMatch(create.slice(0,create.indexOf('create_data_allocate:')),
     /^\s*(?:DREAD|DWRITE|LOAD).*CR10\b/m,
     'Namespace access is confined to the private Lambda; continuation only checks NULL');
 assert.match(create, /create_data_allocate:[\s\S]*LOAD CR7, CR6, #1[\s\S]*LOAD CR8, CR6, #3/);
-assert.match(create, /BRANCH TODO_CREATE_COMMIT_ACCOUNT_AND_ISSUE/);
-assert.match(create, /BRANCH TODO_CREATE_RESULT_TYPE/);
+assert.match(create, /LOAD CR1, CR9, #0/);
+assert.match(create, /BRANCHNE TODO_CREATE_RESULT_TYPE/);
 assert.ok(destroy.indexOf('TODO_DESTROY_REJECT_RESIDENT_AND_OUTFORM') <
     destroy.indexOf('destroy_body:'));
 
@@ -193,6 +193,7 @@ for(const size of [24,40,56,72,0xfffffff8]) {
 const descriptor=[0x80001000,0x12345678,0x87654321,0xffffffff];
 for(const slot of [0,1,14,255]) {
     const namespace=Array(256*4).fill(0xa5a5a5a5);
+    namespace.fill(0, slot*4, slot*4+4);
     const expected=namespace.slice();
     expected.splice(slot*4,4,...descriptor);
     const dr={DR7:slot,DR8:descriptor[0],DR9:descriptor[1],
@@ -204,7 +205,8 @@ for(const slot of [0,1,14,255]) {
 for(let word=0;word<4;word++) {
     const dr={DR7:14,DR8:descriptor[0],DR9:descriptor[1],
         DR10:descriptor[2],DR11:descriptor[3]};
-    assert.equal(walk('create_data_slot_offset',dr,[],Array(1024).fill(0),56+word),
+    dr.DR13=56;
+    assert.equal(walk('create_data_slot_write',dr,[],Array(1024).fill(0),56+word),
         `TODO_CREATE_SLOT_CONFIRM_WORD${word}`);
 }
 
