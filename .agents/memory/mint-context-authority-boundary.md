@@ -3,6 +3,18 @@ name: Mint context authority boundary
 description: Keep synthetic context evidence distinct from granting Mint access to protected Thread state.
 ---
 
+## PkVerify responsibility
+
+PkVerify's sole objective is to establish that the caller is approved to execute
+the protected function—“No more no less.”
+
+**Why:** The user explicitly narrowed its purpose while replacing the isolated
+always-approve stub.
+
+**How to apply:** Keep caller authorization separate from allocation, operational
+argument validation, function execution and success reporting. This scope
+agreement does not itself choose the approval evidence or verification mechanism.
+
 ## Phase 1 Mint ownership and local Lambda decision
 
 Use only existing instruction encodings for the Mint happy path. Report what
