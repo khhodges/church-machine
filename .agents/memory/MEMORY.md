@@ -153,3 +153,4 @@
 - [Namespace public names](namespace-public-names.md) — exact dropdown names govern IDE profile labels and reports; internal keys are not public names.
 - [Native dialog keyboard ownership](native-dialog-keyboard-ownership.md) — native modals must own Escape and Tab ahead of the shared overlay capture handler.
 - [Mint RTL replay boundary](mint-rtl-replay-boundary.md) — exact-byte tests must not translate instructions; encoding corrections cover every emitter and execution profile.
+- [Mint trial history origin](mint-trial-history-origin.md) — fresh disposable slot history cannot certify live or reused slots; closed-fixture alias evidence is not a live audit.

@@ -190,9 +190,13 @@ without rewriting native instructions or redirecting memory accesses. Isolated
 issuance fixtures provision an already-committed legacy-table entry and do not
 prove subsequent access reaches the allocated physical bytes.
 
-Still outstanding: saved-design provisioning, durable history across
-reboot/release, and full-path RTL/physical execution. No live LUMP, Namespace
-assignment, boot image, simulator semantics or hardware is changed.
+An isolated fresh saved-design binding candidate is now reproducible via
+`scripts/prepare_mint_fpga_trial.py`; see
+[private FPGA trial](mint-private-fpga-trial.md) for its layout, history origin,
+exact hashes and acceptance exclusions. This does not provision the live service.
+Durable history across reboot/release and full-path RTL/physical execution remain
+outstanding. No live LUMP, Namespace assignment, boot image, simulator semantics
+or hardware is changed.
 
 ### Branch-format compatibility
 
