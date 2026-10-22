@@ -52,3 +52,16 @@ during the five-case review.
 **How to apply:** Preserve SecurityRegulator's protected control role and the
 ISA-defined SWITCH checks. An Abstract credential authorizing a protected
 function is case 2, not a distinct machine-control token scheme.
+
+## Lambda attestation service — deferred
+
+Defer the historical service for issuing, verifying, composing and revoking
+Abstract credentials. It is not required for Mint V1.
+
+**Why:** The user explicitly chose deferral during the five-case review.
+Genesis provisioning plus EXACT already supplies Mint's agreed authorization.
+
+**How to apply:** Do not implement this service or adopt its historical
+issuance/revocation rules as part of Mint V1. Deferral does not reject
+credentials or derived proofs as possible future uses and does not grant
+Lambda authority to issue them.
