@@ -304,6 +304,7 @@ async function testPlacementAction() {
             window: {
                 _nsAddAvailableList: record ? [record] : [],
                 _nsAddInspectionPending: false,
+                _nsState: { namespaceFingerprint: 'saved-fingerprint' },
                 _nsTableSave: async () => { saves++; return true; }
             },
             document: { getElementById: key => elements[key] || null },
@@ -312,6 +313,10 @@ async function testPlacementAction() {
                 submitted = args; return { slot: args[1] };
             },
             _setNsDirty: () => {}, updateNamespace: () => {},
+            fetch: async () => ({}),
+            _actionableJsonResponse: async () => ({bindingReport:{lists:[
+                {slot:24,status:'blocked',reason:'No complete binding',rows:[]}
+            ]}}),
         };
         vm.createContext(sandbox);
         vm.runInContext(src.slice(begin, end), sandbox);
@@ -319,7 +324,8 @@ async function testPlacementAction() {
         check(`Add placement ${expected}: exact design row uses existing Save without install`,
             submitted && submitted[1] === 24 &&
             submitted[2].status === expected && saves === 1 &&
-            !error.textContent);
+                /Placement saved\. Not ready/.test(error.textContent) &&
+                button.textContent === 'Close');
     }
 }
 

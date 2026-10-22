@@ -205,6 +205,7 @@
             binaryHash:record.binary_hash,revision:record.lump_version};
         state.document.rows.push(row);changed();
         document.getElementById('_nsAddModalOverlay').remove();
+        await save();
     }
     function boot(slot) {
         if(state.saving) return;
@@ -440,6 +441,7 @@
             }
             state.document.rows=state.document.rows.filter(r=>r!==original).concat([row]).sort((a,b)=>a.slot-b.slot);
             overlay.remove(); changed();
+            save();
         };
         name.focus();
         try {
@@ -473,9 +475,11 @@
             root.NamespaceBindingWindows.show(result.bindingReport);
             const st=result.bindingReport.status;
             if (st==='partial' || st==='unresolved') {
-                state.error='Design saved. Some references remain unresolved; they fault only if executed. See the C-list windows. No running session was changed.';
+                state.error='Namespace saved. Not ready: unresolved references. See the named references and reasons in the C-list windows. No running session was changed.';
             } else if (st !== 'complete') {
-                state.error='Design saved. Binding is blocked; see the C-list windows for the exact reasons. No runtime image was changed.';
+                state.error='Namespace saved. Not ready: binding validation is blocked. See the C-list windows for the exact reasons. No runtime image was changed.';
+            } else {
+                state.error='Namespace saved. Binding checks passed. Simulation preparation is still required; nothing was run.';
             }
         } else {
             showBindingFailure('Design saved, but binding results are unavailable. Reload the IDE and bind again. No runtime image was changed.');

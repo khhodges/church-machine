@@ -151,6 +151,7 @@
 - [Alice/Mallory Threads](alice-mallory-thread-isolation.md) — separate Threads with each actor's entry GT in CR1; distinguish fixture execution from saved-design adoption.
 - [Intentional capability faults](intentional-capability-fault-publication.md) — absent-row accesses remain authored programs; publication diagnostics must not replace runtime checks.
 - [Namespace public names](namespace-public-names.md) — exact dropdown names govern IDE profile labels and reports; internal keys are not public names.
+- [Namespace Add binding](namespace-add-binding-workflow.md) — one Add action saves and validates; unfinished bindings stay explicit, never imply runtime readiness.
 - [Native dialog keyboard ownership](native-dialog-keyboard-ownership.md) — native modals must own Escape and Tab ahead of the shared overlay capture handler.
 - [Mint RTL replay boundary](mint-rtl-replay-boundary.md) — exact-byte tests must not translate instructions; encoding corrections cover every emitter and execution profile.
 - [Mint CREATE RTL entry](mint-create-rtl-entry-boundary.md) — use normal proof checks and an explicit scratch L binding; exact saved candidates need independent replay.

@@ -4964,8 +4964,7 @@ function _nsTableAdd() {
       <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;">
         <button id="_nsNewButton" data-testid="ns-new-button" onclick="_nsOpenNewAssembler()" class="btn" style="margin-right:auto;color:#c89b3c;border-color:#c89b3c;">NEW</button>
         <button onclick="document.getElementById('_nsAddModalOverlay').remove()" class="btn">Cancel</button>
-        <button id="_nsAddPlacementBtn" onclick="_nsAddPlacementConfirm()" class="btn" disabled title="Add this selection to the Namespace as a non-executable design placement">Add to Namespace (design)</button>
-        <button id="_nsAddConfirmBtn" onclick="_nsTableAddConfirm()" class="btn" disabled title="Advanced: requires approved immutable executable bytes">Install executable…</button>
+        <button id="_nsAddPlacementBtn" onclick="_nsAddPlacementConfirm()" class="btn" disabled title="Save this placement and validate its bindings. Does not run or change hardware.">Add to Namespace</button>
       </div>
     </div>`;
     _overlay.addEventListener('click', function(ev) { if (ev.target === _overlay) _overlay.remove(); });
@@ -5004,10 +5003,10 @@ function _nsTableAdd() {
                 <label style="display:block;margin-bottom:8px;">Abstraction name (can be missing from library)
                     <input id="_nsPlacementName" placeholder="Example.Service" oninput="_nsUpdatePlacementButton()" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
                 </label>
-                <label style="display:block;margin-bottom:8px;">Design-time slot (blank = first free)
+                <label style="display:block;margin-bottom:8px;">Namespace slot (blank = first free)
                     <input id="_nsPlacementSlot" type="number" min="2" max="${window.NamespaceDesignV1 && window.NamespaceDesignV1.state.active ? window.NamespaceDesignV1.state.document.slotCount - 1 : sim.MAX_NS_ENTRIES - 1}" placeholder="Auto-assign" style="width:100%;box-sizing:border-box;background:#0d0d1a;color:#d0d0e8;border:1px solid #2a2a4a;padding:6px;">
                 </label>
-                <div style="font-size:0.74rem;color:#f0a040;margin-bottom:8px;">Add to Namespace saves the selection without executing or changing its saved bytes. Install executable is a separate advanced action requiring exact compiler-approved, unmodified binary bytes.</div>
+                <div style="font-size:0.74rem;color:#f0a040;margin-bottom:8px;">Add to Namespace saves this placement and checks its bindings. Missing references are reported by name. Nothing is run or sent to hardware.</div>
                 <div id="_nsAddMeta" style="margin-bottom:8px;"></div>
                 <div id="_nsAddError" style="color:#f87171;font-size:0.78rem;min-height:1.2em;margin-bottom:8px;"></div>`;
 
@@ -5078,6 +5077,7 @@ async function _nsAddPlacementConfirm() {
     const errEl = document.getElementById('_nsAddError');
     const btn = document.getElementById('_nsAddPlacementBtn');
     if (!sim || !nameEl) return;
+    if (btn && btn.disabled) return;
     const index = sel && sel.selectedIndex > 0 ? sel.selectedIndex - 1 : -1;
     const record = index >= 0 ? (window._nsAddAvailableList || [])[index] : null;
     const slotText = slotEl ? slotEl.value.trim() : '';
@@ -5116,13 +5116,47 @@ async function _nsAddPlacementConfirm() {
         updateNamespace();
         const saved = await window._nsTableSave(document.getElementById('nsSaveBtn'));
         if (!saved) throw new Error('Placement remains local; Save for next build to retry.');
-        const overlay = document.getElementById('_nsAddModalOverlay');
-        if (overlay) overlay.remove();
+        if (btn) { btn.disabled = true; btn.textContent = 'Checking bindings…'; }
+        // Save has committed. Validation failure must not be reported as a
+        // failed save or offer another Add that would duplicate this placement.
+        try {
+            const response = await fetch('/api/namespace/bind-placements', {
+                method:'POST', headers:{'Content-Type':'application/json',
+                    'X-Requested-With':'NamespaceDesign'},
+                body:JSON.stringify({namespaceFingerprint:window._nsState.namespaceFingerprint}),
+            });
+            const data = await _actionableJsonResponse(response, 'Validate Namespace bindings', {
+                dataChanged:true, nextAction:'Review this saved placement in Namespace.',
+            });
+            const report = data.bindingReport;
+            if (!report || !Array.isArray(report.lists)) throw Error('Binding results are unavailable.');
+            if (window.NamespaceBindingWindows) window.NamespaceBindingWindows.show(report);
+            if (errEl) errEl.textContent = _nsPlacementBindingMessage(report, result.slot);
+        } catch (validationError) {
+            if (errEl) errEl.textContent = 'Placement saved. Not ready: binding validation failed. ' +
+                validationError.message + ' Review the saved placement in Namespace; do not add it again.';
+        }
+        if (btn) { btn.textContent = 'Close'; btn.disabled = false;
+            btn.onclick = () => document.getElementById('_nsAddModalOverlay')?.remove(); }
         return result;
     } catch (err) {
         if (errEl) errEl.textContent = err.message || String(err);
-        if (btn) { btn.disabled = false; btn.textContent = 'Add to Namespace (design)'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Add to Namespace'; }
     }
+}
+
+function _nsPlacementBindingMessage(report, slot) {
+    const item = report.lists.find(row => Number(row.slot) === Number(slot));
+    if (!item) return 'Placement saved. Not ready: no binding result was returned for this slot.';
+    const missing = [...(item.rows || []), ...(item.calls || [])]
+        .filter(row => row.status !== 'bound')
+        .map(row => (row.name || row.reference || 'Unnamed reference') +
+            (row.reason ? ': ' + row.reason : ''));
+    if (item.status === 'bound' && !missing.length)
+        return 'Placement saved. Binding checks passed. Simulation preparation is still required; nothing was run.';
+    return 'Placement saved. Not ready: ' +
+        (missing.length ? missing.join('; ') : item.reason || 'binding validation is incomplete') +
+        '. No running image was changed.';
 }
 
 async function _nsOpenNewAssembler() {
@@ -5403,47 +5437,8 @@ async function _nsPopulateAddMeta(token, catalogIndex) {
 
     container.innerHTML = `
         ${approval.binary_valid === false || window._nsAddInspectionError
-            ? `<div style="color:#f87171;padding:6px;border:1px solid #f8717155;margin-bottom:8px;">Non-executable selection: ${esc(window._nsAddInspectionError || (approval.validation_errors || []).join('; ') || 'Saved artifact is invalid.')}. Use Add placement, not Install.</div>`
+            ? `<div style="color:#f87171;padding:6px;border:1px solid #f8717155;margin-bottom:8px;">Not ready: ${esc(window._nsAddInspectionError || (approval.validation_errors || []).join('; ') || 'Saved artifact is invalid.')}. You can save this placement; binding checks will report what needs attention.</div>`
             : ''}
-        <div style="${sCard}">
-            <div style="${sGH}">INSTALL OPTIONS</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                <div>
-                    <span style="${sLabel}">Load Policy</span>
-                    <select id="_nsLoadPolicy" ${phase1Design ? 'disabled' : ''} style="${sSelect}" title="The IDE derives transport, capacity, hash, and Namespace metadata.">
-                        <option value="Resident" ${loadPolicyDefault === 'Resident' ? 'selected' : ''}>Resident</option>
-                        ${phase1Design ? '' : `<option value="Preload" ${loadPolicyDefault === 'Preload' ? 'selected' : ''}>Preload</option>
-                        <option value="Lazy" ${loadPolicyDefault === 'Lazy' ? 'selected' : ''}>Lazy load</option>`}
-                    </select>
-                    <div style="color:#6b7280;font-size:0.68rem;margin-top:3px;">Empty is available from an installed Namespace row.</div>
-                </div>
-                <div>
-                    <span style="${sLabel}">NS Slot</span>
-                    <input type="number" id="_nsSlotInput" min="2" max="${sim.MAX_NS_ENTRIES - 1}"
-                           placeholder="Auto-assign" value="${nsSlotVal}" style="${sInput}">
-                    <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Blank = auto (first free slot ≥ 11)</div>
-                </div>
-                <div>
-                    <span style="${sLabel}">Proposed location (word address)</span>
-                    <input id="_nsAddLocationInput" placeholder="Propose a free range" style="${sInput}">
-                    <div style="color:#6b7280;font-size:0.68rem;margin-top:2px;">Full allocation checked again at Save. A refused proposal stays here for review.</div>
-                </div>
-                <div>
-                    <span style="${sLabel}">Slot Policy</span>
-                    <select id="_nsSlotPolicy" style="${sSelect}">
-                        <option value="static"  ${policy === 'static'  ? 'selected' : ''}>Static</option>
-                        <option value="dynamic" ${policy === 'dynamic' ? 'selected' : ''}>Dynamic</option>
-                    </select>
-                </div>
-                <div>
-                    <span style="${sLabel}">GT Type</span>
-                    <select id="_nsGtType" style="${sSelect}">
-                        <option value="1" ${gtTypeDefault === 1 ? 'selected' : ''}>Inform (code/thread)</option>
-                        <option value="2" ${gtTypeDefault === 2 ? 'selected' : ''}>Outform (data)</option>
-                    </select>
-                </div>
-            </div>
-        </div>
         <div style="${sCard}">
             <div style="${sGH}">LUMP METADATA</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px 12px;font-size:0.78rem;">

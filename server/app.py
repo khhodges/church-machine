@@ -5175,6 +5175,27 @@ def namespace_design_v1():
         return jsonify(ok=False, error=str(exc), dataChanged=False), 409
 
 
+@app.route("/api/namespace/bind-placements", methods=["POST"])
+def namespace_bind_placements():
+    """Validate/bind exact saved placements without activating any image."""
+    if not _is_ide_design_request():
+        return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict) or set(payload) != {"namespaceFingerprint"}:
+        return jsonify(ok=False, error="Expected namespaceFingerprint only"), 400
+    try:
+        from server.namespace_placement_binding import bind_saved_placements
+        with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR):
+            rows = _read_namespace_design_document()["abstractions"]
+            fingerprint = _namespace_state_fingerprint(rows)
+            if payload["namespaceFingerprint"] != fingerprint:
+                raise ValueError("Saved Namespace changed; reload it before validating bindings.")
+            report = bind_saved_placements(rows, LUMPS_DIR, fingerprint)
+        return jsonify(ok=True, bindingReport=report, installed=False)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), installed=False), 409
+
+
 @app.route("/api/namespace/inspect", methods=["GET"])
 def namespace_inspect():
     """Inspect exact saved rows, never the enriched/runtime Namespace projection."""
