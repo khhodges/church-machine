@@ -65,3 +65,15 @@ Genesis provisioning plus EXACT already supplies Mint's agreed authorization.
 issuance/revocation rules as part of Mint V1. Deferral does not reject
 credentials or derived proofs as possible future uses and does not grant
 Lambda authority to issue them.
+
+## Proposed Abstract subtype field
+
+The user proposed a two-bit field to distinguish the two accepted roles
+(constants/mathematical values and credentials/proofs), leaving headroom.
+
+**Why:** Two accepted categories need two values; two bits provide four.
+
+**How to apply:** Treat this as an Abstract subtype design direction, not a
+replacement for the outer NULL/Inform/Outform/Abstract GT type field. Preserve
+B and its binding meaning. Exact bit positions and subtype value assignments
+remain unspecified; no encoding or implementation change is authorized yet.
