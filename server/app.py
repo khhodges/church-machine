@@ -5175,6 +5175,35 @@ def namespace_design_v1():
         return jsonify(ok=False, error=str(exc), dataChanged=False), 409
 
 
+@app.route("/api/namespace/attention", methods=["GET"])
+def namespace_attention():
+    """Recompute advisory findings without saving or invoking the linker."""
+    from pathlib import Path
+    from server.namespace_attention import attention_report
+    from server.namespace_placement_binding import placement_document
+    from server.namespace_design_v1 import DesignStore
+    profile = request.args.get("profile", "ascending")
+    if profile not in ("ascending", "phase1", "legacy"):
+        return jsonify(ok=False, error="Unknown Namespace profile"), 400
+    try:
+        with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR):
+            if profile == "legacy":
+                document = placement_document(_read_namespace_design_document()["abstractions"])
+            else:
+                store = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
+                                    ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
+                                    LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
+                document = store.read_document()
+            result = attention_report(document, LUMPS_DIR,
+                                      Path(__file__).resolve().parent.parent / "simulator" / "cloomc",
+                                      _parse_intrinsic_lump_content, profile)
+        response = jsonify(result)
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error="Needs attention scan failed: " + str(exc)), 409
+
+
 @app.route("/api/namespace/bind-placements", methods=["POST"])
 def namespace_bind_placements():
     """Validate/bind exact saved placements without activating any image."""

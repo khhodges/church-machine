@@ -13,3 +13,12 @@ not left for the programmer to discover through a separate install action.
 not ready” when references cannot bind. Never infer resource provisioning from a
 declared name, substitute newer artifacts, or activate a runtime/hardware image.
 Binding checks passing still requires separate simulation preparation.
+
+The Namespace toolbar also needs an on-demand list of unfinished abstractions
+and missing resources, immediately ahead of Add.
+
+**Why:** The user wants the current things to fix available from the Namespace
+view rather than a static chat list.
+
+**How to apply:** Recompute on each opening, identify the saved profile and source
+of evidence, and keep this advisory inspection read-only.
