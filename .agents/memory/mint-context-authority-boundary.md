@@ -26,6 +26,18 @@ B=0 contract and verify simulator behavior against the ISA. The user clarified
 B=0 after the agent incorrectly left the architectural mechanism unresolved;
 implementation conformance remains a separate verification question.
 
+Genesis approves and installs this token in authorized callers' C-lists and
+issues the matching reference token to Mint for an EXACT comparison.
+
+**Why:** The user specified this as the complete authorization design:
+Genesis provisioning establishes approval; Mint checks the approved proof.
+
+**How to apply:** Replace unconditional approval with the ISA EXACT check
+against Mint's trusted reference before the protected operation. Do not add
+four-word proof data, an authentication service or another authorization scheme.
+Provisioning the token defines the approval scope; design agreement is not
+evidence that the runtime check has already been implemented or tested.
+
 ## Phase 1 Mint ownership and local Lambda decision
 
 Use only existing instruction encodings for the Mint happy path. Report what
