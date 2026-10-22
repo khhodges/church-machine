@@ -77,3 +77,16 @@ The user proposed a two-bit field to distinguish the two accepted roles
 replacement for the outer NULL/Inform/Outform/Abstract GT type field. Preserve
 B and its binding meaning. Exact bit positions and subtype value assignments
 remain unspecified; no encoding or implementation change is authorized yet.
+
+The user further proposed five structural bits total (two outer GT type bits,
+two Abstract subtype bits and B), leaving 27 payload bits in a 32-bit Abstract
+GT, with a generic constants catalogue and random credential generation.
+
+**Why:** This is the user's intended minimal design following rejection of the
+separate I/O and machine-control Abstract schemes.
+
+**How to apply:** Treat this as the proposed Abstract-specific format, not a
+change to Inform/Outform layout. Exact placement remains unspecified.
+Use collision-checked secure generation for credential identifiers; random
+bits alone are not authority or a large cryptographic secret. Authority comes
+from approved provisioning and ISA enforcement, not a claim of unguessability.
