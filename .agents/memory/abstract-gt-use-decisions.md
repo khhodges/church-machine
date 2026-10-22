@@ -14,3 +14,17 @@ as pi, TRUE, FALSE and Church numerals.
 execution authority through a constant, or adopt historical Lambda services,
 methods or encodings. Encoding and access must follow the approved ISA.
 Acceptance of a role is not authorization to change implementations.
+
+## Credentials and proofs
+
+Abstract GTs may represent an authority's approval or attestation. For Mint,
+Genesis provisions the immutable B=0 proof in the authorized caller's C-list
+and the matching reference in Mint; Mint checks EXACT before the protected
+function.
+
+**Why:** The user explicitly accepted this use and the Genesis/EXACT design
+during the five-case review.
+
+**How to apply:** Do not add separate cryptographic proof data, a credential
+service or historical Lambda issuance/revocation methods. Follow the detailed
+Mint authorization boundary in mint-context-authority-boundary.md.
