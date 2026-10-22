@@ -18,6 +18,30 @@ The generator creates a new `generated-artifacts/mint-fpga-trial-*` directory:
 - `candidate.bin`: 16,384 big-endian 32-bit words, with physical-byte descriptors.
 - `native-code.json`: original sources, declarations and exact compiled method/table words.
 - `evidence.json`: design/image hashes, checks and acceptance exclusions.
+- Evidence also binds the complete native-code record (source, words and all
+  declaration metadata) and the `mint-private-fpga-create-trial-v1` format.
+
+Before downstream replay, verify the independently saved files:
+
+```
+python3 scripts/prepare_mint_fpga_trial.py --verify generated-artifacts/mint-fpga-trial-EXAMPLE
+```
+
+The command exits nonzero on missing, malformed, stale or inconsistent inputs.
+Python replay consumers must call `verify_saved_candidate(directory)` and use its
+returned `image` bytes (or `words`) directly, never reopen the files after checking.
+It reloads all four files, reconstructs the exact pinned design, compares all
+saved compiler fields with fresh compiler output, and recomputes the complete
+evidence record. Hashes describe canonical JSON content, not whitespace or key
+order; binary hashes cover the exact big-endian bytes. Identical content from two
+generations is interchangeable; different content is not. Older evidence missing
+the native-code hash must be regenerated, not silently accepted.
+
+This gate checks integrity and current reviewed identity, not authenticity of a
+signer or permission to replay on a board. It neither installs nor activates nor
+programs hardware, and it does not implement the separate ascending-v1 endpoint
+boundary. Current compiler/source changes require explicit review and regeneration;
+the verifier never substitutes newly compiled bytes for saved bytes.
 
 No catalog, manifest, approval store, saved live configuration or board is read
 or written. Generated binary output is excluded from Git and deployment. The
@@ -92,11 +116,11 @@ It reconstructs the closed design from those exact inputs, checks exact
 declarations and native words, then checks queue uniqueness, explicit history,
 slot bounds, pool byte arithmetic, table identity and disjoint physical extents.
 Any additional public alias, C-list change, descriptor change, source change or
-permission widening invalidates the exact candidate contract. Read-back validates
-the saved JSON and binary after writing. Tests mutate each relevant boundary,
+permission widening invalidates the exact candidate contract. Read-back uses the
+same four-file consumer gate after writing. Tests mutate each relevant boundary,
 including scratch, history flags, duplicate slots, table base, public aliases and
-code words, plus changed executable inputs with unchanged declarations; 31 checks
-passed at preparation.
+code words, plus changed executable inputs with unchanged declarations, mixed
+review generations, evidence metadata, truncation and current compiler drift.
 
 PkVerify remains the explicitly documented Phase 1 always-approve implementation.
 These checks do not establish credential authentication, lawful operational

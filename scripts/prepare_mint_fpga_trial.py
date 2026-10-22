@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fresh, inert Mint binding fixture; no live catalog, approval or installation IO."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -42,6 +43,10 @@ PINS = {
 
 def sha(raw):
     return hashlib.sha256(raw).hexdigest()
+
+
+def canonical(value):
+    return json.dumps(value, sort_keys=True, allow_nan=False).encode()
 
 
 def native_code():
@@ -144,7 +149,7 @@ def construct(code):
 def validate(design, memory, code):
     """Fail closed on any unreviewed design/byte change, plus geometry checks."""
     expected_design, expected_memory = construct(code)
-    if design != expected_design:
+    if canonical(design) != canonical(expected_design):
         raise ValueError("Design differs from the exact private provisioning contract")
     if len(memory) != WORDS or any(type(w) is not int or not 0 <= w <= 0xffffffff for w in memory):
         raise ValueError("Invalid image word bounds")
@@ -178,15 +183,61 @@ def validate(design, memory, code):
     if memory != expected_memory:
         raise ValueError("Image differs from exact code, bindings, history or private alias inventory")
     return {
+        "format": FORMAT,
         "status": "candidate-bindings-validated",
         "imageSha256": sha(encoded(memory)),
-        "designSha256": sha(json.dumps(design, sort_keys=True).encode()),
+        "designSha256": sha(canonical(design)),
+        "nativeCodeSha256": sha(canonical(code)),
         "checks": ["exact-native-code", "ascending-table-identity", "physical-byte-pool",
                    "explicit-fresh-history", "unique-free-queue", "bounds",
                    "scratch-disjoint", "closed-c-list-inventory-no-public-aliases"],
         "notEstablished": ["live-provisioning", "CREATE-RTL-execution", "physical-FPGA-acceptance",
                            "durable-reboot-or-release-history", "credential-authentication"],
     }
+
+
+def _unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"Duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+
+def verify_saved_candidate(directory):
+    """Return a verified snapshot for replay; callers must not reopen the files.
+
+    This is candidate integrity validation, not installation or replay approval.
+    Recompile only to compare identity, never to replace the saved replay bytes.
+    """
+    directory = Path(directory)
+    try:
+        # Each file is independently read once. No caller-supplied in-memory
+        # constructor data can stand in for any of these persisted inputs.
+        design, code, evidence = [
+            json.loads((directory / name).read_text(encoding="utf-8"),
+                       object_pairs_hook=_unique_object)
+            for name in ("saved-design.json", "native-code.json", "evidence.json")
+        ]
+        raw = (directory / "candidate.bin").read_bytes()
+        if len(raw) != WORDS * 4:
+            raise ValueError(f"candidate.bin must contain exactly {WORDS * 4} bytes")
+        words = list(struct.unpack(f">{WORDS}I", raw))
+        # Compare the entire compiler record, including all declaration metadata,
+        # not merely the projected (name, rights) pairs used for provisioning.
+        current = native_code()
+        construct(current)  # current source/code must still satisfy review pins
+        if canonical(code) != canonical(current):
+            raise ValueError("Saved native source/code/declarations differ from current compiler output")
+        expected_evidence = validate(design, words, code)
+        if canonical(evidence) != canonical(expected_evidence):
+            raise ValueError("Saved evidence differs from recomputed candidate evidence")
+    except (OSError, ValueError, TypeError, KeyError, struct.error,
+            subprocess.SubprocessError) as exc:
+        raise ValueError(f"Saved Mint trial rejected: {exc}") from exc
+    return {"design": design, "code": code, "image": raw,
+            "words": words, "evidence": expected_evidence}
 
 
 def prepare():
@@ -202,11 +253,19 @@ def prepare():
     for name, value in [("saved-design", design), ("evidence", evidence), ("native-code", code)]:
         (output / f"{name}.json").write_text(json.dumps(value, indent=2) + "\n")
     # Validate the saved bytes, not just the in-memory constructor.
-    saved = (output / "candidate.bin").read_bytes()
-    validate(json.loads((output / "saved-design.json").read_text()),
-             list(struct.unpack(f">{WORDS}I", saved)), code)
+    verify_saved_candidate(output)
     print(output.relative_to(ROOT))
 
 
 if __name__ == "__main__":
-    prepare()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--verify", type=Path, metavar="DIRECTORY",
+                        help="verify saved trial files without preparing or replaying")
+    args = parser.parse_args()
+    try:
+        if args.verify is not None:
+            print(json.dumps(verify_saved_candidate(args.verify)["evidence"], indent=2))
+        else:
+            prepare()
+    except ValueError as exc:
+        parser.exit(1, f"{exc}\n")
