@@ -23,26 +23,20 @@ cleared before reuse.
 allocator bookkeeping with release-time version advancement; do not preserve
 the conflicting draft comment as authority.
 
-Keep the free-memory pool as a simple advancing allocator. A separate cleaning
-service recycles released memory; do not add arbitrary-block recycling to
-CREATE.
+Mint always requests memory from the cleaning service. The service owns the
+simple advancing allocator and recycling of released memory; neither cursor
+management nor arbitrary-block recycling belongs in CREATE.
 
-**Why:** The user explicitly chose a simple advancing freepool with a cleaning
-service rather than complicating Mint's allocation path.
+**Why:** The user refined the design from an exhaustion-only cleaning call to
+always using the service, explicitly hiding “hitting the wall” from Mint.
 
 **How to apply:** Distinguish released memory awaiting cleaning from memory
 available for allocation. Define the cleaner handoff before implementing it;
 do not rewind the allocation cursor across live objects or infer GT collection
 as part of this service.
 
-When the advancing allocator cannot satisfy a request, it asks the cleaning
-service for the memory needed rather than handling recycling itself.
-
-**Why:** The user explicitly chose an exhaustion-triggered service call to keep
-allocator complexity hidden.
-
-**How to apply:** Keep ordinary allocation as a cursor advance. Delegate
-recycled-space selection and cleaning to the service on insufficient capacity.
-Its returned memory must meet the request's size/alignment and be safe for
-reuse; the exact call interface and unavailable-memory behavior remain to be
-defined.
+**Service boundary:** Every CREATE memory request goes through the same
+service interface. Advancing into unused space versus selecting and cleaning
+released space is internal to the service. Returned memory must meet the
+request's size/alignment and be safe for reuse. The exact call interface and
+unavailable-memory behavior remain to be defined.
