@@ -6,6 +6,8 @@ const {fixture} = require('../tests/simulator/cr6_contract_fixture');
 const Compiler = require('./cloomc_compiler');
 const {assembleLump} = require('./lump_assembler');
 const api = require('./abstract_gt_phase1');
+const {savePasskeyImage, restorePasskeyImage} = require('./passkey_saved_image');
+const os = require('node:os');
 global.window.bootConfig.step1.totalNamespaceWords = 32768;
 
 function compile(text) {
@@ -52,7 +54,7 @@ for (const literal of ['-1', '0x100000000', 'bogus']) {
 
 const circleSource = fs.readFileSync(path.join(__dirname, 'cloomc/constants_circle.cloomc'), 'utf8');
 const circle = compile(circleSource);
-function setup({capacity = 101, proofSource, token = api.packAbstract(0, 41)} = {}) {
+function setup({capacity = 101, proofSource, restored, token = api.packAbstract(0, 41)} = {}) {
     const f = fixture(true), s = f.sim;
     const STATE = 0x5000, CSCRATCH = 0x4900, NAME = 0x4800, CATALOGUE = 0x3800;
     function data(slot, base, words, rights) {
@@ -69,7 +71,8 @@ function setup({capacity = 101, proofSource, token = api.packAbstract(0, 41)} = 
             s.writeNSEntry(slot, base, 0, 0, 0, 1, 0, 0, 0));
         return s.createGT(0, slot, {L: 1}, 1);
     }
-    const stateGT = data(43, STATE, api.stateImage(capacity), {R: 1, W: 1});
+    const stateWords = restored ? restored.stateWords : api.stateImage(capacity);
+    const stateGT = data(43, STATE, stateWords, {R: 1, W: 1});
     const catalogueGT = data(44, CATALOGUE, api.catalogueImage(), {R: 1});
     const scratchGT = data(45, CSCRATCH, new Uint32Array(64), {R: 1, W: 1});
     const constantLoad = loadView(46, CSCRATCH + 1);
@@ -78,6 +81,13 @@ function setup({capacity = 101, proofSource, token = api.packAbstract(0, 41)} = 
     const constantDomain = f.install(32, constants.lump.buf.slice(1), [scratchGT, catalogueGT, constantLoad]);
     const p = proofSource ? compile(proofSource) : passkey;
     const proofDomain = f.install(33, p.lump.buf.slice(1), [stateGT, proofLoad]);
+    const artifactWords = s.memory.slice(proofDomain.base,
+        proofDomain.base + proofDomain.hdr.lumpSize);
+    if (restored) {
+        assert.deepEqual(artifactWords, restored.artifactWords);
+        // Restore the exact private words, including the original DATA header.
+        s.memory.set(restored.stateWords, STATE);
+    }
     const callers = {};
     callers.get = f.compile(30, `
         LOAD CR2, CR6, #1
@@ -132,7 +142,9 @@ function setup({capacity = 101, proofSource, token = api.packAbstract(0, 41)} = 
         return {fault, site: fault && sites.get(s.pc), gt: s.cr[1].word0 >>> 0,
             status: s.dr[1], real: s.dr[2] | 0, imaginary: s.dr[3] | 0, fractional: s.dr[1]};
     }
-    return {s, invoke, STATE, CSCRATCH, NAME, CATALOGUE};
+    return {s, invoke, STATE, CSCRATCH, NAME, CATALOGUE,
+        snapshot: () => ({artifactWords,
+            stateWords: s.memory.slice(STATE, STATE + stateWords.length)})};
 }
 function rejected(result, site) {
     assert(result.fault, `expected ${site}`);
@@ -207,4 +219,62 @@ assert.equal(collision.invoke('proof', 'Other').gt, pool[1]);
 assert.equal(collision.s.memory[collision.STATE+3], 3);
 const badPool = setup({proofSource: api.source('passkey').replace(/\.word 0x[0-9a-f]+/, '.word 0')});
 rejected(badPool.invoke('proof', 'Mint'), 'proof_bad_pool');
+
+// Saved restart uses only a disposable directory and fresh simulator RAM.
+const savedDir = fs.mkdtempSync(path.join(os.tmpdir(), 'passkey-restart-'));
+try {
+    const filename = path.join(savedDir, 'private.json');
+    const original = setup();
+    for (let i = 0; i < 3; i++) assert.equal(original.invoke('proof', `Saved${i}`).gt, pool[i]);
+    const captured = original.snapshot();
+    savePasskeyImage(filename, captured);
+    assert.equal(fs.statSync(filename).mode & 0o777, 0o600);
+    const restored = restorePasskeyImage(filename, captured.artifactWords);
+    assert.deepEqual(restored, captured);
+    const restarted = setup({restored});
+    const beforeDuplicate = restarted.snapshot().stateWords;
+    rejected(restarted.invoke('proof', 'Saved0'), 'proof_duplicate');
+    assert.deepEqual(restarted.snapshot().stateWords, beforeDuplicate);
+    for (let i = 3; i < 100; i++) {
+        const r = restarted.invoke('proof', `Saved${i}`);
+        assert.equal(r.fault, null);
+        assert.equal(r.gt, pool[i]);
+    }
+    savePasskeyImage(filename, restarted.snapshot());
+    const exhausted = setup({restored: restorePasskeyImage(filename, captured.artifactWords)});
+    const terminal = exhausted.snapshot().stateWords;
+    rejected(exhausted.invoke('proof', 'NewAfterRestart'), 'proof_no_random');
+    rejected(exhausted.invoke('proof', 'Saved99'), 'proof_duplicate');
+    assert.deepEqual(exhausted.snapshot().stateWords, terminal);
+    savePasskeyImage(filename, exhausted.snapshot());
+    const again = setup({restored: restorePasskeyImage(filename, captured.artifactWords)});
+    rejected(again.invoke('proof', 'StillExhausted'), 'proof_no_random');
+    const different = captured.artifactWords.slice();
+    different[3] ^= 1;
+    assert.throws(() => restorePasskeyImage(filename, different), /exact selected artifact/);
+    const invalid = exhausted.snapshot();
+    invalid.stateWords[3] = 0;
+    const validFile = fs.readFileSync(filename);
+    assert.throws(() => savePasskeyImage(filename, invalid), /state/);
+    assert.deepEqual(fs.readFileSync(filename), validFile);
+    const damaged = JSON.parse(validFile);
+    damaged.payload.state[3] = 0;
+    fs.writeFileSync(filename, JSON.stringify(damaged));
+    assert.throws(() => restorePasskeyImage(filename, captured.artifactWords), /integrity/);
+    fs.writeFileSync(filename, '{');
+    assert.throws(() => restorePasskeyImage(filename, captured.artifactWords));
+    fs.unlinkSync(filename);
+    assert.throws(() => restorePasskeyImage(filename, captured.artifactWords), /ENOENT/);
+    savePasskeyImage(filename, full.snapshot());
+    const fullRestart = setup({restored: restorePasskeyImage(filename, full.snapshot().artifactWords)});
+    rejected(fullRestart.invoke('proof', 'Other'), 'proof_full');
+    // Cursor can exceed count after collision skips; never infer it from count.
+    const skipped = original.snapshot();
+    skipped.stateWords[3] = 5;
+    savePasskeyImage(filename, skipped);
+    const skipRestart = setup({restored: restorePasskeyImage(filename, skipped.artifactWords)});
+    assert.equal(skipRestart.invoke('proof', 'AfterSkippedEntries').gt, pool[5]);
+} finally {
+    fs.rmSync(savedDir, {recursive: true, force: true});
+}
 console.log('PASS: separate native Constants/Passkey; 100 numerical values, complex values, pi circle calculation, original 100-proof pool, negative paths and cleanup.');

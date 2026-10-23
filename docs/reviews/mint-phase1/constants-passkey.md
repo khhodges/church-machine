@@ -135,6 +135,43 @@ the issued records and cursor with the exact pool artifact across restarts.
 Never recreate empty state while issued tokens remain provisioned. Capacity
 is 1..1024 records, but the fixed pool permits at most 100 distinct issuances.
 
+### Explicit private saved-image path
+
+`simulator/passkey_saved_image.js` supplies Genesis-side file persistence:
+
+```js
+savePasskeyImage(filename, {artifactWords, stateWords});
+const restored = restorePasskeyImage(filename, expectedArtifactWords);
+// restored.artifactWords and restored.stateWords are independent Uint32Arrays.
+```
+
+Genesis must stop execution and serialize issuance before capturing both arrays
+and keep it stopped until the save completes. `artifactWords` is the complete
+selected executable LUMP (header, original embedded pool, code and c-list);
+`stateWords` includes the DATA header, count, capacity, cursor, scratch/reserved
+words and all allocated records. No pool generation or compilation happens on
+restore. The expected artifact must come from Genesis's trusted selection,
+not be copied from the untrusted saved image. Restore returns data only; it
+does not install a Namespace, activate execution, or distribute capabilities.
+The destination must retain the saved private-state and scratch bindings.
+
+The single versioned JSON envelope retains both arrays and a SHA-256 checksum.
+Save validates before touching the destination, writes a private mode-0600
+temporary file, flushes it, atomically renames it, and flushes the directory.
+Use a private Genesis-owned directory and a single serialized writer.
+Restore rejects missing, truncated, corrupt, mismatched or invalid state;
+there is no empty-state fallback. Issued names and tokens must be unique,
+tokens must occur in the consumed pool prefix, and count/capacity/cursor
+must remain in bounds. Cursor is retained independently of count, including
+skipped entries and terminal exhaustion. Scratch must be zero at this boundary.
+
+This checksum detects corruption, not malicious rewriting or rollback.
+Genesis must retain the latest successfully saved image and must not resume an
+older snapshot while later-issued tokens remain provisioned. This explicit
+save path does not make unsaved issuance crash-durable or provide a monotonic
+external rollback anchor. An interrupted in-flight call is not a save boundary.
+No state is sent to diagnostics or public API endpoints.
+
 Genesis alone distributes the Passkey E capability and approved result tokens.
 Knowing a name grants no authority. The internal pool is readable in source
 or binary; it is not a cryptographic secret. Mint still authorizes by EXACT
@@ -150,6 +187,14 @@ components, pi arithmetic, unknown/proof/NULL inputs, corrupted format,
 all 100 proof issuances, collisions, duplicates, exhausted/full pools and
 private capability cleanup are checked.
 
-This is software execution evidence, not installed-namespace persistence or
-hardware evidence. The former combined 33-word constants catalogue is not
+The same test command additionally saves into a disposable directory, restores
+into fresh simulator RAM, and executes native CALL/RETURN to prove next-token
+advancement, duplicate rejection without mutation, full-capacity rejection,
+independent cursor retention and terminal exhaustion across repeated restarts.
+It also rejects wrong artifacts, damaged/truncated/missing images and invalid
+state without overwriting a valid save.
+
+This is isolated saved-image/software execution evidence, not live
+installed-namespace persistence or hardware evidence.
+The former combined 33-word constants catalogue is not
 compatible with the new 36-word Constants records; do not reuse it.
