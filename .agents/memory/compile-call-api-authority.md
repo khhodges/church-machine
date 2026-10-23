@@ -51,6 +51,18 @@ gate. Unused unresolved references are valid.
 binding and load; fault on actual execution-time reference, never guess a
 target or silently rebind from Run, Step or Walk.
 
+Missing/nonresident named LUMPs must not impose an all-resident precondition
+on simulation preparation or image/bitstream building.
+
+**Why:** The user explicitly rejected the “private ascending replay requires
+Resident bodies” blocker and reiterated that dot.name is sufficient until
+resolution; missing items are runtime concerns.
+
+**How to apply:** Keep names and exact selections in the design, leave absent
+bodies without executable authority, and retain runtime faults on use. This
+does not waive structural, integrity or hardware-profile checks on bytes that
+are actually supplied.
+
 Symbolic CALL sites must preserve their execution condition while unresolved.
 An untaken conditional reference must not fault. Binding modifies only private
 destination copies; original names and relocation evidence remain covered by

@@ -22,14 +22,12 @@ def selected_rows(document):
     for item in document["rows"]:
         if item["kind"] != "lump":
             continue
-        if item["policy"] != "Resident":
-            raise ValueError(f"NS[{item['slot']}] {item['name']}: private ascending replay requires "
-                             "Resident bodies. Explicitly select Resident and save, or keep this design unexecuted.")
         selected = item.get("selection") or {}
         rows.append(dict(slot=item["slot"], name=item["name"], type="Inform",
                          seq=item["sequence"], resident=True, boot_resident=True,
                          load_policy="Resident", filename=selected.get("filename"),
                          binary_hash=selected.get("binaryHash"), token=selected.get("token"),
+                         unresolved=item["policy"] != "Resident" or not selected.get("filename"),
                          boot=item.get("boot", False)))
     return rows
 
@@ -37,15 +35,23 @@ def selected_rows(document):
 def bindings(document, directory):
     from server.lump_integrity import parse_canonical_filename, compute_number
     from server.lump_approvals import read_approvals, compiler_record_verification_key, is_trusted_compiler_record
-    rows = selected_rows(document)
+    # Existing binding snapshots describe the complete selected graph,
+    # including Lazy artifacts. Residency controls emission, not graph identity.
+    rows = [row for row in selected_rows(document) if row.get("filename")]
     approvals = read_approvals(str(Path(directory) / "approvals.json"))
+    available = []
     for row in rows:
         label = f"NS[{row['slot']}] {row['name']}"
         filename = row["filename"]
         if (not isinstance(filename, str) or Path(filename).name != filename
                 or (Path(directory) / filename).is_symlink()):
             raise ValueError(f"{label}: select an exact saved local LUMP, then retry.")
-        raw = (Path(directory) / filename).read_bytes()
+        try:
+            raw = (Path(directory) / filename).read_bytes()
+        except FileNotFoundError:
+            # Keep the selected identity in the saved design. No body or
+            # authority is invented for an artifact not yet present.
+            continue
         words = _validate_body(raw, executable=True, label=label)
         api = embedded_api(words)
         identity = parse_canonical_filename(filename)
@@ -71,7 +77,8 @@ def bindings(document, directory):
             raise ValueError(f"{label}: compiler evidence unavailable; recompile and approve a new revision.") from exc
         if not approval or not is_trusted_compiler_record(approval, binary=raw, signing_key=key):
             raise ValueError(f"{label}: authenticated compiler approval is required; compile and approve a new revision.")
-    result = artifact_bindings(rows, directory)
+        available.append(row)
+    result = artifact_bindings(available, directory)
     # Bind evidence for non-portable, already localized approved revisions too.
     for binding in result:
         from server.simulation_preparation import digest
@@ -108,9 +115,15 @@ def stage(cfg, document, directory, entry_slot):
     rows.extend(non_lump_rows(document))
     artifacts, prepared = {}, []
     by_slot = {row["slot"]: row for row in rows}
+    available_slots = {binding["slot"] for binding in source_bindings}
+    for row in rows:
+        if row.get("type") == "Inform" and row["slot"] not in available_slots:
+            row["unresolved"] = True
     for binding in source_bindings:
         runtime_binding = next(item for item in runtime_bindings if item["slot"] == binding["slot"])
         row = by_slot[binding["slot"]]
+        if row.get("unresolved"):
+            continue
         raw = (Path(directory) / binding["filename"]).read_bytes()
         if hashlib.sha256(raw).hexdigest() != binding["binaryHash"]:
             raise ValueError("Selected artifact changed during preparation; retry.")
@@ -150,7 +163,9 @@ def stage(cfg, document, directory, entry_slot):
                 targets = ([by_slot[explicit["entrySlot"]]] if explicit else
                            [r for r in rows if r["name"] in (entry_name, "ide." + entry_name)])
                 if len(targets) != 1:
-                    raise ValueError(f"NS[{slot}]: fresh Thread requires one exact {entry_name} assignment.")
+                    row.update(unresolved=True, unresolvedReason=f"Missing named Thread entry {entry_name}")
+                    prepared.append(row)
+                    continue
                 target = targets[0]
                 actor = by_slot[explicit["actorSlot"]] if explicit else None
                 raw = build_fresh_thread_lump(allocation_words=item["words"], stack_words=32,

@@ -147,7 +147,8 @@
         const prof = profile();
         body.replaceChildren(el('p', 'Checking saved Namespace (' + prof + ')…', {role: 'status'}));
         try {
-            const response = await fetch('/api/namespace/attention?profile=' + encodeURIComponent(prof),
+            const response = await fetch('/api/namespace/attention?profile=' + encodeURIComponent(prof) +
+                (root.NamespaceDesignV1 && root.NamespaceDesignV1.state.active ? root.NamespaceDesignV1.designQuery() : ''),
                 {cache: 'no-store', credentials: 'include'});
             let data = null;
             try { data = await response.json(); } catch (_) { data = null; }

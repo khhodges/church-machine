@@ -164,8 +164,6 @@ def validate(document):
             validate_authoring(row["authoring"], kind)
         if row.get("policy") not in ("Resident", "Lazy", "Hardware"):
             raise ValueError("Invalid load policy")
-        if phase1 and kind == "lump" and row["policy"] != "Resident":
-            raise ValueError("Phase 1 LUMPs must be Resident; Lazy placements are not allowed")
         if kind != "lump" and row["policy"] != ("Hardware" if kind == "mmio" else "Resident"):
             raise ValueError("Architectural objects retain their residency")
         if kind == "thread" and row.get("words") != 256:
@@ -198,8 +196,8 @@ def validate(document):
     for row in rows:
         for slot in row.get("preparedThread", {}).values():
             target = by_slot.get(slot, {})
-            if target.get("kind") != "lump" or target.get("policy") != "Resident" or not target.get("selection"):
-                raise ValueError("Prepared Thread driver and actor must select exact Resident LUMPs")
+            if target.get("kind") != "lump":
+                raise ValueError("Prepared Thread driver and actor must name declared LUMP rows")
     if (by_slot.get(1, {}).get("name"), by_slot.get(1, {}).get("kind"),
         by_slot.get(2, {}).get("name"), by_slot.get(2, {}).get("kind"),
         by_slot.get(2, {}).get("sequence")) != ("Boot.NS", "namespace", "Boot.Thread", "thread", 0):

@@ -29,6 +29,8 @@ function harness(initialProfile, persisted) {
         NamespaceIdeNode: {savePending: async () => true},
         _nsRenderSavedVersionCell: () => '<td>NA</td>',
         fetch: async (url, options) => {
+            if(url === '/api/namespace/design-copies')
+                return {ok:true, json:async()=>({ok:true,copies:[]})};
             requests.push({url, method: options.method});
             if (scope.fail) return {ok: false, json: async () => ({error: 'Save refused'})};
             const data = structuredClone(response);
@@ -47,6 +49,7 @@ function harness(initialProfile, persisted) {
         },
     };
     scope.window = scope;
+    vm.runInNewContext(fs.readFileSync(__dirname + '/namespace-profile-names.js', 'utf8'), scope);
     vm.runInNewContext(fs.readFileSync(__dirname + '/namespace-design-v1.js', 'utf8'), scope);
     return {scope, api: scope.NamespaceDesignV1, host, controls, requests, response};
 }
@@ -56,7 +59,7 @@ async function run() {
         for (const persisted of [true, false, undefined]) {
             const {api, host, scope, controls, requests} = harness(profile, persisted);
             await api.load();
-            assert.match(host.innerHTML, new RegExp(profile === 'phase1' ? 'Phase 1' : 'Ascending layout'));
+            assert.match(host.innerHTML, new RegExp(profile === 'phase1' ? 'Phase 1' : 'New layout'));
             assert.match(host.innerHTML, persisted === true ? /Saved design/ :
                 persisted === false ? /Generated defaults — not saved/ : /Saved status unknown/);
             if (persisted === false) {
@@ -82,8 +85,8 @@ async function run() {
             assert.equal(api.state.dirty, false);
             assert.match(host.innerHTML, /Saved design/);
             assert.doesNotMatch(host.innerHTML, /Unsaved local draft|Generated defaults/);
-            // The successful save status remains visible even when binding is unavailable.
-            assert.match(controls['#nsSaveLayoutNote'].textContent, /binding results are unavailable/);
+            // Ordinary save must not bind.
+            assert.match(controls['#nsSaveLayoutNote'].textContent, /no GTs were bound/);
         }
     }
     const {api, host, requests} = harness('phase1', false);
@@ -91,14 +94,14 @@ async function run() {
     api.capacity(80);
     api.setProfile('ascending');
     await new Promise(resolve => setImmediate(resolve));
-    assert.match(host.innerHTML, /Ascending layout · Saved design/);
+    assert.match(host.innerHTML, /New layout.* · Saved design/);
     api.setProfile('phase1');
-    assert.match(host.innerHTML, /Phase 1 · Unsaved local draft/);
+    assert.match(host.innerHTML, /Phase 1.* · Unsaved local draft/);
     assert.match(host.innerHTML, /generated defaults, not recovered/);
     assert.equal(api.state.document.slotCount, 80);
     api.setProfile('legacy');
     api.setProfile('phase1');
-    assert.match(host.innerHTML, /Phase 1 · Unsaved local draft/);
+    assert.match(host.innerHTML, /Phase 1.* · Unsaved local draft/);
     assert.deepEqual(requests.map(r => r.method), ['GET', 'GET']);
     console.log('PASS Namespace profile, saved/generated evidence, dirty drafts, save results, and profile switching');
 }

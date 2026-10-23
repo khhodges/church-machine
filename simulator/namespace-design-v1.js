@@ -8,6 +8,10 @@
     const state = {active:true, loading:false, saving:false, document:null, fingerprint:null,
         projection:null, persisted:null, error:'', dirty:false};
     const endpoint = '/api/namespace/design-v1';
+    state.designId = '';
+    let copies = [];
+    let copiesLoaded = false;
+    const designQuery = () => state.designId ? '&design=' + encodeURIComponent(state.designId) : '';
     state.profile = 'ascending';
     const profileKey = 'church_namespace_design_profile';
     try {
@@ -30,7 +34,8 @@
     const slotCount = () => state.document.slotCount || 64;
     const metadata = () => [(0xf8800100 | (slotCount() << 10)) >>> 0, 0, state.document.rows.length - 1, 0];
     async function request(method, body) {
-        const response = await fetch(endpoint + (state.profile === 'phase1' ? '?profile=phase1' : ''), {method, cache:'no-store',
+        const response = await fetch(endpoint + (state.profile === 'phase1' ? '?profile=phase1' :
+            state.designId ? '?profile=ascending' : '') + designQuery(), {method, cache:'no-store',
             headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign'},
             ...(body ? {body:JSON.stringify(body)} : {})});
         const data = await response.json();
@@ -49,9 +54,85 @@
     async function load() {
         if (state.loading) return;
         state.loading = true;
-        try { accept(await request('GET')); }
+        try {
+            if (!copiesLoaded) {
+                const response = await fetch('/api/namespace/design-copies', {cache:'no-store'});
+                const result = await response.json();
+                if (!response.ok || !result.ok) throw Error(result.error || 'Saved Namespace list unavailable');
+                copies = result.copies; copiesLoaded = true;
+            }
+            accept(await request('GET'));
+        }
         catch (e) { state.error = e.message; }
         finally { state.loading = false; render(); }
+    }
+    async function selectCopy(identifier) {
+        if (state.loading || state.saving) return;
+        if (state.dirty) {
+            state.error='Save your Namespace changes before switching copies. Your draft is retained.';
+            render(); return;
+        }
+        const item = copies.find(c => c.id === identifier);
+        if (identifier && !item) return;
+        if(root.DesignSimulation) { root.DesignSimulation.stop(); root.DesignSimulation.invalidate(); }
+        if(typeof root.stopSim==='function') root.stopSim();
+        ++sourceRequest; invalidatePreview();
+        state.designId=identifier;
+        if (item) state.profile=item.profile;
+        state.document=null;
+        await load();
+    }
+    function duplicateNamespace() {
+        if (state.loading || state.saving) return;
+        if (state.dirty || !state.persisted) {
+            state.error='Save the source Namespace before duplicating it. Your draft is retained.';
+            render(); return;
+        }
+        if (document.getElementById('namespaceDuplicateDialog')) return;
+        const dialog=document.createElement('dialog');
+        dialog.id='namespaceDuplicateDialog';
+        dialog.style.cssText='max-width:480px;background:#171723;color:#eee;border:1px solid #666;border-radius:8px;padding:20px';
+        dialog.innerHTML=`<form><h3>Duplicate Namespace</h3>
+            <p>Copy the saved layout and exact LUMP selections into an independent Namespace.
+            The source is unchanged. Nothing is bound or activated; the new copy is not marked tested.</p>
+            <label>New Namespace name <input name="name" required maxlength="128" autocomplete="off" style="width:100%;margin:10px 0"></label>
+            <p role="alert" id="namespaceDuplicateError"></p>
+            <button type="button" id="namespaceDuplicateCancel">Cancel</button>
+            <button type="submit">Create copy</button></form>`;
+        document.body.appendChild(dialog);
+        dialog.addEventListener('cancel', event=>{ if(state.saving) event.preventDefault(); });
+        dialog.addEventListener('close',()=>dialog.remove());
+        dialog.querySelector('#namespaceDuplicateCancel').onclick=()=>{ if(!state.saving) dialog.close(); };
+        dialog.querySelector('form').onsubmit=async event=>{
+            event.preventDefault();
+            const name=dialog.querySelector('input').value.trim();
+            const errorBox=dialog.querySelector('#namespaceDuplicateError');
+            if (!name || name.length>128 || /[\x00-\x1f]/.test(name)) {
+                errorBox.textContent='Enter a Namespace name of 1–128 characters without control characters.';
+                return;
+            }
+            if (name.toLowerCase()==='original' || copies.some(c=>c.name.toLowerCase()===name.toLowerCase())) {
+                errorBox.textContent='That Namespace name is already in use. Choose a different name.';
+                return;
+            }
+            errorBox.textContent='';
+            const button=dialog.querySelector('[type=submit]');
+            button.disabled=true; state.saving=true;
+            try {
+                const response=await fetch('/api/namespace/design-copies', {
+                    method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign'},
+                    body:JSON.stringify({profile:state.profile,sourceId:state.designId,
+                        fingerprint:state.fingerprint,name})});
+                const result=await response.json();
+                if(!response.ok || !result.ok) throw Error(result.error || 'Namespace was not duplicated');
+                copies.push(result.copy);
+                dialog.close(); state.saving=false;
+                await selectCopy(result.copy.id);
+            } catch(error) {
+                dialog.querySelector('#namespaceDuplicateError').textContent=error.message;
+            } finally { state.saving=false; button.disabled=false; }
+        };
+        dialog.showModal(); dialog.querySelector('input').focus();
     }
     function setProfile(value) {
         invalidatePreview();
@@ -71,7 +152,7 @@
         state.active = value !== 'legacy';
         if (state.active && value !== state.profile) {
             Object.assign(state, drafts[value] || {document:null, fingerprint:null,
-                projection:null, persisted:null, error:'', dirty:false, loading:false, saving:false},
+                projection:null, persisted:null, error:'', dirty:false, loading:false, saving:false,designId:''},
                 {profile:value, active:true});
         }
         try { root.localStorage.setItem(profileKey, value); }
@@ -116,7 +197,8 @@
             lazy:rows.filter(r=>r.policy==='Lazy').length,garbage:0,free:slotCount()-1-rows.length}};
     }
     function profileLabel() {
-        return root.NamespaceProfileNames.label(state.profile);
+        const item=copies.find(c=>c.id===state.designId);
+        return item ? item.name : root.NamespaceProfileNames.label(state.profile);
     }
     function designStatus() {
         const origin = state.persisted === true
@@ -128,9 +210,15 @@
             : state.persisted === true ? 'Saved design'
             : state.persisted === false ? 'Generated defaults — not saved' : 'Saved status unknown';
         return `<div id="namespaceDesignStatus" role="status" style="margin:0 0 10px;padding:10px;border:1px solid #6b5320;border-radius:4px">
+            <label>Namespace <select id="namespaceSavedCopy" onchange="NamespaceDesignV1.selectCopy(this.value)" ${state.loading || state.saving?'disabled':''}>
+                <option value="">Original — ${esc(root.NamespaceProfileNames.label(state.profile))}</option>
+                ${copies.filter(c=>c.profile===state.profile).map(c=>`<option value="${esc(c.id)}" ${c.id===state.designId?'selected':''}>${esc(c.name)}</option>`).join('')}
+            </select></label>
+            <button type="button" id="duplicateNamespace" onclick="NamespaceDesignV1.duplicateNamespace()" ${state.loading || state.saving?'disabled':''}>Duplicate Namespace</button>
             <strong>${esc(profileLabel())} · ${label}</strong>
+            ${state.designId?'<div>Independent copy · test/approval status is not inherited.</div>':''}
             <div>${origin}${state.dirty ? ' Local changes have not been saved.' : ''}
-            ${state.dirty || state.persisted === false ? 'Use Bind Namespace Design to save explicitly; nothing is saved automatically.' : ''}
+            ${state.dirty || state.persisted === false ? 'Save explicitly; binding remains a separate action.' : ''}
             </div></div>`;
     }
     function renderRows(html, host) {
@@ -148,7 +236,7 @@
             const current=!state.dirty && projection && projection.policy===r.policy && projection.name===r.name;
             const location=r.kind==='namespace'?0:r.kind==='mmio'?r.address:current?projection.location:null;
             const limit=r.kind==='namespace'?slotCount()*4-1:r.kind==='mmio'?r.limit:current?projection.limit:null;
-            const select=r.kind==='lump'?(state.profile==='phase1'?'<span class="ns-fixed-policy">Resident</span>':`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`):
+            const select=r.kind==='lump'?`<select aria-label="Load policy for slot ${slot}" onchange="NamespaceDesignV1.policy(${slot},this.value)" style="margin-left:5px;background:#0d0d1a;color:#d0d0e8;border:1px solid #6b5320;border-radius:3px;font-size:0.68rem;padding:1px 3px;"><option ${r.policy==='Resident'?'selected':''}>Resident</option><option ${r.policy==='Lazy'?'selected':''}>Lazy</option></select>`:
                 `<span class="ns-fixed-policy">${r.kind==='mmio'?'Resident I/O register':r.kind==='thread'?'Resident · Thread':'Bootstrap'}</span>`;
             const clear=r.kind==='lump'&&!r.boot?`<button class="btn btn-xs" onclick="NamespaceDesignV1.clear(${slot})" style="background:#2e1a1a;color:#f87171;border:1px solid rgba(248,113,113,0.35);margin-right:4px;font-size:0.65rem;padding:1px 5px;">Clear</button>`:'';
             const selection=r.selection||{};
@@ -187,7 +275,6 @@
     }
     function policy(slot,value) {
         if(state.saving) return;
-        if(state.profile==='phase1' && value!=='Resident') return;
         const row=state.document.rows.find(r=>r.slot===slot);
         if(row && row.kind==='lump' && ['Lazy','Resident'].includes(value)) {row.policy=value;changed();}
     }
@@ -262,7 +349,7 @@
             state.fingerprint === fingerprint && JSON.stringify(state.document) === documentText;
         const context = {slot:row.slot, generation:row.sequence, profile:profileLabel(), fingerprint, accepts};
         if (state.dirty) return {...context, reason:'Namespace has unsaved changes. Bind this design explicitly to inspect its derivative.'};
-        const response = await fetch(endpoint + '?binding_preview=1&profile=' + encodeURIComponent(profile), {cache:'no-store'});
+        const response = await fetch(endpoint + '?binding_preview=1&profile=' + encodeURIComponent(profile) + designQuery(), {cache:'no-store'});
         const result = await response.json();
         if (!accepts()) throw Error('Namespace selection changed while opening preview. Reopen the selected slot.');
         if (!response.ok || !result.ok) throw Error(result.error || 'Binding inspection failed');
@@ -394,13 +481,13 @@
             `<label>Saved LUMP (optional)<select id="nsDraftLump" style="width:100%"><option value="">Unfinished / name only</option></select></label>
             <p><label>Pet name <input id="nsDraftName" maxlength="128" value="${esc(original?original.name:'')}" style="width:100%"></label></p>
             <p><label>Slot <input id="nsDraftSlot" type="number" min="3" max="${slotCount()-1}" value="${original?original.slot:preferred||free||''}"></label></p>
-            <p><label>Policy <select id="nsDraftPolicy" ${state.profile==='phase1'?'disabled':''}>${state.profile==='phase1'?'':'<option>Lazy</option>'}<option>Resident</option></select></label></p>
+            <p><label>Policy <select id="nsDraftPolicy"><option>Lazy</option><option>Resident</option></select></label></p>
             <p><label><input id="nsDraftBoot" type="checkbox" ${original&&original.boot?'checked':''}> Boot target in this design</label></p>
             <p>Unfinished entries are allowed. Placement does not grant execution authority.</p>
             <p id="nsDraftError" role="alert"></p><button class="btn" id="nsDraftApply">${original?'Apply changes':'Add to Namespace (design)'}</button> `);
         const name=overlay.querySelector('#nsDraftName'), slotEl=overlay.querySelector('#nsDraftSlot');
         const policy=overlay.querySelector('#nsDraftPolicy'), picker=overlay.querySelector('#nsDraftLump');
-        policy.value=state.profile==='phase1'?'Resident':original?original.policy:'Lazy';
+        policy.value=original?original.policy:state.profile==='phase1'?'Resident':'Lazy';
         let selected=original && original.selection;
         // A catalog refresh must never disguise or replace the exact placement.
         if(selected) {
@@ -430,7 +517,7 @@
             if(original && next!==original.slot) {
                 error.textContent='Clear and add a separate design placement to change its slot; existing bindings are not rewritten.'; return;
             }
-            const row={slot:next,name:value,kind:'lump',policy:state.profile==='phase1'?'Resident':policy.value,sequence:original?original.sequence:0};
+            const row={slot:next,name:value,kind:'lump',policy:policy.value,sequence:original?original.sequence:0};
             if(original?.authoring) row.authoring=clone(original.authoring);
             if(selected) row.selection=clone(selected);
             const boot=overlay.querySelector('#nsDraftBoot').checked;
@@ -546,7 +633,7 @@
             render();
         }
     }
-    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview};
+    root.NamespaceDesignV1={state,render,load,save,edit,inspect,source,assigned,authoring,thread,setThread,clear,setProfile,snapshot,renderRows,policy,boot,addFromOriginal,identity,capacity,advanceSavedRevision,newSelfTestRevision,bindingPreview,preview,selectCopy,duplicateNamespace,designQuery};
     if(typeof document!=='undefined') {
         const initialize = () => {
             const capacity = document.getElementById('bootCapacityPanel');

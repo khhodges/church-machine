@@ -414,14 +414,15 @@ def validate_image(image, *, image_format):
             or decoded["permissions"] != 0b100):
         raise ValueError("Entry Thread CR0 must contain an executable Inform GT")
     target = live.get(decoded["slot"])
-    if (decoded["slot"] < 3 or target is None
-            or decoded["sequence"] != target["sequence"]
-            or target["location"] >= total):
+    if (decoded["slot"] < 3 or (target is not None and (
+            decoded["sequence"] != target["sequence"]
+            or target["location"] >= total))):
         raise ValueError("Entry Thread CR0 does not bind to a live destination Namespace slot")
-    target_header = words[target["location"]]
-    if (target["location"] < table_words
-            or target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0):
-        raise ValueError("Entry Thread CR0 target is not an ordinary in-range code LUMP")
+    if target is not None:
+        target_header = words[target["location"]]
+        if (target["location"] < table_words
+                or target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0):
+            raise ValueError("Entry Thread CR0 target is not an ordinary in-range code LUMP")
 
     thread_rows = []
     for slot, entry in live.items():
@@ -442,29 +443,31 @@ def validate_image(image, *, image_format):
             _thread_words, target_fields, layout = _fresh_thread_words(
                 struct.pack(f">{size}I", *body), f"NS[{slot}]")
             destination = live.get(target_fields["slot"])
-            if (destination is None or target_fields["slot"] < 3
-                    or destination["sequence"] != target_fields["sequence"]
-                    or destination["location"] >= total):
+            if (target_fields["slot"] < 3 or (destination is not None and (
+                    destination["sequence"] != target_fields["sequence"]
+                    or destination["location"] >= total))):
                 raise ValueError(
                     f"NS[{slot}] fresh Thread continuation does not bind to a live destination row")
-            target_header = words[destination["location"]]
-            target_size = 1 << (((target_header >> 23) & 15) + 6)
-            target_cw = (target_header >> 10) & 8191
-            if (target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0
-                    or target_cw == 0 or destination["location"] + target_size > total):
-                raise ValueError(f"NS[{slot}] fresh Thread continuation target is not executable code")
+            if destination is not None:
+                target_header = words[destination["location"]]
+                target_size = 1 << (((target_header >> 23) & 15) + 6)
+                target_cw = (target_header >> 10) & 8191
+                if (target_header >> 27 != 31 or ((target_header >> 8) & 3) != 0
+                        or target_cw == 0 or destination["location"] + target_size > total):
+                    raise ValueError(f"NS[{slot}] fresh Thread continuation target is not executable code")
             actor_gt = body[layout["caps_start"] + 1]
             actor_fields = _decode_gt(actor_gt) if actor_gt else None
             if actor_fields:
                 actor = live.get(actor_fields["slot"])
-                if (not actor or actor_fields["slot"] < 3
-                        or actor["sequence"] != actor_fields["sequence"]
-                        or actor["location"] >= total):
+                if (actor_fields["slot"] < 3 or (actor is not None and (
+                        actor["sequence"] != actor_fields["sequence"]
+                        or actor["location"] >= total))):
                     raise ValueError(f"NS[{slot}] prepared Thread actor does not bind to a live destination")
-                actor_header = words[actor["location"]]
-                if (actor_header >> 27 != 31 or ((actor_header >> 8) & 3) != 0
-                        or not ((actor_header >> 10) & 8191)):
-                    raise ValueError(f"NS[{slot}] prepared Thread actor is not executable code")
+                if actor is not None:
+                    actor_header = words[actor["location"]]
+                    if (actor_header >> 27 != 31 or ((actor_header >> 8) & 3) != 0
+                            or not ((actor_header >> 10) & 8191)):
+                        raise ValueError(f"NS[{slot}] prepared Thread actor is not executable code")
             thread_rows.append({
                 "slot": slot, "sequence": entry["sequence"],
                 "entrySlot": target_fields["slot"],
@@ -480,17 +483,9 @@ def validate_image(image, *, image_format):
             raise ValueError(f"NS[{slot}] is not a bounded ordinary executable LUMP")
         body_ranges.append((location, location + size, f"NS[{slot}] LUMP"))
         expected_self = boot.create_gt(entry["sequence"], slot, {"E": 1}, 1)
-        if cc < 1 or words[location + size - cc] != expected_self:
+        if cc < 1 or words[location + size - cc] not in (0, expected_self):
             raise ValueError(f"NS[{slot}] LUMP C-list row zero is not its exact destination SELF GT")
-        for index, gt in enumerate(words[location + size - cc:location + size]):
-            fields = _decode_gt(gt)
-            if fields["type"] != 1:
-                continue
-            destination = live.get(fields["slot"])
-            if (gt >> 31 or fields["slot"] == 0 or destination is None
-                    or destination["sequence"] != fields["sequence"]):
-                raise ValueError(
-                    f"NS[{slot}] C-list row {index} carries an absent or stale local Inform GT")
+        # C-list references are checked on use, not globally resolved at build.
 
     body_ranges.sort()
     cursor = 0
@@ -551,9 +546,12 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
         slot = _integer(row.get("slot"), "Namespace slot")
         if slot == 0 or slot >= slots or slot in by_slot:
             raise ValueError("Slot 0 is metadata; other slots must be unique and in range")
-        if row.get("archived") is True or row.get("symbolic") is True or row.get("implementationMissing") is True:
+        if row.get("archived") is True:
             raise ValueError(f"NS[{slot}] is not a live executable assignment")
         by_slot[slot] = dict(row)
+        if (row.get("symbolic") is True or row.get("implementationMissing") is True
+                or row.get("load_policy") == "Lazy"):
+            by_slot[slot]["unresolved"] = True
     self_row, thread_row = by_slot.get(SELF_SLOT), by_slot.get(THREAD_SLOT)
     if not self_row or self_row.get("name") != "Boot.NS":
         raise ValueError("New-format target rows must assign Boot.NS self to slot 1")
@@ -575,9 +573,16 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
     for slot, row in sorted(by_slot.items()):
         if slot in (SELF_SLOT, THREAD_SLOT) or row.get("backing") == "mmio":
             continue
+        if row.get("unresolved") or not row.get("filename"):
+            row["unresolved"] = True
+            continue
         if row.get("type") not in ("Inform", "Resident", "Thread"):
             raise ValueError(f"NS[{slot}] requires an executable Inform/Resident/Thread LUMP")
-        body, typ, cw, cc = _load_lump(row, lumps_dir, artifacts)
+        try:
+            body, typ, cw, cc = _load_lump(row, lumps_dir, artifacts)
+        except FileNotFoundError:
+            row["unresolved"] = True
+            continue
         sequence = _integer(row.get("seq"), f"NS[{slot}] sequence")
         if sequence > 511:
             raise ValueError(f"NS[{slot}] sequence is outside the 9-bit range")
@@ -626,7 +631,7 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
             if typ != 0 or cw < 1:
                 raise ValueError(f"NS[{slot}] selected artifact is not an ordinary executable LUMP")
             expected_self = boot.create_gt(sequence, slot, {"E": 1}, 1)
-            if cc < 1 or body[-cc] != expected_self:
+            if cc < 1 or body[-cc] not in (0, expected_self):
                 raise ValueError(
                     f"NS[{slot}] exact artifact must already contain its destination SELF GT; "
                     "recompile/reapprove rather than patching saved bytes")
@@ -634,7 +639,8 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
 
     memory = [0] * total
     table_words = slots * ENTRY_WORDS
-    member_count = len(rows) - 1
+    member_count = sum(1 for slot, row in by_slot.items()
+                       if slot != SELF_SLOT and not row.get("unresolved"))
     memory[:4] = [pack_namespace_word0(total, slots), 0, member_count, 0]
     _write_entry(memory, SELF_SLOT, 0, table_words - 1, 0)
     body_cursor = table_words
@@ -670,6 +676,8 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
     for slot, row in sorted(by_slot.items()):
         if slot < 3:
             continue
+        if row.get("unresolved"):
+            continue  # Empty descriptor: ordinary mLoad faults only on use.
         sequence = _integer(row.get("seq"), f"NS[{slot}] sequence")
         if not 0 <= sequence <= 511:
             raise ValueError(f"NS[{slot}] sequence is outside the 9-bit range")
@@ -708,5 +716,7 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
         "imageSha256": _sha(image),
         "hardwareCertified": False,
         "approvalEligible": False,
+        "unresolvedRows": [{"slot": slot, "name": row.get("name")}
+                           for slot, row in sorted(by_slot.items()) if row.get("unresolved")],
         "activationAllowed": False,
     }

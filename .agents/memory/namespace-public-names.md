@@ -41,3 +41,12 @@ Give the C-list highest prominence and the API equal importance to source.
 even more so.
 **How to apply:** Show decoded named capabilities first, with an always-visible
 saved API before source and raw binary. Do not hide the API behind disclosure.
+
+Duplicating a saved Namespace initializes an independent design, not a new
+test certification or activation.
+
+**Why:** The user wants to start new Namespaces from tested copies. Exact
+selections should be retained without suggesting subsequent edits are tested.
+
+**How to apply:** Preserve source selection identity and keep the original
+unchanged; duplication must not implicitly bind, install or inherit approval.

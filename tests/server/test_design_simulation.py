@@ -69,6 +69,7 @@ def identifiers(response):
 def test_real_saved_revision_admits_exact_private_runtime(setup_design, tmp_path, profile):
     root, client, document, path, _ = setup_design
     document["rows"].extend([
+        dict(slot=9, name="ide.Mint", kind="lump", policy="Resident", sequence=0),
         dict(slot=12, name="Thread.4", kind="thread", policy="Resident", sequence=2, words=256),
         dict(slot=8, name="UART_DEV", kind="mmio", policy="Hardware", sequence=1,
              address=0x40000014, limit=2)])
@@ -77,6 +78,9 @@ def test_real_saved_revision_admits_exact_private_runtime(setup_design, tmp_path
         path = path.parent / "phase1.json"
     path.write_text(json.dumps(document))
     protected = {p: p.read_bytes() for p in root.iterdir() if p.is_file()}
+    from server.namespace_design_v1 import DesignStore
+    DesignStore(path, root, root / "ns-state.json", phase1=profile == "phase1").save(
+        dict(document=document, fingerprint=digest(document), bind=True))
     before = path.read_bytes()
     prepared = request(client, "prepare", {"namespaceFingerprint": digest(document)}, profile)
     assert prepared.status_code == 200, prepared.json
@@ -108,7 +112,27 @@ if(sim.dr[1]!==73 || sim.faultLog.length) throw Error(JSON.stringify({dr:sim.dr[
     assert client.get("/api/simulation/history").json["revisions"] == []
 
 
-@pytest.mark.parametrize("defect", ["identity", "hash", "canonical-token", "missing", "lazy", "signature"])
+@pytest.mark.parametrize("missing", ["unselected", "missing-file", "lazy"])
+def test_missing_code_is_admitted_without_binding(setup_design, missing):
+    root, client, document, path, _ = setup_design
+    row = document["rows"][-1]
+    if missing == "unselected":
+        row.pop("selection")
+    elif missing == "missing-file":
+        (root / row["selection"]["filename"]).unlink()
+    else:
+        row["policy"] = "Lazy"
+    path.write_text(json.dumps(document))
+    prepared = request(client, "prepare", {"namespaceFingerprint": digest(document)})
+    assert prepared.status_code == 200, prepared.json
+    assert len(prepared.json["artifactBindings"]) == (1 if missing == "lazy" else 0)
+    assert request(client, "approve", identifiers(prepared)).status_code == 200
+    active = request(client, "activate", identifiers(prepared))
+    assert active.status_code == 200, active.json
+    assert json.loads(path.read_text()) == document
+
+
+@pytest.mark.parametrize("defect", ["identity", "hash", "canonical-token", "signature"])
 def test_invalid_selected_inputs_remain_blocked(setup_design, defect):
     root, client, document, path, _ = setup_design
     row = document["rows"][-1]
@@ -188,11 +212,11 @@ HALT
         sequence=1, boot=True, selection=dict(filename=caller["filename"],
             binaryHash=caller["binary_hash"], token=caller["token"], revision=caller["lump_version"])))
     saved_design = client.put("/api/namespace/design-v1",
-        json=dict(fingerprint=digest(document), document=draft),
+        json=dict(fingerprint=digest(document), document=draft, bind=True),
         headers={"X-Requested-With": "NamespaceDesign"})
     if saved_design.status_code == 428:
         saved_design = client.put("/api/namespace/design-v1",
-            json=dict(fingerprint=digest(document), document=draft),
+            json=dict(fingerprint=digest(document), document=draft, bind=True),
             headers={"X-Requested-With": "NamespaceDesign",
                      "X-Change-Confirmation": saved_design.json["change_confirmation"]["id"]})
     assert saved_design.status_code == 200, saved_design.json

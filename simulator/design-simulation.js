@@ -90,7 +90,7 @@
         const state = root.NamespaceDesignV1 && root.NamespaceDesignV1.state;
         if (!state || !state.active || state.dirty || !state.document || !state.fingerprint)
             throw Error('Save the selected Namespace design before private simulation.');
-        return {profile:state.profile, fingerprint:state.fingerprint, document:JSON.stringify(state.document)};
+        return {profile:state.profile, designId:state.designId || '', fingerprint:state.fingerprint, document:JSON.stringify(state.document)};
     }
     function same(selected) {
         try { return JSON.stringify(selection()) === JSON.stringify(selected); }
@@ -148,7 +148,8 @@
         render();
     }
     async function request(selected, action, payload) {
-        const response = await fetch('/api/simulation/design/'+selected.profile+'/'+action, {
+        const response = await fetch('/api/simulation/design/'+selected.profile+'/'+action+
+            (selected.designId?'?design='+encodeURIComponent(selected.designId):''), {
             method:'POST',headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign'},
             body:JSON.stringify(payload)});
         const data = await response.json();

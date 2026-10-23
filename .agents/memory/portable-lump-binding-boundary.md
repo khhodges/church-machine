@@ -151,3 +151,13 @@ old slot, patch the original, or automatically recompile it. Preserve the
 original for inspection and report that programmer recompilation is required
 before assignment/reloading. Destination-local binding is not a substitute
 for this requirement.
+
+Binding snapshot identity must be consistent between explicit BIND and replay,
+independent of extra diagnostic/provenance fields added during preparation.
+
+**Why:** A preparation-only canonical-token annotation changed a snapshot key,
+so replay missed an existing explicit binding and used unresolved SELF instead.
+
+**How to apply:** Use the same complete selection graph, including selected
+Lazy artifacts, for snapshot lookup. Residency controls body emission, not
+whether selected artifacts contribute to binding identity.

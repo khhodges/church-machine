@@ -4998,16 +4998,22 @@ _design_simulation_stores = {
 def simulation_design_transition(profile, action):
     from pathlib import Path
     from server.namespace_design_v1 import DesignStore, digest, FORMAT
-    if profile not in _design_simulation_stores or action not in ("prepare", "approve", "activate"):
+    if profile not in ("ascending", "phase1") or action not in ("prepare", "approve", "activate"):
         return jsonify(ok=False, error="Unknown private design simulation operation"), 400
     if not _is_ide_design_request():
         return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
-    design = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
-                         ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
-                         LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
     payload = request.get_json(silent=True)
-    store = _design_simulation_stores[profile]
     try:
+        from server.namespace_design_copies import resolve_store
+        identifier = request.args.get("design", "")
+        design = resolve_store(profile, identifier, LUMPS_DIR, NS_STATE_PATH)
+        key = profile + (":" + identifier if identifier else "")
+        if key not in _design_simulation_stores:
+            _design_simulation_stores[key] = _SimulationPreparationStore(
+                revision_store=lambda: RevisionStore(os.path.join(_BUILD_SNAPSHOTS_DIR, "revisions")),
+                binding_reader=_design_simulation.bindings,
+                purpose="private-design-" + key)
+        store = _design_simulation_stores[key]
         design.path.parent.mkdir(parents=True, exist_ok=True)
         with _namespace_commit_guard(), _lump_history_transition_lock(LUMPS_DIR), \
                 open(str(design.path) + ".lock", "a") as design_lock:
@@ -5024,7 +5030,7 @@ def simulation_design_transition(profile, action):
                 entry = next(row["slot"] for row in document["rows"] if row.get("boot"))
                 result = store.prepare(document, _design_simulation.configuration(document),
                     LUMPS_DIR, entry, stage=_design_simulation.stage,
-                    provenance_extra=dict(imageFormat=FORMAT, designProfile=profile,
+                    provenance_extra=dict(imageFormat=FORMAT, designProfile=profile, designId=identifier,
                         designFormat=document["format"], slotCount=document["slotCount"],
                         installationAllowed=False, hardwareProgrammingAllowed=False))
             else:
@@ -5158,10 +5164,9 @@ def namespace_design_v1():
     profile = request.args.get("profile", "ascending")
     if profile not in ("ascending", "phase1"):
         return jsonify(ok=False, error="Unknown Namespace design profile"), 400
-    store = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
-                        ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
-                        LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
     try:
+        from server.namespace_design_copies import resolve_store
+        store = resolve_store(profile, request.args.get("design", ""), LUMPS_DIR, NS_STATE_PATH)
         if request.method == "PUT":
             if not _is_ide_design_request():
                 return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
@@ -5171,6 +5176,20 @@ def namespace_design_v1():
                 result["bindingCleanup"] = _cleanup_binding_snapshots()
             return jsonify(result)
         return jsonify(store.read(binding_preview=request.args.get("binding_preview") == "1"))
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return jsonify(ok=False, error=str(exc), dataChanged=False), 409
+
+
+@app.route("/api/namespace/design-copies", methods=["GET", "POST"])
+def namespace_design_copies():
+    from server.namespace_design_copies import catalog, duplicate
+    try:
+        if request.method == "POST":
+            if not _is_ide_design_request():
+                return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
+            with _lump_history_transition_lock(LUMPS_DIR):
+                return jsonify(duplicate(request.get_json(silent=True), LUMPS_DIR, NS_STATE_PATH)), 201
+        return jsonify(ok=True, copies=catalog(NS_STATE_PATH))
     except (OSError, ValueError, TypeError, KeyError) as exc:
         return jsonify(ok=False, error=str(exc), dataChanged=False), 409
 
@@ -5190,9 +5209,8 @@ def namespace_attention():
             if profile == "legacy":
                 document = placement_document(_read_namespace_design_document()["abstractions"])
             else:
-                store = DesignStore(Path(NS_STATE_PATH).parent / "design-drafts" /
-                                    ("phase1.json" if profile == "phase1" else "ascending-v1.json"),
-                                    LUMPS_DIR, NS_STATE_PATH, phase1=profile == "phase1")
+                from server.namespace_design_copies import resolve_store
+                store = resolve_store(profile, request.args.get("design", ""), LUMPS_DIR, NS_STATE_PATH)
                 document = store.read_document()
             def source_companion(filename):
                 # Reuse the LUMP view's exact-revision validation, never its
@@ -28108,6 +28126,7 @@ def _change_confirmation_paths():
     if request.path == "/api/namespace/design-v1":
         paths.append(Path(NS_STATE_PATH).parent / "design-drafts" / "ascending-v1.json")
         paths.append(Path(NS_STATE_PATH).parent / "design-drafts" / "phase1.json")
+        paths.extend((Path(NS_STATE_PATH).parent / "design-drafts" / "copies").glob("*/design.json"))
     for pattern in ("*.lump", "*.json", "*.bin"):
         # Lease heartbeats are coordination state, not reviewed artifacts.
         # Exclude only the registry; manifests and other JSON stay protected.

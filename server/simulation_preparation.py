@@ -92,7 +92,7 @@ def portable_snapshot_key(raw, binding, rows, bindings):
         "destinations": sorted([
             {k: row.get(k) for k in ("slot", "seq", "name", "type", "filename", "binary_hash")}
             for row in rows], key=lambda row: row["slot"]),
-        "contracts": [{k: v for k, v in b.items() if k != "symbolicReport"}
+        "contracts": [{k: v for k, v in b.items() if k not in ("symbolicReport", "canonicalToken")}
                       for b in sorted(bindings, key=lambda b: b["slot"])]})
 
 

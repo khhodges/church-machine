@@ -111,7 +111,7 @@ def design_http(tmp_path):
     return app.test_client(), paths
 
 
-def test_phase1_rejects_lazy_and_recovers_named_slots(tmp_path):
+def test_phase1_preserves_lazy_and_recovers_named_slots(tmp_path):
     live = tmp_path / "ns-state.json"
     live.write_text('{"abstractions":[]}')
     store = DesignStore(tmp_path / "phase1.json", tmp_path, live, phase1=True)
@@ -125,9 +125,8 @@ def test_phase1_rejects_lazy_and_recovers_named_slots(tmp_path):
     assert reopened["persisted"]
     assert reopened["document"] == document
     document["rows"][-1]["policy"] = "Lazy"
-    with pytest.raises(ValueError, match="must be Resident"):
-        store.save(dict(fingerprint=reopened["fingerprint"], document=document))
-    assert store.read() == reopened
+    store.save(dict(fingerprint=reopened["fingerprint"], document=document))
+    assert store.read()["document"]["rows"][-1]["policy"] == "Lazy"
 
 def design_snapshot(paths):
     return {key: path.read_bytes() if path.exists() else None
