@@ -161,3 +161,11 @@ so replay missed an existing explicit binding and used unresolved SELF instead.
 **How to apply:** Use the same complete selection graph, including selected
 Lazy artifacts, for snapshot lookup. Residency controls body emission, not
 whether selected artifacts contribute to binding identity.
+
+Keep that selection graph frozen throughout preparation; hashes of localized
+or source-stripped image derivatives must never enter later binding lookups.
+**Why:** Preparation mutated earlier rows' hashes, then missed an existing
+approved SELF binding for a later row. A temporary frozen-graph replay restored
+the intended actor flow without changing saved artifacts or creating bindings.
+**How to apply:** Separate original binding-lookup inputs from mutable image
+output rows; test mixed portable/symbolic selections across multiple rows.
