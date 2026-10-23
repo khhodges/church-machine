@@ -3857,6 +3857,179 @@
         "signature": "4d19f04dda7946a9da0f70b1191a5f96dac66e3e1068578bd32f36ac878575eb"
       },
       "identity_hash": "825a3f398c8f164d58347d5161a28aa8de678dc9769a1ffd41e6b8c1972e33e4"
+    },
+    "f941d2fb7e4c6528d610a5c28308af73caee6786bd044eff7f5d21417e290924": {
+      "binary_hash": "f941d2fb7e4c6528d610a5c28308af73caee6786bd044eff7f5d21417e290924",
+      "dot_name": "ide.PkVerify",
+      "issue_n": 1,
+      "abstraction": "ide.PkVerify",
+      "filename": "ide.PkVerify.1.7333ddad.lump",
+      "compiled_at": 1792753571.4143949,
+      "portable_binding": {
+        "schema": "church.portable-lump-binding/v1",
+        "owner": "ide.PkVerify#1",
+        "dependencies": [
+          {
+            "N": "ide.PkVerify#1",
+            "dot_name": "ide.PkVerify",
+            "issue_n": 1,
+            "T": null,
+            "binary_hash": null,
+            "identity_hash": null,
+            "rights": [
+              "E"
+            ],
+            "capability_type": 1,
+            "relocation_row": 0,
+            "symbolic_self": true
+          }
+        ],
+        "compatibility": "strong",
+        "canonical_gt_words": "unresolved"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "f941d2fb7e4c6528d610a5c28308af73caee6786bd044eff7f5d21417e290924",
+        "source_hash": "4c0e4996baf63abd21969a800e7dd325197ae270551e37e5bb4405d90e9483b6",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "8bfd7aa69eafc1d89e8faaeff5fee7b725c6ed50dea6e207704d398ceaa67ba1",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "b25296e250545138e70546f8f7340159d7f08dd70d2b8b28e1379f225fbaaf7e"
+      },
+      "identity_hash": "1c6bc1c3eecdf86bd18302171056cd4aedbc180cc8d2aee1f3d5462a571c7ba0"
+    },
+    "a3c09fb7ae2ff7e13a89adfcdbb20ec9ed326ff8cc4d5272cc107fce4776b8f2": {
+      "binary_hash": "a3c09fb7ae2ff7e13a89adfcdbb20ec9ed326ff8cc4d5272cc107fce4776b8f2",
+      "dot_name": "ide.MintCleaner",
+      "issue_n": 1,
+      "abstraction": "ide.MintCleaner",
+      "filename": "ide.MintCleaner.1.c04e6904.lump",
+      "compiled_at": 1792754075.202737,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.CleanerState",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.CleanerPool",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.MintCleaner",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "a3c09fb7ae2ff7e13a89adfcdbb20ec9ed326ff8cc4d5272cc107fce4776b8f2",
+        "source_hash": "f04aae8f733b1d3aabb1993bc750fd1b9351d1ca455a942fa8515a415e409457",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "8bfd7aa69eafc1d89e8faaeff5fee7b725c6ed50dea6e207704d398ceaa67ba1",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [
+          {
+            "offset": 107,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "No free memory of the size required",
+            "method": "Allocate",
+            "sourceLine": 131
+          },
+          {
+            "offset": 108,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "MintCleaner: invalid allocation state or request",
+            "method": "Allocate",
+            "sourceLine": 133
+          },
+          {
+            "offset": 109,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "MintCleaner: allocation record capacity exhausted",
+            "method": "Allocate",
+            "sourceLine": 135
+          },
+          {
+            "offset": 142,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "MintCleaner: release does not name a live allocation",
+            "method": "Release",
+            "sourceLine": 174
+          },
+          {
+            "offset": 173,
+            "reason": "EXPLICIT_FAULT",
+            "explanation": "MintCleaner: target is not a live owned DATA allocation",
+            "method": "ValidateRelease",
+            "sourceLine": 210
+          }
+        ],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "dc150f080463f1b5298314d18ab7151bf49463baa6566054ae34daf4173d191e"
+      },
+      "identity_hash": "dc7204bf250b47abfac9bae55b7f263d06f89f8b6807c0ed024d3116982c73ef"
     }
   }
 }

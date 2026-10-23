@@ -5168,6 +5168,14 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             t += `<div class="lump-hex-diff-summary lump-hex-diff-summary--changed">${diffCount} word${diffCount === 1 ? '' : 's'} changed</div>`;
             t += `<div class="lump-hex-diff-legend"><span class="lump-hex-diff-legend-arch">archived (v${version})</span><span class="lump-hex-diff-legend-sep">\u2192</span><span class="lump-hex-diff-legend-cur">current</span></div>`;
         }
+        // Region colors come from the exact displayed words, not catalog metadata.
+        const _hexReg = typeof LumpHexRegions !== 'undefined'
+            ? LumpHexRegions.classifyLumpWords(words) : null;
+        if (_hexReg && numWords) {
+            t += LumpHexRegions.regionLegendHtml(_hexReg.regions);
+            if (_hexReg.diagnostics.length)
+                t += `<div class="lump-hex-diff-summary lump-hex-diff-summary--warn">Region diagnostics: ${e(_hexReg.diagnostics.join('; '))}</div>`;
+        }
         t += '<table class="lump-hex-table lump-hex-table-wide"><thead><tr><th>Addr</th>';
         for (let c = 0; c < COLS; c++) t += `<th>+${c}</th>`;
         t += '<th>Pack4 ASCII</th></tr></thead><tbody>';
@@ -5175,11 +5183,14 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
             const baseIdx  = row * COLS;
             const baseAddr = (baseIdx * 4).toString(16).toUpperCase().padStart(6, '0');
             let rowHex = '', rowAscArch = '', rowAscCur = '', rowHasChange = false, rowClass = '';
-            if (baseIdx === 0)                            rowClass = 'lump-hex-hdr-row';
-            else if (cc > 0 && baseIdx + COLS > lumpSize - cc) rowClass = 'lump-hex-clist-row';
+            if (!_hexReg) {
+                if (baseIdx === 0)                            rowClass = 'lump-hex-hdr-row';
+                else if (cc > 0 && baseIdx + COLS > lumpSize - cc) rowClass = 'lump-hex-clist-row';
+            }
             for (let c = 0; c < COLS; c++) {
                 const i = baseIdx + c;
                 if (i < numWords) {
+                    const _rc = _hexReg ? LumpHexRegions.regionCellAttrs(_hexReg.regions[i], i) : {cls: '', attrs: ''};
                     const archVal = words[i] >>> 0;
                     const curVal  = i < curWords.length ? (curWords[i] >>> 0) : null;
                     const changed = !curFetchFailed && (curVal === null || archVal !== curVal);
@@ -5188,9 +5199,9 @@ async function _lumpHistoryPreview(token, version, cw, cc, lumpSize, tk, histori
                     if (changed) {
                         rowHasChange = true;
                         const curDisplay = curVal === null ? '<span class="lump-hex-diff-absent">(absent)</span>' : hexw(curVal);
-                        rowHex += `<td class="lump-hex-diff-changed"><span class="lump-hex-diff-arch">${savedWordHtml}</span><span class="lump-hex-diff-cur">${curDisplay}</span></td>`;
+                        rowHex += `<td class="lump-hex-diff-changed ${_rc.cls}"${_rc.attrs}><span class="lump-hex-diff-arch">${savedWordHtml}</span><span class="lump-hex-diff-cur">${curDisplay}</span></td>`;
                     } else {
-                        rowHex += `<td>${savedWordHtml}</td>`;
+                        rowHex += `<td class="${_rc.cls}"${_rc.attrs}>${savedWordHtml}</td>`;
                     }
                     rowAscArch += pack4ascii(archVal);
                     rowAscCur  += curVal !== null ? pack4ascii(curVal) : '.'.repeat(4);
