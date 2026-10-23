@@ -9017,7 +9017,8 @@ async function openLumpInEditor(token, options) {
             if (_bannerRestoreBtn) {
                 _bannerRestoreBtn.addEventListener('click', async function() {
                     if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
-                        asmEd, _savedDraft, 'Restore the preserved browser copy instead of the selected binary source.')) return;
+                        asmEd, _savedDraft, 'Restore the preserved browser copy instead of the selected binary source.',
+                        {before: 'Current editor — Before', after: 'Preserved browser draft — After'})) return;
                     window._advanceEditorNavigationEpoch('restore saved LUMP draft');
                     _setSavedLumpEditorSource(_savedDraft);
                     if (typeof saveEditorState === 'function') saveEditorState();

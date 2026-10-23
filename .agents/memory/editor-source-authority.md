@@ -16,6 +16,11 @@ that question.
 
 **How to apply:** Clearly identify the saved and draft sides, highlight complete
 source differences, and never interpret opening the comparison as deletion consent.
+When diagnosing a reported short draft, establish the exact dialog and named
+section first. A deletion review can contain both the copy being deleted and
+the full saved replacement; the presence of full code alone does not establish
+that the recovery copy contains it. Never fill a short draft with saved text
+to make a comparison appear complete.
 
 **Why:** The programmer's screenshot showed a full comparison consuming the
 editor area and hiding the decision controls, making code opening unusable.

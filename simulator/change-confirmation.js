@@ -190,7 +190,7 @@
         queue = result.catch(function () { return false; });
         return result;
     };
-    window.confirmSourceReplacement = async function (editor, after, reason) {
+    window.confirmSourceReplacement = async function (editor, after, reason, labels) {
         if (!editor) return false;
         var before = editor.value;
         var epoch = window._editorNavigationEpoch;
@@ -198,7 +198,14 @@
         var approved = await window.confirmProtectedChange({
             title: 'Replace editor source',
             reason: reason,
+            comparisonLabels: labels ? {
+                before: labels.before + ' (' + splitLines(before).length + ' lines, ' + before.length + ' characters)',
+                after: labels.after + ' (' + splitLines(after).length + ' lines, ' + after.length + ' characters)',
+            } : undefined,
             changes: ['Before:\n' + before, 'After:\n' + after,
+                ...(labels && after.length > 0 && before.length > after.length && before.startsWith(after)
+                    ? ['The proposed replacement is only the opening portion of the current editor text. Its remaining code is absent from this copy—not hidden by the preview. Confirming replaces the full editor text with this shorter copy.']
+                    : []),
                 'This review does not save or compile the replacement.'],
         });
         return approved && editor.value === before &&

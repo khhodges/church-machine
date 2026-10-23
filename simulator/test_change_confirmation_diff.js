@@ -72,5 +72,23 @@ const texts = n => (n.textContent || '') + n.children.map(texts).join('');
     assert(lumps.includes("'Before:\\n' + _recoveredSource"));
     assert(lumps.includes("'After:\\n' + _savedDraft"));
     assert(lumps.includes("'After:\\n' + _draftToReview"));
+    // A genuinely short draft is not expanded from the saved source. Show
+    // its actual length and distinguish missing content from viewport clipping.
+    h = harness();
+    const full = Array.from({length: 788}, (_, i) => '; line ' + i).join('\n');
+    const short = full.split('\n').slice(0, 22).join('\n').slice(0, -3);
+    const current = {value: full};
+    const restore = h.window.confirmSourceReplacement(current, short, 'Restore draft', {
+        before: 'Current editor — Before', after: 'Preserved browser draft — After',
+    });
+    for (let i = 0; i < 50 && !h.dialogs.length; i++) await new Promise(r => setTimeout(r, 1));
+    const review = texts(h.dialogs[0].children[2]);
+    assert(review.includes('Current editor — Before (788 lines'));
+    assert(review.includes('Preserved browser draft — After (22 lines'));
+    assert(review.includes('absent from this copy—not hidden by the preview'));
+    assert(review.includes('; line 787'));
+    h.dialogs[0].children[3].onclick();
+    assert.equal(await restore, false);
+    assert.equal(current.value, full);
     console.log('Source diff confirmation tests passed');
 })().catch(e => { console.error(e); process.exitCode = 1; });
