@@ -134,6 +134,18 @@ not implementation authorization.
 
 ## Phase 1 constants catalogue approval
 
+**Required numerical access:** The user explicitly states that the constants
+facility is not enough without `Constant.value(token)`. Identity lookup alone
+does not satisfy Phase 1 constants functionality.
+
+**Why:** The user wants to use constants such as pi in actual calculations,
+not merely receive an identifying token.
+
+**How to apply:** Provide numerical access compatible with the arithmetic
+representation, distinguishing constant tokens from proof tokens. Numerical
+format, precision and result ABI must be established before claiming this
+requirement implemented. Do not describe the identity-only catalogue as complete.
+
 The user explicitly approved the proposed 100 mathematical constants for
 Phase 1, including exact-value names, shared tokens for aliases, and keeping
 logical TRUE/FALSE distinct from numerical ONE/ZERO.
