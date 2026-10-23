@@ -5480,6 +5480,52 @@ function _migrateBfextBfinsSyntax(text) {
 window._previewBfextBfinsSyntaxCorrection = _migrateBfextBfinsSyntax;
 
 function _draftLsKey(token) { return _DRAFT_LS_PREFIX + _lumpTokenIdentity(token); }
+// Explicit user-downloaded evidence only: never upload or alter recovery data.
+// Limit reads to the selected LUMP's known keys, not arbitrary browser storage.
+window._savedLumpDraftEvidence = function() {
+    const token = window._editorOpenLumpToken;
+    const report = {schema: 'selected-lump-drafts/v1', token: token || null,
+        copies: [], errors: []};
+    if (!token) return report;
+    const identity = _lumpTokenIdentity(token);
+    const add = (origin, text, key) => {
+        if (typeof text !== 'string') return;
+        report.copies.push({origin, ...(key ? {key} : {}),
+            characters: text.length, lines: text.split('\n').length, source: text});
+    };
+    const read = (storage, key, origin, decode) => {
+        try {
+            const raw = storage.getItem(key);
+            if (raw !== null) {
+                add(origin, decode ? decode(JSON.parse(raw)) : raw, key);
+            }
+        } catch (error) { report.errors.push({origin, error: error.message}); }
+    };
+    const editor = document.getElementById('asmEditor');
+    add('current-editor', editor && editor.value);
+    add('selected-saved-source', window._editorOriginalDisasm);
+    read(localStorage, _draftLsKey(token), 'persisted-lump-draft');
+    read(localStorage, _LEGACY_DRAFT_LS_PREFIX + String(token), 'legacy-copy-unverified');
+    add('inline-editor-draft', _lumpEditorDraftText[identity]);
+    const ownerKey = 'lump:' + identity;
+    const navigation = window._editorNavigationBuffers && window._editorNavigationBuffers[ownerKey];
+    add('navigation-memory', navigation && navigation.source);
+    read(sessionStorage, 'cm_editor_navigation:' + ownerKey, 'navigation-session',
+        value => value && value.source);
+    const owner = {type: 'lump', id: token};
+    read(localStorage, 'church_editor_owner_draft_v1:' + encodeURIComponent(JSON.stringify(owner)),
+        'owner-recovery', value => value);
+    read(localStorage, 'church_editor_document_v1', 'persisted-editor-document',
+        value => value && value.owner && value.owner.type === 'lump' &&
+            _lumpTokenIdentity(value.owner.id) === identity ? value.code : undefined);
+    const persisted = report.copies.find(copy => copy.origin === 'persisted-lump-draft');
+    for (const copy of report.copies) {
+        copy.sameAsPersistedDraft = !!persisted && copy.source === persisted.source;
+        copy.extendsPersistedDraft = !!persisted && copy.source.length > persisted.source.length &&
+            copy.source.startsWith(persisted.source);
+    }
+    return report;
+};
 function _draftLsGet(token) {
     try {
         const key = _draftLsKey(token);

@@ -9,11 +9,12 @@ const end = source.indexOf('    _verifyServedSimulatorAsset();', start);
 assert.ok(start >= 0 && end > start);
 const sim = new Simulator();
 let clicked = false, revoked = false;
+let exportedBlob;
 const context = {
     sim, window: {}, Blob,
     _executionIdentityGet: () => ({ token: 'synthetic-only', status: 'unverified' }),
     URL: {
-        createObjectURL: blob => { assert.equal(blob.type, 'application/json'); return 'blob:test'; },
+        createObjectURL: blob => { exportedBlob = blob; assert.equal(blob.type, 'application/json'); return 'blob:test'; },
         revokeObjectURL: url => { assert.equal(url, 'blob:test'); revoked = true; },
     },
     document: { createElement: () => ({ click() { clicked = true; } }) },
@@ -35,6 +36,14 @@ vm.runInNewContext(handler, context);
 assert.equal(JSON.stringify(sim.getControlFlowDiagnostics()), beforeDownload,
     'button export does not execute, reset, or clear the capture');
 assert.ok(clicked && revoked);
+context.window._savedLumpDraftEvidence = () => ({
+    schema: 'selected-lump-drafts/v1', copies: [{origin: 'persisted-lump-draft', source: 'x'.repeat(24000)}],
+});
+assert.equal(api.get().draftEvidence.copies[0].source.length, 24000);
+api.download();
+exportedBlob.text().then(text => {
+    assert.equal(JSON.parse(text).draftEvidence.copies[0].source.length, 24000);
+}).catch(error => {console.error(error); process.exitCode = 1;});
 assert.ok(fs.readFileSync(require.resolve('./app-run.js'), 'utf8')
     .includes("sim.recordControlFlowDiagnostic('UI_STOP', { stopReason, breakpointAddr });"));
 console.log('PASS detached browser control-flow export and stop wiring');

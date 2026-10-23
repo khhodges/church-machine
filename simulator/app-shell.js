@@ -1611,9 +1611,13 @@ function init() {
         executionIdentity: _executionIdentityGet(),
     }));
     window.SimulatorControlFlowDiagnostics = {
-        get: () => sim.getControlFlowDiagnostics(),
+        get: () => ({
+            ...sim.getControlFlowDiagnostics(),
+            ...(typeof window._savedLumpDraftEvidence === 'function'
+                ? {draftEvidence: window._savedLumpDraftEvidence()} : {}),
+        }),
         download: () => {
-            const blob = new Blob([JSON.stringify(sim.getControlFlowDiagnostics(), null, 2)],
+            const blob = new Blob([JSON.stringify(window.SimulatorControlFlowDiagnostics.get(), null, 2)],
                 { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');

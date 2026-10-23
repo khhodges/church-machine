@@ -33,6 +33,11 @@ does not establish that the user's current recovery data is incomplete.
 **How to apply:** Recheck the reviewed copy before restoring or deleting it;
 if it changed, preserve both editor and storage and require a fresh review.
 
+Passing a synthetic stale-draft reproduction does not establish the cause of a
+user's actual short copy. When it persists, gather explicitly shared read-only
+evidence of their selected LUMP's recovery stores instead of claiming another
+fix from screenshots or choosing the longest copy as authoritative.
+
 **Why:** The programmer's screenshot showed a full comparison consuming the
 editor area and hiding the decision controls, making code opening unusable.
 
