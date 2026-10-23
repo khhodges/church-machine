@@ -10,7 +10,12 @@
 
 - **[Mint/Cleaner GT queues proposal](mint-cleaner-gt-queues-proposal.md)** —
   pre-provisioned size classes, an independent Cleaner Thread, and versioned
-  memory reuse through Dijkstra GT queues; proposal for review.
+  memory reuse through Dijkstra GT queues; finalized Phase 1 design document,
+  with implementation mechanisms and evidence still pending.
+- **[Authority-handoff rule](cm-authority-handoff-rule.md)** — required surrender
+  before or with observable effect; fail-closed loss, not implicit recovery.
+- **[Mint/Cleaner review disposition](cleaner-queue-review-note.md)** — four
+  review findings, incorporated changes and remaining proof obligations.
 
 **ISA refinement work:** [Phase 1.1 review](phase-1.1/README.md) keeps new
 findings and decisions separate from the authoritative Master ISA. Phase 2

@@ -1345,12 +1345,40 @@ content_type = "text/markdown"
 id = "HAI9Fko4vf_WwfVztuXVU"
 uri = "file://docs/phase-1/mint-cleaner-gt-queues-proposal.md"
 type = "text"
-title = "Phase 1 — Mint/Cleaner GT Queues Proposal"
-description = "Review proposal for pre-provisioned size classes, asynchronous cleaning, Dijkstra GT queues, and versioned memory reuse."
+title = "Phase 1 — Finalized Mint/Cleaner Design"
+description = "Finalized Phase 1 documentation; implementation mechanisms and safety evidence remain separate."
 logical_id = "1c168ebe-c213-43f8-8eca-ac71df0e94aa"
-content_hash = "sha256:48020c2e3c6532a21de53e4dec800356a47aa7ffbcb98672543989029d63c4d1"
-size = 12525
-mtime_ms = 1792759480012
-storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1c168ebe-c213-43f8-8eca-ac71df0e94aa/cfe681c8-86ce-400b-90f5-d95e51c3bed5"
-storage_version_token = "1792759496603885"
+content_hash = "sha256:fc4118347696fae965c93f6934db5214ba891a398cbec6d76a9f228fa6f0edd4"
+size = 16472
+mtime_ms = 1792760965879
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1c168ebe-c213-43f8-8eca-ac71df0e94aa/60db24a8-3e15-455c-a3e8-e93f2c2e0925"
+storage_version_token = "1792761023141687"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "Pfvht3mqkNhq1UnLINN1R"
+uri = "file://docs/phase-1/cm-authority-handoff-rule.md"
+type = "text"
+title = "Phase 1 — Authority-Handoff Rule"
+description = "Finalized Phase 1 documentation; implementation mechanisms and safety evidence remain separate."
+logical_id = "c3e9199f-59dc-4304-84f0-d4b7af2c6c20"
+content_hash = "sha256:581c46b020872b1ea9c175cf1fb9caf92fc0827b50a9645a110265b03bb1af78"
+size = 3972
+mtime_ms = 1792760979643
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/c3e9199f-59dc-4304-84f0-d4b7af2c6c20/2989f796-1e1a-47f0-9c55-9279132cbebc"
+storage_version_token = "1792761023828290"
+content_type = "text/markdown"
+
+[[outputs]]
+id = "BMTq1mNG45115QZdVYSPo"
+uri = "file://docs/phase-1/cleaner-queue-review-note.md"
+type = "text"
+title = "Phase 1 — Cleaner Review Disposition"
+description = "Finalized Phase 1 documentation; implementation mechanisms and safety evidence remain separate."
+logical_id = "86db6465-0e3c-492b-b2c1-6f1d9a227445"
+content_hash = "sha256:ec253e593cdfd6cb4992119d79e5d878b4feaf2676cbf0a60867d64cc3f839b6"
+size = 3933
+mtime_ms = 1792760994815
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/86db6465-0e3c-492b-b2c1-6f1d9a227445/d064947d-c6b1-40a4-bfc9-8887ff9e492e"
+storage_version_token = "1792761024474765"
 content_type = "text/markdown"

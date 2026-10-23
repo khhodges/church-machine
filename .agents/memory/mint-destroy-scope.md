@@ -133,3 +133,13 @@ queued/cleaning/clean-free states; do not also put it on the general free-slot
 queue. Software advances the version before handing Cleaner the new GT.
 Retain terminal-version retirement and clearing-before-reuse. This refines the
 earlier slot-release proposal; implementation and handoff details remain pending.
+
+Finalizing the Phase 1 Cleaner documents does not authorize runtime changes or
+establish safety acceptance.
+
+**Why:** The user requested document finalization after reviewing mechanism
+gaps, not implementation of a new allocator or queue.
+
+**How to apply:** Use the finalized Phase 1 proposal and companion handoff rule
+as the design baseline; resolve their explicit mechanism and evidence gates
+before claiming a working concurrent allocator.
