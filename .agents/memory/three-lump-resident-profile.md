@@ -20,6 +20,19 @@ An explicit approved boot profile remains distinct from catalog-derived
 membership. Historical fixed-slot boot profiles are not a general restriction
 on the requested clear/reload lifecycle.
 
+Phase 1 software loading should use a complete top-to-bottom runtime memory
+reload, including a full copy of the baseline Namespace and resident code.
+
+**Why:** The user explicitly chose the easiest loading approach, accepting
+replacement of baseline-initialized memory rather than requiring incremental
+installation or preservation of the running Namespace.
+
+**How to apply:** Define and test the complete image in the simulator first.
+Treat loading as a stopped, fresh-start operation, not live replacement.
+Distinguish runtime memory replacement from FPGA configuration programming;
+do not add a resident incremental loader as a Phase 1 prerequisite. This design
+choice does not itself authorize a physical board upload.
+
 Phase 1 must separate the FPGA bitstream with a minimal Namespace of resident
 LUMPs from reprogrammable LUMPs undergoing development and test.
 
