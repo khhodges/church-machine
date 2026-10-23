@@ -459,7 +459,13 @@
             render();
         }
     }
-    function assigned(slot) { return source(slot,true); }
+    function assigned(slot) {
+        // Do not obscure the editor or its replacement-consent dialog with
+        // the higher-z-index inspection overlay.
+        const inspection = document.getElementById('namespaceDesignDialog');
+        if (inspection) inspection.remove();
+        return source(slot,true);
+    }
     function authoring(slot) {
         return source(slot);
     }
