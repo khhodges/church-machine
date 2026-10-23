@@ -33,6 +33,15 @@ Distinguish runtime memory replacement from FPGA configuration programming;
 do not add a resident incremental loader as a Phase 1 prerequisite. This design
 choice does not itself authorize a physical board upload.
 
+The two Phase 1 layouts mean one minimal baseline and one full development/test
+layout including a copy of that baseline.
+
+**Why:** The user explicitly selected this interpretation when asked, rather
+than two alternative placements of each code base for portability testing.
+
+**How to apply:** Keep the two deliverables distinct; do not reinterpret this
+as concurrent Namespaces or a requirement for duplicate placement variants.
+
 Phase 1 must separate the FPGA bitstream with a minimal Namespace of resident
 LUMPs from reprogrammable LUMPs undergoing development and test.
 

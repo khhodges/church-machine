@@ -11,6 +11,10 @@ Dijkstra message queues carrying Golden Tokens (GTs).
 [review disposition](cleaner-queue-review-note.md). Mechanisms marked pending
 below must be resolved and verified before implementation acceptance.
 
+**Delivery scope:** This developing software belongs in the full development/test
+layout described by the [two-layout full-image reload contract](namespace-layouts-and-full-image-reload.md),
+not automatically in the minimal FPGA resident baseline.
+
 ## 1. Objective
 
 Avoid repeated memory-allocation setup by pre-provisioning blocks of required

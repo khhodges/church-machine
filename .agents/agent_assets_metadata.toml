@@ -1382,3 +1382,17 @@ mtime_ms = 1792760994815
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/86db6465-0e3c-492b-b2c1-6f1d9a227445/d064947d-c6b1-40a4-bfc9-8887ff9e492e"
 storage_version_token = "1792761024474765"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "Dd0pEgEtfGaw_EMEG3fZN"
+uri = "file://docs/phase-1/namespace-layouts-and-full-image-reload.md"
+type = "text"
+title = "Phase 1 — Two Namespace Layouts and Full-Image Reload"
+description = "Minimal baseline and full development/test layouts, complete memory reload semantics, and simulator-first acceptance requirements."
+logical_id = "b99f08d7-541f-4d7b-9f2b-aab3528d9e41"
+content_hash = "sha256:9cb870a541268a153304ad8704247b21e81666bc7b98b6c6cdb8b6f304c06c84"
+size = 7163
+mtime_ms = 1792763295016
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/b99f08d7-541f-4d7b-9f2b-aab3528d9e41/1b72b8f2-1ea4-41ce-9a1d-fb9572434a88"
+storage_version_token = "1792763319296814"
+content_type = "text/markdown"

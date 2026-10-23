@@ -8,6 +8,10 @@
 
 ## Software review scope
 
+- **[Two Namespace layouts and full-image reload](namespace-layouts-and-full-image-reload.md)** —
+  one minimal baseline and one full development/test layout; complete stopped
+  memory replacement, simulator-first evidence, no incremental loader required.
+
 - **[Mint/Cleaner GT queues proposal](mint-cleaner-gt-queues-proposal.md)** —
   pre-provisioned size classes, an independent Cleaner Thread, and versioned
   memory reuse through Dijkstra GT queues; finalized Phase 1 design document,
