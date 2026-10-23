@@ -1,5 +1,6 @@
 """Absent code is a runtime condition, not an image construction error."""
 import copy
+import hashlib
 import json
 import struct
 import subprocess
@@ -10,6 +11,43 @@ from server.design_simulation import stage, configuration
 from server.namespace_design_v1 import phase1_seed
 from server.namespace_ascending_image import generate_image, validate_image, FORMAT
 from test_namespace_ascending_image import fixture, ROOT
+
+
+@pytest.mark.parametrize("entry_slot", [3, 19])
+def test_stale_self_does_not_block_image_but_faults_on_entry(tmp_path, entry_slot):
+    state, config, artifacts = fixture()
+    bad = artifacts["EntryProgram.lump"][:-4] + struct.pack(">I", 0x02000006)
+    artifacts["OtherProgram.lump"] = bad
+    state["abstractions"][2]["boot"] = entry_slot == 3
+    state["abstractions"].append(dict(
+        slot=19, name="OtherProgram", seq=0, type="Inform",
+        filename="OtherProgram.lump", binary_hash=hashlib.sha256(bad).hexdigest(),
+        limit=1, boot=entry_slot == 19))
+    original = copy.deepcopy((state, artifacts))
+    image, _ = generate_image(state, config, None, image_format=FORMAT, artifacts=artifacts)
+    assert (state, artifacts) == original
+    words = struct.unpack(f"<{len(image)//4}I", image)
+    location = words[19 * 4]
+    assert struct.pack(">64I", *words[location:location+64]) == bad
+    path = tmp_path / "stale-self.bin"
+    path.write_bytes(image)
+    script = """
+const S=require('./simulator/simulator'), fs=require('fs');
+const s=S.fromAscendingNamespaceImage(fs.readFileSync(process.argv[1]),
+ {word0:0x02000001,word1:0,word2:255,word3:0,m:1});
+if(s.halted || s.faultLog.length) throw Error('Preparation faulted');
+const entered=s.startEntryThread();
+console.log(JSON.stringify({entered,faults:s.faultLog}));
+"""
+    run = subprocess.run(["node", "-e", script, str(path)], cwd=ROOT,
+                         capture_output=True, text=True)
+    assert run.returncode == 0, run.stderr
+    result = json.loads(run.stdout.strip().splitlines()[-1])
+    assert bool(result["entered"]) == (entry_slot == 3)
+    if entry_slot == 19:
+        assert any("SELF" in f["message"] for f in result["faults"])
+    else:
+        assert result["faults"] == []
 
 
 def test_named_unfinished_phase1_builds_without_inventing_bodies(tmp_path):

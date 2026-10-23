@@ -482,10 +482,8 @@ def validate_image(image, *, image_format):
         if typ != 0 or 1 + cw + cc > size or limit < cw:
             raise ValueError(f"NS[{slot}] is not a bounded ordinary executable LUMP")
         body_ranges.append((location, location + size, f"NS[{slot}] LUMP"))
-        expected_self = boot.create_gt(entry["sequence"], slot, {"E": 1}, 1)
-        if cc < 1 or words[location + size - cc] not in (0, expected_self):
-            raise ValueError(f"NS[{slot}] LUMP C-list row zero is not its exact destination SELF GT")
-        # C-list references are checked on use, not globally resolved at build.
+        # SELF and other C-list bindings are checked on execution/use. A
+        # structurally valid, unused LUMP must not block the whole image.
 
     body_ranges.sort()
     cursor = 0
@@ -523,8 +521,8 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
     """Generate and structurally validate a private image from explicit target rows.
 
     Rows must already use the new slot identities and exact selected artifacts.
-    This routine does not migrate old rows or rewrite C-lists; stale bindings
-    fail closed and must be recompiled/reapproved before a candidate can run.
+    This routine does not migrate old rows or rewrite C-lists. Runtime checks
+    fault when execution uses a stale binding, not while building the image.
     """
     if image_format != FORMAT or not isinstance(state, dict) or state.get("namespaceFormat") != FORMAT:
         raise ValueError(f"Input state and explicit selection must both be {FORMAT!r}")
@@ -630,11 +628,6 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
         else:
             if typ != 0 or cw < 1:
                 raise ValueError(f"NS[{slot}] selected artifact is not an ordinary executable LUMP")
-            expected_self = boot.create_gt(sequence, slot, {"E": 1}, 1)
-            if cc < 1 or body[-cc] not in (0, expected_self):
-                raise ValueError(
-                    f"NS[{slot}] exact artifact must already contain its destination SELF GT; "
-                    "recompile/reapprove rather than patching saved bytes")
         loaded[slot] = body
 
     memory = [0] * total

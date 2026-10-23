@@ -63,6 +63,16 @@ bodies without executable authority, and retain runtime faults on use. This
 does not waive structural, integrity or hardware-profile checks on bytes that
 are actually supplied.
 
+Destination SELF mismatches also belong to execution-time binding checks, not
+whole-image admission. Preserve the mismatched C-list without rebinding it.
+
+**Why:** The user's simulation remained blocked on an unused Namespace member's
+SELF after missing-body checks were removed. Availability of a body does not
+make its destination binding a prerequisite for executing unrelated code.
+
+**How to apply:** Validate supplied-byte integrity and allocation independently;
+test both an unused mismatched SELF and actual entry into that LUMP.
+
 Symbolic CALL sites must preserve their execution condition while unresolved.
 An untaken conditional reference must not fault. Binding modifies only private
 destination copies; original names and relocation evidence remain covered by

@@ -389,7 +389,7 @@ def test_validator_rejects_wrong_format_and_corrupt_new_images(corruption, messa
         validate_image(corrupted, image_format=FORMAT)
 
 
-def test_builder_requires_explicit_new_format_and_rejects_stale_self_binding():
+def test_builder_requires_explicit_new_format_and_preserves_stale_self_binding():
     state, config, artifacts = fixture()
     with pytest.raises(ValueError, match="explicit selection"):
         generate_image(state, config, None, image_format="clean-saved-namespace-v1",
@@ -397,5 +397,7 @@ def test_builder_requires_explicit_new_format_and_rejects_stale_self_binding():
     artifacts["EntryProgram.lump"] = artifacts["EntryProgram.lump"][:-4] + struct.pack(">I", 0x02000006)
     state["abstractions"][2]["binary_hash"] = hashlib.sha256(
         artifacts["EntryProgram.lump"]).hexdigest()
-    with pytest.raises(ValueError, match="destination SELF GT"):
-        generate_image(state, config, None, image_format=FORMAT, artifacts=artifacts)
+    image, _ = generate_image(state, config, None, image_format=FORMAT, artifacts=artifacts)
+    words = struct.unpack(f"<{len(image)//4}I", image)
+    assert words[words[3 * 4] + 63] == 0x02000006
+    assert validate_image(image, image_format=FORMAT)
