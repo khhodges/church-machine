@@ -33,6 +33,18 @@
     const drafts = {};
     const slotCount = () => state.document.slotCount || 64;
     const metadata = () => [(0xf8800100 | (slotCount() << 10)) >>> 0, 0, state.document.rows.length - 1, 0];
+    function paintBindingProgress() {
+        // A network read can contain every event. Yield past a paint, rather
+        // than updating and removing all intermediate DOM in one microtask.
+        return new Promise(resolve => {
+            const timer=setTimeout(resolve,100);
+            if(typeof root.requestAnimationFrame==='function' && !document.hidden)
+                root.requestAnimationFrame(()=>root.requestAnimationFrame(()=>{
+                    clearTimeout(timer);resolve();
+                }));
+            else { clearTimeout(timer);setTimeout(resolve,0); }
+        });
+    }
     async function request(method, body) {
         const response = await fetch(endpoint + (state.profile === 'phase1' ? '?profile=phase1' :
             state.designId ? '?profile=ascending' : '') + designQuery(), {method, cache:'no-store',
@@ -42,22 +54,25 @@
         if(response.ok && response.headers?.get('Content-Type')?.includes('application/x-ndjson')){
             const reader=response.body.getReader(), decoder=new TextDecoder();
             let buffer='', result;
-            function event(line){
+            async function event(line){
                 if(!line.trim()) return;
                 const data=JSON.parse(line);
                 if(data.type==='error') throw Error(data.error);
                 if(data.type==='result') result=data.result;
-                else root.NamespaceBindingWindows?.progress(data);
+                else {
+                    root.NamespaceBindingWindows?.progress(data);
+                    if(data.type!=='waiting') await paintBindingProgress();
+                }
             }
             try{
                 while(true){
                     const chunk=await reader.read();
                     buffer+=decoder.decode(chunk.value,{stream:!chunk.done});
                     let end;
-                    while((end=buffer.indexOf('\n'))>=0){event(buffer.slice(0,end));buffer=buffer.slice(end+1);}
+                    while((end=buffer.indexOf('\n'))>=0){await event(buffer.slice(0,end));buffer=buffer.slice(end+1);}
                     if(chunk.done) break;
                 }
-                if(buffer.trim()) event(buffer);
+                if(buffer.trim()) await event(buffer);
                 if(!result?.ok) throw Error('Binding connection ended before save confirmation. Reload the saved design before retrying.');
                 return result;
             }finally{reader.releaseLock();}
@@ -626,6 +641,10 @@
         bindNow = bindNow === true;
         state.saving=true; state.bindingNow=bindNow; state.error=''; render();
         try {
+            if(bindNow){
+                root.NamespaceBindingWindows?.progress({type:'started'});
+                await paintBindingProgress();
+            }
             if (!root.NamespaceIdeNode) throw Error('IDE node setting is unavailable. Reload the page before saving.');
             if (!await root.NamespaceIdeNode.savePending()) {
                 const message='Namespace save stopped: IDE node was not saved. Binding did not run; your Namespace edits are retained. Resolve the IDE node setting, then retry.';

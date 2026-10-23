@@ -4,11 +4,10 @@
 - [CHANGE operand authority](change-programmer-access.md) — indexed CR6 lookup is now explicitly approved for the simulator; still one Thread GT, no scratch LOAD, no FPGA approval.
 - [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
 - [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.
-- [Wide-screen touch refresh](wide-touch-refresh.md) — suppress pull-to-refresh in the wide-screen IDE while retaining normal touch scrolling.
+- [IDE interaction rules](ide-interaction-index.md) — header layout, touch refresh, dialog keyboard ownership, visible binding progress and resize evidence.
 - [ISA review decisions](isa-review-index.md) — scope, compatibility, encoding checks, conformance fixtures, instruction commentary and scheduling.
 - [Primary ISA/FPGA goal](isa-fpga-primary-release-goal.md) — align approved red-ISA through simulator and exact bitstream to physical acceptance; B.1.1+ is provisional.
 - [ISA history authority](isa-history-authority.md) — unique historical paragraphs remain evidence, not new normative decisions.
-- [Compact header grouping](compact-header-grouping.md) — left stack ends at diagnostics; execution controls remain central, with board/settings on the right.
 - [Refresh provenance validation](refresh-provenance-validation.md) — generic refresh and legacy generation use distinct evidence schemas; preserve full localized-byte checks for both.
 - [Editor test contracts](editor-test-contracts.md) — guarded navigation needs stable editor identity and explicit consent; missing fixture state is not a runtime failure.
 - [Declared abstraction identity](declared-abstraction-identity.md) — missing names require programmer correction, never generated fallback identities.
@@ -137,7 +136,6 @@
 - [Workflow role boundaries](workflow-role-boundaries.md) — programmer creates LUMPs; builder configures, tests, approves; system engineer flashes FPGA
 - [RETURN incident evidence](return-incident-evidence.md) — distinguish reset, caller continuation, and trace mislabeling using protected frames and live identity, not post-stop flags
 - [Boot capacity advisory](boot-capacity-advisory.md) — 48/16 KiB is a reporting guideline, not authority to change residency; saved cost and installed footprint remain distinct.
-- [Resize warning evidence](resize-error-evidence.md) — native resize warnings do not prove a fatal crash or identify an observer; require attribution, not speculative layout patches.
 - [Approved revision inputs](approved-revision-inputs.md) — frozen downstream deliverables retain upstream bytes, not mutable catalog filenames; newer inputs require explicit adoption.
 - [CapabilityTest SAVE intent](capabilitytest-save-intent.md) — preserve the authorized write/readback test; diagnostic grants do not authorize live provisioning.
 - [Merged server runtime](merged-server-runtime.md) — verify Python merges reach the serving process; successful preparation is not committed installation.
@@ -153,7 +151,6 @@
 - [Intentional capability faults](intentional-capability-fault-publication.md) — absent-row accesses remain authored programs; publication diagnostics must not replace runtime checks.
 - [Namespace public names](namespace-public-names.md) — exact dropdown names govern IDE profile labels and reports; internal keys are not public names.
 - [Namespace Add binding](namespace-add-binding-workflow.md) — one Add action saves and validates; unfinished bindings stay explicit, never imply runtime readiness.
-- [Native dialog keyboard ownership](native-dialog-keyboard-ownership.md) — native modals must own Escape and Tab ahead of the shared overlay capture handler.
 - [Mint RTL replay boundary](mint-rtl-replay-boundary.md) — exact-byte tests must not translate instructions; encoding corrections cover every emitter and execution profile.
 - [Mint CREATE RTL entry](mint-create-rtl-entry-boundary.md) — use normal proof checks and an explicit scratch L binding; exact saved candidates need independent replay.
 - [Mint trial history origin](mint-trial-history-origin.md) — fresh disposable slot history cannot certify live or reused slots; closed-fixture alias evidence is not a live audit.

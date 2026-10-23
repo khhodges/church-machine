@@ -106,7 +106,8 @@ const {JSDOM}=require('jsdom');
         const count=writes;
         w.document.getElementById('nsSaveBtn').click();
         assert.equal(w.document.getElementById('nsSaveBtn').textContent,'Binding…');
-        await new Promise(resolve=>setImmediate(resolve));
+        for(let wait=0;api.state.saving && wait<100;wait++)
+            await new Promise(resolve=>setTimeout(resolve,5));
         assertWindows();
         assert.equal(writes,count+1);
     }

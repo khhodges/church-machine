@@ -18,23 +18,26 @@ const {TextDecoder}=require('node:util');
         {type:'result',result:{ok:true,document:{rows:[]},fingerprint:'new',persisted:true,
             bindingReport:{status:'complete',installed:false,lists:[{...item,status:'bound'}]}}}
     ];
-    let index=0, reads=0;
+    let index=0, reads=0, paints=[];
+    Object.defineProperty(w.document,'hidden',{value:false});
+    w.requestAnimationFrame=callback=>setTimeout(()=>{
+        paints.push(w.document.querySelector('.nsbw-badge')?.textContent);
+        callback();
+    },0);
     w.fetch=async(url,opts)=>{
         assert.equal(opts.headers.Accept,'application/x-ndjson');
         return {ok:true,headers:{get:()=> 'application/x-ndjson'},body:{getReader:()=>({
             async read(){
-                if(index===2) assert(w.document.querySelector('.nsbw-binding'),'window appears before completion');
-                if(index===3) {
-                    assert(w.document.querySelector('.nsbw-bound'));
-                    assert.equal(w.document.querySelectorAll('.nsbw-win').length,1,'updates same window');
-                }
                 reads++;
-                return index<events.length ? {value:Buffer.from(JSON.stringify(events[index++])+'\n'),done:false} : {done:true};
+                // Reproduce a proxy delivering ALL progress in a single read.
+                return index++===0 ? {value:Buffer.from(events.map(e=>JSON.stringify(e)).join('\n')+'\n'),done:false} : {done:true};
             },releaseLock(){}
         })}};
     };
     await api.save(true);
-    assert.equal(reads,5);
+    assert.equal(reads,2);
+    assert(paints.includes('binding'),'in-progress state must survive a real paint');
+    assert(paints.includes('bound'),'entry result paints before final save is accepted');
     assert.equal(api.state.fingerprint,'new');
     assert.equal(api.state.saving,false);
     assert(api.state.error.includes('Binding checks passed'));

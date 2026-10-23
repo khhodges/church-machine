@@ -27,6 +27,11 @@ def binding_report(document, directory, fingerprint, *, bind_now=True, progress=
                     sourceToken=selection.get("token"), generation=placement["sequence"],
                     status="blocked", rows=[])
         lists.append(item)
+        if progress:
+            progress(dict(type="binding", fingerprint=fingerprint,
+                          total=sum(p["kind"] == "lump" for p in document["rows"]),
+                          item={**item, "status": "binding",
+                                "reason": "Checking selected artifact and capability declarations…"}))
         row = dict(slot=placement["slot"], name=placement["name"], type="Inform",
                    seq=placement["sequence"], resident=True, boot_resident=True,
                    load_policy="Resident", filename=selection.get("filename"),

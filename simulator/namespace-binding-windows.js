@@ -147,6 +147,7 @@
     }
     function progress(event){
         if(event.type==='started'){
+            if(layer && currentReport && currentReport.status==='binding') return;
             show({status:'binding',lists:[],installed:false});
             bar.querySelector('span').textContent='Checking selected artifacts…';
             bar.lastChild.textContent='Waiting for the first C-list…';
@@ -166,6 +167,7 @@
         }else{
             wins.push(w);layer.appendChild(w);cascade();
         }
+        front(w);
         currentReport.fingerprint=event.fingerprint;
         var done=lists.filter(function(l){return l.status!=='binding';}).length;
         bar.querySelector('span').textContent='Binding '+done+' / '+event.total+' · save not yet confirmed';
