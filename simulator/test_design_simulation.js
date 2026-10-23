@@ -53,6 +53,46 @@ function harness(defect) {
     return {api:scope.DesignSimulation,scope,calls,instances,panel,toolbar,timers};
 }
 (async()=>{
+    // Run/Step must join a save-triggered preparation, not cancel it with a
+    // busy error. Only the latest execution intent runs after admission.
+    const joined = harness();
+    const joinedFetch = joined.scope.fetch;
+    let releaseJoined;
+    joined.scope.fetch = async (...args) => {
+        if(args[0].endsWith('/prepare'))
+            await new Promise(resolve => {releaseJoined=resolve;});
+        return joinedFetch(...args);
+    };
+    const background = joined.api.prepare(true, {preserveView:true});
+    const firstStep = joined.api.command('step');
+    const lastStep = joined.api.command('step');
+    assert(releaseJoined, 'one preparation must already be pending');
+    releaseJoined();
+    assert.equal(await background, true);
+    assert.equal(await firstStep, false, 'superseded click must not execute');
+    assert.equal(await lastStep, true);
+    assert.equal(joined.calls.filter(url=>url.endsWith('/prepare')).length,1);
+    assert.equal(joined.instances.length,1);
+    assert.equal(joined.instances[0].dr[1],1, 'execute once after shared preparation');
+    assert(!joined.api.markup().includes('already in progress'));
+
+    const sharedStop = harness();
+    let releaseStopped;
+    const stoppedFetch = sharedStop.scope.fetch;
+    sharedStop.scope.fetch = async (...args) => {
+        if(args[0].endsWith('/prepare')) await new Promise(resolve=>{releaseStopped=resolve;});
+        return stoppedFetch(...args);
+    };
+    const preparingStopped = sharedStop.api.prepare();
+    const queuedStopped = sharedStop.api.command('step');
+    sharedStop.api.stop();
+    releaseStopped();
+    assert.equal(await preparingStopped,false);
+    assert.equal(await queuedStopped,false);
+    assert.equal(sharedStop.instances.length,0,'Stop revokes all shared waiters');
+    sharedStop.scope.fetch=stoppedFetch;
+    assert.equal(await sharedStop.api.prepare(),true,'failure/Stop must allow retry');
+
     const saved = harness('boot');
     const saveViews = [];
     saved.scope.switchView = view => saveViews.push(view);

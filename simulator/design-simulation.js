@@ -6,6 +6,7 @@
     let busy = false, running = false, generation = 0, runEpoch = 0, steps = 0, intent = 0;
     let reportedMachine = null, reportedOutput = '', reportedFaults = 0;
     let previousSimulator = null;
+    let pendingPreparation = null;
 
     function freezeRecord(value) {
         if (!value || typeof value !== 'object') return value;
@@ -132,7 +133,7 @@
         if (busy) {
             // Revoke the pending operation before releasing the toolbar. Late
             // responses must neither admit bytes nor modify a newer operation.
-            generation++; busy=false;
+            generation++; busy=false; pendingPreparation=null;
             message='Execution was stopped while preparation was pending. No instruction ran.';
         }
         render();
@@ -143,7 +144,7 @@
             if(typeof repl!=='undefined' && repl) repl.sim=sim;
         }
         previousSimulator=null;
-        generation++; runEpoch++; busy=false; running=false; machine=null; provenance=null; frozenWords=null; owner=null;
+        generation++; runEpoch++; busy=false; pendingPreparation=null; running=false; machine=null; provenance=null; frozenWords=null; owner=null;
         message='Saved revision changed. Prepare a fresh private simulation; previous execution is stopped.';
         render();
     }
@@ -168,10 +169,27 @@
         return instance;
     }
     async function prepare(throwOnError=false, options={}) {
-        if (busy) {
-            if (throwOnError) throw Error('Private simulation preparation is already in progress; retry after it finishes.');
+        let pending;
+        try {
+            pending=pendingPreparation;
+            if(!pending || !same(pending.selected)) {
+                const selected=selection();
+                pending={selected,promise:performPrepare(options)};
+                pendingPreparation=pending;
+            }
+            return await pending.promise;
+        } catch(error) {
+            if(!pending) {
+                message='Private simulation blocked: '+error.message;
+                render();
+            }
+            if(throwOnError) throw error;
             return false;
+        } finally {
+            if(pending && pendingPreparation===pending) pendingPreparation=null;
         }
+    }
+    async function performPrepare(options={}) {
         invalidate();
         busy=true;
         const ticket=generation;
@@ -214,8 +232,7 @@
             return true;
         } catch(error) {
             if(ticket===generation) message='Private simulation blocked: '+error.message;
-            if(throwOnError) throw error;
-            return false;
+            throw error;
         } finally {
             if(ticket===generation) { busy=false; render(); }
         }

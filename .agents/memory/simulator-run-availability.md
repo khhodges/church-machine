@@ -42,3 +42,13 @@ handoff write) or an evidenced mismatch with the programmer's explicit intent.
 and approved facts-first presentation without additional testing gates.
 **How to apply:** Keep viewing and loaded identities separate, say unknown when
 evidence is absent, and scope administrative warnings to their own controls.
+
+Concurrent preparation requests for the same frozen saved design share the
+pending result; a toolbar action must not turn ordinary preparation progress
+into an error that cancels the original request.
+
+**Why:** Run/Step during preparation raised “already in progress,” and the
+generic execution error handler then stopped the preparation itself.
+
+**How to apply:** Share only identical selections, honor Stop and selection
+invalidation for all waiters, and let only the latest toolbar intent execute.
