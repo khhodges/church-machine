@@ -8,6 +8,10 @@
 
 ## Software review scope
 
+- **[Mint/Cleaner GT queues proposal](mint-cleaner-gt-queues-proposal.md)** —
+  pre-provisioned size classes, an independent Cleaner Thread, and versioned
+  memory reuse through Dijkstra GT queues; proposal for review.
+
 **ISA refinement work:** [Phase 1.1 review](phase-1.1/README.md) keeps new
 findings and decisions separate from the authoritative Master ISA. Phase 2
 is a compatibility consideration, not an added Phase 1 acceptance dependency.

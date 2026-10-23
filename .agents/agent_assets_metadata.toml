@@ -1340,3 +1340,17 @@ mtime_ms = 1792587875697
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/bf13f86f-22f9-4fc6-9d0d-bca3f1ad7de7/e97893d6-6382-4390-9a52-22f7a786a296"
 storage_version_token = "1792587882088416"
 content_type = "text/markdown"
+
+[[outputs]]
+id = "HAI9Fko4vf_WwfVztuXVU"
+uri = "file://docs/phase-1/mint-cleaner-gt-queues-proposal.md"
+type = "text"
+title = "Phase 1 — Mint/Cleaner GT Queues Proposal"
+description = "Review proposal for pre-provisioned size classes, asynchronous cleaning, Dijkstra GT queues, and versioned memory reuse."
+logical_id = "1c168ebe-c213-43f8-8eca-ac71df0e94aa"
+content_hash = "sha256:48020c2e3c6532a21de53e4dec800356a47aa7ffbcb98672543989029d63c4d1"
+size = 12525
+mtime_ms = 1792759480012
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/1c168ebe-c213-43f8-8eca-ac71df0e94aa/cfe681c8-86ce-400b-90f5-d95e51c3bed5"
+storage_version_token = "1792759496603885"
+content_type = "text/markdown"
