@@ -22,6 +22,17 @@ the full saved replacement; the presence of full code alone does not establish
 that the recovery copy contains it. Never fill a short draft with saved text
 to make a comparison appear complete.
 
+An opening-time recovery snapshot is not evidence of the browser's current
+preserved draft. Reviews must read the current stored copy at the user's action,
+then bind approval to those exact bytes.
+
+**Why:** Repeated reports of a 1,024-character preview exposed that a banner can
+retain an older prefix even after a fuller copy is stored. Labeling the prefix
+does not establish that the user's current recovery data is incomplete.
+
+**How to apply:** Recheck the reviewed copy before restoring or deleting it;
+if it changed, preserve both editor and storage and require a fresh review.
+
 **Why:** The programmer's screenshot showed a full comparison consuming the
 editor area and hiding the decision controls, making code opening unusable.
 

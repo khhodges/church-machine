@@ -9016,9 +9016,24 @@ async function openLumpInEditor(token, options) {
             var _bannerRestoreBtn = _draftBanner.querySelector('#_lumpDraftBannerRestore');
             if (_bannerRestoreBtn) {
                 _bannerRestoreBtn.addEventListener('click', async function() {
+                    // The banner can outlive edits and writes from another tab.
+                    // Review the current persisted copy, not the opening snapshot.
+                    const _savedDraft = _draftLsGet(token);
+                    const requestId = window._savedLumpOpenRequestId;
+                    const status = _draftBanner.querySelector('.lump-draft-copy');
+                    if (_savedDraft === null) {
+                        if (status) status.textContent = 'No browser draft is currently stored. Nothing was restored.';
+                        return;
+                    }
                     if (!window.confirmSourceReplacement || !await window.confirmSourceReplacement(
                         asmEd, _savedDraft, 'Restore the preserved browser copy instead of the selected binary source.',
                         {before: 'Current editor — Before', after: 'Preserved browser draft — After'})) return;
+                    if (_draftLsGet(token) !== _savedDraft ||
+                            window._editorOpenLumpToken !== token ||
+                            window._savedLumpOpenRequestId !== requestId) {
+                        if (status) status.textContent = 'The draft or selected LUMP changed during review. Nothing was restored. Review again.';
+                        return;
+                    }
                     window._advanceEditorNavigationEpoch('restore saved LUMP draft');
                     _setSavedLumpEditorSource(_savedDraft);
                     if (typeof saveEditorState === 'function') saveEditorState();
@@ -9045,6 +9060,11 @@ async function openLumpInEditor(token, options) {
                         if (typeof appendOutput === 'function') appendOutput(message, 'error');
                     };
                     try {
+                        const _savedDraft = _draftLsGet(token);
+                        if (_savedDraft === null) {
+                            report('No browser draft is currently stored. Nothing was deleted.');
+                            return;
+                        }
                         if (!window.confirmProtectedChange) throw new Error('The confirmation dialog is unavailable.');
                         if (!await window.confirmProtectedChange({
                             title: 'Delete browser draft',
@@ -9057,6 +9077,10 @@ async function openLumpInEditor(token, options) {
                                 'After:\n' + _savedDraft,
                                 'This comparison does not apply the draft. If the reviewed draft is currently in the editor, deletion restores the saved source. Other editor text remains unchanged.'],
                         })) return;
+                        if (_draftLsGet(token) !== _savedDraft) {
+                            report('The browser draft changed during review. Nothing was deleted. Review again.');
+                            return;
+                        }
                         if (window._editorNavigationEpoch !== epoch ||
                                 window._editorOpenLumpToken !== token ||
                                 window._savedLumpOpenRequestId !== requestId ||
