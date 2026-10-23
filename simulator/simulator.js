@@ -5307,7 +5307,15 @@ class ChurchSimulator {
                 frameBase < layout.stackStart - 1 ||
                 frameBase + 2 > layout.stackEnd) {
             this.fault('BOUNDS',
-                `CHANGE Thread slot ${threadSlot}: invalid CHURCH frame STO ${frameBase}`);
+                `CHANGE Thread slot ${threadSlot}: invalid CHURCH frame STO ${frameBase}`, {
+                    threadResumeFailure: {
+                        targetSlot: threadSlot,
+                        sto: frameBase,
+                        sz: protectedState.sz,
+                        reason: protectedState.sz === 0 && frameBase === 0
+                            ? 'empty-context' : 'invalid-frame',
+                    },
+                });
             return null;
         }
         const enterGT = staged ? staged.enterGT : this.memory[threadBase + frameBase + 1] >>> 0;

@@ -4392,6 +4392,31 @@ const _FAULT_DESCRIPTIONS = {
     STACK_CORRUPT:  'The call-stack integrity check failed — the saved return address or frame data has been overwritten. This may indicate a buffer overflow or stray write that corrupted the stack region.',
 };
 
+// Use captured evidence only: inspecting today's Thread would misdiagnose
+// a historical fault after reset or initialization.
+function _faultDescription(f) {
+    const frame = f.threadResumeFailure;
+    if (f.type === 'BOUNDS' && frame && Number.isInteger(frame.targetSlot)) {
+        const target = `Thread at NS[${frame.targetSlot}]`;
+        if (frame.reason === 'empty-context' && frame.sto === 0 && frame.sz === 0) {
+            return `${target} has no initialized execution context (STO=0, SZ=0). ` +
+                'CHANGE found the Thread, but there is no valid CHURCH entry/resume frame telling it where to execute. ' +
+                'The switch was rejected before entering the target code. IDE reboot clears non-boot Threads, including their starting contexts. ' +
+                'Initialize the Thread through the intended Amoeba lifecycle before CHANGE; CHANGE does not initialize it. Rebooting alone will not fix this.';
+        }
+        return `${target} has an invalid CHURCH entry/resume frame. ` +
+            `Captured STO=${frame.sto}, SZ=${frame.sz}. CHANGE requires a valid protected frame within the Thread stack. ` +
+            'The switch was rejected before entering the target code. Inspect the Thread initialization and any writes to its protected frame; this is not an ordinary c-list offset error.';
+    }
+    // Older records lack SZ evidence: do not assert that STO=0 proves empty.
+    if (f.type === 'BOUNDS' && /CHANGE Thread slot \d+: invalid CHURCH frame STO \d+$/.test(f.rawDiagnosticReason || f.message || '')) {
+        return 'CHANGE found the target Thread but rejected its CHURCH entry/resume frame before entering its code. ' +
+            'The Thread may be uninitialized or its protected frame may be invalid. This older record does not capture enough information to distinguish them. ' +
+            'Check explicit Thread initialization before CHANGE; reboot clears non-boot starting contexts and does not initialize them.';
+    }
+    return _FAULT_DESCRIPTIONS[f.type];
+}
+
 // ── Fault-note localStorage persistence ──────────────────────────────────────
 const _FAULT_NOTE_LS_PREFIX = 'cm_fault_note:';
 
@@ -5012,13 +5037,13 @@ function showFaultModal(f) {
     // ── General fault description callout ────────────────────────────────────
     let descSection = '';
     {
-        const descText = _FAULT_DESCRIPTIONS[f.type];
+        const descText = _faultDescription(f);
         if (descText) {
             const color2 = _FAULT_COLORS[f.type] || '#e05555';
             descSection = `
         <div class="fault-desc-section" style="border-left-color:${color2}">
             <div class="fault-desc-label" style="color:${color2}">&#x2139; ${f.type}</div>
-            <div class="fault-desc-detail">${descText}</div>
+            <div class="fault-desc-detail">${_escHtml(descText)}</div>
         </div>`;
         }
     }

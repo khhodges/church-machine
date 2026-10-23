@@ -122,6 +122,23 @@ print(json.dumps(list(struct.unpack(f'<{len(image)//4}I',image))))
     assert.equal(fresh.cr[14].word0 & 65535,3,'Lightning Bolt entry remains authoritative');
     assert.equal(fresh._activateChangeThread(0x0200000c,{crDst:12},0,true),null);
     assert(fresh.halted,'CHANGE to an uninitialized Thread must fault');
+    const fault = fresh.faultLog[fresh.faultLog.length - 1];
+    assert.deepEqual(fault.threadResumeFailure, {
+        targetSlot:12, sto:0, sz:0, reason:'empty-context',
+    });
+    const descriptionScope = {};
+    vm.createContext(descriptionScope);
+    vm.runInContext(source.slice(source.indexOf('const _FAULT_DESCRIPTIONS ='),
+        source.indexOf('// ── Fault-note localStorage persistence')), descriptionScope);
+    const explain = descriptionScope._faultDescription;
+    assert.match(explain(fault), /NS\[12\].*no initialized execution context/);
+    assert.match(explain(fault), /Rebooting alone will not fix/);
+    assert.match(explain({type:'BOUNDS', message:fault.message}), /does not capture enough/);
+    assert.match(explain({type:'BOUNDS', threadResumeFailure:{
+        targetSlot:12,sto:4,sz:1,reason:'invalid-frame',
+    }}), /invalid CHURCH entry\/resume frame/);
+    assert.match(explain({type:'BOUNDS',message:'unrelated'}), /c-list or memory scope/);
+    assert(source.includes('const descText = _faultDescription(f);'));
     assert.equal(fresh.cr[14].word0 & 65535,3,'failed CHANGE cannot enter saved actor code');
     console.log('PASS selected-design fault reboot and reset-and-step routing');
 })().catch(error => {console.error(error); process.exitCode = 1;});
