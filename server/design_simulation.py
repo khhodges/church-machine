@@ -113,6 +113,9 @@ def stage(cfg, document, directory, entry_slot):
     rows = selected_rows(document)
     from server.namespace_binding_targets import non_lump_rows
     rows.extend(non_lump_rows(document))
+    # Binding identity belongs to the saved graph, never to derivatives emitted
+    # while walking it. Keep lookup inputs separate from mutable output rows.
+    binding_rows = copy.deepcopy(rows)
     artifacts, prepared = {}, []
     by_slot = {row["slot"]: row for row in rows}
     available_slots = {binding["slot"] for binding in source_bindings}
@@ -129,7 +132,9 @@ def stage(cfg, document, directory, entry_slot):
             raise ValueError("Selected artifact changed during preparation; retry.")
         # No new linker authority: use only authenticated existing contracts.
         if "portableBinding" in binding:
-            raw, _ = _localize_portable(raw, runtime_binding, rows, runtime_bindings, directory)
+            raw, _ = _localize_portable(
+                raw, runtime_binding, copy.deepcopy(binding_rows),
+                copy.deepcopy(source_bindings), directory)
         else:
             raw, _ = boot_image.materialize_compiler_self(raw, row, directory, row["name"])
         raw = api_only(raw)
