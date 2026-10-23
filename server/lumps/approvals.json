@@ -4030,6 +4030,68 @@
         "signature": "dc150f080463f1b5298314d18ab7151bf49463baa6566054ae34daf4173d191e"
       },
       "identity_hash": "dc7204bf250b47abfac9bae55b7f263d06f89f8b6807c0ed024d3116982c73ef"
+    },
+    "4a9c9e43b4e428aacf2afac3136da3f18a2cd01fc13b3e09b579a5ff8975ffbe": {
+      "binary_hash": "4a9c9e43b4e428aacf2afac3136da3f18a2cd01fc13b3e09b579a5ff8975ffbe",
+      "dot_name": "ide.AmoebaStartup",
+      "issue_n": 1,
+      "abstraction": "ide.AmoebaStartup",
+      "filename": "ide.AmoebaStartup.1.f6b1d589.lump",
+      "compiled_at": 1792788997.9187422,
+      "portable_binding": {
+        "calls": [],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.BootThread",
+            "rights": [],
+            "relocation_row": 1,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.AmoebaStartup",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "4a9c9e43b4e428aacf2afac3136da3f18a2cd01fc13b3e09b579a5ff8975ffbe",
+        "source_hash": "9596794ee26d056402d27012b19a1900470bfdc8392cc476ee2b48392de554d5",
+        "language": "javascript",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "0a50a4d3e012ad354d902b0b1418ff9731b09ce84844db61ec1240a0916dc4ab",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "javascript"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "b8914b4676c42d29488cd1f40048cf8cdc4e9d7444df7946e0f75bd6824fa2e0"
+      },
+      "identity_hash": "ba1427c1973e591cf4956427bec9aaa336a9cfc8a7460adacca980be7e5fb543"
     }
   }
 }
