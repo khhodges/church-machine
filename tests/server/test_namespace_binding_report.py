@@ -31,6 +31,34 @@ def test_legacy_gt_is_never_reused(tmp_path):
     assert (tmp_path / "legacy.lump").read_bytes() == raw
 
 
+def test_portable_preparation_never_binds_self_without_bind(tmp_path, monkeypatch):
+    import server.namespace_binding_report as module
+    from server.simulation_preparation import _localize_portable
+    raw = struct.pack(">64I", (31 << 27) | (1 << 10) | 1,
+                      0x07230002, *([0] * 62))
+    (tmp_path / "self.lump").write_bytes(raw)
+    source_hash = hashlib.sha256(raw).hexdigest()
+    binding = dict(slot=16, filename="self.lump", binaryHash=source_hash,
+        portableBinding=dict(dependencies=[dict(
+            N="ide.Test#1", rights=["E"], capability_type=1,
+            symbolic_self=True, relocation_row=0)]))
+    rows = [dict(slot=16, name="ide.Test", type="Inform", seq=2,
+                 filename="self.lump", binary_hash=source_hash)]
+    unchanged, self_gt = _localize_portable(raw, binding, rows, [binding], tmp_path)
+    assert unchanged == raw and self_gt == 0
+    assert not (tmp_path / ".binding-previews").exists()
+    monkeypatch.setattr(module, "artifact_bindings", lambda *args: [binding])
+    document = {"rows": [dict(slot=16, name="ide.Test", sequence=2, kind="lump",
+        selection=dict(filename="self.lump", binaryHash=source_hash))]}
+    report = binding_report(document, tmp_path, "exact", bind_now=True)
+    assert report["lists"][0]["words"][-1] == 0x4A020010
+    loaded, self_gt = _localize_portable(raw, binding, rows, [binding], tmp_path)
+    assert self_gt == 0x4A020010 and loaded != raw
+    assert (tmp_path / "self.lump").read_bytes() == raw
+    rows[0]["seq"] = 3
+    assert _localize_portable(raw, binding, rows, [binding], tmp_path) == (raw, 0)
+
+
 def test_fresh_portable_linker_result_uses_new_sequence(tmp_path, monkeypatch):
     # Isolate the authenticated admission adapter; exercise the real linker.
     import server.namespace_binding_report as module
@@ -72,12 +100,23 @@ def test_fresh_portable_linker_result_uses_new_sequence(tmp_path, monkeypatch):
     assert (tmp_path / "self.lump").read_bytes() == raw
 
 
-def test_save_returns_bound_report_without_activating(tmp_path):
+def test_save_is_portable_and_explicit_bind_returns_report(tmp_path, monkeypatch):
     live = tmp_path / "ns-state.json"
     live.write_text('{"abstractions":[]}')
     store = DesignStore(tmp_path / "draft/phase1.json", tmp_path, live, phase1=True)
     before = store.read()
+    import server.namespace_binding_report as module
+    original = module.binding_report
+    def forbidden(*args, **kwargs):
+        raise AssertionError("ordinary save must not call the linker")
+    monkeypatch.setattr(module, "binding_report", forbidden)
     saved = store.save(dict(document=before["document"], fingerprint=before["fingerprint"]))
+    assert "bindingReport" not in saved
+    assert saved["bindingRequested"] is False
+    assert not (tmp_path / ".binding-previews").exists()
+    assert not (tmp_path / ".symbolic-bindings").exists()
+    monkeypatch.setattr(module, "binding_report", original)
+    saved = store.save(dict(document=saved["document"], fingerprint=saved["fingerprint"], bind=True))
     assert saved["bindingReport"]["fingerprint"] == saved["fingerprint"]
     assert saved["bindingReport"]["installed"] is False
     assert store.read()["document"] == before["document"]

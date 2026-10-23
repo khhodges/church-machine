@@ -9,7 +9,8 @@ async function check(status, networkFailure=false, saveFailure=false) {
     const calls=[];
     const els={_nsPlacementName:{value:'ide.Mint'},_nsPlacementSlot:{value:'12'},
         _nsAddSelect:{selectedIndex:1},_nsAddPlacementBtn:{disabled:false},
-        _nsAddError:{textContent:''},_nsAddModalOverlay:{remove(){calls.push('close');}}};
+        _nsAddError:{textContent:''},nsSaveLayoutNote:{textContent:''},
+        _nsAddModalOverlay:{remove(){calls.push('close');}}};
     const record={token:'mint',filename:'mint.lump',binary_hash:'hash',lump_version:2};
     const report={lists:[{slot:12,status,rows:status==='bound'?[]:
         [{name:'ide.MintState',status:'unresolved',reason:'No Namespace target'}]}]};
@@ -38,8 +39,15 @@ async function check(status, networkFailure=false, saveFailure=false) {
     } else {
         assert.equal(els._nsAddPlacementBtn.textContent,'Close');
         assert.match(els._nsAddError.textContent,/Placement saved/);
-        assert.match(els._nsAddError.textContent,networkFailure?/validation failed/:
-            status==='bound'?/checks passed/:/ide.MintState/);
+        assert.match(els._nsAddError.textContent,/no GTs were bound/);
+        assert(!calls.includes('bind'),'Add must not call the linker');
+        context.window._nsTableDirty=true;
+        await context._nsBindPlacements({});
+        assert(!calls.includes('bind'),'BIND must not use unsaved placements');
+        context.window._nsTableDirty=false;
+        await context._nsBindPlacements({});
+        assert(calls.includes('bind'),'explicit BIND calls the linker');
+        if(networkFailure) assert.match(els.nsSaveLayoutNote.textContent,/Binding failed: offline/);
         els._nsAddPlacementBtn.onclick();
         assert(calls.includes('close'));
     }
@@ -49,5 +57,5 @@ async function check(status, networkFailure=false, saveFailure=false) {
     await check('bound',false,true);
     assert(!source.slice(source.indexOf('function _nsTableAdd()'),
         source.indexOf('function _nsUpdatePlacementButton()')).includes('id="_nsAddConfirmBtn"'));
-    console.log('PASS single Add saves then binds; unresolved names and post-save failures stay explicit; no activation');
+    console.log('PASS legacy Add saves without binding; explicit BIND handles saved placements and errors');
 })().catch(e=>{console.error(e);process.exitCode=1;});

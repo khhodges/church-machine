@@ -32,6 +32,7 @@ async function run(status, failure=false) {
     await design.addFromOriginal();
     assert.equal(writes.length,1);
     assert.equal(writes[0][1].method,'PUT');
+    assert.equal(JSON.parse(writes[0][1].body).bind,false);
     assert.equal(JSON.parse(writes[0][1].body).document.rows[0].selection.filename,'mint.lump');
     assert.equal(design.state.saving,false);
     if(failure) {
@@ -40,12 +41,14 @@ async function run(status, failure=false) {
     } else {
         assert.equal(design.state.dirty,false);
         assert.equal(design.state.fingerprint,'new');
-        assert.match(design.state.error,status==='complete'?/checks passed/:/Not ready/);
+        assert.match(design.state.error,/no GTs were bound/);
+        assert.equal(reports.length,0,'Add must not open a binding result');
+        await design.save(true);
+        assert.equal(JSON.parse(writes[1][1].body).bind,true);
         assert.equal(reports.at(-1).installed,false);
-        if(status!=='complete') assert.equal(reports.at(-1).lists[0].rows[0].name,'ide.MintState');
     }
 }
 (async()=>{
     await run('complete');await run('unresolved');await run('blocked',true);
-    console.log('PASS design Add automatically saves and binds; exact selection, missing names, retained draft on failure, no activation');
+    console.log('PASS Add saves portable placement; only explicit Bind requests GTs; draft retained on failure');
 })().catch(e=>{console.error(e);process.exitCode=1;});

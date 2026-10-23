@@ -318,8 +318,13 @@ class DesignStore:
 
     @serialized("self")
     def save(self, payload):
-        if not isinstance(payload, dict) or set(payload) != {"fingerprint", "document"}:
+        if (not isinstance(payload, dict) or
+                not {"fingerprint", "document"}.issubset(payload) or
+                set(payload) - {"fingerprint", "document", "bind"}):
             raise ValueError("Expected reviewed fingerprint and design")
+        bind_now = payload.get("bind", False)
+        if type(bind_now) is not bool:
+            raise ValueError("bind must be an explicit boolean")
         document = self.validate_profile(copy.deepcopy(payload["document"]))
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with open(str(self.path)+".lock", "a") as lock:
@@ -330,7 +335,10 @@ class DesignStore:
             # missing unfinished implementations do not prohibit design saves.
             response = self.response(document)
             from server.namespace_binding_report import binding_report
-            response["bindingReport"] = binding_report(document, self.lumps, response["fingerprint"])
+            if bind_now:
+                response["bindingReport"] = binding_report(
+                    document, self.lumps, response["fingerprint"], bind_now=True)
+            response["bindingRequested"] = bind_now
             fd, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".namespace-design-")
             try:
                 with os.fdopen(fd, "w") as out:

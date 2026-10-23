@@ -53,6 +53,12 @@ def test_missing_target_compiles_and_reaches_signed_save_plan(client, isolated_l
            "token": saved["token"]}
     bindings = artifact_bindings([row], isolated_lumps)
     assert bindings[0]["portableBinding"]["schema"] == "church.symbolic-lump-binding/v1"
+    # Preparation/loading without an explicit Bind preserves every portable
+    # byte, including NULL SELF; it must not produce a local 4A... token.
+    unbound, self_gt = _localize_symbolic(raw, bindings[0], [row], bindings, isolated_lumps)
+    assert unbound == raw
+    assert self_gt == 0
+    assert not (isolated_lumps / ".symbolic-bindings").exists()
     bound, _ = _localize_symbolic(raw, bindings[0], [row], bindings, isolated_lumps, bind_now=True)
     assert bindings[0]["symbolicReport"]["status"] == "unresolved"
     from server.namespace_binding_report import binding_report

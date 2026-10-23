@@ -94,17 +94,14 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
             else:
                 # Portable bindings predate symbolic snapshots. Persist their exact
                 # result too; inspection must never invoke the linker.
-                from server.namespace_binding_targets import naming_context
-                key = hashlib.sha256(json.dumps(
-                    [document, naming_context(),
-                     [{k: v for k, v in candidate.items() if k != "symbolicReport"}
-                      for candidate in candidates], item["slot"]],
-                    sort_keys=True).encode()).hexdigest()
+                from server.simulation_preparation import portable_snapshot_key
+                key = portable_snapshot_key(
+                    bodies[item["slot"]], binding, rows, candidates)
                 path = directory / ".binding-previews" / (key + ".json")
                 item["snapshotKey"] = key
                 if bind_now:
                     localized, _ = _localize_portable(
-                        bodies[item["slot"]], binding, rows, candidates, directory)
+                        bodies[item["slot"]], binding, rows, candidates, directory, bind_now=True)
                     path.parent.mkdir(parents=True, exist_ok=True)
                     fd, temporary = tempfile.mkstemp(dir=path.parent)
                     try:

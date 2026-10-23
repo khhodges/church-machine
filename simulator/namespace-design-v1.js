@@ -168,12 +168,14 @@
         if(state.profile==='phase1') html+=`<p>${esc(profileLabel())}: slot 0 metadata · 1 self · 2 entry Thread · 8 UART · 9 ide.Mint (requested E) · 14 nstab (requested RW) · 15 pkverify (requested E). Requested rights are design intent, not granted capabilities.</p><label>Total slots (including metadata) <input type="number" min="16" max="4096" value="${slotCount()}" onchange="NamespaceDesignV1.capacity(this.value)" ${state.saving?'disabled':''}></label><p>${slotCount()*4} table words / ${slotCount()*16} bytes · CR15 table-only limit ${slotCount()*4-1}. Unfinished placements remain non-executable.</p>`;
         host.innerHTML=designStatus()+html;
         const saveButton=host.querySelector('#nsSaveBtn');
-        saveButton.onclick=save;
-        saveButton.textContent=state.saving?'Binding…':'Bind Namespace Design';
+        const legacyBind=host.querySelector('#nsBindPlacementsBtn');
+        if(legacyBind) legacyBind.hidden=true;
+        saveButton.onclick=()=>save(true);
+        saveButton.textContent=state.saving?(state.bindingNow?'Binding…':'Saving…'):'Bind Namespace Design';
         saveButton.title='Save this design and show fresh C-list binding results. Does not activate or change a running image.';
         saveButton.disabled=state.saving;
         if(state.dirty) saveButton.textContent+=' *';
-        host.querySelector('#nsSaveLayoutNote').textContent=state.saving?'Binding selected Namespace…':state.error ||
+        host.querySelector('#nsSaveLayoutNote').textContent=state.saving?'Saving selected Namespace…':state.error ||
             profileLabel()+' · API-only allocations · design only, not installed. '+(state.dirty?'Unsaved changes. ':'')+
             p.warnings.join('; ');
         const bolt=host.querySelector('#nsBoltDrag');
@@ -469,8 +471,12 @@
             });
         }
     }
-    function acceptSavedResult(result) {
+    function acceptSavedResult(result, bindNow = false) {
         accept(result);
+        if (!bindNow) {
+            state.error='Placement saved. Portable LUMPs unchanged; no GTs were bound. Click Bind Namespace Design to create local bindings. Nothing was activated.';
+            return;
+        }
         if (result.bindingReport && root.NamespaceBindingWindows) {
             root.NamespaceBindingWindows.show(result.bindingReport);
             const st=result.bindingReport.status;
@@ -489,21 +495,25 @@
                 result.bindingCleanup.reason + '. Retry cleanup from LUMP History.';
         }
     }
-    async function save() {
+    async function save(bindNow = false) {
         if(state.saving || !state.document) return;
-        state.saving=true; state.error=''; render();
+        bindNow = bindNow === true;
+        state.saving=true; state.bindingNow=bindNow; state.error=''; render();
         try {
             if (!root.NamespaceIdeNode) throw Error('IDE node setting is unavailable. Reload the page before saving.');
             if (!await root.NamespaceIdeNode.savePending()) {
-                showBindingFailure('IDE node was not saved. Binding did not run; your Namespace edits are retained. Resolve the IDE node setting, then bind again.');
+                const message='Namespace save stopped: IDE node was not saved. Binding did not run; your Namespace edits are retained. Resolve the IDE node setting, then retry.';
+                if(bindNow) showBindingFailure(message); else state.error=message;
                 return;
             }
-            const result = await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document)});
-            acceptSavedResult(result);
+            const result = await request('PUT',{fingerprint:state.fingerprint,document:clone(state.document),bind:bindNow});
+            acceptSavedResult(result, bindNow);
         }
-        catch(e) { showBindingFailure(e.message+
+        catch(e) { const message=e.message+
             ' Check the IDE node status above: its save is separate and may already have completed. '+
-            'No executable image was changed. Your Namespace draft is retained.'); }
+            'No executable image was changed. Your Namespace draft is retained.';
+            if(bindNow) showBindingFailure(message); else state.error=message;
+        }
         finally { state.saving=false; render(); }
     }
     function capacity(value) {

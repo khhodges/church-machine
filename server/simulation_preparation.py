@@ -85,14 +85,36 @@ def artifact_bindings(rows, directory):
     return bindings
 
 
-def _localize_portable(raw, binding, rows, bindings, directory):
+def portable_snapshot_key(raw, binding, rows, bindings):
+    from server.namespace_binding_targets import naming_context
+    return digest({"version": 1, "source": hashlib.sha256(raw).hexdigest(),
+        "slot": binding["slot"], "naming": naming_context(),
+        "destinations": sorted([
+            {k: row.get(k) for k in ("slot", "seq", "name", "type", "filename", "binary_hash")}
+            for row in rows], key=lambda row: row["slot"]),
+        "contracts": [{k: v for k, v in b.items() if k != "symbolicReport"}
+                      for b in sorted(bindings, key=lambda b: b["slot"])]})
+
+
+def _localize_portable(raw, binding, rows, bindings, directory, *, bind_now=False):
     """Materialize only a private derivative; retain source N/T/hash separately."""
     from server.portable_binding import mint_gt, verify_candidate
     contract = binding["portableBinding"]
     if contract.get("schema") == "church.symbolic-lump-binding/v1":
-        return _localize_symbolic(raw, binding, rows, bindings, directory)
+        return _localize_symbolic(raw, binding, rows, bindings, directory, bind_now=bind_now)
     words = _validate_body(
         raw, executable=True, label=f"NS[{binding['slot']}] {binding['filename']}")
+    if not bind_now:
+        key = portable_snapshot_key(raw, binding, rows, bindings)
+        snapshot = Path(directory) / ".binding-previews" / (key + ".json")
+        if not snapshot.exists():
+            return raw, words[len(words) - (words[0] & 255)]
+        record = json.loads(snapshot.read_text())
+        data = bytes.fromhex(record["bytes"])
+        if hashlib.sha256(data).hexdigest() != record["hash"]:
+            raise ValueError("Binding snapshot integrity failed. Bind again.")
+        bound = _validate_body(data)
+        return data, bound[len(bound) - (bound[0] & 255)]
     owner = next(row for row in rows if row["slot"] == binding["slot"])
     start = len(words) - (words[0] & 255)
     for dep in contract["dependencies"]:
@@ -150,12 +172,8 @@ def _localize_symbolic(raw, binding, rows, bindings, directory, *, bind_now=Fals
             if require_snapshot:
                 raise ValueError("No binding snapshot for this exact Namespace selection and generation. Bind explicitly first.")
             # No binding action has occurred: preserve the unresolved program.
-            # SELF alone is destination-local identity, not target resolution.
-            from server.portable_binding import mint_gt
-            owner = next(r for r in rows if r["slot"] == binding["slot"])
-            result = list(words)
-            result[len(result) - (result[0] & 255)] = mint_gt(owner["seq"], owner["slot"], ["E"], 1)
-            return struct.pack(f">{len(result)}I", *result), result[len(result) - (result[0] & 255)]
+            # SELF is also a relocation: preparation cannot bind it implicitly.
+            return raw, words[len(words) - (words[0] & 255)]
         record = json.loads(snapshot.read_text())
         data = bytes.fromhex(record["bytes"])
         if record.get("key") != snapshot_key or hashlib.sha256(data).hexdigest() != record.get("hash"):

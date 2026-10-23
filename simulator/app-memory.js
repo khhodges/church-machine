@@ -4297,6 +4297,7 @@ function updateNamespace(useAscendingDesign) {
     html += _statChip('Free',     _cntFree,     '#6a9f6a', 'Slots available for allocation');
     html += `<span id="nsBoltDrag" class="ns-bolt-drag" draggable="true" title="Drag \u26a1 onto any NS row to crown that abstraction as Boot.Thread.CR0 \u2014 the first abstraction invoked after boot">\u26a1 Boot entry</span>`;
     html += `<button type="button" id="nsSaveBtn" aria-live="polite" aria-describedby="nsSaveLayoutNote" onclick="event.stopPropagation();_nsTableSaveClick(this)" style="margin-left:auto;background:#1a2a1f;color:#7ec87e;border:1px solid rgba(100,200,100,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Save Namespace rows only; built images and simulation remain unchanged">\u{1F4BE} Save Namespace Table</button>`;
+    html += `<button type="button" id="nsBindPlacementsBtn" onclick="event.stopPropagation();_nsBindPlacements(this)" title="Explicitly create local C-list bindings from saved placements; does not activate an image">BIND</button>`;
     html += `<button type="button" id="nsAttentionBtn" onclick="event.stopPropagation();NamespaceAttention.open()" style="background:#2a2410;color:#c89b3c;border:1px solid rgba(200,155,60,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Read-only report of flagged issues in the saved Namespace">Needs attention</button>`;
     html += `<button onclick="event.stopPropagation();_nsTableAdd()" style="background:#1a2e1a;color:#4ec9b0;border:1px solid rgba(78,201,176,0.35);border-radius:3px;padding:2px 10px;font-size:0.72rem;cursor:pointer;white-space:nowrap;" title="Select a saved LUMP or name and add a non-executable design placement">+ Add to Namespace</button>`;
     html += '</div>';
@@ -5117,32 +5118,43 @@ async function _nsAddPlacementConfirm() {
         updateNamespace();
         const saved = await window._nsTableSave(document.getElementById('nsSaveBtn'));
         if (!saved) throw new Error('Placement remains local; Save for next build to retry.');
-        if (btn) { btn.disabled = true; btn.textContent = 'Checking bindings…'; }
-        // Save has committed. Validation failure must not be reported as a
-        // failed save or offer another Add that would duplicate this placement.
-        try {
-            const response = await fetch('/api/namespace/bind-placements', {
-                method:'POST', headers:{'Content-Type':'application/json',
-                    'X-Requested-With':'NamespaceDesign'},
-                body:JSON.stringify({namespaceFingerprint:window._nsState.namespaceFingerprint}),
-            });
-            const data = await _actionableJsonResponse(response, 'Validate Namespace bindings', {
-                dataChanged:true, nextAction:'Review this saved placement in Namespace.',
-            });
-            const report = data.bindingReport;
-            if (!report || !Array.isArray(report.lists)) throw Error('Binding results are unavailable.');
-            if (window.NamespaceBindingWindows) window.NamespaceBindingWindows.show(report);
-            if (errEl) errEl.textContent = _nsPlacementBindingMessage(report, result.slot);
-        } catch (validationError) {
-            if (errEl) errEl.textContent = 'Placement saved. Not ready: binding validation failed. ' +
-                validationError.message + ' Review the saved placement in Namespace; do not add it again.';
-        }
+        if (errEl) errEl.textContent = 'Placement saved. Portable LUMP unchanged; no GTs were bound. Click BIND in Namespace to create local bindings. Nothing was activated.';
         if (btn) { btn.textContent = 'Close'; btn.disabled = false;
             btn.onclick = () => document.getElementById('_nsAddModalOverlay')?.remove(); }
         return result;
     } catch (err) {
         if (errEl) errEl.textContent = err.message || String(err);
         if (btn) { btn.disabled = false; btn.textContent = 'Add to Namespace'; }
+    }
+}
+
+async function _nsBindPlacements(btn) {
+    const note = document.getElementById('nsSaveLayoutNote');
+    if (window._nsTableDirty) {
+        if (note) note.textContent = 'Save Namespace Table before BIND. No bindings changed.';
+        return;
+    }
+    if (btn?.disabled) return;
+    if (btn) btn.disabled = true;
+    try {
+        const response = await fetch('/api/namespace/bind-placements', {
+            method:'POST', headers:{'Content-Type':'application/json',
+                'X-Requested-With':'NamespaceDesign'},
+            body:JSON.stringify({namespaceFingerprint:window._nsState.namespaceFingerprint}),
+        });
+        const data = await _actionableJsonResponse(response, 'Bind Namespace placements', {
+            dataChanged:false, nextAction:'Review the saved Namespace and retry BIND.',
+        });
+        const report = data.bindingReport;
+        if (!report || !Array.isArray(report.lists)) throw Error('Binding results are unavailable.');
+        if (window.NamespaceBindingWindows) window.NamespaceBindingWindows.show(report);
+        if (note) note.textContent = report.status === 'complete'
+            ? 'Bindings created. Portable originals unchanged; nothing activated.'
+            : 'Binding incomplete. Review the C-list windows. Portable originals unchanged; nothing activated.';
+    } catch (error) {
+        if (note) note.textContent = 'Binding failed: ' + error.message + ' Review the saved Namespace and retry BIND. Nothing activated.';
+    } finally {
+        if (btn) btn.disabled = false;
     }
 }
 
