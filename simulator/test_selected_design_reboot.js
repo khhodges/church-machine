@@ -48,17 +48,24 @@ import sys,json,struct,hashlib
 sys.path.insert(0,'tests/server')
 from test_namespace_ascending_image import fixture
 from server.namespace_ascending_image import generate_image,build_fresh_thread_lump,FORMAT
+from server.boot_image import pack_lump_header
 state,cfg,artifacts=fixture()
 state['abstractions'][2]['name']='CapabilityTest'
+raw=bytearray(artifacts['EntryProgram.lump'])
+struct.pack_into('>I',raw,0,pack_lump_header(0,2,1,0))
+artifacts['EntryProgram.lump']=bytes(raw)
+state['abstractions'][2].update(binary_hash=hashlib.sha256(raw).hexdigest(),limit=2)
 for slot,ordinal in [(11,2),(12,3)]:
- raw=build_fresh_thread_lump(allocation_words=256,stack_words=32,entry_slot=3,entry_sequence=0)
+ raw=build_fresh_thread_lump(allocation_words=256,stack_words=32,entry_slot=3,entry_sequence=0,
+   actor_slot=3,entry_nia=1)
  filename=f'thread-{slot}.lump'
  artifacts[filename]=raw
  sha=hashlib.sha256(raw).hexdigest()
  state['abstractions'].append(dict(slot=slot,name=f'Thread.{ordinal}',seq=0,type='Thread',
   filename=filename,binary_hash=sha,allocationWords=256,stackWords=32,limit=255,
-  freshThreadImage=dict(format='fresh-thread-continuation-v1',destinationSlot=slot,
-   destinationSequence=0,entryName='CapabilityTest',entrySlot=3,entrySequence=0,sha256=sha)))
+   freshThreadImage=dict(format='prepared-thread-actor-v2',destinationSlot=slot,
+    destinationSequence=0,entryName='CapabilityTest',entrySlot=3,entrySequence=0,sha256=sha,
+    actorSlot=3,actorSequence=0,actorName='CapabilityTest',entryNia=1)))
 image,_=generate_image(state,cfg,None,image_format=FORMAT,artifacts=artifacts)
 print(json.dumps(list(struct.unpack(f'<{len(image)//4}I',image))))
 `], {cwd: __dirname + '/..', encoding: 'utf8'}));
@@ -140,5 +147,24 @@ print(json.dumps(list(struct.unpack(f'<{len(image)//4}I',image))))
     assert.match(explain({type:'BOUNDS',message:'unrelated'}), /c-list or memory scope/);
     assert(source.includes('const descText = _faultDescription(f);'));
     assert.equal(fresh.cr[14].word0 & 65535,3,'failed CHANGE cannot enter saved actor code');
+    // Explicit saved startup is different from restoring an old actor image.
+    runtime.NamespaceDesignV1.state.document.rows.push(...[11,12].map(slot=>({
+        kind:'thread',slot,preparedThread:{entrySlot:3,actorSlot:3,entryNia:1},
+    })));
+    await runtime.DesignSimulation.prepare(true);
+    for (const slot of [11,12]) {
+        const initial = runtime.sim;
+        assert.deepEqual(Array.from(initial.memory),words,'fresh explicit initializer retained');
+        for (let i=0;i<3;i++) assert(initial._bootStep());
+        assert(initial._activateChangeThread(0x02000000 | slot,{crDst:12},0,true));
+        assert.equal(initial.pc,1,'explicit starting NIA honored');
+        assert.equal(initial.cr[14].word0 & 65535,3,'entry executable honored');
+        assert.equal(initial.cr[1].word0 & 65535,3,'application E-GT retained');
+        initial.memory.fill(0xdeadbeef, words[slot*4]+1, words[slot*4]+256);
+        initial.dr.fill(88);
+        assert.equal(await runtime.DesignSimulation.command('reset'),true);
+        assert.deepEqual(Array.from(runtime.sim.memory),words,'reset regenerates pristine approved contexts');
+        assert(runtime.sim.dr.every(v=>v===0),'reset discards dirty registers');
+    }
     console.log('PASS selected-design fault reboot and reset-and-step routing');
 })().catch(error => {console.error(error); process.exitCode = 1;});

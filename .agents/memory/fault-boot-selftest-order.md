@@ -39,20 +39,25 @@ Genesis recovery path, and failure of Genesis recovery remain unspecified.
 After a fault, boot always takes control, not a direct handoff from the faulted Thread to a test manager. The user requires diagnosis after SelfTest, but this does not insert SelfTest into the boot sequence: the lightning-bolt target follows the three Boot steps. With CapabilityTest selected and prepared, those steps enter CapabilityTest.
 
 IDE boot/reboot must discard prior-run execution state for every Thread, not
-only the currently active one. Initialize Boot.Thread for the Lightning Bolt;
-leave every non-boot Thread allocated but empty/uninitialized.
+only the currently active one. Initialize Boot.Thread for the Lightning Bolt.
+Non-boot Threads stay empty unless explicitly assigned a fresh startup context.
+On 2026-10-23 the user approved Thread.2 and Thread.3 starting at the saved
+AmoebaStartup abstraction, NIA 1, with Alice/Mallory application E-GTs in CR1.
+These are fresh starts, never restored prior execution.
 **Why:** The user explicitly required clearing stale state “including the 3
 threads.” Suspended registers, stacks and continuations are execution state too.
 **How to apply:** Route every selected-design reboot control through whole-image
-reconstruction followed by clearing non-boot Thread payloads. Saved definitions
-are not rewritten, but their preseeded actor contexts must not be restored into
-IDE execution. Individual Thread reset baselines must also remain cleared.
+reconstruction followed by clearing unconfigured non-boot Thread payloads.
+Explicit startup assignments use newly generated pristine frames from the
+saved design. Historical driver bindings without an explicit fresh-start
+assignment must not restore old actor contexts. Individual Thread reset
+baselines must reflect that same empty-or-fresh policy.
 Keep separately labelled historical fault evidence outside live execution.
 
 **Why this distinction matters:** The user explicitly confirmed that “clear”
-includes starting contexts, not merely restoring saved actor images. CHANGE
-into a cleared Thread must fault until explicit program initialization; never
-silently initialize it or resume the old Mallory/Alice demonstration.
+includes starting contexts, not merely restoring saved actor images. The later
+explicit AmoebaStartup approval is a bounded exception. CHANGE into a cleared
+Thread must still fault; never silently initialize it or resume old execution.
 
 **Why:** The user explicitly corrected both the proposed direct-manager recovery path and the assumption that boot unconditionally enters SelfTest. A test stopped at the initial fault boundary proves rejection, not the complete recovery lifecycle.
 

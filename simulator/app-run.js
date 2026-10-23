@@ -4401,7 +4401,7 @@ function _faultDescription(f) {
         if (frame.reason === 'empty-context' && frame.sto === 0 && frame.sz === 0) {
             return `${target} has no initialized execution context (STO=0, SZ=0). ` +
                 'CHANGE found the Thread, but there is no valid CHURCH entry/resume frame telling it where to execute. ' +
-                'The switch was rejected before entering the target code. IDE reboot clears non-boot Threads, including their starting contexts. ' +
+                'The switch was rejected before entering the target code. IDE reboot clears non-boot Threads unless an explicit fresh startup context is configured. ' +
                 'Initialize the Thread through the intended Amoeba lifecycle before CHANGE; CHANGE does not initialize it. Rebooting alone will not fix this.';
         }
         return `${target} has an invalid CHURCH entry/resume frame. ` +
@@ -4412,7 +4412,7 @@ function _faultDescription(f) {
     if (f.type === 'BOUNDS' && /CHANGE Thread slot \d+: invalid CHURCH frame STO \d+$/.test(f.rawDiagnosticReason || f.message || '')) {
         return 'CHANGE found the target Thread but rejected its CHURCH entry/resume frame before entering its code. ' +
             'The Thread may be uninitialized or its protected frame may be invalid. This older record does not capture enough information to distinguish them. ' +
-            'Check explicit Thread initialization before CHANGE; reboot clears non-boot starting contexts and does not initialize them.';
+            'Check explicit Thread initialization before CHANGE; reboot leaves non-boot Threads empty unless a fresh startup context is configured.';
     }
     return _FAULT_DESCRIPTIONS[f.type];
 }

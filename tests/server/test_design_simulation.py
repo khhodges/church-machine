@@ -65,6 +65,34 @@ def identifiers(response):
     return {key: response.json[key] for key in ("preparationId", "configurationHash")}
 
 
+def test_explicit_fresh_thread_nia_survives_admission(setup_design):
+    root, client, document, path, _ = setup_design
+    for slot in (11, 12):
+        document["rows"].append(dict(slot=slot, name=f"Thread.{slot-9}", kind="thread",
+            policy="Resident", sequence=0, words=256,
+            preparedThread=dict(entrySlot=6, actorSlot=6, entryNia=1)))
+    path.write_text(json.dumps(document))
+    prepared = request(client, "prepare", {"namespaceFingerprint": digest(document)})
+    assert prepared.status_code == 200, prepared.json
+    assert request(client, "approve", identifiers(prepared)).status_code == 200
+    active = request(client, "activate", identifiers(prepared))
+    assert active.status_code == 200, active.json
+    from server.boot_image import thread_layout, THREAD_STO_OFFSET
+    layout = thread_layout(256, 32)
+    words = active.json["words"]
+    for slot in (11, 12):
+        base = words[slot * 4]
+        sto = words[base + THREAD_STO_OFFSET] & 0xfff
+        assert (words[base + sto + 2] >> 13) & 0x7fff == 1
+        assert words[base + sto + 1] & 0xffff == 6
+        assert words[base + layout["caps_start"] + 1] & 0xffff == 6
+    document["rows"][-1]["preparedThread"]["entryNia"] = 32000
+    path.write_text(json.dumps(document))
+    rejected = request(client, "prepare", {"namespaceFingerprint": digest(document)})
+    assert rejected.status_code == 409
+    assert "NIA" in rejected.json["error"]
+
+
 @pytest.mark.parametrize("profile", ["ascending", "phase1"])
 def test_real_saved_revision_admits_exact_private_runtime(setup_design, tmp_path, profile):
     root, client, document, path, _ = setup_design

@@ -171,9 +171,12 @@ def validate(document):
         if "preparedThread" in row:
             binding = row["preparedThread"]
             if (kind != "thread" or slot == 2 or not isinstance(binding, dict)
-                    or set(binding) != {"entrySlot", "actorSlot"}
+                    or not {"entrySlot", "actorSlot"}.issubset(binding)
+                    or set(binding) - {"entrySlot", "actorSlot", "entryNia"}
                     or any(type(binding[k]) is not int for k in binding)):
                 raise ValueError("Prepared Thread requires explicit driver and actor slots on a non-entry Thread")
+            if "entryNia" in binding and not 0 <= binding["entryNia"] < 0x7fff:
+                raise ValueError("Prepared Thread entry NIA must be 0–32766")
         if kind == "mmio":
             if any(type(row.get(k)) is not int or not 0 <= row[k] <= 0xffffffff for k in ("address", "limit")):
                 raise ValueError("Invalid MMIO address/limit")
@@ -194,10 +197,13 @@ def validate(document):
                     raise ValueError(f"Invalid selection {field}")
     by_slot = {r["slot"]: r for r in rows}
     for row in rows:
-        for slot in row.get("preparedThread", {}).values():
+        binding = row.get("preparedThread", {})
+        for slot in (binding[key] for key in ("entrySlot", "actorSlot") if key in binding):
             target = by_slot.get(slot, {})
             if target.get("kind") != "lump":
                 raise ValueError("Prepared Thread driver and actor must name declared LUMP rows")
+            if "entryNia" in binding and (target.get("policy") != "Resident" or not target.get("selection")):
+                raise ValueError("Fresh startup Thread requires selected Resident entry and application LUMPs")
     if (by_slot.get(1, {}).get("name"), by_slot.get(1, {}).get("kind"),
         by_slot.get(2, {}).get("name"), by_slot.get(2, {}).get("kind"),
         by_slot.get(2, {}).get("sequence")) != ("Boot.NS", "namespace", "Boot.Thread", "thread", 0):

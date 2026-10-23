@@ -43,6 +43,17 @@ CHANGE needs an entry frame first. Mint's legal protected priming path is the
 remaining prerequisite. This prototype demonstrates the code that runs after
 that prerequisite, not its implementation.
 
-No saved Namespace, selected CapabilityTest, actor artifact, reboot behavior,
-CHANGE semantics or physical hardware is modified. The existing live empty-
-Thread fault is therefore not fixed by adding this prototype alone.
+The prototype test itself modifies no saved Namespace or hardware.
+
+## Explicit IDE startup assignments
+
+The IDE now supports an explicit saved startup NIA alongside a Thread's
+entry and application bindings. A fresh simulation generates the protected
+starting frame from these assignments. Reboot reconstructs the same pristine
+frame, not a prior execution snapshot. Unmarked non-boot Threads remain empty.
+The starting NIA must be within the selected resident entry LUMP's code.
+
+This is private-image preparation, not operational Mint Thread CREATE.
+The programmer must explicitly bind the selected Namespace's capability
+references; choosing an entry/NIA does not implicitly grant or repair them.
+The boot target is independent of these per-Thread startup assignments.

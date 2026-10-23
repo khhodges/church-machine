@@ -261,12 +261,15 @@ def _decode_gt(word):
 
 
 def build_fresh_thread_lump(*, allocation_words, stack_words, entry_slot,
-                            entry_sequence, actor_slot=None, actor_sequence=0):
+                            entry_sequence, actor_slot=None, actor_sequence=0, entry_nia=0):
     """Build a zero-initialized Thread with an explicit fresh entry continuation."""
     size = _integer(allocation_words, "Thread allocationWords")
     stack = _integer(stack_words, "Thread stackWords")
     target_slot = _integer(entry_slot, "Thread entry slot")
     target_sequence = _integer(entry_sequence, "Thread entry sequence")
+    entry_nia = _integer(entry_nia, "Thread entry NIA")
+    if not 0 <= entry_nia < 0x7fff:
+        raise ValueError("Thread entry NIA must be 0–32766")
     if not 0 < target_slot <= 65535 or target_sequence > 511:
         raise ValueError("Fresh Thread entry binding is outside the GT fields")
     layout = boot.thread_layout(size, stack)
@@ -290,7 +293,7 @@ def build_fresh_thread_lump(*, allocation_words, stack_words, entry_slot,
     # STO is the next free stack word. CHANGE reads its two-word resume
     # frame at STO+1/STO+2, just as CALL/RETURN do.
     words[resume_sto + 1] = entry_gt
-    words[resume_sto + 2] = (1 << 12) | root_sto
+    words[resume_sto + 2] = (entry_nia << 13) | (1 << 12) | root_sto
     words[root_sto + 1] = entry_gt
     words[root_sto + 2] = (0x7FFF << 13) | (1 << 12) | layout["stack_end"]
     return struct.pack(f">{size}I", *words)
@@ -325,6 +328,7 @@ def _fresh_thread_words(raw, label):
         build_fresh_thread_lump(
             allocation_words=len(words), stack_words=stack_words,
             entry_slot=fields["slot"], entry_sequence=fields["sequence"],
+            entry_nia=(words[layout["stack_end"] - 2] >> 13) & 0x7fff,
             actor_slot=actor["slot"] if actor else None,
             actor_sequence=actor["sequence"] if actor else 0))
     if tuple(words) != expected:
@@ -620,6 +624,7 @@ def generate_image(state, config, lumps_dir, *, image_format, artifacts=None):
                 allocation_words=_integer(row.get("allocationWords"), "Thread allocationWords"),
                 stack_words=_integer(row.get("stackWords"), "Thread stackWords"),
                 entry_slot=entry_slot, entry_sequence=entry_sequence,
+                entry_nia=binding.get("entryNia", 0),
                 actor_slot=actor["slot"] if actor else None,
                 actor_sequence=actor["seq"] if actor else 0)
             actual = struct.pack(f">{len(body)}I", *body)

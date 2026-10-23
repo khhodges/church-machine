@@ -157,10 +157,13 @@
         if (!response.ok || data.ok===false) throw Error([data.error,data.nextAction].filter(Boolean).join(' ') || 'Private simulation request failed.');
         return data;
     }
-    function create(words, record) {
+    function create(words, record, selected = owner) {
         const instance = ChurchSimulator.fromAscendingNamespaceImage(new Uint32Array(words), {
             word0:0x02000001, word1:0, word2:record.slotCount*4-1, word3:0, m:1});
-        instance.beginBoot({clearNonBootThreads:true});
+        const rows = selected ? JSON.parse(selected.document).rows : [];
+        const freshThreadSlots = rows.filter(row => row.kind === 'thread' &&
+            Number.isInteger(row.preparedThread?.entryNia)).map(row => row.slot);
+        instance.beginBoot({clearNonBootThreads:true, freshThreadSlots});
         instance.simulationConfiguration=freezeRecord(record);
         if(typeof instance.on==='function') {
             if(typeof root._traceRecordStep==='function') instance.on('step',root._traceRecordStep);
@@ -223,7 +226,7 @@
                 b=>b.toString(16).padStart(2,'0')).join('');
             check();
             if(hash!==review.imageHash) throw Error('Private simulation bytes failed the approved image hash.');
-            const candidate=create(active.words,review);
+            const candidate=create(active.words,review,selected);
             check();
             machine=candidate; frozenWords=active.words.slice(); owner=selected;
             displayMachine(machine, options);

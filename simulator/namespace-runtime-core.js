@@ -116,15 +116,22 @@ class NamespaceRuntimeCore extends Simulator {
             };
         }
     }
-    beginBoot({clearNonBootThreads = false} = {}) {
+    beginBoot({clearNonBootThreads = false, freshThreadSlots = []} = {}) {
         if(this._liveThreadOwned || this.halted) throw Error('Boot requires a fresh Namespace image');
+        const configured = this.configuredThreadSlots();
+        if (!Array.isArray(freshThreadSlots) || freshThreadSlots.some(slot =>
+                !Number.isInteger(slot) || slot === this._bootThreadSlot() || !configured.includes(slot))) {
+            throw Error('Fresh Thread startup must name configured non-boot Threads');
+        }
         if (clearNonBootThreads) {
             // IDE boot is a fresh execution, not a replay of authored actor
             // starting contexts. Keep allocations/descriptors, discard homes,
             // stack frames, capabilities and heap data for every other Thread.
             // Validate all ranges before changing any bytes.
-            const ranges = this.configuredThreadSlots()
-                .filter(slot => slot !== this._bootThreadSlot())
+            // Explicit saved startup bindings keep only server-generated fresh
+            // frames from this pristine image, never a prior execution snapshot.
+            const ranges = configured
+                .filter(slot => slot !== this._bootThreadSlot() && !freshThreadSlots.includes(slot))
                 .map(slot => {
                     const base = this.readNSEntry(slot).word0_location;
                     const layout = this._threadLayoutAtBase(base);

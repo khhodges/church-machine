@@ -173,8 +173,17 @@ def stage(cfg, document, directory, entry_slot):
                     continue
                 target = targets[0]
                 actor = by_slot[explicit["actorSlot"]] if explicit else None
+                entry_nia = explicit.get("entryNia", 0) if explicit else 0
+                if explicit and "entryNia" in explicit:
+                    target_bytes = artifacts.get(target.get("filename"))
+                    if not target_bytes:
+                        raise ValueError(f"NS[{slot}]: fresh startup entry must be resident")
+                    target_header = struct.unpack_from(">I", target_bytes)[0]
+                    if entry_nia >= ((target_header >> 10) & 0x1fff):
+                        raise ValueError(f"NS[{slot}]: entry NIA is outside the selected entry LUMP code")
                 raw = build_fresh_thread_lump(allocation_words=item["words"], stack_words=32,
                                              entry_slot=target["slot"], entry_sequence=target["seq"],
+                                             entry_nia=entry_nia,
                                              actor_slot=actor["slot"] if actor else None,
                                              actor_sequence=actor["seq"] if actor else 0)
                 filename = f"private-thread-{slot}.lump"
@@ -187,6 +196,8 @@ def stage(cfg, document, directory, entry_slot):
                 if actor:
                     row["freshThreadImage"].update(format="prepared-thread-actor-v2",
                         actorSlot=actor["slot"], actorSequence=actor["seq"], actorName=actor["name"])
+                if explicit and "entryNia" in explicit:
+                    row["freshThreadImage"]["entryNia"] = entry_nia
         prepared.append(row)
     image, _ = generate_image(dict(namespaceFormat=FORMAT, abstractions=prepared), cfg, directory,
                               image_format=FORMAT, artifacts=artifacts)

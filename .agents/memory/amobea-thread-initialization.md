@@ -24,6 +24,30 @@ before admission to test capability use, but must label it as a prerequisite,
 not successful Amobea execution or a complete Thread lifecycle. Do not add
 implicit initialization, CALLs or preparation operations to CHANGE/SWITCH.
 
+The user approved fresh IDE startup assignments for Thread.2 and Thread.3
+to saved AmoebaStartup at NIA 1, retaining Alice/Mallory application E-GTs.
+This permits private-image startup-frame construction, not an assertion that
+Mint's operational Thread CREATE or hardware initialization has been completed.
+
+**Why:** Explicit confirmation on 2026-10-23 supersedes empty-on-boot behavior
+for these two configured Threads only.
+
+**How to apply:** Regenerate fresh contexts on reboot, discard prior execution,
+and preserve hard faults for Threads without an explicit startup assignment.
+
+Startup configuration and capability binding are separate prerequisites.
+Complete the explicit Namespace binding step when applying an approved fresh
+startup assignment; do not silently bind inside CHANGE.
+
+**Why:** Fresh Amoeba entry frames could be present while the exact selected
+graph had no binding snapshot, leaving even SELF unresolved and causing CHANGE
+to reject the entry. Seeing NS/NIA in the Thread display alone is not execution
+proof.
+
+**How to apply:** Verify actual CHANGE into the selected saved startup bytes,
+and inspect the current saved boot selection rather than assuming the target
+from earlier conversation.
+
 Minimal startup experimentation is authorized separately from storage and
 rollback, but fixture priming must never be presented as an operational Mint
 implementation or a fix to live reboot.

@@ -377,6 +377,9 @@
             `<p>Choose the driver resumed in CR0 and the actor E capability placed in CR1. This changes only the draft; Save design before preparing simulation.</p>
             <label>Driver <select id="preparedThreadDriver">${options(row.preparedThread?.entrySlot)}</select></label>
             <label>Actor <select id="preparedThreadActor">${options(row.preparedThread?.actorSlot)}</select></label>
+            <label><input type="checkbox" id="preparedThreadFresh" ${Number.isInteger(row.preparedThread?.entryNia)?'checked':''}> Initialize a fresh starting context on boot/reboot</label>
+            <label>Starting NIA <input id="preparedThreadNia" type="number" min="0" max="32766" step="1" value="${row.preparedThread?.entryNia ?? 0}"></label>
+            <p>Fresh startup discards prior execution. With this unchecked, IDE boot leaves this Thread empty. NIA is relative to the entry LUMP's code, not its header.</p>
             <button class="btn" onclick="NamespaceDesignV1.setThread(${slot})">Use these bindings</button>`);
     }
     function setThread(slot) {
@@ -385,7 +388,13 @@
         const entrySlot=Number(document.getElementById('preparedThreadDriver').value);
         const actorSlot=Number(document.getElementById('preparedThreadActor').value);
         if(!entrySlot || !actorSlot) return;
-        row.preparedThread={entrySlot,actorSlot};
+        const fresh=document.getElementById('preparedThreadFresh').checked;
+        const entryNia=Number(document.getElementById('preparedThreadNia').value);
+        if(fresh && (!Number.isInteger(entryNia) || entryNia<0 || entryNia>=32767)) {
+            root.alert('Starting NIA must be an integer from 0 to 32766.');
+            return;
+        }
+        row.preparedThread={entrySlot,actorSlot,...(fresh?{entryNia}:{})};
         document.getElementById('namespaceDesignDialog').remove();
         changed();
     }
@@ -412,7 +421,7 @@
             content+=`<h4>Thread target</h4><p>Allocation: ${esc(row.words)} words.
                 Sequence: ${esc(row.sequence)}. Policy: ${esc(row.policy)}.</p>
                 <p>This is a configured Thread object, not an executable abstraction's source.</p>
-                ${row.preparedThread?`<p>Driver: NS[${row.preparedThread.entrySlot}] · Actor E in CR1: NS[${row.preparedThread.actorSlot}]</p>`:''}
+                ${row.preparedThread?`<p>Entry: NS[${row.preparedThread.entrySlot}] · Actor E in CR1: NS[${row.preparedThread.actorSlot}] · ${Number.isInteger(row.preparedThread.entryNia)?`Fresh on boot · NIA ${row.preparedThread.entryNia}`:'Empty on IDE boot'}</p>`:''}
                 ${row.slot!==2?`<button class="btn" onclick="NamespaceDesignV1.thread(${row.slot})">Prepare driver and actor</button>`:''}`;
         } else {
             content+=`<h4>Namespace entry definition</h4><pre>${esc(JSON.stringify(row,null,2))}</pre>
