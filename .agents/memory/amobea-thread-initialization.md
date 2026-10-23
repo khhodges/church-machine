@@ -23,3 +23,16 @@ Disposable tests may supply an initialized context
 before admission to test capability use, but must label it as a prerequisite,
 not successful Amobea execution or a complete Thread lifecycle. Do not add
 implicit initialization, CALLs or preparation operations to CHANGE/SWITCH.
+
+Minimal startup experimentation is authorized separately from storage and
+rollback, but fixture priming must never be presented as an operational Mint
+implementation or a fix to live reboot.
+
+**Why:** The user requested a CLOOMC startup prototype for the empty-Thread
+CHANGE case. A Thread must already have a legal entry frame before Amoeba can
+execute inside it; ordinary CALL/RETURN also cannot be assumed to preserve
+scratch capability registers.
+
+**How to apply:** Keep executable startup evidence separate from protected
+priming evidence. Reload continuation/supervisor authority from an explicit
+declared capability after application RETURN, rather than relying on CR2.
