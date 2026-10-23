@@ -5446,6 +5446,17 @@ function faultModalReboot() {
     if (sim && sim.faultLog) sim.faultLog = [];
     try { localStorage.removeItem(_FAULT_LOG_LS_KEY); } catch(e) {}
     if (pipelineViz) pipelineViz.setNIA(null);
+    if (window.NamespaceDesignV1?.state.active) {
+        // Reconstruct every Thread from the selected design's pristine image.
+        // The legacy reset path is not authority for this runtime.
+        _bootAuditAccum = [];
+        if (pipelineViz) pipelineViz.reset();
+        if (_bootAnimTimer !== null) { clearTimeout(_bootAnimTimer); _bootAnimTimer = null; }
+        bootAnimating = false;
+        const console = document.getElementById('editorConsole');
+        if (console) console.textContent = '';
+        return window.DesignSimulation.command('reset');
+    }
     // Do NOT clear _defaultProgramLoaded — see resetSim() comment.  Clearing it
     // here forced _autoLoadDefaultProgram() down the cold-start branch
     // (loadExample('capability_test')), which discards the user's compiled
@@ -5951,6 +5962,10 @@ function resetSim() {
 
 // Reset is stopped; the explicitly combined action requests exactly one Step.
 function resetAndStep() {
+    if (window.NamespaceDesignV1?.state.active) {
+        return window.DesignSimulation.command('reset').then(ok =>
+            ok ? window.DesignSimulation.command('step') : false);
+    }
     if (!_ensureCommittedImageForBoot('Reset & Step')) return;
     if (resetSim() === false) return;
     void stepSim();
