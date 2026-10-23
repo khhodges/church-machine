@@ -99,3 +99,14 @@ to block development closure on compatible-model lifecycle acceptance.
 **How to apply:** Preserve the unproven gates for FPGA testing; do not reopen
 development merely because those gates remain unproven, and never equate
 administrative closure with safety acceptance or live-use authorization.
+
+The intended Cleaner is an independent background Thread, notified of releases
+through a Dijkstra message queue.
+
+**Why:** The user specified asynchronous background cleaning and explicitly
+requested a Dijkstra queue for release notifications.
+
+**How to apply:** Treat the synchronous prototype as distinct from that intended
+architecture. Queue API, message layout, synchronization and heap placement are
+still design proposals, not approved implementation contracts. Do not assume a
+one-bit Dijkstra flag provides a counting semaphore.
