@@ -30,11 +30,21 @@ machine.simulationConfiguration = {designProfile:'ascending',preparedRows:[
 machine.cr[14] = {word0:0x0a00000a,word1:base};
 machine.cr[12] = {word0:0x0200000c,word1:1024};
 machine.cr[15] = {word0:0x02000001,word1:0};
+machine.pc=0;
+assert.match(context._cr14CodeContextHeading(machine),
+    /^Code: method-table entry #1 → Run · Abstraction: CapabilityTest/);
+machine.pc=1;
+assert.match(context._cr14CodeContextHeading(machine),
+    /^Code: method-table entry #2 → Other/);
 machine.pc=2;
 assert.strictEqual(context._cr14CodeContextHeading(machine),
     'Code: Run · Abstraction: CapabilityTest · Thread: T.3 · Namespace: New layout — ascending table / four-word header (Boot.NS)');
 machine.pc=4;
 assert.match(context._cr14CodeContextHeading(machine), /^Code: Other/);
+const frame = machine.memory[base+6];
+machine.memory[base+6]=0;
+assert.match(context._cr14CodeContextHeading(machine), /^Code: method name unavailable/);
+machine.memory[base+6]=frame;
 machine.cr[12].word0=0;
 assert.match(context._cr14CodeContextHeading(machine), /Thread: unavailable/);
 machine.cr[14].word1=999;

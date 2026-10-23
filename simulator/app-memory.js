@@ -1433,6 +1433,25 @@ function _cr14CodeContextHeading(machine) {
         try {
             method = machine._methodNameForPC(
                 abstraction.slot, machine.pc, machine.cr[14].word1 >>> 0);
+            if (!method && typeof machine._embeddedMethodMap === 'function') {
+                const entry = machine.readNSEntry(abstraction.slot);
+                if (entry && (entry.word0_location >>> 0) === (machine.cr[14].word1 >>> 0)) {
+                    const map = machine._embeddedMethodMap(abstraction.slot);
+                    const tableEntry = map?.methods.find(item =>
+                        item.selector - 1 === machine.pc);
+                    if (tableEntry) {
+                        method = `method-table entry #${tableEntry.selector} → ${tableEntry.name}`;
+                    } else {
+                        const header = machine.parseLumpHeader(
+                            machine.memory[entry.word0_location] >>> 0);
+                        if (header.valid && header.typ === 0 &&
+                                Number.isInteger(machine.pc) &&
+                                machine.pc >= 0 && machine.pc < header.cw) {
+                            method = 'method name unavailable';
+                        }
+                    }
+                }
+            }
         } catch (_) {}
     }
     // Profile display names are not the Namespace's stored SELF-row label.
