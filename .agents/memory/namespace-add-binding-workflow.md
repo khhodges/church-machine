@@ -1,9 +1,14 @@
 ---
 name: Namespace Add binding workflow
-description: Single Add action validates bindings without implying execution readiness.
+description: Add records placement and checks dependencies; explicit BIND alone materializes GTs.
 ---
 The user approved one Add to Namespace action, with binding validation automatic
 after saving, instead of competing design-placement and executable-install buttons.
+
+**Updated boundary:** The user subsequently specified that only clicking BIND
+may materialize local GTs, including SELF. Add must preserve portable bytes;
+automatic validation is advisory only, not creation of a bound derivative.
+See portable-lump-binding-boundary.md.
 
 **Why:** The two buttons exposed internal implementation stages and made ordinary
 Mint placement confusing. Missing references should be named by validation,

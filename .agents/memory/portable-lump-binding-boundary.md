@@ -5,6 +5,19 @@ description: Security boundary between portable unresolved artifacts and destina
 
 ## Simulator binding lifecycle
 
+Only the user's explicit BIND action may materialize destination-local GTs,
+including SELF. Compile produces a portable LUMP; selecting or adding a local
+slot records placement without binding its C-list. BIND creates a separate
+local derivative and preserves the portable original.
+
+**Why:** The user explicitly rejected a local SELF slot in an otherwise
+unbound C-list: adding a local slot must not destroy mobility.
+
+**How to apply:** Do not bind on Add, compile, save, inspect or execution.
+Advisory dependency validation may report readiness without materializing GTs.
+This supersedes any earlier Add workflow that implicitly produced bound bytes;
+activation remains separate.
+
 Obsolete binding snapshots are disposable derivatives, not immutable LUMP
 history. Delete unreachable snapshots on authorized maintenance; protect exact
 saved designs and retained execution/preparation references, and serialize
