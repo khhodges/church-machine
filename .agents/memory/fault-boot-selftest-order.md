@@ -38,13 +38,21 @@ Genesis recovery path, and failure of Genesis recovery remain unspecified.
 
 After a fault, boot always takes control, not a direct handoff from the faulted Thread to a test manager. The user requires diagnosis after SelfTest, but this does not insert SelfTest into the boot sequence: the lightning-bolt target follows the three Boot steps. With CapabilityTest selected and prepared, those steps enter CapabilityTest.
 
-Reboot must discard prior-run execution state for every Thread, not only the
-currently active one. Restore all Thread allocations from the pristine image.
+IDE boot/reboot must discard prior-run execution state for every Thread, not
+only the currently active one. Initialize Boot.Thread for the Lightning Bolt;
+leave every non-boot Thread allocated but empty/uninitialized.
 **Why:** The user explicitly required clearing stale state “including the 3
 threads.” Suspended registers, stacks and continuations are execution state too.
 **How to apply:** Route every selected-design reboot control through whole-image
-reconstruction. Preserve saved Thread initialization settings and separately
-label retained historical fault evidence; neither is live resumed state.
+reconstruction followed by clearing non-boot Thread payloads. Saved definitions
+are not rewritten, but their preseeded actor contexts must not be restored into
+IDE execution. Individual Thread reset baselines must also remain cleared.
+Keep separately labelled historical fault evidence outside live execution.
+
+**Why this distinction matters:** The user explicitly confirmed that “clear”
+includes starting contexts, not merely restoring saved actor images. CHANGE
+into a cleared Thread must fault until explicit program initialization; never
+silently initialize it or resume the old Mallory/Alice demonstration.
 
 **Why:** The user explicitly corrected both the proposed direct-manager recovery path and the assumption that boot unconditionally enters SelfTest. A test stopped at the initial fault boundary proves rejection, not the complete recovery lifecycle.
 

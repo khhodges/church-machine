@@ -160,7 +160,7 @@
     function create(words, record) {
         const instance = ChurchSimulator.fromAscendingNamespaceImage(new Uint32Array(words), {
             word0:0x02000001, word1:0, word2:record.slotCount*4-1, word3:0, m:1});
-        instance.beginBoot();
+        instance.beginBoot({clearNonBootThreads:true});
         instance.simulationConfiguration=freezeRecord(record);
         if(typeof instance.on==='function') {
             if(typeof root._traceRecordStep==='function') instance.on('step',root._traceRecordStep);

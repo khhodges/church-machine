@@ -83,6 +83,13 @@ print(json.dumps(list(struct.unpack(f'<{len(image)//4}I',image))))
     vm.createContext(runtime);
     vm.runInContext(fs.readFileSync(__dirname+'/design-simulation.js','utf8'),runtime);
     await runtime.DesignSimulation.prepare(true);
+    const expected = words.slice();
+    for (const slot of [11,12]) {
+        const base = words[slot*4];
+        expected.fill(0, base+1, base+256);
+    }
+    assert.deepEqual(Array.from(runtime.sim.memory),expected,
+        'initial IDE boot clears non-boot starting contexts too');
     const old = runtime.sim;
     for(const slot of [2,11,12]) {
         const base=words[slot*4];
@@ -95,7 +102,7 @@ print(json.dumps(list(struct.unpack(f'<{len(image)//4}I',image))))
     assert.equal(await runtime.DesignSimulation.command('reset'),true);
     const fresh=runtime.sim;
     assert.notEqual(fresh,old);
-    assert.deepEqual(Array.from(fresh.memory),words,'all image bytes, including all three Threads, restored');
+    assert.deepEqual(Array.from(fresh.memory),expected,'reboot clears non-boot starting contexts too');
     assert(fresh.dr.every(value=>value===0));
     assert(fresh.cr.every(cap=>cap.word0===0));
     assert.equal(fresh.callStack.length,0);
@@ -103,5 +110,18 @@ print(json.dumps(list(struct.unpack(f'<{len(image)//4}I',image))))
     assert.equal(fresh.pc,0);
     assert.equal(fresh.halted,false);
     assert.equal(fresh.bootComplete,false);
+    const rows = fresh.threadStatusRows(10);
+    for (const slot of [11,12]) {
+        const row = rows.find(row => row.slot === slot);
+        assert.equal(row.lifecycleStatus,'uninitialized');
+        assert.equal(fresh._threadDisplayGT(slot,null),0);
+        assert.equal(fresh.resetThreadToBaseline(slot).ok,true);
+        assert.deepEqual(Array.from(fresh.memory),expected,'individual reset cannot revive an actor context');
+    }
+    for(let i=0;i<3;i++) assert(fresh._bootStep());
+    assert.equal(fresh.cr[14].word0 & 65535,3,'Lightning Bolt entry remains authoritative');
+    assert.equal(fresh._activateChangeThread(0x0200000c,{crDst:12},0,true),null);
+    assert(fresh.halted,'CHANGE to an uninitialized Thread must fault');
+    assert.equal(fresh.cr[14].word0 & 65535,3,'failed CHANGE cannot enter saved actor code');
     console.log('PASS selected-design fault reboot and reset-and-step routing');
 })().catch(error => {console.error(error); process.exitCode = 1;});

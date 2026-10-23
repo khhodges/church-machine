@@ -116,8 +116,25 @@ class NamespaceRuntimeCore extends Simulator {
             };
         }
     }
-    beginBoot() {
+    beginBoot({clearNonBootThreads = false} = {}) {
         if(this._liveThreadOwned || this.halted) throw Error('Boot requires a fresh Namespace image');
+        if (clearNonBootThreads) {
+            // IDE boot is a fresh execution, not a replay of authored actor
+            // starting contexts. Keep allocations/descriptors, discard homes,
+            // stack frames, capabilities and heap data for every other Thread.
+            // Validate all ranges before changing any bytes.
+            const ranges = this.configuredThreadSlots()
+                .filter(slot => slot !== this._bootThreadSlot())
+                .map(slot => {
+                    const base = this.readNSEntry(slot).word0_location;
+                    const layout = this._threadLayoutAtBase(base);
+                    if (!layout || !layout.valid)
+                        throw Error(`Cannot clear invalid Thread allocation NS[${slot}]`);
+                    return [base + 1, base + layout.lumpSize];
+                });
+            for (const [start, end] of ranges) this.memory.fill(0, start, end);
+            this._captureThreadBaselines();
+        }
         this._bootRoot = Object.freeze({...this.cr[15]});
         this.bootComplete = false;
         this.bootStep = 0;
@@ -132,6 +149,10 @@ class NamespaceRuntimeCore extends Simulator {
         this.output='';
         this.pc=0;
         this.physicalPC=0;
+    }
+    _threadLifecycleStatus(active, savedIndicator) {
+        if (!active && savedIndicator && savedIndicator.sz === 0) return 'uninitialized';
+        return super._threadLifecycleStatus(active, savedIndicator);
     }
     _mmioDeviceSlot(index) {
         if (!this._namespaceRuntimeReady) return super._mmioDeviceSlot(index);
