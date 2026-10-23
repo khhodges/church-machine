@@ -1,5 +1,9 @@
 # AbstractGTManager — native Phase 1 implementation
 
+> Superseded by the approved [Constants and Passkey split](constants-passkey.md).
+> The combined CLOOMC source was removed. The interface and layouts below
+> describe the previous combined design, not the current implementation.
+
 ## Authority and scope
 
 The user approved the two-method named interface, the 100-entry constants

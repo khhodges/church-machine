@@ -1,0 +1,18 @@
+; Numerical example: area of a circle of radius 2, in Q16.16.
+; PIName is a DATA R name record containing "PI".
+; DR2 returns the area, DR3=0, DR1=16 fractional bits.
+; No host arithmetic or floating-point instruction is used.
+; Language: Assembly
+abstraction ide.ConstantsCircle {
+capabilities { SELF E, ide.PIName R, ide.Constants E }
+method AreaRadiusTwo {
+    LOAD CR2, CR6, #1
+    LOAD CR0, CR6, #2
+    CALL CR0, #0
+    LOAD CR0, CR6, #2
+    CALL CR0, #1
+    IADD DR2, DR2, DR2
+    IADD DR2, DR2, DR2
+    RETURNAL #2
+}
+}

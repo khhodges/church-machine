@@ -1,0 +1,139 @@
+; Phase 1 Constants: names, Abstract identity and usable numerical values.
+; Language: Assembly
+; Get(name): CR2 = name DATA R; returns CR1 token, DR1=1.
+; value(token): CR1 = constant token; returns DR2 real, DR3 imaginary,
+; DR1=16 fractional bits, CR1 unchanged. Signed Q16.16 components.
+; DR1..DR3 are the existing CALL result registers; DR4..DR15 restore on RETURN.
+; DREAD offsets are words. No host dispatch or additional ISA instructions.
+; Catalogue: header,count,records. Record: length,token,31 name words,
+; signed real Q16.16, signed imaginary Q16.16, fractional-bit count.
+; Private Scratch RW points to a DATA object; ScratchLoad L views word 1.
+; Provision catalogue read-only, serialize access to scratch, never export it.
+abstraction ide.Constants {
+capabilities { SELF E, ide.ConstantsScratch RW, ide.ConstantsCatalogue R, ide.ConstantsScratchLoad L }
+method Get {
+constant_entry:
+    IADD DR1, DR0, #0
+    DREAD DR6, CR2, #1, DR0
+    MCMP DR6, #1
+    BRANCHLO constant_bad_name
+    MCMP DR6, #31
+    BRANCHHI constant_bad_name
+    LOAD CR7, CR6, #1
+    LOAD CR8, CR6, #2
+    LOAD CR9, CR6, #3
+    DREAD DR7, CR8, #1, DR0
+    MCMP DR7, #101
+    BRANCHNE constant_bad_catalogue
+    IADD DR8, DR0, #2
+    IADD DR9, DR0, #0
+constant_find:
+    MCMP DR9, DR7
+    BRANCHHS constant_unknown
+    DREAD DR11, CR8, #0, DR8
+    MCMP DR11, DR6
+    BRANCHNE constant_next
+    IADD DR10, DR0, #0
+constant_chars:
+    MCMP DR10, DR6
+    BRANCHHS constant_found
+    DREAD DR11, CR2, #2, DR10
+    IADD DR12, DR8, DR10
+    DREAD DR12, CR8, #2, DR12
+    MCMP DR11, DR12
+    BRANCHNE constant_next
+    IADD DR10, DR10, #1
+    BRANCH constant_chars
+constant_next:
+    IADD DR9, DR9, #1
+    IADD DR8, DR8, #36
+    BRANCH constant_find
+constant_found:
+    DREAD DR13, CR8, #1, DR8
+    BFEXT DR11, DR13, #29, #3
+    MCMP DR11, #0
+    BRANCHNE constant_bad_catalogue
+    BFEXT DR11, DR13, #25, #2
+    MCMP DR11, #3
+    BRANCHNE constant_bad_catalogue
+    DWRITE DR13, CR7, #1, DR0
+    LOAD CR1, CR9, #0
+    DWRITE DR0, CR7, #1, DR0
+    IADD DR1, DR0, #1
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
+    RETURNAL #2
+constant_bad_name:
+    HARDFAULT "Constants.Get: name length must be 1..31"
+constant_unknown:
+    HARDFAULT "Constants.Get: unknown constant name"
+constant_bad_catalogue:
+    HARDFAULT "Constants.Get: invalid provisioned catalogue"
+}
+method value {
+value_entry:
+    IADD DR1, DR0, #0
+    IADD DR2, DR0, #0
+    IADD DR3, DR0, #0
+    IADD DR4, DR0, #0
+    LOAD CR7, CR6, #1
+    LOAD CR8, CR6, #2
+    LOAD CR9, CR6, #3
+    DREAD DR7, CR8, #1, DR0
+    MCMP DR7, #101
+    BRANCHNE value_bad_catalogue
+    IADD DR8, DR0, #2
+    IADD DR9, DR0, #0
+value_find:
+    MCMP DR9, DR7
+    BRANCHHS value_unknown
+    DREAD DR13, CR8, #1, DR8
+    BFEXT DR11, DR13, #29, #3
+    MCMP DR11, #0
+    BRANCHNE value_bad_catalogue
+    BFEXT DR11, DR13, #25, #2
+    MCMP DR11, #3
+    BRANCHNE value_bad_catalogue
+    DWRITE DR13, CR7, #1, DR0
+    LOAD CR11, CR9, #0
+    DWRITE DR0, CR7, #1, DR0
+    TPERM CR1, EXACT, CR11
+    BRANCHEQ value_found
+    IADD DR9, DR9, #1
+    IADD DR8, DR8, #36
+    BRANCH value_find
+value_found:
+    DREAD DR6, CR8, #35, DR8
+    MCMP DR6, #16
+    BRANCHNE value_bad_catalogue
+    DREAD DR2, CR8, #33, DR8
+    DREAD DR3, CR8, #34, DR8
+    IADD DR1, DR0, #16
+    IADD DR6, DR0, #0
+    IADD DR7, DR0, #0
+    IADD DR8, DR0, #0
+    IADD DR9, DR0, #0
+    IADD DR10, DR0, #0
+    IADD DR11, DR0, #0
+    IADD DR12, DR0, #0
+    IADD DR13, DR0, #0
+    IADD DR14, DR0, #0
+    IADD DR15, DR0, #0
+    RETURNAL #2
+value_unknown:
+    HARDFAULT "Constants.value: unknown constant token or non-constant capability"
+value_bad_catalogue:
+    HARDFAULT "Constants.value: invalid catalogue or unsupported numerical format"
+}
+}

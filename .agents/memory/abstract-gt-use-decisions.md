@@ -3,6 +3,32 @@ name: Abstract GT use decisions
 description: Explicitly accepted uses from the user's review of historical Abstract GT roles.
 ---
 
+## Current Phase 1 ownership
+
+The user approved replacing the combined AbstractGTManager with **Constants**
+(name, identity and usable numerical value) and **Passkey** (name and B=0 proof).
+This supersedes the combined interface descriptions below, not the accepted
+Abstract subtype roles or the original 100-proof pool.
+
+**Why:** The user found identities without numerical access insufficient and
+approved the clearer separation for implementation in CLOOMC.
+
+**How to apply:** Keep numerical access in Constants.value(token), named proof
+issuance in Passkey.NewProof(name), and no wrapper manager as a third layer.
+See docs/reviews/mint-phase1/constants-passkey.md for the current contract.
+Q16.16 real/imaginary components are the Phase 1 implementation choice:
+ordinary integer arithmetic, explicit precision, no invented ISA/FPU. Do not
+claim exact or arbitrary-precision numerical values.
+
+Native multi-result verification must cross a real CALL/RETURN boundary.
+
+**Why:** A numeric value looked correct before RETURN, but a proposed DR4
+format result was restored to the caller's old value. Only testing method
+fragments would have missed this failure.
+
+**How to apply:** Keep return components within the existing result ABI,
+test them in the caller, and never change RETURN to accommodate a new service.
+
 ## Constants and mathematical values
 
 Abstract GTs may represent immutable constants and mathematical values, such

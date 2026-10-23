@@ -135,6 +135,10 @@ The subsequent [AbstractGTManager implementation](abstract-gt-manager.md)
 records the separately approved encoding and random-input contract, the native
 CLOOMC API, private provisioning requirements and simulator evidence.
 
+**Current Phase 1:** the user approved replacing that combined abstraction
+with [Constants and Passkey](constants-passkey.md). Constants now supplies
+numerical values as well as identities; Passkey owns the original proof pool.
+
 ## Glossary
 
 | Term | Meaning here |

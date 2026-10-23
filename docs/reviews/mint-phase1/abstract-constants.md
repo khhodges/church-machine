@@ -1,5 +1,9 @@
 # AbstractGTManager — Phase 1 mathematical constants
 
+Current owner: [Constants](constants-passkey.md), following the approved split
+from Passkey. The implementation supplies Q16.16 numerical approximations;
+the exact identities and catalogue names below remain unchanged.
+
 **Status: approved catalogue.** The user approved the following 100 entries
 for Phase 1. This is design approval, not implementation or runtime evidence.
 List numbers are review positions, not assigned token encodings.
