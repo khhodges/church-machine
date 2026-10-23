@@ -110,3 +110,14 @@ requested a Dijkstra queue for release notifications.
 architecture. Queue API, message layout, synchronization and heap placement are
 still design proposals, not approved implementation contracts. Do not assume a
 one-bit Dijkstra flag provides a counting semaphore.
+
+Release messages must identify memory using a GT, not a new allocation-record
+handle and separate generation scheme.
+
+**Why:** The user explicitly corrected the proposed queue message: “It should
+define memory using GT! not something new”.
+
+**How to apply:** Model release notifications as GT-bearing messages. Preserve
+normal capability checks; the cleaning GT must remain valid after the old
+object authority is invalidated. Do not invent a replacement memory identity
+or assume the revoked object's old GT remains usable.
