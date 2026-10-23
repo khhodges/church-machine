@@ -34,8 +34,10 @@
 ; CREATE / DESTROY retain source indices 0 / 1.
 ; MakeOutform / MakeInform are proposed additional entries, indices 2 / 3.
 ; Their CR7 target convention is a draft for review, not a deployed ABI.
-; Common input: CR2 credential, CR3 DATA R proof (four words at offset zero).
-; Phase 1 PkVerify always approves; real credential/proof verification is deferred.
+; Common input: CR2 = Genesis-provisioned B=0 Abstract Passkey.
+; CR3 is NOT caller proof data: Mint replaces it with its own approved reference.
+; Genesis installs the matching token in ide.MintApproval (C-list row 7).
+; PkVerify uses native EXACT; approval is separate from operation completion.
 ; Common output: DR1=1 only after completed body, never assigned by a wrapper.
 ; CR1 is a non-NULL result GT except DESTROY, which requires architectural NULL.
 ; Preserve CR5/DR5 and architectural CR12..15 rules.
@@ -48,20 +50,19 @@
 ; These masks complete outward capability cleanup, not the early *_CLEAR_* gates.
 ; LAMBDA-frame RETURN preserves ALL CRs, regardless of mask: same context,
 ; not a CALL security boundary. It CANNOT implement any early cleanup helper.
-; Early result/proof/private-authority clearing still needs a legal mechanism.
+; Early private-authority clearing in unimplemented methods remains unresolved.
 ; LOAD CRd, NULL discards authority; zero-permission attenuation does not.
 ; Do not replace these gates with TPERM CLEAR, host writes or an invented opcode.
-; This draft checks available NULL/permission/scalar shapes only. Exact GT
-; type, residency, provenance, proof and object-specific output checks are
-; explicit unresolved gates, not silently assumed to pass.
+; Authorization uses the Genesis-approved exact proof, not a readable object.
+; Unsupported operations retain explicit hard-fault gates.
 
 abstraction ide.Mint {
-capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW, ide.MintCleaner E }
+capabilities { SELF E, ide.MintState RW, ide.MintScratch L, ide.MintPool RW, ide.PkVerify E, ide.MintNamespace RW, ide.MintCleaner E, ide.MintApproval SL }
 
 method CREATE {
 CREATE_inputs:
     ; First implementation slice: case 4, DATA RW only.
-    ; CR2/CR3: Passkey GT/proof. CR4: NULL; Data has no source payload.
+    ; CR2: Passkey GT. CR3: ignored caller input. CR4: NULL; no source payload.
     ; Allocate separate storage and zero EVERY word before issuing its GT.
     ; DR2 = power-of-two word size | 4 (low three bits).
     ; DR3 = 3: DATA permission bits W|R, NOT TPERM preset number 2.
@@ -77,10 +78,6 @@ create_data_credentials:
     ; Normal credential/proof checks only. No all-ones token escape.
     TPERM CR2, NULL
     BRANCHEQ TODO_CREATE_INPUT_CREDENTIAL_NULL
-    TPERM CR3, R
-    BRANCHNE TODO_CREATE_INPUT_PROOF_READ
-    ; Probe proof bounds without clobbering packed DR2 or permission DR3.
-    DREAD DR4, CR3, #3, DR0
 create_data_source_checks:
     TPERM CR4, NULL
     BRANCHNE TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL
@@ -106,15 +103,16 @@ create_data_power_loop:
     SHR DR7, DR7, #1
     BRANCH create_data_power_loop
 create_data_authorize:
-    ; Call Verify through Mint's own E capability after the ordinary
-    ; credential/proof checks. Source method 0 uses CALL selector 1.
+    ; Replace untrusted CR3 with the Genesis-approved reference before Verify.
+    ; Call through Mint's own E capability; source method 0 uses selector 1.
+    LOAD CR3, CR6, #7
     LOAD CR1, CR6, #4
     CALL CR1, #0
     MCMP DR1, #1
     BRANCHNE TODO_CREATE_PKVERIFY_NOT_APPROVED
     ; Phase 1 uses PkVerify APPROVED as allocation approval: no separate quota gate.
     ; Approval is not completed CREATE; pool/slot capacity checks still follow.
-    ; PkVerify preserves requested size DR6 and credential/proof CR2/CR3.
+    ; PkVerify preserves requested size DR6 and proof/reference CR2/CR3.
     IADD DR1, DR0, #0
     LOAD CR1, NULL
     BRANCH create_v1_allocate
@@ -574,8 +572,6 @@ TODO_CREATE_DESCRIPTOR_RETIRED:
     HARDFAULT "Mint.CREATE: selected slot is retired and cannot be allocated"
 TODO_CREATE_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.CREATE: missing Passkey"
-TODO_CREATE_INPUT_PROOF_READ:
-    HARDFAULT "Mint.CREATE: proof capability is not readable"
 TODO_CREATE_INPUT_DATA_SOURCE_NOT_NULL:
     HARDFAULT "Mint.CREATE: DATA source CR4 must be NULL"
 TODO_CREATE_INPUT_CASE_NOT_DATA:
@@ -612,18 +608,22 @@ method DESTROY {
 DESTROY_inputs:
     ; ISOLATED V1 ONLY: private DATA RW allocated by MintCleaner.
     ; DR2 identifies the target slot; CR7 must match its exact current GT.
-    ; CR2/3 retain the Phase 1 test credential/proof convention.
+    ; CR2 is the Genesis-provisioned Passkey; CR3 is replaced by Mint.
     ; Non-DATA, resident/shared-flagged and non-owned allocations are rejected.
     ; Fixture provisioning excludes active/code/C-list aliases into this pool.
-    ; No general active-use detector or real authorization is claimed.
+    ; No general active-use detector is claimed.
     LOAD CR1, NULL
 destroy_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_DESTROY_INPUT_CREDENTIAL_NULL
-    TPERM CR3, R
-    BRANCHNE TODO_DESTROY_INPUT_PROOF_READ
-    DREAD DR4, CR3, #3, DR0
+    LOAD CR3, CR6, #7
+    LOAD CR1, CR6, #4
+    CALL CR1, #0
+    MCMP DR1, #1
+    BRANCHNE TODO_DESTROY_PKVERIFY_NOT_APPROVED
+    IADD DR1, DR0, #0
+    LOAD CR1, NULL
     TPERM CR7, NULL
     BRANCHEQ TODO_DESTROY_INPUT_TARGET_NULL
     TPERM CR4, NULL
@@ -689,10 +689,6 @@ destroy_v1_compare:
     BRANCHNE destroy_v1_bad
     DREAD DR8, CR10, #0, DR13
 destroy_authorize:
-    LOAD CR1, CR6, #4
-    CALL CR1, #0
-    MCMP DR1, #1
-    BRANCHNE destroy_v1_bad
     LOAD CR1, CR6, #6
     CALL CR1, #2
     MCMP DR1, #1
@@ -771,8 +767,8 @@ destroy_v1_bad:
 
 TODO_DESTROY_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.DESTROY: missing Passkey"
-TODO_DESTROY_INPUT_PROOF_READ:
-    HARDFAULT "Mint.DESTROY: proof capability is not readable"
+TODO_DESTROY_PKVERIFY_NOT_APPROVED:
+    HARDFAULT "Mint.DESTROY: PkVerify did not return APPROVED"
 TODO_DESTROY_INPUT_TARGET_NULL:
     HARDFAULT "Mint.DESTROY: target is NULL"
 TODO_DESTROY_INPUT_CR4_NOT_NULL:
@@ -794,9 +790,6 @@ outform_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_MakeOutform_INPUT_CREDENTIAL_NULL
-    TPERM CR3, R
-    BRANCHNE TODO_MakeOutform_INPUT_PROOF_READ
-    DREAD DR2, CR3, #3
     TPERM CR7, NULL
     BRANCHEQ TODO_MakeOutform_INPUT_TARGET_NULL
     TPERM CR4, NULL
@@ -838,8 +831,6 @@ TODO_MakeOutform_RESULT_TYPE_AND_IDENTITY:
     HARDFAULT "Mint.MakeOutform: not implemented in Phase 1 CREATE package"
 TODO_MakeOutform_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.MakeOutform: missing Passkey"
-TODO_MakeOutform_INPUT_PROOF_READ:
-    HARDFAULT "Mint.MakeOutform: proof capability is not readable"
 TODO_MakeOutform_INPUT_TARGET_NULL:
     HARDFAULT "Mint.MakeOutform: target is NULL"
 TODO_MakeOutform_INPUT_CR4_NOT_NULL:
@@ -861,9 +852,6 @@ inform_inputs_after_clear:
     IADD DR1, DR0, #0
     TPERM CR2, NULL
     BRANCHEQ TODO_MakeInform_INPUT_CREDENTIAL_NULL
-    TPERM CR3, R
-    BRANCHNE TODO_MakeInform_INPUT_PROOF_READ
-    DREAD DR2, CR3, #3
     TPERM CR7, NULL
     BRANCHEQ TODO_MakeInform_INPUT_TARGET_NULL
     TPERM CR4, NULL
@@ -905,8 +893,6 @@ TODO_MakeInform_RESULT_TYPE_AND_IDENTITY:
     HARDFAULT "Mint.MakeInform: not implemented in Phase 1 CREATE package"
 TODO_MakeInform_INPUT_CREDENTIAL_NULL:
     HARDFAULT "Mint.MakeInform: missing Passkey"
-TODO_MakeInform_INPUT_PROOF_READ:
-    HARDFAULT "Mint.MakeInform: proof capability is not readable"
 TODO_MakeInform_INPUT_TARGET_NULL:
     HARDFAULT "Mint.MakeInform: target is NULL"
 TODO_MakeInform_INPUT_CR4_NOT_NULL:

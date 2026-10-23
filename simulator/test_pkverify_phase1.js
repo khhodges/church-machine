@@ -11,17 +11,20 @@ assert.equal(result.methods.length, 1);
 assert.equal(result.methods[0].name, 'Verify');
 const binary = assembleLump(result.methods.map(m => m.code));
 assert.deepEqual(binary.errors || [], []);
-for (const credential of [0, 0xffffffff, 0x12345678]) {
+const reference = 0x3f6ccfe8;
+for (const credential of [0, reference, reference ^ 1, reference ^ 0x10000,
+    0xffffffff, 0xfffffffe, 0x06000000]) {
+for (const trusted of [0, reference]) {
     const {sim, install, compile, activate} = fixture(true);
     const verifier = install(32, binary.buf.slice(1));
     const caller = compile(30,
         'LOAD CR1, CR6, #1\nCALL CR1, #0\nHALT', [verifier.gt]);
     activate(caller);
     sim.pc = 1;
-    // Deliberately invalid/NULL credentials and inaccessible proofs: the
-    // Phase 1 service must not try to validate or dereference either.
+    // Abstract identities have no readable backing object.
     sim.cr[2] = {word0: credential >>> 0, word1: 0, word2: 0, word3: 0, m: 0};
-    sim.cr[3] = {word0: credential >>> 0, word1: 0xffffff00, word2: 0, word3: 0, m: 0};
+    sim.cr[3] = {word0: trusted, word1: 0xffffff00, word2: 0, word3: 0, m: 0};
+    for (const reg of [4, 7, 8]) sim.cr[reg] = {...sim.cr[2]};
     sim.dr[6] = 512;
     const depth = sim.callStack.length;
     let called = false, returned = false;
@@ -32,14 +35,16 @@ for (const credential of [0, 0xffffffff, 0x12345678]) {
         if (event.instr.opcode === 2) called = true;
         if (event.instr.opcode === 3) {
             returned = true;
-            assert.equal(sim.dr[1], 1, 'APPROVED');
+            assert.equal(sim.dr[1], trusted && credential === trusted ? 1 : 0, 'EXACT approval only');
             assert.equal(sim.dr[6], 512, 'allocation size preserved');
             assert.equal(sim.cr[2].word0 >>> 0, credential >>> 0);
-            assert.equal(sim.cr[3].word0 >>> 0, credential >>> 0);
+            assert.equal(sim.cr[3].word0 >>> 0, trusted);
+            for (const reg of [4, 7, 8]) assert.equal(sim.cr[reg].word0 >>> 0, credential >>> 0);
             assert.equal(sim.cr[14].word1, caller.base);
             assert.equal(sim.callStack.length, depth);
         }
     }
     assert(called && returned && sim.halted, 'ordinary call, return and caller continuation');
 }
-console.log('PASS: Phase 1 PkVerify always APPROVED through native CALL/RETURN');
+}
+console.log('PASS: PkVerify EXACT approval/rejection through native CALL/RETURN');

@@ -1,13 +1,25 @@
-; PHASE 1 ONLY: unconditional approval, not real credential authentication.
+; Genesis-provisioned Passkey comparison; no proof DATA or external service.
 ; API: Verify (source method 0, CALL selector 1).
-; CR2 credential and CR3 proof are accepted but never inspected or dereferenced.
-; Result: DR1 = 1 (APPROVED). All other DRs, including DR6, are unchanged.
-; RETURN keeps CR2/CR3; other CRs follow the ordinary CALL/RETURN convention.
+; CR2 = caller's B=0 Abstract proof; CR3 = Mint's trusted matching reference.
+; Mint must load CR3 from its own Genesis-provisioned C-list, not caller input.
+; Result: DR1 = 1 only on native EXACT equality, otherwise 0.
+; NULL operands reject before EXACT (which faults on NULL).
+; All other DRs, including DR6, are unchanged.
+; RETURN keeps CR2/CR3 and Mint's operation inputs CR4/CR7/CR8 so validation
+; after authorization sees the original inputs, not registers cleared by RETURN.
 ; No allocation, allowance accounting, memory writes or external service calls.
 abstraction ide.PkVerify {
     capabilities { SELF E }
     method Verify() {
+        IADD DR1, DR0, #0
+        TPERM CR2, NULL
+        BRANCHEQ verify_return
+        TPERM CR3, NULL
+        BRANCHEQ verify_return
+        TPERM CR2, EXACT, CR3
+        BRANCHNE verify_return
         IADD DR1, DR0, #1
-        RETURNAL #12
+verify_return:
+        RETURNAL #412
     }
 }

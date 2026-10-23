@@ -282,7 +282,10 @@ console.log('PASS: native zeroing and exact-slot write/read-back fragments');
 console.log('PASS: native SZ=0 RETURN resumes the saved context and preserves ALL CRs.');
 console.log('PASS: TPERM CLEAR is a test, not erasure; only CALL-frame RETURN masks supply erasure.');
 console.log('PASS: native label-bound LAMBDA enters its body and returns, without changing instruction encoding.');
-// Every credential now requires proof; the unsupported all-ones escape is gone.
+// This fragment only checks NULL credentials and source shape. Authorization
+// now occurs later through the full native PkVerify call, not a DATA proof read.
+// test_mint_pkverify_call.js covers that complete boundary; no token is approved
+// by reaching scalar checks here.
 const escapeText = fragment('create_data_credentials', 'create_data_scalar_checks');
 const escapeStops = [...new Set([...escapeText.matchAll(/\bTODO_CREATE_\w+/g)].map(m => m[0]))];
 for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xfffffffe, 0x06000000, 0]) {
@@ -300,10 +303,11 @@ for (const stateWords of [64, 256]) for (const credential of [0xffffffff, 0xffff
     s.cr[4] = {word0: 0, word1: 0, word2: 0, word3: 0, m: 0};
     let steps = 0;
     while (!s.halted && s.pc !== labels.create_data_scalar_checks && steps++ < 40) s.step();
-    assert.notEqual(s.pc, labels.create_data_scalar_checks,
-        'No credential, including all-ones, may skip the proof check');
+    assert.equal(s.pc === labels.create_data_scalar_checks, !Simulator.isNullGT(credential),
+        'Only non-NULL credentials reach scalar checks; none is approved here');
 }
-console.log('PASS: no credential bypasses the proof checks.');
+assert.doesNotMatch(escapeText, /EXACT|DREAD.*CR3/);
+console.log('PASS: credential shape checks do not substitute for subsequent EXACT authorization.');
 require('./test_mint_allocator_descriptor');
 require('./test_mint_create_publication');
 require('./test_factory_branch_encoding');

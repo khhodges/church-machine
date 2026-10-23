@@ -100,8 +100,8 @@ for (const [seq, fresh, next] of [[0, 1, 0], [0, 0, 1], [509, 0, 510]]) {
 {
     const f = setup();
     const fault = run(f);
-    assert(fault && fault.message === 'LOAD: c-list index 6 is out of bounds',
-        'legacy fixture lacks the new Cleaner binding and cannot certify V1: ' + JSON.stringify(fault));
+    assert(fault && fault.message === 'LOAD: c-list index 7 is out of bounds',
+        'legacy fixture lacks the approved Passkey reference and cannot certify V1: ' + JSON.stringify(fault));
     assert.equal(f.sim.dr[1], 0);
     assert.equal(f.sim.cr[1].word0, 0);
     assert.notEqual(f.sim.cr[14].word1, f.caller.base);

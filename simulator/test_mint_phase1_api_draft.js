@@ -44,7 +44,7 @@ for (const [, name, body] of methods) {
         assert.match(body, new RegExp(`^${label}:`, 'm'));
     }
 }
-assert.equal(faultCount, 46, 'Reviewed failures and remaining unsupported methods use HARDFAULT');
+assert.equal(faultCount, 43, 'Reviewed failures and remaining unsupported methods use HARDFAULT');
 
 for (const [, name, body] of methods) {
     assert.match(body, new RegExp(`^\\s*${name}_inputs:`),
@@ -64,8 +64,9 @@ for (const [, name, body] of methods) {
         assert.ok(label.startsWith(`TODO_${name}_`), `${label} must identify API method ${name}`);
     }
     assert.match(body, new RegExp(`TPERM CR2, NULL\\s+BRANCHEQ TODO_${name}_INPUT_CREDENTIAL_NULL`));
-    assert.match(body, new RegExp(`TPERM CR3, R\\s+BRANCHNE TODO_${name}_INPUT_PROOF_READ`));
-    assert.match(body, new RegExp(`DREAD DR${['CREATE','DESTROY'].includes(name) ? 4 : 2}, CR3, #3`));
+    assert.doesNotMatch(body, /DREAD.*CR3|TPERM CR3, R/);
+    if (['CREATE','DESTROY'].includes(name))
+        assert.match(body, /LOAD CR3, CR6, #7\s+LOAD CR1, CR6, #4\s+CALL CR1, #0/);
     assert.match(body, new RegExp(`MCMP DR1, #1\\s+BRANCHNE TODO_${name}_RESULT_COMPLETION`));
     const result = body.slice(body.indexOf(`${name === 'CREATE' ? 'create' :
         name === 'DESTROY' ? 'destroy' : name === 'MakeOutform' ? 'outform' : 'inform'}_result:`));

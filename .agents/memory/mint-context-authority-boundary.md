@@ -35,8 +35,16 @@ Genesis provisioning establishes approval; Mint checks the approved proof.
 **How to apply:** Replace unconditional approval with the ISA EXACT check
 against Mint's trusted reference before the protected operation. Do not add
 four-word proof data, an authentication service or another authorization scheme.
-Provisioning the token defines the approval scope; design agreement is not
-evidence that the runtime check has already been implemented or tested.
+Provisioning the token defines the approval scope. A verifier comparing two
+arguments does not establish who approved them: Mint must obtain the reference
+from its own Genesis-provisioned authority, never accept the caller's reference.
+
+**Why:** An attacker can supply two equal unapproved tokens; EXACT alone cannot
+distinguish those from the approved pair without trusted reference provenance.
+
+**How to apply:** Keep reference selection in the protected service. Preserve
+operation-input capabilities across verification RETURN when later validation
+still needs them; erased inputs can otherwise appear to satisfy NULL checks.
 
 ## Phase 1 Mint ownership and local Lambda decision
 

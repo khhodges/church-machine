@@ -2,6 +2,9 @@
 ; Language: Assembly
 ; NewProof(name): CR2=name DATA R (header,length,ASCII words).
 ; Result CR1=B=0 Abstract proof GT, DR1=1. All offsets are words.
+; Genesis installs the issued Mint proof into approved callers' C-lists and
+; Mint's ide.MintApproval row. PkVerify compares the two GTs with native EXACT.
+; No public lookup, readable proof object, or additional proof data is required.
 ; State: header,count,capacity,cursor,scratch,reserved,33-word name/token records.
 ; Scratch L views State[4]. Serialize calls and retain state with this exact pool.
 ; Original 100 random values, preformatted once; never regenerated at startup.
