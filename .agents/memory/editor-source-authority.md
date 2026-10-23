@@ -7,6 +7,16 @@ Ordinary editor reopening must prioritize the editable buffer. Source freshness 
 recovery notices stay compact; full before/after comparisons are opt-in and
 bounded, with decisions accessible without scrolling through source.
 
+Draft-deletion review must compare the preserved browser draft against saved
+source, not merely compare current editor text with a replacement buffer.
+
+**Why:** The user needs to identify important changes in the longer recovery
+copy before deciding to delete it. A short replacement preview does not answer
+that question.
+
+**How to apply:** Clearly identify the saved and draft sides, highlight complete
+source differences, and never interpret opening the comparison as deletion consent.
+
 **Why:** The programmer's screenshot showed a full comparison consuming the
 editor area and hiding the decision controls, making code opening unusable.
 

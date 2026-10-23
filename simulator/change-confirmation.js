@@ -75,7 +75,8 @@
         el.textContent = text;
         return el;
     }
-    function renderDiff(before, after) {
+    function renderDiff(before, after, labels) {
+        labels = labels || {};
         var wrap = document.createElement('div');
         wrap.setAttribute('role', 'table');
         wrap.setAttribute('aria-label', 'Source changes, Before and After side by side');
@@ -83,8 +84,8 @@
         var grid = document.createElement('div');
         grid.style.cssText = MONO + 'display:grid;grid-template-columns:3.5em 1.4em minmax(260px,1fr) 3.5em 1.4em minmax(260px,1fr);min-width:640px';
         var head = 'position:sticky;top:0;background:#22314b;color:#e8b94f;font-weight:600;padding:4px 8px;border-bottom:1px solid #3a4a66;';
-        grid.appendChild(cell('Before', head + 'grid-column:1 / span 3'));
-        grid.appendChild(cell('After', head + 'grid-column:4 / span 3;border-left:1px solid #3a4a66'));
+        grid.appendChild(cell(labels.before || 'Before', head + 'grid-column:1 / span 3'));
+        grid.appendChild(cell(labels.after || 'After', head + 'grid-column:4 / span 3;border-left:1px solid #3a4a66'));
         var rows = diffRows(before, after);
         var DEL = 'background:#4a1d24;color:#ffd7d7;', ADD = 'background:#173d27;color:#d3f5dc;',
             SAME = 'color:#c9d3e3;', EMPTY = 'background:#141e30;';
@@ -105,7 +106,7 @@
         wrap.appendChild(grid);
         return wrap;
     }
-    function renderChanges(list) {
+    function renderChanges(list, labels) {
         var container = document.createElement('div');
         container.style.cssText = 'max-height:60vh;overflow:auto';
         var bi = -1, ai = -1;
@@ -127,7 +128,7 @@
             if (idx === ai) return;
             if (idx === bi && ai >= 0) {
                 flush();
-                container.appendChild(renderDiff(c.slice(8), list[ai].slice(7)));
+                container.appendChild(renderDiff(c.slice(8), list[ai].slice(7), labels));
                 return;
             }
             rest.push(c);
@@ -148,7 +149,7 @@
             var reason = document.createElement('p');
             reason.textContent = details.reason || 'This action changes protected data.';
             dialog.appendChild(reason);
-            dialog.appendChild(renderChanges(details.changes || []));
+            dialog.appendChild(renderChanges(details.changes || [], details.comparisonLabels));
             var reject = document.createElement('button');
             reject.textContent = 'Reject — keep unchanged';
             var confirm = document.createElement('button');

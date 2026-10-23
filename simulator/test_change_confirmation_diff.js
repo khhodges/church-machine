@@ -51,5 +51,26 @@ const texts = n => (n.textContent || '') + n.children.map(texts).join('');
     h.window.confirmProtectedChange({title: 'T', changes: ['slot 10', 'slot 11']});
     for (let i = 0; i < 50 && !h.dialogs.length; i++) await new Promise(r => setTimeout(r, 1));
     assert.strictEqual(h.dialogs[0].children[2].children[0].textContent, 'slot 10\n\nslot 11');
+    // Deletion review compares saved source against the entire recovery copy,
+    // not against whichever text happens to be in the editor.
+    h = harness();
+    const saved = Array.from({length: 22}, (_, i) => 'saved ' + i).join('\n');
+    const draft = saved + '\nIMPORTANT SELFTEST CHANGE\n' + Array(300).fill('test body').join('\n');
+    h.window.confirmProtectedChange({
+        title: 'Delete browser draft',
+        comparisonLabels: {before: 'Saved source — kept', after: 'Browser draft — to delete'},
+        changes: ['Before:\n' + saved, 'After:\n' + draft],
+    });
+    for (let i = 0; i < 50 && !h.dialogs.length; i++) await new Promise(r => setTimeout(r, 1));
+    const comparison = texts(h.dialogs[0].children[2]);
+    assert(comparison.includes('Saved source — kept'));
+    assert(comparison.includes('Browser draft — to delete'));
+    assert(comparison.includes('IMPORTANT SELFTEST CHANGE'));
+    assert(comparison.includes('323'));
+    h.dialogs[0].children[3].onclick(); // Reject; review must not require deletion.
+    const lumps = fs.readFileSync(__dirname + '/app-lumps.js', 'utf8');
+    assert(lumps.includes("'Before:\\n' + _recoveredSource"));
+    assert(lumps.includes("'After:\\n' + _savedDraft"));
+    assert(lumps.includes("'After:\\n' + _draftToReview"));
     console.log('Source diff confirmation tests passed');
 })().catch(e => { console.error(e); process.exitCode = 1; });

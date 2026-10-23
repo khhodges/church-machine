@@ -9047,9 +9047,14 @@ async function openLumpInEditor(token, options) {
                         if (!window.confirmProtectedChange) throw new Error('The confirmation dialog is unavailable.');
                         if (!await window.confirmProtectedChange({
                             title: 'Delete browser draft',
-                            reason: 'Delete only this reviewed browser recovery copy. Saved artifacts and other editor text remain unchanged.',
-                            changes: ['Copy to delete:\n' + _savedDraft,
-                                'If this copy is in the editor, restore:\n' + _recoveredSource],
+                            reason: 'Compare the saved source with the browser draft before deleting it. Green (+) marks draft additions; red (−) marks saved lines missing or changed in the draft. Confirm deletes the reviewed draft, not the saved artifact.',
+                            comparisonLabels: {
+                                before: 'Saved source — kept (' + _recoveredSource.split('\n').length + ' lines)',
+                                after: 'Browser draft — to delete (' + _savedDraft.split('\n').length + ' lines)',
+                            },
+                            changes: ['Before:\n' + _recoveredSource,
+                                'After:\n' + _savedDraft,
+                                'This comparison does not apply the draft. If the reviewed draft is currently in the editor, deletion restores the saved source. Other editor text remains unchanged.'],
                         })) return;
                         if (window._editorNavigationEpoch !== epoch ||
                                 window._editorOpenLumpToken !== token ||
@@ -9238,14 +9243,25 @@ async function openLumpInEditor(token, options) {
         var _beforeDiscard = document.getElementById('asmEditor');
         var _beforeText = _beforeDiscard ? _beforeDiscard.value : '';
         var _beforeEpoch = window._editorNavigationEpoch;
+        var _reviewedDraft = _draftLsGet(token);
+        var _discardSource = window._editorOriginalDisasm || '';
+        var _draftToReview = _reviewedDraft === null ? _beforeText : _reviewedDraft;
         if (!window.confirmProtectedChange || !await window.confirmProtectedChange({
             title: 'Discard LUMP edits',
-            reason: 'Delete the browser draft, replace editor source and return to the LUMP panel.',
-            changes: ['Before:\n' + _beforeText,
-                'After:\n' + (window._editorOriginalDisasm || '')],
+            reason: 'Compare saved source with the browser draft before discarding. Green (+) marks draft additions; red (−) marks saved lines missing or changed in the draft. Confirm deletes the draft, restores saved source in the editor, and returns to the LUMP panel.',
+            comparisonLabels: {
+                before: 'Saved source — kept (' + _discardSource.split('\n').length + ' lines)',
+                after: 'Browser draft — to discard (' + _draftToReview.split('\n').length + ' lines)',
+            },
+            changes: ['Before:\n' + _discardSource,
+                'After:\n' + _draftToReview,
+                ...(_beforeText !== _draftToReview
+                    ? ['Current editor text also being replaced:\n' + _beforeText] : [])],
         })) return;
         if ((_beforeDiscard && _beforeDiscard.value !== _beforeText) ||
-                window._editorNavigationEpoch !== _beforeEpoch) return;
+                window._editorNavigationEpoch !== _beforeEpoch ||
+                _draftLsGet(token) !== _reviewedDraft ||
+                (window._editorOriginalDisasm || '') !== _discardSource) return;
         window._advanceEditorNavigationEpoch('discard saved LUMP edit');
         _draftLsDel(token);
         var _ed = document.getElementById('asmEditor');
