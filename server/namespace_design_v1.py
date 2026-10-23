@@ -321,7 +321,7 @@ class DesignStore:
         return response
 
     @serialized("self")
-    def save(self, payload):
+    def save(self, payload, *, progress=None):
         if (not isinstance(payload, dict) or
                 not {"fingerprint", "document"}.issubset(payload) or
                 set(payload) - {"fingerprint", "document", "bind"}):
@@ -341,7 +341,8 @@ class DesignStore:
             from server.namespace_binding_report import binding_report
             if bind_now:
                 response["bindingReport"] = binding_report(
-                    document, self.lumps, response["fingerprint"], bind_now=True)
+                    document, self.lumps, response["fingerprint"], bind_now=True,
+                    **({"progress": progress} if progress else {}))
             response["bindingRequested"] = bind_now
             fd, temporary = tempfile.mkstemp(dir=self.path.parent, prefix=".namespace-design-")
             try:

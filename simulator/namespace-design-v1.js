@@ -36,8 +36,32 @@
     async function request(method, body) {
         const response = await fetch(endpoint + (state.profile === 'phase1' ? '?profile=phase1' :
             state.designId ? '?profile=ascending' : '') + designQuery(), {method, cache:'no-store',
-            headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign'},
+            headers:{'Content-Type':'application/json','X-Requested-With':'NamespaceDesign',
+                ...(body?.bind ? {'Accept':'application/x-ndjson'} : {})},
             ...(body ? {body:JSON.stringify(body)} : {})});
+        if(response.ok && response.headers?.get('Content-Type')?.includes('application/x-ndjson')){
+            const reader=response.body.getReader(), decoder=new TextDecoder();
+            let buffer='', result;
+            function event(line){
+                if(!line.trim()) return;
+                const data=JSON.parse(line);
+                if(data.type==='error') throw Error(data.error);
+                if(data.type==='result') result=data.result;
+                else root.NamespaceBindingWindows?.progress(data);
+            }
+            try{
+                while(true){
+                    const chunk=await reader.read();
+                    buffer+=decoder.decode(chunk.value,{stream:!chunk.done});
+                    let end;
+                    while((end=buffer.indexOf('\n'))>=0){event(buffer.slice(0,end));buffer=buffer.slice(end+1);}
+                    if(chunk.done) break;
+                }
+                if(buffer.trim()) event(buffer);
+                if(!result?.ok) throw Error('Binding connection ended before save confirmation. Reload the saved design before retrying.');
+                return result;
+            }finally{reader.releaseLock();}
+        }
         const data = await response.json();
         if (!response.ok || !data.ok) throw Error(data.error || 'Namespace design request failed');
         return data;

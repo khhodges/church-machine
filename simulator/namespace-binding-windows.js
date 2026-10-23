@@ -54,7 +54,7 @@
         else closeAll();
     }
     function makeWin(list,i){
-        var id='nsbw-'+i, anyOpen=list&&Array.isArray(list.calls)&&list.calls.some(function(c){return c&&c.status!=='bound';}), st=list&&['bound','unresolved','partial'].includes(list.status)?list.status:'blocked'; if(st==='bound'&&anyOpen) st='partial';
+        var id='nsbw-'+i, anyOpen=list&&Array.isArray(list.calls)&&list.calls.some(function(c){return c&&c.status!=='bound';}), st=list&&['binding','bound','unresolved','partial'].includes(list.status)?list.status:'blocked'; if(st==='bound'&&anyOpen) st='partial';
         var w=el('div','nsbw-win'); w.setAttribute('role','dialog'); w.setAttribute('aria-modal','false');
         w.setAttribute('aria-labelledby',id+'-t'); w.tabIndex=-1;
         var t=el('div','nsbw-title'); var h=el('h2',null,'C-list slot '+(list.slot==null?'?':list.slot)+' — '+(list.name||list.filename||'(unnamed)'));
@@ -71,7 +71,7 @@
             b.appendChild(inspect);
         }
         var rows=Array.isArray(list.rows)?list.rows:[];
-        if(!rows.length) b.appendChild(el('p','nsbw-meta','No binding rows. No artifact was produced for this entry.'));
+        if(!rows.length) b.appendChild(el('p','nsbw-meta',st==='binding'?'Processing…':'No binding rows. No artifact was produced for this entry.'));
         else{
             var tb=el('table','nsbw-table'), hr=el('tr');
             ['#','Name','Previous GT','','New GT','Target slot','Permissions','Status / error'].forEach(function(s){hr.appendChild(el('th',null,s));});
@@ -145,7 +145,33 @@
                 typeof root._closeLumpHistoryPreviewModal==='function')
             root._closeLumpHistoryPreviewModal();
     }
-    root.NamespaceBindingWindows={show:show,closeAll:closeAll,cascade:cascade,_hex:hex,
+    function progress(event){
+        if(event.type==='started'){
+            show({status:'binding',lists:[],installed:false});
+            bar.querySelector('span').textContent='Checking selected artifacts…';
+            bar.lastChild.textContent='Waiting for the first C-list…';
+            return;
+        }
+        if(!event.item) return;
+        if(!layer) show({status:'binding',lists:[],installed:false});
+        if(!wins.length && bar.lastChild.tagName==='SPAN') bar.lastChild.remove();
+        var lists=currentReport.lists, index=lists.findIndex(function(l){return l.slot===event.item.slot;});
+        if(index<0) index=lists.length;
+        lists[index]=event.item;
+        var old=wins.find(function(w){return w.dataset.slot===String(event.item.slot);});
+        var w=makeWin(event.item,index); w.dataset.slot=String(event.item.slot);
+        if(old){
+            w.style.cssText=old.style.cssText;
+            wins[wins.indexOf(old)]=w; old.replaceWith(w);
+        }else{
+            wins.push(w);layer.appendChild(w);cascade();
+        }
+        currentReport.fingerprint=event.fingerprint;
+        var done=lists.filter(function(l){return l.status!=='binding';}).length;
+        bar.querySelector('span').textContent='Binding '+done+' / '+event.total+' · save not yet confirmed';
+        bar.querySelector('code').textContent=shortFp(event.fingerprint);
+    }
+    root.NamespaceBindingWindows={show:show,progress:progress,closeAll:closeAll,cascade:cascade,_hex:hex,
         invalidate:invalidate,
         exact:function(filename,hash){
             return currentReport ? currentReport.lists.filter(function(l){

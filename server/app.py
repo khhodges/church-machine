@@ -5171,8 +5171,18 @@ def namespace_design_v1():
             if not _is_ide_design_request():
                 return jsonify(ok=False, error="Expected a same-origin IDE design request"), 403
             from server.binding_cleanup import binding_lock
+            payload = request.get_json(silent=True)
+            if (request.headers.get("Accept") == "application/x-ndjson"
+                    and isinstance(payload, dict) and payload.get("bind") is True):
+                from server.binding_progress_stream import stream_binding_save
+                def operation(progress):
+                    with _lump_history_transition_lock(LUMPS_DIR), binding_lock(LUMPS_DIR):
+                        result = store.save(payload, progress=progress)
+                        result["bindingCleanup"] = _cleanup_binding_snapshots()
+                        return result
+                return stream_binding_save(operation)
             with _lump_history_transition_lock(LUMPS_DIR), binding_lock(LUMPS_DIR):
-                result = store.save(request.get_json(silent=True))
+                result = store.save(payload)
                 result["bindingCleanup"] = _cleanup_binding_snapshots()
             return jsonify(result)
         return jsonify(store.read(binding_preview=request.args.get("binding_preview") == "1"))

@@ -15,7 +15,7 @@ from server.binding_cleanup import serialized
 
 
 @serialized("directory")
-def binding_report(document, directory, fingerprint, *, bind_now=True):
+def binding_report(document, directory, fingerprint, *, bind_now=True, progress=None):
     directory = Path(directory)
     lists, candidates, rows, bodies = [], [], [], {}
     for placement in document["rows"]:
@@ -76,8 +76,13 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
     rows.extend(non_lump_rows(document))
     by_slot = {binding["slot"]: binding for binding in candidates}
     for item in lists:
+        if progress:
+            progress(dict(type="binding", fingerprint=fingerprint, total=len(lists),
+                          item={**item, "status": "binding", "reason": "Binding this C-list…"}))
         binding = by_slot.get(item["slot"])
         if item.get("reason") or not binding:
+            if progress:
+                progress(dict(type="entry", fingerprint=fingerprint, total=len(lists), item=item))
             continue
         try:
             symbolic = binding["portableBinding"].get("schema") == "church.symbolic-lump-binding/v1"
@@ -142,6 +147,8 @@ def binding_report(document, directory, fingerprint, *, bind_now=True):
                                     "Binding snapshot saved; unresolved references HardFault only if executed. Not activated."))
         except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
             item["reason"] = str(exc)
+        if progress:
+            progress(dict(type="entry", fingerprint=fingerprint, total=len(lists), item=item))
     status = ("complete" if lists and all(item["status"] == "bound" for item in lists)
               else "unresolved" if lists and all(item["status"] in ("bound", "unresolved") for item in lists)
               else "blocked")
