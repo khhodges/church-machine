@@ -20,6 +20,17 @@ An explicit approved boot profile remains distinct from catalog-derived
 membership. Historical fixed-slot boot profiles are not a general restriction
 on the requested clear/reload lifecycle.
 
+Phase 1 must separate the FPGA bitstream with a minimal Namespace of resident
+LUMPs from reprogrammable LUMPs undergoing development and test.
+
+**Why:** The user explicitly requested this separation so the hardware baseline
+is not coupled to the developing software inventory.
+
+**How to apply:** Keep resident membership an explicit reviewed minimum, not a
+catalog-derived list. Distinguish hardware-baseline acceptance from reloadable
+software testing; this scope decision does not authorize rebuilding or flashing
+hardware or changing current Namespace assignments.
+
 **Why:** Manifest history can contain duplicate or newer-looking artifacts;
 neither that history nor old fixed-map conventions may silently choose or
 reserve the next Namespace's assignments.
