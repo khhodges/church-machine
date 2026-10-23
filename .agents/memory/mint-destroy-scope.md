@@ -121,3 +121,15 @@ define memory using GT! not something new”.
 normal capability checks; the cleaning GT must remain valid after the old
 object authority is invalidated. Do not invent a replacement memory identity
 or assume the revoked object's old GT remains usable.
+
+The user proposed retaining the memory and Namespace slot together for reuse,
+with an elevated-version GT passed to Cleaner, to avoid rebuilding allocations.
+
+**Why:** Releasing and recreating the slot/memory association would waste work
+when the same bounded block can satisfy another request.
+
+**How to apply:** In this proposed recycling path, reserve the slot throughout
+queued/cleaning/clean-free states; do not also put it on the general free-slot
+queue. Software advances the version before handing Cleaner the new GT.
+Retain terminal-version retirement and clearing-before-reuse. This refines the
+earlier slot-release proposal; implementation and handoff details remain pending.
