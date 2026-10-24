@@ -7721,6 +7721,19 @@ class ChurchSimulator {
         this._flushLambdaCache();
 
         const callThreadBase = this._activeThreadBase();
+        // Validate executable geometry before changing the protected stack or
+        // publishing code/C-list descriptors. Header magic alone is not proof
+        // that its declared regions fit the allocation.
+        const entryBase = nsEntry.word0_location;
+        const entryHeader = this.parseLumpHeader(this.memory[entryBase]);
+        if (!entryHeader.valid || entryHeader.typ !== 0 ||
+                entryHeader.n_minus_6 > 8 || entryHeader.cw === 0 ||
+                1 + entryHeader.cw + entryHeader.cc > entryHeader.lumpSize ||
+                entryHeader.lumpSize > this.parseNSWord1(nsEntry.word1_limit).limit + 1 ||
+                entryBase + entryHeader.lumpSize > this.memory.length) {
+            this.fault('BOUNDS', 'CALL: malformed executable header or code/C-list outside allocation');
+            return null;
+        }
         const savedSTO = this._readProtectedSto(callThreadBase);
         this.sto = savedSTO;
         if (callThreadBase !== null) {

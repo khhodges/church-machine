@@ -39,7 +39,7 @@ class ReturnHarness(Elaboratable):
         m.submodules.cload = c
         m.submodules.regs = regs
         pending = Signal()
-        m.d.sync += pending.eq(r.complete & ~r.fault_valid)
+        m.d.sync += pending.eq(r.complete & ~r.fault_valid & ~r.lambda_return)
         m.d.comb += [
             r.return_mask.eq(d.return_mask),
             c.cload_start.eq(pending),
@@ -187,14 +187,15 @@ def test_call_cleanup_never_touches_cr5(mask):
 
     async def bench(ctx):
         ctx.set(call.mask, mask)
-        ctx.set(call.cr_rd_data.as_value(), make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2))
+        ctx.set(call.cr_rd_data.as_value(),
+                make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2) | (255 << 64))
         ctx.set(call.call_start, 1)
         await ctx.tick()
         ctx.set(call.call_start, 0)
         for _ in range(100):
             ctx.set(call.mload_done, 1)
             ctx.set(call.mem_rd_valid, 1)
-            ctx.set(call.mem_rd_data, (2 << 23) | (32 << 10) | 12)
+            ctx.set(call.mem_rd_data, (31 << 27) | (2 << 23) | (32 << 10) | 12)
             null = ctx.get(call.cr_null_mask)
             b_clear = ctx.get(call.cr_b_clear_mask)
             assert not ((null | b_clear) & (1 << 5))
@@ -211,8 +212,8 @@ def test_call_cleanup_never_touches_cr5(mask):
 
 
 @pytest.mark.parametrize("mask", [0, 0xFFF, 0xA95, 0x060])
-@pytest.mark.parametrize("fault", [None, "invalid_x", "location", "seal"])
-def test_lambda_return_rebuilds_cr6_from_code_identity(mask, fault):
+@pytest.mark.parametrize("fault", [None, "invalid_x", "location", "frame"])
+def test_lambda_return_preserves_all_authority(mask, fault):
     dut = ReturnHarness()
     r, c, regs = dut.ret, dut.cload, dut.regs
     xgt = make_gt(GT_TYPE_INFORM, PERM_MASK_X, slot_id=2)
@@ -220,9 +221,11 @@ def test_lambda_return_rebuilds_cr6_from_code_identity(mask, fault):
     memory = {
         0x8020: 0x6000,
         0x8024: 0,
-        0x8028: integrity32(0x6000, 0) ^ int(fault == "seal"),
+        0x8028: integrity32(0x6000, 0),
         0x802C: 0,
         0x6000: (2 << 23) | (32 << 10) | 12,
+        0x4000 + THREAD_STO_OFFSET * 4: 242,
+        0x4000 + 243 * 4: (0x1804 << 13) | (1 << 12) | (242 if fault == "frame" else 243),
     }
 
     def read(ctx, i):
@@ -241,8 +244,12 @@ def test_lambda_return_rebuilds_cr6_from_code_identity(mask, fault):
         ctx.set(regs.m_bit_device_wr_en, 0)
         ctx.set(r.lambda_active, 1)
         ctx.set(r.lambda_pc, 0x6010)
+        ctx.set(r.cr5_heap.as_value(), cap(5))
+        ctx.set(r.cr12_thread.as_value(), cap(12))
+        ctx.set(r.thread_base, 0x4000)
+        ctx.set(r.thread_hdr, (31 << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12)
         ctx.set(r.cr14_code.as_value(),
-                0 if fault == "invalid_x" else code ^ ((4 << 32) if fault == "location" else 0))
+                0 if fault == "invalid_x" else code + ((0x100 << 32) if fault == "location" else 0))
         ctx.set(c.cr15_namespace.as_value(), 0x8000 << 32)
         ctx.set(dut.dec.instruction, (int(ChurchOpcode.RETURN) << 27) | mask)
         ctx.set(r.return_start, 1)
@@ -253,15 +260,24 @@ def test_lambda_return_rebuilds_cr6_from_code_identity(mask, fault):
         ctx.set(dut.dec.instruction, 0xFFF ^ mask)
         committed = False
         for _ in range(100):
-            assert not ctx.get(r.mem_rd_en)  # no invented frame/snapshot reads
-            assert not ctx.get(r.mem_wr_en)
+            ctx.set(r.mem_rd_valid, ctx.get(r.mem_rd_en))
+            ctx.set(r.mem_rd_data, memory.get(ctx.get(r.mem_rd_addr), 0))
+            assert not ctx.get(c.cload_start)
+            assert not ctx.get(regs.return_commit_en)
+            if ctx.get(r.mem_wr_en):
+                assert fault is None
+                assert ctx.get(r.mem_wr_addr) == 0x4000 + THREAD_STO_OFFSET * 4
+                assert ctx.get(r.mem_wr_data) == 243 | (1 << 12)
             ctx.set(c.mem_rd_valid, ctx.get(c.mem_rd_en))
             ctx.set(c.mem_rd_data, memory.get(ctx.get(c.mem_addr), 0))
             if ctx.get(regs.return_commit_en):
                 committed = True
                 for i in ELIGIBLE:
                     assert read(ctx, i) == cap(i)
-            terminal = ctx.get(r.fault_valid) or ctx.get(c.cload_fault) or ctx.get(c.cload_done)
+            if ctx.get(r.nia_set):
+                assert ctx.get(r.nia_value) == 0x6010
+            committed = bool(ctx.get(r.complete))
+            terminal = ctx.get(r.fault_valid) or committed
             await ctx.tick()
             if terminal:
                 break
@@ -269,21 +285,12 @@ def test_lambda_return_rebuilds_cr6_from_code_identity(mask, fault):
             pytest.fail("lambda RETURN did not terminate")
         assert committed == (fault is None)
         for i in ELIGIBLE:
-            assert read(ctx, i) == (cap(i) if fault or (mask & (1 << i)) else 0)
+            assert read(ctx, i) == cap(i)
         assert read(ctx, 5) == cap(5)
         assert read(ctx, 14) == code
         assert read(ctx, 15) == cap(15)
-        if committed:
-            expected = make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2)
-            expected |= (0x6000 + (256 - 12) * 4) << 32
-            expected |= 11 << 64
-            assert read(ctx, 6) == expected
-            # Descriptor CR5 is untouched, but CR5.M follows the existing
-            # separate RETURN security boundary and is cleared.
-            assert ctx.get(regs.m_bit_device_state) == 1 << 6
-        else:
-            assert read(ctx, 6) == cap(6)
-            assert ctx.get(regs.m_bit_device_state) == 0xFFFF
+        assert read(ctx, 6) == cap(6)
+        assert ctx.get(regs.m_bit_device_state) == 0xFFFF
 
     sim = Simulator(dut)
     sim.add_clock(1e-6)

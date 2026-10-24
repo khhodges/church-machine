@@ -246,7 +246,13 @@ for (const protectedThread of [false, true]) {
     const domain = install(30, [0, sim.encodeInstruction(3, 14, 0, 0, 0)]);
     activate(domain);
     const sto = sim.sto;
-    assert(sim._execLambda({crDst: 14}));
+    const address = domain.base + 2;
+    sim.withNamespaceWrite('isolated LAMBDA instruction entry', () =>
+        sim.writeNSEntry(43, address, 0, 0, 0, 1, 0, 0, 0));
+    const entry = sim.readNSEntry(43);
+    sim.cr[0] = {word0: sim.createGT(0, 43, {X: 1}, 1), word1: address,
+        word2: entry.word1_limit, word3: entry.word2_seals, m: 0};
+    assert(sim._execLambda({crDst: 0}));
     assert.equal(sim.sto, sto - 1);
     sim.cr[6].m = 0;
     const currentCRs = sim.cr.map(cr => ({...cr}));

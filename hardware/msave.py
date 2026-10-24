@@ -67,6 +67,9 @@ class ChurchMSave(Elaboratable):
         ns_ns_w2 = View(WORD2_LAYOUT, ns_view.word2_w2)
         ns_entry_addr = Signal(32)
         m.d.comb += ns_entry_addr.eq(ns_view.word1_location + (src_gt_view.slot_id << 4))
+        ns_entry_end = Signal(33)
+        m.d.comb += ns_entry_end.eq(
+            ns_view.word1_location + (src_gt_view.slot_id << 4) + 15)
 
         ns_location_reg = Signal(32)
         ns_w1_reg = Signal(32)
@@ -141,7 +144,11 @@ class ChurchMSave(Elaboratable):
                     m.next = "CHECK_SRC_BOUND"
 
             with m.State("CHECK_SRC_BOUND"):
-                with m.If(~src_gt_view.b_flag & ~src_m_elevated_reg):
+                with m.If((((src_gt_view.slot_id << 2) + 3) > ns_ns_w2.limit_offset) |
+                          ns_entry_end[32]):
+                    m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
+                    m.next = "FAULT"
+                with m.Elif(~src_gt_view.b_flag & ~src_m_elevated_reg):
                     m.d.sync += fault_type_reg.eq(FaultType.NULL_CAP)
                     m.next = "FAULT"
                 with m.Else():

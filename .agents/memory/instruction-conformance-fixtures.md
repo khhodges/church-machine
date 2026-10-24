@@ -96,6 +96,17 @@ subregion enforcement separate from the bounded cross-Thread regression.
 Synthetic activation probes must provide a complete executable continuation,
 not assume constructor boot completion makes every placeholder resumable.
 
+Legacy green tests are not independent ISA evidence. During the RTL audit,
+RETURN tests explicitly expected LAMBDA capability clearing and CR6 rebuilding,
+despite the clarified SZ=0 rule requiring preservation.
+
+**Why:** Keeping those expectations would preserve the defect while making the
+test suite look healthy.
+
+**How to apply:** Derive assertions from the current normative ISA first.
+Distinguish fixture corrections from runtime changes, and never infer complete
+ISA conformance from a passing focused regression suite.
+
 Boot acceptance must execute the first ordinary instruction and a C-list
 access before any CHANGE; reaching `bootComplete` alone is insufficient.
 

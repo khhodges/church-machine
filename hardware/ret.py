@@ -45,6 +45,7 @@ class ChurchReturn(Elaboratable):
         self.lambda_active = Signal()
         self.lambda_pc = Signal(32)
         self.lambda_clear = Signal()
+        self.lambda_return = Signal()
 
         self.cr5_heap   = Signal(CAP_REG_LAYOUT)
         self.cr14_code = Signal(CAP_REG_LAYOUT)
@@ -95,6 +96,8 @@ class ChurchReturn(Elaboratable):
         cr12_view = View(CAP_REG_LAYOUT, cr12_thread_latched)
         cr12_gt   = View(GT_LAYOUT, cr12_view.word0_gt)
         code_view = View(CAP_REG_LAYOUT, self.cr14_code)
+        accepted_code = Signal(CAP_REG_LAYOUT)
+        accepted_code_view = View(CAP_REG_LAYOUT, accepted_code)
         code_gt = View(GT_LAYOUT, code_view.word0_gt)
         lambda_code_valid = Signal()
         lambda_egt = Signal(GT_LAYOUT)
@@ -105,7 +108,9 @@ class ChurchReturn(Elaboratable):
             lambda_egt.dom.eq(1),
             lambda_egt.perm.eq(0b100),
             lambda_egt.b_flag.eq(code_gt.b_flag),
-            self.cload_same_code.eq(lambda_active_latched),
+            # Only CALL returns invoke cLoad. The popped frame, not the
+            # diagnostic lambda flag, determines which context is restored.
+            self.cload_same_code.eq(0),
         ]
         cr12_null = Signal()
         m.d.comb += cr12_null.eq(cr12_gt.gt_type == GT_TYPE_NULL)
@@ -210,6 +215,7 @@ class ChurchReturn(Elaboratable):
                 ]
                 with m.If(self.return_start):
                     m.d.sync += [
+                        accepted_code.eq(self.cr14_code),
                         self.return_mask_latched.eq(self.return_mask),
                         cr5_heap_latched.eq(self.cr5_heap),
                         cr12_thread_latched.eq(self.cr12_thread),
@@ -222,32 +228,7 @@ class ChurchReturn(Elaboratable):
                             ~code_gt.dom & code_gt.perm[PERM_X]),
                         self.cload_code_location.eq(code_view.word1_location),
                     ]
-                    with m.If(self.lambda_active):
-                        # CR6 may have changed in the lambda body; derive the
-                        # reconstruction identity from the still-current CR14.
-                        m.d.sync += callee_egt_latched.eq(lambda_egt.as_value())
-                        m.next = "LAMBDA_FAST"
-                    with m.Else():
-                        # RETURN has no CR source operand. Its authority is the
-                        # saved Enter E-GT in the architectural stack frame.
-                        m.next = "CHECK_CR5_CR12"
-
-            with m.State("LAMBDA_FAST"):
-                with m.If(~lambda_code_valid):
-                    m.d.sync += [
-                        fault_flag.eq(1),
-                        fault_latched.eq(FaultType.PERM_X),
-                    ]
-                    m.next = "FAULT"
-                with m.Else():
-                    # No frame pop on the legacy hardware leaf path, but the
-                    # core must still run cLoad before committing the RETURN.
-                    m.d.comb += [
-                        self.nia_set.eq(1),
-                        self.nia_value.eq(lambda_pc_latched),
-                        self.lambda_clear.eq(1),
-                    ]
-                    m.next = "COMPLETE"
+                    m.next = "READ_STO"
 
             with m.State("CHECK_CR5_CR12"):
                 m.d.sync += [
@@ -266,7 +247,7 @@ class ChurchReturn(Elaboratable):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.NULL_CAP)]
                     m.next = "FAULT"
                 with m.Else():
-                    m.next = "READ_STO"
+                    m.next = "READ_FRAME"
 
             with m.State("READ_STO"):
                 m.d.comb += [
@@ -287,9 +268,8 @@ class ChurchReturn(Elaboratable):
                 # either frame word.  This keeps an out-of-zone STO from
                 # turning the subsequent frame reads into an address oracle.
                 with m.If(
-                    (sto_indicator[12] == 0) |
                     (sto_indicator[13:28] != 0) |
-                    (sto_latched < (stack_start + 2)) |
+                    (sto_latched < (stack_start + Mux(sto_indicator[12], 2, 1))) |
                     (sto_latched > sp_max)
                 ):
                     m.d.sync += [
@@ -298,7 +278,10 @@ class ChurchReturn(Elaboratable):
                     ]
                     m.next = "FAULT"
                 with m.Else():
-                    m.next = "READ_FRAME"
+                    with m.If(sto_indicator[12]):
+                        m.next = "CHECK_CR5_CR12"
+                    with m.Else():
+                        m.next = "READ_FRAME"
 
             with m.State("READ_FRAME"):
                 m.d.comb += [
@@ -317,7 +300,25 @@ class ChurchReturn(Elaboratable):
                         prev_flags_latched.eq(self.mem_rd_data[28:32]),
                         rd_armed.eq(0),
                     ]
-                    m.next = "READ_EGT"
+                    with m.If(sto_indicator[12]):
+                        m.next = "READ_EGT"
+                    with m.Else():
+                        m.next = "VALIDATE_LAMBDA"
+
+            with m.State("VALIDATE_LAMBDA"):
+                with m.If((frame_prev_sto != sto_latched + 1) |
+                          (frame_prev_sto > sp_max) |
+                          (return_pc_latched == 0x7FFF) |
+                          ((return_pc_latched << 2) < accepted_code_view.word1_location) |
+                          ((return_pc_latched << 2) >
+                           accepted_code_view.word1_location +
+                           (accepted_code_view.word2_w2[:21] << 2)) |
+                          ~lambda_code_valid):
+                    m.d.sync += [fault_flag.eq(1),
+                                 fault_latched.eq(FaultType.STACK_CORRUPT)]
+                    m.next = "FAULT"
+                with m.Else():
+                    m.next = "POP_STACK"
 
             with m.State("READ_EGT"):
                 m.d.comb += [
@@ -426,6 +427,7 @@ class ChurchReturn(Elaboratable):
                 m.next = "IDLE"
 
         m.d.comb += [
+            self.lambda_return.eq(~sto_indicator[12]),
             self.busy.eq(~fsm.ongoing("IDLE")),
             self.complete.eq(fsm.ongoing("COMPLETE")),
             self.fault_valid.eq(fault_flag),

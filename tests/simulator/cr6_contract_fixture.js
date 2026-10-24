@@ -44,7 +44,7 @@ function fixture(protectedThread = false) {
         assert(minted.ok, minted.message);
         sim.memory.set(minted.words, base);
         sim.withNamespaceWrite('isolated CR6 contract fixture', () =>
-            sim.writeNSEntry(slot, base, hdr.cw, 0, 0, 1,
+            sim.writeNSEntry(slot, base, size - 1, 0, 0, 1,
                 minted.entry.seq, cc, minted.entry.cacheToken));
         assert(sim.mLoad(minted.selfGT, 'E', 1).ok);
         return {slot, base, hdr, gt: minted.selfGT,

@@ -535,7 +535,11 @@ class ChurchCall(Elaboratable):
                 m.next = "CHECK_PERM"
 
             with m.State("CHECK_PERM"):
-                with m.If(src_gt.gt_type == GT_TYPE_ABSTRACT):
+                with m.If(src_gt.gt_type == GT_TYPE_NULL):
+                    m.d.sync += [fault_latched.eq(1),
+                                 fault_type_latched.eq(FaultType.NULL_CAP)]
+                    m.next = "FAULT"
+                with m.Elif(src_gt.gt_type == GT_TYPE_ABSTRACT):
                     # M-GT dispatch: latch the Abstract GT word and fetch 3 NS entry
                     # words (location/authority/integrity) from Mem[CR15.loc+slot<<4].
                     # No lump or stack frame — M-window set fires at M_FETCH_DONE.
@@ -605,12 +609,7 @@ class ChurchCall(Elaboratable):
                 m.next = "SET_M_WRITE"
 
             with m.State("SET_M_WRITE"):
-                # Write CR14 back with PERM_X forced to 1 (M=1 for method entry)
-                m.d.comb += [
-                    local_cr_wr_addr.eq(CR14_CODE),
-                    local_cr_wr_data.eq(cr14_with_m),
-                    local_cr_wr_en.eq(1),
-                ]
+                # Publish CR14 only after validating the header and method.
                 m.next = "FETCH_LUMP"
 
             with m.State("FETCH_LUMP"):
@@ -631,7 +630,16 @@ class ChurchCall(Elaboratable):
                     ]
                     # If method index > 0, read the method table before setting CR14 limit.
                     # Index 0 = single entry point (NIA = lump_base + 4); skip table fetch.
-                    with m.If(_hdr.cw == 0):
+                    with m.If((_hdr.magic != 0x1F) | (_hdr.typ != 0) |
+                              (_hdr.n_minus_6 > 8) |
+                              ((Const(1, 25) << (_hdr.n_minus_6 + 6)) >
+                               (cr14_lat_w2.limit_offset + 1)) |
+                              ((_hdr.cw + _hdr.cc + 1) >
+                               (Const(1, 25) << (_hdr.n_minus_6 + 6)))):
+                        m.d.sync += [fault_latched.eq(1),
+                                     fault_type_latched.eq(FaultType.BOUNDS)]
+                        m.next = "FAULT"
+                    with m.Elif(_hdr.cw == 0):
                         m.next = "LAZY_LOAD_ABORT"
                     with m.Elif(call_imm_latched > 0):
                         m.next = "FETCH_METHOD_ENTRY"

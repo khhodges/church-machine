@@ -510,13 +510,10 @@ class ChurchCore(Elaboratable):
         lambda_start_sig = Signal()
         nested_lambda_fault = Signal()
         if not self.iot_profile:
-            m.d.comb += nested_lambda_fault.eq(
-                cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy
-                & lambda_active_reg & (cr_dst != CR_CLIST)
-            )
+            m.d.comb += nested_lambda_fault.eq(0)
             m.d.comb += lambda_start_sig.eq(
                 cond_exec_enable & is_church_op & (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy
-                & ~(lambda_active_reg & (cr_dst != CR_CLIST))
+                & ~u_perm.fault_valid & ~u_decoder.fault_valid
             )
 
         tperm_start_sig = Signal()
@@ -869,11 +866,25 @@ class ChurchCore(Elaboratable):
         cr_wr_addr_inner = Mux(self.dbg_cr_wr_en, self.dbg_cr_wr_addr, cr_wr_addr_inner)
         cr_wr_data_inner = Mux(self.dbg_cr_wr_en, self.dbg_cr_wr_data, cr_wr_data_inner)
         cr_wr_en_extra = cr_wr_en_extra | self.dbg_cr_wr_en
+        # CALL's mLoad results are provisional until executable geometry has
+        # been validated. Keep them private, not in architectural CR6/CR14.
+        call_cr6 = Signal(CAP_REG_LAYOUT)
+        call_cr14 = Signal(CAP_REG_LAYOUT)
+        call_cr6_valid = Signal()
+        call_cr14_valid = Signal()
+        with m.If(call_start_sig):
+            m.d.sync += [call_cr6_valid.eq(0), call_cr14_valid.eq(0)]
+        with m.If(u_call.call_busy & u_shared_mload.cr_wr_en):
+            with m.If(u_shared_mload.cr_wr_addr == CR_CLIST):
+                m.d.sync += [call_cr6.eq(u_shared_mload.cr_wr_data), call_cr6_valid.eq(1)]
+            with m.If(u_shared_mload.cr_wr_addr == 14):
+                m.d.sync += [call_cr14.eq(u_shared_mload.cr_wr_data), call_cr14_valid.eq(1)]
+        publish_mload = u_shared_mload.cr_wr_en & ~u_call.call_busy
         m.d.comb += [
             u_regs.cr_wr_addr.eq(
                 Mux(mwin_cr_wr_en, CR_NAMESPACE,
                     Mux(boot_cap_wr_en, boot_cap_wr_addr,
-                        Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_addr,
+                        Mux(publish_mload, u_shared_mload.cr_wr_addr,
                             Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_addr,
                                 Mux(u_call.cr_wr_en, u_call.cr_wr_addr,
                                     Mux(u_return.cr_wr_en, u_return.cr_wr_addr,
@@ -882,7 +893,7 @@ class ChurchCore(Elaboratable):
             u_regs.cr_wr_data.eq(
                 Mux(mwin_cr_wr_en, mwin_cr_wr_data,
                     Mux(boot_cap_wr_en, boot_cap_wr_data,
-                        Mux(u_shared_mload.cr_wr_en, u_shared_mload.cr_wr_data,
+                        Mux(publish_mload, u_shared_mload.cr_wr_data,
                             Mux(u_tperm.cr_wr_en, u_tperm.cr_wr_data,
                                 Mux(u_call.cr_wr_en, u_call.cr_wr_data,
                                     Mux(u_return.cr_wr_en, u_return.cr_wr_data,
@@ -890,14 +901,14 @@ class ChurchCore(Elaboratable):
             ),
             u_regs.cr_wr_en.eq(
                 mwin_cr_wr_en | boot_cap_wr_en |
-                u_shared_mload.cr_wr_en | u_tperm.cr_wr_en | u_call.cr_wr_en |
+                publish_mload | u_tperm.cr_wr_en | u_call.cr_wr_en |
                 u_return.cr_wr_en | cr_wr_en_extra
             ),
             # M-window set/clear connect to u_regs controls
             u_regs.m_set_en.eq(mwin_m_set_en),
             u_regs.m_clear_en.eq(mwin_m_clear_en),
             u_regs.null_clear_en.eq(u_load.load_busy & u_load.mload_direct &
-                                   u_shared_mload.cr_wr_en),
+                                   publish_mload),
             u_regs.null_clear_addr.eq(u_shared_mload.cr_wr_addr),
             u_regs.m_bit_device_wr_en.eq(
                 u_dwrite.m_bit_wr_en | self.dbg_m_bit_wr_en),
@@ -1308,7 +1319,8 @@ class ChurchCore(Elaboratable):
         # After ChurchOutformFSM promotes it to Inform, the CALL retries normally.
         m.d.comb += call_start_sig.eq(
             cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CALL) &
-            ~any_unit_busy & ~_call_src_is_outform & ~call_index_fault
+            ~any_unit_busy & ~_call_src_is_outform & ~call_index_fault &
+            ~u_perm.fault_valid & ~u_decoder.fault_valid
         )
 
         # Trigger the ChurchOutformFSM when a CALL sees an Outform source GT.
@@ -1351,7 +1363,11 @@ class ChurchCore(Elaboratable):
             u_call.index.eq(Mux(u_decoder.call_indexed, call_row[:32], 0)),
             u_call.call_imm.eq(call_method[:32]),
             u_call.mask.eq(u_decoder.call_mask),
-            u_call.cr_rd_data.eq(u_regs.cr_rd_data),
+            u_call.cr_rd_data.eq(
+                Mux((u_call.cr_rd_addr == CR_CLIST) & call_cr6_valid & ~call_start_sig,
+                    call_cr6,
+                    Mux((u_call.cr_rd_addr == 14) & call_cr14_valid & ~call_start_sig,
+                        call_cr14, u_regs.cr_rd_data))),
             u_call.cr15_namespace.eq(u_regs.cr15_namespace),
             u_call.cr14_code.eq(u_regs.cr14_code),
             u_call.mem_rd_data.eq(self.dmem_rd_data),
@@ -1402,7 +1418,7 @@ class ChurchCore(Elaboratable):
 
         with m.If(
             u_return.complete & ~u_return.fault_valid &
-            ~u_return.reboot_request & cross_domain_ret
+            ~u_return.reboot_request & cross_domain_ret & ~u_return.lambda_return
         ):
             m.d.sync += cload_pending.eq(1)
         with m.Elif(cload_pending):
@@ -1433,6 +1449,12 @@ class ChurchCore(Elaboratable):
                 u_lambda.cr_target.eq(cr_dst),
                 u_lambda.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_lambda.saved_nia.eq(nia_reg + 4),
+                u_lambda.thread_base.eq(self.active_thread_base),
+                u_lambda.thread_hdr.eq(u_change.thread_hdr_out),
+                u_lambda.code_cap.eq(u_regs.cr14_code),
+                u_lambda.flags.eq(u_regs.flags),
+                u_lambda.mem_rd_data.eq(self.dmem_rd_data),
+                u_lambda.mem_rd_valid.eq(self.dmem_rd_valid),
             ]
         else:
             with m.If(clear_all):
@@ -3208,6 +3230,14 @@ class ChurchCore(Elaboratable):
                 self.dmem_wr_en.eq(1),
             ]
         if not self.iot_profile:
+            with m.Elif(u_lambda.mem_rd_en | u_lambda.mem_wr_en):
+                m.d.comb += [
+                    self.dmem_addr.eq(Mux(u_lambda.mem_wr_en,
+                                         u_lambda.mem_wr_addr, u_lambda.mem_rd_addr)),
+                    self.dmem_rd_en.eq(u_lambda.mem_rd_en),
+                    self.dmem_wr_en.eq(u_lambda.mem_wr_en),
+                    self.dmem_wr_data.eq(u_lambda.mem_wr_data),
+                ]
             with m.Elif(u_irq_dispatch.mem_rd_en):
                 m.d.comb += [
                     self.dmem_addr.eq(u_irq_dispatch.mem_rd_addr),
