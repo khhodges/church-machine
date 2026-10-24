@@ -1,35 +1,11 @@
 function _crDisplayName(crIdx, cr) {
-    if (cr && !cr.isNull && typeof _gtPetName === 'function') {
-        const raw = typeof cr.word0_gt === 'string' ? parseInt(cr.word0_gt,16) : cr.word0_gt;
-        const name = _gtPetName(raw);
-        if (name) return crIdx === 5 ? `${name}.Heap` : name;
-    }
-    const petCR = _petNameCRMap[crIdx];
-    if (petCR) return petCR;
-
-    const localNames = {
-        0: 'Result', 1: 'Arg 1', 5: 'Heap', 6: 'C-List',
-        12: 'Thread', 13: 'IRQ', 14: 'CLOOMC', 15: 'Namespace'
-    };
-    if (crIdx !== 5) return localNames[crIdx] || '';
-
-    // CR5 is architecturally the Heap subregion of a Thread.  Qualify that
-    // role only from a complete, live Namespace validation and a body that
-    // actually decodes as a Thread; never infer an identity from raw GT bits.
-    if (cr && !cr.isNull && cr.validationStatus === 'valid' &&
-            Number.isInteger(cr.gtIndex) && sim &&
-            typeof sim.getThreadInstanceLayout === 'function') {
-        try {
-            const layout = sim.getThreadInstanceLayout(cr.gtIndex);
-            const threadName = sim.nsLabels && sim.nsLabels[cr.gtIndex];
-            if (layout && layout.valid && threadName) {
-                const displayThreadName = typeof formatThreadDisplayName === 'function'
-                    ? formatThreadDisplayName(threadName) : String(threadName);
-                return `${displayThreadName}.Heap`;
-            }
-        } catch (_e) {}
-    }
-    return 'Heap';
+    // Name describes the current GT, not the register's role or an old
+    // compiler alias. NULL and unresolved identities have no PetName.
+    if (!cr || cr.isNull || typeof _gtPetName !== 'function') return '';
+    const raw = typeof cr.word0_gt === 'string' ? parseInt(cr.word0_gt,16) : cr.word0_gt;
+    if (!Number.isFinite(raw) || !raw) return '';
+    const name = _gtPetName(raw);
+    return name ? (crIdx === 5 ? `${name}.Heap` : name) : '';
 }
 
 function _escapeCRDisplayName(value) {

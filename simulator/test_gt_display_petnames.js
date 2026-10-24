@@ -37,4 +37,10 @@ assert.equal(ctx._gtPetName(0x4a000014),'');
 delete sim.simulationConfiguration;
 assert.equal(ctx._gtPetName(0x4a000014),'StaleName');
 assert.equal(ctx._gtPetName(0),'');
+ctx._petNameCRMap=Object.fromEntries(Array.from({length:16},(_,i)=>[i,'OldAlias']));
+for(let i=0;i<16;i++){
+    assert.equal(ctx._crDisplayName(i,{isNull:true,word0_gt:'00000000'}),'');
+    assert.equal(ctx._crDisplayName(i,{isNull:false,word0_gt:'00000000'}),'');
+    assert.equal(ctx._crDisplayName(i,{isNull:false,word0_gt:'4A00003F'}),'');
+}
 console.log('PASS all CRs, saved homes, frozen PetNames, stale generation and legacy names');

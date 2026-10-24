@@ -8,6 +8,11 @@ Use petnames for every GT currently held in a Church capability register. Keep T
 This includes saved CR homes and GTs in protected Thread stack frames, not only
 the live register dashboard. Prefer the GT target's PetName over a generic CR
 role; retain raw bits and slot numbers as secondary inspection details.
+The CR table Name column is empty for NULL or unresolved GTs. Architectural
+roles and retained compiler aliases are not fallback PetNames.
+
+**Why:** The user identified Result, Arg 1, Heap, C-List and other role labels
+as stale names when every displayed GT was NULL.
 
 Static-meaning comments also show PetNames. Register names describe explicitly
 current GTs, not predicted values at every instruction; capture names with the
