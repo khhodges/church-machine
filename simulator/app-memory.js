@@ -1642,7 +1642,7 @@ function updateCRDetail() {
                           ? _clHdr.cc
                           : (_clNSLim.clistCount > 0 ? _clNSLim.clistCount : cr.limit17 + 1);
     const _clistBase    = cr.word1_location >>> 0;
-    const _absName      = (sim.nsLabels && sim.nsLabels[nsIdx]) || '';
+    const _absName      = _gtPetName(parseInt(cr.word0_gt,16)) || '';
     const _absLabel     = _absName ? (_absName + ' Abstraction') : '';
 
     const _activeTabLabel =
@@ -1829,7 +1829,7 @@ function updateCRDetail() {
             codeHtml += `<td class="cr-gt">0x${word0.toString(16).toUpperCase().padStart(8,'0')}</td>`;
             codeHtml += `<td class="code-disasm">${hdrDisasm}</td>`;
             if (_brArrows.hasBranches) codeHtml += '<td class="br-arrow-col"></td>';
-            const _hdrLumpName = _absName || (nsIdx >= 0 ? `Slot ${nsIdx}` : '');
+            const _hdrLumpName = _bootHtmlEsc(_absName || (nsIdx >= 0 ? `Slot ${nsIdx}` : ''));
             codeHtml += `<td class="code-decompiled code-decompiled-infra">header${_hdrLumpName ? ' \u00b7 <span style="color:#4ec9b0;font-weight:600;">' + _hdrLumpName + '</span>' : ''}</td>`;
             codeHtml += '</tr>';
             codeStart = baseLoc + 1;

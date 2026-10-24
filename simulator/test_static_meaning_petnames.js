@@ -1,0 +1,17 @@
+'use strict';
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const source=fs.readFileSync(__dirname+'/app-cr-detail.js','utf8');
+const sim={memory:new Uint32Array(64),cr:Array.from({length:16},()=>({word0:0,word1:0}))};
+sim.memory[63]=0x02000002;sim.cr[14].word1=0;sim.cr[1].word0=0x4a000010;
+const ctx={sim,_gtPetName:w=>w===0x02000002?'ide.BootThread':w===0x4a000010?'ide.Alice':'',_petNameDRMap:{}};
+vm.runInNewContext(source.slice(source.indexOf('function _codeViewCallContext(')),ctx);
+const context=ctx._codeViewCallContext(0,{valid:true,lumpSize:64,cc:1});
+assert.match(ctx._indexedCallTarget(context,0),/ide.BootThread · GT 0x02000002/);
+assert.match(ctx._decompileWord(0x17080001,0,0,0,{},context).desc,/current GTs: CR1=ide.Alice/);
+sim.cr[1].word0=0;
+assert.equal(context.currentNames[1],'ide.Alice','captured names remain stable');
+ctx._gtPetName=()=>'<other>';
+assert.match(ctx._indexedCallTarget(context,0),/ide.BootThread/);
+context.currentNames[1]='<Alice>';
+assert.match(ctx._decompileWord(0x17080001,0,0,0,{},context).desc,/&lt;Alice&gt;/);
+console.log('PASS static target PetNames and explicitly current, captured CR names');

@@ -9,6 +9,10 @@ This includes saved CR homes and GTs in protected Thread stack frames, not only
 the live register dashboard. Prefer the GT target's PetName over a generic CR
 role; retain raw bits and slot numbers as secondary inspection details.
 
+Static-meaning comments also show PetNames. Register names describe explicitly
+current GTs, not predicted values at every instruction; capture names with the
+listing context so later state changes do not relabel retained annotations.
+
 **Why:** The user reiterated the all-CR naming requirement with a saved-frame
 GT still shown only as “Inform Slot=20.”
 

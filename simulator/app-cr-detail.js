@@ -2360,7 +2360,22 @@ function _codeViewCallContext(base, header) {
             header.lumpSize < header.cc || base < 0 ||
             base + header.lumpSize > sim.memory.length) return null;
     const words = sim.memory.slice(base, base + header.lumpSize);
-    return { words, count: header.cc };
+    const context = { words, count: header.cc };
+    if (typeof _gtPetName === 'function') {
+        context.targetNames = {};
+        for (let row=0;row<header.cc;row++)
+            context.targetNames[row] = _gtPetName(words[words.length-header.cc+row]);
+        // Current register names are explicitly qualified, never predictions
+        // about the values an earlier/later instruction will execute with.
+        if (sim.cr && sim.cr[14] && sim.cr[14].word1 === base) {
+            context.currentNames = {};
+            sim.cr.forEach((cr,index)=>{
+                const name=_gtPetName(cr.word0);
+                if(name) context.currentNames[index]=name;
+            });
+        }
+    }
+    return context;
 }
 
 // index is a decoded C-list row, not CALL's packed immediate.
@@ -2373,7 +2388,8 @@ function _indexedCallTarget(context, index) {
     if (!gt) return 'unresolved C-list target';
     // Even a declared name in this artifact is not proof that this word
     // currently resolves to that named abstraction.
-    return `GT 0x${gt.toString(16).toUpperCase().padStart(8, '0')}`;
+    const name = context.targetNames && context.targetNames[index];
+    return `${name ? name + ' · ' : ''}GT 0x${gt.toString(16).toUpperCase().padStart(8, '0')}`;
 }
 
 // Static meaning only. Never sample live operands (including neighbouring code)
@@ -2399,7 +2415,19 @@ function _decompileWord(word, addr, nsIdx, clistBase, crPets, callContext) {
 
     const dr = n => n === 0 ? 'DR0(0)' : _drTag(n);
     const resultNote = crDst === 0 ? ' [DR0 write discarded]' : '';
-    const out = desc => ({desc: _escDecomp(desc + ccDesc), compiler: false, kind: 'static'});
+    const out = desc => {
+        const names=callContext && callContext.currentNames;
+        const used=new Set();
+        const notes=[];
+        if(names) for(const match of desc.matchAll(/\bCR(\d+)\b/g)) {
+            const index=Number(match[1]);
+            if(names[index] && !used.has(index)) {
+                used.add(index);notes.push(`CR${index}=${names[index]}`);
+            }
+        }
+        return {desc:_escDecomp(desc + ccDesc + (notes.length ? ' · current GTs: '+notes.join(', ') : '')),
+            compiler:false,kind:'static'};
+    };
 
     // Data instructions have no capability-name dependency.
     if (opcode === 16 || opcode === 17) {
