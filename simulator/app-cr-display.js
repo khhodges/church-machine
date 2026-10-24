@@ -1,4 +1,9 @@
 function _crDisplayName(crIdx, cr) {
+    if (cr && !cr.isNull && typeof _gtPetName === 'function') {
+        const raw = typeof cr.word0_gt === 'string' ? parseInt(cr.word0_gt,16) : cr.word0_gt;
+        const name = _gtPetName(raw);
+        if (name) return crIdx === 5 ? `${name}.Heap` : name;
+    }
     const petCR = _petNameCRMap[crIdx];
     if (petCR) return petCR;
 
@@ -1363,8 +1368,9 @@ function showCRPopup(evt, crIdx) {
     } else {
 
     const nsIdx = cr.gtIndex;
-    const nsLabel = (sim.nsLabels && sim.nsLabels[nsIdx]) || '';
-    const displayName = crIdx === 5 ? _crDisplayName(crIdx, cr) : (petCR || nsLabel || '');
+    const nsLabel = typeof _gtPetName === 'function'
+        ? _gtPetName(parseInt(cr.word0_gt,16)) : '';
+    const displayName = _crDisplayName(crIdx, cr) || nsLabel || petCR || '';
     const _crMain = displayName ? _escapeCRDisplayName(displayName) : `CR${crIdx}`;
     const _crSub  = displayName ? ` <span class="popup-sub-id">(CR${crIdx})</span>` : '';
     const hasL = cr.perms.indexOf('L') !== -1;

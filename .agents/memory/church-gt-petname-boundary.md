@@ -5,6 +5,13 @@ description: Defines the first-stage symbolic naming boundary between Church cap
 
 Use petnames for every GT currently held in a Church capability register. Keep Turing data registers numeric and do not assign source-variable names to them yet.
 
+This includes saved CR homes and GTs in protected Thread stack frames, not only
+the live register dashboard. Prefer the GT target's PetName over a generic CR
+role; retain raw bits and slot numbers as secondary inspection details.
+
+**Why:** The user reiterated the all-CR naming requirement with a saved-frame
+GT still shown only as “Inform Slot=20.”
+
 The CR14 Code header must show four separate identities: Code (method, e.g.
 Run), Abstraction, Thread (compact T.n), and Namespace/layout context.
 

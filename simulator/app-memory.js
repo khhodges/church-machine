@@ -1337,7 +1337,7 @@ function _resolveCListPetName(gtWord) {
                 return `${AB_TYPE_NAMES[ab.ab_type] || `ab${ab.ab_type}`} 0x${ab.ab_data.toString(16).toUpperCase()}`;
             }
         } else {
-            return (sim.nsLabels && sim.nsLabels[parsed.index]) ? sim.nsLabels[parsed.index] : null;
+            return _gtPetName(gtWord) || null;
         }
     } catch(e) { return null; }
 }
@@ -3325,6 +3325,11 @@ function _gtPetName(gtWord) {
         if (ab.ab_type === 0) return `${DC[ab.device_class] || 'dc' + ab.device_class}[${ab.device_data}]`;
         return `M-Elev 0x${ab.ab_data.toString(16).toUpperCase()}`;
     }
+    if (sim.simulationConfiguration) {
+        const rows = sim.simulationConfiguration.preparedRows || [];
+        const matches = rows.filter(row => row.slot === p.index && row.seq === p.gt_seq);
+        return matches.length === 1 ? String(matches[0].name || '') : '';
+    }
     return (sim.nsLabels && sim.nsLabels[p.index]) ? sim.nsLabels[p.index] : '';
 }
 
@@ -3357,7 +3362,7 @@ function _renderGTRow(idx, addr, word) {
         decoded += ` <span style="color:#555;">seq${ab.gt_seq}</span>`;
     } else {
         const permStr = (p.permissions.B ? 'B' : '-') + (p.permissions.R ? 'R' : '-') + (p.permissions.W ? 'W' : '-') + (p.permissions.X ? 'X' : '-') + (p.permissions.L ? 'L' : '-') + (p.permissions.S ? 'S' : '-') + (p.permissions.E ? 'E' : '-');
-        const label = sim.nsLabels[p.index] || '';
+        const label = _bootHtmlEsc(_gtPetName(word));
         decoded  = crPetPrefix;
         decoded += `<span style="color:rgba(78,201,176,0.7);">${p.typeName}</span>`;
         decoded += ` <span style="color:rgba(200,155,60,0.55);">[${permStr}]</span>`;
@@ -3699,7 +3704,7 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
                 const gt = sim.parseGT(word);
                 if (gt.type !== 0) {
                     const perms = Object.entries(gt.permissions).filter(([,v])=>v).map(([k])=>k).join('') || 'none';
-                    const lbl = _gtPetName(word);
+                    const lbl = _bootHtmlEsc(_gtPetName(word));
                     decoded = `GT → <span style="color:#38bdf8;">${gt.typeName}</span>${gt.type === 3 ? '' : ' Slot='+gt.index}${lbl?' <i style="color:#93c5fd;">('+lbl+')</i>':''} [${perms}]`;
                 } else {
                     const returnPC = niaBits;
