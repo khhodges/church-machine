@@ -13,6 +13,24 @@ assert.equal(ctx._gtPetName(0x4a000014),'ide.ActorManager');
 for(let i=0;i<16;i++)
     assert.equal(ctx._crDisplayName(i,{isNull:false,word0_gt:'4A000014'}),i===5?'ide.ActorManager.Heap':'ide.ActorManager');
 assert(ctx._renderGTRow(1,42,0x4a000014).includes('ide.ActorManager'));
+// Render the exact Capabilities table section from app-memory.js. This path
+// previously bypassed the helper and displayed the legacy SUCC alias.
+const start=mem.indexOf("html += '<div class=\"abs-clist-heading\">GOLDEN TOKENS");
+const end=mem.indexOf("html += '</tbody></table>';",start);
+const table=mem.slice(start,end)+"html += '</tbody></table>';";
+const {JSDOM}=require('jsdom');
+const document=new JSDOM('').window.document;
+Object.assign(ctx,{html:'',threadCapsWords:12,threadCapsStart:244,slotBase:256,addrOf:n=>String(n)});
+sim.memory[500]=0x4a000014;
+vm.runInNewContext(table,ctx);
+const view=document.createElement('div');view.innerHTML=ctx.html;
+assert.equal(view.querySelector('.abs-clist-name strong').textContent,'ide.ActorManager');
+assert.equal(view.querySelectorAll('.abs-clist-empty-slot').length,11);
+ctx.html='';sim.simulationConfiguration.preparedRows[0].name='<Actor>';
+vm.runInNewContext(table,ctx);view.innerHTML=ctx.html;
+assert.equal(view.querySelector('.abs-clist-name strong').textContent,'<Actor>');
+assert.equal(view.querySelector('actor'),null);
+sim.simulationConfiguration.preparedRows[0].name='ide.ActorManager';
 assert.equal(ctx._gtPetName(0x4a010014),'');
 sim.simulationConfiguration.preparedRows=[];
 assert.equal(ctx._gtPetName(0x4a000014),'');

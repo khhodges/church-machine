@@ -15,6 +15,8 @@ listing context so later state changes do not relabel retained annotations.
 
 **Why:** The user reiterated the all-CR naming requirement with a saved-frame
 GT still shown only as “Inform Slot=20.”
+They also identified the separate GOLDEN TOKENS capability-home table showing
+the legacy alias “SUCC.” Verify that rendered table, not just a shared helper.
 
 The CR14 Code header must show four separate identities: Code (method, e.g.
 Run), Abstraction, Thread (compact T.n), and Namespace/layout context.

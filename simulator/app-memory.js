@@ -3751,13 +3751,10 @@ function renderThreadMemoryLayout(nsIndex, expandAll = false) {
                 permHtml += `<span class="abs-perm-badge ${cls}">${bit}</span>`;
             }
             const nsIdx = parsed.index;
-            const label = (sim.nsLabels && sim.nsLabels[nsIdx]) ||
-                (typeof abstractionRegistry !== 'undefined' && abstractionRegistry &&
-                 abstractionRegistry.abstractions && abstractionRegistry.abstractions[nsIdx] &&
-                 abstractionRegistry.abstractions[nsIdx].name) || null;
+            const label = _gtPetName(word);
             const nameStr = label
-                ? `<strong>${label}</strong> <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`
-                : `NS[${nsIdx}]`;
+                ? `<strong>${_bootHtmlEsc(label)}</strong>${parsed.type === 3 ? '' : ` <span style="color:#6b7280;font-size:0.8em;margin-left:4px;">NS[${nsIdx}]</span>`}`
+                : `PetName unavailable${parsed.type === 3 ? '' : ` · NS[${nsIdx}]`}`;
             const gtHex = '0x' + word.toString(16).toUpperCase().padStart(8, '0');
             html += `<tr>`;
             html += `<td class="thread-offset-cell abs-clist-offset">+${off}</td>`;
