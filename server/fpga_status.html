@@ -636,12 +636,27 @@
     if (d) return 'HTTP ' + status + ': ' + JSON.stringify(d);
     return 'HTTP ' + status + (bodyText ? ': ' + bodyText.slice(0, 120) : '');
   }
+  function controlHeaders() {
+    var headers = { 'Content-Type': 'application/json' };
+    // Share the IDE's tab-scoped operator credential; never put it in a URL.
+    try {
+      var token = sessionStorage.getItem('ba_build_token') || '';
+      if (token) headers.Authorization = 'Bearer ' + token;
+    } catch (_) {}
+    return headers;
+  }
+  function controlFailure(label, status, d, text) {
+    if (status === 401 || status === 403) {
+      return label + ' REQUEST DENIED — no command sent. Authorization required (HTTP ' +
+        status + '). Configure or renew authorization in IDE Build Approval in this same tab, then return here and retry.';
+    }
+    return label + ' FAILED: ' + describeFailure(status, d, text);
+  }
   function ctlFetch(url, body, label, okCheck, okMsg) {
     if (ctlBusy) return;
     setCtlBusy(true);
-    var opts = { method: 'POST' };
+    var opts = { method: 'POST', headers: controlHeaders() };
     if (body) {
-      opts.headers = { 'Content-Type': 'application/json' };
       opts.body = JSON.stringify(body);
     }
     fetch(url, opts)
@@ -650,7 +665,7 @@
           var d = null;
           try { d = JSON.parse(t); } catch (e) {}
           if (r.ok && d && okCheck(d)) note(label + ' — ' + okMsg);
-          else note(label + ' FAILED: ' + describeFailure(r.status, d, t));
+          else note(controlFailure(label, r.status, d, t));
         });
       })
       .catch(function (e) { note(label + ' FAILED: ' + e); })
@@ -759,7 +774,7 @@
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: controlHeaders(),
       body: JSON.stringify(body)
     }).then(function (r) {
       return r.text().then(function (t) {
@@ -779,7 +794,7 @@
           // (stopCmdWatch releases the lock) — see race note above.
           startCmdWatch(d.id, label, onResult);
         } else {
-          note(label + ' FAILED: ' + describeFailure(r.status, d, t));
+          note(controlFailure(label, r.status, d, t));
           setCtlBusy(false);
           if (typeof onResult === 'function') onResult(false);
         }
@@ -931,7 +946,7 @@
     setCtlBusy(true);
     fetch('/hardware/wukong/command', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: controlHeaders(),
       body: JSON.stringify({ cmd: 'f' })
     }).then(function (r) {
       return r.text().then(function (t) {
@@ -943,7 +958,7 @@
           rebootWatch = { t0: Date.now(), id: d.id, writeTs: null,
                           timer: setInterval(rebootTick, 500), phase: 'queued', warned: false };
         } else {
-          note('REBOOT FAILED: ' + describeFailure(r.status, d, t));
+          note(controlFailure('REBOOT', r.status, d, t));
         }
       });
     }).catch(function (e) { note('REBOOT FAILED: ' + e); })
