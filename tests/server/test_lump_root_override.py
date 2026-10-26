@@ -1,8 +1,10 @@
 """Regression coverage for the release runner's isolated LUMP library."""
 
 import hashlib
+import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -12,6 +14,40 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CANONICAL_LUMPS = ROOT / "server" / "lumps"
 CANONICAL_BOOT_IMAGE = CANONICAL_LUMPS / "boot-image.bin"
+
+
+def _archive_fixture(root, *, token, abstraction, version, archived_word):
+    """Build a private catalog; retention in the real library is irrelevant."""
+    lumps = root / "lumps"
+    lumps.mkdir()
+    active_name = f"fixture.{abstraction}.1.{token}.lump"
+    archive_name = f"{abstraction}_v{version}.lump"
+    active_words = [0xF8000401, 0x1F000000] + [0] * 62
+    archive_words = [0xF8000401, archived_word] + [0] * 62
+    approvals = {}
+    for name, words in ((active_name, active_words), (archive_name, archive_words)):
+        raw = struct.pack(">64I", *words)
+        (lumps / name).write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        approvals[digest] = {"binary_hash": digest, "abstraction": abstraction}
+    (lumps / "manifest.json").write_text(json.dumps([{
+        "token": token, "abstraction": abstraction, "filename": active_name,
+        "lump_version": version + 1,
+    }]))
+    (lumps / "approvals.json").write_text(json.dumps({
+        "version": 1, "algorithm": "sha256", "approvals": approvals,
+    }))
+    (lumps / "ns-state.json").write_text('{"abstractions": []}')
+    (root / "boot-config.json").write_text("{}")
+    env = os.environ.copy()
+    env.update({
+        "CHURCH_TEST_ISOLATED_MODE": "1",
+        "CHURCH_TEST_LUMPS_DIR": str(lumps),
+        "CHURCH_TEST_BOOT_CONFIG_PATH": str(root / "boot-config.json"),
+        "CHURCH_TEST_BUILD_SNAPSHOTS_DIR": str(root / "build-snapshots"),
+        "CHURCH_TEST_DB_PATH": str(root / "church_machine.db"),
+    })
+    return env
 
 
 def test_resize_is_immediate_410_and_changes_no_artifacts():
@@ -73,8 +109,10 @@ assert hashlib.sha256(canonical.read_bytes()).hexdigest() == canonical_digest
 def test_archived_named_lump_cannot_replace_canonical_selftest():
     """An archived SelfTest_v<N> binary is history-only, never a token alias."""
     with tempfile.TemporaryDirectory() as tmp:
-        isolated_lumps = Path(tmp) / "lumps"
-        shutil.copytree(CANONICAL_LUMPS, isolated_lumps, symlinks=True)
+        env = _archive_fixture(
+            Path(tmp), token="00000600", abstraction="SelfTest",
+            version=76, archived_word=0x37000003,
+        )
         probe = r'''
 import os
 from pathlib import Path
@@ -90,6 +128,8 @@ module.LAZY_LUMPS.clear()
 module._build_lazy_lumps()
 module._load_bundled_lumps()
 assert "selftest" not in module.LAZY_LUMPS
+assert "selftest_v76" not in module.LAZY_LUMPS
+assert module.LAZY_LUMPS["00000600"] != archive.read_bytes()
 
 client = module.app.test_client()
 archived_response = client.get("/api/lump/SelfTest_v76/words")
@@ -98,10 +138,11 @@ assert archived_response.status_code == 400, archived_response.get_json()
 canonical_response = client.get("/api/lump/00000600/words")
 assert canonical_response.status_code == 200, canonical_response.get_json()
 canonical_words = canonical_response.get_json()["words"]
-assert 0x37000003 not in canonical_words
+assert canonical_words == [0xF8000401, 0x1F000000] + [0] * 62
+history_response = client.get("/api/lumps/00000600/words/76")
+assert history_response.status_code == 200, history_response.get_json()
+assert history_response.get_json()["words"] == [0xF8000401, 0x37000003] + [0] * 62
 '''
-        env = os.environ.copy()
-        env["CHURCH_TEST_LUMPS_DIR"] = str(isolated_lumps)
         subprocess.run(
             [sys.executable, "-c", probe],
             cwd=ROOT,
@@ -115,8 +156,10 @@ assert 0x37000003 not in canonical_words
 def test_legacy_named_archive_remains_fetchable_after_active_filename_changes():
     """A named archive must survive a newer tokenized active filename."""
     with tempfile.TemporaryDirectory() as tmp:
-        isolated_lumps = Path(tmp) / "lumps"
-        shutil.copytree(CANONICAL_LUMPS, isolated_lumps, symlinks=True)
+        env = _archive_fixture(
+            Path(tmp), token="00aa9999", abstraction="Legacy",
+            version=16, archived_word=0x37000003,
+        )
         probe = r'''
 import os
 import server.app as module
@@ -133,9 +176,11 @@ body = archived.get_json()
 assert body["version"] == 16
 assert body["abstraction"] == "Legacy"
 assert body["count"] == 64
+assert body["words"] == [0xF8000401, 0x37000003] + [0] * 62
+active = client.get("/api/lump/00aa9999/words")
+assert active.status_code == 200, active.get_json()
+assert active.get_json()["words"] == [0xF8000401, 0x1F000000] + [0] * 62
 '''
-        env = os.environ.copy()
-        env["CHURCH_TEST_LUMPS_DIR"] = str(isolated_lumps)
         subprocess.run(
             [sys.executable, "-c", probe],
             cwd=ROOT,
