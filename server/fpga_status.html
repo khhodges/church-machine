@@ -173,7 +173,7 @@
   <input id="bpNia" placeholder="BP NIA (hex)" spellcheck="false">
   <button id="btnBp" title="Arm a breakpoint at this NIA ('b' + NIA)">Set BP</button>
   <span class="sep"></span>
-  <button id="btnUpload" title="Load the current server boot image onto the Wukong board over UART ('u')">⚡ Load</button>
+  <button id="btnUpload" title="Install only the approved Namespace revision selected in Builder">Install Image</button>
   <span class="sep"></span>
   <button id="btnReboot" title="Force the board to retransmit its boot sentinel ('f') — confirms which bitstream is running">↺ Reboot</button>
   <span class="sep"></span>
@@ -974,11 +974,33 @@
     var nia = parseInt(raw.replace(/^0x/i, ''), 16);
     sendCmd({ cmd: 'b', nia: nia }, 'SET BP @ ' + hex(nia));
   };
-  document.getElementById('btnUpload').onclick = function () {
-    note('UPLOAD boot image — sending to bridge…');
-    ctlFetch('/api/boot-image/send-to-hardware', null, 'UPLOAD',
-             function (d) { return d.queued; },
-             'queued — bridge will stream it to the board over UART');
+  document.getElementById('btnUpload').onclick = async function () {
+    if (ctlBusy) return;
+    var revision = selectedNamespaceRevision;
+    if (!/^[0-9a-f]{64}$/.test(revision)) {
+      note('Install Image blocked: select an approved Namespace revision in Builder → Build Approval first. No command sent.');
+      return;
+    }
+    setCtlBusy(true);
+    var target;
+    try {
+      var response = await fetch('/hardware/wukong/status', {cache: 'no-store'});
+      if (!response.ok) throw new Error('Cannot read board identity');
+      target = (await response.json()).physical_target;
+      if (!target || !target.live || !target.device_uid || !target.session_id)
+        throw new Error('No live identified board. No command sent.');
+      if (!window.confirm('Install Namespace revision ' + revision + ' on board ' +
+          target.device_uid + '?\nThis discards runtime data and Thread progress. Execution may begin immediately. No FPGA reflash.'))
+        return;
+    } catch (error) {
+      note('Install Image blocked: ' + error.message);
+      return;
+    } finally { setCtlBusy(false); }
+    ctlFetch('/api/namespace-image/install',
+             {namespace_revision_id: revision, target_device_uid: target.device_uid,
+              target_session_id: target.session_id}, 'INSTALL ' + revision.slice(0, 12),
+             function (d) { return d.queued && d.namespace_revision_id === revision; },
+             'queued — await board acknowledgement and startup evidence; installation not yet confirmed');
   };
 
   function eventName(e) {

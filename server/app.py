@@ -24978,7 +24978,28 @@ from server.guarded_runtime_reload import register as _register_guarded_runtime_
 _register_guarded_runtime_reload(app, sys.modules[__name__])
 
 
+def _approved_namespace_upload_source(revision_id):
+    """Use only retained, certified inputs; never consult the mutable catalog."""
+    store = _artifact_revision_store()
+    record = store.read("namespace", revision_id)
+    _require_hardware_namespace_revision(record)
+
+    def retained(name):
+        with open(store.file_path("namespace", revision_id, name), "rb") as stream:
+            data = stream.read()
+        if hashlib.sha256(data).hexdigest() != record["files"][name]:
+            raise ValueError("Approved Namespace input changed: " + name)
+        return data
+
+    image = retained("boot-image.bin")
+    config = json.loads(retained("boot-config.json"))
+    if not isinstance(config, dict) or not isinstance(config.get("step1"), dict):
+        raise ValueError("Approved Namespace has no usable retained boot configuration")
+    return image, config
+
+
 @app.route('/api/boot-image/send-to-hardware', methods=['POST'])
+@app.route('/api/namespace-image/install', methods=['POST'])
 def boot_image_send_to_hardware():
     """Read the generated boot image and enqueue it as an upload command for
     the Wukong bridge.
@@ -24997,6 +25018,14 @@ def boot_image_send_to_hardware():
         return auth_error
     import base64 as _b64
     request_data = request.get_json(silent=True) or {}
+    revision_id = request_data.get('namespace_revision_id')
+    if request.path == '/api/namespace-image/install' and revision_id is None:
+        return jsonify(error='Select an exact approved Namespace revision. No image was queued.'), 400
+    if revision_id is not None and (
+            not isinstance(revision_id, str) or
+            not re.fullmatch(r'[0-9a-f]{64}', revision_id) or
+            request_data.get('source_image_base64') is not None):
+        return jsonify(error='Select one exact approved Namespace revision; mixed sources are forbidden.'), 400
     target, target_error = _wukong_target_error(request_data)
     if target_error:
         return _wukong_target_rejection(target_error)
@@ -25017,7 +25046,14 @@ def boot_image_send_to_hardware():
     try:
         _boot_bin = os.path.join(LUMPS_DIR, 'boot-image.bin')
         _source_b64 = request_data.get('source_image_base64')
-        if _source_b64 is not None:
+        _projection_config = None
+        if revision_id is not None:
+            try:
+                _raw, _projection_config = _approved_namespace_upload_source(revision_id)
+            except (ValueError, OSError, KeyError, TypeError) as exc:
+                return jsonify(error=f'Approved Namespace installation rejected: {exc}',
+                               decision='namespace_revision_rejected'), 409
+        elif _source_b64 is not None:
             try:
                 _raw = _b64.b64decode(str(_source_b64), validate=True)
             except (ValueError, TypeError):
@@ -25070,9 +25106,14 @@ def boot_image_send_to_hardware():
                             'Regenerate the boot image.'}), 400
 
         try:
-            _boot_image_gen.validate_resident_artifact_bindings(
-                _raw, LUMPS_DIR,
-                require_provenance_image_digest=(_source_b64 is None))
+            if revision_id is None:
+                _boot_image_gen.validate_resident_artifact_bindings(
+                    _raw, LUMPS_DIR,
+                    require_provenance_image_digest=(_source_b64 is None))
+            # An approved revision binds the exact image and all its frozen
+            # inputs through verified hashes and hardware build certification.
+            # Validating it against today's mutable catalog would substitute
+            # authority and incorrectly reject legitimate historical images.
         except ValueError as _exc:
             return jsonify({
                 'error': (
@@ -25088,7 +25129,7 @@ def boot_image_send_to_hardware():
         # Build the board-native projection after validating the generic source.
         try:
             _wukong_raw, _wukong_entry_info = _boot_image_gen.build_wukong_upload_image(
-                _raw, _read_saved_boot_config())
+                _raw, _projection_config if revision_id is not None else _read_saved_boot_config())
         except ValueError as _exc:
             return jsonify({'error': f'boot image cannot be projected for Wukong: {_exc}'}), 400
 
@@ -25126,32 +25167,22 @@ def boot_image_send_to_hardware():
         # bytes. Caller labels are not provenance and cannot replace it.
         _artifact_identity = 'wukong-native-dmem-v1:' + _artifact_digest
 
-        # Register NIA label map so trace events for the uploaded lump resolve
-        # to "LumpName.N" labels instead of raw hex NIAs.
-        _wukong_update_active_lump_nia(_wukong_raw, _wukong_entry_info)
-
-        # Record which entry slot this upload carries BEFORE the command
-        # becomes observable to the bridge: a fast bridge could otherwise
-        # consume the command and POST the ACK before the pending slot is
-        # set, leaving the ACK unable to commit it (and the value stale).
-        # Rolled back in the finally block on any enqueue failure.
         global _wukong_pending_entry_slot, _wukong_pending_thread_contexts
-        with _wukong_hw_entry_lock:
-            _wukong_pending_entry_slot = _wukong_entry_info['entry_slot']
-            _wukong_pending_thread_contexts = list(_wukong_entry_info.get('thread_contexts', []))
-
-        # Clear any stale ACK from a previous upload BEFORE making the new
-        # upload command observable to the bridge.  Clearing after would create
-        # a race: a fast bridge could complete and POST the new ACK in the
-        # interval between the command enqueue and the clear, causing the IDE
-        # poll to time out on a stale {} response.
-        with _wukong_upload_ack_lock:
-            _wukong_upload_ack = {}
-
         global _wukong_cmd_delivery, _wukong_cmd_id
         with _wukong_command_lock:
+            if _wukong_pending_cmd is not None:
+                return jsonify(error='Another hardware command is pending; installation was not queued.'), 409
+            # Publish matching metadata before exposing the command. A rejected
+            # queue attempt must not erase prior acknowledgements or labels.
+            _wukong_update_active_lump_nia(_wukong_raw, _wukong_entry_info)
+            with _wukong_hw_entry_lock:
+                _wukong_pending_entry_slot = _wukong_entry_info['entry_slot']
+                _wukong_pending_thread_contexts = list(_wukong_entry_info.get('thread_contexts', []))
+            with _wukong_upload_ack_lock:
+                _wukong_upload_ack = {}
             _wukong_cmd_id += 1
             _wukong_pending_cmd = {'cmd': 'u', 'data': _encoded, 'reboot': True,
+                                   'namespace_revision_id': revision_id,
                                    'id': _wukong_cmd_id, **target,
                                    'target_device_uid': target['device_uid'],
                                    'artifact_sha256': _artifact_digest,
@@ -25170,10 +25201,13 @@ def boot_image_send_to_hardware():
                 'artifact_sha256': _artifact_digest,
                 'artifact_size': len(_wukong_raw),
                 'artifact_identity': _artifact_identity,
+                'namespace_revision_id': revision_id,
             }
 
         _rollback = False   # committed — in-flight flag stays set
         return jsonify({'queued': True, 'size': len(_wukong_raw),
+                        'namespace_revision_id': revision_id,
+                        'source_sha256': hashlib.sha256(_raw).hexdigest(),
                         'source_size': len(_raw),
                         'format': 'wukong-native-dmem-v1',
                         'entry_slot': _wukong_entry_info['entry_slot'],

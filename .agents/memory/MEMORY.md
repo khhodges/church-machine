@@ -70,7 +70,6 @@
 - [UART raw-transfer ownership](uart-raw-transfer-ownership.md) — bridge control bytes must be deferred for the whole framed payload interval or they corrupt board-side binary parsers
 - [Execution identity provenance](execution-identity-provenance.md) — empty source is comparable; opaque cross-algorithm source hashes never prove editor freshness
 - [Release LUMP replacement](lump-release-replacement.md) — release rebuilds replace the selected user slot by default; New Entry is explicit, while fixed system slots stay protected
-- [Save picker visibility](save-namespace-picker-visibility.md) — display every known NS slot; only Boot.NS and Boot.Thread are disabled in the picker
 - [Namespace upload composite integrity](namespace-upload-composite-integrity.md) — validate each LUMP, then bind slots, layout, boot entry, and hashes into one exact upload image
 - [GT runtime authority](dynamic-composite-pola-boundary.md) — no advance GT meaning or policy enforcement; programmer owns protection design; machine checks apply at runtime.
 - [Thread rules and Amobea design](normative-thread-private-abi.md) — geometry, root frames, placement, Amobea initialization ownership, tuple allocation and prototype scope.
@@ -108,7 +107,6 @@
 - [Bootstrap repair archive discovery](bootstrap-repair-archive-discovery.md) — repair must accept both manifest-recorded archives and exact files discovered from the active LUMP's standard history filename pattern
 - [Compiler C-list normalization](compiler-clist-normalization.md) — finalized metadata drives operand rows; preserve concrete positions and investigate row-zero reports separately
 - [Embedded source frame sizing](embedded-source-frame-sizing.md) — allocate LUMPs for the complete API/source frame before placing the relocated c-list
-- [Namespace policy foundation boundary](ns-policy-foundation-boundary.md) — only slots 0–1 are foundational; catalog LUMPs at 6–10 may have Resident/Lazy policies
 - [Prepared boot authority](prepared-boot-authority.md) — explicit preparation owns CR0; boot/import/Run never repair it; ROM evidence stays separate from Namespace data
 - [Shared served-script dependencies](shared-served-script-dependencies.md) — declare shared UI modules explicitly and test consumers in manifest order; avoid runtime script injection
 - [Named CALL CR6 lookup](named-call-cr6-fallback.md) — unbound CALL dot.name compiles to opcode CALL through CR6[petname], never ELOADCALL or CR0 materialization
@@ -151,8 +149,7 @@
 - [Mint context authority](mint-context-authority-boundary.md) — synthetic frame evidence grants no service access; approve protected interfaces and Lambda authority before implementation.
 - [Alice/Mallory Threads](alice-mallory-thread-isolation.md) — separate Threads with each actor's entry GT in CR1; distinguish fixture execution from saved-design adoption.
 - [Intentional capability faults](intentional-capability-fault-publication.md) — absent-row accesses remain authored programs; publication diagnostics must not replace runtime checks.
-- [Namespace public names](namespace-public-names.md) — exact dropdown names govern IDE profile labels and reports; internal keys are not public names.
-- [Namespace Add binding](namespace-add-binding-workflow.md) — one Add action saves and validates; unfinished bindings stay explicit, never imply runtime readiness.
+- [Namespace workflow rules](namespace-workflow-index.md) — public names, picker visibility, foundational slots, and Add/binding behavior.
 - [Mint RTL replay boundary](mint-rtl-replay-boundary.md) — exact-byte tests must not translate instructions; encoding corrections cover every emitter and execution profile.
 - [Mint CREATE RTL entry](mint-create-rtl-entry-boundary.md) — use normal proof checks and an explicit scratch L binding; exact saved candidates need independent replay.
 - [Mint trial history origin](mint-trial-history-origin.md) — fresh disposable slot history cannot certify live or reused slots; closed-fixture alias evidence is not a live audit.

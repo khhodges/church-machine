@@ -756,6 +756,8 @@ const BuildApprovalView = {
         // Live draft checks govern a NEW approval, not an already approved
         // immutable input. Building a selected older revision is intentional.
         btn.disabled = !this._selectedSnapshot || this._buildRunning;
+        const install = document.getElementById('baInstallImageBtn');
+        if (install) install.disabled = !this._selectedSnapshot || !!this._installRunning;
         if (!this._selectedSnapshot) {
             btn.title = 'Freeze or explicitly select an approved Namespace revision first';
         } else {
@@ -795,6 +797,44 @@ const BuildApprovalView = {
         // Loading a latest record is informational; this is the explicit
         // adoption action and pins its exact identity until changed by hand.
         this._selectSnapshot(this._availableSnapshot);
+    },
+
+    async installSelectedImage() {
+        if (this._installRunning || !this._selectedSnapshot) return;
+        const revision = this._selectedSnapshot.namespace_revision_id;
+        const status = document.getElementById('baInstallImageStatus');
+        this._installRunning = true;
+        this._updateApproveBtn();
+        try {
+            const response = await fetch('/hardware/wukong/status', {cache: 'no-store'});
+            if (!response.ok) throw new Error('Could not read the physical target.');
+            const target = (await response.json()).physical_target;
+            if (!target || !target.live || !target.device_uid || !target.session_id)
+                throw new Error('No live, identified board is available. Nothing was sent.');
+            if (!window.confirm(`Install Namespace revision ${revision} on board ${target.device_uid}?\n\nThis replaces runtime memory and discards data and Thread progress. Execution may begin immediately. It does not reflash the FPGA.`))
+                return;
+            status.textContent = 'Submitting exact selected image…';
+            const result = await fetch('/api/namespace-image/install', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', ...this._authHeaders()},
+                body: JSON.stringify({namespace_revision_id: revision,
+                    target_device_uid: target.device_uid, target_session_id: target.session_id}),
+            });
+            const data = await result.json();
+            if (!result.ok || !data.queued) throw new Error(data.error || 'Installation request rejected.');
+            if (data.namespace_revision_id !== revision)
+                throw new Error('Upload response identity mismatch. Check FPGA status before taking another action.');
+            status.textContent = `Revision ${revision.slice(0, 12)} queued as command ${data.id}. Await board acknowledgement; installation is not yet confirmed. `;
+            const link = document.createElement('a');
+            link.href = '/fpga?namespace_revision=' + encodeURIComponent(revision);
+            link.textContent = 'View delivery and startup status';
+            status.appendChild(link);
+        } catch (error) {
+            status.textContent = 'Install Image: ' + error.message;
+        } finally {
+            this._installRunning = false;
+            this._updateApproveBtn();
+        }
     },
 
     _revisionChoice(record) {

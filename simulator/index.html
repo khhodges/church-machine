@@ -1630,6 +1630,8 @@
                 <label for="baRevisionSelect">Approved Namespace revision</label>
                 <select id="baRevisionSelect" aria-label="Choose exact approved Namespace revision" onchange="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectRevisionId(this.value)"><option value="">Select an approved Namespace revision…</option></select>
                 <button id="baSelectSnapshotBtn" class="ba-freeze-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.selectAvailableSnapshot()">Use approved revision</button>
+                <button id="baInstallImageBtn" class="ba-approve-btn" disabled onclick="BuildApprovalView.installSelectedImage()">Install Image</button>
+                <span id="baInstallImageStatus" role="status"></span>
                 <button id="baApproveBtn" class="ba-approve-btn" disabled onclick="if(typeof BuildApprovalView!=='undefined')BuildApprovalView.startBuild()">&#x1F528; Build Bitstream</button>
                 <span id="baSnapshotStatus" class="ba-snapshot-status"></span>
             </div>

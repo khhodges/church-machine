@@ -15,9 +15,21 @@ to a physical board.
 ## Operator workflow — two actions
 
 Describe software image reload as **Select Namespace → Install Image**.
-These are the operator activity names, not a claim that a combined two-button
-interface is already implemented. The preparation and safety requirements
-below remain in force.
+Use **Builder → Build Approval → Approved Namespace revision** to select an approved
+revision, then **Install Image**. Confirm the exact revision and physical board
+shown in the confirmation. The preparation and safety requirements below remain
+in force.
+
+The server reads the revision's retained image and boot configuration, verifies
+its hashes and hardware certification, then applies the supported Wukong memory
+projection. It never substitutes the current server image or newer catalog
+inputs. Missing, unapproved, simulation-only or corrupt revisions are rejected.
+Queue acceptance is not installation success: use **View delivery and startup
+status** to inspect board acknowledgement and execution evidence.
+
+On the FPGA status page, **Install Image** uses the exact revision in that page's
+selection link. Without a selected revision it refuses to upload; **Reboot**
+remains a separate action and does not select or install another image.
 
 ### 1. Select Namespace
 
