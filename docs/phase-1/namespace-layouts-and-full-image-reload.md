@@ -12,6 +12,46 @@ This is a loading contract, not a claim of implemented or tested behavior.
 It does not authorize changing current Namespace assignments or uploading
 to a physical board.
 
+## Operator workflow — two actions
+
+Describe software image reload as **Select Namespace → Install Image**.
+These are the operator activity names, not a claim that a combined two-button
+interface is already implemented. The preparation and safety requirements
+below remain in force.
+
+### 1. Select Namespace
+
+Choose the saved Namespace to install, using its exact public name. Confirm
+the selected revision, included LUMPs and boot entry. Selection alone does not
+change the board or replace the currently running image.
+
+Use a complete, reviewed image prepared from that selection. If preparation,
+explicit BIND, validation or simulation is still required, complete it before
+installation; selecting a Namespace must not silently adopt newer revisions
+or rebind its contents.
+
+### 2. Install Image
+
+Explicitly authorize replacement of the board's software image with the
+prepared image for the selected Namespace. The installation activity includes
+stopping execution, transferring the complete image through the supported
+loader, checking the reported result and reporting startup status.
+
+**Warning:** This is a fresh software start, not a live update. Previous
+runtime data, allocations and Thread progress are discarded; they are not
+merged into the selected image. This action does **not** synthesize or reflash
+the FPGA.
+
+Report transfer acceptance and startup outcome separately. A loader
+acknowledgement is not proof of installed-byte equality. A post-reload Halt is
+best-effort: execution may begin before it arrives. Report a program fault-stop
+as a fault, not as a successfully confirmed startup halt. A guaranteed pause
+before the first instruction is not established by this workflow.
+
+The two-action description groups the operator's work; it does not remove
+explicit preparation/approval gates or claim stronger hardware evidence than
+the [installed-image reload result](installed-image-reload-result.md).
+
 ## 1. Two layouts
 
 Phase 1 has **one minimal baseline layout and one full development/test
@@ -79,6 +119,9 @@ Select layout and exact artifact revisions
     → establish defined fresh execution state
     → start at the image's boot entry
 ```
+
+This is the detailed preparation and execution sequence underlying the
+two operator actions above, not a list of additional top-level UI actions.
 
 No incremental resident loader, hot replacement, preservation of live objects,
 or developing allocator is a prerequisite for this approach.
