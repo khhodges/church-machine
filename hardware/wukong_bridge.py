@@ -406,6 +406,17 @@ def halt_state_evidence_matches_pending(decoded, pending_halt):
     )
 
 
+def read_available_serial(ser):
+    """Wait for one byte, not 128 bytes/timeout, then drain buffered input.
+
+    In particular a four-byte sentinel must reach the parser promptly. This
+    reduces host latency; it cannot stop entry execution before the FPGA
+    releases its sentinel fetch gate.
+    """
+    first = ser.read(1)
+    return first + ser.read(min(4096, ser.in_waiting)) if first else first
+
+
 def _compute_expected_n_init():
     """Return the N_INIT value expected from the current boot_rom.py tables.
 
@@ -2126,7 +2137,7 @@ def main():
     try:
         while True:
             try:
-                chunk = ser.read(128)
+                chunk = read_available_serial(ser)
                 if chunk:
                     last_read_ts = time.time()
             except (serial.SerialException, OSError) as exc:
@@ -2445,10 +2456,8 @@ def main():
                         print(f'BOOT: board ready — N_INIT byte=0x{board_n_init_byte:02X} '
                               f'(validation skipped: boot_rom not importable){tu_str}{bv_str}')
 
-                    # The current RTL powers up in free-run mode.  Fail safe in
-                    # software by halting immediately after a fresh sentinel;
-                    # both control surfaces then require one deliberate Step
-                    # before they enable Run.
+                    # Best-effort post-sentinel halt, NOT a pre-entry pause.
+                    # RTL resumes fetch once the sentinel is transmitted.
                     startup_state = 'halt_failed'
                     try:
                         halt_nonce_counter = (halt_nonce_counter + 1) & 0xFF
@@ -2510,6 +2519,9 @@ def main():
                             'build_version': build_version,
                             'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
                             'startup_state': startup_state,
+                            'startup_trace_counter': trace_counter,
+                            'startup_halt_nonce': halt_nonce_counter,
+                            'startup_state_counter': state_counter,
                             'session_id': session_id,
                             'device_uid': device_uid,
                         })
@@ -2520,6 +2532,9 @@ def main():
                             'build_version': build_version,
                             'thread_scheduler': bool(sentinel.get('thread_scheduler', False)),
                             'startup_state': startup_state,
+                            'startup_trace_counter': trace_counter,
+                            'startup_halt_nonce': halt_nonce_counter,
+                            'startup_state_counter': state_counter,
                             'session_id': session_id,
                             'device_uid': device_uid,
                         })

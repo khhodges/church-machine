@@ -22413,6 +22413,7 @@ import threading as _wk_threading
 _wukong_trace_lock    = _wk_threading.Lock()
 _wukong_command_lock  = _wk_threading.Lock()
 _wukong_latest_trace  = {}         # {nia, ev_type, payload_gt, flags, fault_code, fault_valid, bp_hit, ts}
+_wukong_startup_fault = {}         # session -> fault, independent of status/trace delivery order
 _wukong_latest_snapshot = {}
 # Latest GT word0 seen for each CALL-type event, keyed by CR index (6 or 14).
 # Maintained separately from _wukong_latest_trace so that a subsequent CALL_PUSH
@@ -23434,6 +23435,20 @@ def wukong_trace_post():
         # Never alias the immutable execution-history event: live status may
         # later be cleared only after board-originated skip completion proof.
         _wukong_latest_trace = dict(entry)
+        if entry['fault_valid'] and incident_id:
+            # Authenticated priority fault telemetry may precede even the
+            # first bridge-status report. Retain by session now; correlate
+            # with the trusted boot/session boundary only when rendering.
+            previous = _wukong_startup_fault.get(bridge_session, {})
+            if entry['bridge_trace_counter'] > previous.get('bridge_trace_counter', -1):
+                _wukong_startup_fault[bridge_session] = dict(entry)
+            with _wukong_bridge_lock:
+                current_session = _wukong_bridge_info.get('session_id')
+            for old_session in list(_wukong_startup_fault):
+                if len(_wukong_startup_fault) <= 16:
+                    break
+                if old_session not in (current_session, bridge_session):
+                    del _wukong_startup_fault[old_session]
         global _wukong_run_unlocked, _wukong_step_write_trace_seq, \
             _wukong_step_bridge_session, _wukong_runtime_identity
         if bridge_session and entry.get('bridge_trace_counter', -1) >= 0:
@@ -24352,13 +24367,7 @@ def wukong_status_get():
     bridge_age = (now - _wukong_last_bridge_poll) if _wukong_last_bridge_poll else None
     trace_age  = (now - _wukong_last_trace_post)  if _wukong_last_trace_post  else None
     bridge_alert = _wukong_refresh_bridge_alert(now)
-    if boot_info.get('startup_state') == 'halt_requested':
-        requested_at = float(boot_info.get('received_ts') or now)
-        if bridge_age is None or bridge_age >= 3.0 or bridge_info.get('state') in (
-                'reconnecting', 'serial_error'):
-            boot_info['startup_state'] = 'halt_confirmation_unavailable'
-        elif now - requested_at > _WUKONG_HALT_CONFIRM_TIMEOUT:
-            boot_info['startup_state'] = 'halt_confirmation_timed_out'
+    boot_info = _wukong_startup_view(boot_info, latest)
     return jsonify({
         # Pipeline-health counters (never reset within a process session).
         # total_trace_posts == 0  → server has never seen a trace packet this session.
@@ -24660,7 +24669,10 @@ def wukong_skip_fault_completion_post():
                 snapshot_seq)
             if not valid_delivery:
                 return jsonify({'accepted': False, 'decision': 'command_mismatch'}), 409
-            live = _wukong_latest_trace
+            retained = _wukong_startup_fault.get(completion_session, {})
+            live = (retained
+                    if retained.get('incident_id') == incident_id
+                    else _wukong_latest_trace)
             if not (live.get('fault_valid') and
                     live.get('incident_id') == incident_id and
                     int(live.get('nia', -1)) == fault_nia):
@@ -24670,6 +24682,8 @@ def wukong_skip_fault_completion_post():
             _wukong_latest_trace['fault_valid'] = False
             _wukong_latest_trace['skip_fault_consumed'] = True
             _wukong_latest_trace['skip_completion_nia'] = nia
+            if retained.get('incident_id') == incident_id:
+                _wukong_startup_fault.pop(completion_session, None)
             delivery['skip_completion'] = True
             delivery['skip_completion_nia'] = nia
             delivery['skip_completion_ts'] = _wk_time.time()
@@ -24715,6 +24729,11 @@ def wukong_halt_state_post():
             if _wukong_boot_info.get('session_id') != session:
                 return jsonify({'ok': False, 'accepted': False,
                                 'error': 'boot session mismatch'}), 409
+            if (data.get('halt_nonce') != _wukong_boot_info.get('startup_halt_nonce')
+                    or _wukong_boot_info.get('startup_halt_nonce') is None
+                    or write_counter != _wukong_boot_info.get('startup_state_counter')):
+                return jsonify({'ok': False, 'accepted': False,
+                                'error': 'startup halt request mismatch'}), 409
             _wukong_boot_info.update({
                 'startup_state': 'awaiting_first_step',
                 'halt_confirmed_ts': now,
@@ -25113,6 +25132,9 @@ def wukong_boot_info_post():
         'build_version': int(bv) if bv is not None else None,
         'thread_scheduler': bool(data.get('thread_scheduler', False)),
         'startup_state': str(data.get('startup_state', '') or '')[:40],
+        'startup_trace_counter': data.get('startup_trace_counter'),
+        'startup_halt_nonce': data.get('startup_halt_nonce'),
+        'startup_state_counter': data.get('startup_state_counter'),
         'session_id':   reported_session,
         'device_uid':   reported_uid,
         'trusted':      True,
@@ -25145,6 +25167,40 @@ def wukong_boot_info_post():
     return jsonify({'ok': True})
 
 
+def _wukong_startup_view(boot_info, latest):
+    """Fault evidence is a stop, never proof that startup Halt succeeded.
+
+    Compare bridge counters, not HTTP arrival times: fault deliveries have
+    priority and can reach the server before their boot-info delivery.
+    """
+    entry = dict(boot_info)
+    with _wukong_trace_lock:
+        retained_fault = dict(_wukong_startup_fault.get(entry.get('session_id'), {}))
+    if retained_fault.get('bridge_session') == entry.get('session_id'):
+        latest = retained_fault
+    baseline = entry.get('startup_trace_counter')
+    counter = latest.get('bridge_trace_counter')
+    if (entry.get('startup_state') and latest.get('fault_valid') and
+            entry.get('session_id') and
+            latest.get('bridge_session') == entry.get('session_id') and
+            isinstance(baseline, int) and isinstance(counter, int) and
+            counter > baseline):
+        entry['startup_state'] = 'fault_stopped'
+        entry['startup_fault_code'] = latest.get('fault_code')
+        entry['startup_fault_nia'] = latest.get('nia')
+    elif entry.get('startup_state') == 'halt_requested':
+        now = _wk_time.time()
+        with _wukong_bridge_lock:
+            bridge_state = _wukong_bridge_info.get('state')
+        if (not _wukong_last_bridge_poll or
+                now - _wukong_last_bridge_poll >= 3.0 or
+                bridge_state in ('reconnecting', 'serial_error')):
+            entry['startup_state'] = 'halt_confirmation_unavailable'
+        elif now - float(entry.get('received_ts') or now) > _WUKONG_HALT_CONFIRM_TIMEOUT:
+            entry['startup_state'] = 'halt_confirmation_timed_out'
+    return entry
+
+
 @app.route('/hardware/wukong/boot-info', methods=['GET'])
 def wukong_boot_info_get():
     """IDE polls here to learn whether the connected bitstream is stale.
@@ -25153,7 +25209,9 @@ def wukong_boot_info_get():
     """
     with _wukong_boot_info_lock:
         entry = dict(_wukong_boot_info)
-    return jsonify(entry)
+    with _wukong_trace_lock:
+        latest = dict(_wukong_latest_trace)
+    return jsonify(_wukong_startup_view(entry, latest))
 
 
 @app.route('/dev/firmware/main.c')

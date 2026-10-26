@@ -20299,6 +20299,28 @@ function _wukongArmStepProgressExpectation(delivery, nowMs) {
     return _wukongStepProgressExpectation;
 }
 
+function _wukongApplyStartupState(bi) {
+    if (!bi || !bi.received_ts) return;
+    const key = bi.received_ts + ':' + bi.startup_state;
+    if (key === _wukongStartupTs) return;
+    _wukongStartupTs = key;
+    if (bi.startup_state === 'awaiting_first_step') {
+        _wukongHWRunning = false;
+        _wukongRunUnlocked = false;
+        _wukongCmdLog('Board halt confirmed after boot sentinel \u2014 waiting for the first deliberate Step');
+    } else if (bi.startup_state === 'halt_requested') {
+        _wukongCmdLog('Board halt requested after boot sentinel \u2014 waiting for FPGA confirmation');
+    } else if (bi.startup_state === 'fault_stopped') {
+        _wukongHWRunning = false;
+        _wukongRunUnlocked = false;
+        _wukongCmdLog('Program fault-stopped after reboot. Startup pause was not established; inspect the fault evidence before recovery.');
+    } else if (bi.startup_state === 'halt_confirmation_timed_out' ||
+               bi.startup_state === 'halt_confirmation_unavailable') {
+        _wukongCmdLog('Startup halt is unconfirmed. Check the bridge connection and board evidence before issuing another command.');
+    }
+    _wukongUpdateBtn();
+}
+
 /** Fetch status and render the health strip inside #wukong-health-strip. */
 async function _wukongRefreshHealthStrip() {
     try {
@@ -20325,16 +20347,7 @@ async function _wukongRefreshHealthStrip() {
             _wukongCmdLog('STOP confirmed by FPGA board evidence');
         }
         const bi = (s && s.boot_info) || {};
-        if (bi.received_ts && bi.received_ts !== _wukongStartupTs) {
-            _wukongStartupTs = bi.received_ts;
-            if (bi.startup_state === 'awaiting_first_step') {
-                _wukongHWRunning = false;
-                _wukongRunUnlocked = false;
-                _wukongCmdLog('Board halt confirmed after boot sentinel \u2014 waiting for the first deliberate Step');
-            } else if (bi.startup_state === 'halt_requested') {
-                _wukongCmdLog('Board halt requested after boot sentinel \u2014 waiting for FPGA confirmation');
-            }
-        }
+        _wukongApplyStartupState(bi);
         const pending = s && s.pending_command;
         _wukongPendingExecutionCmd = pending &&
             (pending.cmd === 's' || pending.cmd === 'r') ? pending.cmd : null;
@@ -21260,16 +21273,7 @@ setInterval(async function _wukongPoll() {
                         ? 'firmware-v' + bdata.build_version : null)
             });
         }
-        if (bdata && bdata.received_ts &&
-                bdata.received_ts !== _wukongStartupTs) {
-            _wukongStartupTs = bdata.received_ts;
-            if (bdata.startup_state === 'awaiting_first_step') {
-                _wukongHWRunning = false;
-                _wukongRunUnlocked = false;
-                _wukongCmdLog('Board halt confirmed after boot sentinel \u2014 waiting for the first deliberate Step');
-                _wukongUpdateBtn();
-            }
-        }
+        _wukongApplyStartupState(bdata);
         if (bdata && bdata.stale_tu) {
             _wukongShowStaleBanner();
         } else if (bdata && Object.keys(bdata).length > 0 && !bdata.stale_tu) {

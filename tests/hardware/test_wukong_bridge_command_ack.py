@@ -17,6 +17,28 @@ import types
 
 import pytest
 
+
+def test_short_sentinel_read_does_not_wait_for_full_chunk():
+    class BufferedSerial:
+        def __init__(self):
+            self.data = bytearray(b'\xbc\x01\x03\x07')
+            self.reads = []
+
+        @property
+        def in_waiting(self):
+            return len(self.data)
+
+        def read(self, n):
+            self.reads.append(n)
+            assert n <= len(self.data), 'would wait for serial timeout'
+            result = bytes(self.data[:n])
+            del self.data[:n]
+            return result
+
+    serial = BufferedSerial()
+    assert bridge.read_available_serial(serial) == b'\xbc\x01\x03\x07'
+    assert serial.reads == [1, 3]
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)

@@ -198,3 +198,66 @@ The operator subsequently authorized software-only correction:
 No further board command, retained image modification or programming operation
 was performed for these corrections. The configured completion checks remain
 the final software gate; physical evidence does not waive them.
+
+## Post-reload startup halt investigation (software-only)
+
+The physical result above is unchanged: the New Layout 64 KiB transfer was
+acknowledged, execution reached Mallory's expected denial, and the automatic
+post-sentinel halt timed out. Nothing in this investigation upgrades that
+timeout to a successful startup pause. No board command, reflash, image
+replacement, or reset-policy change was performed.
+
+### What the existing implementation can guarantee
+
+`hardware/wukong_top.py` clears `step_mode` and `step_halted` when recovery
+re-arms the sentinel. Instruction fetch is gated by `sentinel_req`, which
+clears when the last sentinel byte is accepted by the UART transmitter, not
+when the bridge receives it or responds. Entry execution can therefore begin
+before the host can send its nonce-bearing Halt. A pre-entry pause is **not
+guaranteed by this protocol**. Guaranteeing one requires a separately approved
+FPGA/protocol change; sending Halt faster is not a substitute.
+
+The bridge previously called `read(128)` with a 50 ms serial timeout. A short
+sentinel could wait for that timeout before parsing. It now waits for one
+byte and drains available bytes, removing that avoidable batching delay.
+This improves best-effort post-sentinel Halt latency but is not physical
+acceptance evidence and does not establish the sole cause of the recorded
+timeout.
+
+Source inspection also found that the current UART arbiter gives Halt-state
+bytes priority over trace/snapshot bytes without a whole-frame ownership
+guard. A Halt arriving during a frame can therefore interrupt that frame.
+The retained capture does not establish whether this happened in the reload
+above. This needs separate RTL framing validation before any hardware release;
+the current change does not modify RTL or teach the parser to accept damaged
+frames.
+
+### Reporting and correlation
+
+- A successful serial write remains only `halt_requested`.
+- Matching nonce, bridge session and board-state counters are required for
+  automatic Halt confirmation, just as request correlation is required for
+  explicit Halt.
+- A fault trace from the same session with a bridge trace counter greater
+  than the sentinel baseline reports `fault_stopped`. It is not
+  `awaiting_first_step` and does not prove a successful startup pause.
+- The counter boundary handles a rapid fault arriving at the server before
+  boot-info because fault telemetry has delivery priority. Older-boot and
+  wrong-session evidence cannot establish this state.
+- Fault evidence is retained independently of the latest trace: queued
+  non-fault telemetry arriving after the prioritized fault cannot hide it.
+  Retention is keyed by authenticated bridge session and does not require
+  its initial status report to arrive first; rendering still requires an
+  exact match to the trusted boot session and counter boundary.
+  A new boot's counter boundary excludes the old fault, and confirmed
+  Skip Fault completion clears the retained live fault, not its history.
+- A later Halt confirmation does not erase a current program fault.
+  Halt confirmation evidence remains separately recorded.
+- Missing evidence remains timed out/unavailable. Both polling endpoints use
+  the same interpretation, and the UI observes state changes within one boot
+  timestamp instead of suppressing them as duplicates.
+
+Focused software regressions cover short serial reads, timely nonce-bound
+Halt, rapid fault delivery in either HTTP order, late Halt after fault,
+stale-session/old-counter rejection, timeout consistency, and UI transitions.
+They do not certify a new physical reload or a pause before entry execution.

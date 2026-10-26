@@ -63,6 +63,7 @@ from server.app import app
 def _reset_state():
     with _app_module._wukong_trace_lock:
         _app_module._wukong_latest_trace = {}
+        _app_module._wukong_startup_fault.clear()
         _app_module._wukong_latest_snapshot = {}
         _app_module._wukong_event_queue.clear()
         _app_module._wukong_fault_incidents.clear()
@@ -834,6 +835,9 @@ class TestTestingOnlySkipFault:
             self, client, monkeypatch):
         monkeypatch.setenv('REPORT_TOKEN', 'report-secret')
         incident = self._seed_fault()
+        with _app_module._wukong_trace_lock:
+            _app_module._wukong_startup_fault['bridge-a'] = dict(
+                _app_module._wukong_latest_trace)
         queued = _post_cmd(client, 'k')
         assert queued.status_code == 200
         cmd_id = queued.get_json()['id']
@@ -873,6 +877,7 @@ class TestTestingOnlySkipFault:
         status = _status(client)
         assert status['latest_trace']['fault_valid'] is False
         assert status['latest_trace']['skip_fault_consumed'] is True
+        assert not _app_module._wukong_startup_fault
         # Snapshot remains a durable historical record; only live status clears.
         assert status['latest_snapshot']['incident_id'] == incident
         assert status['latest_snapshot']['promotion_status'] == 'promoted'
@@ -988,3 +993,88 @@ class TestBootInfoReceivedTs:
         assert bi['build_version'] == 7
         assert bi['startup_state'] == 'awaiting_first_step'
         assert _status(client)['startup_state'] == 'awaiting_first_step'
+
+
+class TestStartupHaltRace:
+    def boot(self, client, monkeypatch):
+        monkeypatch.setenv('REPORT_TOKEN', 'bridge-report-secret')
+        self.headers = {'Authorization': 'Bearer bridge-report-secret'}
+        _app_module._wukong_bridge_info['session_id'] = 'bridge-a'
+        _app_module._wukong_last_bridge_poll = time.time()
+        response = client.post('/hardware/wukong/boot-info', json={
+            'tu_version': 3, 'session_id': 'bridge-a',
+            'startup_state': 'halt_requested', 'startup_halt_nonce': 17,
+            'startup_trace_counter': 10, 'startup_state_counter': 4,
+        }, headers=self.headers)
+        assert response.status_code == 200
+
+    def halt(self, client, **changes):
+        payload = {
+            'automatic': True, 'state': 'halted', 'reason': 'explicit_halt',
+            'session_id': 'bridge-a', 'halt_nonce': 17,
+            'state_counter_at_write': 4, 'board_state_counter': 5,
+        }
+        payload.update(changes)
+        return client.post('/hardware/wukong/halt-state',
+                           json=payload, headers=self.headers)
+
+    def fault(self, client, counter=11, session='bridge-a'):
+        response = client.post('/hardware/wukong/trace', json={
+            'nia': 4096, 'ev_type': 0, 'fault_valid': True, 'fault_code': 1,
+            'bridge_session': session, 'bridge_trace_counter': counter,
+            'incident_id': 'startup-race-incident-0001',
+        }, headers=self.headers)
+        assert response.status_code == 200
+
+    def test_timely_halt_and_strict_correlation(self, client, monkeypatch):
+        self.boot(client, monkeypatch)
+        assert self.halt(client, halt_nonce=16).status_code == 409
+        assert self.halt(client, session_id='old-session').status_code == 409
+        assert self.halt(client, state_counter_at_write=3).status_code == 409
+        assert self.halt(client).status_code == 200
+        assert _status(client)['startup_state'] == 'awaiting_first_step'
+        assert client.get('/hardware/wukong/boot-info').json['startup_state'] == 'awaiting_first_step'
+
+    @pytest.mark.parametrize('fault_first', [False, True])
+    def test_rapid_fault_is_not_a_successful_pause(self, client, monkeypatch, fault_first):
+        if fault_first:
+            self.headers = {}
+            _app_module._wukong_bridge_info.clear()
+            self.fault(client)
+            # The priority fault arrived before initial session registration.
+            response = client.post('/hardware/wukong/bridge-status', json={
+                'session_id': 'bridge-a', 'device_uid': 'board-a',
+                'state': 'connected', 'event': 'connected',
+            })
+            assert response.status_code == 200
+        self.boot(client, monkeypatch)
+        if not fault_first:
+            self.fault(client)
+        # Ordinary telemetry queued before the prioritized fault arrives late.
+        response = client.post('/hardware/wukong/trace', json={
+            'nia': 4092, 'ev_type': 0, 'fault_valid': False,
+            'bridge_session': 'bridge-a', 'bridge_trace_counter': 10,
+        }, headers=self.headers)
+        assert response.status_code == 200
+        assert _status(client)['startup_state'] == 'fault_stopped'
+        assert client.get('/hardware/wukong/boot-info').json['startup_state'] == 'fault_stopped'
+        # Even a later valid explicit halt does not erase the program fault.
+        assert self.halt(client).status_code == 200
+        assert _status(client)['startup_state'] == 'fault_stopped'
+        assert client.get('/hardware/wukong/boot-info').json['startup_state'] == 'fault_stopped'
+        # A later sentinel excludes this retained fault by its counter boundary.
+        with _app_module._wukong_boot_info_lock:
+            _app_module._wukong_boot_info['startup_trace_counter'] = 11
+        assert _status(client)['startup_state'] == 'awaiting_first_step'
+
+    @pytest.mark.parametrize('counter,session', [(10, 'bridge-a'), (11, 'old-session')])
+    def test_previous_boot_or_session_fault_cannot_confirm_stop(self, client, monkeypatch, counter, session):
+        self.boot(client, monkeypatch)
+        self.fault(client, counter, session)
+        assert _status(client)['startup_state'] == 'halt_requested'
+
+    def test_timeout_agrees_across_poll_endpoints(self, client, monkeypatch):
+        self.boot(client, monkeypatch)
+        _app_module._wukong_boot_info['received_ts'] -= 60
+        assert _status(client)['startup_state'] == 'halt_confirmation_timed_out'
+        assert client.get('/hardware/wukong/boot-info').json['startup_state'] == 'halt_confirmation_timed_out'
