@@ -69,3 +69,4 @@ server/lumps/.lump-transition-*
 server/ide-hierarchy.json
 /generated-artifacts/
 /server/lumps/design-drafts/
+/build/guarded-runtime-installation.json
