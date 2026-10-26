@@ -22415,6 +22415,62 @@ _wukong_command_lock  = _wk_threading.Lock()
 _wukong_latest_trace  = {}         # {nia, ev_type, payload_gt, flags, fault_code, fault_valid, bp_hit, ts}
 _wukong_startup_fault = {}         # session -> fault, independent of status/trace delivery order
 _wukong_latest_snapshot = {}
+
+
+def _wukong_trace_is_current(entry, latest=None, live_session=None):
+    """HTTP sequence is a history cursor, never a hardware execution clock.
+
+    Counters are comparable only within a bridge session. A different session
+    must be the bridge's currently advertised session, not a late old worker.
+    Legacy packets can advance legacy state but cannot erase ordered evidence.
+    Caller holds _wukong_trace_lock.
+    """
+    latest = _wukong_latest_trace if latest is None else latest
+    session = entry.get('bridge_session', '')
+    counter = entry.get('bridge_trace_counter', -1)
+    previous_session = latest.get('bridge_session', '')
+    previous_counter = latest.get('bridge_trace_counter', -1)
+    if (session and _wukong_latest_snapshot.get('bridge_session') == session and
+            _wukong_latest_snapshot.get('bridge_trace_counter', -1) > previous_counter):
+        previous_session = session
+        previous_counter = _wukong_latest_snapshot['bridge_trace_counter']
+    if not session or counter < 0:
+        return previous_counter < 0
+    if live_session is None:
+        live_session = _wukong_bridge_info.get('session_id', '')
+    if live_session and session != live_session:
+        return False
+    if previous_session and session != previous_session:
+        return session == live_session
+    return counter > previous_counter
+
+
+def _wukong_reconcile_depth_locked(session):
+    """Only claim a depth when retained causal history has no gaps."""
+    global _wukong_call_depth
+    packets = {
+        ev['bridge_trace_counter']: ev for ev in _wukong_event_queue
+        if ev.get('bridge_session') == session and
+        isinstance(ev.get('ev_type'), int) and
+        ev.get('bridge_trace_counter', -1) >= 1
+    }
+    depth, expected = 0, 1
+    for counter, ev in sorted(packets.items()):
+        if counter != expected:
+            depth = None
+        if depth is not None:
+            if ev['ev_type'] == 8:
+                depth += 1
+            elif ev['ev_type'] == 9:
+                depth = max(0, depth - 1)
+        ev['call_depth'] = depth
+        expected = counter + 1
+    if _wukong_latest_trace.get('bridge_session') == session:
+        _wukong_latest_trace['call_depth'] = depth
+        # Legacy accumulator remains numeric; ordered records explicitly expose
+        # unknown depth until missing predecessors arrive.
+        _wukong_call_depth = depth if depth is not None else 0
+
 # Latest GT word0 seen for each CALL-type event, keyed by CR index (6 or 14).
 # Maintained separately from _wukong_latest_trace so that a subsequent CALL_PUSH
 # packet (ev_type=0x08) cannot overwrite a CR6/CR14 update before the IDE polls.
@@ -22997,12 +23053,19 @@ def _wukong_relay_worker(my_gen):
                             with _wukong_trace_lock:
                                 for ev in events:
                                     ev_type = int(ev.get('ev_type', 0) or 0)
-                                    if ev_type == 0x08:    # CALL_PUSH
+                                    current = (isinstance(ev.get('ev_type'), int) and
+                                               ev.get('is_current') is not False and
+                                               _wukong_trace_is_current(
+                                                   ev, live_session=ev.get('bridge_session', '')
+                                                   if ev.get('is_current') is True else None))
+                                    if current and ev_type == 0x08:    # CALL_PUSH
                                         _wukong_call_depth += 1
-                                    elif ev_type == 0x09:  # CALL_POP
+                                    elif current and ev_type == 0x09:  # CALL_POP
                                         if _wukong_call_depth > 0:
                                             _wukong_call_depth -= 1
                                     ev_copy = dict(ev)
+                                    if isinstance(ev.get('ev_type'), int):
+                                        ev_copy['is_current'] = current
                                     ev_copy['call_depth'] = _wukong_call_depth
                                     ev_copy['relayed']    = True
                                     if not ev_copy.get('ts'):
@@ -23012,10 +23075,13 @@ def _wukong_relay_worker(my_gen):
                                     _wukong_event_queue.append(ev_copy)
                                     if len(_wukong_event_queue) > _WUKONG_EVENT_QUEUE_MAXLEN:
                                         del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
-                                    _wukong_latest_trace = ev_copy
-                                    if ev_type == 0x06:
+                                    if current:
+                                        _wukong_latest_trace = dict(ev_copy)
+                                    if ev_copy.get('bridge_session') and ev_copy.get('bridge_trace_counter', -1) >= 1:
+                                        _wukong_reconcile_depth_locked(ev_copy['bridge_session'])
+                                    if current and ev_type == 0x06:
                                         _wukong_latest_cr_gts[6]  = int(ev.get('payload_gt', 0) or 0)
-                                    elif ev_type == 0x07:
+                                    elif current and ev_type == 0x07:
                                         _wukong_latest_cr_gts[14] = int(ev.get('payload_gt', 0) or 0)
                                     remote_seq = ev.get('seq', 0) or 0
                                     if remote_seq > local_cursor:
@@ -23149,7 +23215,7 @@ def _promote_wukong_fault_snapshot(snapshot, trace):
         'nia':               int(trace.get('nia', snapshot['nia'])),
         'pc':                int(trace.get('nia', snapshot['nia'])),
         'flags':             int(snapshot['flags']),
-        'call_depth':        int(trace.get('call_depth', 0)),
+        'call_depth':        trace.get('call_depth'),
         'led_bits':          0,
         'abstraction_label': str(trace.get('gt_label') or
                                  trace.get('nia_label') or ''),
@@ -23161,6 +23227,7 @@ def _promote_wukong_fault_snapshot(snapshot, trace):
         'snapshot_seq':      int(snapshot['seq']),
         'incident_id':       str(snapshot.get('incident_id', '') or ''),
         'bridge_session':    str(snapshot.get('bridge_session', '') or ''),
+        'bridge_trace_counter': snapshot.get('bridge_trace_counter', -1),
         'server_boot_id':     str(snapshot.get('fault_boot_id', '') or ''),
         'fault_trace_seq':    int(snapshot.get('fault_trace_seq', 0) or 0),
         'correlation_status': 'correlated',
@@ -23365,6 +23432,7 @@ def wukong_trace_post():
         'bp_hit':      bool(data.get('bp_hit', False)),
         'ts':          float(data.get('ts', 0.0)),
         'bridge_trace_counter': int(data.get('bridge_trace_counter', -1)),
+        'bridge_session': str(data.get('bridge_session', '') or ''),
     }
     incident_id = str(data.get('incident_id', '') or '')
     bridge_session = str(data.get('bridge_session', '') or '')
@@ -23418,11 +23486,12 @@ def wukong_trace_post():
                 'boot_id': existing_incident['server_boot_id'],
             })
 
+        entry['is_current'] = _wukong_trace_is_current(entry)
         # Update authoritative call depth BEFORE assigning seq so that
         # entry['call_depth'] reflects the state AFTER this event is applied.
-        if ev_type == 0x08:    # TRACE_EV_CALL_PUSH
+        if entry['is_current'] and ev_type == 0x08:    # TRACE_EV_CALL_PUSH
             _wukong_call_depth += 1
-        elif ev_type == 0x09:  # TRACE_EV_CALL_POP
+        elif entry['is_current'] and ev_type == 0x09:  # TRACE_EV_CALL_POP
             if _wukong_call_depth > 0:
                 _wukong_call_depth -= 1
         entry['call_depth'] = _wukong_call_depth
@@ -23434,7 +23503,12 @@ def wukong_trace_post():
             del _wukong_event_queue[:-_WUKONG_EVENT_QUEUE_MAXLEN]
         # Never alias the immutable execution-history event: live status may
         # later be cleared only after board-originated skip completion proof.
-        _wukong_latest_trace = dict(entry)
+        if entry['is_current'] and bridge_session != _wukong_latest_trace.get('bridge_session', ''):
+            _wukong_latest_cr_gts.clear()
+        if entry['is_current']:
+            _wukong_latest_trace = dict(entry)
+        if bridge_session and entry['bridge_trace_counter'] >= 1:
+            _wukong_reconcile_depth_locked(bridge_session)
         if entry['fault_valid'] and incident_id:
             # Authenticated priority fault telemetry may precede even the
             # first bridge-status report. Retain by session now; correlate
@@ -23455,7 +23529,7 @@ def wukong_trace_post():
             _wukong_bridge_trace_highwater[bridge_session] = max(
                 entry['bridge_trace_counter'],
                 _wukong_bridge_trace_highwater.get(bridge_session, -1))
-        if (_wukong_step_write_trace_seq is not None and
+        if (entry['is_current'] and _wukong_step_write_trace_seq is not None and
                 entry.get('bridge_trace_counter', -1) >
                 _wukong_step_write_trace_seq and
                 (not _wukong_step_bridge_session or
@@ -23476,9 +23550,9 @@ def wukong_trace_post():
         # Persist CR GT updates separately so a subsequent CALL_PUSH packet
         # (ev_type=0x08, payload_gt=0) cannot overwrite the CR6/CR14 GTs
         # before the IDE polls GET /hardware/wukong/trace.
-        if ev_type == 0x06:    # TRACE_EV_CALL_CR6
+        if entry['is_current'] and ev_type == 0x06:    # TRACE_EV_CALL_CR6
             _wukong_latest_cr_gts[6]  = payload_gt
-        elif ev_type == 0x07:  # TRACE_EV_CALL_CR14
+        elif entry['is_current'] and ev_type == 0x07:  # TRACE_EV_CALL_CR14
             _wukong_latest_cr_gts[14] = payload_gt
         if incident_id and entry['fault_valid']:
             _wukong_fault_incidents[incident_id] = {
@@ -23502,7 +23576,7 @@ def wukong_trace_post():
                 'correlation_status': 'trace accepted; complete snapshot pending',
                 'promotion_status': 'pending complete snapshot',
                 'reason': 'fault trace accepted; complete reason-2 snapshot pending',
-            }
+            } if entry['is_current'] else _wukong_fault_candidate
             _trim_wukong_fault_incidents_locked()
     decision = 'trace_accepted' if incident_id else 'accepted'
     return jsonify({
@@ -23576,6 +23650,7 @@ def wukong_snapshot_post():
         'bridge_session': bridge_session,
         'fault_boot_id': fault_boot_id,
         'fault_trace_seq': fault_trace_seq,
+        'bridge_trace_counter': int(data.get('bridge_trace_counter', -1)),
     })
     snapshot_digest = _wukong_payload_digest(data)
 
@@ -23600,10 +23675,11 @@ def wukong_snapshot_post():
                     incident.get('trace_seq') != fault_trace_seq:
                 decision, status = 'incident_mismatch', 409
                 reason = 'snapshot correlation does not match the accepted trace'
-            elif incident.get('state') == 'promoted':
+            elif incident.get('state') in ('promoted', 'correlated_history'):
                 if incident.get('snapshot_digest') == snapshot_digest:
                     return jsonify({
-                        'ok': True, 'accepted': True, 'promoted': True,
+                        'ok': True, 'accepted': True,
+                        'promoted': incident.get('state') == 'promoted',
                         'duplicate': True, 'decision': 'duplicate',
                         'incident_id': incident_id,
                         'seq': incident.get('snapshot_event_seq'),
@@ -23638,6 +23714,13 @@ def wukong_snapshot_post():
                     'reason': reason,
                 }), status
 
+        if entry['reason'] == 2 and entry['bridge_trace_counter'] < 0:
+            entry['bridge_trace_counter'] = incident['trace'].get('bridge_trace_counter', -1)
+        # A snapshot at the same counter follows that trace, not a retirement.
+        comparison = dict(entry)
+        if comparison['bridge_trace_counter'] >= 0:
+            comparison['bridge_trace_counter'] += 1
+        entry['is_current'] = _wukong_trace_is_current(comparison)
         _wukong_event_seq += 1
         entry['seq'] = _wukong_event_seq
         _wukong_event_queue.append(entry)
@@ -23646,7 +23729,19 @@ def wukong_snapshot_post():
         promoted = False
         if entry['reason'] == 2:
             incident = _wukong_fault_incidents[incident_id]
-            promoted = _promote_wukong_fault_snapshot(entry, incident['trace'])
+            promoted = (entry['is_current'] and
+                        _promote_wukong_fault_snapshot(entry, incident['trace']))
+            if not promoted:
+                # Retain complete correlated history without allowing delayed
+                # evidence to replace the active incident or authorize reboot.
+                entry['correlation_status'] = 'correlated'
+                entry['promotion_status'] = 'historical'
+                incident.update({
+                    'state': 'correlated_history',
+                    'snapshot': dict(entry),
+                    'snapshot_digest': snapshot_digest,
+                    'snapshot_event_seq': entry['seq'],
+                })
             if promoted:
                 entry['correlation_status'] = 'correlated'
                 entry['promotion_status'] = 'promoted'
@@ -23660,8 +23755,10 @@ def wukong_snapshot_post():
                     'incident_id': incident_id,
                     'reason': 'complete fault-time snapshot durably promoted',
                 }
-        _wukong_latest_snapshot = dict(entry)
-    decision = 'promoted' if promoted else 'not_fault_snapshot'
+        if entry['is_current']:
+            _wukong_latest_snapshot = dict(entry)
+    decision = ('promoted' if promoted else
+                'correlated_history' if entry['reason'] == 2 else 'not_fault_snapshot')
     app.logger.info(
         'Wukong snapshot incident=%s decision=%s promoted=%s',
         incident_id or '<none>', decision, promoted)
@@ -23801,7 +23898,7 @@ def wukong_events_get():
             'events':        events,
             # Authoritative call-stack depth after all events received so far.
             # The client uses this to resync after a gap or server restart.
-            'call_depth':    _wukong_call_depth,
+            'call_depth':    _wukong_latest_trace.get('call_depth', _wukong_call_depth),
             # Highest seq number ever assigned; used to detect server restarts
             # (client cursor > server_seq means the counter was reset).
             'server_seq':    _wukong_event_seq,
@@ -24288,7 +24385,7 @@ def wukong_status_get():
         snapshot  = dict(_wukong_latest_snapshot)
         seq       = _wukong_event_seq
         qlen      = len(_wukong_event_queue)
-        depth     = _wukong_call_depth
+        depth     = latest.get('call_depth', _wukong_call_depth)
         cr_gts    = dict(_wukong_latest_cr_gts)
         fault_candidate = dict(_wukong_fault_candidate)
     with _fault_snapshot_lock:

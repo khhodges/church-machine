@@ -183,7 +183,7 @@ register_suite "wukong-command-delivery-tests" \
     'python -m pytest tests/server/test_wukong_command_delivery.py tests/hardware/test_wukong_bridge_command_ack.py -v'
 
 register_suite "wukong-fault-sentinel" \
-    'python -m pytest tests/hardware/test_wukong_snapshot_protocol.py hardware/test_wukong_bridge_resync.py tests/server/test_wukong_snapshot.py tests/server/test_wukong_command_delivery.py tests/server/test_lump_root_override.py hardware/test_boot_rom_no_false_halt.py::test_repeated_reboots_stay_clean -q'
+    'python -m pytest tests/hardware/test_wukong_snapshot_protocol.py hardware/test_wukong_bridge_resync.py tests/server/test_wukong_snapshot.py tests/server/test_wukong_trace_causal_order.py tests/server/test_wukong_command_delivery.py tests/server/test_lump_root_override.py hardware/test_boot_rom_no_false_halt.py::test_repeated_reboots_stay_clean -q && node simulator/test_wukong_trace_causal_order.js'
 
 register_suite "sha32-vectors" \
     'python -m pytest scripts/test_sha32_vectors.py -v'

@@ -2260,6 +2260,11 @@ def main():
                             'skip_fault_completion', completion)
                         i += SNAPSHOT_HEADER_LEN + decoded['payload_len'] + SNAPSHOT_CRC_LEN
                         continue
+                    # Snapshot follows all trace packets counted so far. Carry
+                    # that causal fence even if priority HTTP delivery overtakes
+                    # the ordinary trace queue.
+                    decoded['bridge_session'] = session_id
+                    decoded['bridge_trace_counter'] = trace_counter
                     snapshot_payload = fault_recovery.snapshot_payload(decoded)
                     if decoded.get('reason') == FaultRecovery.FAULT_SNAPSHOT_REASON:
                         # The fault trace worker is ahead of this snapshot, but

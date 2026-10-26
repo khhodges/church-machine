@@ -27,3 +27,11 @@ of recovery. Packet counters need their session boundary to remain meaningful.
 **How to apply:** Separate snapshot authority from arrival-order UI state,
 preserve packet/session identity in stored records, and report missing tags
 as an evidence limitation rather than inventing them in offline analysis.
+
+Do not reconstruct a definite call depth from an incomplete packet prefix.
+Report it as unknown until missing predecessors arrive; keep arrival-order
+history cursors separate from the session-scoped execution clock.
+
+**Why:** Priority delivery can omit earlier CALL/RETURN records temporarily.
+Ignoring their state effects prevents a false recovery, but counting only the
+remaining records would still fabricate a call depth.

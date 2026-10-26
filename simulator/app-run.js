@@ -20753,8 +20753,21 @@ function _wukongUpdateCallDepthBadge() {
     if (!badge) return;
     const connected = _wukongIsConnected();
     badge.style.display = connected ? '' : 'none';
-    badge.textContent   = '\u21C6 ' + _wukongCallDepth;
-    badge.title         = 'HW call-stack depth: ' + _wukongCallDepth;
+    const depth = _wukongCallDepth == null ? 'unknown' : _wukongCallDepth;
+    badge.textContent   = '\u21C6 ' + depth;
+    badge.title         = 'HW call-stack depth: ' + depth;
+}
+
+function _wukongApplyCallDepth(data) {
+    if (Object.prototype.hasOwnProperty.call(data, 'call_depth')) {
+        _wukongCallDepth = typeof data.call_depth === 'number' ? data.call_depth : null;
+    } else if (_wukongCallDepth != null) {
+        // Compatibility for old, unordered bridges only. Explicit unknown
+        // depth never permits us to count through missing predecessors.
+        if (data.ev_type === 8) _wukongCallDepth++;
+        if (data.ev_type === 9) _wukongCallDepth = Math.max(0, _wukongCallDepth - 1);
+    }
+    _wukongUpdateCallDepthBadge();
 }
 function _wukongApplyCRUpdate(data) {
     if (!data) return;
@@ -20807,6 +20820,10 @@ function _wukongRenderHardwareRegisters() {
 }
 
 function _wukongApplySnapshot(data) {
+    if (data && data.is_current === false) {
+        _wukongAppendTrace(data);
+        return false;
+    }
     if (!data || data.snapshot !== true || data.crc_valid === false ||
         !Array.isArray(data.cr) || data.cr.length !== 16 ||
         !data.cr.every(row => Array.isArray(row) && row.length >= 3 &&
@@ -20888,7 +20905,7 @@ async function _wukongDrainEvents() {
     const wasConnected = _wukongIsConnected();
     for (const ev of events) {
         if ((ev.seq || 0) > _wukongLastEventSeq) _wukongLastEventSeq = ev.seq;
-        if (typeof ev.ev_type === 'number' &&
+        if (ev.is_current !== false && typeof ev.ev_type === 'number' &&
                 (ev.seq || 0) > _wukongLastRetirementSeq) {
             _wukongLastRetirementSeq = ev.seq;
         }
@@ -20923,6 +20940,9 @@ async function _wukongDrainEvents() {
     }
     // Top-level CR values are latest board observations, not event operands.
     _wukongApplyCRUpdate(data);
+    // Late predecessors may have completed the causal prefix without any new
+    // current packet. Use the server's reconciled value after draining history.
+    _wukongApplyCallDepth(data);
     // Refresh the machine-status chip after processing drained events so it
     // shows HW RUNNING / HW FAULTED without waiting for a fault transition.
     if (typeof updateFlagsDisplay === 'function') updateFlagsDisplay();
@@ -21365,6 +21385,9 @@ function _wukongNormalizeEvent(e) {
         (e.instr != null ? e.instr : null);
     return {
         seq: e.seq == null ? 'unavailable' : e.seq,
+        session: e.bridge_session || 'unavailable',
+        counter: e.bridge_trace_counter == null || e.bridge_trace_counter < 0
+            ? 'unavailable' : e.bridge_trace_counter,
         type: snapshot ? 'snapshot' : (e.kind === 'info' ? 'info' : 'trace'),
         event: ev, nia: e.nia == null ? 'unavailable' : _wukongHex(e.nia),
         lump: e.pet_name || e.abstraction_label || e.nia_label || 'unavailable',
@@ -21402,6 +21425,7 @@ function _wukongFormatEvent(e) {
             ' state=' + n.state + ' reason=' + n.reason;
     if (n.type === 'snapshot')
         return '[' + t + '] #' + n.seq + '  SNAPSHOT reason=' + n.reason +
+            ' session=' + n.session + ' packet=' + n.counter +
             ' snapshot_seq=' + (e.snapshot_seq == null ? 'unavailable' : e.snapshot_seq) +
             ' integrity=' + n.integrity +
             ' stored_pc=' + (e.stored_packed_pc == null ? 'unavailable' : _wukongHex(e.stored_packed_pc)) +
@@ -21410,6 +21434,8 @@ function _wukongFormatEvent(e) {
             ' correlated=' + (e.fault_trace_seq ? 'yes' : 'no');
     return '[' + t + '] #' + n.seq + '  TRACE group=' +
         (e.group || (e.nia == null ? 'unavailable' : _wukongHex(e.nia) + ':' + n.event.split(' ')[0])) +
+        ' session=' + n.session + ' packet=' + n.counter +
+        ' current_at_delivery=' + (e.is_current === false ? 'no (late/history)' : 'yes') +
         ' event=' + n.event +
         ' nia=' + n.nia + ' lump=' + n.lump + ' offset=' + n.offset +
         ' raw=' + n.raw + ' decoded(symbolic)=' + n.decoded + ' metadata=' + n.metadata +
@@ -21468,7 +21494,7 @@ function _wukongAppendTrace(data) {
     }
 
     // Snapshots and bridge lifecycle records are first-class ordered events.
-    if (data.snapshot || data.kind === 'info') {
+    if (data.snapshot || data.kind === 'info' || data.is_current === false) {
         const line = document.createElement('div');
         line.className = 'wukong-trace-line wukong-hardware-trace' +
             (data.snapshot ? ' wukong-trace-fault' : '');
@@ -21598,12 +21624,7 @@ function _wukongAppendTrace(data) {
     }
 
     if (evType === 0x08) {
-        if (typeof data.call_depth === 'number') {
-            _wukongCallDepth = data.call_depth;
-        } else {
-            _wukongCallDepth++;
-        }
-        _wukongUpdateCallDepthBadge();
+        _wukongApplyCallDepth(data);
         // Fault on CALL_PUSH: show inline panel (modal already opened by
         // the transition block above for the false→true case).
         if (data.fault_valid) _wukongShowFaultPanel(data);
@@ -21615,7 +21636,7 @@ function _wukongAppendTrace(data) {
             '  '));
         const callLink = document.createElement('button');
         callLink.className = 'call-return-event';
-        callLink.textContent = 'CALL push (depth ' + _wukongCallDepth + ')';
+        callLink.textContent = 'CALL push (depth ' + (_wukongCallDepth == null ? 'unknown' : _wukongCallDepth) + ')';
         callLink.title = 'Open the exact CALL instruction';
         callLink._traceEvent = Object.freeze(Object.assign({}, data, {
             kind: 'CALL', call_depth: _wukongCallDepth
@@ -21634,12 +21655,7 @@ function _wukongAppendTrace(data) {
     }
 
     if (evType === 0x09) {
-        if (typeof data.call_depth === 'number') {
-            _wukongCallDepth = data.call_depth;
-        } else {
-            if (_wukongCallDepth > 0) _wukongCallDepth--;
-        }
-        _wukongUpdateCallDepthBadge();
+        _wukongApplyCallDepth(data);
         // Fault on RETURN_POP: show inline panel (modal already opened above).
         if (data.fault_valid) _wukongShowFaultPanel(data);
         const line = document.createElement('div');
@@ -21650,7 +21666,7 @@ function _wukongAppendTrace(data) {
             '  '));
         const returnLink = document.createElement('button');
         returnLink.className = 'call-return-event';
-        returnLink.textContent = 'RETURN (depth ' + _wukongCallDepth + ')';
+        returnLink.textContent = 'RETURN (depth ' + (_wukongCallDepth == null ? 'unknown' : _wukongCallDepth) + ')';
         returnLink.title = 'Open the exact RETURN instruction';
         returnLink._traceEvent = Object.freeze(Object.assign({}, data, {
             kind: 'RETURN', call_depth: _wukongCallDepth

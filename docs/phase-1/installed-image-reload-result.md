@@ -130,6 +130,13 @@ fault-code conformance.
   Ordinary trace records omit the session field; session-tagged ACK/fault
   evidence and the controlled single-bridge context support the interpretation,
   not an independently retained session tag on every normal trace packet.
+  The delayed-delivery regression now replays these exact 39 trace records in
+  recorded, reverse-counter, and seeded shuffled arrival order. Its replay
+  envelope explicitly supplies the session missing from historical ordinary
+  records; it does not change or strengthen this retained physical evidence.
+  Current software preserves bridge session/counter tags and separates
+  arrival-order history from current execution state. A late lower-counter
+  packet remains visible in history but cannot clear a newer fault.
 - The board's exact installed configuration and entire installed runtime
   memory were not read back. This is not general Phase 1 certification,
   release approval, GT memory parity/ECC acceptance or interrupted-transfer
