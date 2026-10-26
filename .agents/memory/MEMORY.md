@@ -157,3 +157,4 @@
 - [Mint CREATE RTL entry](mint-create-rtl-entry-boundary.md) — use normal proof checks and an explicit scratch L binding; exact saved candidates need independent replay.
 - [Mint trial history origin](mint-trial-history-origin.md) — fresh disposable slot history cannot certify live or reused slots; closed-fixture alias evidence is not a live audit.
 - [Startup halt boundary](startup-halt-boundary.md) — post-sentinel Halt is best-effort, not a pre-entry pause; distinguish program fault-stop from confirmed startup halt.
+- [Reboot authority evidence](reboot-authority-evidence.md) — skipped-instruction telemetry is not a grant; distinguish live reset, persistent homes, and exact-image replay.

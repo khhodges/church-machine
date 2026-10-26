@@ -122,6 +122,10 @@ fault-code conformance.
   registers match. This needs separate investigation of cached register
   state across runtime reboot; do not claim a completely pristine initial
   register state or alter reset semantics in this trial.
+  Subsequent [offline authority investigation](runtime-reboot-authority.md)
+  distinguishes the skipped conditional LOAD's retained diagnostic latch from
+  cleared live descriptors; see its simulator-admission and physical-proof
+  limitations before interpreting this anomaly.
 - **HTTP arrival order is not retirement order.** Critical fault delivery
   overtook ordinary trace delivery. `latest_trace` consequently names an
   earlier non-faulting event even though the authoritative correlated fault
