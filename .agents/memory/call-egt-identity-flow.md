@@ -22,6 +22,26 @@ permission bits in LOAD, CALL and RETURN work. Never fix ordinary non-CR6
 L-only header access by rewriting CR6's GT or granting mixed R/L rights.
 RETURN frames retain caller E authority, not a fabricated L-only identity.
 
+Verify the E token and CR6.M together at actual CALL completion and subsequent
+LOAD, rather than accepting a successful LOAD as sufficient evidence.
+
+**Why:** An L-only token rewrite can conceal missing CR6.M and make an otherwise
+incorrect CALL appear functional.
+
+**How to apply:** Assert exact token preservation and the M boundary independently,
+then observe an authored instruction's committed state change through real CALL.
+
+Do not equate that retirement with delivery of its UART trace. The next
+instruction can become active while the preceding packet's last byte is still
+in flight.
+
+**Why:** Full-top observation exposed a fault before the preceding LOAD trace
+finished transmitting, which a core-only test ending at LOAD retirement missed.
+
+**How to apply:** Distinguish committed state, queued trace data and fully
+received frames. Report partial frames explicitly, and do not attribute a fault
+to the current fetch word without checking latched issuer/subunit evidence.
+
 Preserving E authority also means preserving its generation: never refresh a
 saved or calling token from the current Namespace sequence when constructing
 an Enter companion, including lump-only simulator adapters.

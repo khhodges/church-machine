@@ -87,13 +87,22 @@ def artifact_bindings(rows, directory):
 
 def portable_snapshot_key(raw, binding, rows, bindings):
     from server.namespace_binding_targets import naming_context
-    return digest({"version": 1, "source": hashlib.sha256(raw).hexdigest(),
+    # Bind sees all assigned bodies, whereas simulation copies only residents.
+    # Pin the complete saved assignment context and this owner's authenticated
+    # contract, not the caller's resident-filtered set of other contracts.
+    return digest({"version": 2, "source": hashlib.sha256(raw).hexdigest(),
         "slot": binding["slot"], "naming": naming_context(),
-        "destinations": sorted([
-            {k: row.get(k) for k in ("slot", "seq", "name", "type", "filename", "binary_hash")}
-            for row in rows], key=lambda row: row["slot"]),
-        "contracts": [{k: v for k, v in b.items() if k not in ("symbolicReport", "canonicalToken")}
-                      for b in sorted(bindings, key=lambda b: b["slot"])]})
+        "destinations": _binding_destinations(rows),
+        "namespaceLeaves": [r for r in rows if r.get("type") in ("Data", "Thread", "Namespace")],
+        "contract": {k: v for k, v in binding.items()
+                     if k not in ("symbolicReport", "canonicalToken")}})
+
+
+def _binding_destinations(rows):
+    return sorted([
+        {"slot": r["slot"], "hash": r.get("binary_hash") or r.get("binaryHash"),
+         "filename": r["filename"], "seq": r.get("seq"), "name": r.get("name")}
+        for r in rows if r.get("filename")], key=lambda x: x["slot"])
 
 
 def _localize_portable(raw, binding, rows, bindings, directory, *, bind_now=False):
@@ -150,12 +159,13 @@ def symbolic_snapshot_key(binding, rows, bindings):
     from server.namespace_binding_targets import naming_context
     names = naming_context()
     leaves = [row for row in rows if row.get("type") in ("Data", "Thread", "Namespace")]
-    return digest({"bindingVersion": 2, "source": binding["binaryHash"], "slot": binding["slot"],
+    # Bind reviews every assigned artifact; simulation copies only residents.
+    # Residency must not change the meaning of an already reviewed binding.
+    # Pin the complete saved assignment context, including Lazy artifacts,
+    # rather than the caller's (possibly resident-only) validated body subset.
+    return digest({"bindingVersion": 3, "source": binding["binaryHash"], "slot": binding["slot"],
         "namespaceLeaves": leaves, "naming": names,
-        "destinations": sorted([
-            {"slot": b["slot"], "hash": b["binaryHash"], "filename": b["filename"],
-             "seq": next(r.get("seq") for r in rows if r["slot"] == b["slot"])}
-            for b in bindings], key=lambda x: x["slot"])})
+        "destinations": _binding_destinations(rows)})
 
 
 @serialized("directory")

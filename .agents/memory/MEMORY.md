@@ -1,6 +1,8 @@
 - [CM KISS rule](cm-kiss-hard-fault.md) — default to hard fault; correct first-occurrence causes instead of adding recovery strategies; hardware never changes versions.
 - [Mint DESTROY scope](mint-destroy-scope.md) — releases the Namespace slot and object memory; does not collect or erase GT copies.
 - [NULL capability loading](null-capability-loading.md) — loading NULL must discard destination authority; distinguish NULL as loaded data from NULL used to authorize access.
+- [Thread home restoration](thread-home-restoration-authority.md) — zeroed caches do not neutralize unresolved authority; unadmitted Outforms must fault rather than acquire address-zero access.
+- [Nonzero-version probes](nonzero-version-layout-probes.md) — zero versions hide descriptor-layout mismatches; test version comparisons and limits independently.
 - [CHANGE operand authority](change-programmer-access.md) — indexed CR6 lookup is now explicitly approved for the simulator; still one Thread GT, no scratch LOAD, no FPGA approval.
 - [IDE product goal](ide-product-goal.md) — approved UI details define behavior; security stays internal; simplify affected code rather than adding competing state or approval gates.
 - [Spreadsheet preview caches](spreadsheet-preview-caches.md) — deliver cached formula results with the tracker; blank counts made aggregate status columns misleading.

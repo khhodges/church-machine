@@ -57,7 +57,10 @@ class ChurchNSGate(Elaboratable):
         cLoad  — passes e_gt_latched as gt_word0 after CHECK_TYPE/CHECK_PERM
     """
 
-    def __init__(self, enable_seal_check=None):
+    def __init__(self, enable_seal_check=None, *, authority_version_shift=21):
+        if authority_version_shift not in (17, 21):
+            raise ValueError("unsupported Namespace authority layout")
+        self.authority_version_shift = authority_version_shift
         self.enable_seal_check = (
             enable_seal_check if enable_seal_check is not None else ENABLE_SEAL_CHECK
         )
@@ -113,7 +116,9 @@ class ChurchNSGate(Elaboratable):
             raw_w2_view = View(WORD2_LAYOUT, raw_w2_reg)
 
             gt_seq_match = Signal()
-            m.d.comb += gt_seq_match.eq(gt_view.gt_seq == raw_w2_view.gt_seq)
+            m.d.comb += gt_seq_match.eq(
+                gt_view.gt_seq == raw_w2_reg[
+                    self.authority_version_shift:self.authority_version_shift + 9])
 
             raw_integrity_reg = Signal(32)
             computed_integrity = Signal(32)

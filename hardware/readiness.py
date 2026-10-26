@@ -25,6 +25,13 @@ ROOT = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------------
 
 CORE_SOURCES: tuple[str, ...] = (
+    "hardware/ascending_authority.py",
+    "hardware/ascending_namespace.py",
+    "hardware/boot_pair_guard.py",
+    "hardware/boot_thread_activation.py",
+    "hardware/boot_thread_validation.py",
+    "hardware/ordinary_change.py",
+    "hardware/reset_marker.py",
     "hardware/boot_change.py",
     "hardware/boot_rom.py",
     "hardware/call.py",
@@ -62,6 +69,9 @@ CORE_SOURCES: tuple[str, ...] = (
 )
 
 WUKONG_SOURCES: tuple[str, ...] = CORE_SOURCES + (
+    "hardware/guarded_build_profile.py",
+    "hardware/profiles/new_layout_guarded.json",
+    "docs/phase-1/reload-evidence/new-layout-amoeba-runtime/candidate-le.bin",
     "hardware/sparse_memory_init.py",
     "hardware/gen_rtlil.py",
     "hardware/uart_rx.py",

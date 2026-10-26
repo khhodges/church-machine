@@ -43,15 +43,15 @@ for (const method of ['CREATE', 'DESTROY', 'MakeOutform', 'MakeInform']) {
 ${dataScratch.map(reg => `IADD DR${reg}, DR0, #${512 + reg}`).join('\n')}
 IADD DR1, DR0, #77
 ${returnBlock}`, values);
-    const caller = compile(30, `${loads}
-LOAD CR11, CR6, #11
-CALL CR11, #0
-CHANGE CR13
-HALT`, [...values, callee.gt]);
     const slots = sim.configuredThreadSlots();
     assert.ok(slots.length >= 2);
     const threadGT = slot => sim.createGT(
         sim.parseNSWord1(sim.readNSEntry(slot).word1_limit).gtSeq, slot, {}, 1);
+    const caller = compile(30, `${loads}
+LOAD CR11, CR6, #11
+CALL CR11, #0
+CHANGE CR6, #12
+HALT`, [...values, callee.gt, threadGT(slots[1])]);
     const other = compile(35, 'CHANGE CR2\nHALT');
     const otherEntry = sim.readNSEntry(slots[1]);
     const otherBase = otherEntry.word0_location;

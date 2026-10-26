@@ -10,7 +10,7 @@ Pin assignments (xc7a100tfgg676-2 / LVCMOS33 — hardware-confirmed on real boar
   led[0] G21  User LED D1 (ACTIVE-LOW: FPGA drives LOW → LED ON)
   led[1] G20  User LED D2 (ACTIVE-LOW: FPGA drives LOW → LED ON)
 
-Note: Do NOT use Instance("BUFG") explicitly — Vivado drops it during opt_design for
+Legacy direct-clock path: do NOT use Instance("BUFG") explicitly — Vivado drops it during opt_design for
 SRCC pins in this design.  Use a direct comb assignment so Vivado auto-infers IBUF→BUFG.
 
 BRAM initialisation note:
@@ -43,6 +43,41 @@ What you will see:
 """
 
 from amaranth import *
+
+
+class WukongClock25(Elaboratable):
+    """Artix-7 50 MHz board input -> 25 MHz global user clock.
+
+    Explicit buffers here are MMCM feedback/output resources, not the legacy
+    direct SRCC-to-BUFG path described above.
+    Vendor primitive implementation; behavioral simulation of this block is
+    a separate acceptance gate, not supplied by the Amaranth simulator.
+    """
+
+    def __init__(self):
+        self.clk_in = Signal()
+        self.clk_out = Signal()
+        self.locked = Signal()
+
+    def elaborate(self, platform):
+        m = Module()
+        buffered = Signal()
+        feedback_raw = Signal()
+        feedback = Signal()
+        divided = Signal()
+        m.submodules.input_buffer = Instance("IBUF", i_I=self.clk_in, o_O=buffered)
+        m.submodules.mmcm = Instance(
+            "MMCME2_BASE",
+            p_BANDWIDTH="OPTIMIZED", p_CLKIN1_PERIOD=20.0,
+            p_DIVCLK_DIVIDE=1, p_CLKFBOUT_MULT_F=20.0,
+            p_CLKOUT0_DIVIDE_F=40.0, p_CLKOUT0_DUTY_CYCLE=0.5,
+            p_CLKOUT0_PHASE=0.0, p_STARTUP_WAIT="FALSE",
+            i_CLKIN1=buffered, i_CLKFBIN=feedback, i_RST=0, i_PWRDWN=0,
+            o_CLKFBOUT=feedback_raw, o_CLKOUT0=divided, o_LOCKED=self.locked)
+        m.submodules.feedback_buffer = Instance("BUFG", i_I=feedback_raw, o_O=feedback)
+        m.submodules.user_buffer = Instance(
+            "BUFGCE", i_I=divided, i_CE=self.locked, o_O=self.clk_out)
+        return m
 from amaranth.lib.memory import Memory as LibMemory
 
 from .hw_types import *
@@ -426,16 +461,41 @@ class ChurchWukongXC7A100T(Elaboratable):
 
     def __init__(self, clk_freq=50_000_000, baud=57_600, sim_mode=False, build_sig=None,
                  button_debounce_cycles=None, sim_dmem_init=True,
-                 upload_watchdog_limit=None, sim_upload_only=False):
+                 upload_watchdog_limit=None, sim_upload_only=False,
+                 expected_boot_guard=None, sim_boot_image_words=None, runtime_image_words=None,
+                 clock_mode="direct"):
+        if clock_mode not in ("direct", "mmcm-25mhz"):
+            raise ValueError("Unsupported board clock mode")
+        if clock_mode == "mmcm-25mhz" and (clk_freq != 25_000_000 or sim_upload_only):
+            raise ValueError("MMCM candidate requires 25 MHz full top")
+        if not sim_mode and clock_mode == "direct" and clk_freq != 50_000_000:
+            raise ValueError("Direct board clock is physically 50 MHz")
+        self.clock_mode = clock_mode
         self.clk_freq = clk_freq
         self.baud     = baud
         self.sim_mode = sim_mode
         self.sim_dmem_init = sim_dmem_init
         self.upload_watchdog_limit = upload_watchdog_limit
         self.sim_upload_only = sim_upload_only
+        self.expected_boot_guard = expected_boot_guard
+        if runtime_image_words is not None:
+            if sim_boot_image_words is not None or sim_upload_only:
+                raise ValueError("Production runtime image cannot be mixed with simulation overrides")
+            from .guarded_build_profile import validate_words
+            runtime_image_words = validate_words(runtime_image_words, expected_boot_guard)
+        self.runtime_image_words = runtime_image_words
+        if sim_boot_image_words is not None:
+            if not sim_mode or sim_upload_only:
+                raise ValueError("sim_boot_image_words requires the full simulation model")
+            sim_boot_image_words = tuple(sim_boot_image_words)
+            if (len(sim_boot_image_words) != _WUKONG_DMEM_WORDS or
+                    any(type(word) is not int or not 0 <= word <= 0xffffffff
+                        for word in sim_boot_image_words)):
+                raise ValueError("simulation boot image must contain exactly 16384 uint32 words")
+        self.sim_boot_image_words = sim_boot_image_words
         self.button_debounce_cycles = (
             button_debounce_cycles if button_debounce_cycles is not None
-            else (4 if sim_mode else 50_000))
+            else (4 if sim_mode else clk_freq // 1000))
 
         self.clk          = Signal()        # 50 MHz oscillator  (M21, SRCC bank 34)
         self.rst_n        = Signal(init=1)  # Active-low button   (M6) — constrained, reserved
@@ -508,13 +568,28 @@ class ChurchWukongXC7A100T(Elaboratable):
         # self.clk is left undriven (unused) in simulation.
         m.domains += ClockDomain("sync", reset_less=True)
         if not self.sim_mode:
-            m.d.comb += ClockSignal("sync").eq(self.clk)
+            if self.clock_mode == "mmcm-25mhz":
+                # The board oscillator remains 50 MHz. Dedicated MMCM generates
+                # 25 MHz; no LUT clock divider and no relaxed input constraint.
+                # BUFGCE suppresses user clock edges until MMCM lock. GSR still
+                # owns initialization; do not introduce a self-resetting domain.
+                clock = m.submodules.phase1_clock = WukongClock25()
+                m.d.comb += [clock.clk_in.eq(self.clk),
+                             ClockSignal("sync").eq(clock.clk_out)]
+            else:
+                m.d.comb += ClockSignal("sync").eq(self.clk)
 
         # ── ChurchCore ─────────────────────────────────────────────────────────
-        core = m.submodules.core = ChurchCore()
+        core = m.submodules.core = ChurchCore(expected_boot_guard=self.expected_boot_guard)
+        if self.sim_mode:
+            self.sim_core = core  # Observation only; no board port or reset override.
 
         # ── Boot ROM (instruction fetch — read-only BRAM tile) ─────────────────
-        boot_rom = m.submodules.boot_rom = BootRom(_WUKONG_ROM)
+        rom_words = list(_WUKONG_ROM)
+        if self.expected_boot_guard is not None:
+            from .reset_marker import RESET_MARKER_WORD
+            rom_words[1] = RESET_MARKER_WORD
+        boot_rom = m.submodules.boot_rom = BootRom(rom_words)
         m.d.comb += boot_rom.addr.eq(core.imem_addr[2:12])
         # imem source mux: NIA 0x0-0xF fetches the three boot instructions plus
         # the BRANCH -1 return guard from ROM; everything else fetches from DMEM
@@ -523,8 +598,10 @@ class ChurchWukongXC7A100T(Elaboratable):
         # code — actually executes.  Both sources have 1-cycle latency, so the
         # select is registered to stay aligned with the data.
         imem_from_dmem = Signal()
-        m.d.sync += imem_from_dmem.eq(
-            core.imem_addr >= _WUKONG_BOOT_WINDOW_BYTES)
+        m.d.sync += [
+            imem_from_dmem.eq(core.imem_addr >= _WUKONG_BOOT_WINDOW_BYTES),
+            core.imem_fetch_address.eq(core.imem_addr),
+        ]
 
         # ── Data memory (BRAM, 16 384 × 32-bit = 64 KB) ───────────────────────
         # init= is used for simulation accuracy only.  On real FPGA hardware the
@@ -603,6 +680,10 @@ class ChurchWukongXC7A100T(Elaboratable):
             GT_TYPE_INFORM, PERM_MASK_E, CAPABILITY_TEST_NS_SLOT, 0))
         # Words 0x47A..0x47F remain zero (padding to 128-word init boundary).
 
+        if self.runtime_image_words is not None:
+            dmem_init = list(self.runtime_image_words)
+        elif self.sim_boot_image_words is not None:
+            dmem_init = list(self.sim_boot_image_words)
         hw_init_pairs = [(addr, val)
                          for addr, val in enumerate(dmem_init) if val != 0]
 
@@ -632,6 +713,7 @@ class ChurchWukongXC7A100T(Elaboratable):
         m.d.comb += [
             imem_rd.addr.eq(core.imem_addr[2:16]),
             core.imem_data.eq(Mux(imem_from_dmem, imem_rd.data, boot_rom.data)),
+            core.imem_from_reset_rom.eq(~imem_from_dmem),
         ]
 
         # ── Memory address mux ─────────────────────────────────────────────────

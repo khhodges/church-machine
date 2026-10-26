@@ -1,0 +1,21 @@
+; Minimal startup prototype, not an installed Thread service.
+; Priming contract: fresh zeroed Thread, canonical entry frame at Start,
+; CR1 = application's E-GT; c-list ide.BootThread = supervisor Thread GT.
+; Application entry is first public method (CLOOMC selector #0).
+; No heap allocator/checkpoint ABI.
+; Mint-side protected-frame priming is a fixture prerequisite, not implemented here.
+abstraction ide.AmoebaStartup {
+capabilities { SELF E, ide.BootThread }
+method Start {
+    ; Initialize application-visible startup status in the current Thread.
+    IADD DR1, DR0, #0
+    ; Ordinary CALL checks the supplied application's Enter authority.
+    CALL CR1, #0
+    ; Application returns here; preserve its DR1 result and yield to supervisor.
+    ; CALL/RETURN does not preserve scratch CR2: reload declared authority.
+    LOAD CR2, CR6, #1
+    CHANGE CR2
+    ; A completed startup must not restart the application if resumed.
+    HALT
+}
+}

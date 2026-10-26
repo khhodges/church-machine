@@ -164,7 +164,7 @@ def test_h07_raw_null_b_and_exact_bits(preset, left, right):
     simulate(dut, bench)
 
 
-@pytest.mark.parametrize("defect", ["permission", "header_type", "header_cc", "header_size"])
+@pytest.mark.parametrize("defect", ["destination", "permission", "header_type", "header_cc", "header_size"])
 def test_h08_thread_admission_distinct_approved_faults(defect):
     """No frame packing assumption is needed to reject these single defects."""
     dut = ChurchChange()
@@ -180,10 +180,9 @@ def test_h08_thread_admission_distinct_approved_faults(defect):
     operand = 0x12000001 if defect == "permission" else 0x02000001
     async def bench(ctx):
         ctx.set(dut.ordinary, 1)
-        # Unit interface (not instruction encoding); destination routing is
-        # checked independently at the full-core boundary.
+        # Ordinary CHANGE checks its reserved destination even at this interface.
         ctx.set(dut.cr_src, 2)
-        ctx.set(dut.cr_dst, 2)
+        ctx.set(dut.cr_dst, 2 if defect == "destination" else 0)
         ctx.set(dut.cr_rd_data.as_value(), operand)
         ctx.set(dut.cr15_namespace.as_value(), 0x1a000000 | (255 << 64))
         ctx.set(dut.change_start, 1)
@@ -197,7 +196,8 @@ def test_h08_thread_admission_distinct_approved_faults(defect):
             assert not ctx.get(dut.flags_restore_en)
             assert not ctx.get(dut.change_complete)
             if ctx.get(dut.change_fault):
-                assert ctx.get(dut.fault_type) == (0x1e if defect == "permission" else 0x1d)
+                assert ctx.get(dut.fault_type) == (
+                    0xb if defect == "destination" else 0x1e if defect == "permission" else 0x1d)
                 return
             request, addr = ctx.get(dut.mem_rd_en), ctx.get(dut.mem_rd_addr)
             await ctx.tick()

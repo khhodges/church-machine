@@ -1,0 +1,11 @@
+; Explicit selected-image entry; CapabilityTest remains unchanged.
+abstraction ide.ActorManager {
+    capabilities { SELF E, ide.Thread2, ide.Thread3 }
+    method Run() {
+        LOAD CR2, CR6, #1
+        CHANGE CR2
+        LOAD CR3, CR6, #2
+        CHANGE CR3
+        HALT
+    }
+}

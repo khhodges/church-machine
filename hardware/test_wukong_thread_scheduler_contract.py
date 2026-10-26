@@ -77,9 +77,9 @@ def test_change_contract_uses_canonical_church_suspension_frame():
     assert 'with m.State("SAVE_EGT_WRITE")' in source
     assert 'with m.State("SAVE_FRAME")' in source
     assert 'stack_slot_addr(' in source
-    assert 'self.nia_restore_val.eq(incoming_frame[13:28] << 2)' in source
+    assert 'self.nia_restore_val.eq(entry_raw_base + 4 + (incoming_frame[13:28] << 2))' in source
     assert 'nia_current_latched.eq(self.nia_current)' in source
-    assert '(nia_current_latched[2:17] + 1)[:15]' in source
+    assert '(((nia_current_latched - code_base_latched) >> 2) + 1)[:15]' in source
     assert 'with m.State("PREFLIGHT_CAP_READ")' in source
     assert 'with m.State("PREFLIGHT_EGT_VALIDATE")' in source
     # Scheduler preflight's only successful edge into write-capable SAVE_*
@@ -271,7 +271,7 @@ def test_change_enforces_defined_thread_body_before_restoring_context(
             assert not flags_written
             return
         assert terminal == "complete"
-        assert nia == return_pc * 4
+        assert nia == code_base + 4 + return_pc * 4
         assert drs == [0xA0000000 | i for i in range(16)]
         cr14 = crs[14]
         assert (crs[0] & 0xFFFF) == cr0_code_slot
@@ -355,10 +355,9 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         GT_TYPE_INFORM, PERM_MASK_E, slot_id=target_code_slot)
 
     source_word = source_code_base // 4
-    # CHANGE frames carry absolute word NIAs, and admission checks those
-    # against cw. Keep each tiny test program at its real image address while
-    # retaining a code zone large enough to include that address.
-    dmem[source_word] = pack_lump_header(3, 400, 2, 0)
+    # Saved NIAs are relative to the first instruction, not the physical
+    # image address. A relocated program still has only its authored code size.
+    dmem[source_word] = pack_lump_header(3, 4, 2, 0)
     if decoded_change:
         dmem[source_word + 1] = encode_church(
             ChurchOpcode.LOAD, CondCode.AL, cr_dst=1, cr_src=6, imm=0x0010)
@@ -380,7 +379,7 @@ def _thread_switch_core_image(decoded_change, corruption=None):
             TuringOpcode.BRANCH, CondCode.AL, imm=0)
 
     target_word = target_code_base // 4
-    dmem[target_word] = pack_lump_header(6, target_word + 2, 1, 0)
+    dmem[target_word] = pack_lump_header(6, 2, 1, 0)
     dmem[target_word + 1] = encode_turing(
         TuringOpcode.IADD, CondCode.AL, dr_dst=2, dr_src=2, imm=1)
     dmem[target_word + 2] = encode_turing(
@@ -392,7 +391,7 @@ def _thread_switch_core_image(decoded_change, corruption=None):
         (layout["stack_end"] - 2) | (1 << 12))
     dmem[thread_word + layout["stack_end"] - 1] = target_gt
     dmem[thread_word + layout["stack_end"]] = (
-        layout["stack_end"] | ((target_word + 1) << 13))
+        layout["stack_end"] | (0 << 13))
     dmem[thread_word + layout["caps_start"]] = target_gt
     if corruption == "null_egt":
         dmem[thread_word + layout["stack_end"] - 1] = 0
@@ -638,7 +637,7 @@ def test_full_core_thread_switch_preserves_flags_for_next_branch(
     loop = encode_turing(TuringOpcode.BRANCH, CondCode.AL, imm=0)
     # The observation window continues after `taken` retires. Keep that path
     # inside executable test code instead of falling through into the c-list.
-    dmem[target_word] = pack_lump_header(6, target_word + 6, 1, 0)
+    dmem[target_word] = pack_lump_header(6, 6, 1, 0)
     dmem[target_word + 1:target_word + 7] = [
         change_back, branch_on_restored_flag, fallthrough, loop, taken, loop,
     ]

@@ -1,0 +1,178 @@
+{
+  "recordedAtUtc": "2026-10-25T16:38:19.502995+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/observer-program",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked-600s.vvp",
+    "+program-trial"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 17277.0,
+  "deadlineSeconds": 28800,
+  "cycleLimit": 6000000,
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "executableSha256": "ac2910c5ea3056477f37e544ef092cf5769eb161ca4931a297cb21870c236f4f",
+  "verilogSha256": "2b8733b8e2d3737275b499a9ae1bf25cbff4d28e4e7fd79c62e42959ac262c1b",
+  "sourceFingerprint": "bbd09abb0c963f5afa84f5da3ed39f8ef0f4a72f051690c08716bf4920e36fa1",
+  "driverSourceSha256": "45bcf3f6e198e117d1baddeb492dc1a67b4bed6e317fea971ffcdae6164da43b",
+  "driverBinarySha256": "9f60162919f07987db611dbece11a1d4ccd52659175f76c6d6417f963bca5fa6",
+  "terminalObservations": [
+    "FAULT cycle=3953996 code=8 nia=00002e08"
+  ],
+  "bootCompleteObserved": true,
+  "observedAddressOpcodeSequence": [
+    [
+      4,
+      4
+    ],
+    [
+      8,
+      2
+    ],
+    [
+      13572,
+      0
+    ],
+    [
+      13576,
+      0
+    ],
+    [
+      13580,
+      4
+    ],
+    [
+      14600,
+      21
+    ],
+    [
+      14604,
+      2
+    ],
+    [
+      11276,
+      0
+    ],
+    [
+      11280,
+      17
+    ],
+    [
+      11284,
+      3
+    ],
+    [
+      14608,
+      0
+    ],
+    [
+      14612,
+      4
+    ],
+    [
+      13584,
+      0
+    ],
+    [
+      13588,
+      4
+    ],
+    [
+      14600,
+      21
+    ],
+    [
+      14604,
+      2
+    ]
+  ],
+  "referenceAddressOpcodeSequence": [
+    [
+      4,
+      4
+    ],
+    [
+      8,
+      2
+    ],
+    [
+      13572,
+      0
+    ],
+    [
+      13576,
+      0
+    ],
+    [
+      13580,
+      4
+    ],
+    [
+      14600,
+      21
+    ],
+    [
+      14604,
+      2
+    ],
+    [
+      11276,
+      0
+    ],
+    [
+      11280,
+      17
+    ],
+    [
+      11284,
+      3
+    ],
+    [
+      14608,
+      0
+    ],
+    [
+      14612,
+      4
+    ],
+    [
+      13584,
+      0
+    ],
+    [
+      13588,
+      4
+    ],
+    [
+      14600,
+      21
+    ],
+    [
+      14604,
+      2
+    ]
+  ],
+  "addressOpcodeSequenceMatchesPriorModel": true,
+  "faults": [
+    {
+      "cycle": 3953996,
+      "code": 8,
+      "nia": 11784
+    }
+  ],
+  "priorModelFault": {
+    "code": 8,
+    "nia": 11784,
+    "instruction": 118161440
+  },
+  "faultCodeConformance": "Unresolved: prior model BOUNDS=8 differs from source comment NO_CAPABILITY; equality is not ISA approval",
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test",
+  "fullLogSha256": "777e43062cc2fc406411b6a3b7297dff00f5b5b81dfebdd4262ffffa91a107e3",
+  "scope": "Exact generated-design program observation; expected endpoint is Mallory denial, not arbitrary fault; physical reload and installed bytes unverified"
+}

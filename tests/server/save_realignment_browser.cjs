@@ -23,11 +23,14 @@ async function main() {
     const context = await browser.newContext();
     const page = await context.newPage();
     const calls = [];
+    const preparationFailures = [];
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('response', response => {
-        if (/\/api\/(lumps\/(save|save-plan|approval-intent)|namespace\/save-table|simulation\/)/.test(response.url()))
+    page.on('response', async response => {
+        if (/\/api\/(lumps\/(save|save-plan|approval-intent)|namespace\/(save-table|bind-placements)|simulation\/)/.test(response.url()))
             calls.push([new URL(response.url()).pathname, response.status()]);
+        if (response.url().endsWith('/api/simulation/prepare') && !response.ok())
+            preparationFailures.push(await response.json().catch(() => ({error: 'unreadable response'})));
     });
     // Block external traffic and all hardware even on the disposable server.
     await context.route('**/*', route => {
@@ -87,6 +90,7 @@ async function main() {
         return (await response.json()).abstractions;
     }
     async function publish(value, previous, mode) {
+        preparationFailures.length = 0;
         return page.evaluate(async ({value, previous, mode, callback}) => {
             const source = `abstraction ide.CapabilityTest {\n method Ping() { return(${value}) }\n}\n`;
             async function post(url, body) {
@@ -141,30 +145,68 @@ async function main() {
             const expected = words.slice();
             expected[expected.length - 1] = parseInt(row.simulationBinding.localSelfGT, 16);
             const location = Number(row.location);
+            const descriptor = sim.readNSEntry(row.slot);
+            const allocationWords = sim.parseNSWord1(descriptor.word1_limit).limit + 1;
             const actual = Array.from(sim.memory.slice(location, location + expected.length));
             // Do not patch PC/registers or force entry. Execute the prepared boot
             // until the source's return value has been computed, before RETURN.
             for (let i=0; i<40 && sim.dr[1] !== value && !sim.halted; i++) await stepSim();
-            return {row, actual, expected, result:sim.dr[1], faults:sim.faultLog, output:sim.output,
+            return {row, actual, expected, allocationWords,
+                result:sim.dr[1], faults:sim.faultLog, output:sim.output,
                 steps:sim.stepCount, configuration:config.configurationHash};
         }, {saved, value});
         assert.equal(evidence.row.filename, saved.filename);
         assert.equal(evidence.row.binary_hash, saved.binary_hash);
         assert.deepEqual(evidence.actual, evidence.expected, 'complete localized saved body');
+        assert(evidence.allocationWords >= 1 + ((evidence.expected[0] >>> 10) & 8191),
+            'Namespace access limit must cover the executable code, not necessarily the c-list');
         assert.equal(evidence.result, value, JSON.stringify(evidence));
         assert.equal(evidence.faults.length, 0, JSON.stringify(evidence.faults));
         assert(evidence.steps > 0);
         return evidence;
     }
+    async function bindAndRetryIfRequired(result) {
+        await page.waitForFunction(() => !window._savedLumpRealignment ||
+            window._savedLumpRealignment.pending === false);
+        const barrier = await page.evaluate(() => window._savedLumpRealignment);
+        if (barrier && /cannot materialize compiler SELF/.test(
+                preparationFailures.at(-1)?.error || '')) {
+            // Current compiler output is explicitly unbound. Act as the
+            // engineer through the real binding endpoint; saving alone must
+            // not silently bind SELF or execute the newly published program.
+            const before = await snapshot();
+            await assertBlocked();
+            const response = await page.evaluate(async () => {
+                const state = await (await fetch('/api/boot-image/ns-state')).json();
+                const r = await fetch('/api/namespace/bind-placements', {
+                    method:'POST', headers:{'Content-Type':'application/json',
+                        'X-Requested-With':'NamespaceDesign'},
+                    body:JSON.stringify({namespaceFingerprint:state.namespaceFingerprint})
+                });
+                return {status:r.status, body:await r.json()};
+            });
+            assert.equal(response.status, 200, JSON.stringify(response));
+            assert.equal(response.body.ok, true, JSON.stringify(response));
+            assert(response.body.bindingReport.lists.filter(row => row.filename)
+                .every(row => row.status === 'bound'), JSON.stringify(response.body));
+            assert.deepEqual(await snapshot(), before, 'binding must not activate an image');
+            await page.getByRole('button', {name:'Retry simulation preparation', exact:true}).click();
+            await page.waitForFunction(() => !window._savedLumpRealignment ||
+                window._savedLumpRealignment.pending === false);
+        }
+        if (result) result.barrier = await page.evaluate(() => window._savedLumpRealignment);
+    }
     try {
         await load();
         let result = await publish(42, input.old);
+        await bindAndRetryIfRequired(result);
         assert.equal(result.barrier, null, JSON.stringify(result.barrier));
         await assertHistory(result.saved);
         await assertActivated(result.saved, 42);
         const first = result.saved;
         // This identity keeps its token across source revisions.
         result = await publish(43, first);
+        await bindAndRetryIfRequired(result);
         assert.equal(result.saved.token, first.token);
         assert.notEqual(result.saved.filename, first.filename);
         await assertHistory(result.saved);
@@ -178,6 +220,7 @@ async function main() {
         for (let repeat = 0; repeat < 2; repeat++) {
             const callStart = calls.length;
             result = await publish(43, previous);
+            await bindAndRetryIfRequired(result);
             assert.equal(result.committed.committed, true);
             for (const key of ['token', 'filename', 'binary_hash'])
                 assert.equal(result.saved[key], sameToken[key], key);
@@ -206,6 +249,7 @@ async function main() {
         await assertBlocked();
         await page.evaluate(() => { window._nsTableDirty = false; });
         await page.getByRole('button', {name:'Retry simulation preparation', exact:true}).click();
+        await bindAndRetryIfRequired();
         await page.waitForFunction(() => window._savedLumpRealignment === null);
         await assertActivated(result.saved, 44);
 
@@ -213,6 +257,7 @@ async function main() {
         const beforeFailure = await snapshot();
         await control('expire-activation');
         result = await publish(45, result.saved);
+        await bindAndRetryIfRequired(result);
         assert.match(result.barrier.message, /activate failed/);
         assert.deepEqual(await snapshot(), beforeFailure);
         await assertBlocked();
@@ -269,12 +314,13 @@ async function main() {
             namespaceWritesBeforeConflict + 1, 'no silent retry of the rejected Namespace write');
         await page.unroute('**/api/boot-image/ns-state');
         await page.getByRole('button', {name:'Retry simulation preparation', exact:true}).click();
+        await bindAndRetryIfRequired();
         await page.waitForFunction(() => window._savedLumpRealignment === null);
         await assertActivated(result.saved, 46);
         assert.equal((await namespace()).find(row => row.slot === 14).label, 'concurrent engineer edit',
             'explicit retry must preserve the competing edit');
         for (const endpoint of ['lumps/save-plan','lumps/approval-intent','lumps/save',
-            'namespace/save-table','simulation/prepare','simulation/approve','simulation/activate'])
+            'namespace/save-table','namespace/bind-placements','simulation/prepare','simulation/approve','simulation/activate'])
             assert(calls.some(([path,status]) => path === '/api/'+endpoint && status < 300), endpoint);
         assert(calls.some(([path,status]) => path === '/api/simulation/activate' && status === 409));
         console.log('PASS executed saved revision: canonical identity, unchanged saves, same-token History, draft/CAS, activation barrier, restart/retry');
@@ -283,6 +329,7 @@ async function main() {
         console.error('Save status:', await page.locator('#saveNSStatus').textContent().catch(() => 'absent'));
         console.error('Browser errors:', errors);
         console.error('Endpoint evidence:', calls);
+        console.error('Preparation failures:', JSON.stringify(preparationFailures));
         throw error;
     } finally {
         clearInterval(reviewPump);

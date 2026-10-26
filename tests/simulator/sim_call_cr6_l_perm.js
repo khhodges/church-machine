@@ -4,6 +4,35 @@
 const assert = require('node:assert/strict');
 const {fixture, checkContext} = require('./cr6_contract_fixture');
 
+// A Namespace access limit may exclude the tail c-list without truncating the
+// physical allocation. CALL must bound code by that limit and derive CR6 from
+// the validated LUMP header, never enlarge the Namespace's ordinary access.
+for (const limit of [3, 4, 62, 63]) {
+    const {sim} = fixture();
+    const base = 0x200;
+    sim.memory[base] = sim.packLumpHeader(0, 4, 1, 0);
+    sim.memory[base + 1] = 2;
+    sim.withNamespaceWrite('code access-bound fixture', () =>
+        sim.writeNSEntry(30, base, limit, 0, 0, 1, 7, 1, 0));
+    const gt = sim.createGT(7, 30, {E: 1}, 1);
+    sim.cr[0].word0 = gt;
+    const depth = sim.callStack.length;
+    let fault;
+    sim.fault = type => { fault = type; };
+    const result = sim._execCall({crDst: 0, imm: 1});
+    if (limit < 4) {
+        assert.equal(result, null);
+        assert.equal(fault, 'BOUNDS');
+        assert.equal(sim.callStack.length, depth, 'failed admission must not push a frame');
+    } else {
+        assert(result);
+        assert.equal(fault, undefined);
+        checkContext(sim, {gt, base, clistBase: base + 63});
+        assert.equal(sim.parseNSWord1(sim.readNSEntry(30).word1_limit).limit, limit,
+            'CALL must not widen the stored Namespace access bound');
+    }
+}
+
 // Keep the original method-dispatch matrix: signed canonical displacements,
 // legacy offsets, private methods and both table/target bounds.
 for (const [method, entry, target, fault] of [

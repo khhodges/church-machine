@@ -1,0 +1,8 @@
+{
+  "passed": 310,
+  "failed": 3,
+  "newCaptureTestsPassed": 15,
+  "baselineReproducedFailures": 3,
+  "scope": "Three failures persist with pre-correction DWRITE; not a clean conformance-suite pass",
+  "releaseVerified": false
+}

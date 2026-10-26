@@ -1,0 +1,28 @@
+{
+  "recordedAtUtc": "2026-10-25T19:49:29.148880+00:00",
+  "command": [
+    "iverilog",
+    "-v",
+    "-g2012",
+    "-s",
+    "church_wukong_xc7a100t",
+    "-o",
+    "generated-artifacts/new-layout-timing-dwrite-capture/compiled.vvp",
+    "generated-artifacts/new-layout-timing-dwrite-capture/rtl/church_wukong_xc7a100t.v",
+    "/nix/store/d0jss2q3m0bc346bbpgii1l0b3a0mx0p-yosys-0.51/share/yosys/xilinx/cells_sim.v"
+  ],
+  "status": "passed",
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 480.06,
+  "deadlineSeconds": 900,
+  "sourceFingerprint": "ecc4babfc6a8ae93186fe17ec3d329f46360aa196c40dd0dfba50a407a1b85c0",
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "inputsUnchanged": true,
+  "hardwareCommandsSent": false,
+  "releaseVerified": false,
+  "verilogSha256": "af3df46a567fd7331f0ce5b4f10ebc50185208354a0a09825c326b18471639db",
+  "librarySha256": "10f8afc61bf708949ebf238294327dce95eaa68919bb0ab5938d40f24e39d15e",
+  "executableSha256": "cf5985d2eea1085a6c5b8ccc5ced7485dd04f99c7700e52fa44640cb6fcd6cee",
+  "programReplayPerformed": false
+}

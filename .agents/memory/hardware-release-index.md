@@ -17,3 +17,4 @@ description: Build-host, staging, artifact tracking, and release authority const
 - [Validation supervision](rtl-validation-budget.md) — long matrices may outlive completion validation; unfinished checks are not passes or RTL failures.
 - [ISA/simulator reference goals](isa-simulator-reference-goals.md) — fully defined ISA, explicit simulator exceptions, and FPGA-comparable binary memory detail.
 - [Flash capacity units](configuration-memory-capacity.md) — write_cfgmem uses MiB; the Wukong 64 Mbit flash requires size 8, not 64.
+- [Phase 1 clock](phase1-reduced-clock.md) — approved 25 MHz functional-test candidate first; memory integrity separately, with timing and programming gates preserved.

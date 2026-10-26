@@ -1,0 +1,305 @@
+{
+  "name": "New Layout",
+  "format": "ascending-nst-metadata-slot0-v1",
+  "length": 65536,
+  "sha256": "866886bca3670f74e9e5ee3726c26302741d3557b2fef40622ffa9e9ee994879",
+  "inputSha256": "47966de85a7a8561b838a6c85f3ea6de447a7c54b0ea3b9c198527992ea4c565",
+  "inputReportSha256": "1cfd16b75f5e60d8d8b7d1c92194a6a114f3f844f5564306de3b77102d410314",
+  "slots": 64,
+  "entryThreadSlot": 2,
+  "entryProgramSlot": 20,
+  "entryProgram": "ide.ActorManager",
+  "layout": [
+    {
+      "slot": 1,
+      "name": "Boot.NS",
+      "location": 0,
+      "limit": 255,
+      "sequence": 46,
+      "seal": 1588748004,
+      "token": 0,
+      "resident": false,
+      "residentBytesSha256": null
+    },
+    {
+      "slot": 2,
+      "name": "Boot.Thread",
+      "location": 256,
+      "limit": 255,
+      "sequence": 419,
+      "seal": 515038855,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "0b93ca48d9fb72015bf2416915eeaeceff4718e718326cc88f41d1a5909299cc"
+    },
+    {
+      "slot": 3,
+      "name": "LED_DEV",
+      "location": 1073741824,
+      "limit": 4,
+      "sequence": 0,
+      "seal": 3735895759,
+      "token": 0,
+      "resident": false,
+      "residentBytesSha256": null
+    },
+    {
+      "slot": 4,
+      "name": "BTN_DEV",
+      "location": 1073741864,
+      "limit": 0,
+      "sequence": 0,
+      "seal": 3735923407,
+      "token": 0,
+      "resident": false,
+      "residentBytesSha256": null
+    },
+    {
+      "slot": 5,
+      "name": "TIMER_DEV",
+      "location": 1073741868,
+      "limit": 4,
+      "sequence": 0,
+      "seal": 3735890127,
+      "token": 0,
+      "resident": false,
+      "residentBytesSha256": null
+    },
+    {
+      "slot": 6,
+      "name": "ide.SelfTest",
+      "location": 512,
+      "limit": 1023,
+      "sequence": 0,
+      "seal": 3738394351,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "ef1e3ca0727169cb77c41762adca1efab27595cb96123fa23e6747c858d8678a"
+    },
+    {
+      "slot": 7,
+      "name": "ide.WukongCallHome",
+      "location": 1536,
+      "limit": 255,
+      "sequence": 0,
+      "seal": 3736166127,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "a27e521bce89909aa6b344c3f30fcf636d5197bb772f60c32033b3c7e7678518"
+    },
+    {
+      "slot": 8,
+      "name": "UART_DEV",
+      "location": 1073741844,
+      "limit": 2,
+      "sequence": 16,
+      "seal": 3735942347,
+      "token": 0,
+      "resident": false,
+      "residentBytesSha256": null
+    },
+    {
+      "slot": 10,
+      "name": "ide.CapabilityTest",
+      "location": 1792,
+      "limit": 511,
+      "sequence": 0,
+      "seal": 3734101743,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "86521d994e68ae32939f013f772a7b110fec3e628f2edd3a66636eb2711651b0"
+    },
+    {
+      "slot": 11,
+      "name": "Thread.2",
+      "location": 2304,
+      "limit": 255,
+      "sequence": 0,
+      "seal": 3736526575,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "d2012e131a0a62fc4721477deee0143695d07ae3325b64a507dad7e6f571d5cf"
+    },
+    {
+      "slot": 12,
+      "name": "Thread.3",
+      "location": 2560,
+      "limit": 255,
+      "sequence": 0,
+      "seal": 3736559343,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "20e90decaab2d8afb6380577d41c82143c1106cfde3b9f155988861f3202dbb8"
+    },
+    {
+      "slot": 13,
+      "name": "M_BIT_DEV",
+      "location": 4294967068,
+      "limit": 0,
+      "sequence": 0,
+      "seal": 559034512,
+      "token": 0,
+      "resident": false,
+      "residentBytesSha256": null
+    },
+    {
+      "slot": 16,
+      "name": "ide.Alice",
+      "location": 2816,
+      "limit": 127,
+      "sequence": 0,
+      "seal": 3735543535,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "10e105ceebccabeac334e9c985ce498a127c0ba2c39a61885918a59c17e190e8"
+    },
+    {
+      "slot": 17,
+      "name": "ide.Mallory",
+      "location": 2944,
+      "limit": 127,
+      "sequence": 0,
+      "seal": 3735527151,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "b9204c0de204bc649e593657248e35aa03a8ccac51418f9eb5b456fde04351fb"
+    },
+    {
+      "slot": 18,
+      "name": "ide.AliceDriver",
+      "location": 3072,
+      "limit": 255,
+      "sequence": 0,
+      "seal": 3736362735,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "6eff481fc2257912501eb486f85b432ae12f8b7c562e52cfed6b39f9bdbc1461"
+    },
+    {
+      "slot": 19,
+      "name": "ide.MalloryDriver",
+      "location": 3328,
+      "limit": 63,
+      "sequence": 0,
+      "seal": 3735871215,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "5f5aa257ce632a2c328021d8f09748fad2ae7e10d7c023534e0db799cad46c65"
+    },
+    {
+      "slot": 20,
+      "name": "ide.ActorManager",
+      "location": 3392,
+      "limit": 255,
+      "sequence": 0,
+      "seal": 3736403695,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "d7552f14c96cc112e9f2023cb43220573796dccc79eb867081f6689072794925"
+    },
+    {
+      "slot": 21,
+      "name": "ide.AmoebaStartup",
+      "location": 3648,
+      "limit": 127,
+      "sequence": 0,
+      "seal": 3735387887,
+      "token": 0,
+      "resident": true,
+      "residentBytesSha256": "dac4426f6fe06dbd352fd8b10f2ea665a22533d575611b599f20904fd9b1e7ec"
+    }
+  ],
+  "entryThread": {
+    "locationWord": 256,
+    "header": 4177560076,
+    "indicator": 4337,
+    "capabilityHomes": [
+      1241514004,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "unresolvedSelections": [
+    "ide.Mint",
+    "ide.PkVerify",
+    "ide.MintCleaner"
+  ],
+  "byteOrder": "little-endian words; no transport conversion performed",
+  "sourceArtifacts": {
+    "ide.WukongCallHome.1.8d0a25eb.lump": "6af835f829b21b37e2074fcb0cb45a8d77e9c18e4cde1b653c5dd7d16d091f89",
+    "ide.CapabilityTest.1.210178c8.lump": "d60fd9a9e708e78c11e8fb68df35cbabf4fcf939e4bc050f55b0aaf374fbfc2a",
+    "ide.SelfTest.1.c01f5b7c.lump": "ee0a2ff43f384fab39c9c4f46f4b869e11fa35d3d625e5811cd4f546db472ecb",
+    "ide.Alice.1.9d996919.lump": "bf6e8a61967a81261d19da797783f5ed9762892fd00ba00fc19c618b19d24050",
+    "ide.Mallory.1.3a5e7373.lump": "11341685017d1852f514d1af6fda990edf87c89cbd082be8df83ccfb8a677fb5",
+    "ide.AliceDriver.1.e653d1b7.lump": "a6572caf86cfbaeebfd6e71323ae5bbe8cb794af27e513f1ae6787d642222246",
+    "ide.MalloryDriver.1.7c2fbe67.lump": "4207f0ff124b70e712b52e1f52f520cae272078dc9db92c0585d686cd0fd2756",
+    "ide.ActorManager.1.906aece0.lump": "6f62f1a234a191c8ffb3710448b439481a3e6f41821050dce7c865c72ebaf62d",
+    "ide.Mint.1.3229a560.lump": "cbae60a878fed9c540942ebdc32c3446be7fee04ed985a0f1528fa068e8039a5",
+    "ide.PkVerify.1.7333ddad.lump": "f941d2fb7e4c6528d610a5c28308af73caee6786bd044eff7f5d21417e290924",
+    "ide.MintCleaner.1.c04e6904.lump": "a3c09fb7ae2ff7e13a89adfcdbb20ec9ed326ff8cc4d5272cc107fce4776b8f2",
+    "ide.AmoebaStartup.1.f6b1d589.lump": "4a9c9e43b4e428aacf2afac3136da3f18a2cd01fc13b3e09b579a5ff8975ffbe"
+  },
+  "patches": [
+    {
+      "word": 5,
+      "byteOffset": 20,
+      "before": 255,
+      "after": 6029567,
+      "reason": "NS[1] approved boot version"
+    },
+    {
+      "word": 6,
+      "byteOffset": 24,
+      "before": 3736231663,
+      "after": 1588748004,
+      "reason": "NS[1] descriptor integrity"
+    },
+    {
+      "word": 9,
+      "byteOffset": 36,
+      "before": 255,
+      "after": 54919423,
+      "reason": "NS[2] approved boot version"
+    },
+    {
+      "word": 10,
+      "byteOffset": 40,
+      "before": 3736264431,
+      "after": 515038855,
+      "reason": "NS[2] descriptor integrity"
+    },
+    {
+      "word": 2303,
+      "byteOffset": 9212,
+      "before": 33554434,
+      "after": 61014018,
+      "reason": "NS[10] typed capability referencing NS[2]"
+    },
+    {
+      "word": 3327,
+      "byteOffset": 13308,
+      "before": 33554434,
+      "after": 61014018,
+      "reason": "NS[18] typed capability referencing NS[2]"
+    },
+    {
+      "word": 3775,
+      "byteOffset": 15100,
+      "before": 33554434,
+      "after": 61014018,
+      "reason": "NS[21] typed capability referencing NS[2]"
+    }
+  ],
+  "hardwareCompatible": false,
+  "uploaded": false,
+  "status": "Offline guard candidate only; full-core and loader integration pending"
+}

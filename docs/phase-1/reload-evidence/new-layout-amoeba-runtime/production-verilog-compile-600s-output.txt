@@ -1,0 +1,60 @@
+Icarus Verilog Preprocessor version 12.0 (stable) ()
+
+Copyright (c) 1999-2021 Stephen Williams (steve@icarus.com)
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+Using language generation: IEEE1800-2012,no-specify,xtypes,icarus-misc
+PARSING INPUT
+ ... done, 2.59 seconds.
+ELABORATING DESIGN
+ ... done, 19.78 seconds.
+RUNNING FUNCTORS
+ -F cprop ...
+ ... Iteration detected 2268 optimizations.
+ ... Iteration detected 0 optimizations.
+ ... Look for dangling constants
+ ... done
+ -F nodangle ...
+ ... scan for dangling signal and event nodes. (scomplete=F, ecomplete=F)
+ ... 1 iterations deleted 47830 dangling signals and 0 events.
+ ... scan for dangling signal and event nodes. (scomplete=T, ecomplete=F)
+ ... 2 iterations deleted 47830 dangling signals and 17891 events.
+ ... done
+CALCULATING ISLANDS
+ ... done, 8.84 seconds.
+CODE GENERATION
+ ... invoking target_design
+ ... done, 300.26 seconds.
+STATISTICS
+lex_string: add_count=1494339 hit_count=2870516
+Icarus Verilog version 12.0 (stable) ()
+
+Copyright (c) 2000-2021 Stephen Williams (steve@icarus.com)
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License along
+  with this program; if not, write to the Free Software Foundation, Inc.,
+  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+
+translate: /nix/store/xqrx3sr3nnvrcyzrqv91csgrnpdlx3wq-iverilog-12.0/lib/ivl/ivlpp -v -L -F"/tmp/ivrlg22da88cb6" -f"/tmp/ivrlg2da88cb6" -p"/tmp/ivrli2da88cb6" |/nix/store/xqrx3sr3nnvrcyzrqv91csgrnpdlx3wq-iverilog-12.0/lib/ivl/ivl -v -C"/tmp/ivrlh2da88cb6" -C"/nix/store/xqrx3sr3nnvrcyzrqv91csgrnpdlx3wq-iverilog-12.0/lib/ivl/vvp.conf" -- -

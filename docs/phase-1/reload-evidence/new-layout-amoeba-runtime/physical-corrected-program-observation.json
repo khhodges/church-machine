@@ -1,0 +1,56 @@
+{
+  "schema": "church.physical-program-observation/v1",
+  "evidenceOrigin": "User-uploaded passive UART capture after reported temporary programming",
+  "capture": "attached_assets/wukong-corrected-program-20261026T200751646720Z_1793045631780.bin",
+  "captureBytes": 772,
+  "captureSha256": "2373193def2384f725d269a8fb76139fe308ac26586993e05e404995cfddf586",
+  "preparedBitstreamSha256": "c1d71a721a1380532c59be4da188def94ae8a000d6ea9b702f095d83b67c83b7",
+  "referenceImageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "bootBannerBytes": 12,
+  "tracePackets": 39,
+  "tracePacketsHaveCRC": false,
+  "consecutiveDistinctTraceNia": [
+    "00000004", "00000008", "00003504", "00003508", "0000350c",
+    "00003908", "0000390c", "00002c0c", "00002c10", "00002c14",
+    "00003910", "00003914", "00003510", "00003514",
+    "00003908", "0000390c", "00002e08"
+  ],
+  "faultTracePackets": 2,
+  "faultCode": 8,
+  "faultName": "BOUNDS",
+  "faultNia": "00002e08",
+  "instructionAtThatAddressInReferenceImage": "070b0020",
+  "referenceInstruction": "Mallory LOAD CR1, CR6, #2",
+  "snapshot": {
+    "offset": 480,
+    "bytes": 292,
+    "sequence": 1,
+    "reason": 2,
+    "crc16": "32de",
+    "crcValid": true,
+    "nia": "00002e08",
+    "threadBase": "00002800",
+    "cr12GT": "0200000c",
+    "mFlag": false
+  },
+  "comparison": {
+    "reference": "docs/phase-1/reload-evidence/new-layout-amoeba-runtime/full-program-result.json",
+    "faultAddressMatches": true,
+    "faultCodeMatches": true,
+    "referenceInstructionMatches": true,
+    "allReferenceSelectedCapabilityRegistersMatch": true,
+    "comparedCapabilityRegisters": [2, 6, 12, 13, 14, 15]
+  },
+  "conclusion": "Physical trace reaches ActorManager, Alice return and Mallory denied LOAD in Thread.3, matching the retained model endpoint.",
+  "limitations": [
+    "Program comments name NO_CAPABILITY; observed BOUNDS is not silently treated as exact fault-code conformance.",
+    "The build identifier 20 is reused and is not exact installed-bitstream identification.",
+    "No configuration or installed-runtime-byte readback was performed.",
+    "The corrected programming filename was selected and programming was user-reported; the complete new programming transcript is not retained.",
+    "This was startup after temporary FPGA programming, not a full runtime-image reload through the IDE/bridge."
+  ],
+  "physicalExecutionObserved": true,
+  "installedBytesVerified": false,
+  "runtimeReloadPerformed": false,
+  "releaseApproved": false
+}

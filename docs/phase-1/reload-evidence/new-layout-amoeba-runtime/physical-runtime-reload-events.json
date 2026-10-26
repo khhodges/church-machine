@@ -1,0 +1,1311 @@
+{
+  "bridge_connected": true,
+  "call_depth": 2,
+  "cr14_gt": 1107296273,
+  "cr6_gt": 1241514001,
+  "events": [
+    {
+      "event": "command_queued",
+      "kind": "info",
+      "reason": "command 'q' queued",
+      "reconnect_attempt": 0,
+      "seq": 1,
+      "serial_port": "",
+      "session_id": "",
+      "state": "server",
+      "ts": 1793047937.9072986
+    },
+    {
+      "event": "command_write_ok",
+      "kind": "info",
+      "reason": "",
+      "reconnect_attempt": 0,
+      "seq": 2,
+      "serial_port": "",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793047939.5167477
+    },
+    {
+      "event": "command_queued",
+      "kind": "info",
+      "reason": "command 'f' queued",
+      "reconnect_attempt": 0,
+      "seq": 3,
+      "serial_port": "",
+      "session_id": "",
+      "state": "server",
+      "ts": 1793048280.6621892
+    },
+    {
+      "event": "command_write_ok",
+      "kind": "info",
+      "reason": "",
+      "reconnect_attempt": 0,
+      "seq": 4,
+      "serial_port": "",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048282.2505646
+    },
+    {
+      "event": "automatic_halt_after_sentinel",
+      "kind": "info",
+      "reason": "halt written after boot sentinel; awaiting board evidence",
+      "reconnect_attempt": 0,
+      "seq": 5,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_requested",
+      "ts": 1793048285.11932
+    },
+    {
+      "automatic": true,
+      "board_state_counter": 1,
+      "event": "halt_confirmed",
+      "kind": "info",
+      "reason": "FPGA emitted halted-state evidence after boot",
+      "seq": 6,
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_confirmed",
+      "ts": 1793048287.1566699
+    },
+    {
+      "event": "halt_confirmed",
+      "kind": "info",
+      "reason": "board emitted halted-state evidence",
+      "reconnect_attempt": 0,
+      "seq": 7,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_confirmed",
+      "ts": 1793048288.2551901
+    },
+    {
+      "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+      "cr": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          439222273,
+          0,
+          96469247
+        ]
+      ],
+      "crc16": 38356,
+      "crc_valid": true,
+      "dr": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fault_boot_id": "",
+      "fault_trace_seq": 0,
+      "flags": 0,
+      "incident_id": "",
+      "integrity": "CRC16 verified",
+      "m_flag": false,
+      "nia": 4,
+      "reason": 3,
+      "seq": 8,
+      "snapshot": true,
+      "snapshot_seq": 2,
+      "sto": 4169203968,
+      "stored_cr12_gt": 4177560076,
+      "stored_mflag": 3735923407,
+      "stored_packed_pc": 0,
+      "thread_base": 0,
+      "ts": 1793048281.2521086,
+      "version": 1
+    },
+    {
+      "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+      "cr": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          439222273,
+          0,
+          96469247
+        ]
+      ],
+      "crc16": 52008,
+      "crc_valid": true,
+      "dr": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fault_boot_id": "",
+      "fault_trace_seq": 0,
+      "flags": 0,
+      "incident_id": "",
+      "integrity": "CRC16 verified",
+      "m_flag": false,
+      "nia": 4,
+      "reason": 3,
+      "seq": 9,
+      "snapshot": true,
+      "snapshot_seq": 3,
+      "sto": 4169203968,
+      "stored_cr12_gt": 4177560076,
+      "stored_mflag": 3735923407,
+      "stored_packed_pc": 0,
+      "thread_base": 0,
+      "ts": 1793048283.3196912,
+      "version": 1
+    },
+    {
+      "event": "command_queued",
+      "kind": "info",
+      "reason": "command 'h' queued",
+      "reconnect_attempt": 0,
+      "seq": 10,
+      "serial_port": "",
+      "session_id": "",
+      "state": "server",
+      "ts": 1793048638.1886353
+    },
+    {
+      "event": "command_write_ok",
+      "kind": "info",
+      "reason": "",
+      "reconnect_attempt": 0,
+      "seq": 11,
+      "serial_port": "",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048639.7032988
+    },
+    {
+      "board_state_counter": 2,
+      "command_id": 3,
+      "event": "halt_confirmed",
+      "kind": "info",
+      "reason": "FPGA emitted halted-state evidence for Halt command",
+      "seq": 12,
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_confirmed",
+      "ts": 1793048640.6134086
+    },
+    {
+      "event": "halt_confirmed",
+      "kind": "info",
+      "reason": "board emitted halted-state evidence",
+      "reconnect_attempt": 0,
+      "seq": 13,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_confirmed",
+      "ts": 1793048641.6452458
+    },
+    {
+      "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+      "cr": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          439222273,
+          0,
+          96469247
+        ]
+      ],
+      "crc16": 17405,
+      "crc_valid": true,
+      "dr": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fault_boot_id": "",
+      "fault_trace_seq": 0,
+      "flags": 0,
+      "incident_id": "",
+      "integrity": "CRC16 verified",
+      "m_flag": false,
+      "nia": 4,
+      "reason": 3,
+      "seq": 14,
+      "snapshot": true,
+      "snapshot_seq": 4,
+      "sto": 4169203968,
+      "stored_cr12_gt": 4177560076,
+      "stored_mflag": 3735923407,
+      "stored_packed_pc": 0,
+      "thread_base": 0,
+      "ts": 1793048638.5816178,
+      "version": 1
+    },
+    {
+      "event": "automatic_halt_after_sentinel",
+      "kind": "info",
+      "reason": "halt written after boot sentinel; awaiting board evidence",
+      "reconnect_attempt": 0,
+      "seq": 15,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_requested",
+      "ts": 1793048655.2585545
+    },
+    {
+      "bp_hit": false,
+      "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+      "bridge_trace_counter": 38,
+      "call_depth": 0,
+      "ev_type": 1,
+      "fault_code": 8,
+      "fault_valid": true,
+      "flags": 4,
+      "gt_label": "slot 17, Church E-perm",
+      "incident_id": "536ddc4bdd614a55a87ea77c0ae9acbe",
+      "instr": null,
+      "nia": 11784,
+      "payload_gt": 1241514001,
+      "seq": 16,
+      "ts": 1793048653.077557
+    },
+    {
+      "bp_hit": false,
+      "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+      "bridge_trace_counter": 39,
+      "call_depth": 0,
+      "ev_type": 2,
+      "fault_code": 8,
+      "fault_valid": true,
+      "flags": 4,
+      "gt_label": "NULL GT",
+      "incident_id": "3e070c32fd784aeabe38ead84c9c6c16",
+      "instr": null,
+      "nia": 11784,
+      "payload_gt": 0,
+      "seq": 17,
+      "ts": 1793048653.0778277
+    },
+    {
+      "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+      "correlation_status": "correlated",
+      "cr": [
+        [
+          1241514005,
+          14592,
+          127
+        ],
+        [
+          1241514001,
+          11776,
+          127
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          838860812,
+          10312,
+          193
+        ],
+        [
+          1241514001,
+          12280,
+          1
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          33554444,
+          10240,
+          255
+        ],
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          1107296273,
+          11780,
+          3
+        ],
+        [
+          439222273,
+          0,
+          96469247
+        ]
+      ],
+      "crc16": 22799,
+      "crc_valid": true,
+      "dr": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fault_boot_id": "10946451-1e5c-4181-a8da-bc2649c9c590",
+      "fault_trace_seq": 17,
+      "flags": 4,
+      "incident_id": "3e070c32fd784aeabe38ead84c9c6c16",
+      "integrity": "CRC16 verified",
+      "m_flag": false,
+      "nia": 11784,
+      "promotion_status": "promoted",
+      "reason": 2,
+      "seq": 18,
+      "snapshot": true,
+      "snapshot_seq": 5,
+      "sto": 0,
+      "stored_cr12_gt": 0,
+      "stored_mflag": 0,
+      "stored_packed_pc": 536875247,
+      "thread_base": 10240,
+      "ts": 1793048653.12858,
+      "version": 1
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 1,
+      "call_depth": 0,
+      "disasm": "LOAD THREAD+HEAP CR12+, CR5",
+      "ev_type": 3,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "map_instr_word": 661094401,
+      "metadata_status": "NIA map (unverified)",
+      "nia": 4,
+      "nia_label": "Boot.1",
+      "offset": 1,
+      "payload_gt": 0,
+      "pet_name": "Boot",
+      "seq": 19,
+      "source_map": "reference-bitstream",
+      "ts": 1793048653.0651777
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 2,
+      "call_depth": 0,
+      "disasm": "LOAD THREAD+HEAP CR12+, CR5",
+      "ev_type": 4,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 2, Turing no-perm",
+      "instr": null,
+      "map_instr_word": 661094401,
+      "metadata_status": "NIA map (unverified)",
+      "nia": 4,
+      "nia_label": "Boot.1",
+      "offset": 1,
+      "payload_gt": 61014018,
+      "pet_name": "Boot",
+      "seq": 20,
+      "source_map": "reference-bitstream",
+      "ts": 1793048653.0662732
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 3,
+      "call_depth": 0,
+      "disasm": "LOAD THREAD+HEAP CR12+, CR5",
+      "ev_type": 5,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 2, Turing R+W-perm",
+      "instr": null,
+      "map_instr_word": 661094401,
+      "metadata_status": "NIA map (unverified)",
+      "nia": 4,
+      "nia_label": "Boot.1",
+      "offset": 1,
+      "payload_gt": 866320386,
+      "pet_name": "Boot",
+      "seq": 21,
+      "source_map": "reference-bitstream",
+      "ts": 1793048653.0665953
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 4,
+      "call_depth": 0,
+      "disasm": "CALL CR[0] SelfTest",
+      "ev_type": 6,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 20, Church E-perm",
+      "instr": null,
+      "map_instr_word": 385875968,
+      "metadata_status": "NIA map (unverified)",
+      "nia": 8,
+      "nia_label": "Boot.2",
+      "offset": 2,
+      "payload_gt": 1241514004,
+      "pet_name": "Boot",
+      "seq": 22,
+      "source_map": "reference-bitstream",
+      "ts": 1793048653.067014
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 5,
+      "call_depth": 0,
+      "disasm": "CALL CR[0] SelfTest",
+      "ev_type": 7,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 20, Turing X-perm",
+      "instr": null,
+      "map_instr_word": 385875968,
+      "metadata_status": "NIA map (unverified)",
+      "nia": 8,
+      "nia_label": "Boot.2",
+      "offset": 2,
+      "payload_gt": 1107296276,
+      "pet_name": "Boot",
+      "seq": 23,
+      "source_map": "reference-bitstream",
+      "ts": 1793048653.0672917
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 6,
+      "call_depth": 1,
+      "disasm": "CALL CR[0] SelfTest",
+      "ev_type": 8,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "map_instr_word": 385875968,
+      "metadata_status": "NIA map (unverified)",
+      "nia": 8,
+      "nia_label": "Boot.2",
+      "offset": 2,
+      "payload_gt": 0,
+      "pet_name": "Boot",
+      "seq": 24,
+      "source_map": "reference-bitstream",
+      "ts": 1793048653.0676007
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 7,
+      "call_depth": 1,
+      "ev_type": 1,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 17, Church E-perm",
+      "instr": null,
+      "nia": 13572,
+      "payload_gt": 1241514001,
+      "seq": 25,
+      "ts": 1793048653.0677743
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 8,
+      "call_depth": 1,
+      "ev_type": 2,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "NULL GT",
+      "instr": null,
+      "nia": 13572,
+      "payload_gt": 0,
+      "seq": 26,
+      "ts": 1793048653.068471
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 9,
+      "call_depth": 1,
+      "ev_type": 1,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "NULL GT",
+      "instr": null,
+      "nia": 13576,
+      "payload_gt": 0,
+      "seq": 27,
+      "ts": 1793048653.0687132
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 10,
+      "call_depth": 1,
+      "ev_type": 2,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 11, Turing no-perm",
+      "instr": null,
+      "nia": 13576,
+      "payload_gt": 33554443,
+      "seq": 28,
+      "ts": 1793048653.0688612
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 11,
+      "call_depth": 1,
+      "ev_type": 3,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "nia": 13580,
+      "payload_gt": 0,
+      "seq": 29,
+      "ts": 1793048653.0712495
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 12,
+      "call_depth": 1,
+      "ev_type": 4,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 11, Turing no-perm",
+      "instr": null,
+      "nia": 13580,
+      "payload_gt": 33554443,
+      "seq": 30,
+      "ts": 1793048653.0724914
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 13,
+      "call_depth": 1,
+      "ev_type": 5,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 11, Turing R+W-perm",
+      "instr": null,
+      "nia": 13580,
+      "payload_gt": 838860811,
+      "seq": 31,
+      "ts": 1793048653.0731306
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 14,
+      "call_depth": 1,
+      "ev_type": 0,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "nia": 14600,
+      "payload_gt": 0,
+      "seq": 32,
+      "ts": 1793048653.0733197
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 15,
+      "call_depth": 1,
+      "ev_type": 6,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 16, Church E-perm",
+      "instr": null,
+      "nia": 14604,
+      "payload_gt": 1241514000,
+      "seq": 33,
+      "ts": 1793048653.07345
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 16,
+      "call_depth": 1,
+      "ev_type": 7,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 16, Turing X-perm",
+      "instr": null,
+      "nia": 14604,
+      "payload_gt": 1107296272,
+      "seq": 34,
+      "ts": 1793048653.0735843
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 17,
+      "call_depth": 2,
+      "ev_type": 8,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "",
+      "instr": null,
+      "nia": 14604,
+      "payload_gt": 0,
+      "seq": 35,
+      "ts": 1793048653.073795
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 18,
+      "call_depth": 2,
+      "ev_type": 1,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 16, Church E-perm",
+      "instr": null,
+      "nia": 11276,
+      "payload_gt": 1241514000,
+      "seq": 36,
+      "ts": 1793048653.0741532
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 19,
+      "call_depth": 2,
+      "ev_type": 2,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 16, Turing R+W-perm",
+      "instr": null,
+      "nia": 11276,
+      "payload_gt": 838860816,
+      "seq": 37,
+      "ts": 1793048653.0744798
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 20,
+      "call_depth": 2,
+      "ev_type": 0,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "",
+      "instr": null,
+      "nia": 11280,
+      "payload_gt": 0,
+      "seq": 38,
+      "ts": 1793048653.0746756
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 21,
+      "call_depth": 1,
+      "ev_type": 9,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "",
+      "instr": null,
+      "nia": 11284,
+      "payload_gt": 0,
+      "seq": 39,
+      "ts": 1793048653.074934
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 22,
+      "call_depth": 1,
+      "ev_type": 10,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 16, Church E-perm",
+      "instr": null,
+      "nia": 11284,
+      "payload_gt": 1241514000,
+      "seq": 40,
+      "ts": 1793048653.0752666
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 23,
+      "call_depth": 1,
+      "ev_type": 11,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 21, Turing R+X-perm",
+      "instr": null,
+      "nia": 11284,
+      "payload_gt": 1375731733,
+      "seq": 41,
+      "ts": 1793048653.0754194
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 24,
+      "call_depth": 1,
+      "ev_type": 1,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "NULL GT",
+      "instr": null,
+      "nia": 14608,
+      "payload_gt": 0,
+      "seq": 42,
+      "ts": 1793048653.0755608
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 25,
+      "call_depth": 1,
+      "ev_type": 2,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 2, Turing no-perm",
+      "instr": null,
+      "nia": 14608,
+      "payload_gt": 61014018,
+      "seq": 43,
+      "ts": 1793048653.075672
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 26,
+      "call_depth": 1,
+      "ev_type": 3,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "nia": 14612,
+      "payload_gt": 0,
+      "seq": 44,
+      "ts": 1793048653.0757878
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 27,
+      "call_depth": 1,
+      "ev_type": 4,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 2, Turing no-perm",
+      "instr": null,
+      "nia": 14612,
+      "payload_gt": 61014018,
+      "seq": 45,
+      "ts": 1793048653.0759645
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 28,
+      "call_depth": 1,
+      "ev_type": 5,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 2, Turing R+W-perm",
+      "instr": null,
+      "nia": 14612,
+      "payload_gt": 866320386,
+      "seq": 46,
+      "ts": 1793048653.07615
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 29,
+      "call_depth": 1,
+      "ev_type": 1,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "NULL GT",
+      "instr": null,
+      "nia": 13584,
+      "payload_gt": 0,
+      "seq": 47,
+      "ts": 1793048653.076282
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 30,
+      "call_depth": 1,
+      "ev_type": 2,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 12, Turing no-perm",
+      "instr": null,
+      "nia": 13584,
+      "payload_gt": 33554444,
+      "seq": 48,
+      "ts": 1793048653.076391
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 31,
+      "call_depth": 1,
+      "ev_type": 3,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "nia": 13588,
+      "payload_gt": 0,
+      "seq": 49,
+      "ts": 1793048653.0765164
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 32,
+      "call_depth": 1,
+      "ev_type": 4,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 12, Turing no-perm",
+      "instr": null,
+      "nia": 13588,
+      "payload_gt": 33554444,
+      "seq": 50,
+      "ts": 1793048653.076712
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 33,
+      "call_depth": 1,
+      "ev_type": 5,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "slot 12, Turing R+W-perm",
+      "instr": null,
+      "nia": 13588,
+      "payload_gt": 838860812,
+      "seq": 51,
+      "ts": 1793048653.0768325
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 34,
+      "call_depth": 1,
+      "ev_type": 0,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 0,
+      "gt_label": "",
+      "instr": null,
+      "nia": 14600,
+      "payload_gt": 0,
+      "seq": 52,
+      "ts": 1793048653.076951
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 35,
+      "call_depth": 1,
+      "ev_type": 6,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 17, Church E-perm",
+      "instr": null,
+      "nia": 14604,
+      "payload_gt": 1241514001,
+      "seq": 53,
+      "ts": 1793048653.077054
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 36,
+      "call_depth": 1,
+      "ev_type": 7,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "slot 17, Turing X-perm",
+      "instr": null,
+      "nia": 14604,
+      "payload_gt": 1107296273,
+      "seq": 54,
+      "ts": 1793048653.077189
+    },
+    {
+      "bp_hit": false,
+      "bridge_trace_counter": 37,
+      "call_depth": 2,
+      "ev_type": 8,
+      "fault_code": 0,
+      "fault_valid": false,
+      "flags": 4,
+      "gt_label": "",
+      "instr": null,
+      "nia": 14604,
+      "payload_gt": 0,
+      "seq": 55,
+      "ts": 1793048653.0774052
+    },
+    {
+      "event": "fault_decoded",
+      "kind": "info",
+      "reason": "local fault decoded; awaiting IDE delivery",
+      "reconnect_attempt": 0,
+      "seq": 56,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048700.3149366
+    },
+    {
+      "event": "fault_decoded",
+      "kind": "info",
+      "reason": "local fault decoded; awaiting IDE delivery",
+      "reconnect_attempt": 0,
+      "seq": 57,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048701.285065
+    },
+    {
+      "event": "fault_trace_accepted",
+      "kind": "info",
+      "reason": "fault trace accepted; complete snapshot pending",
+      "reconnect_attempt": 0,
+      "seq": 58,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048702.2866404
+    },
+    {
+      "event": "fault_snapshot_correlated",
+      "kind": "info",
+      "reason": "complete fault snapshot promoted; awaiting operator disposition",
+      "reconnect_attempt": 0,
+      "seq": 59,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048703.2762828
+    }
+  ],
+  "queue_min_seq": 1,
+  "server_seq": 59
+}

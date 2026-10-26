@@ -1,0 +1,36 @@
+{
+  "recordedAtUtc": "2026-10-25T15:38:13.258642+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-timing-read-selection/observer-boot",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-timing-read-selection/compiled.vvp",
+    "+stop-at-boot"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 1873.53,
+  "deadlineSeconds": 5400,
+  "executableSha256": "b20b767011486b50fb0c7e13d9d6499e1742c71713cd9b3b64597c67915f72af",
+  "verilogSha256": "658c272111a75b5b56c1d43bd2cff7e3b327b0b471037784e8ce72d534c5983d",
+  "sourceFingerprint": "fee3b23767af431ee042e3cc5740c7d552703a9a9faded9ccfbb0484896a4708",
+  "driverSourceSha256": "45bcf3f6e198e117d1baddeb492dc1a67b4bed6e317fea971ffcdae6164da43b",
+  "driverBinarySha256": "5caebba68ba3c7f13e9d97909ca2b2e342f330e3f1593112cb8e6863008231f7",
+  "terminalObservations": [
+    "BOOT_HANDOFF_OBSERVED cycle=411792 (not a program or upload pass)"
+  ],
+  "bootCompleteObserved": true,
+  "bootHandoffObserved": true,
+  "expectedEntryNia": 13572,
+  "finalNiaObservation": [
+    "00003504",
+    "00000000"
+  ],
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test",
+  "fullLogSha256": "abae0e04fe1d5779a2d42c51a10daa3926e4362ddd95ccc907c6452a536ab146",
+  "scope": "Corrected design boot handoff only; not a program, routed timing, or physical reload pass"
+}

@@ -38,7 +38,7 @@ function fixture(indexed = false) {
         return {gt: minted.selfGT, entry: sim.readNSEntry(slot),
             header: sim.parseLumpHeader(minted.words[0]), base};
     }
-    const manager = driver(32, 4096, (indexed ? 'CHANGE CR6, #9' : 'CHANGE CR13') + '\nIADD DR2, DR0, #303\nHALT');
+    const manager = driver(32, 4096, (indexed ? 'CHANGE CR6, #9' : 'CHANGE CR2') + '\nIADD DR2, DR0, #303\nHALT');
     const incoming = driver(33, 4160, 'IADD DR1, DR0, #202\nCHANGE CR2\nHALT');
     const target = slots[1], entry = sim.readNSEntry(target), base = entry.word0_location;
     const layout = sim._threadLayoutAtBase(base);
@@ -52,7 +52,7 @@ function fixture(indexed = false) {
     sim.memory[base + 17] = (1 << 12) | (rootSTO - 2);
     sim._writeCR(0, manager.gt, manager.entry);
     sim._installLumpHeaderContext(sim.parseGT(manager.gt), 32, manager.entry, manager.header);
-    sim.cr[13] = {word0: gt(target), word1: entry.word0_location,
+    sim.cr[2] = {word0: gt(target), word1: entry.word0_location,
         word2: entry.word1_limit, word3: 0, m: 0};
     sim.pc = 0;
     sim.dr[1] = 101;
@@ -60,7 +60,7 @@ function fixture(indexed = false) {
 }
 let count = 0;
 function test(name, fn) { fn(); count++; console.log('PASS', name); }
-test('instruction-driven CR13 -> Thread.2 -> manager preserves continuation and data', () => {
+test('instruction-driven CR2 -> Thread.2 -> manager preserves continuation and data', () => {
     const {sim, target, slots} = fixture();
     const first = sim.step();
     assert(first, sim.faultLog.map(f => f.rawDiagnosticReason).join('\n'));
@@ -166,14 +166,14 @@ rejects('indexed CHANGE validates incoming C-list', f => {
 }, /C-List SELF/, true);
 for (const permission of ['B', 'R', 'W', 'X', 'L', 'S', 'E']) {
     rejects(`permission ${permission} is a hard fault`, f => {
-        f.sim.cr[13].word0 = f.gt(f.target, {[permission]: 1});
+        f.sim.cr[2].word0 = f.gt(f.target, {[permission]: 1});
     }, /no permissions/);
 }
-rejects('NULL Thread GT', f => { f.sim.cr[13].word0 = 0; }, /non-null/);
-rejects('non-Thread object', f => { f.sim.cr[13].word0 = f.gt(32); }, /Thread descriptor/);
+rejects('NULL Thread GT', f => { f.sim.cr[2].word0 = 0; }, /non-null/);
+rejects('non-Thread object', f => { f.sim.cr[2].word0 = f.gt(32); }, /Thread descriptor/);
 rejects('stale Thread generation', f => {
-    const p = f.sim.parseGT(f.sim.cr[13].word0);
-    f.sim.cr[13].word0 = f.sim.createGT((p.gt_seq + 1) & 15, f.target, {}, 1);
+    const p = f.sim.parseGT(f.sim.cr[2].word0);
+    f.sim.cr[2].word0 = f.sim.createGT((p.gt_seq + 1) & 15, f.target, {}, 1);
 }, /CHANGE Thread GT/);
 rejects('invalid stack indicator', f => { f.sim.memory[f.base + 17] = 0; }, /frame/);
 rejects('invalid stack Enter GT', f => {
@@ -187,7 +187,7 @@ rejects('wrong C-List SELF identity', f => {
 rejects('C-List geometry mismatch', f => {
     f.sim.memory[f.incoming.base] = f.sim.packLumpHeader(0, 3, 0, 0);
 }, /C-List.*geometry/);
-for (const register of [12, 13]) {
+for (const register of [12]) {
     test(`self CHANGE CR${register} restores the new continuation without M authority`, () => {
         const {sim, slots, gt} = fixture();
         sim.memory[4097] = assemble(`CHANGE CR${register}`)[0];
@@ -212,14 +212,17 @@ for (const register of [12, 13]) {
     });
 }
 rejects('self CHANGE still rejects invalid current C-List atomically', f => {
-    f.sim.cr[13].word0 = f.gt(f.slots[0]);
+    f.sim.cr[2].word0 = f.gt(f.slots[0]);
     f.sim.memory[4096 + 63] = 0;
 }, /C-List SELF/);
+rejects('reserved CR13 is rejected without activating a Thread', f => {
+    f.sim.memory[4097] = assemble('CHANGE CR13')[0];
+}, /reserved/);
 rejects('unexpected validation error becomes a hard fault', f => {
     f.sim._readThreadResumeFrame = () => { throw new Error('injected frame validation error'); };
 }, /injected frame validation error/);
 rejects('indexed legacy CHANGE rejected, not silently reinterpreted', f => {
-    f.sim.memory[4097] = assemble('CHANGE CR13, CR13, #1')[0];
+    f.sim.memory[4097] = assemble('CHANGE CR2, CR2, #1')[0];
 }, /one Thread GT/);
 test('manual Thread selection uses the same validation', () => {
     const {sim, target} = fixture();

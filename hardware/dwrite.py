@@ -10,7 +10,8 @@ class ChurchDWrite(Elaboratable):
 
     Phase 1 opcode 17: unsigned DR[imm[3:0]] plus/minus magnitude
     imm[13:4] (0–1023); bit14 selects subtraction. DR0 supplies zero.
-    Capture the index at acceptance; reject negative/wrapped offsets.
+    Capture capability, source data and index at acceptance; reject
+    negative/wrapped offsets without consulting later live read-port values.
 
     Security gate: checks W permission on CR_src.word0_gt.perms[PERM_W].
     Bounds gate:   checks effective_offset <= the full descriptor limit and
@@ -71,8 +72,7 @@ class ChurchDWrite(Elaboratable):
         dr_data_reg = Signal(32)
         drx_val_reg = Signal(32)   # latched DR[DRx] value for indexed mode
         namespace_authorized_reg = Signal()
-        private_mode_reg = Signal()
-        private_word_reg = Signal(16)
+        cap_reg = Signal(CAP_REG_LAYOUT)
 
         private_cap = Signal(CAP_REG_LAYOUT)
         private_cap_view = View(CAP_REG_LAYOUT, private_cap)
@@ -83,8 +83,7 @@ class ChurchDWrite(Elaboratable):
             private_cap_view.word1_location.eq(M_BIT_PORT),
             private_cap_view.word2_w2.eq(0),
         ]
-        effective_cap = Mux(private_mode_reg, private_cap, self.cr_rd_data)
-        cr_view = View(CAP_REG_LAYOUT, effective_cap)
+        cr_view = View(CAP_REG_LAYOUT, cap_reg)
         cr_gt   = View(GT_LAYOUT,      cr_view.word0_gt)
         cr_w2   = View(WORD2_LAYOUT,   cr_view.word2_w2)
 
@@ -140,8 +139,12 @@ class ChurchDWrite(Elaboratable):
                         drx_val_reg.eq(Mux(self.private_m_start | (self.imm[:4] == 0),
                                            0, self.dr_rd_data2)),
                         namespace_authorized_reg.eq(self.namespace_authorized),
-                        private_mode_reg.eq(self.private_m_start),
-                        private_word_reg.eq(self.private_m_word),
+                        # Bind authority and payload on the accepted edge.
+                        # PERM_CHECK must not depend on live core read muxes.
+                        cap_reg.eq(Mux(self.private_m_start, private_cap, self.cr_rd_data)),
+                        dr_data_reg.eq(Mux(self.private_m_start,
+                                           Cat(self.private_m_word, C(0, 16)),
+                                           self.dr_rd_data)),
                     ]
                     m.next = "PERM_CHECK"
 
@@ -149,9 +152,6 @@ class ChurchDWrite(Elaboratable):
                 m.d.comb += self.busy.eq(1)
                 with m.If(exact_m_cap & (eff_off == 0) &
                           namespace_authorized_reg):
-                    m.d.sync += dr_data_reg.eq(
-                        Mux(private_mode_reg, Cat(private_word_reg, C(0, 16)),
-                            self.dr_rd_data))
                     m.next = "M_BIT_WRITE"
                 with m.Elif(exact_m_cap & (eff_off == 0)):
                     m.d.comb += [self.fault.eq(1), self.fault_type.eq(FaultType.PERM_S)]
@@ -179,7 +179,6 @@ class ChurchDWrite(Elaboratable):
                     # bounds. Only now is narrowing to the 32-bit bus safe.
                     m.d.sync += [
                         addr_reg.eq(effective_addr),
-                        dr_data_reg.eq(self.dr_rd_data),
                     ]
                     m.next = "MEM_WRITE"
 

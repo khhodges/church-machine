@@ -1,0 +1,43 @@
+{
+  "schema": "church.runtime-reboot-observation/v1",
+  "deviceUid": "20250619ac5c01",
+  "identityBasis": "Operator-supplied label from earlier JTAG session; not UART attestation",
+  "bridgeSession": "9bc8f0b355574cdc89e82f51ea428a71",
+  "command": {
+    "id": 2,
+    "cmd": "f",
+    "queuedEpochSeconds": 1793048280.662171,
+    "consumedEpochSeconds": 1793048281.2614193,
+    "serialWriteAcknowledged": true,
+    "writeAcknowledgedEpochSeconds": 1793048282.2505536
+  },
+  "startup": {
+    "reportedBuildVersion": 20,
+    "traceProtocolVersion": 2,
+    "threadScheduler": true,
+    "startupState": "awaiting_first_step",
+    "boardStateCounter": 1,
+    "haltEvidenceSession": "9bc8f0b355574cdc89e82f51ea428a71",
+    "haltConfirmedEpochSeconds": 1793048287.1566591
+  },
+  "snapshot": {
+    "crcValid": true,
+    "crc16": 52008,
+    "nia": 4,
+    "reason": 3,
+    "boardSnapshotSequence": 3,
+    "serverSequence": 9,
+    "threadBase": 0,
+    "mFlag": false,
+    "bridgeTimestampEpochSeconds": 1793048283.3196912
+  },
+  "pendingCommand": null,
+  "uploadInFlight": false,
+  "runtimeReloadPerformed": false,
+  "installedBytesVerified": false,
+  "limitations": [
+    "Build 20 is reused and cannot establish the exact bitstream.",
+    "Runtime reboot and board-confirmed halt are observed, not a full-image upload.",
+    "NIA 4 is an initial halted startup state, not ActorManager entry or completed program execution."
+  ]
+}

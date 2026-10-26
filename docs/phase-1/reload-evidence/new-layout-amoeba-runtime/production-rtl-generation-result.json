@@ -1,0 +1,18 @@
+{
+  "schema": "church.guarded-rtl-generation-result/v1",
+  "recordedAtUtc": "2026-10-24T22:36:24.732585+00:00",
+  "profile": "new-layout-guarded-relative-nia-v1",
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "sourceFingerprint": "605ca977eaf415db87848c1474317d3307b48dc3b03b903154ed98b469952d5d",
+  "command": "python3 -m hardware.gen_rtlil generated-artifacts/new-layout-production-rtl --profile new-layout-guarded-relative-nia-v1",
+  "exitCode": 1,
+  "result": "blocked",
+  "failure": "Amaranth CombinationalCycle in LAMBDA start / CR read selection / permission fault path",
+  "rtlilProduced": false,
+  "verilogProduced": false,
+  "vendorSynthesisRun": false,
+  "hardwareCommandsSent": false,
+  "physicalReloadVerified": false,
+  "logSha256": "4e6e4e1efeb884cbd12f7ebbe782ca91b7e6026e7c6595b777831a9ab31ec8bb",
+  "outputDirectoryEntries": []
+}

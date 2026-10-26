@@ -1,0 +1,30 @@
+{
+  "recordedAtUtc": "2026-10-25T10:44:44.413422+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/observer-handoff",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked-600s.vvp",
+    "+handoff-probe"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 636.24,
+  "deadlineSeconds": 1200,
+  "executableSha256": "ac2910c5ea3056477f37e544ef092cf5769eb161ca4931a297cb21870c236f4f",
+  "verilogSha256": "2b8733b8e2d3737275b499a9ae1bf25cbff4d28e4e7fd79c62e42959ac262c1b",
+  "sourceFingerprint": "bbd09abb0c963f5afa84f5da3ed39f8ef0f4a72f051690c08716bf4920e36fa1",
+  "driverSourceSha256": "61f9fe56248eb5dd8d3ec1b7757d9e944cf7e9007e985448573823755634353f",
+  "driverBinarySha256": "1fe4c656c17d4cc4c1f8624294cbce071fb9fb85906fe41beed48877afe9a8c2",
+  "terminalObservations": [
+    "DIAGNOSTIC_LIMIT cycles=130000 (not a pass)"
+  ],
+  "bootCompleteObserved": false,
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test",
+  "fullLogSha256": "577d90d530991c306f628964d827f9479cceea1c1e8a8d0e4fb0149ab866672f",
+  "scope": "Read-only boot handoff / trace queue progress probe; diagnostic completion is not a boot pass"
+}

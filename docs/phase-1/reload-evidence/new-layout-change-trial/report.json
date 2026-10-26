@@ -1,0 +1,85 @@
+{
+  "name": "New Layout \u2014 corrected CHANGE trial",
+  "artifact": "ide.ActorManager",
+  "status": "inert compiled revision; destination binding and hardware replay pending",
+  "originalArtifactSha256": "6f62f1a234a191c8ffb3710448b439481a3e6f41821050dce7c865c72ebaf62d",
+  "exampleSourceSha256": "988f0d1f14c9610f75257d32807c8a0672f6146112991a6032709f5d2ec23354",
+  "sourceSha256": "69a15c4adc4b81663118243151ac9754f59516afca3ba5a6b573a48318c47a86",
+  "sourceProvenance": "Example program with imports pinned to the retained API; not recovered original editing text",
+  "variants": {
+    "full": {
+      "filename": "ActorManager.full.lump",
+      "sha256": "4afa321210a556d138b58925817dffd4f7c78277f221799979c6e4396165be0c",
+      "length": 1024,
+      "compilerRecord": {
+        "schema": "church-compiler-output/v1",
+        "compiler": "CLOOMC",
+        "compiler_version": "workspace",
+        "language": "assembly",
+        "abstraction": "ide.ActorManager",
+        "binary_hash": "4afa321210a556d138b58925817dffd4f7c78277f221799979c6e4396165be0c",
+        "source_hash": "69a15c4adc4b81663118243151ac9754f59516afca3ba5a6b573a48318c47a86",
+        "words": 256,
+        "cw": 7,
+        "cc": 3,
+        "static_validated": true
+      }
+    },
+    "compact": {
+      "filename": "ActorManager.compact.lump",
+      "sha256": "1b7da2bb8011773cdeef49d084a65c2dcaf38ba203f4b16362495cafd5aa3a78",
+      "length": 1024,
+      "compilerRecord": {
+        "schema": "church-compiler-output/v1",
+        "compiler": "CLOOMC",
+        "compiler_version": "workspace",
+        "language": "assembly",
+        "abstraction": "ide.ActorManager",
+        "binary_hash": "1b7da2bb8011773cdeef49d084a65c2dcaf38ba203f4b16362495cafd5aa3a78",
+        "source_hash": "69a15c4adc4b81663118243151ac9754f59516afca3ba5a6b573a48318c47a86",
+        "words": 256,
+        "cw": 7,
+        "cc": 3,
+        "static_validated": true
+      }
+    },
+    "api": {
+      "filename": "ActorManager.api.lump",
+      "sha256": "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa",
+      "length": 1024,
+      "compilerRecord": {
+        "schema": "church-compiler-output/v1",
+        "compiler": "CLOOMC",
+        "compiler_version": "workspace",
+        "language": "assembly",
+        "abstraction": "ide.ActorManager",
+        "binary_hash": "77c842aafb8728355e279774931154ce886f90b1825463328431be7271ff7faa",
+        "source_hash": "69a15c4adc4b81663118243151ac9754f59516afca3ba5a6b573a48318c47a86",
+        "words": 256,
+        "cw": 7,
+        "cc": 3,
+        "static_validated": true
+      }
+    }
+  },
+  "primaryBuildVariant": "api",
+  "codeChanges": [
+    {
+      "word": 3,
+      "before": 655425536,
+      "after": 654376960
+    },
+    {
+      "word": 5,
+      "before": 655982592,
+      "after": 654409728
+    }
+  ],
+  "allocationWords": 256,
+  "publicApiAndDependenciesUnchanged": true,
+  "savedNamespaceChanged": false,
+  "published": false,
+  "uploaded": false,
+  "hardwareCompatible": false,
+  "scope": "No catalog revision number assigned, signing/admission claimed, GT localization, image replacement or hardware operation"
+}

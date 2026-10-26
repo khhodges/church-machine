@@ -1,0 +1,28 @@
+{
+  "recordedAtUtc": "2026-10-25T14:58:05.441024+00:00",
+  "command": [
+    "python3",
+    "-u",
+    "-m",
+    "hardware.gen_rtlil",
+    "generated-artifacts/new-layout-timing-read-selection/rtl",
+    "--profile",
+    "new-layout-guarded-relative-nia-v1"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 37.2,
+  "deadlineSeconds": 1800,
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "sourceFingerprint": "fee3b23767af431ee042e3cc5740c7d552703a9a9faded9ccfbb0484896a4708",
+  "inputsUnchanged": true,
+  "outputsSha256": {
+    "church_wukong_xc7a100t.il": "3094706b9a81b47f310150c705a375b07dab2f999bfe4c2a44a5e75a0387f304",
+    "church_wukong_xc7a100t.v": "658c272111a75b5b56c1d43bd2cff7e3b327b0b471037784e8ce72d534c5983d",
+    "guarded-profile.json": "17a0c9842f30ffe2b5f49ff32f622f22268af11a99d3c3eb0b0791e6066ba5e2"
+  },
+  "focusedTestCommand": "python3 -m pytest tests/hardware/test_dr_read_selection_timing.py tests/hardware/test_rtl_audit_boundaries.py hardware/test_phase1_independent_execution.py -q",
+  "focusedTestsPassed": 69,
+  "scope": "Separate RTL candidate generation only; not routed timing, emitted-RTL execution, physical reload, or release verification",
+  "hardwareCommandsSent": false
+}

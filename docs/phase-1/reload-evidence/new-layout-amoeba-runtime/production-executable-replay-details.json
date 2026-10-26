@@ -1,0 +1,43 @@
+{
+  "recordedAtUtc": "2026-10-25T00:00:57.893274+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/observer-details",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked-600s.vvp"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 563.4,
+  "executableSha256": "ac2910c5ea3056477f37e544ef092cf5769eb161ca4931a297cb21870c236f4f",
+  "sourceFingerprint": "bbd09abb0c963f5afa84f5da3ed39f8ef0f4a72f051690c08716bf4920e36fa1",
+  "driverSourceSha256": "e1c754fa43255e054fed97fbcb560ce670dd632e890e502c50c6b8722bc7674c",
+  "driverBinarySha256": "7c7e75730ae1958fe29b092211fd70e3aa7edf48e5c23f68f7ff8d69e4663c3f",
+  "terminalObservations": [
+    "UNKNOWN_RETIRE cycle=99298 nia_unknown=0 instruction_unknown=1"
+  ],
+  "details": [
+    "DETAIL cycle=99298 field=hw_init_done width=1 aval=00000001 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.boot_complete width=1 aval=00000000 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.fault_valid width=1 aval=00000000 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.fault width=5 aval=00000000 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.nia width=32 aval=00000004 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.retire_valid width=1 aval=00000001 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.retire_nia width=32 aval=00000004 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.retire_instr width=32 aval=20000000 xz_mask=07ffffff",
+    "DETAIL cycle=99298 field=core.imem_addr width=32 aval=00000004 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.imem_fetch_address width=32 aval=00000004 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.imem_valid width=1 aval=00000001 xz_mask=00000000",
+    "DETAIL cycle=99298 field=core.imem_data width=32 aval=27000001 xz_mask=00000000",
+    "DETAIL cycle=99298 field=imem_from_dmem width=1 aval=00000000 xz_mask=00000000",
+    "DETAIL cycle=99298 field=imem_rd__data width=32 aval=00000000 xz_mask=00000000",
+    "DETAIL cycle=99298 field=boot_rom.addr width=10 aval=00000001 xz_mask=00000000",
+    "DETAIL cycle=99298 field=boot_rom.data width=32 aval=27000001 xz_mask=00000000"
+  ],
+  "bootCompleteObserved": false,
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test"
+}

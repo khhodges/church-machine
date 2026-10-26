@@ -1,0 +1,52 @@
+{
+  "namespace": "New Layout",
+  "image_sha256": "47966de85a7a8561b838a6c85f3ea6de447a7c54b0ea3b9c198527992ea4c565",
+  "size_bytes": 65536,
+  "ascending_image_validation": "passed",
+  "source_boot_words": [
+    "0x077f8000",
+    "0x27678001",
+    "0x17000000"
+  ],
+  "source_boot_root_slot": 0,
+  "source_boot_thread_slot": 1,
+  "required_root_slot": 1,
+  "required_thread_slot": 2,
+  "boot_slot_match": false,
+  "metadata_words": [
+    4169203968,
+    0,
+    17,
+    0
+  ],
+  "self_descriptor_words": [
+    0,
+    255,
+    3736231663,
+    0
+  ],
+  "thread_descriptor_words": [
+    256,
+    255,
+    3736264431,
+    0
+  ],
+  "existing_loader_rejection": "validate_boot_image: Namespace Header V2 format marker not found; image is stale or corrupt (legacy format is unsupported) and must be regenerated",
+  "status": "blocked; hardware compatibility has not been established",
+  "installed_board": "unknown; disconnected; no physical test performed",
+  "address_unit_review": "New Layout descriptor locations are word addresses. Current ns_gate/mload pass raw_base into word1_location; Wukong memory arbitration treats addresses as bytes. See source references.",
+  "source_references": [
+    "hardware/boot_rom.py: BOOT_PROGRAM",
+    "hardware/wukong_top.py: BootRom(_WUKONG_ROM), DMEM address arbitration",
+    "hardware/ns_gate.py: ns_entry_addr and raw_base",
+    "hardware/mload.py: WAIT_GATE"
+  ],
+  "source_sha256": {
+    "hardware/boot_rom.py": "587b0ce045eeb4ef3b293d63c2394271b6e3e00595e66c595cceded97e40d683",
+    "hardware/wukong_top.py": "428a542f617744c439752a55ce9e86d6d807616c0c6583a81103e72648991990",
+    "hardware/ns_gate.py": "1659f0f9fab7fc830ade4c22122a0a2aefa784b2fe6715fa17e4ae05bed82cfc",
+    "hardware/mload.py": "60ff53ef21fb61f082a10abbac9bf2bd4649fcba3c00795ab93b7fa161af2cb1",
+    "server/namespace_ascending_image.py": "fb7cd1f896830645b61ac500713d4c73497ba49ca2c1ee4a101ffd67a458d2bd",
+    "server/boot_image.py": "3134a89e14a9b1f9f351f35fc11a80a04cd9f319b6ee4da14833234bd6c792d7"
+  }
+}

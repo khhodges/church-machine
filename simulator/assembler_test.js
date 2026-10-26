@@ -9951,13 +9951,13 @@ function _srcExtract(lines, startSig, endSig, endOffset, label, fromIdx) {
         a.errors.map(e => e.message).join('; '));
 }
 
-// ── SYN2: CHANGE CRx (1-arg) — source defaults to destination ────────────────
+// ── SYN2: CHANGE CRx (1-arg) — source selected, destination implicit ──────────
 
 // No privilege-mode opt-in: all isolated destinations and all source CRs
 // assemble identically in shorthand, explicit, and disassembled forms.
 for (let dst = 12; dst <= 15; dst++) {
     const a = new ChurchAssembler();
-    const expected = ((4 << 27) | (14 << 23) | (dst << 19) | (dst << 15)) >>> 0;
+    const expected = ((4 << 27) | (14 << 23) | (dst << 15)) >>> 0;
     const one = a.assemble(`CHANGE CR${dst}`);
     assert(`CHANGE CR${dst}: shorthand accepted`, a.errors.length === 0);
     assert(`CHANGE CR${dst}: exact binary`, one.words[0] === expected);
@@ -9972,7 +9972,7 @@ for (let dst = 12; dst <= 15; dst++) {
     }
 }
 
-// SYN2-a: CHANGE CR12 (1-arg) encodes same word as CHANGE CR12, CR12, 0
+// SYN2-a: canonical shorthand differs from the historical duplicated field.
 {
     const a1 = new ChurchAssembler();
     const r1 = a1.assemble('CHANGE CR12');
@@ -9981,8 +9981,8 @@ for (let dst = 12; dst <= 15; dst++) {
 
     const a3 = new ChurchAssembler();
     const r3 = a3.assemble('CHANGE CR12, CR12, 0');
-    assert('SYN2-a CHANGE CR12 (1-arg) === CHANGE CR12,CR12,0',
-        r1.words[0] === r3.words[0],
+    assert('SYN2-a canonical CHANGE clears historical redundant destination',
+        r1.words[0] === ((r3.words[0] & ~(15 << 19)) >>> 0),
         `1arg=0x${(r1.words[0]>>>0).toString(16)} 3arg=0x${(r3.words[0]>>>0).toString(16)}`);
 }
 

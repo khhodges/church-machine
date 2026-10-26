@@ -1,0 +1,610 @@
+{
+  "active_thread": {
+    "count": 3,
+    "name": "Thread.3",
+    "position": 3,
+    "slot": 12
+  },
+  "boot_info": {
+    "build_version": 20,
+    "device_uid": "20250619ac5c01",
+    "received_ts": 1793048659.4428067,
+    "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+    "stale_tu": false,
+    "startup_state": "halt_confirmation_timed_out",
+    "thread_scheduler": true,
+    "trusted": true,
+    "tu_version": 2
+  },
+  "bridge": {
+    "bridge_version": 19,
+    "church_only": false,
+    "device_uid": "20250619ac5c01",
+    "event": "polling",
+    "fault_delivery": {
+      "correlation_status": "trace accepted; complete snapshot pending",
+      "fault_code": 8,
+      "fault_name": "BOUNDS",
+      "flags": 4,
+      "incident_id": "3e070c32fd784aeabe38ead84c9c6c16",
+      "nia": 11784,
+      "promotion_status": "pending complete snapshot",
+      "state": "trace_accepted_awaiting_snapshot"
+    },
+    "last_read_ts": 1793048653.1277792,
+    "last_write_ts": 1793048653.068276,
+    "reason": "",
+    "reconnect_attempt": 0,
+    "serial_port": "COM3",
+    "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+    "state": "polling",
+    "updated_ts": 1793048713.3596244
+  },
+  "bridge_alert": {
+    "action": "Restart the bridge and check its server URL/network; switch to the simulator if the board is unavailable.",
+    "active": false,
+    "dismissed": false,
+    "incident_id": "wukong-bridge-1",
+    "kind": "bridge_unreachable",
+    "message": "The IDE has not heard a bridge poll for 13 seconds.",
+    "started_ts": 1793048648.4150574,
+    "title": "Wukong bridge connection lost",
+    "updated_ts": 1793048657.4104578
+  },
+  "bridge_connected": true,
+  "bridge_poll_age": 0.3954639434814453,
+  "bridge_timeline": [
+    {
+      "event": "http_error",
+      "reason": "HTTPSConnectionPool(host='31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt-2jmrcemt.kirk.replit.dev', port=5000): Read timed out. (read timeout=2.0)",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "network_error",
+      "ts": 1793047872.1111934
+    },
+    {
+      "event": "http_error",
+      "reason": "HTTPSConnectionPool(host='31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt-2jmrcemt.kirk.replit.dev', port=5000): Read timed out. (read timeout=2.0)",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "network_error",
+      "ts": 1793047872.1204233
+    },
+    {
+      "event": "http_error",
+      "reason": "HTTPSConnectionPool(host='31592a69-0a64-402e-9237-89b7ce66a127-00-1hr1bt2ealopt-2jmrcemt.kirk.replit.dev', port=5000): Read timed out. (read timeout=2.0)",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "network_error",
+      "ts": 1793047891.9502754
+    },
+    {
+      "event": "command_queued",
+      "reason": "command 'q' queued",
+      "reconnect_attempt": 0,
+      "serial_port": "",
+      "session_id": "",
+      "state": "server",
+      "ts": 1793047937.9072886
+    },
+    {
+      "event": "command_write_ok",
+      "reason": "",
+      "reconnect_attempt": 0,
+      "serial_port": "",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793047939.5167372
+    },
+    {
+      "event": "command_queued",
+      "reason": "command 'f' queued",
+      "reconnect_attempt": 0,
+      "serial_port": "",
+      "session_id": "",
+      "state": "server",
+      "ts": 1793048280.6621816
+    },
+    {
+      "event": "reconnect_attempt",
+      "reason": "waiting for serial port",
+      "reconnect_attempt": 1,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "reconnecting",
+      "ts": 1793048282.2461843
+    },
+    {
+      "event": "command_write_ok",
+      "reason": "",
+      "reconnect_attempt": 0,
+      "serial_port": "",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048282.2505572
+    },
+    {
+      "event": "reconnected",
+      "reason": "serial port available: COM3",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048284.0760634
+    },
+    {
+      "event": "automatic_halt_after_sentinel",
+      "reason": "halt written after boot sentinel; awaiting board evidence",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_requested",
+      "ts": 1793048285.1193018
+    },
+    {
+      "event": "boot_sentinel",
+      "reason": "boot sentinel observed",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048286.1226897
+    },
+    {
+      "event": "halt_confirmed",
+      "reason": "board emitted halted-state evidence",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_confirmed",
+      "ts": 1793048288.2551706
+    },
+    {
+      "event": "command_queued",
+      "reason": "command 'h' queued",
+      "reconnect_attempt": 0,
+      "serial_port": "",
+      "session_id": "",
+      "state": "server",
+      "ts": 1793048638.1886256
+    },
+    {
+      "event": "command_write_ok",
+      "reason": "",
+      "reconnect_attempt": 0,
+      "serial_port": "",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048639.703291
+    },
+    {
+      "event": "halt_confirmed",
+      "reason": "board emitted halted-state evidence",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_confirmed",
+      "ts": 1793048641.645225
+    },
+    {
+      "event": "automatic_halt_after_sentinel",
+      "reason": "halt written after boot sentinel; awaiting board evidence",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "halt_requested",
+      "ts": 1793048655.258534
+    },
+    {
+      "event": "boot_sentinel",
+      "reason": "boot sentinel observed",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "connected",
+      "ts": 1793048659.4428067
+    },
+    {
+      "event": "fault_decoded",
+      "reason": "local fault decoded; awaiting IDE delivery",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048700.3149126
+    },
+    {
+      "event": "fault_decoded",
+      "reason": "local fault decoded; awaiting IDE delivery",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048701.2850375
+    },
+    {
+      "event": "fault_trace_accepted",
+      "reason": "fault trace accepted; complete snapshot pending",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048702.2866175
+    },
+    {
+      "event": "fault_snapshot_correlated",
+      "reason": "complete fault snapshot promoted; awaiting operator disposition",
+      "reconnect_attempt": 0,
+      "serial_port": "COM3",
+      "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+      "state": "fault_hold",
+      "ts": 1793048703.27626
+    }
+  ],
+  "call_depth": 2,
+  "command_delivery": {
+    "artifact_identity": "new-layout-guarded-relative-nia-v1:2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+    "artifact_sha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+    "artifact_size": 65536,
+    "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+    "cmd": "u",
+    "consumed_ts": 1793048641.6907551,
+    "id": 4,
+    "queued_ts": 1793048641.4426003,
+    "target_device_uid": "20250619ac5c01",
+    "target_session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+    "write_error": "",
+    "write_ok": true,
+    "write_ts": 1793048654.242621
+  },
+  "cr14_gt": 1107296273,
+  "cr6_gt": 1241514001,
+  "expected_build_version": 20,
+  "fault_candidate": {
+    "correlation_status": "trace accepted; complete snapshot pending",
+    "decision": "trace_accepted_awaiting_snapshot",
+    "fault_code": 8,
+    "fault_name": "BOUNDS",
+    "flags": 4,
+    "incident_id": "3e070c32fd784aeabe38ead84c9c6c16",
+    "nia": 11784,
+    "promotion_status": "pending complete snapshot",
+    "reason": "fault trace accepted; complete snapshot pending",
+    "state": "pending"
+  },
+  "halt": {
+    "active_fault": false,
+    "breakpoint_hit": false,
+    "confirmed_ts": null,
+    "evidence_session": null,
+    "fault_code": null,
+    "fault_name": null,
+    "fault_stage": null,
+    "instruction": null,
+    "last_command_id": 4,
+    "location": null,
+    "nia": null,
+    "reason": "no newer trace; a missing trace alone is not treated as a fault",
+    "recovery_authorized": false,
+    "snapshot_complete": true,
+    "snapshot_correlated": true,
+    "snapshot_promoted": false,
+    "state": "intentional halt"
+  },
+  "hw_entry_slot": 20,
+  "hw_entry_source": "upload",
+  "ide_version": "db06e60f",
+  "ide_version_kind": "git",
+  "last_accepted_fault": {
+    "abstraction_label": "NULL GT",
+    "abstraction_slot": null,
+    "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+    "call_depth": 0,
+    "correlation_status": "correlated",
+    "cr": [
+      [
+        1241514005,
+        14592,
+        127
+      ],
+      [
+        1241514001,
+        11776,
+        127
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        838860812,
+        10312,
+        193
+      ],
+      [
+        1241514001,
+        12280,
+        1
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        33554444,
+        10240,
+        255
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        1107296273,
+        11780,
+        3
+      ],
+      [
+        439222273,
+        0,
+        96469247
+      ]
+    ],
+    "crc16": 22799,
+    "crc_valid": true,
+    "dr": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "fault_code": 8,
+    "fault_message": "BOUNDS",
+    "fault_trace_seq": 17,
+    "flags": 4,
+    "incident_id": "3e070c32fd784aeabe38ead84c9c6c16",
+    "integrity": "CRC16 verified",
+    "led_bits": 0,
+    "nia": 11784,
+    "pc": 11784,
+    "promotion_status": "promoted",
+    "recovery_authorized": false,
+    "server_boot_id": "10946451-1e5c-4181-a8da-bc2649c9c590",
+    "snapshot_complete": true,
+    "snapshot_reason": 2,
+    "snapshot_seq": 18,
+    "source": "hardware",
+    "sto": 0,
+    "stored_cr12_gt": 0,
+    "stored_mflag": 0,
+    "stored_packed_pc": 536875247,
+    "thread_base": 10240,
+    "ts": 1793048653.12858
+  },
+  "last_trace_age": 14.40800166130066,
+  "latest_bridge_version": 19,
+  "latest_snapshot": {
+    "bridge_session": "9bc8f0b355574cdc89e82f51ea428a71",
+    "correlation_status": "correlated",
+    "cr": [
+      [
+        1241514005,
+        14592,
+        127
+      ],
+      [
+        1241514001,
+        11776,
+        127
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        838860812,
+        10312,
+        193
+      ],
+      [
+        1241514001,
+        12280,
+        1
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        33554444,
+        10240,
+        255
+      ],
+      [
+        0,
+        0,
+        0
+      ],
+      [
+        1107296273,
+        11780,
+        3
+      ],
+      [
+        439222273,
+        0,
+        96469247
+      ]
+    ],
+    "crc16": 22799,
+    "crc_valid": true,
+    "dr": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "fault_boot_id": "10946451-1e5c-4181-a8da-bc2649c9c590",
+    "fault_trace_seq": 17,
+    "flags": 4,
+    "incident_id": "3e070c32fd784aeabe38ead84c9c6c16",
+    "integrity": "CRC16 verified",
+    "m_flag": false,
+    "nia": 11784,
+    "promotion_status": "promoted",
+    "reason": 2,
+    "seq": 18,
+    "snapshot": true,
+    "snapshot_seq": 5,
+    "sto": 0,
+    "stored_cr12_gt": 0,
+    "stored_mflag": 0,
+    "stored_packed_pc": 536875247,
+    "thread_base": 10240,
+    "ts": 1793048653.12858,
+    "version": 1
+  },
+  "latest_trace": {
+    "bp_hit": false,
+    "bridge_trace_counter": 37,
+    "call_depth": 2,
+    "ev_type": 8,
+    "fault_code": 0,
+    "fault_valid": false,
+    "flags": 4,
+    "gt_label": "",
+    "instr": null,
+    "nia": 14604,
+    "payload_gt": 0,
+    "seq": 55,
+    "ts": 1793048653.0774052
+  },
+  "min_thread_scheduler_build": 18,
+  "min_tu_version": 2,
+  "namespace_snapshot": {
+    "reason": "No recorded Namespace snapshot matches this FPGA build.",
+    "state": "unavailable"
+  },
+  "pending_command": null,
+  "physical_target": {
+    "device_uid": "20250619ac5c01",
+    "live": true,
+    "session_id": "9bc8f0b355574cdc89e82f51ea428a71"
+  },
+  "queue_len": 59,
+  "relay_enabled": false,
+  "relay_last_ok": null,
+  "relay_last_rx": null,
+  "relay_source_url": "https://lab.cloomc.org",
+  "run_unlocked": false,
+  "runtime_upload_ack": {
+    "artifact_identity": "new-layout-guarded-relative-nia-v1:2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+    "artifact_sha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+    "artifact_size": 65536,
+    "error": "",
+    "id": 4,
+    "ok": true,
+    "session_id": "9bc8f0b355574cdc89e82f51ea428a71",
+    "target_device_uid": "20250619ac5c01"
+  },
+  "server_seq": 59,
+  "server_time": 1793048713.7550883,
+  "skip_fault": null,
+  "skip_fault_available": false,
+  "startup_state": "halt_confirmation_timed_out",
+  "total_bridge_polls": 806,
+  "total_trace_posts": 43,
+  "upload_in_flight": false
+}

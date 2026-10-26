@@ -35,12 +35,13 @@ def _header():
     return (0x1F << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12
 
 
-def _run(frame_pc=10, companion=None, validate_fault=False):
+def _run(frame_pc=10, companion=None, validate_fault=False, code_base=0x6000):
     dut = ChurchReturn()
     if companion is None:
         companion = make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2)
     frame = (frame_pc << 13) | PREV_STO
     memory = {
+        code_base: 0xf9008001,
         STO_ADDR: STO | (1 << 12),
         THREAD_BASE + (STO + 2) * 4: frame,
         THREAD_BASE + (STO + 1) * 4: companion,
@@ -61,6 +62,7 @@ def _run(frame_pc=10, companion=None, validate_fault=False):
         ctx.set(dut.thread_base, THREAD_BASE)
         ctx.set(dut.thread_hdr, _header())
         ctx.set(dut.return_start, 1)
+        ctx.set(dut.mload_resolved_cap.as_value(), companion | (code_base << 32) | (255 << 64))
         ctx.set(dut.mem_rd_valid, 0)
         await ctx.tick()
         ctx.set(dut.return_start, 0)
@@ -112,7 +114,7 @@ def test_return_pops_only_after_validating_frame_and_companion():
     result, writes, nia_events, flag_events = _run()
     assert result == {"complete": True}
     assert writes == [(STO_ADDR, PREV_STO)]
-    assert len(nia_events) == 1
+    assert nia_events == [0x6004 + 10 * 4]
     assert flag_events
 
 
@@ -130,7 +132,7 @@ def test_saved_pc_three_requires_ordinary_caller_validation():
     result, writes, nia_events, flag_events = _run(frame_pc=3)
     assert result == {"complete": True}
     assert writes == [(STO_ADDR, PREV_STO)]
-    assert nia_events == [0x0C]
+    assert nia_events == [0x6004 + 0x0C]
     assert flag_events
 
 
@@ -170,3 +172,15 @@ def test_return_propagates_stale_companion_mload_validation_fault(frame_pc):
     assert writes == []
     assert nia_events == []
     assert flag_events == []
+
+
+@pytest.mark.parametrize("code_base", [0x2000, 0xa000])
+@pytest.mark.parametrize("pc", [0, 31, 32, 0x1804])
+def test_relative_continuation_relocation_and_bounds(code_base, pc):
+    result, writes, nia, flags = _run(frame_pc=pc, code_base=code_base)
+    if pc < 32:
+        assert result == {"complete": True}
+        assert nia == [code_base + 4 + pc * 4]
+    else:
+        assert result == {"fault": int(FaultType.STACK_CORRUPT)}
+        assert not writes and not nia and not flags

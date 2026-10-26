@@ -39,6 +39,7 @@ class ChurchReturn(Elaboratable):
         self.mload_validate_only = Signal()
 
         self.mload_done = Signal()
+        self.mload_resolved_cap = Signal(CAP_REG_LAYOUT)
         self.mload_fault = Signal()
         self.mload_fault_type = Signal(5)  # 5 bits: FaultType values up to 0x18
 
@@ -125,6 +126,11 @@ class ChurchReturn(Elaboratable):
         sto_latched        = Signal(12)
         callee_egt_latched = Signal(32)
         return_pc_latched  = Signal(15)
+        return_code_base = Signal(32)
+        resolved_return = Signal(CAP_REG_LAYOUT)
+        resolved_view = View(CAP_REG_LAYOUT, resolved_return)
+        with m.If(self.mload_done):
+            m.d.sync += resolved_return.eq(self.mload_resolved_cap)
         prev_sto_latched   = Signal(12)
         prev_sz_latched    = Signal()
         prev_flags_latched = Signal(COND_FLAGS_LAYOUT)
@@ -309,15 +315,13 @@ class ChurchReturn(Elaboratable):
                 with m.If((frame_prev_sto != sto_latched + 1) |
                           (frame_prev_sto > sp_max) |
                           (return_pc_latched == 0x7FFF) |
-                          ((return_pc_latched << 2) < accepted_code_view.word1_location) |
-                          ((return_pc_latched << 2) >
-                           accepted_code_view.word1_location +
-                           (accepted_code_view.word2_w2[:21] << 2)) |
+                          (return_pc_latched > accepted_code_view.word2_w2[:21]) |
                           ~lambda_code_valid):
                     m.d.sync += [fault_flag.eq(1),
                                  fault_latched.eq(FaultType.STACK_CORRUPT)]
                     m.next = "FAULT"
                 with m.Else():
+                    m.d.sync += return_code_base.eq(accepted_code_view.word1_location)
                     m.next = "POP_STACK"
 
             with m.State("READ_EGT"):
@@ -397,7 +401,31 @@ class ChurchReturn(Elaboratable):
                     ]
                     m.next = "FAULT"
                 with m.Else():
-                    m.next = "POP_STACK"
+                    m.d.sync += rd_armed.eq(0)
+                    m.next = "READ_RETURN_HEADER"
+
+            with m.State("READ_RETURN_HEADER"):
+                m.d.comb += [
+                    local_mem_rd_en.eq(1),
+                    local_mem_rd_addr.eq(resolved_view.word1_location),
+                ]
+                m.d.sync += rd_armed.eq(1)
+                with m.If(rd_armed & self.mem_rd_valid):
+                    header = self.mem_rd_data
+                    size = Const(1, 32) << (header[23:27] + 6)
+                    with m.If((header[27:32] != 31) | (header[8:10] != 0) |
+                              (header[23:27] > 8) | (header[:8] == 0) |
+                              (header[10:23] == 0) |
+                              (header[10:23] >= size - header[:8]) |
+                              (resolved_view.word2_w2[:21] != size - 1) |
+                              (return_pc_latched >= header[10:23]) |
+                              (resolved_view.word1_location[:2] != 0) |
+                              (resolved_view.word1_location + ((size - 1) << 2) > 0xffffffff)):
+                        m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.STACK_CORRUPT)]
+                        m.next = "FAULT"
+                    with m.Else():
+                        m.d.sync += return_code_base.eq(resolved_view.word1_location + 4)
+                        m.next = "POP_STACK"
 
             with m.State("POP_STACK"):
                 m.d.comb += [
@@ -413,7 +441,7 @@ class ChurchReturn(Elaboratable):
             with m.State("SET_NIA"):
                 m.d.comb += [
                     self.nia_set.eq(1),
-                    self.nia_value.eq(return_pc_latched << 2),
+                    self.nia_value.eq(return_code_base + (return_pc_latched << 2)),
                 ]
                 m.next = "COMPLETE"
 

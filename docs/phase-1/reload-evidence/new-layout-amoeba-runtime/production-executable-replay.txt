@@ -1,0 +1,4 @@
+REPLAY_START external pins only; pre-edge observations; no UART commands
+INITIALIZED cycle=3679
+PROGRESS cycle=50000 initialized=1 boot=0
+UNKNOWN_RETIRE cycle=99298

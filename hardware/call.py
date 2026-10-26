@@ -16,6 +16,9 @@ class ChurchCall(Elaboratable):
     def __init__(self):
         self.call_start = Signal()
         self.boot_window = Signal()  # 1 during BOOT_PROGRAM microcode (first 3 retires)
+        # Machine-owned first CALL context; root-frame construction only.
+        # Unlike boot_window this grants no permission or Namespace elevation.
+        self.reset_root = Signal()
         self.cr_src = Signal(4)
         self.indexed_source = Signal()
         self.index = Signal(32)
@@ -73,7 +76,7 @@ class ChurchCall(Elaboratable):
         # not packed with protected STO). The frame records return_PC =
         # caller_pc + 1 beside the prior STO so RETURN can restore both through
         # their separate hardware paths.
-        self.caller_pc = Signal(15)
+        self.caller_pc = Signal(15)  # word offset from caller CR14 code base
 
         # Thread lump byte base address (CR12.word1_location)
         self.thread_base = Signal(32)
@@ -410,11 +413,8 @@ class ChurchCall(Elaboratable):
         cr6_lat_gt   = View(GT_LAYOUT, cr6_lat_view.word0_gt)
         cr6_lat_w2   = View(WORD2_LAYOUT, cr6_lat_view.word2_w2)
 
-        # CR6 with corrected base, limit; perms fixed to L-only — architectural invariant.
-        # CR6 always carries L perm (allows LOAD to extract capabilities from the c-list via mLoad).
-        # Device GTs (L+S+E) have S and E stripped; regular L-GTs are unchanged.
-        # M-elevation for CR6 is implicit: CALL FSM always sets mload_m_elevated=1 (Phase 1).
-        # It is NOT encoded as a perm bit — contrast with CR14 where PERM_X = M flag.
+        # Adjust only CR6's cached c-list base and limit. Its Enter token stays
+        # intact; the successful CALL boundary establishes CR6.M for L access.
         cr6_adjusted = Signal(CAP_REG_LAYOUT)
         cr6_adj_view = View(CAP_REG_LAYOUT, cr6_adjusted)
         cr6_adj_gt   = View(GT_LAYOUT, cr6_adj_view.word0_gt)
@@ -423,10 +423,10 @@ class ChurchCall(Elaboratable):
             cr6_adj_gt.slot_id.eq(cr6_lat_gt.slot_id),
             cr6_adj_gt.gt_seq.eq(cr6_lat_gt.gt_seq),
             cr6_adj_gt.gt_type.eq(cr6_lat_gt.gt_type),
-            # Fixed L-only — CR6 always carries L (mLoad path for c-list access).
-            # Church domain (dom=1), perm[0]=L.
-            cr6_adj_gt.dom.eq(1),
-            cr6_adj_gt.perm.eq(0b001),   # L = perm[0] in Church domain
+            # Preserve the Enter identity; CR6.M supplies L access without
+            # manufacturing a different capability token.
+            cr6_adj_gt.dom.eq(cr6_lat_gt.dom),
+            cr6_adj_gt.perm.eq(cr6_lat_gt.perm),
             cr6_adj_gt.b_flag.eq(cr6_lat_gt.b_flag),
             # base = NS_base + (lumpSize − cc) × 4  (byte address of c-list word 0)
             cr6_adj_view.word1_location.eq(
@@ -475,7 +475,7 @@ class ChurchCall(Elaboratable):
                         thread_hdr_latched.eq(self.thread_hdr),
                         caller_pc_latched.eq(self.caller_pc),
                         flags_latched.eq(self.flags),
-                        root_frame_latched.eq(self.boot_window),
+                        root_frame_latched.eq(self.boot_window | self.reset_root),
                         mask_latched.eq(self.mask),
                         index_latched.eq(self.index),
                         call_imm_latched.eq(self.call_imm),
@@ -579,7 +579,7 @@ class ChurchCall(Elaboratable):
                 # Combinatorially read back CR6 — Phase 1 mLoad has just deposited
                 # the callee's cap entry there.  Latch word0_gt (pre-SET_CR6_LIMIT,
                 # original perms from cload.py Phase 1) for STACK_WRITE_EGT.
-                # Note: cr6_adjusted (PERM_MASK_L) is the *final* CR6 written later.
+                # cr6_adjusted changes cache geometry, not the Enter token.
                 m.d.comb += local_cr_rd_addr.eq(CR6_CLIST)
                 m.d.sync += callee_egt_latched.eq(
                     View(CAP_REG_LAYOUT, self.cr_rd_data).word0_gt.as_value()
@@ -704,7 +704,7 @@ class ChurchCall(Elaboratable):
 
             with m.State("SET_CR6_BASE"):
                 # cc=0: c-list absent — write NULL GT to CR6 per spec step 7
-                # cc>0: read CR6 (Phase 1 deposited the raw GT there) to latch for L-only adjustment
+                # cc>0: retain the raw Enter GT while adjusting cache geometry.
                 with m.If(cc_reg == 0):
                     m.d.comb += [
                         local_cr_wr_en.eq(1),

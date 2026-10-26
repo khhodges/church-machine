@@ -2407,7 +2407,15 @@ class ChurchAssembler {
                 // CHANGE is available to programmer code. Isolated register
                 // operands are not a compile-time privilege violation;
                 // execution validates the operation and capability authority.
-                // 1-arg form: CHANGE CRx → CHANGE CRx, CRx, 0  (src defaults to dst)
+                // Canonical direct CHANGE: one source GT, implicit CR12.
+                // Historical explicit forms remain available for byte-preserving
+                // inspection, but are not hardware-compatible instructions.
+                if (parts[2] === undefined) {
+                    crSrc = this._parseCR(parts[1], lineNum);
+                    crDst = 0;
+                    imm = 0;
+                    break;
+                }
                 crDst = this._parseCR(parts[1], lineNum);
                 if (parts[2] !== undefined) {
                     crSrc = this._parseCR(parts[2], lineNum);
@@ -3552,9 +3560,9 @@ class ChurchAssembler {
                     return ref.slotName ? `${mnemonic}  ${ref.slotName}${ref.comment}` :
                         `${mnemonic}  CR6, #${imm}`;
                 }
-                // The simulator's general one-GT form uses the existing
-                // shorthand word. Keep legacy indexed words explicit.
-                if (crSrc === crDst && imm === 0) return `${mnemonic}  CR${crDst}`;
+                // Canonical direct form; keep historical words explicit so
+                // inspecting them never silently changes their encoding.
+                if (crDst === 0 && imm === 0) return `${mnemonic}  CR${crSrc}`;
                 if (crSrc === 6) {
                     const ref = cdNamed(imm);
                     return `${mnemonic}  CR${crDst}, ${ref.operand}${ref.comment}`;

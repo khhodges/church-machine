@@ -1,0 +1,26 @@
+{
+  "recordedAtUtc": "2026-10-25T15:06:34.366717+00:00",
+  "command": [
+    "iverilog",
+    "-v",
+    "-g2012",
+    "-s",
+    "church_wukong_xc7a100t",
+    "-o",
+    "generated-artifacts/new-layout-timing-read-selection/compiled.vvp",
+    "generated-artifacts/new-layout-timing-read-selection/rtl/church_wukong_xc7a100t.v",
+    "/nix/store/d0jss2q3m0bc346bbpgii1l0b3a0mx0p-yosys-0.51/share/yosys/xilinx/cells_sim.v"
+  ],
+  "status": "passed",
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 481.45,
+  "deadlineSeconds": 900,
+  "verilogSha256": "658c272111a75b5b56c1d43bd2cff7e3b327b0b471037784e8ce72d534c5983d",
+  "sourceFingerprint": "fee3b23767af431ee042e3cc5740c7d552703a9a9faded9ccfbb0484896a4708",
+  "inputsUnchanged": true,
+  "librarySha256": "10f8afc61bf708949ebf238294327dce95eaa68919bb0ab5938d40f24e39d15e",
+  "executableSha256": "b20b767011486b50fb0c7e13d9d6499e1742c71713cd9b3b64597c67915f72af",
+  "programReplayPerformed": false,
+  "hardwareCommandsSent": false
+}

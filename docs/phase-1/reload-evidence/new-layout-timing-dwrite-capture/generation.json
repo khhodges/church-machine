@@ -1,0 +1,27 @@
+{
+  "recordedAtUtc": "2026-10-25T19:41:28.973745+00:00",
+  "command": [
+    "python3",
+    "-u",
+    "-m",
+    "hardware.gen_rtlil",
+    "generated-artifacts/new-layout-timing-dwrite-capture/rtl",
+    "--profile",
+    "new-layout-guarded-relative-nia-v1"
+  ],
+  "status": "passed",
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 35.49,
+  "deadlineSeconds": 1800,
+  "sourceFingerprint": "ecc4babfc6a8ae93186fe17ec3d329f46360aa196c40dd0dfba50a407a1b85c0",
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "inputsUnchanged": true,
+  "hardwareCommandsSent": false,
+  "releaseVerified": false,
+  "outputsSha256": {
+    "church_wukong_xc7a100t.il": "8a2d797c6ba6977b0e2e6372c358a4ad10fec01cc5d9993b6070867eac57b755",
+    "church_wukong_xc7a100t.v": "af3df46a567fd7331f0ce5b4f10ebc50185208354a0a09825c326b18471639db",
+    "guarded-profile.json": "f804a896cf502fc7ef080c8ade34e4e72f049a73fc7cdfcce0b5c0a51fc3c93c"
+  }
+}

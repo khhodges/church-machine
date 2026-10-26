@@ -47,10 +47,15 @@ class ChurchCLoad(Elaboratable):
     or cload_fault is asserted.
     """
 
-    def __init__(self, enable_seal_check=None):
+    def __init__(self, enable_seal_check=None, *, resident_word_locations=False):
+        # Explicit build profile, never inferred from live bytes or a failed
+        # legacy lookup. ChurchNSGate verifies the original W0 before conversion.
+        self.resident_word_locations = resident_word_locations
         self.enable_seal_check = (
             enable_seal_check if enable_seal_check is not None else ENABLE_SEAL_CHECK
         )
+        if self.resident_word_locations and not self.enable_seal_check:
+            raise ValueError("guarded cLoad requires original-descriptor seal validation")
 
         self.cload_start      = Signal()
         self.cload_busy       = Signal()
@@ -79,7 +84,8 @@ class ChurchCLoad(Elaboratable):
         m = Module()
 
         m.submodules.u_ns_gate = u_ns_gate = ChurchNSGate(
-            enable_seal_check=self.enable_seal_check
+            enable_seal_check=self.enable_seal_check,
+            authority_version_shift=17 if self.resident_word_locations else 21,
         )
 
         e_gt_latched   = Signal(32)
@@ -90,6 +96,11 @@ class ChurchCLoad(Elaboratable):
 
         raw_base = Signal(32)
         raw_w2   = Signal(32)
+        checked_base = Signal(32)
+        header_armed = Signal()
+        m.d.comb += checked_base.eq(
+            (u_ns_gate.raw_base << 2) if self.resident_word_locations
+            else u_ns_gate.raw_base)
 
         cc_reg        = Signal(8)
         cw_reg        = Signal(13)   # _hdr.cw: authoritative code-word count from lump header
@@ -198,25 +209,38 @@ class ChurchCLoad(Elaboratable):
                     m.next = "START_GATE"
 
             with m.State("START_GATE"):
-                m.d.comb += [
-                    u_ns_gate.ns_gate_start.eq(1),
-                    u_ns_gate.gt_word0.eq(e_gt_latched),
-                ]
-                m.next = "WAIT_GATE"
+                ns = View(CAP_REG_LAYOUT, self.cr15_namespace)
+                with m.If(self.resident_word_locations &
+                          ((e_gt_view.slot_id == 0) |
+                           (((e_gt_view.slot_id << 2) + 3) >
+                            ns.word2_w2[:17]))):
+                    m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
+                    m.next = "FAULT"
+                with m.Else():
+                    m.d.comb += [
+                        u_ns_gate.ns_gate_start.eq(1),
+                        u_ns_gate.gt_word0.eq(e_gt_latched),
+                    ]
+                    m.next = "WAIT_GATE"
 
             with m.State("WAIT_GATE"):
                 with m.If(u_ns_gate.ns_gate_fault):
                     m.d.sync += fault_type_reg.eq(u_ns_gate.ns_gate_fault_type)
                     m.next = "FAULT"
                 with m.Elif(u_ns_gate.ns_gate_done):
-                    with m.If(same_code_latched &
-                              ((u_ns_gate.raw_base + 4) != code_location_latched)):
+                    with m.If(self.resident_word_locations &
+                              ((u_ns_gate.raw_base >= 16384) | u_ns_gate.raw_w2[31])):
+                        m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
+                        m.next = "FAULT"
+                    with m.Elif(same_code_latched &
+                              ((checked_base + 4) != code_location_latched)):
                         m.d.sync += fault_type_reg.eq(FaultType.STACK_CORRUPT)
                         m.next = "FAULT"
                     with m.Else():
                         m.d.sync += [
-                            raw_base.eq(u_ns_gate.raw_base),
+                            raw_base.eq(checked_base),
                             raw_w2.eq(u_ns_gate.raw_w2),
+                            header_armed.eq(0),
                         ]
                         m.next = "FETCH_HDR"
 
@@ -225,7 +249,9 @@ class ChurchCLoad(Elaboratable):
                     local_mem_addr.eq(raw_base),
                     local_mem_rd_en.eq(1),
                 ]
-                with m.If(self.mem_rd_valid):
+                m.d.sync += header_armed.eq(1)
+                with m.If(self.mem_rd_valid &
+                          (header_armed | Const(not self.resident_word_locations))):
                     _hdr = View(LUMP_HEADER_LAYOUT, self.mem_rd_data)
                     m.d.sync += [
                         cc_reg.eq(_hdr.cc),
@@ -233,7 +259,20 @@ class ChurchCLoad(Elaboratable):
                         n_minus_6_reg.eq(_hdr.n_minus_6),
                         lump_size_reg.eq(Const(1, 15) << (_hdr.n_minus_6 + 6)),
                     ]
-                    with m.If(same_code_latched):
+                    _size = Const(1, 15) << (_hdr.n_minus_6 + 6)
+                    _caps = _size - _hdr.cc
+                    _invalid = (
+                        (self.mem_rd_data[27:32] != 31) |
+                        (self.mem_rd_data[8:10] != 0) |
+                        (_hdr.n_minus_6 > 7) | (_hdr.cc == 0) |
+                        (_hdr.cw == 0) | (_hdr.cw >= _caps) |
+                        ((raw_w2[:17] != _size - 1) &
+                         (raw_w2[:17] != _caps - 1)) |
+                        ((raw_base >> 2) + _size > 16384))
+                    with m.If(self.resident_word_locations & _invalid):
+                        m.d.sync += fault_type_reg.eq(FaultType.BOUNDS)
+                        m.next = "FAULT"
+                    with m.Elif(same_code_latched):
                         # In-scope LAMBDA retains CR14 verbatim; only CR6 is
                         # reconstructed from the revalidated code identity.
                         m.next = "WRITE_CR6"

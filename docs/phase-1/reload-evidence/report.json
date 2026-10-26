@@ -1,0 +1,481 @@
+{
+  "created_utc": "2026-10-24T14:25:32.430836+00:00",
+  "status": "BLOCKED: offline boot failed; do not upload",
+  "source": {
+    "size": 65536,
+    "sha256": "0ff1b24d76b7010c13b8b50737f4513a771b586be73b8d0fa80a748087070a5b",
+    "entry": {
+      "entry_slot": 10,
+      "entry_loc": 1296,
+      "entry_gt_seq": 0,
+      "resident": true,
+      "reason": null,
+      "thread_caps0": 1241513994,
+      "thread_caps_offset": 244,
+      "expected_gt": 1241513994,
+      "caps0_ok": true
+    }
+  },
+  "projection": {
+    "size": 65536,
+    "sha256": "ae711729facfb0b0f607c3560f9f4d57bc195d92b249b733dfd9f8e629dd1db9",
+    "entry": {
+      "entry_slot": 10,
+      "entry_loc": 2944,
+      "resident": true,
+      "reason": null,
+      "thread_caps0": 1241513994,
+      "expected_gt": 1241513994,
+      "caps0_ok": true,
+      "source_entry_loc": 1296,
+      "source_words": 16384,
+      "thread_count": 3,
+      "thread_contexts": [
+        {
+          "number": 1,
+          "slot": 1,
+          "source_base": 16,
+          "base_word": 2432,
+          "size": 256,
+          "caps0": 1241513994
+        },
+        {
+          "number": 2,
+          "slot": 11,
+          "source_base": 4368,
+          "base_word": 3968,
+          "size": 256,
+          "caps0": 1241513994
+        },
+        {
+          "number": 3,
+          "slot": 12,
+          "source_base": 4624,
+          "base_word": 4224,
+          "size": 256,
+          "caps0": 1241513994
+        }
+      ],
+      "dynamic_end": 4480
+    },
+    "layout": [
+      {
+        "slot": 0,
+        "descriptor": [
+          0,
+          63,
+          3735707375,
+          0
+        ]
+      },
+      {
+        "slot": 1,
+        "descriptor": [
+          9728,
+          255,
+          3735117551,
+          0
+        ],
+        "base_word": 2432,
+        "allocation_words": 256,
+        "body_sha256": "60b57078edd005624885442244b942fac3f26a2c7286ce85f19c6ee406a6d98a"
+      },
+      {
+        "slot": 2,
+        "descriptor": [
+          1073741844,
+          2,
+          3735942351,
+          0
+        ]
+      },
+      {
+        "slot": 3,
+        "descriptor": [
+          1073741824,
+          4,
+          3735895759,
+          0
+        ]
+      },
+      {
+        "slot": 4,
+        "descriptor": [
+          1073741864,
+          0,
+          3735923407,
+          0
+        ]
+      },
+      {
+        "slot": 5,
+        "descriptor": [
+          1073741868,
+          4,
+          3735890127,
+          0
+        ]
+      },
+      {
+        "slot": 6,
+        "descriptor": [
+          1536,
+          2047,
+          3729874671,
+          0
+        ],
+        "base_word": 384,
+        "allocation_words": 2048,
+        "body_sha256": "68083eeef4a1f281c1325f0a1ac2ca186ad76d6d5a7abff37aa88d8de7a3f9fe"
+      },
+      {
+        "slot": 7,
+        "descriptor": [
+          11264,
+          127,
+          3736362735,
+          0
+        ],
+        "base_word": 2816,
+        "allocation_words": 128,
+        "body_sha256": "9e15c845f5cef61e4150849acbf473d634df7651f04a8156a763ccb2224e5926"
+      },
+      {
+        "slot": 10,
+        "descriptor": [
+          11776,
+          1012,
+          3737403119,
+          1241513994
+        ],
+        "base_word": 2944,
+        "allocation_words": 1024,
+        "body_sha256": "4e115df219b85ac3bcd4ec4c533192eeb99db63e5f17b2f13dbc0583d3e3ab7c"
+      },
+      {
+        "slot": 11,
+        "descriptor": [
+          15872,
+          255,
+          3735903983,
+          0
+        ],
+        "base_word": 3968,
+        "allocation_words": 256,
+        "body_sha256": "414bfec44bfcf3f5abd231bcd2e40c4459bba75aaf854c315f5377ecbffa0052"
+      },
+      {
+        "slot": 12,
+        "descriptor": [
+          16896,
+          255,
+          3734200047,
+          0
+        ],
+        "base_word": 4224,
+        "allocation_words": 256,
+        "body_sha256": "414bfec44bfcf3f5abd231bcd2e40c4459bba75aaf854c315f5377ecbffa0052"
+      },
+      {
+        "slot": 13,
+        "descriptor": [
+          4294967068,
+          0,
+          559034512,
+          0
+        ]
+      },
+      {
+        "slot": 63,
+        "descriptor": [
+          0,
+          0,
+          0,
+          3
+        ]
+      }
+    ]
+  },
+  "wire": {
+    "payload_sha256": "44fc8769856200061b98e496de2db948b1aa104174fc535435ecda9693f72347",
+    "frame_size": 65541,
+    "header_hex": "7500010000",
+    "conversion": "LE words to BE words"
+  },
+  "simulator_exit_code": 0,
+  "simulator_boot_passed": false,
+  "simulator_result": {
+    "loaded": true,
+    "lastBootImageError": null,
+    "rejectedAtomically": null,
+    "bootComplete": false,
+    "halted": true,
+    "bootStep": 2,
+    "iterations": 3,
+    "nsCount": 14,
+    "memoryWords": 16384,
+    "nsTableBase": 16128,
+    "pc": 2,
+    "sto": 243,
+    "mElevation": false,
+    "ledBits": 0,
+    "faultLog": [
+      {
+        "type": "BOUNDS",
+        "message": "From unknown.unknown -> To CapabilityTest.method#0 \u2014 CALL: malformed executable header or code/C-list outside allocation",
+        "pc": 2,
+        "step": 0
+      }
+    ],
+    "callStackDepth": 0,
+    "sentinelOnTop": false,
+    "bootEntrySlot": 10,
+    "cr0": {
+      "word0": 1241513994,
+      "word1": 1296,
+      "word2": 1073742836,
+      "word3": 0,
+      "m": 0
+    },
+    "cr6": {
+      "word0": 0,
+      "word1": 0,
+      "word2": 0,
+      "word3": 0,
+      "m": 0
+    },
+    "cr12": {
+      "word0": 33554433,
+      "word1": 16,
+      "word2": 255,
+      "word3": 0,
+      "m": 0
+    },
+    "cr14": {
+      "word0": 0,
+      "word1": 0,
+      "word2": 0,
+      "word3": 0,
+      "m": 0
+    },
+    "cr15": {
+      "word0": 33554432,
+      "word1": 0,
+      "word2": 255,
+      "word3": 0,
+      "m": 0
+    },
+    "auditLog": [
+      {
+        "gate": "RST",
+        "label": "Reset event",
+        "nsIndex": null,
+        "result": "pass",
+        "checks": {
+          "reset": {
+            "pass": true
+          }
+        },
+        "bootStepName": null
+      },
+      {
+        "gate": "mLoad",
+        "label": "Boot.NS",
+        "nsIndex": 0,
+        "result": "pass",
+        "checks": {
+          "version": {
+            "pass": true
+          },
+          "seal": {
+            "pass": true
+          },
+          "perm": {
+            "pass": true,
+            "perm": null
+          }
+        },
+        "bootStepName": null
+      },
+      {
+        "gate": "mLoad",
+        "label": "CapabilityTest",
+        "nsIndex": 10,
+        "result": "pass",
+        "checks": {
+          "version": {
+            "pass": true
+          },
+          "seal": {
+            "pass": true
+          },
+          "perm": {
+            "pass": true,
+            "perm": "E"
+          }
+        },
+        "bootStepName": null
+      },
+      {
+        "gate": "mLoad",
+        "label": "CapabilityTest",
+        "nsIndex": 10,
+        "result": "pass",
+        "checks": {
+          "version": {
+            "pass": true
+          },
+          "seal": {
+            "pass": true
+          },
+          "perm": {
+            "pass": true,
+            "perm": "E"
+          }
+        },
+        "bootStepName": null
+      }
+    ],
+    "pipelineOutput": [
+      {
+        "stage": "RST",
+        "type": "RST",
+        "desc": "Reset event: CR0\u2013CR15 and DR0\u2013DR15 cleared before boot ROM.",
+        "label": "Reset event",
+        "nsIndex": null,
+        "requiredPerm": null,
+        "checks": [
+          {
+            "name": "RESET",
+            "pass": true,
+            "perm": null
+          }
+        ],
+        "status": "pass",
+        "b": 0,
+        "f": 0,
+        "bootStepName": null
+      },
+      {
+        "stage": "mLoad",
+        "type": "mLoad",
+        "desc": "mLoad(NS[0]=\"Boot.NS\")",
+        "label": "Boot.NS",
+        "nsIndex": 0,
+        "requiredPerm": null,
+        "checks": [
+          {
+            "name": "VERSION",
+            "pass": true,
+            "perm": null
+          },
+          {
+            "name": "SEAL",
+            "pass": true,
+            "perm": null
+          },
+          {
+            "name": "PERM",
+            "pass": true,
+            "perm": null
+          }
+        ],
+        "status": "pass",
+        "b": 0,
+        "f": 0,
+        "bootStepName": null
+      },
+      {
+        "stage": "mLoad",
+        "type": "mLoad",
+        "desc": "mLoad(NS[10]=\"CapabilityTest\", E)",
+        "label": "CapabilityTest",
+        "nsIndex": 10,
+        "requiredPerm": "E",
+        "checks": [
+          {
+            "name": "VERSION",
+            "pass": true,
+            "perm": null
+          },
+          {
+            "name": "SEAL",
+            "pass": true,
+            "perm": null
+          },
+          {
+            "name": "PERM",
+            "pass": true,
+            "perm": "E"
+          }
+        ],
+        "status": "pass",
+        "b": 0,
+        "f": 0,
+        "bootStepName": null
+      },
+      {
+        "stage": "mLoad",
+        "type": "mLoad",
+        "desc": "mLoad(NS[10]=\"CapabilityTest\", E)",
+        "label": "CapabilityTest",
+        "nsIndex": 10,
+        "requiredPerm": "E",
+        "checks": [
+          {
+            "name": "VERSION",
+            "pass": true,
+            "perm": null
+          },
+          {
+            "name": "SEAL",
+            "pass": true,
+            "perm": null
+          },
+          {
+            "name": "PERM",
+            "pass": true,
+            "perm": "E"
+          }
+        ],
+        "status": "pass",
+        "b": 0,
+        "f": 0,
+        "bootStepName": null
+      }
+    ],
+    "consoleOutput": "--- HARD RESET: all registers zeroed ---\nBoot microcode ready. Step or Run to begin boot sequence.\n[BOOTIMG] Boot-entry discrepancy: prior UI slot 6; imported image slot 10 is authoritative.\n[BOOTIMG] Loaded 16384-word boot image; 14 NS entries active.\nBOOT LOAD CR15, CR15[0] \u2014 Namespace root established\nCHANGE CR12 (system-wide; RESTORE_CALL: CR0\u2013CR11 loaded from Thread tail homes) <- [CR15+1]\nBOOT CHANGE CR12, CR15[1] \u2014 Boot.Thread restored\nFAULT [BOUNDS] at PC=2: From unknown.unknown -> To CapabilityTest.method#0 \u2014 CALL: malformed executable header or code/C-list outside allocation\n",
+    "stepSnapshots": [
+      {
+        "iteration": 1,
+        "bootStepBefore": 0,
+        "bootStepAfter": 1,
+        "outputDelta": "BOOT LOAD CR15, CR15[0] \u2014 Namespace root established\n"
+      },
+      {
+        "iteration": 2,
+        "bootStepBefore": 1,
+        "bootStepAfter": 2,
+        "outputDelta": "CHANGE CR12 (system-wide; RESTORE_CALL: CR0\u2013CR11 loaded from Thread tail homes) <- [CR15+1]\nBOOT CHANGE CR12, CR15[1] \u2014 Boot.Thread restored\n"
+      },
+      {
+        "iteration": 3,
+        "bootStepBefore": 2,
+        "bootStepAfter": 2,
+        "outputDelta": "FAULT [BOUNDS] at PC=2: From unknown.unknown -> To CapabilityTest.method#0 \u2014 CALL: malformed executable header or code/C-list outside allocation\n"
+      }
+    ]
+  },
+  "simulator_scope": "generic source loader/boot only, not projected RTL execution",
+  "physical_transport": "not attempted",
+  "installed_byte_verification": "not available from upload ACK",
+  "physical_execution": "not attempted",
+  "projection_warning": "Non-entry dependencies use hardware.boot_rom factory bodies; not all saved resident artifacts are copied.",
+  "implementation_sha256": {
+    "server/boot_image.py": "3134a89e14a9b1f9f351f35fc11a80a04cd9f319b6ee4da14833234bd6c792d7",
+    "hardware/boot_rom.py": "587b0ce045eeb4ef3b293d63c2394271b6e3e00595e66c595cceded97e40d683",
+    "hardware/wukong_bridge.py": "646c58949dbba10e1923902c5ca64549d9994c8e63137b4a9f0ba5ff4f7c5b23",
+    "hardware/wukong_top.py": "428a542f617744c439752a55ce9e86d6d807616c0c6583a81103e72648991990",
+    "shared/architecture_contracts.json": "874efb463d26c4509b6c8b92d6f587db99a1350cfb1e6ba1a33aa0b530b9319b"
+  }
+}

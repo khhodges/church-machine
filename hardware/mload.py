@@ -5,6 +5,7 @@ from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, NS_ENTRY_LAYOUT, WORD2_LAYOUT
 from .perm_check import perm_bit
 from .ns_gate import ChurchNSGate
+from .ascending_authority import cached_authority
 from shared.architecture_contracts import NS_ENTRY as ARCH_NS_ENTRY, field_lsb
 
 
@@ -32,8 +33,11 @@ class ChurchMLoad(Elaboratable):
              → FAULT
     """
 
-    def __init__(self, enable_seal_check=None):
+    def __init__(self, enable_seal_check=None, *, resident_word_locations=False):
+        self.resident_word_locations = resident_word_locations
         self.enable_seal_check = enable_seal_check if enable_seal_check is not None else ENABLE_SEAL_CHECK
+        if resident_word_locations and not self.enable_seal_check:
+            raise ValueError("guarded mLoad requires descriptor seal validation")
 
         self.sub_start = Signal()
         self.sub_cr_src = Signal(4)
@@ -103,7 +107,8 @@ class ChurchMLoad(Elaboratable):
         m = Module()
 
         m.submodules.u_ns_gate = u_ns_gate = ChurchNSGate(
-            enable_seal_check=self.enable_seal_check
+            enable_seal_check=self.enable_seal_check,
+            authority_version_shift=17 if self.resident_word_locations else 21,
         )
 
         cr_src_reg = Signal(4)
@@ -145,8 +150,31 @@ class ChurchMLoad(Elaboratable):
 
         ns_index_in_bounds = Signal()
         m.d.comb += ns_index_in_bounds.eq(
-            result_gt.slot_id <= ns_ns_w2.limit_offset[:16]
+            ((result_gt.slot_id != 0) &
+             (((result_gt.slot_id << 2) + 3) <= ns_ns_w2.limit_offset))
+            if self.resident_word_locations else
+            (result_gt.slot_id <= ns_ns_w2.limit_offset[:16])
         )
+        resolved_base = Signal(32)
+        resolved_authority = Signal(32)
+        invalid_descriptor = Signal()
+        if self.resident_word_locations:
+            m.d.comb += [
+                resolved_base.eq(Mux(u_ns_gate.raw_base < 16384,
+                                     u_ns_gate.raw_base << 2, u_ns_gate.raw_base)),
+                resolved_authority.eq(cached_authority(u_ns_gate.raw_w2)),
+                invalid_descriptor.eq(
+                    u_ns_gate.raw_w2[31] |
+                    Mux(u_ns_gate.raw_base < 16384,
+                        u_ns_gate.raw_base + u_ns_gate.raw_w2[:17] >= 16384,
+                        (u_ns_gate.raw_base[30:32] != 1) &
+                        (u_ns_gate.raw_base != M_BIT_PORT))),
+            ]
+        else:
+            m.d.comb += [
+                resolved_base.eq(u_ns_gate.raw_base),
+                resolved_authority.eq(u_ns_gate.raw_w2),
+            ]
 
         ns_w1_saved = Signal(32)
         rd_armed = Signal()  # stale-valid guard for FETCH_GT (see below)
@@ -165,7 +193,8 @@ class ChurchMLoad(Elaboratable):
         # M-elevated accesses bypass the ns_gate seal/version check so that
         # the boot FSM and the 3-instruction BOOT_PROGRAM microcode window can
         # read uninitialized or out-of-range NS slots without a SEAL fault.
-        m.d.comb += u_ns_gate.m_elevated.eq(self.sub_m_elevated)
+        m.d.comb += u_ns_gate.m_elevated.eq(
+            self.sub_m_elevated & Const(not self.resident_word_locations))
 
         m.d.comb += [
             self.mem_addr.eq(
@@ -182,7 +211,7 @@ class ChurchMLoad(Elaboratable):
 
         m.d.comb += [
             self.ns_entry_addr_out.eq(u_ns_gate.ns_entry_addr_out),
-            self.resolved_base.eq(u_ns_gate.raw_base),
+            self.resolved_base.eq(resolved_base),
             self.resolved_cap.eq(result_cap),
         ]
 
@@ -303,7 +332,8 @@ class ChurchMLoad(Elaboratable):
                         m.next = "CHECK_NS"
 
             with m.State("CHECK_NS"):
-                with m.If(~ns_index_in_bounds & ~self.sub_m_elevated):
+                with m.If(~ns_index_in_bounds &
+                          (Const(self.resident_word_locations) | ~self.sub_m_elevated)):
                     # M-elevated accesses bypass the NS slot bounds check.
                     # The ns_gate still runs; slot_id out of range simply reads
                     # zeroed DMEM (no NS entry at that address) and returns
@@ -321,13 +351,16 @@ class ChurchMLoad(Elaboratable):
                 m.next = "WAIT_GATE"
 
             with m.State("WAIT_GATE"):
-                with m.If(u_ns_gate.ns_gate_fault):
-                    m.d.sync += fault_type_reg.eq(u_ns_gate.ns_gate_fault_type)
+                with m.If(u_ns_gate.ns_gate_fault |
+                          (u_ns_gate.ns_gate_done & invalid_descriptor)):
+                    m.d.sync += fault_type_reg.eq(Mux(
+                        u_ns_gate.ns_gate_fault, u_ns_gate.ns_gate_fault_type,
+                        FaultType.BOUNDS))
                     m.next = "FAULT"
                 with m.Elif(u_ns_gate.ns_gate_done):
                     m.d.sync += [
-                        result_view.word1_location.eq(u_ns_gate.raw_base),
-                        result_view.word2_w2.eq(u_ns_gate.raw_w2),
+                        result_view.word1_location.eq(resolved_base),
+                        result_view.word2_w2.eq(resolved_authority),
                     ]
                     if self.enable_seal_check:
                         m.d.sync += ns_w1_saved.eq(u_ns_gate.raw_w2)

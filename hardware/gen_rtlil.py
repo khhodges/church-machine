@@ -439,14 +439,23 @@ def install_elaboration_caches():
     install_elaboration_caches._installed = True
 
 
-def generate_rtlil_wukong(output_dir="build"):
+def generate_rtlil_wukong(output_dir="build", *, profile=None):
     """Generate generic release RTL for Wukong; vendor implementation is separate."""
     from .wukong_top import ChurchWukongXC7A100T
     import gc
     import time
+    import json
+    import hashlib
+    from pathlib import Path
+    from .guarded_build_profile import build_inputs, ROOT
+    kwargs, profile_record = build_inputs(profile)
+    if profile_record:
+        output = Path(output_dir).resolve()
+        if output == ROOT / "build" or (output.exists() and any(output.iterdir())):
+            raise ValueError("Guarded generation requires a separate empty output directory")
     os.makedirs(output_dir, exist_ok=True)
     install_elaboration_caches()
-    top = ChurchWukongXC7A100T(clk_freq=50_000_000, baud=57_600, sim_mode=False)
+    top = ChurchWukongXC7A100T(**kwargs)
     ports = (
         [top.clk, top.rst_n]
         + list(top.led)
@@ -464,6 +473,8 @@ def generate_rtlil_wukong(output_dir="build"):
     with open(il_path, "w") as f:
         # RTLIL uses `#` comments.  A Verilog-style `//` freshness stamp makes
         # Yosys reject the generated IL before it can emit the Vivado input.
+        if profile_record:
+            f.write("# church-guarded-profile: " + json.dumps(profile_record, sort_keys=True) + "\n")
         f.write(stamp_text(rtlil_text, WUKONG_SOURCES, comment_prefix="# "))
 
     print(f"Generated: {il_path}")
@@ -476,7 +487,20 @@ def generate_rtlil_wukong(output_dir="build"):
         with open(v_path, "r", encoding="utf-8") as f:
             generated_verilog = f.read()
         with open(v_path, "w", encoding="utf-8") as f:
+            if profile_record:
+                f.write("// church-guarded-profile: " + json.dumps(profile_record, sort_keys=True) + "\n")
             f.write(stamp_text(generated_verilog, WUKONG_SOURCES))
+    if profile_record:
+        if not Path(v_path).is_file():
+            raise ValueError("Guarded Verilog generation did not produce an output")
+        profile_record.update(
+            schema="church.guarded-generated-rtl/v1", synthesized=False,
+            generatedFilesSha256={
+                Path(p).name: hashlib.sha256(Path(p).read_bytes()).hexdigest()
+                for p in (il_path, v_path)})
+        with open(Path(output_dir) / "guarded-profile.json", "x") as output:
+            json.dump(profile_record, output, indent=2)
+            output.write("\n")
 
     return il_path
 
@@ -486,9 +510,9 @@ def generate_rtlil(output_dir="build"):
 
 
 if __name__ == "__main__":
-    output_dir = "build"
-    for arg in sys.argv[1:]:
-        if not arg.startswith("--"):
-            output_dir = arg
-
-    generate_rtlil_wukong(output_dir)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("output_dir", nargs="?", default="build")
+    parser.add_argument("--profile", default=None)
+    args = parser.parse_args()
+    generate_rtlil_wukong(args.output_dir, profile=args.profile)

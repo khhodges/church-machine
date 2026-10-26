@@ -1,0 +1,78 @@
+{
+  "name": "New Layout \u2014 corrected AmoebaStartup trial",
+  "artifact": "ide.AmoebaStartup",
+  "originalArtifactSha256": "4a9c9e43b4e428aacf2afac3136da3f18a2cd01fc13b3e09b579a5ff8975ffbe",
+  "exampleSourceSha256": "5f528fe65c89e71018a6c07b417c4d5f6c96b355d7cca4c0d55f1b36d32d6db9",
+  "sourceSha256": "5dab783a4bcea8794ca8a8ee63290a4dd000912c4b2aeaa1f45a6ebf4f3d6b0e",
+  "sourceProvenance": "Repository prototype with the exact retained API import; not recovered original editing text",
+  "variants": {
+    "full": {
+      "filename": "AmoebaStartup.full.lump",
+      "sha256": "91581d5b58b42e0fbdf63da29be3d918f803a083cce00e18c0930a4082213066",
+      "length": 1024,
+      "compilerRecord": {
+        "schema": "church-compiler-output/v1",
+        "compiler": "CLOOMC",
+        "compiler_version": "workspace",
+        "language": "assembly",
+        "abstraction": "ide.AmoebaStartup",
+        "binary_hash": "91581d5b58b42e0fbdf63da29be3d918f803a083cce00e18c0930a4082213066",
+        "source_hash": "5dab783a4bcea8794ca8a8ee63290a4dd000912c4b2aeaa1f45a6ebf4f3d6b0e",
+        "words": 256,
+        "cw": 7,
+        "cc": 2,
+        "static_validated": true
+      }
+    },
+    "compact": {
+      "filename": "AmoebaStartup.compact.lump",
+      "sha256": "bda7a1184bdb6cbdd7b379135bbd1d6cd4f2437f5fd92a690f35d9e8df58505c",
+      "length": 2048,
+      "compilerRecord": {
+        "schema": "church-compiler-output/v1",
+        "compiler": "CLOOMC",
+        "compiler_version": "workspace",
+        "language": "assembly",
+        "abstraction": "ide.AmoebaStartup",
+        "binary_hash": "bda7a1184bdb6cbdd7b379135bbd1d6cd4f2437f5fd92a690f35d9e8df58505c",
+        "source_hash": "5dab783a4bcea8794ca8a8ee63290a4dd000912c4b2aeaa1f45a6ebf4f3d6b0e",
+        "words": 512,
+        "cw": 7,
+        "cc": 2,
+        "static_validated": true
+      }
+    },
+    "api": {
+      "filename": "AmoebaStartup.api.lump",
+      "sha256": "c0f5d99e1596ba189fc2af1a3911e260ef276fa5f116b50f96f802b46dcb8d22",
+      "length": 512,
+      "compilerRecord": {
+        "schema": "church-compiler-output/v1",
+        "compiler": "CLOOMC",
+        "compiler_version": "workspace",
+        "language": "assembly",
+        "abstraction": "ide.AmoebaStartup",
+        "binary_hash": "c0f5d99e1596ba189fc2af1a3911e260ef276fa5f116b50f96f802b46dcb8d22",
+        "source_hash": "5dab783a4bcea8794ca8a8ee63290a4dd000912c4b2aeaa1f45a6ebf4f3d6b0e",
+        "words": 128,
+        "cw": 7,
+        "cc": 2,
+        "static_validated": true
+      }
+    }
+  },
+  "primaryBuildVariant": "api",
+  "allocationWords": 128,
+  "codeChanges": [
+    {
+      "word": 5,
+      "before": 655425536,
+      "after": 654376960
+    }
+  ],
+  "publicApiAndDependenciesUnchanged": true,
+  "savedNamespaceChanged": false,
+  "published": false,
+  "uploaded": false,
+  "status": "Inert compiled revision; destination binding and full-program replay pending"
+}

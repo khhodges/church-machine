@@ -1,0 +1,31 @@
+{
+  "profile": "new-layout-guarded-relative-nia-v1",
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "targetPart": "xc7a100tfgg676-2",
+  "generatorArguments": {
+    "clk_freq": 50000000,
+    "baud": 57600,
+    "sim_mode": false,
+    "expected_boot_guard": 23971,
+    "runtime_image_words": {
+      "count": 16384,
+      "sha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451"
+    }
+  },
+  "blockers": [],
+  "configurationWired": true,
+  "readyForSynthesis": false,
+  "remainingGates": [
+    "generated RTL replay",
+    "full UART reload",
+    "profile-aware vendor readiness and release provenance"
+  ],
+  "sourceSha256": {
+    "hardware/gen_rtlil.py": "b3beefa3439dd034fb00469c12b4347f37003513b1b9e8a8f058d39c5389173a",
+    "hardware/wukong_top.py": "12a9add848bd228fb34b910e0634920569bbb14bb1611da8d862330d20272d77",
+    "hardware/wukong_xc7a100t.tcl": "b1ee4e1f8ede9bff85d7df1a3793f7911d89e7c16aa781eb6d5bf89722b0598b",
+    "hardware/wukong_xc7a100t.xdc": "a50dbe318aaa62a092a0d4417c8ef9a8d1899bd84ad78710c145c98d3d7476e2",
+    "hardware/profiles/new_layout_guarded.json": "80fa2d96709f230efcb8ecdb8da07eb9c994723eacffd76daad80cac7ad5f820"
+  },
+  "scope": "Read-only configuration audit; no elaboration, synthesis, network or hardware I/O"
+}

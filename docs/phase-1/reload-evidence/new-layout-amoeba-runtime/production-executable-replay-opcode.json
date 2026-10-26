@@ -1,0 +1,26 @@
+{
+  "recordedAtUtc": "2026-10-25T00:34:13.565896+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/observer-opcode",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked-600s.vvp"
+  ],
+  "supervisionStatus": "wall-timeout",
+  "exitCode": null,
+  "elapsedSeconds": 1800.02,
+  "deadlineSeconds": 1800,
+  "executableSha256": "ac2910c5ea3056477f37e544ef092cf5769eb161ca4931a297cb21870c236f4f",
+  "sourceFingerprint": "bbd09abb0c963f5afa84f5da3ed39f8ef0f4a72f051690c08716bf4920e36fa1",
+  "driverSourceSha256": "1bc138efa3d64636a2da989f894b20bd2ae16123a7785baaca7f8b18ab8f9846",
+  "driverBinarySha256": "24d28caf69f8673a0197d7a9ebe50a5729ae6bbeae47f29f8127928117dee2f2",
+  "retireObservable": "opcode bits 31:27 and NIA; lower 27 instruction bits unavailable and verified unused in frozen netlist",
+  "terminalObservations": [],
+  "bootCompleteObserved": false,
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test",
+  "fullLogSha256": "5c80edcb14cb91a897ec8ae6cb865464b0bb6f2d5cda3b06168ba9179dad961d"
+}

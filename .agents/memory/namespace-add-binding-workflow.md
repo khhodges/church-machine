@@ -2,6 +2,19 @@
 name: Namespace Add binding workflow
 description: Add records placement and checks dependencies; explicit BIND alone materializes GTs.
 ---
+Binding evidence must use a shared saved-assignment context across review and
+execution preparation, not whichever resident subset a consumer happens to copy.
+
+**Why:** Bind can review Lazy assignments too. Recomputing its evidence key from
+only resident bodies makes legitimate explicit binding disappear at preparation
+time. The reverse shortcut—ignoring changed Lazy destinations—can accept stale
+authority. Source identity, destination generation and owner contract must stay
+bound while residency filtering stays separate.
+
+**How to apply:** Keep shared context normalization, invalidate old preview keys
+when semantics change, require explicit rebinding, and exercise the real Bind
+action in save-to-execution tests rather than implicitly granting SELF.
+
 The user approved one Add to Namespace action, with binding validation automatic
 after saving, instead of competing design-placement and executable-install buttons.
 

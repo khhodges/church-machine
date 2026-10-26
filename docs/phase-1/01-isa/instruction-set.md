@@ -116,6 +116,23 @@ restore old values for masked CRs.
 
 ### Oracle closure
 
+#### Approved saved-NIA convention (2026-10-24)
+
+The user explicitly selected program-relative saved NIA for CALL, RETURN and
+CHANGE. A non-poison saved NIA is a word offset from the first code word after
+the executable LUMP header, identified by the saved executable capability.
+Validate the offset against that executable's code word count before resuming.
+The physical fetch address is the resolved code base plus four times the offset;
+the internal core may continue using absolute byte addresses.
+
+CALL saves the caller's next program-relative word offset. CHANGE saves its
+issuing continuation in the same form and resumes the incoming one. RETURN
+revalidates the saved executable and reconstructs its physical address from
+that base. Relocation does not rewrite the relative offset. The poison-root
+sentinel remains a sentinel and is never converted into an executable address.
+This settles saved-NIA coordinate meaning, not other unresolved frame packing
+or LAMBDA authority-policy questions below.
+
 The review did **not** settle every baseline corner. Before claiming complete
 instruction conformance, close these exact test expectations:
 

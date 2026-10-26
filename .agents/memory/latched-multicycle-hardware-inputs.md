@@ -17,6 +17,15 @@ values selected by temporary side-band requests. Add a regression that drops or
 changes the live input after launch and verifies the operation still uses the
 accepted value.
 
+Publication data must be valid on the same edge as its success handshake.
+
+**Why:** Registering an admitted Thread header on completion while the core
+samples that register on the same edge gives the core the previous header.
+The transition can appear successful but the next CALL uses wrong stack bounds.
+
+**How to apply:** Provide the admitted value on the successful commit edge and
+retain it afterward; never expose speculative admission data on failed paths.
+
 The user states that the GT and instruction must coexist for every ISA step
 that references memory.
 The user explicitly rejects packing them together: Church and Turing remain

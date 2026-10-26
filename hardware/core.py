@@ -5,6 +5,12 @@ from amaranth.lib.data import View
 from .hw_types import *
 from .layouts import GT_LAYOUT, CAP_REG_LAYOUT, WORD2_LAYOUT, COND_FLAGS_LAYOUT, LUMP_HEADER_LAYOUT
 from .integrity32 import integrity32_amaranth
+from .reset_marker import ResetMarkerAdmission, RESET_MARKER_WORD
+from .ascending_namespace import AscendingNamespaceBootstrap
+from .boot_pair_guard import BootPairGuard, validate_boot_guard
+from .boot_thread_validation import BootThreadValidation
+from .boot_thread_activation import BootThreadActivation
+from .ascending_authority import cached_authority
 from .boot_rom import NUC_LUMP_BASE, NUC_PROGRAM_CW, DEMO_CLIST_NAMED_SLOTS
 from .registers import ChurchRegisters
 from .decoder import ChurchDecoder
@@ -46,13 +52,32 @@ class ChurchCore(Elaboratable):
     When iot_profile=True: GC, Lambda, Change, Switch, ELoadCall, XLoadLambda
     are excluded; excluded opcodes emit FAULT_OPCODE.  Outform uses the lean
     tunnel-hunting ChurchOutformIoT instead of ChurchOutform.
+
+    An explicit expected_boot_guard selects ascending Namespace admission.
+    This staged implementation commits CR15 after metadata/seal/version checks,
+    checks slot 2 and its boot root frame, then holds before Thread activation.
+    It never enters the historical
+    bootstrap states or falls back after failure. Omission preserves existing
+    historical callers; it does not select or support an ascending image.
     """
 
-    def __init__(self, iot_profile=False):
+    def __init__(self, iot_profile=False, *, expected_boot_guard=None):
         self.iot_profile = iot_profile
+        if expected_boot_guard is not None:
+            validate_boot_guard(expected_boot_guard)
+        self.expected_boot_guard = expected_boot_guard
+        self.boot_namespace_admitted = Signal()
+        self.boot_thread_validated = Signal()
+        self.boot_thread_activated = Signal()
+        self.boot_marker_available = Signal()
+        self.boot_fault_slot = Signal(2)
         self.imem_addr = Signal(32)
         self.imem_data = Signal(32)
         self.imem_valid = Signal()
+        # Fetch provenance from the immutable-ROM mux, not a software M bit or
+        # a comparison against the current instruction address.
+        self.imem_from_reset_rom = Signal()
+        self.imem_fetch_address = Signal(32)
 
         self.dmem_addr = Signal(32)
         self.dmem_rd_en = Signal()
@@ -296,11 +321,13 @@ class ChurchCore(Elaboratable):
         m.submodules.u_tperm = _rst(u_tperm)
         m.submodules.u_save = _rst(u_save)
         m.submodules.u_load = _rst(u_load)
-        u_shared_mload = ChurchMLoad()
+        u_shared_mload = ChurchMLoad(
+            resident_word_locations=self.expected_boot_guard is not None)
         m.submodules.u_shared_mload = _rst(u_shared_mload)
         u_dread = ChurchDRead()
         u_dwrite = ChurchDWrite()
-        u_cload = ChurchCLoad()
+        u_cload = ChurchCLoad(
+            resident_word_locations=self.expected_boot_guard is not None)
 
         if self.iot_profile:
             u_outform = ChurchOutformIoT()
@@ -310,7 +337,8 @@ class ChurchCore(Elaboratable):
         if not self.iot_profile:
             u_gc = ChurchGCUnit()
             u_lambda = ChurchLambda()
-            u_change = ChurchChange()
+            u_change = ChurchChange(
+                resident_word_locations=self.expected_boot_guard is not None)
             u_switch = ChurchSwitch()
             u_eloadcall = ChurchELoadCall()
             u_xloadlambda = ChurchXLoadLambda()
@@ -362,12 +390,130 @@ class ChurchCore(Elaboratable):
 
         boot_state_reg = Signal(3, init=BootState.IDLE)
         namespace_init_armed = Signal()
+        namespace_commit = Signal()
+        activation_start = Signal()
+        guarded_marker_issue = Signal()
+        guarded_call_ready = Signal()
+        execution_phase = Signal()
+        guarded_call_fault = Signal()
+        guarded_call_error = Signal(5)
+        active_thread_header = Signal(32)
+        if self.expected_boot_guard is not None:
+            with m.If(clear_all):
+                m.d.sync += active_thread_header.eq(0)
+            with m.Elif(u_change.change_complete):
+                m.d.sync += active_thread_header.eq(u_change.thread_hdr_out)
+        else:
+            m.d.comb += active_thread_header.eq(u_change.thread_hdr_out if not self.iot_profile else 0)
+        m.d.comb += execution_phase.eq(
+            self.boot_complete | (boot_state_reg == BootState.GUARDED_CALL))
+        if self.expected_boot_guard is not None:
+            with m.If(clear_all):
+                m.d.sync += guarded_call_error.eq(0)
+            with m.Elif((boot_state_reg == BootState.GUARDED_CALL) &
+                        self.fault_valid & (guarded_call_error == 0)):
+                m.d.sync += guarded_call_error.eq(self.fault)
+            m.d.comb += guarded_call_ready.eq(
+                (boot_state_reg == BootState.GUARDED_CALL) &
+                (guarded_call_error == 0) & ~clear_all &
+                self.boot_namespace_admitted & self.boot_thread_activated &
+                self.imem_from_reset_rom & (self.imem_fetch_address == 8) &
+                (nia_reg == 8) & (self.imem_data == 0x17000000))
+        namespace_error = Signal(5)
+        if self.expected_boot_guard is not None:
+            reader = AscendingNamespaceBootstrap(namespace_only=True)
+            guard = BootPairGuard(expected_guard=self.expected_boot_guard)
+            m.submodules.boot_metadata = _rst(reader)
+            m.submodules.boot_namespace_guard = _rst(guard)
+            thread = BootThreadValidation(expected_guard=self.expected_boot_guard)
+            m.submodules.boot_thread_validation = _rst(thread)
+            activation = BootThreadActivation(expected_guard=self.expected_boot_guard)
+            m.submodules.boot_thread_activation = _rst(activation)
+            metadata_started = Signal()
+            m.d.comb += [
+                reader.start.eq((boot_state_reg == BootState.LOAD_NS) &
+                                ~metadata_started & (namespace_error == 0)),
+                reader.mem_valid.eq(self.dmem_rd_valid),
+                reader.mem_data.eq(self.dmem_rd_data),
+                guard.start.eq(reader.done),
+                guard.thread_stage.eq(0),
+                guard.observed_version.eq(reader.namespace_version),
+                namespace_commit.eq(guard.done & guard.accepted &
+                                    (boot_state_reg == BootState.LOAD_NS)),
+                thread.start.eq(namespace_commit),
+                thread.namespace_slots.eq(reader.slots),
+                thread.mem_valid.eq(self.dmem_rd_valid),
+                thread.mem_data.eq(self.dmem_rd_data),
+                activation.start.eq(activation_start),
+                activation.base_word.eq(thread.base_word),
+                activation.authority.eq(thread.authority),
+                activation.header.eq(thread.header),
+                activation.indicator.eq(thread.indicator),
+                activation.entry_gt.eq(thread.entry_gt),
+                activation.namespace_slots.eq(reader.slots),
+                activation.mem_valid.eq(self.dmem_rd_valid),
+                activation.mem_data.eq(self.dmem_rd_data),
+            ]
+            with m.If(clear_all):
+                m.d.sync += [
+                    metadata_started.eq(0), namespace_error.eq(0),
+                    self.boot_namespace_admitted.eq(0), self.boot_fault_slot.eq(0),
+                    self.boot_thread_validated.eq(0),
+                    self.boot_thread_activated.eq(0),
+                ]
+            with m.Else():
+                with m.If(reader.start):
+                    m.d.sync += metadata_started.eq(1)
+                with m.If(reader.fault):
+                    m.d.sync += [
+                        namespace_error.eq(Mux((reader.error == 3) | (reader.error == 5),
+                                               FaultType.SEAL, FaultType.BOUNDS)),
+                        self.boot_fault_slot.eq(Mux(reader.error >= 4, 2,
+                                                   Mux(reader.error >= 2, 1, 0))),
+                    ]
+                with m.Elif(guard.fault):
+                    m.d.sync += [
+                        namespace_error.eq(guard.fault_type),
+                        self.boot_fault_slot.eq(guard.fault_slot),
+                    ]
+                with m.Elif(namespace_commit):
+                    m.d.sync += self.boot_namespace_admitted.eq(1)
+                with m.If(thread.fault):
+                    m.d.sync += [
+                        namespace_error.eq(thread.fault_type),
+                        self.boot_fault_slot.eq(2),
+                    ]
+                with m.Elif(thread.done):
+                    m.d.sync += self.boot_thread_validated.eq(1)
+                with m.If(activation.fault):
+                    m.d.sync += [
+                        namespace_error.eq(activation.fault_type),
+                        self.boot_fault_slot.eq(2),
+                    ]
+                with m.Elif(activation.done):
+                    m.d.sync += self.boot_thread_activated.eq(1)
 
         m.d.comb += [
             self.boot_state.eq(boot_state_reg),
             self.boot_complete.eq(boot_state_reg == BootState.COMPLETE),
             clear_all.eq(boot_state_reg == BootState.FAULT_RST),
         ]
+        m.submodules.reset_marker_admission = reset_marker = ResetMarkerAdmission()
+        m.d.comb += [
+            reset_marker.reset_enter.eq(clear_all),
+            reset_marker.boot_handoff.eq(u_call.call_normal_complete),
+            reset_marker.instruction.eq(self.imem_data),
+            reset_marker.fetch_address.eq(self.imem_fetch_address),
+            reset_marker.trusted_rom_fetch.eq(self.imem_from_reset_rom),
+            reset_marker.namespace_admitted.eq(self.boot_namespace_admitted),
+            self.boot_marker_available.eq(reset_marker.available),
+            activation_start.eq(reset_marker.accepted),
+        ]
+        if self.expected_boot_guard is not None:
+            m.d.comb += guarded_marker_issue.eq(
+                (boot_state_reg == BootState.LOAD_NS) & self.boot_thread_validated &
+                (namespace_error == 0) & ~activation.busy & self.imem_valid &
+                (self.imem_fetch_address == self.imem_addr))
 
         with m.Switch(boot_state_reg):
             with m.Case(BootState.IDLE):
@@ -379,7 +525,14 @@ class ChurchCore(Elaboratable):
                     namespace_init_armed.eq(0),
                 ]
             with m.Case(BootState.LOAD_NS):
-                m.d.sync += boot_state_reg.eq(BootState.INIT_THRD)
+                if self.expected_boot_guard is not None:
+                    with m.If(activation.done):
+                        m.d.sync += boot_state_reg.eq(BootState.GUARDED_CALL)
+                if self.expected_boot_guard is None:
+                    m.d.sync += boot_state_reg.eq(BootState.INIT_THRD)
+                # Guarded boot holds after Namespace/Thread validation.
+                # The incoming-only Thread activation must be wired before leaving
+                # this state; never execute legacy INIT_THRD/INIT_CLIST.
             with m.Case(BootState.INIT_THRD):
                 m.d.sync += boot_state_reg.eq(BootState.INIT_CLIST)
             with m.Case(BootState.INIT_CLIST):
@@ -397,7 +550,11 @@ class ChurchCore(Elaboratable):
 
         m.d.comb += [
             u_decoder.instruction.eq(self.imem_data),
-            u_decoder.instr_valid.eq(self.imem_valid & self.boot_complete),
+            u_decoder.instr_valid.eq(self.imem_valid &
+                (self.boot_complete | guarded_call_ready) &
+                (Const(self.expected_boot_guard is None) |
+                 ((self.imem_fetch_address == nia_reg) &
+                  (~self.boot_complete | ~self.imem_from_reset_rom)))),
             u_decoder.flags.eq(u_regs.flags),
         ]
 
@@ -431,7 +588,7 @@ class ChurchCore(Elaboratable):
         # Including ~fetch_bounds_fault here ensures that NO instruction can start in the
         # same cycle that a BOUNDS fault is asserted — decode side effects are suppressed.
         m.d.comb += cond_exec_enable.eq(
-            self.boot_complete & exec_enable & ~fetch_bounds_fault & ~u_decoder.fault_valid)
+            execution_phase & exec_enable & ~fetch_bounds_fault & ~u_decoder.fault_valid)
 
         # 1-cycle busy registers for single-cycle Turing ops (prevent double-execution
         # due to the 1-cycle ROM fetch pipeline latency)
@@ -499,6 +656,8 @@ class ChurchCore(Elaboratable):
                 u_eloadcall.busy | u_xloadlambda.busy |
                 u_irq_dispatch.busy
             )
+        if self.expected_boot_guard is not None:
+            busy_expr = busy_expr | activation.busy
         m.d.comb += any_unit_busy.eq(busy_expr)
 
         # Halt detection: zero instruction word fetched after boot, while no unit is busy.
@@ -542,7 +701,13 @@ class ChurchCore(Elaboratable):
                                        cr_rd_addr_default))
             m.d.comb += u_regs.cr_rd_addr.eq(
                 Mux(u_shared_mload.sub_busy, u_shared_mload.cr_rd_addr,
-                    Mux(lambda_start_sig | u_lambda.lambda_busy, u_lambda.cr_rd_addr,
+                    # Select the decoded operand before checking permission.
+                    # Accepted start depends on that check, and the unit's
+                    # idle read address itself depends on accepted start.
+                    Mux(u_lambda.lambda_busy |
+                        (cond_exec_enable & is_church_op &
+                         (church_op == ChurchOpcode.LAMBDA) & ~any_unit_busy),
+                        Mux(u_lambda.lambda_busy, u_lambda.cr_rd_addr, cr_dst),
                         Mux(u_tperm.tperm_busy, u_tperm.cr_rd_addr,
                             Mux(u_call.call_busy, u_call.cr_rd_addr,
                                     Mux(u_save.save_busy, u_save.cr_rd_addr,
@@ -924,6 +1089,8 @@ class ChurchCore(Elaboratable):
             # At that exact write, clear all boundary M state and grant CR6.M.
             u_regs.m_return_commit_en.eq(
                 u_cload.cr_wr_en & (u_cload.cr_wr_addr == CR_CLIST)),
+            u_regs.m_call_commit_en.eq(
+                u_call.call_normal_complete & ~u_call.call_fault & ~clear_all),
             # Normal RETURN may still fault in cLoad after the frame FSM
             # completes. Reset descriptors only at its validated CR6 write.
             u_regs.return_commit_en.eq(
@@ -1007,6 +1174,11 @@ class ChurchCore(Elaboratable):
             m.d.sync += nia_reg.eq(nia_reg)
         with m.Elif(clear_all):
             m.d.sync += nia_reg.eq(0)
+        if self.expected_boot_guard is not None:
+            with m.Elif(namespace_commit):
+                m.d.sync += nia_reg.eq(4)
+            with m.Elif(activation.done):
+                m.d.sync += nia_reg.eq(8)
         with m.Elif(self.skip_fault_req & self.boot_complete):
             m.d.sync += nia_reg.eq(nia_reg + 4)
         with m.Elif(self.free_run_start):
@@ -1051,6 +1223,7 @@ class ChurchCore(Elaboratable):
             m.d.sync += nia_reg.eq(branch_target_checked[:32])
         with m.Elif(
             self.boot_complete & u_decoder.instr_valid & ~any_unit_busy
+            & (self.imem_data != RESET_MARKER_WORD)
             & ~call_start_sig
             & ~ret_start_sig
             & ~load_start_sig
@@ -1161,7 +1334,9 @@ class ChurchCore(Elaboratable):
         boot_wr_en = [Signal(name=f"boot_cap{i}_wr_en") for i in range(16)]
         boot_wr_gt = [Signal(GT_LAYOUT, name=f"boot_cap{i}_wr_gt") for i in range(16)]
 
-        with m.Switch(boot_state_reg):
+        # Historical bootstrap writes are excluded structurally in a guarded
+        # build; invalid metadata or guard failure cannot fall back to them.
+        with m.Switch(boot_state_reg if self.expected_boot_guard is None else Const(15, 4)):
             with m.Case(BootState.LOAD_NS):
                 # CR15 (namespace cap): full 96-bit write to include word1_location=0
                 # (NS at dmem byte 0) and word2_w2=18 (limit: slots 0..18 accessible).
@@ -1269,6 +1444,21 @@ class ChurchCore(Elaboratable):
                 ]
 
         # ── Boot microcode M-elevation window (connections) ────────────────────────
+        if self.expected_boot_guard is not None:
+            with m.If(namespace_commit):
+                m.d.comb += [
+                    boot_cap_wr_en.eq(1),
+                    boot_cap_wr_addr.eq(15),
+                    boot_cap_wr_data.eq(Cat(
+                        Const(0x1a000001 | ((self.expected_boot_guard >> 9) << 16), 32),
+                        Const(0, 32), cached_authority(reader.namespace_authority))),
+                ]
+            with m.Elif(activation.cr_en):
+                m.d.comb += [
+                    boot_cap_wr_en.eq(1), boot_cap_wr_addr.eq(activation.cr_addr),
+                    boot_cap_wr_data.eq(activation.cr_data),
+                ]
+
         # boot_retire_count / boot_microcode_active were forward-declared above (before
         # u_perm wiring) so they could gate u_perm.check_valid.  The sync increment
         # and comb value are connected here, after the full retire machinery is wired.
@@ -1290,7 +1480,8 @@ class ChurchCore(Elaboratable):
         with m.Elif(self.boot_complete & self.retire_valid & (boot_retire_count < 3)):
             m.d.sync += boot_retire_count.eq(boot_retire_count + 1)
         m.d.comb += boot_microcode_active.eq(
-            self.boot_complete & (boot_retire_count < 3)
+            self.boot_complete & (boot_retire_count < 3) &
+            Const(self.expected_boot_guard is None)
         )
 
         runtime_wr_en = [Signal(name=f"rt_cap{i}_wr_en") for i in range(16)]
@@ -1358,6 +1549,7 @@ class ChurchCore(Elaboratable):
                 ((u_decoder.call_indexed & call_row[32]) | call_method[32])),
             u_call.call_start.eq(call_start_sig),
             u_call.boot_window.eq(boot_microcode_active),
+            u_call.reset_root.eq(guarded_call_ready),
             u_call.cr_src.eq(cr_src),
             u_call.indexed_source.eq(u_decoder.call_indexed),
             u_call.index.eq(Mux(u_decoder.call_indexed, call_row[:32], 0)),
@@ -1374,7 +1566,7 @@ class ChurchCore(Elaboratable):
             u_call.mem_rd_valid.eq(self.dmem_rd_valid),
             # Stack push inputs
             u_call.cr5_heap.eq(u_regs.cr5_heap),
-            u_call.caller_pc.eq(nia_reg[2:17]),           # CALL word offset (nia_reg >> 2)
+            u_call.caller_pc.eq((nia_reg - u_regs.cr14_code.word1_location) >> 2),
             u_call.cr12_thread.eq(u_regs.cr12_thread),
             # Stack frames belong to the active Thread body. CR12 remains the
             # system Thread root and may have location zero on Wukong; CHANGE
@@ -1382,7 +1574,7 @@ class ChurchCore(Elaboratable):
             # into active_thread_base. CALL and RETURN must use that same base.
             u_call.thread_base.eq(self.active_thread_base),
             # THREAD_HDR: populated by CHANGE on thread restore, cached for CALL's stack validation
-            u_call.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+            u_call.thread_hdr.eq(active_thread_header),
             u_call.flags.eq(u_regs.flags),
             # Parallel register-file mask operations for domain-crossing cleanup
             u_regs.cr_b_clear_mask.eq(u_call.cr_b_clear_mask),
@@ -1401,7 +1593,7 @@ class ChurchCore(Elaboratable):
             u_return.cr14_code.eq(u_regs.cr14_code),
             u_return.cr12_thread.eq(u_regs.cr12_thread),
             u_return.thread_base.eq(self.active_thread_base),
-            u_return.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+            u_return.thread_hdr.eq(active_thread_header),
             u_return.mem_rd_data.eq(self.dmem_rd_data),
             u_return.mem_rd_valid.eq(self.dmem_rd_valid),
         ]
@@ -1450,7 +1642,7 @@ class ChurchCore(Elaboratable):
                 u_lambda.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_lambda.saved_nia.eq(nia_reg + 4),
                 u_lambda.thread_base.eq(self.active_thread_base),
-                u_lambda.thread_hdr.eq(u_change.thread_hdr_out),
+                u_lambda.thread_hdr.eq(active_thread_header),
                 u_lambda.code_cap.eq(u_regs.cr14_code),
                 u_lambda.flags.eq(u_regs.flags),
                 u_lambda.mem_rd_data.eq(self.dmem_rd_data),
@@ -1551,8 +1743,9 @@ class ChurchCore(Elaboratable):
         # when the imm[14] immediate marker is clear.
         m.d.comb += u_regs.dr_rd_addr2.eq(
             Mux(u_dwrite.busy, u_dwrite.dr_rd_addr,
-                Mux(bfins_start_sig | mcmp_start_sig, cr_dst,
-                    Mux((iadd_start_sig | isub_start_sig) &
+                # DWRITE captures data at acceptance, before busy is asserted.
+                Mux(is_dwrite_op | is_bfins_op | is_mcmp_op, cr_dst,
+                    Mux((is_iadd_op | is_isub_op) &
                         ~u_decoder.immediate[14],
                         u_decoder.immediate[:4], 0)))
         )
@@ -1608,9 +1801,13 @@ class ChurchCore(Elaboratable):
             Mux(u_dread.busy, u_dread.dr_rd_addr,
                 Mux(u_dwrite.busy, u_dwrite.dr_rd_addr2,
                     Mux(compact_index_selected, u_decoder.immediate[:4],
-                    Mux(iadd_start_sig | isub_start_sig |
-                        shl_start_sig | shr_start_sig |
-                        bfext_start_sig | bfins_start_sig | mcmp_start_sig,
+                    # Operand selection must precede acceptance. In particular,
+                    # bitfield bounds must not feed this mux and then the
+                    # compact-index fault/NIA cone. Reads grant no authority;
+                    # all start, fault and write gates remain unchanged.
+                    Mux(is_iadd_op | is_isub_op |
+                        is_shl_op | is_shr_op |
+                        is_bfext_op | is_bfins_op | is_mcmp_op,
                         cr_src, 0))))
         )
         if not self.iot_profile:
@@ -1857,10 +2054,12 @@ class ChurchCore(Elaboratable):
             thread_switch_start_sig = Signal()
             m.d.comb += thread_switch_start_sig.eq(
                 self.thread_switch_req & self.boot_complete & ~any_unit_busy)
-            m.d.comb += change_start_sig.eq(
-                (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) & ~any_unit_busy) |
+            m.d.comb += change_start_sig.eq(~reset_marker.fault & (
+                (cond_exec_enable & is_church_op & (church_op == ChurchOpcode.CHANGE) &
+                 (self.imem_data != RESET_MARKER_WORD) &
+                 ~any_unit_busy) |
                 thread_switch_start_sig | u_switch.handoff_start
-            )
+            ))
             m.d.comb += [
                 u_change.change_start.eq(change_start_sig),
                 u_change.ordinary.eq(u_switch.handoff_start |
@@ -1878,6 +2077,7 @@ class ChurchCore(Elaboratable):
                 u_change.active_thread_owned.eq(self.active_thread_owned),
                 u_change.cr_rd_data.eq(u_regs.cr_rd_data),
                 u_change.cr12_thread.eq(u_regs.cr12_thread),
+                u_change.code_base.eq(u_regs.cr14_code.word1_location),
                 u_change.cr15_namespace.eq(u_regs.cr15_namespace),
                 u_change.mem_rd_data.eq(self.dmem_rd_data),
                 u_change.mem_rd_valid.eq(self.dmem_rd_valid),
@@ -1979,7 +2179,7 @@ class ChurchCore(Elaboratable):
                 # (LUMP_HEADER_LAYOUT for sp_max/sp_min bounds), and CR12 for null check.
                 u_eloadcall.cr5_heap.eq(u_regs.cr5_heap),
                 u_eloadcall.thread_base.eq(self.active_thread_base),
-                u_eloadcall.thread_hdr.eq(u_change.thread_hdr_out if not self.iot_profile else 0),
+                u_eloadcall.thread_hdr.eq(active_thread_header),
                 u_eloadcall.cr12_thread.eq(u_regs.cr12_thread),
                 u_eloadcall.flags.eq(u_regs.flags),
             ]
@@ -2772,10 +2972,30 @@ class ChurchCore(Elaboratable):
             (code_lo_reg != code_hi_reg) &
             ((nia_reg < code_lo_reg) | (nia_reg >= code_hi_reg))
         )
-        with m.If(fetch_bounds_fault):
+        if self.expected_boot_guard is not None:
+            m.d.comb += guarded_call_fault.eq(
+                self.imem_valid & ~any_unit_busy &
+                (self.imem_fetch_address == nia_reg) &
+                (((boot_state_reg == BootState.GUARDED_CALL) & ~guarded_call_ready) |
+                 (self.boot_complete & self.imem_from_reset_rom)))
+            with m.If((boot_state_reg == BootState.GUARDED_CALL) &
+                      u_call.call_normal_complete & ~self.fault_valid & ~clear_all):
+                m.d.sync += boot_state_reg.eq(BootState.COMPLETE)
+        m.d.comb += reset_marker.issue.eq(
+            (cond_exec_enable | guarded_marker_issue) & ~any_unit_busy & ~self.halt_req)
+        with m.If(namespace_error != 0):
+            m.d.comb += [self.fault.eq(namespace_error), self.fault_valid.eq(1)]
+        with m.Elif(guarded_call_error != 0):
+            m.d.comb += [self.fault.eq(guarded_call_error), self.fault_valid.eq(1)]
+        with m.Elif(fetch_bounds_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
         with m.Elif(compact_index_fault | bf_fault | call_index_fault | branch_index_fault):
             m.d.comb += [self.fault.eq(FaultType.BOUNDS), self.fault_valid.eq(1)]
+        with m.Elif(reset_marker.fault | guarded_call_fault):
+            m.d.comb += [
+                self.fault.eq(Mux(guarded_call_fault, FaultType.INVALID_OP, reset_marker.fault_type)),
+                self.fault_valid.eq(1),
+            ]
         # Decoder/perm faults are combinational functions of the currently
         # fetched word.  While a multi-cycle unit owns the shared DMEM bus the
         # fetch data can be transient garbage (observed on Wukong: mload
@@ -2828,6 +3048,17 @@ class ChurchCore(Elaboratable):
             m.d.comb += [self.fault.eq(FaultType.NONE), self.fault_valid.eq(0)]
 
         # ── fault telemetry stage encoder ─────────────────────────────────────
+        # Python-model observations only: no RTL ports, arbitration or grants.
+        self.model_fault_sources = {
+            "namespace": namespace_error, "guarded_call": guarded_call_error,
+            "guarded_fetch": guarded_call_fault, "marker": reset_marker.fault,
+            "m_window": mwin_fault_valid,
+            "mload": u_shared_mload.sub_fault,
+            "cload": u_cload.cload_fault,
+        }
+        if not self.iot_profile:
+            self.model_fault_sources["change"] = u_change.change_fault
+            self.model_fault_sources["switch"] = u_switch.switch_fault
         # 4-bit stage index that mirrors the fault priority chain above.
         # Stage IDs: 0=Fetch/BOUNDS 1=Decode 2=PermCheck 3=Lambda
         #            4=TPERM 5=Call 6=Return 7=DataRW/Other
@@ -2963,15 +3194,20 @@ class ChurchCore(Elaboratable):
             retire_conds = retire_conds_base
 
         m.d.comb += [
-            self.retire_valid.eq(self.boot_complete & retire_conds),
+            self.retire_valid.eq(((execution_phase & retire_conds) |
+                                (activation.done if self.expected_boot_guard is not None else 0)) &
+                                (Const(self.expected_boot_guard is None) | ~clear_all)),
             self.retire_nia.eq(
-                Mux(change_retire, change_issuer_nia, nia_reg)),
+                Mux(activation.done if self.expected_boot_guard is not None else 0, 4,
+                    Mux(change_retire, change_issuer_nia, nia_reg))),
             self.retire_instr.eq(
-                Mux(delayed_complete | delayed_fault | change_retire,
-                    delayed_issuer_instr, self.imem_data)),
+                Mux(activation.done if self.expected_boot_guard is not None else 0,
+                    RESET_MARKER_WORD,
+                    Mux(delayed_complete | delayed_fault | change_retire,
+                        delayed_issuer_instr, self.imem_data))),
             self.retire_flags.eq(u_regs.flags),
             self.retire_fault_code.eq(self.fault),
-            self.retire_fault_valid.eq(self.fault_valid & self.boot_complete),
+            self.retire_fault_valid.eq(self.fault_valid & execution_phase),
         ]
 
         # ── TraceUnit per-event GT signals ─────────────────────────────────────
@@ -3076,6 +3312,7 @@ class ChurchCore(Elaboratable):
             u_return.mload_done.eq(u_shared_mload.sub_done & return_grant),
             u_return.mload_fault.eq(u_shared_mload.sub_fault & return_grant),
             u_return.mload_fault_type.eq(u_shared_mload.sub_fault_type),
+            u_return.mload_resolved_cap.eq(u_shared_mload.resolved_cap),
 
             u_load.mload_busy.eq(u_shared_mload.sub_busy & load_grant),
             u_load.mload_done.eq(u_shared_mload.sub_done & load_grant),
@@ -3289,4 +3526,33 @@ class ChurchCore(Elaboratable):
                     self.ns_wr_en.eq(0),
                 ]
 
+        if self.expected_boot_guard is not None:
+            # Bootstrap exclusively owns the memory read bus. No legacy
+            # initializer or instruction may write while admission is pending.
+            with m.If(boot_state_reg == BootState.LOAD_NS):
+                m.d.comb += [
+                    self.dmem_addr.eq(Mux(activation.busy, activation.mem_addr,
+                                         Mux(self.boot_namespace_admitted,
+                                             thread.mem_addr, reader.mem_addr))),
+                    self.dmem_rd_en.eq(Mux(activation.busy, activation.mem_en,
+                                          Mux(self.boot_namespace_admitted,
+                                              thread.mem_en, reader.mem_rd_en))),
+                    self.dmem_wr_en.eq(0),
+                ]
+            with m.If(activation.dr_en):
+                m.d.comb += [
+                    u_regs.dr_wr_en.eq(1), u_regs.dr_wr_addr.eq(activation.dr_addr),
+                    u_regs.dr_wr_data.eq(activation.dr_data),
+                ]
+            with m.If(activation.flags_en):
+                m.d.comb += [
+                    u_regs.flags_wr_en.eq(1), u_regs.flags_in.eq(activation.flags),
+                ]
+            with m.If(activation.done & ~clear_all):
+                m.d.sync += [
+                    active_thread_header.eq(thread.header),
+                    self.active_thread_slot.eq(2),
+                    self.active_thread_base.eq(activation.thread_base_byte),
+                    self.active_thread_owned.eq(1),
+                ]
         return m

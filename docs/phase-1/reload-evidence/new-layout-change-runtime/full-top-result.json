@@ -1,0 +1,363 @@
+{
+  "imageSha256": "53ac2da9f51b27aad253cc1c9f1335e6c340506f3cec9db2bbef2f10b1ae7017",
+  "model": "full ChurchWukongXC7A100T",
+  "physicalBoardTested": false,
+  "transportVerified": false,
+  "installedBytesVerified": false,
+  "cycleBudget": 20000,
+  "retired": [
+    {
+      "cycle": 4043,
+      "address": 4,
+      "instruction": 654311425
+    },
+    {
+      "cycle": 6972,
+      "address": 8,
+      "instruction": 385875968
+    },
+    {
+      "cycle": 9867,
+      "address": 13572,
+      "instruction": 2
+    },
+    {
+      "cycle": 11857,
+      "address": 13576,
+      "instruction": 118685712
+    }
+  ],
+  "memorySignals": [
+    {
+      "cycle": 6948,
+      "address": 328,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 3736403695,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6950,
+      "address": 332,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6951,
+      "address": 332,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 0,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6953,
+      "address": 324,
+      "readEnable": 0,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 1,
+      "writeData": 255
+    },
+    {
+      "cycle": 6959,
+      "address": 13568,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6960,
+      "address": 13568,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 4177533955,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6966,
+      "address": 1092,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6967,
+      "address": 1092,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 4337,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 6969,
+      "address": 1992,
+      "readEnable": 0,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 1,
+      "writeData": 1241514004
+    },
+    {
+      "cycle": 6970,
+      "address": 1996,
+      "readEnable": 0,
+      "readValid": 0,
+      "readData": 1241514004,
+      "writeEnable": 1,
+      "writeData": 268431603
+    },
+    {
+      "cycle": 6971,
+      "address": 1092,
+      "readEnable": 0,
+      "readValid": 0,
+      "readData": 268431603,
+      "writeEnable": 1,
+      "writeData": 4337
+    },
+    {
+      "cycle": 11841,
+      "address": 14584,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11842,
+      "address": 14584,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 33554443,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11845,
+      "address": 176,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11846,
+      "address": 176,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 2304,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11847,
+      "address": 180,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 2304,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11848,
+      "address": 180,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 255,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11849,
+      "address": 184,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 255,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11850,
+      "address": 184,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 3736526575,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11852,
+      "address": 188,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11853,
+      "address": 188,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 0,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 11855,
+      "address": 180,
+      "readEnable": 0,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 1,
+      "writeData": 255
+    },
+    {
+      "cycle": 13806,
+      "address": 176,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13807,
+      "address": 176,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 2304,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13808,
+      "address": 180,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 2304,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13809,
+      "address": 180,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 255,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13810,
+      "address": 184,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 255,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13811,
+      "address": 184,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 3736526575,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13813,
+      "address": 188,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13814,
+      "address": 188,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 0,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13816,
+      "address": 2304,
+      "readEnable": 1,
+      "readValid": 0,
+      "readData": 4169203968,
+      "writeEnable": 0,
+      "writeData": 0
+    },
+    {
+      "cycle": 13817,
+      "address": 2304,
+      "readEnable": 1,
+      "readValid": 1,
+      "readData": 2936553480,
+      "writeEnable": 0,
+      "writeData": 0
+    }
+  ],
+  "outcome": "fault",
+  "firstChangeRetired": false,
+  "incomingThreadExecuted": false,
+  "cycle": 13819,
+  "faultCode": 29,
+  "fetchAddress": 13580,
+  "sources": {
+    "change": 1
+  },
+  "faultStage": 7,
+  "faultInstruction": 654376960,
+  "registers": {
+    "2": [
+      33554443,
+      9216,
+      255
+    ],
+    "6": [
+      1241514004,
+      14580,
+      2
+    ],
+    "12": [
+      61014018,
+      1024,
+      878706943
+    ],
+    "13": [
+      0,
+      0,
+      0
+    ],
+    "14": [
+      1107296276,
+      13572,
+      6
+    ],
+    "15": [
+      439222273,
+      0,
+      96469247
+    ]
+  }
+}

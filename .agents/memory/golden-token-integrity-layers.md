@@ -19,3 +19,15 @@ semantic/permission checks, correct and scrub single-bit errors, and fault
 closed on uncorrectable errors. Cover DMEM, Namespace/C-list words, CR storage,
 GT-bearing latches, and transfer framing. Report ECC as unsupported until the
 FPGA memory implementation and fault path actually provide it.
+
+GT memory fault protection is an explicit requirement alongside Phase 1
+hardware testing; the user suggested parity as an example, not a settled
+encoding or correction policy.
+
+**Why:** The user stated that GTs in memory need protection while discussing
+reduced-clock functional testing. Slower operation does not supply storage
+integrity.
+
+**How to apply:** Distinguish the required protection from the still-open
+parity-versus-ECC choice. Keep check bits outside the architectural token and
+state detection limits and actual covered storage boundaries explicitly.

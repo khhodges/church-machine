@@ -29,6 +29,17 @@
 set PART     "xc7a100tfgg676-2"
 set TOP      "church_wukong_xc7a100t"
 set PROJ_DIR "./vivado_wukong"
+if {[file exists "./guarded-profile.json"]} {
+    error "Guarded RTL requires profile-aware vendor readiness/provenance gates; the legacy release script must not certify this candidate."
+}
+if {[file exists "./church_wukong_xc7a100t.v"]} {
+    set profile_check [open "./church_wukong_xc7a100t.v" r]
+    set profile_header [read $profile_check 4096]
+    close $profile_check
+    if {[string first "church-guarded-profile:" $profile_header] >= 0} {
+        error "Guarded RTL cannot be built through the legacy release gate, even without its sidecar."
+    }
+}
 # This design's RTL elaboration is memory-intensive.  Constraining Vivado's
 # internal parallelism keeps synthesis below the 8 GiB release-builder limit;
 # unbounded auto-threading is killed by the host before a bitstream is written.

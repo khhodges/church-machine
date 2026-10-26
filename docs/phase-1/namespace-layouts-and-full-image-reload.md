@@ -1,5 +1,12 @@
 # Phase 1 — two Namespace layouts and full-image reload
 
+**Physical-trial update, 2026-10-26:** the retained New Layout 64 KiB image
+was acknowledged by the FPGA UART loader and executed to Mallory's denied
+access endpoint without reflashing during the reload. Installed-byte equality,
+pristine initial register state and post-reload automatic halt are not
+established. See the [bounded physical result](installed-image-reload-result.md)
+for exact hashes, acknowledgements, observations and limitations.
+
 **Status:** Agreed Phase 1 design direction, documented 2026-10-23.
 This is a loading contract, not a claim of implemented or tested behavior.
 It does not authorize changing current Namespace assignments or uploading
@@ -131,6 +138,9 @@ actual bitstream before use.
 
 ## 7. Related Phase 1 documents
 
+- [Disconnected reload trial evidence](installed-image-reload-trial.md) — retained
+  exact candidate, offline boot blocker and gated reconnect runbook; physical
+  reload remains pending, not passed.
 - [Mint/Cleaner GT queues](mint-cleaner-gt-queues-proposal.md) — development
   software design, separate from the minimal baseline.
 - [Authority handoff](cm-authority-handoff-rule.md) — service-level surrender

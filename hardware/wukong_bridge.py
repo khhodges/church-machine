@@ -44,6 +44,7 @@ Multi-event instructions emit multiple consecutive packets with the same NIA:
 
 import argparse
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import os
 import queue
 import struct
@@ -52,6 +53,45 @@ import threading
 import time
 import uuid
 import zlib
+
+# Separate connect/read limits for HTTPS over an internet/proxied connection.
+# These are network limits, not UART ACK or board-state confirmation deadlines.
+IDE_HTTP_TIMEOUT = (3.0, 2.0)
+
+
+class CommandPoll:
+    """One outstanding dequeue request, without blocking UART reception.
+
+    Only the UART thread consumes the response and executes its command.
+    Never prefetch a second command while a response awaits consumption.
+    """
+
+    def __init__(self, ide_base, verify_tls, session_id, device_uid):
+        self.url = f'{ide_base}/hardware/wukong/command'
+        self.verify_tls = verify_tls
+        self.session_id = session_id
+        self.device_uid = device_uid
+        self._executor = ThreadPoolExecutor(max_workers=1,
+                                            thread_name_prefix='wukong-command')
+        self._future = None
+
+    def poll(self):
+        if self._future is None:
+            self._future = self._executor.submit(
+                requests.get, self.url,
+                headers=dict(_bridge_auth_headers(),
+                             **{'X-Wukong-Session': self.session_id,
+                                'X-Wukong-Device-UID': self.device_uid}),
+                timeout=IDE_HTTP_TIMEOUT, verify=self.verify_tls)
+            return None
+        if not self._future.done():
+            return None
+        future, self._future = self._future, None
+        # A failed HTTP request is never replayed as a cached board command.
+        return future.result()
+
+    def close(self):
+        self._executor.shutdown(wait=False, cancel_futures=True)
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
@@ -1201,6 +1241,8 @@ class FaultDeliveryWorker:
         self.verify_tls = verify_tls
         self.session_id = session_id
         self.device_uid = device_uid
+        self._registration_http_failure = None
+        self._registration_http_log_at = 0.0
         # Fault evidence has a small reserved lane. Ordinary telemetry is
         # lossy by design during an outage: the most recent later trace/status
         # is useful, but no backlog is worth starving a board-fault record.
@@ -1213,6 +1255,30 @@ class FaultDeliveryWorker:
         self._thread = threading.Thread(
             target=self._run, name='wukong-telemetry', daemon=True)
         self._thread.start()
+
+    def _report_registration_http(self, status):
+        """Report rejected registration without logging headers or response bodies."""
+        now = time.monotonic()
+        if 200 <= status < 300:
+            if self._registration_http_failure is not None:
+                print('  [IDE registration] accepted again; this confirms HTTP '
+                      'registration only, not board execution.', flush=True)
+            self._registration_http_failure = None
+            return
+        if (self._registration_http_failure == status
+                and now - self._registration_http_log_at < 30):
+            return
+        self._registration_http_failure = status
+        self._registration_http_log_at = now
+        if status in (401, 403):
+            action = ('Check that REPORT_TOKEN is configured in the terminal '
+                      'running this bridge and matches the intended IDE server. '
+                      'Do not paste the credential into logs or chat.')
+        else:
+            action = ('Check the --ide address and server availability; '
+                      'serial output alone does not confirm an IDE connection.')
+        print(f'  [IDE registration rejected] HTTP {status}. {action} '
+              'No hardware command was issued by this diagnostic.', flush=True)
 
     def close(self):
         """Stop after any in-flight bounded request; used by bridge shutdown/tests."""
@@ -1332,11 +1398,13 @@ class FaultDeliveryWorker:
                         'boot_info': 'boot-info',
                         'halt_state': 'halt-state',
                     }[kind]
-                    timeout = 0.5 if kind == 'status' else 1
                     response = requests.post(
                         f'{self.ide_base}/hardware/wukong/{endpoint}',
-                        json=payload, headers=_bridge_auth_headers(), timeout=timeout,
+                        json=payload, headers=_bridge_auth_headers(),
+                        timeout=IDE_HTTP_TIMEOUT,
                         verify=self.verify_tls)
+                    if kind == 'status':
+                        self._report_registration_http(response.status_code)
                     reply = {} if 200 <= response.status_code < 300 else None
                 else:
                     try:
@@ -1802,6 +1870,7 @@ def main():
     last_write_ts = None
     delivery_worker = FaultDeliveryWorker(
         ide_base, verify_tls, session_id=session_id, device_uid=device_uid)
+    command_poll = CommandPoll(ide_base, verify_tls, session_id, device_uid)
     trace_counter = 0
     state_counter = 0
     # Monotonic parse counter retained for diagnostics only. Authorization uses
@@ -2548,13 +2617,8 @@ def main():
             if now - last_poll >= 0.05 and now >= prefetch_busy_until:
                 last_poll = now
                 try:
-                    r = requests.get(
-                        f'{ide_base}/hardware/wukong/command',
-                        headers=dict(_bridge_auth_headers(),
-                                     **{'X-Wukong-Session': session_id,
-                                        'X-Wukong-Device-UID': device_uid}),
-                        timeout=0.1, verify=verify_tls)
-                    if r.status_code == 200:
+                    r = command_poll.poll()
+                    if r is not None and r.status_code == 200:
                         data = r.json() or {}
                         cmd = data.get('cmd')
                         if cmd and not _command_target_matches(
@@ -2614,6 +2678,7 @@ def main():
     except KeyboardInterrupt:
         print('\nBridge stopped.')
     finally:
+        command_poll.close()
         ser.close()
 
 

@@ -68,6 +68,9 @@ class ChurchLambda(Elaboratable):
         with m.FSM(name="lambda") as fsm:
             with m.State("IDLE"):
                 m.d.sync += [fault_flag.eq(0), fault_latched.eq(FaultType.NONE)]
+                # Read selection is an input to acceptance/permission checking,
+                # not an effect of accepted start. No state changes until start.
+                m.d.comb += self.cr_rd_addr.eq(self.cr_target)
                 with m.If(self.lambda_start):
                     m.d.sync += [
                         base.eq(self.thread_base), hdr.eq(self.thread_hdr),
@@ -75,7 +78,6 @@ class ChurchLambda(Elaboratable):
                         flags.eq(self.flags),
                         armed.eq(0),
                     ]
-                    m.d.comb += self.cr_rd_addr.eq(self.cr_target)
                     m.next = "READ_CR"
 
             with m.State("READ_CR"):
@@ -107,7 +109,8 @@ class ChurchLambda(Elaboratable):
                           (continuation < cv.word1_location) |
                           (continuation >
                            cv.word1_location + (cv.word2_w2[:21] << 2)) |
-                          (continuation[:2] != 0) | (continuation >= 0x1FFFC) |
+                          (continuation[:2] != 0) |
+                          (((continuation - cv.word1_location) >> 2) >= 0x7fff) |
                           (target_view.word1_location[:2] != 0)):
                     m.d.sync += [fault_flag.eq(1), fault_latched.eq(FaultType.BOUNDS)]
                     m.next = "FAULT"
@@ -134,7 +137,7 @@ class ChurchLambda(Elaboratable):
             with m.State("PUSH_FRAME"):
                 m.d.comb += [
                     self.mem_wr_addr.eq(base + (indicator[:12] << 2)),
-                    self.mem_wr_data.eq(Cat(indicator[:13], continuation[2:17],
+                    self.mem_wr_data.eq(Cat(indicator[:13], ((continuation - cv.word1_location) >> 2)[:15],
                                             flags)),
                     self.mem_wr_en.eq(1),
                 ]

@@ -257,7 +257,11 @@ def test_main_reconnects_after_read_failure_and_acknowledges_after_write(
             self.read_count += 1
             if self.port == '/dev/ttyUSB0':
                 raise OSError('USB read failed')
-            if self.read_count == 1:
+            if not self.written and self.read_count < 100:
+                # HTTP polling now runs off the UART thread. Give its single
+                # response time to arrive while continuing serial reads.
+                import time
+                time.sleep(0.001)
                 return b''
             raise KeyboardInterrupt
 

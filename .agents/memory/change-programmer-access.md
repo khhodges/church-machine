@@ -64,6 +64,26 @@ CHANGE CR13 was superseded by the explicit Phase 1 reserved-CR13 decision.
 
 **Why:** An implementation's dormant-only guard is not architectural authority.
 
+Simulator execution and assembler round-trips are likewise not authority for
+hardware encoding compatibility.
+
+**Why:** A retained simulator-running program and its assembler agreed on a
+duplicated source/destination encoding that the approved implicit-destination
+hardware correctly rejected.
+
+**How to apply:** Compare emitted fields with the approved ISA before changing
+hardware validation. Correct immutable artifacts through explicit new revisions,
+not in-place byte patches or relaxed reserved-field checks.
+
+Keep historical duplicated-field CHANGE words explicit during disassembly;
+do not render them as canonical one-register shorthand.
+
+**Why:** Canonical shorthand emits zero unused destination bits. Rendering an
+old word that way would silently change its bytes on reassembly.
+
+**How to apply:** Distinguish historical software compatibility from hardware
+eligibility, while emitting the approved encoding for new one-register source.
+
 **How to apply:** When correcting self-target handling, preserve normal validation
 and verify save/restore ordering against the newly saved continuation, without
 restoring stale context or accumulating frames. When CR12 identifies the active

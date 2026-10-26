@@ -6,6 +6,40 @@ The Namespace dropdown names are the public naming authority. Use their exact
 wording in profile banners, inspection views, and user-facing reports; do not
 substitute internal keys or aliases such as NewLayout or Legacy Namespace.
 
+For runtime-image reload verification, the user explicitly selected **New
+Layout**, the design that runs in the Simulator, rather than a legacy Wukong
+factory projection.
+
+**Why:** The user corrected the candidate selection after the legacy layout
+was described. Transport convenience does not authorize substituting layouts.
+
+**How to apply:** Follow New Layout's exact saved selections and report loader
+incompatibility explicitly; do not quietly fall back to a legacy image.
+
+For New Layout hardware support, correct the underlying implementation rather
+than adding legacy-layout workarounds. The Namespace starts at address zero and
+ascends; retain the agreed metadata, self and entry-Thread meanings.
+
+**Why:** The user explicitly confirmed ascending placement and said, “Lets
+avoid workarround in favor of doing it right,” after the hardware mismatch
+was established.
+
+**How to apply:** Align boot, descriptor interpretation and loader validation
+to the agreed contract. Do not substitute legacy artifacts, introduce slot
+aliases, or weaken security gates to make an upload appear successful.
+Implementation direction is not authorization to flash the physical FPGA.
+
+The user approved preparing a separate guarded hardware candidate for New
+Layout, with boot-slot versions and referring capabilities changed only in the
+isolated copy. Preserve the saved simulator layout and original LUMPs.
+
+**Why:** The user explicitly approved the guarded-candidate proposal after the
+required boot-pair version changes were explained.
+
+**How to apply:** Retain the candidate's guard rather than regenerating it.
+This approval does not authorize publishing the copy into the saved design,
+synthesis, installation, or flashing.
+
 **Why:** The user rejected an audit whose headings did not match the dropdown,
 then explicitly requested standardization on the dropdown names.
 

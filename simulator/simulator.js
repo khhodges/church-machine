@@ -7729,7 +7729,10 @@ class ChurchSimulator {
         if (!entryHeader.valid || entryHeader.typ !== 0 ||
                 entryHeader.n_minus_6 > 8 || entryHeader.cw === 0 ||
                 1 + entryHeader.cw + entryHeader.cc > entryHeader.lumpSize ||
-                entryHeader.lumpSize > this.parseNSWord1(nsEntry.word1_limit).limit + 1 ||
+                // The Namespace limit is an access bound, not the allocation
+                // size. A resident may exclude its tail c-list from ordinary
+                // access while CALL derives CR6 from the complete LUMP header.
+                entryHeader.cw > this.parseNSWord1(nsEntry.word1_limit).limit ||
                 entryBase + entryHeader.lumpSize > this.memory.length) {
             this.fault('BOUNDS', 'CALL: malformed executable header or code/C-list outside allocation');
             return null;
@@ -8693,6 +8696,16 @@ class ChurchSimulator {
     }
 
     _execChangeCore(d, continuationPC) {
+        if (d.crSrc === 13 || d.crDst === 13) {
+            this.fault('INVALID_OP', 'CHANGE CR13 is reserved');
+            return null;
+        }
+        // Approved direct encoding: source CRn, destination CR12 implicit.
+        if (d.crDst === 0 && d.imm === 0 &&
+                Number.isInteger(d.crSrc) && d.crSrc >= 0 && d.crSrc <= 15) {
+            return this._activateChangeThread(
+                this.cr[d.crSrc].word0 >>> 0, d, continuationPC);
+        }
         // Indexed simulator form: obtain one Thread GT from the current C-list,
         // without loading it into a programmer register or changing CR6.
         if (d.crDst === 12 && d.crSrc === 6) {
@@ -8715,7 +8728,7 @@ class ChurchSimulator {
             const threadGT = this.memory[address] >>> 0;
             return this._activateChangeThread(threadGT, d, continuationPC);
         }
-        // Simulator compatibility with the existing one-operand assembler:
+        // Historical saved-binary compatibility with the older assembler:
         // both register fields repeat the input CR; the index must be zero.
         // This does not approve a new hardware encoding or the IRQ proposal.
         if (!Number.isInteger(d.crDst) || d.crDst < 0 || d.crDst > 15 ||

@@ -1,0 +1,46 @@
+{
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "length": 65536,
+  "loader": {
+    "accepted": false,
+    "error": "validate_boot_image: Namespace Header V2 format marker not found; image is stale or corrupt (legacy format is unsupported) and must be regenerated"
+  },
+  "loaderSourceSha256": "3134a89e14a9b1f9f351f35fc11a80a04cd9f319b6ee4da14833234bd6c792d7",
+  "historicalReceiptSha256": "ce71173c210955c7d86369c5034fbaa6524e7a90212a286897103d75505bfb6e",
+  "historicalReceiptTimestamp": "2026-09-08T16:50:19+00:00",
+  "sourceComparisons": {
+    "hardware/core.py": {
+      "current": "220b213f8f753df74c681cd824d491917741daf82e24e77c3805bcd3669741aa",
+      "historicalReceipt": "f49d4407f24a6651f73d56d980f7e5c731f4163655e6339ab4217a639dccf341",
+      "matches": false
+    },
+    "hardware/change.py": {
+      "current": "e319632776cec721dfdd28fec226a424f5e377ed3e8e8909853f3b4a1de74f31",
+      "historicalReceipt": "b9eddf7479632514f637013015c348e17e5440b13b313f94d5fd2e0906716cee",
+      "matches": false
+    },
+    "hardware/ret.py": {
+      "current": "61095ee97228d109f325f8683c46f1d42afbdd248830cfa76969ecd83801c2fc",
+      "historicalReceipt": "57ae04a1c225faf02bab283ec5ef99b9e6332ba26cf04e34de086259f23d0e8e",
+      "matches": false
+    },
+    "hardware/mload.py": {
+      "current": "73402a2dc89cfc409ba1c0ef5f61c618184502157a4ba3eb1b155b8856fac365",
+      "historicalReceipt": "34e6eb7093aa86584052f410fb818644df343811cc4b22a2d64c1f7dff6e19cc",
+      "matches": false
+    },
+    "hardware/wukong_top.py": {
+      "current": "6cea22aae6d332a13caf2fa01060b9915a2ef63403ab55789bc356c576e0a4cb",
+      "historicalReceipt": "957a6dd3682fb5cd4263e5865934a1f0864d7073a4c3de810a75392f133beb77",
+      "matches": false
+    }
+  },
+  "installedBinaryIdentity": "not established; historical version telemetry is not binary identity",
+  "freshBoardStatusChecked": false,
+  "networkAccessed": false,
+  "commandsQueued": false,
+  "uploaded": false,
+  "flashed": false,
+  "conclusion": "Blocked: no existing-loader or installed-board compatibility established",
+  "scopeBoundary": "Do not bypass format validation. Loader support and synthesis require explicit expanded scope."
+}

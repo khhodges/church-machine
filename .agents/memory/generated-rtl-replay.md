@@ -6,12 +6,69 @@ description: Constant combinational emission and preserving the elaboration used
 Model simulation success is not evidence that emitted plain Verilog simulates
 identically. Check constant-only combinational blocks with a four-state simulator.
 
+Vivado 2026.1 can expose NSTD-1 and UCIO-1 as Critical Warning after synthesis.
+An Error-only assertion must explicitly enforce Error and verify the checks
+are enabled, not assume that stage already supplies the final strict severity.
+
+**Why:** A completed droplet synthesis stopped on this default, not on an
+observed missing pin or I/O-standard assignment. Local mocks had incorrectly
+assumed Error by default.
+
+**How to apply:** Keep exact board-port/pin checks, promote severity rather than
+accepting weaker checks, recheck at routing, and test both promotion failure
+and disabled checks. Bind any resume to unchanged inputs and the saved checkpoint.
+
+For build-package handoffs, confirm the recipient's archive hash before treating
+a successful download or SCP exit as delivery.
+
+**Why:** The file-tree folder download produced a 22-byte empty ZIP and the
+original archive was not visible to the user. A downloadable base64 text copy
+was restored on Windows and the user confirmed the exact original SHA-256.
+
+**How to apply:** Prefer the original archive when accessible. If the file UI
+cannot deliver it, a text-encoded transport copy is acceptable with exact-byte
+verification after decoding. Do not rename ZIP to tar.gz, rebuild different
+inputs, or weaken package verification to accommodate the transfer.
+
+Bind long-running replay evidence to the observer source and binary captured at
+launch, as well as the retained design executable.
+
+**Why:** An observer can be edited while a simulation still uses its already
+loaded plugin. Hashing the source only at completion can misattribute results.
+
+**How to apply:** Preserve earlier observer binaries; change observations in a
+separate build without modifying the frozen design, and record both identities.
+
+An internal bus name surviving optimization does not mean every bit remains
+observable. Verify the frozen netlist's unused-bit metadata and actual drivers
+before requiring a whole internal word to be known.
+
+**Why:** The mapped retirement observation retained its opcode drivers but not
+unused operand bits; a whole-word VPI check falsely rejected known instruction
+fetches. This is an observation boundary, not permission to suppress X values.
+
+**How to apply:** Bind the observed-bit contract to the exact netlist hash.
+Report removed bits as unavailable, never as zeros or reconstructed words.
+Continue failing on unknown live/control bits; a fully preserved debug word
+requires separately identified instrumentation, not a claim about frozen RTL.
+
 Also run structural RTL conversion when changing acceptance/busy multiplexers.
 Do not select a unit's busy output using its accepted-start signal.
 
 **Why:** Accepted start is qualified by the core's aggregate busy signal.
 Selecting busy with start closes a combinational loop that behavioral simulation
 may settle, while netlist conversion rejects it.
+
+Read-address selection must also be independent of accepted start in both the
+arbiter and the selected unit's idle logic. A registered busy selector alone
+does not remove feedback hidden in a mux input.
+
+**Why:** Structural conversion traverses both mux inputs; logical exclusivity
+does not make a start → operand read → permission result → start path safe.
+
+**How to apply:** Derive read selection from decode/state, then use permission
+results to gate acceptance and state changes. Cover both NULL and missing-rights
+targets, with an unrelated register deliberately holding valid authority.
 
 **How to apply:** Keep busy selection registered; acceptance-cycle overrides
 should affect only the operand-read path, not the whole output bundle.
@@ -111,6 +168,17 @@ but stopped at the boot CALL before the trace traffic could drain.
 count, observe trace-drain/halt state, and retain a bounded wall-time budget.
 Do not call a short timeout a core stall or force away trace backpressure to
 claim equivalence with the retained hardware.
+
+The user authorized a separate experimental bitstream build in parallel with
+the long Mallory replay, with the user running Vivado on the droplet.
+
+**Why:** Exact mapped-design replay is slow at production UART timing; the user
+wants vendor build evidence in parallel rather than waiting serially.
+
+**How to apply:** Freeze the same inputs, retain the previous build, enforce
+vendor timing/physical-I/O checks and mark unresolved execution/reload gates.
+Experimental synthesis is not release certification or board-programming
+authorization; never weaken the legacy release guard to enable it.
 
 Treat unassigned top-level debug ports as a board-safety review requirement,
 even when retained constraints downgrade NSTD-1 and UCIO-1 to warnings.
@@ -271,6 +339,17 @@ as full release evidence.
 The user authorized increasing release time budgets while preserving every
 behavioral assertion and failure check.
 
+Windows archive restoration instructions must put decoding, verification and
+writing inside one invoked script block with local variables and terminating
+errors; never give these as separate top-level interactive statements.
+
+**Why:** PowerShell can continue accepting later pasted statements after an
+earlier statement throws. Old session bytes can then be written under a new
+archive name and followed by a misleading success message.
+
+**How to apply:** locate the actual downloaded file first, then use an isolated
+script block that writes and reports success only after hash and length match.
+
 **Why:** The saved timed-out compilation completed successfully with a longer
 diagnostic deadline and its four-state RTL replay passed; that did not execute
 the enclosing Python negative-consumer assertion.
@@ -278,3 +357,150 @@ the enclosing Python negative-consumer assertion.
 **How to apply:** Keep compiler, enclosing case and full sequential matrix
 budgets consistent and bounded. Report saved replay success separately from
 the negative-consumer test and complete fresh release evidence.
+
+Use a regular Tcl file for remote Vivado batch diagnostics, not
+`-source /dev/stdin` with a shell heredoc.
+
+**Why:** Vivado 2026.1 on the build droplet printed `source /dev/stdin` and
+exited without observable script execution or the report-ready marker.
+
+**How to apply:** Write a fresh temporary Tcl file, pass its path to `-source`,
+and require the explicit completion marker plus the resulting report before
+treating diagnostics as successful.
+
+Distinguish the time-zero X-to-low clock initialization from an executed
+falling edge in UNISIM testbenches.
+
+**Why:** XSim reports the initialized clock output as a negedge before the
+MMCM can lock; a falling-edge observer otherwise faults at time zero.
+
+**How to apply:** Exempt only time-zero falling-edge settling. Independently
+reject every unlocked rising edge and retain lock/period checks on all later
+falling edges. Test delayed lock plus X-to-low initialization explicitly;
+never skip an arbitrary startup interval or wait for lock before arming faults.
+
+Keep remote vendor replay evidence distinct from locally hashed executable
+replay when preparing experimental build packages.
+
+**Why:** A user-supplied XSim transcript can report exact-input checks and
+successful observation without supplying an exported executable digest.
+
+**How to apply:** Bind the retained input archive, source fingerprint,
+testbench, runner and transcript, explicitly label the evidence origin and
+missing executable proof, and never invent a digest or treat boot evidence as
+full-program or physical acceptance.
+
+Use a unique purpose-and-checksum filename for user-downloaded build transport
+text, and keep subsequent restore commands aligned with that exact name.
+
+**Why:** Identical download basenames in multiple generated folders caused
+repeated selection of an older package and browser duplicate-name suffixes.
+
+**How to apply:** Include the archive checksum prefix in the visible filename;
+verify decoded length and hash before any write/upload. Do not rely on a
+generic basename or silently select the newest browser download.
+
+Do not assume Vivado's reported MMCM feedback clock period equals the
+calculated VCO period.
+
+**Why:** The 25 MHz candidate's synthesized checkpoint passed the MMCM
+parameter and output-clock checks but reported 20 ns on CLKFBOUT, causing a
+guard expecting the 1 ns VCO period to stop before implementation.
+The subsequent constrained project report confirmed an auto-derived
+multiply-by-one feedback timing object from the 50 MHz input master, while
+the separate output clock was correctly reported at 25 MHz.
+
+**How to apply:** Inspect actual clock objects, generation relationships and
+connectivity before choosing a feedback assertion. Keep input/output clock
+checks and routed timing gates; a mock using an assumed feedback period is
+not evidence of Vivado's clock model.
+
+Capture Vivado diagnostic stdout/stderr with shell redirection, not a Tcl
+`redirect` wrapper.
+
+**Why:** The droplet's Vivado 2026.1 Tcl interpreter rejects `redirect` as an
+invalid command even though opening the saved checkpoint succeeds.
+
+**How to apply:** Run a regular temporary Tcl script and capture its process
+output to a unique report file. Require a final completion marker before
+presenting the file as a completed diagnostic.
+
+Inspect synthesized clocks through the project/run context or explicitly load
+the original XDC; a standalone synthesis DCP may contain no clock definitions.
+
+**Why:** A successful standalone open_checkpoint produced an empty clock
+report, while the original open_run had loaded the board XDC and checked clocks.
+Vivado also lowered BUFGCE to BUFGCTRL with XILINX_LEGACY_PRIM=BUFGCE and a
+reported pin map.
+
+**How to apply:** Verify the original inputs, open the project and completed
+synthesis run without relaunching it, and inspect clock objects there. Check
+the lowered primitive's actual pin mapping and constant controls, not only the
+source primitive name; do not treat an empty standalone report as permission
+to remove constraints or bypass clock guards.
+
+Normalize XSim escaped object names for selector matching, but retain the exact
+original object when calling get_value.
+
+**Why:** Implemented-netlist core signals appeared with a leading backslash
+and trailing whitespace. End-anchored selectors silently omitted error signals,
+while unanchored boot-unit selectors continued to work and masked the omission.
+
+**How to apply:** Trim surrounding whitespace and the leading escape only in
+the comparison key. Include escaped scalar/bit-select fixtures in selector tests.
+Do not interpret partial optimized bit aliases as a complete zero-valued bus.
+
+When repeated implemented-model probes expose only synthesized aliases, obtain
+the hash-pinned functional netlist and trace drivers before choosing more probes.
+
+**Why:** A generated error-related net name and a preceding pulse establish
+correlation, not the original validation expression; repeated remote simulation
+startup makes speculative name-based probing slow.
+
+**How to apply:** Preserve the exact export hash, inspect its fan-in offline,
+and use any next bounded replay to test a specific mapped condition.
+
+For reconstructed register values, map implemented flip-flop Q ports rather
+than assuming a surviving source-like net is the register bus.
+
+**Why:** Vivado retained source-like names for control expressions while
+renaming actual register outputs to generated nets, including `_n_0` names.
+A blanket exclusion of those names silently discarded real stored bits.
+
+**How to apply:** Require a complete bit-index-to-Q mapping and fail on missing
+or unknown values. Keep mapped runtime evidence separate from static fan-in
+deductions.
+
+A clocked source-level ROM read is not sufficient evidence of correct startup.
+Validate the first accepted initialization write after synthesis, including
+the memory's internal read stage and optional output register.
+
+**Why:** Source simulation passed while the implemented initializer copied a
+zero startup output before the array's first read, losing the first header
+word even though the ROM contents were correct.
+
+**How to apply:** Test a nonzero first entry at address zero, and compare every
+accepted write with its exact input pair. Do not repair the image, preload the
+expected result in a testbench, or weaken validation to hide an initialization
+sequencing defect.
+
+For isolated synthesis regressions, require the faulty baseline to reproduce
+its specific failure as well as requiring the candidate to pass.
+
+**Why:** Synthesis context can change memory/register mapping; an isolated
+baseline that already passes cannot demonstrate that a correction addresses
+the full-design failure.
+
+**How to apply:** Label baseline non-reproduction inconclusive and retain both
+results independently. Require later full-design verification before promotion.
+
+Frozen-image exports must account separately for import-time factory context.
+
+**Why:** Selecting an explicit runtime image does not prevent boot modules from
+validating factory catalog selections during import. A source-only copy failed
+before elaboration because that independent read-only context was absent.
+
+**How to apply:** Retain and hash the actual required context in the isolated
+tree; never invent selection records or bypass admission. Keep it explicitly
+separate from the runtime image's authority. Child interpreters also need the
+parent's package search paths when workspace-installed dependencies are used.

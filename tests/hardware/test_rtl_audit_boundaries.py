@@ -107,7 +107,7 @@ def test_lambda_pushes_single_protected_frame():
                 writes.append((ctx.get(dut.mem_wr_addr), ctx.get(dut.mem_wr_data)))
             if ctx.get(dut.lambda_complete):
                 assert writes == [
-                    (0x4000 + 241 * 4, (5 << 28) | (0x1804 << 13) | (1 << 12) | 241),
+                    (0x4000 + 241 * 4, (5 << 28) | (3 << 13) | (1 << 12) | 241),
                     (0x4000 + 17 * 4, (5 << 28) | 240),
                 ]
                 return
@@ -143,3 +143,52 @@ def test_permission_fault_cannot_start_call_with_deferred_reset():
             assert snapshot(ctx, dut)["cr"] == before["cr"]
             await ctx.tick()
     run(dut, bench)
+
+
+@pytest.mark.parametrize("target_gt,expected_fault", [
+    (0, 7),  # NULL_CAP
+    (make_gt(GT_TYPE_INFORM, PERM_MASK_E, slot_id=2), 3),  # PERM_X
+    (make_gt(GT_TYPE_INFORM, PERM_MASK_X, slot_id=2), None),
+])
+def test_lambda_checks_decoded_target_not_other_register(target_gt, expected_fault):
+    dut = ChurchCore()
+    async def bench(ctx):
+        ctx.set(dut.defer_fault_reset, 1)
+        await boot_core(ctx, dut)
+        for _ in range(3):
+            await execute_data(ctx, dut, 0xAF784000)
+        # CR0 is executable, but LAMBDA targets CR3. Permission checking must
+        # not be influenced by the idle unit's default read address (CR0).
+        for register, gt in [(0, 0 if expected_fault is None else
+                             make_gt(GT_TYPE_INFORM, PERM_MASK_X, slot_id=2)),
+                             (3, target_gt)]:
+            ctx.set(dut.dbg_cr_wr_en, 1)
+            ctx.set(dut.dbg_cr_wr_addr, register)
+            ctx.set(dut.dbg_cr_wr_data.as_value(), gt | (0x6000 << 32) | (63 << 64))
+            await ctx.tick()
+        ctx.set(dut.dbg_cr_wr_en, 0)
+        before = snapshot(ctx, dut)
+        ctx.set(dut.imem_data, (int(ChurchOpcode.LAMBDA) << 27) | (14 << 23) | (3 << 19))
+        ctx.set(dut.imem_valid, 1)
+        if expected_fault is None:
+            # NULL in CR0 must not veto the valid X capability in CR3.
+            assert not ctx.get(dut.fault_valid)
+            return
+        assert ctx.get(dut.fault_valid)
+        assert ctx.get(dut.fault) == expected_fault
+        await ctx.tick()
+        ctx.set(dut.imem_valid, 0)
+        for _ in range(20):
+            assert not ctx.get(dut.dmem_wr_en)
+            assert snapshot(ctx, dut)["cr"] == before["cr"]
+            await ctx.tick()
+    run(dut, bench)
+
+
+def test_core_read_arbitration_has_no_structural_feedback():
+    from amaranth.back import rtlil
+    dut = ChurchCore()
+    # Structural conversion traverses mux inputs even when behavioral benches
+    # settle their selections. Keep this alongside permission regressions.
+    text = rtlil.convert(dut, ports=[dut.imem_data, dut.imem_valid, dut.fault_valid])
+    assert "module" in text

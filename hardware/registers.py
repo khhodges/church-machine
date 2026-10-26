@@ -131,6 +131,7 @@ class ChurchRegisters(Elaboratable):
         # RETURN commit replaces boundary M state with the caller's c-list
         # authority: CR6.M=1 and every other CR M bit cleared.
         self.m_return_commit_en = Signal()
+        self.m_call_commit_en = Signal()
         # Successful RETURN only. Ones retain the current callee value, not a
         # caller snapshot. CR5/6 and CR12-15 are outside this reset operation.
         self.return_commit_en = Signal()
@@ -251,9 +252,9 @@ class ChurchRegisters(Elaboratable):
             with m.If(self.m_save_consume_en):
                 m.d.sync += m_bit_regs.bit_select(
                     self.m_save_consume_target + 12, 1).eq(0)
-            # Last M-state writer in the cycle: only a successful RETURN cLoad
-            # CR6 commit may establish this boundary state.
-            with m.If(self.m_return_commit_en):
+            # CALL and RETURN establish the same approved M boundary: clear
+            # prior M state and arm CR6.M, without changing descriptor words.
+            with m.If(self.m_return_commit_en | self.m_call_commit_en):
                 m.d.sync += m_bit_regs.eq(1 << CR_CLIST)
 
             with m.If(self.flags_wr_en):

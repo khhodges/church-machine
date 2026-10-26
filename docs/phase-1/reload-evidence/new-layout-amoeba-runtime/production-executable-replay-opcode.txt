@@ -1,0 +1,8 @@
+REPLAY_START external pins only; pre-edge observations; no UART commands
+INITIALIZED cycle=3679
+PROGRESS cycle=50000 initialized=1 boot=0
+RETIRE_PENDING cycle=99298 nia=00000004 opcode=04 lower27=unavailable
+PROGRESS cycle=100000 initialized=1 boot=0
+PROGRESS cycle=150000 initialized=1 boot=0
+PROGRESS cycle=200000 initialized=1 boot=0
+PROGRESS cycle=250000 initialized=1 boot=0

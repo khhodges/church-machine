@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "targetBoard": "wukong-xc7a100t",
+  "bootEntrySlot": 10,
+  "slotRules": {
+    "6": "Resident",
+    "7": "Resident",
+    "10": "Resident",
+    "11": "Resident",
+    "12": "Resident",
+    "13": "Hardware"
+  },
+  "step1": {
+    "totalNamespaceWords": 16384,
+    "namespaceLumpWords": 64,
+    "threadLumpWords": 256,
+    "nsSlotsMax": 64,
+    "threadCount": 3,
+    "threadStackWords": 32
+  },
+  "step2": {
+    "lumps": []
+  },
+  "step3": {
+    "emptySlotCount": 0
+  },
+  "slotLabels": {
+    "7": "WukongCallHome",
+    "8": "SlideRule",
+    "9": "Constants",
+    "10": "CapabilityTest",
+    "11": "Thread.2",
+    "12": "Thread.3",
+    "6": "SelfTest",
+    "13": "M_BIT_DEV",
+    "14": "ide.Alice",
+    "15": "ide.Mallory",
+    "16": "Policy.Probe",
+    "17": "Policy.Probe"
+  }
+}

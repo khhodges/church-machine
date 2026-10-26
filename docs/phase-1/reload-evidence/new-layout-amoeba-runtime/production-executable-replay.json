@@ -1,0 +1,24 @@
+{
+  "recordedAtUtc": "2026-10-24T23:47:49.689261+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked-600s.vvp"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 525.98,
+  "executableSha256": "ac2910c5ea3056477f37e544ef092cf5769eb161ca4931a297cb21870c236f4f",
+  "driverSourceSha256": "1d75d8742ecd9b4126b35654d36cc9d8f180479313cb7279c50eb3939b0f07ff",
+  "driverBinarySha256": "a34075caac670dbfa1f85bd0baa963ba64cffc91490d4359b4aedab04b831bb0",
+  "terminalObservations": [
+    "UNKNOWN_RETIRE cycle=99298"
+  ],
+  "bootCompleteObserved": false,
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test"
+}

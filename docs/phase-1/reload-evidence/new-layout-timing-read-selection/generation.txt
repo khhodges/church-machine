@@ -1,0 +1,8 @@
+  [gen_rtlil] Starting convert() at 14:57:28 — shape cache + gc disabled
+  [gen_rtlil] convert() done in 3.2s
+Generated: generated-artifacts/new-layout-timing-read-selection/rtl/church_wukong_xc7a100t.il
+  File size: 4,787,586 bytes
+  Lines: 158,555
+  Verilog: generated-artifacts/new-layout-timing-read-selection/rtl/church_wukong_xc7a100t.v
+  No \$macc cells found — Verilog already clean
+  No \$alu cells found — Verilog already clean

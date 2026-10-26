@@ -7,6 +7,15 @@ Run Alice and Mallory in different Threads for the protection demonstration.
 The user confirmed priming each Thread's respective actor entry capability
 in CR1, not the protected object's capability.
 
+The intended trial endpoint is Mallory's denied “steal” attempt, not a clean
+program halt.
+
+**Why:** The user explicitly confirmed that expected endpoint.
+
+**How to apply:** Correlate the denial with Mallory's actual instruction and
+preceding actor/thread sequence. An unrelated fault is not success; report
+fault-code conformance separately from the observed access denial.
+
 **Why:** The user explicitly requested different Threads rather than running
 both actors in one execution context.
 

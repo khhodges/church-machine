@@ -23985,6 +23985,7 @@ def wukong_command_post():
     # Keep the protocol field explicit in the dequeued command as well as the
     # compact internal device_uid field used by admission.
     entry['target_device_uid'] = target['device_uid']
+    entry['target_session_id'] = target['bridge_session']
 
     if cmd == 'k':
         # Testing-only Skip Fault is fail-closed at the server as well as RTL.
@@ -24053,6 +24054,11 @@ def wukong_command_post():
             artifact = base64.b64decode(b64, validate=True)
         except (ValueError, TypeError):
             return jsonify({'ok': False, 'error': 'invalid upload data encoding'}), 400
+        from server.guarded_runtime_reload import is_ascending
+        if is_ascending(artifact):
+            return jsonify({'ok': False, 'error':
+                            'Ascending images require the explicit guarded-reload endpoint',
+                            'decision': 'guarded_profile_required'}), 409
         supplied_digest = str(data.get('artifact_sha256', '') or '').lower()
         supplied_size = data.get('artifact_size')
         supplied_identity = str(data.get('artifact_identity', '') or '')[:256]
@@ -24850,6 +24856,10 @@ def wukong_upload_ack_get():
         if entry:
             _wukong_upload_ack = {}
     return jsonify(entry)
+
+
+from server.guarded_runtime_reload import register as _register_guarded_runtime_reload
+_register_guarded_runtime_reload(app, sys.modules[__name__])
 
 
 @app.route('/api/boot-image/send-to-hardware', methods=['POST'])

@@ -1,0 +1,501 @@
+{
+  "reportSha256": "c7c1d75d8f6378a8327f1a34c313de114b27dcf46e05477ae7e2d39a1055911d",
+  "failingEndpointCount": 652,
+  "sourceCounts": {
+    "dmem_reg_3_6/CLKBWRCLK": 490,
+    "dmem_reg_3_3/CLKBWRCLK": 54,
+    "core.u_change.ordinary$214.fsm_state_reg[5]/C": 33,
+    "core.u_switch.load.u_ns_gate.gt_latched_reg[1]_reg/C": 75
+  },
+  "traceEndpoints": 308,
+  "coreEndpoints": 325,
+  "otherEndpoints": 19,
+  "groups": [
+    {
+      "endpointGroup": "tq_data1_reg[]/R",
+      "count": 32,
+      "worstSlackNs": -2.445,
+      "bestSlackNs": -2.329
+    },
+    {
+      "endpointGroup": "tq_len_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -2.344,
+      "bestSlackNs": -2.34
+    },
+    {
+      "endpointGroup": "tq_data1_reg[]/D",
+      "count": 32,
+      "worstSlackNs": -2.336,
+      "bestSlackNs": -1.46
+    },
+    {
+      "endpointGroup": "tq_type0_reg[]/R",
+      "count": 2,
+      "worstSlackNs": -2.329,
+      "bestSlackNs": -2.329
+    },
+    {
+      "endpointGroup": "tq_type2_reg[]/R",
+      "count": 2,
+      "worstSlackNs": -2.278,
+      "bestSlackNs": -2.278
+    },
+    {
+      "endpointGroup": "step_mode_reg/D",
+      "count": 1,
+      "worstSlackNs": -2.001,
+      "bestSlackNs": -2.001
+    },
+    {
+      "endpointGroup": "tq_data2_reg[]/CE",
+      "count": 32,
+      "worstSlackNs": -1.903,
+      "bestSlackNs": -1.507
+    },
+    {
+      "endpointGroup": "core.u_dwrite.dr_data_reg_reg[]/R",
+      "count": 31,
+      "worstSlackNs": -1.894,
+      "bestSlackNs": -1.637
+    },
+    {
+      "endpointGroup": "step_halted_reg/D",
+      "count": 1,
+      "worstSlackNs": -1.836,
+      "bestSlackNs": -1.836
+    },
+    {
+      "endpointGroup": "tq_bidx_reg[]/R",
+      "count": 4,
+      "worstSlackNs": -1.824,
+      "bestSlackNs": -1.824
+    },
+    {
+      "endpointGroup": "core.u_dwrite.dr_data_reg_reg[]/CE",
+      "count": 31,
+      "worstSlackNs": -1.816,
+      "bestSlackNs": -1.382
+    },
+    {
+      "endpointGroup": "snapshot_reason$368_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -1.792,
+      "bestSlackNs": -1.756
+    },
+    {
+      "endpointGroup": "tq_fault_reg[]_reg/D",
+      "count": 7,
+      "worstSlackNs": -1.786,
+      "bestSlackNs": -0.825
+    },
+    {
+      "endpointGroup": "core.nia_reg_reg[]/R",
+      "count": 29,
+      "worstSlackNs": -1.777,
+      "bestSlackNs": -1.477
+    },
+    {
+      "endpointGroup": "step_pause_pending_reg/D",
+      "count": 1,
+      "worstSlackNs": -1.732,
+      "bestSlackNs": -1.732
+    },
+    {
+      "endpointGroup": "core.guarded_call_error_reg[]/D",
+      "count": 5,
+      "worstSlackNs": -1.694,
+      "bestSlackNs": -0.849
+    },
+    {
+      "endpointGroup": "tq_data2_reg[]/D",
+      "count": 32,
+      "worstSlackNs": -1.65,
+      "bestSlackNs": -1.381
+    },
+    {
+      "endpointGroup": "tq_type1_reg[]/D",
+      "count": 1,
+      "worstSlackNs": -1.621,
+      "bestSlackNs": -1.621
+    },
+    {
+      "endpointGroup": "tq_data0_reg[]/D",
+      "count": 32,
+      "worstSlackNs": -1.618,
+      "bestSlackNs": -1.238
+    },
+    {
+      "endpointGroup": "core.u_dwrite.dwrite_fsm_state_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -1.605,
+      "bestSlackNs": -0.446
+    },
+    {
+      "endpointGroup": "tq_type0_reg[]/D",
+      "count": 4,
+      "worstSlackNs": -1.59,
+      "bestSlackNs": -1.326
+    },
+    {
+      "endpointGroup": "core.nia_reg_reg[]/D",
+      "count": 30,
+      "worstSlackNs": -1.589,
+      "bestSlackNs": -0.349
+    },
+    {
+      "endpointGroup": "tq_type2_reg[]/D",
+      "count": 4,
+      "worstSlackNs": -1.568,
+      "bestSlackNs": -1.265
+    },
+    {
+      "endpointGroup": "snapshot_pending_reg/D",
+      "count": 1,
+      "worstSlackNs": -1.546,
+      "bestSlackNs": -1.546
+    },
+    {
+      "endpointGroup": "tq_ptr_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -1.533,
+      "bestSlackNs": -1.497
+    },
+    {
+      "endpointGroup": "tq_data0_reg[]/CE",
+      "count": 32,
+      "worstSlackNs": -1.517,
+      "bestSlackNs": -0.927
+    },
+    {
+      "endpointGroup": "tq_type1_reg[]/CE",
+      "count": 1,
+      "worstSlackNs": -1.517,
+      "bestSlackNs": -1.517
+    },
+    {
+      "endpointGroup": "tq_type2_reg[]/CE",
+      "count": 4,
+      "worstSlackNs": -1.517,
+      "bestSlackNs": -1.193
+    },
+    {
+      "endpointGroup": "tq_type0_reg[]/CE",
+      "count": 4,
+      "worstSlackNs": -1.505,
+      "bestSlackNs": -1.193
+    },
+    {
+      "endpointGroup": "tq_data1_reg[]/CE",
+      "count": 32,
+      "worstSlackNs": -1.489,
+      "bestSlackNs": -1.354
+    },
+    {
+      "endpointGroup": "tq_nia_reg[]/CE",
+      "count": 32,
+      "worstSlackNs": -1.464,
+      "bestSlackNs": -0.927
+    },
+    {
+      "endpointGroup": "tq_bidx_reg[]/CE",
+      "count": 4,
+      "worstSlackNs": -1.454,
+      "bestSlackNs": -1.454
+    },
+    {
+      "endpointGroup": "fault_recovery.fault_pending_reg/D",
+      "count": 1,
+      "worstSlackNs": -1.367,
+      "bestSlackNs": -1.367
+    },
+    {
+      "endpointGroup": "fault_recovery.snapshot_drained_reg/D",
+      "count": 1,
+      "worstSlackNs": -1.331,
+      "bestSlackNs": -1.331
+    },
+    {
+      "endpointGroup": "tq_fault_reg[]_reg/CE",
+      "count": 7,
+      "worstSlackNs": -1.309,
+      "bestSlackNs": -1.037
+    },
+    {
+      "endpointGroup": "core.nia_reg_reg[]/CE",
+      "count": 29,
+      "worstSlackNs": -1.295,
+      "bestSlackNs": -1.025
+    },
+    {
+      "endpointGroup": "core.u_dwrite.dr_data_reg_reg[]/D",
+      "count": 1,
+      "worstSlackNs": -1.216,
+      "bestSlackNs": -1.216
+    },
+    {
+      "endpointGroup": "core.u_registers.flags_reg[]/D",
+      "count": 4,
+      "worstSlackNs": -1.138,
+      "bestSlackNs": -0.306
+    },
+    {
+      "endpointGroup": "core.guarded_call_error_reg[]/CE",
+      "count": 5,
+      "worstSlackNs": -1.095,
+      "bestSlackNs": -0.99
+    },
+    {
+      "endpointGroup": "tq_flags_reg[]_reg/CE",
+      "count": 4,
+      "worstSlackNs": -1.07,
+      "bestSlackNs": -0.927
+    },
+    {
+      "endpointGroup": "trace_unit_state_reg/D",
+      "count": 1,
+      "worstSlackNs": -1.044,
+      "bestSlackNs": -1.044
+    },
+    {
+      "endpointGroup": "core.u_registers.dr4_reg[]/D",
+      "count": 1,
+      "worstSlackNs": -0.848,
+      "bestSlackNs": -0.848
+    },
+    {
+      "endpointGroup": "core.boot_state_reg_reg[]/D",
+      "count": 3,
+      "worstSlackNs": -0.819,
+      "bestSlackNs": -0.664
+    },
+    {
+      "endpointGroup": "core.u_registers.dr2_reg[]/D",
+      "count": 3,
+      "worstSlackNs": -0.626,
+      "bestSlackNs": -0.005
+    },
+    {
+      "endpointGroup": "core.u_registers.dr5_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -0.603,
+      "bestSlackNs": -0.021
+    },
+    {
+      "endpointGroup": "dmem_reg_2_13/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.506,
+      "bestSlackNs": -0.506
+    },
+    {
+      "endpointGroup": "core.u_registers.dr8_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -0.471,
+      "bestSlackNs": -0.021
+    },
+    {
+      "endpointGroup": "dmem_reg_2_11/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.418,
+      "bestSlackNs": -0.418
+    },
+    {
+      "endpointGroup": "dmem_reg_1_13/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.418,
+      "bestSlackNs": -0.418
+    },
+    {
+      "endpointGroup": "core.u_registers.dr7_reg[]/D",
+      "count": 1,
+      "worstSlackNs": -0.411,
+      "bestSlackNs": -0.411
+    },
+    {
+      "endpointGroup": "core.u_dwrite.addr_reg_reg[]/CE",
+      "count": 10,
+      "worstSlackNs": -0.402,
+      "bestSlackNs": -0.052
+    },
+    {
+      "endpointGroup": "core.u_registers.dr6_reg[]/D",
+      "count": 3,
+      "worstSlackNs": -0.368,
+      "bestSlackNs": -0.012
+    },
+    {
+      "endpointGroup": "core.u_registers.dr1_reg[]/D",
+      "count": 3,
+      "worstSlackNs": -0.337,
+      "bestSlackNs": -0.021
+    },
+    {
+      "endpointGroup": "core.u_registers.dr10_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -0.326,
+      "bestSlackNs": -0.001
+    },
+    {
+      "endpointGroup": "dmem_reg_3_8/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.261,
+      "bestSlackNs": -0.261
+    },
+    {
+      "endpointGroup": "fault_latched_reg/D",
+      "count": 1,
+      "worstSlackNs": -0.24,
+      "bestSlackNs": -0.24
+    },
+    {
+      "endpointGroup": "core.u_call.method_entry_reg_reg[]_reg/CE",
+      "count": 29,
+      "worstSlackNs": -0.237,
+      "bestSlackNs": -0.021
+    },
+    {
+      "endpointGroup": "core.u_registers.dr9_reg[]/D",
+      "count": 3,
+      "worstSlackNs": -0.232,
+      "bestSlackNs": -0.038
+    },
+    {
+      "endpointGroup": "core.u_switch.fsm_state_reg[]/D",
+      "count": 3,
+      "worstSlackNs": -0.228,
+      "bestSlackNs": -0.02
+    },
+    {
+      "endpointGroup": "core.u_registers.dr3_reg[]/D",
+      "count": 1,
+      "worstSlackNs": -0.223,
+      "bestSlackNs": -0.223
+    },
+    {
+      "endpointGroup": "dmem_reg_3_15/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.221,
+      "bestSlackNs": -0.221
+    },
+    {
+      "endpointGroup": "dmem_reg_3_13/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.197,
+      "bestSlackNs": -0.197
+    },
+    {
+      "endpointGroup": "core.u_dread.addr_reg_reg[]_reg/CE",
+      "count": 8,
+      "worstSlackNs": -0.194,
+      "bestSlackNs": -0.069
+    },
+    {
+      "endpointGroup": "core.u_return.ret_state_reg[]/D",
+      "count": 2,
+      "worstSlackNs": -0.193,
+      "bestSlackNs": -0.083
+    },
+    {
+      "endpointGroup": "core.u_return.return_code_base_reg[]/CE",
+      "count": 32,
+      "worstSlackNs": -0.192,
+      "bestSlackNs": -0.017
+    },
+    {
+      "endpointGroup": "core.u_change.fault_type_latched_reg[]/R",
+      "count": 1,
+      "worstSlackNs": -0.13,
+      "bestSlackNs": -0.13
+    },
+    {
+      "endpointGroup": "dmem_reg_1_6/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.123,
+      "bestSlackNs": -0.123
+    },
+    {
+      "endpointGroup": "core.u_change.ordinary$214.incoming_cr6_reg[]/CE",
+      "count": 11,
+      "worstSlackNs": -0.104,
+      "bestSlackNs": -0.021
+    },
+    {
+      "endpointGroup": "core.u_call.caller_egt_latched_reg[]_reg/D",
+      "count": 1,
+      "worstSlackNs": -0.092,
+      "bestSlackNs": -0.092
+    },
+    {
+      "endpointGroup": "core.u_cload.cload_state_reg[]/D",
+      "count": 1,
+      "worstSlackNs": -0.085,
+      "bestSlackNs": -0.085
+    },
+    {
+      "endpointGroup": "core.u_change.ordinary$214.incoming_cr5_reg[]/CE",
+      "count": 14,
+      "worstSlackNs": -0.072,
+      "bestSlackNs": -0.017
+    },
+    {
+      "endpointGroup": "core.u_change.ordinary$214.incoming_cr8_reg[]/CE",
+      "count": 5,
+      "worstSlackNs": -0.069,
+      "bestSlackNs": -0.069
+    },
+    {
+      "endpointGroup": "core.u_change.ordinary$214.incoming_cr3_reg[]/CE",
+      "count": 5,
+      "worstSlackNs": -0.066,
+      "bestSlackNs": -0.066
+    },
+    {
+      "endpointGroup": "dmem_reg_2_15/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.063,
+      "bestSlackNs": -0.063
+    },
+    {
+      "endpointGroup": "dmem_reg_1_15/DIADI[]",
+      "count": 1,
+      "worstSlackNs": -0.035,
+      "bestSlackNs": -0.035
+    },
+    {
+      "endpointGroup": "core.u_call.fault_type_reg[]/CE",
+      "count": 4,
+      "worstSlackNs": -0.034,
+      "bestSlackNs": -0.03
+    },
+    {
+      "endpointGroup": "core.u_registers.m_dr11_reg[]/CE",
+      "count": 2,
+      "worstSlackNs": -0.028,
+      "bestSlackNs": -0.028
+    },
+    {
+      "endpointGroup": "core.u_call.cr14_latched_reg[]_reg/D",
+      "count": 2,
+      "worstSlackNs": -0.028,
+      "bestSlackNs": -0.02
+    },
+    {
+      "endpointGroup": "core.u_call.src_reg_latched_reg[]_reg/D",
+      "count": 2,
+      "worstSlackNs": -0.017,
+      "bestSlackNs": -0.016
+    },
+    {
+      "endpointGroup": "core.u_call.indexed_clist_latched_reg[]_reg/D",
+      "count": 1,
+      "worstSlackNs": -0.017,
+      "bestSlackNs": -0.017
+    },
+    {
+      "endpointGroup": "core.u_change.fault_latched_reg/D",
+      "count": 1,
+      "worstSlackNs": -0.006,
+      "bestSlackNs": -0.006
+    }
+  ]
+}

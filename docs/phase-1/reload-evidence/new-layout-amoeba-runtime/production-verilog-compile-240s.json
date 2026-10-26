@@ -1,0 +1,25 @@
+{
+  "command": [
+    "iverilog",
+    "-v",
+    "-g2012",
+    "-s",
+    "church_wukong_xc7a100t",
+    "-o",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked.vvp",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/church_wukong_xc7a100t.v",
+    "/nix/store/d0jss2q3m0bc346bbpgii1l0b3a0mx0p-yosys-0.51/share/yosys/xilinx/cells_sim.v"
+  ],
+  "status": "timeout",
+  "exitCode": null,
+  "elapsedSeconds": 240.0,
+  "verilogSha256": "2b8733b8e2d3737275b499a9ae1bf25cbff4d28e4e7fd79c62e42959ac262c1b",
+  "outputBytes": null,
+  "recordedAtUtc": "2026-10-24T23:29:41.662596+00:00",
+  "independentCompilePassed": false,
+  "lastReportedPhase": "CODE GENERATION",
+  "diagnosticLogSha256": "1b81daa3665cf1fcb5e64b6b6bb033d3602ec34f6831fad2a6268da12d095e98",
+  "programReplayPerformed": false,
+  "hardwareCommandsSent": false,
+  "interpretation": "240-second diagnostic deadline expired; no simulator executable and no reported HDL error. This is not a completed compile or behavioral verification."
+}

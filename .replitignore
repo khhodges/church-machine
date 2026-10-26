@@ -69,3 +69,4 @@ build/uart_test.asc
 build/synth.log
 /generated-artifacts/
 /server/lumps/design-drafts/
+/build/guarded-runtime-installation.json

@@ -15,3 +15,14 @@ producing confirmable evidence.
 command is received, bound partial-command waits, invalidate pending evidence
 on reconnect or later mutations, and keep UIs in requested/timeout/unavailable
 states until matching board evidence arrives.
+
+Preserve the consumer's explicit target-session field in every command
+envelope, even when the server also keeps an internal session field.
+
+**Why:** Server-side admission can succeed while the bridge correctly rejects
+the consumed command if its serialized envelope omits the strict session
+field. Queue/consume records alone then look healthier than actual delivery.
+
+**How to apply:** Test real dequeued server payloads against the bridge's
+target matcher, including guarded uploads, rather than testing each side only
+with independently invented fixtures. Keep wrong-session rejection strict.

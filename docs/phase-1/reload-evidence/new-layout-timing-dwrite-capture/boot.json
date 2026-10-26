@@ -1,0 +1,36 @@
+{
+  "recordedAtUtc": "2026-10-25T20:21:10.750620+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-timing-dwrite-capture/observer-boot",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-timing-dwrite-capture/compiled.vvp",
+    "+stop-at-boot"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 1873.77,
+  "deadlineSeconds": 5400,
+  "executableSha256": "cf5985d2eea1085a6c5b8ccc5ced7485dd04f99c7700e52fa44640cb6fcd6cee",
+  "verilogSha256": "af3df46a567fd7331f0ce5b4f10ebc50185208354a0a09825c326b18471639db",
+  "sourceFingerprint": "ecc4babfc6a8ae93186fe17ec3d329f46360aa196c40dd0dfba50a407a1b85c0",
+  "driverSourceSha256": "45bcf3f6e198e117d1baddeb492dc1a67b4bed6e317fea971ffcdae6164da43b",
+  "driverBinarySha256": "8e9b854f0f974015693b3a6b4ec5586a40c36a775d536708de15ecd166f16d70",
+  "terminalObservations": [
+    "BOOT_HANDOFF_OBSERVED cycle=411792 (not a program or upload pass)"
+  ],
+  "bootCompleteObserved": true,
+  "bootHandoffObserved": true,
+  "expectedEntryNia": 13572,
+  "finalNiaObservation": [
+    "00003504",
+    "00000000"
+  ],
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test",
+  "fullLogSha256": "abae0e04fe1d5779a2d42c51a10daa3926e4362ddd95ccc907c6452a536ab146",
+  "scope": "DWRITE capture design boot handoff only; not a program, routed timing, or physical reload pass"
+}

@@ -1,0 +1,23 @@
+{
+  "profile": "new-layout-guarded-relative-nia-v1",
+  "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+  "targetPart": "xc7a100tfgg676-2",
+  "generatorArguments": {
+    "clk_freq": 50000000,
+    "baud": 57600,
+    "sim_mode": false
+  },
+  "blockers": [
+    "Production generator does not select the frozen boot guard/profile",
+    "No explicit production-capable exact-image input is wired"
+  ],
+  "readyForSynthesis": false,
+  "sourceSha256": {
+    "hardware/gen_rtlil.py": "758e27530240e05b0db234deab42c5efdd9b0cb13038a81283797d1e4268021f",
+    "hardware/wukong_top.py": "6cea22aae6d332a13caf2fa01060b9915a2ef63403ab55789bc356c576e0a4cb",
+    "hardware/wukong_xc7a100t.tcl": "c8bd9b49480dc05739f39a3d178d3baca965d5cd6796b4326ce0e1b23cb59b42",
+    "hardware/wukong_xc7a100t.xdc": "a50dbe318aaa62a092a0d4417c8ef9a8d1899bd84ad78710c145c98d3d7476e2",
+    "hardware/profiles/new_layout_guarded.json": "72bad94d91256f16567b61d100a9550d8f1a8c8a63dae2c318eefedc766b753e"
+  },
+  "scope": "Read-only configuration audit; no elaboration, synthesis, network or hardware I/O"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "church.isolated-boot-guard/v1",
+  "name": "New Layout",
+  "inputSha256": "47966de85a7a8561b838a6c85f3ea6de447a7c54b0ea3b9c198527992ea4c565",
+  "namespaceVersion": 46,
+  "threadVersion": 419,
+  "guard18": 23971,
+  "cr0ChangePolicy": "retain",
+  "approvalScope": "User-approved separate offline hardware candidate; not installation"
+}

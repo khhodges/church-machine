@@ -1,0 +1,169 @@
+.................FF..................................................... [ 23%]
+........................................................................ [ 46%]
+........................................F............................... [ 69%]
+........................................................................ [ 92%]
+.........................                                                [100%]
+=================================== FAILURES ===================================
+_______________ test_full_width_access[65536-0-1-True-4096-read] _______________
+
+kind = 'read', limit = 65536, index = 0, magnitude = 1, immediate = True
+base = 4096
+
+    @pytest.mark.parametrize("kind", ["read", "write"])
+    @pytest.mark.parametrize("limit,index,magnitude,immediate,base", [
+        (0, 0, 0, True, 0x1000),
+        (65536, 0, 1, True, 0x1000),
+        (65535, 65535, 0, False, 0x1000),
+        (65536, 65536, 0, False, 0x1000),
+        (65536, 65535, 1, False, 0x1000),
+        (0x1FFFFF, 0x1FFFFF, 0, False, 0x1000),
+        (0, 0, 0, True, 0xFFFFFFFC),
+    ])
+    def test_full_width_access(kind, limit, index, magnitude, immediate, base):
+        observed = run_access(kind, limit=limit, index=index, magnitude=magnitude,
+                              immediate=immediate, base=base)
+        address = base + 4 * (magnitude if immediate else index + magnitude)
+        assert observed["fault"] is None
+        assert observed["done"] == 1
+        assert observed["m_writes"] == 0
+>       assert observed["reads"] == ([address] if kind == "read" else [])
+E       assert [4096] == [4100]
+E         
+E         At index 0 diff: 4096 != 4100
+E         Use -v to get more diff
+
+tests/hardware/test_data_access_full_width.py:80: AssertionError
+______________ test_full_width_access[65536-0-1-True-4096-write] _______________
+
+kind = 'write', limit = 65536, index = 0, magnitude = 1, immediate = True
+base = 4096
+
+    @pytest.mark.parametrize("kind", ["read", "write"])
+    @pytest.mark.parametrize("limit,index,magnitude,immediate,base", [
+        (0, 0, 0, True, 0x1000),
+        (65536, 0, 1, True, 0x1000),
+        (65535, 65535, 0, False, 0x1000),
+        (65536, 65536, 0, False, 0x1000),
+        (65536, 65535, 1, False, 0x1000),
+        (0x1FFFFF, 0x1FFFFF, 0, False, 0x1000),
+        (0, 0, 0, True, 0xFFFFFFFC),
+    ])
+    def test_full_width_access(kind, limit, index, magnitude, immediate, base):
+        observed = run_access(kind, limit=limit, index=index, magnitude=magnitude,
+                              immediate=immediate, base=base)
+        address = base + 4 * (magnitude if immediate else index + magnitude)
+        assert observed["fault"] is None
+        assert observed["done"] == 1
+        assert observed["m_writes"] == 0
+        assert observed["reads"] == ([address] if kind == "read" else [])
+>       assert observed["writes"] == ([(address, 0xD15EA5E5)] if kind == "write" else [])
+E       assert [(4096, 3512640997)] == [(4100, 3512640997)]
+E         
+E         At index 0 diff: (4096, 3512640997) != (4100, 3512640997)
+E         Use -v to get more diff
+
+tests/hardware/test_data_access_full_width.py:81: AssertionError
+_________ test_h06_save_committed_memory_and_forbidden_writes[None-0] __________
+
+row = 0, defect = None
+
+    @pytest.mark.parametrize("row", [0, 31, 32, 65536, MASK])
+    @pytest.mark.parametrize("defect", [None, "S", "B", "seal", "generation"])
+    def test_h06_save_committed_memory_and_forbidden_writes(row, defect):
+        dut = ChurchMSave(enable_seal_check=True)
+        source = 0x82000003 if defect != "B" else 0x02000003
+        destination = 0xaa000002 if defect != "S" else 0x8a000002
+        authority = 63 | ((1 << 21) if defect == "generation" else 0)
+        memory = {0x8030: 0x3000, 0x8034: authority,
+                  0x8038: seal(0x3000, authority) ^ int(defect == "seal")}
+        target = {0x2000+4*i: 0x5a000000+i for i in range(32)}
+        before = dict(target)
+        valid = row <= 31 and defect is None
+        async def bench(ctx):
+            ctx.set(dut.sub_src_gt, source)
+            ctx.set(dut.sub_dst_cap.as_value(), destination | 0x2000 << 32 | 31 << 64)
+            ctx.set(dut.sub_index, row)
+            ctx.set(dut.cr15_namespace.as_value(), 0x1a000000 | 0x8000 << 32 | 255 << 64)
+            ctx.set(dut.mem_wr_done, 1)
+            ctx.set(dut.sub_start, 1)
+            await ctx.tick()
+            ctx.set(dut.sub_start, 0)
+            # Accepted source/index must be latched.
+            ctx.set(dut.sub_src_gt, 0)
+            ctx.set(dut.sub_index, MASK)
+            writes = []
+            for _ in range(64):
+                request, addr = ctx.get(dut.mem_rd_en), ctx.get(dut.mem_rd_addr)
+                ctx.set(dut.mem_rd_valid, request)
+                ctx.set(dut.mem_rd_data, memory.get(addr, 0xdeadbeef))
+                if ctx.get(dut.mem_wr_en):
+                    assert valid
+                    address, payload = ctx.get(dut.mem_wr_addr), ctx.get(dut.mem_wr_data)
+                    assert (address, payload) == (0x2000+4*row, source)
+                    writes.append((address, payload))
+                    target[address] = payload
+                if ctx.get(dut.sub_fault):
+                    assert not valid and not writes and target == before
+                    return
+                if ctx.get(dut.sub_done):
+                    assert valid and writes == [(0x2000+4*row, source)]
+                    expected = dict(before)
+                    expected[0x2000+4*row] = source
+                    assert target == expected
+                    return
+                await ctx.tick()
+            pytest.fail("SAVE validation timeout")
+>       simulate(dut, bench)
+
+tests/hardware/test_phase1_authority.py:335: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/hardware/test_phase1_authority.py:17: in simulate
+    sim.run()
+.pythonlibs/lib/python3.11/site-packages/amaranth/sim/core.py:302: in run
+    while self.advance():
+          ^^^^^^^^^^^^^^
+.pythonlibs/lib/python3.11/site-packages/amaranth/sim/core.py:342: in advance
+    return self._engine.advance()
+           ^^^^^^^^^^^^^^^^^^^^^^
+.pythonlibs/lib/python3.11/site-packages/amaranth/sim/pysim.py:707: in advance
+    testbench.run()
+.pythonlibs/lib/python3.11/site-packages/amaranth/sim/_async.py:762: in run
+    self.waits_on = self.coroutine.send(None)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+ctx = <amaranth.sim._async.TestbenchContext object at 0x7f6c61cdf3b0>
+
+    async def bench(ctx):
+        ctx.set(dut.sub_src_gt, source)
+        ctx.set(dut.sub_dst_cap.as_value(), destination | 0x2000 << 32 | 31 << 64)
+        ctx.set(dut.sub_index, row)
+        ctx.set(dut.cr15_namespace.as_value(), 0x1a000000 | 0x8000 << 32 | 255 << 64)
+        ctx.set(dut.mem_wr_done, 1)
+        ctx.set(dut.sub_start, 1)
+        await ctx.tick()
+        ctx.set(dut.sub_start, 0)
+        # Accepted source/index must be latched.
+        ctx.set(dut.sub_src_gt, 0)
+        ctx.set(dut.sub_index, MASK)
+        writes = []
+        for _ in range(64):
+            request, addr = ctx.get(dut.mem_rd_en), ctx.get(dut.mem_rd_addr)
+            ctx.set(dut.mem_rd_valid, request)
+            ctx.set(dut.mem_rd_data, memory.get(addr, 0xdeadbeef))
+            if ctx.get(dut.mem_wr_en):
+                assert valid
+                address, payload = ctx.get(dut.mem_wr_addr), ctx.get(dut.mem_wr_data)
+                assert (address, payload) == (0x2000+4*row, source)
+                writes.append((address, payload))
+                target[address] = payload
+            if ctx.get(dut.sub_fault):
+>               assert not valid and not writes and target == before
+E               assert (not True)
+
+tests/hardware/test_phase1_authority.py:325: AssertionError
+=========================== short test summary info ============================
+FAILED tests/hardware/test_data_access_full_width.py::test_full_width_access[65536-0-1-True-4096-read]
+FAILED tests/hardware/test_data_access_full_width.py::test_full_width_access[65536-0-1-True-4096-write]
+FAILED tests/hardware/test_phase1_authority.py::test_h06_save_committed_memory_and_forbidden_writes[None-0]
+3 failed, 310 passed in 74.72s (0:01:14)

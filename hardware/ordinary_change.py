@@ -12,6 +12,7 @@ from .hw_types import FaultType, GT_TYPE_INFORM, GT_TYPE_ABSTRACT
 from .ns_gate import ChurchNSGate
 from .mload import ChurchMLoad
 from .thread_design import THREAD_MIN_N_MINUS_6, THREAD_MAX_N_MINUS_6
+from .ascending_authority import cached_authority
 
 
 class OrdinaryChange(Elaboratable):
@@ -19,7 +20,7 @@ class OrdinaryChange(Elaboratable):
         "cr_src", "cr_dst", "index", "cr_rd_data", "cr12_thread",
         "cr15_namespace", "active_thread_base", "active_thread_owned",
         "mem_rd_data", "mem_rd_valid", "mem_wr_done", "dr_rd_data",
-        "flags_in", "nia_current",
+        "flags_in", "nia_current", "code_base",
         "namespace_handoff", "incoming_namespace",
     )
     OUTPUTS = (
@@ -32,15 +33,34 @@ class OrdinaryChange(Elaboratable):
         "nia_restore_en", "nia_restore_val", "flags_restore_en", "flags_restore_data",
     )
 
-    def __init__(self, ports):
+    def __init__(self, ports, *, resident_word_locations=False):
+        self.resident_word_locations = resident_word_locations
         self.change_start = Signal()
         for name in self.INPUTS + self.OUTPUTS:
             setattr(self, name, Signal.like(getattr(ports, name), name="ordinary_" + name))
 
     def elaborate(self, platform):
         m = Module()
-        m.submodules.gate = gate = ChurchNSGate(enable_seal_check=True)
-        m.submodules.home_load = home_load = ChurchMLoad(enable_seal_check=True)
+        m.submodules.gate = gate = ChurchNSGate(
+            enable_seal_check=True,
+            authority_version_shift=17 if self.resident_word_locations else 21)
+        m.submodules.home_load = home_load = ChurchMLoad(
+            enable_seal_check=True, resident_word_locations=self.resident_word_locations)
+        resolved_base = Signal(32)
+        resolved_authority = Signal(32)
+        invalid_descriptor = Signal()
+        if self.resident_word_locations:
+            # Gate integrity/version checks apply to original stored words.
+            # Ordinary CHANGE's direct resolutions must all be resident RAM.
+            m.d.comb += [
+                resolved_base.eq(gate.raw_base << 2),
+                resolved_authority.eq(cached_authority(gate.raw_w2)),
+                invalid_descriptor.eq((gate.raw_base >= 16384) |
+                    (gate.raw_base + gate.raw_w2[:17] >= 16384)),
+            ]
+        else:
+            m.d.comb += [resolved_base.eq(gate.raw_base),
+                         resolved_authority.eq(gate.raw_w2)]
         namespace = Signal(96)
         home_namespace = Signal(CAP_REG_LAYOUT)
         hnv = View(CAP_REG_LAYOUT, home_namespace)
@@ -57,7 +77,7 @@ class OrdinaryChange(Elaboratable):
         tv, ev = View(CAP_REG_LAYOUT, thread), View(CAP_REG_LAYOUT, entry)
         nw = View(WORD2_LAYOUT, View(CAP_REG_LAYOUT, namespace).word2_w2)
         tw, ew = View(WORD2_LAYOUT, tv.word2_w2), View(WORD2_LAYOUT, ev.word2_w2)
-        rw = View(WORD2_LAYOUT, gate.raw_w2)
+        rw = View(WORD2_LAYOUT, resolved_authority)
         header, out_header, entry_header = Signal(32), Signal(32), Signal(32)
         size, out_size, entry_size = Signal(16), Signal(16), Signal(16)
         caps, out_caps, stack_lo, out_lo = (Signal(16) for _ in range(4))
@@ -72,7 +92,7 @@ class OrdinaryChange(Elaboratable):
         armed, rd = Signal(), Signal()
         addr = Signal(32)
         heap_w2, code_w2, clist_w2 = (Signal(WORD2_LAYOUT) for _ in range(3))
-        resolved = Cat(gt, gate.raw_base, gate.raw_w2)
+        resolved = Cat(gt, resolved_base, resolved_authority)
         m.d.comb += [
             gate.gt_word0.eq(gt), gate.cr15_namespace.eq(namespace),
             gate.m_elevated.eq(0), gate.mem_rd_data.eq(self.mem_rd_data),
@@ -101,7 +121,7 @@ class OrdinaryChange(Elaboratable):
             home_load.sub_validate_only.eq(1),
             home_load.sub_m_elevated.eq(0),
             home_namespace.eq(namespace),
-            hnw.limit_offset.eq(nw.limit_offset >> 2),
+            hnw.limit_offset.eq(nw.limit_offset if self.resident_word_locations else nw.limit_offset >> 2),
             home_load.cr15_namespace.eq(home_namespace),
             home_load.mem_rd_data.eq(self.mem_rd_data),
             home_load.mem_rd_valid.eq(self.mem_rd_valid & home_load.sub_busy),
@@ -145,7 +165,8 @@ class OrdinaryChange(Elaboratable):
                         # CR12 is the architectural Thread identity. The
                         # scheduler's backing-address hint is not authority.
                         out_base.eq(View(CAP_REG_LAYOUT, self.cr12_thread).word1_location),
-                        flags.eq(self.flags_in), nia.eq(self.nia_current[2:17] + 1),
+                        flags.eq(self.flags_in),
+                        nia.eq(((self.nia_current - self.code_base) >> 2) + 1),
                         phase.eq(0), row.eq(0), armed.eq(0), code.eq(0),
                     ]
                     with m.If(~self.namespace_handoff &
@@ -194,12 +215,12 @@ class OrdinaryChange(Elaboratable):
                 with m.If(gate.ns_gate_fault):
                     fail(gate.ns_gate_fault_type)
                 with m.Elif(gate.ns_gate_done):
-                    with m.If(rw.f_flag | (gate.raw_base[:2] != 0)):
+                    with m.If(invalid_descriptor | rw.f_flag | (resolved_base[:2] != 0)):
                         fail(FaultType.BOUNDS)
                     with m.Elif(phase == 0):
                         m.d.sync += [
                             thread.eq(resolved), armed.eq(0),
-                            self_target.eq(~handoff & owned & (gate.raw_base == out_base)),
+                            self_target.eq(~handoff & owned & (resolved_base == out_base)),
                         ]
                         m.next = "HEADER"
                     with m.Elif(phase == 1):
@@ -285,9 +306,7 @@ class OrdinaryChange(Elaboratable):
                           (entry_header[10:23] >= entry_size - entry_header[:8]) |
                           (ew.limit_offset != entry_size - 1) |
                           ((ev.word1_location + ((entry_size - 1) << 2)) > 0xFFFFFFFF) |
-                          (~root_entry & (((frame[13:28] << 2) < ev.word1_location + 4) |
-                          ((frame[13:28] << 2) >=
-                           ev.word1_location + 4 + (entry_header[10:23] << 2))))):
+                          (~root_entry & (frame[13:28] >= entry_header[10:23]))):
                     fail(FaultType.BOUNDS)
                 with m.Else():
                     m.d.sync += [row.eq(0), phase.eq(3)]
@@ -483,7 +502,8 @@ class OrdinaryChange(Elaboratable):
                         (ev.word1_location + ((entry_size - entry_header[:8]) << 2))[:32],
                         clist_w2)),
                     self.nia_restore_en.eq(1),
-                    self.nia_restore_val.eq(Mux(root_entry, 0, frame[13:28] << 2)),
+                    self.nia_restore_val.eq(ev.word1_location + 4 +
+                                           Mux(root_entry, 0, frame[13:28] << 2)),
                     self.flags_restore_en.eq(1), self.flags_restore_data.eq(frame[28:32]),
                 ]
                 m.next = "DONE"

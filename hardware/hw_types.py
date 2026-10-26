@@ -377,5 +377,6 @@ class BootState(IntEnum):
     INIT_CLIST = 4
     LOAD_NUC   = 5
     COMPLETE   = 6
+    GUARDED_CALL = 7
 
 

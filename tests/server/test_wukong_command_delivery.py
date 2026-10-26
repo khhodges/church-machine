@@ -25,6 +25,33 @@ import hashlib
 
 import pytest
 
+
+def test_raw_upload_cannot_bypass_guarded_ascending_admission(client):
+    from server.guarded_runtime_reload import IMAGE_PATH, IMAGE_HASH
+    response = client.post('/hardware/wukong/command', json={
+        'cmd': 'u', 'target_device_uid': 'board-a', 'target_session_id': 'bridge-a',
+        'data': base64.b64encode(IMAGE_PATH.read_bytes()).decode(),
+        'artifact_sha256': IMAGE_HASH, 'artifact_size': 65536,
+        'artifact_identity': 'untrusted-browser-label',
+    })
+    assert response.status_code == 409
+    assert response.json['decision'] == 'guarded_profile_required'
+    assert not _app_module._upload_in_flight
+    assert _app_module._wukong_pending_cmd is None
+
+
+def test_guarded_route_registered_but_no_installation_inferred(client, monkeypatch, tmp_path):
+    from server import guarded_runtime_reload
+    monkeypatch.setattr(guarded_runtime_reload, 'INSTALLATION_PATH', tmp_path / 'absent.json')
+    response = client.post('/hardware/wukong/guarded-reload', json={
+        'profile': guarded_runtime_reload.PROFILE,
+        'target_device_uid': 'board-a', 'target_session_id': 'bridge-a',
+    })
+    assert response.status_code == 409, response.json
+    assert response.json['decision'] == 'guarded_installation_unproven'
+    assert not _app_module._upload_in_flight
+    assert _app_module._wukong_pending_cmd is None
+
 ROOT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', '..'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -119,6 +146,19 @@ def _status(client):
     r = client.get('/hardware/wukong/status')
     assert r.status_code == 200
     return r.get_json()
+
+
+@pytest.mark.parametrize("cmd", ["q", "h", "s", "f", "b"])
+def test_real_dequeued_envelope_passes_exact_bridge_target_check(client, cmd):
+    from hardware.wukong_bridge import _command_target_matches
+    response = _post_cmd(client, cmd, **({"nia": 16} if cmd == "b" else {}))
+    assert response.status_code == 200
+    command = client.get("/hardware/wukong/command").get_json()
+    assert command["cmd"] == cmd
+    assert command["target_session_id"] == "bridge-a"
+    assert _command_target_matches(command, "board-a", "bridge-a")
+    assert not _command_target_matches(command, "board-a", "other-session")
+    assert not _command_target_matches(command, "other-board", "bridge-a")
 
 
 def _ack(client, cmd, cmd_id, ok, error='', session_id='', trace_counter=None,

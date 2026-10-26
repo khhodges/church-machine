@@ -1,0 +1,8 @@
+{
+  "archive": "generated-artifacts/new-layout-timing-build.tar.gz",
+  "bytes": 2220413,
+  "sha256": "09d0231666cf66eaeb58674b90d1d2a8db4fbd2d1102d59f9b5e1f64b5695582",
+  "bootEvidence": "boot.json",
+  "releaseVerified": false,
+  "programmingApproved": false
+}

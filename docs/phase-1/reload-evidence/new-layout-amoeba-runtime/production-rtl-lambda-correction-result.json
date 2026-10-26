@@ -1,0 +1,44 @@
+{
+  "schema": "church.guarded-rtl-generation-result/v1",
+  "recordedAtUtc": "2026-10-24T23:20:28.999446+00:00",
+  "result": "rtl-generated; independent compile and execution unresolved",
+  "generationCommand": "python3 -m hardware.gen_rtlil generated-artifacts/new-layout-production-rtl-lambda-operand --profile new-layout-guarded-relative-nia-v1",
+  "generationExitCode": 0,
+  "profile": {
+    "profile": "new-layout-guarded-relative-nia-v1",
+    "imageSha256": "2a16403e94639abac7716ea9cf56a35f5bbc6bf5e3a99e805457bcd1f563a451",
+    "imageBytes": 65536,
+    "configSha256": "80fa2d96709f230efcb8ecdb8da07eb9c994723eacffd76daad80cac7ad5f820",
+    "part": "xc7a100tfgg676-2",
+    "top": "church_wukong_xc7a100t",
+    "clockHz": 50000000,
+    "uartBaud": 57600,
+    "expectedBootGuard": 23971,
+    "schema": "church.guarded-generated-rtl/v1",
+    "synthesized": false,
+    "generatedFilesSha256": {
+      "church_wukong_xc7a100t.il": "12917e6246e91aa3e093acba2f19d2101ec665d2acaa4aad8a6d5d1a85483092",
+      "church_wukong_xc7a100t.v": "2b8733b8e2d3737275b499a9ae1bf25cbff4d28e4e7fd79c62e42959ac262c1b"
+    }
+  },
+  "sourceFingerprint": "bbd09abb0c963f5afa84f5da3ed39f8ef0f4a72f051690c08716bf4920e36fa1",
+  "outputDirectory": "generated-artifacts/new-layout-production-rtl-lambda-operand",
+  "sourceStampsMatch": true,
+  "outputHashesMatch": true,
+  "tests": {
+    "permissionAndUnitCases": 15,
+    "structuralCoreConversion": 1
+  },
+  "independentVerilogCheck": {
+    "tool": "iverilog",
+    "result": "timed out after 90 seconds without diagnostic",
+    "passed": false,
+    "remainingProcesses": false
+  },
+  "programReplayVerified": false,
+  "uartReloadVerified": false,
+  "physicalReloadVerified": false,
+  "vendorSynthesisRun": false,
+  "hardwareCommandsSent": false,
+  "logSha256": "e0c081066651a6e67e5f540eb21bcfd5a211d28889d9dfa9c502c4b6fb2bf88b"
+}

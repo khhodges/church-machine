@@ -5,6 +5,16 @@ description: Durable ownership and size-derived rules for Church Machine Thread 
 
 Thread suspension identity belongs only to the canonical two-word CHURCH return frame on the private stack. Never add a separate executable-identity word to the Thread body; Heap begins immediately after protected context.
 
+Saved non-poison NIA is a program-relative word offset from the first code word
+after the LUMP header, shared by CALL, RETURN and CHANGE.
+
+**Why:** On 2026-10-24 the user explicitly chose program-relative saved NIA over
+absolute saved addresses to resolve the simulator/RTL disagreement.
+
+**How to apply:** Validate the offset against the saved executable's code extent,
+then derive the physical address from that executable's resolved code base.
+Preserve poison-root handling and do not infer unrelated frame or LAMBDA policy.
+
 **Why:** The user rejected the invented executable-identity field. CR0 is mutable state and can intentionally name a different abstraction from the code being resumed.
 
 **How to apply:** Use the shared Thread layout for geometry. Seed, suspend, and resume through the established CHURCH frame and RETURN-equivalent Enter-GT/NIA validation while preserving the existing private CR/DR homes.

@@ -23,6 +23,17 @@ Every future installer must require its own explicit authorization and retain
 the profile-specific byte validator; historical Header V2 publishers must
 reject ascending-v1 images.
 
+The user subsequently approved a separate guarded loader for the exact New
+Layout trial. This does not authorize synthesis, flashing, publishing, or
+creating installation evidence from a version label.
+
+**Why:** The explicit approval expanded loader scope only; the existing board's
+compatible installed binary was still unestablished.
+
+**How to apply:** Keep runtime-memory replacement consent and installed-target
+evidence separate from candidate/profile approval. Never fabricate an approval
+record to turn an offline model result into hardware admission.
+
 **Why:** Structurally valid private candidates are not evidence of hardware
 certification or permission to replace the currently published image.
 

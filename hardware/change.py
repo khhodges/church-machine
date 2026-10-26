@@ -19,7 +19,8 @@ from .thread_design import (
 
 
 class ChurchChange(Elaboratable):
-    def __init__(self):
+    def __init__(self, *, resident_word_locations=False):
+        self.resident_word_locations = resident_word_locations
         self.change_start = Signal()
         # Explicit decoded programmatic operation; not a scheduler request.
         self.ordinary = Signal()
@@ -43,6 +44,7 @@ class ChurchChange(Elaboratable):
         self.m_elevated = Signal()    # 1 during boot — bypasses CR12/CR13 authority check
 
         self.cr12_thread = Signal(CAP_REG_LAYOUT)
+        self.code_base = Signal(32)  # accepted issuing CR14 byte base
         self.cr15_namespace = Signal(CAP_REG_LAYOUT)
 
         self.mem_rd_addr = Signal(32)
@@ -94,7 +96,8 @@ class ChurchChange(Elaboratable):
 
     def elaborate(self, platform):
         m = Module()
-        m.submodules.ordinary = ordinary = OrdinaryChange(self)
+        m.submodules.ordinary = ordinary = OrdinaryChange(
+            self, resident_word_locations=self.resident_word_locations)
         ordinary_selected = Signal()
         with m.If(self.change_start & ~self.change_busy):
             m.d.sync += ordinary_selected.eq(self.ordinary)
@@ -121,6 +124,7 @@ class ChurchChange(Elaboratable):
         cr_src_latched   = Signal(4)   # latched at change_start; self.cr_src is only valid
         cr_dst_latched   = Signal(4)   # at the decode cycle; NIA advances before FSM runs
         nia_current_latched = Signal(32)
+        code_base_latched = Signal(32)
         thread_change_lat = Signal()
         outgoing_thread_base = Signal(32)
         outgoing_thread_owned = Signal()
@@ -416,6 +420,7 @@ class ChurchChange(Elaboratable):
                         cr_src_latched.eq(self.cr_src),
                         cr_dst_latched.eq(self.cr_dst),
                         nia_current_latched.eq(self.nia_current),
+                        code_base_latched.eq(self.code_base),
                         # Thread context CHANGE is selected by its privileged
                         # destination (CR14/CR15), never by a UI/scheduler
                         # side-band semantic flag.
@@ -866,7 +871,7 @@ class ChurchChange(Elaboratable):
                         outgoing_thread_base, outgoing_indicator[:12], 0)),
                     mem_wr_data_reg.eq(Cat(
                         outgoing_indicator[:13],
-                        (nia_current_latched[2:17] + 1)[:15],
+                        (((nia_current_latched - code_base_latched) >> 2) + 1)[:15],
                         self.flags_in.as_value())),
                 ]
                 with m.If(self.mem_wr_done):
@@ -1042,7 +1047,7 @@ class ChurchChange(Elaboratable):
                     self.flags_restore_en.eq(1),
                     self.nia_restore_en.eq(1),
                     self.flags_restore_data.eq(incoming_frame[28:32]),
-                    self.nia_restore_val.eq(incoming_frame[13:28] << 2),
+                    self.nia_restore_val.eq(entry_raw_base + 4 + (incoming_frame[13:28] << 2)),
                 ]
                 m.next = "ENTRY_COMMIT"
 
@@ -1182,5 +1187,11 @@ class ChurchChange(Elaboratable):
         with m.If(self.change_complete):
             m.d.sync += published_header.eq(
                 Mux(ordinary_selected, ordinary.thread_hdr_out, thread_hdr_reg))
-        m.d.comb += self.thread_hdr_out.eq(published_header)
+        # The core samples this on change_complete. Publishing only through the
+        # register above made that same edge capture the previous Thread header.
+        # Bypass only on successful commit, never during speculative admission.
+        m.d.comb += self.thread_hdr_out.eq(Mux(
+            self.change_complete,
+            Mux(ordinary_selected, ordinary.thread_hdr_out, thread_hdr_reg),
+            published_header))
         return m

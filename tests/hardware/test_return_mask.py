@@ -68,16 +68,17 @@ def test_return_mask_commit_latch_and_fault_atomicity(mask, fault, saved_pc):
         0x4000 + 243 * 4: ((0x7FFF if fault == "frame" else saved_pc) << 13) | 243,
         0x4000 + 242 * 4: egt,
         0x8020: 0x6000,
-        0x8024: 0,
-        0x8028: integrity32(0x6000, 0) ^ int(fault == "seal"),
+        0x8024: 255,
+        0x8028: integrity32(0x6000, 255) ^ int(fault == "seal"),
         0x802C: 0,
-        0x6000: (2 << 23) | (32 << 10) | 12,
+        0x6000: (31 << 27) | (2 << 23) | (32 << 10) | 12,
     }
 
     def read(ctx, i):
         return sum(ctx.get(regs.debug_cr_words[i][w]) << (32 * w) for w in range(3))
 
     async def bench(ctx):
+        ctx.set(r.mload_resolved_cap.as_value(), egt | (0x6000 << 32) | (255 << 64))
         ctx.set(dut.seed, 1)
         for i in range(16):
             ctx.set(dut.seed_addr, i)
@@ -212,7 +213,7 @@ def test_call_cleanup_never_touches_cr5(mask):
 
 
 @pytest.mark.parametrize("mask", [0, 0xFFF, 0xA95, 0x060])
-@pytest.mark.parametrize("fault", [None, "invalid_x", "location", "frame"])
+@pytest.mark.parametrize("fault", [None, "invalid_x", "bounds", "frame"])
 def test_lambda_return_preserves_all_authority(mask, fault):
     dut = ReturnHarness()
     r, c, regs = dut.ret, dut.cload, dut.regs
@@ -225,7 +226,7 @@ def test_lambda_return_preserves_all_authority(mask, fault):
         0x802C: 0,
         0x6000: (2 << 23) | (32 << 10) | 12,
         0x4000 + THREAD_STO_OFFSET * 4: 242,
-        0x4000 + 243 * 4: (0x1804 << 13) | (1 << 12) | (242 if fault == "frame" else 243),
+        0x4000 + 243 * 4: (3 << 13) | (1 << 12) | (242 if fault == "frame" else 243),
     }
 
     def read(ctx, i):
@@ -249,7 +250,7 @@ def test_lambda_return_preserves_all_authority(mask, fault):
         ctx.set(r.thread_base, 0x4000)
         ctx.set(r.thread_hdr, (31 << 27) | (2 << 23) | (32 << 10) | (2 << 8) | 12)
         ctx.set(r.cr14_code.as_value(),
-                0 if fault == "invalid_x" else code + ((0x100 << 32) if fault == "location" else 0))
+                0 if fault == "invalid_x" else code - ((29 << 64) if fault == "bounds" else 0))
         ctx.set(c.cr15_namespace.as_value(), 0x8000 << 32)
         ctx.set(dut.dec.instruction, (int(ChurchOpcode.RETURN) << 27) | mask)
         ctx.set(r.return_start, 1)

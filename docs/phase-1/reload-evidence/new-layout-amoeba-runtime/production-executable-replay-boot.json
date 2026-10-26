@@ -1,0 +1,31 @@
+{
+  "recordedAtUtc": "2026-10-25T11:44:20.800078+00:00",
+  "command": [
+    "vvp",
+    "-M",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/observer-boot",
+    "-m",
+    "replay_guarded_top_vpi",
+    "generated-artifacts/new-layout-production-rtl-lambda-operand/checked-600s.vvp",
+    "+stop-at-boot"
+  ],
+  "supervisionStatus": "completed",
+  "exitCode": 0,
+  "elapsedSeconds": 1668.86,
+  "deadlineSeconds": 5400,
+  "executableSha256": "ac2910c5ea3056477f37e544ef092cf5769eb161ca4931a297cb21870c236f4f",
+  "verilogSha256": "2b8733b8e2d3737275b499a9ae1bf25cbff4d28e4e7fd79c62e42959ac262c1b",
+  "sourceFingerprint": "bbd09abb0c963f5afa84f5da3ed39f8ef0f4a72f051690c08716bf4920e36fa1",
+  "driverSourceSha256": "5d6240dcbf13837ff88ef637b90a86e8d4477d7370a9f98d812f66d4ee6b4388",
+  "driverBinarySha256": "b02c57c6d9803f658fe73bd2e037e7d08546a1c48cc44cd7f9bcbb476dfdafaf",
+  "terminalObservations": [
+    "BOOT_HANDOFF_OBSERVED cycle=411792 (not a program or upload pass)"
+  ],
+  "bootCompleteObserved": true,
+  "bootHandoffObserved": true,
+  "retireSignalsArePreEdge": true,
+  "hardwareCommandsSent": false,
+  "uartInputs": "idle only; not a reload test",
+  "fullLogSha256": "abae0e04fe1d5779a2d42c51a10daa3926e4362ddd95ccc907c6452a536ab146",
+  "scope": "Boot handoff observation only; not full program or physical reload verification"
+}
