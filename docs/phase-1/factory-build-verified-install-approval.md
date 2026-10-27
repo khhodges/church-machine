@@ -157,6 +157,34 @@ disabled, and other eligible work continues. Do not require
 Mallory to execute again merely to produce an alternating trace. Merely showing
 alternating UI labels is insufficient.
 
+### Reliability basis: one Abstraction fault
+
+The user defines the single event as **one Abstraction fault**, not a Thread
+failure, physical single-event upset, or automatic whole-system failure.
+Assess the full flow against that event and its containment.
+
+- Record one incident for the faulting Abstraction, with exact revision,
+  instruction, reason, and execution context. Repeated telemetry for that
+  incident must not be counted as additional faults.
+- Measure Abstraction fault occurrence separately from propagation into loss
+  of other authorized work. Mallory's intentional denied-access test verifies
+  protection and containment; it is not an unplanned system-service failure.
+- For an MTBF estimate, declare the workload, observation boundary, exposure
+  clock, and counted fault population. Report measured operating exposure
+  and qualifying fault count together. A single demonstration cannot establish
+  MTBF, and zero observed faults does not establish infinite MTBF.
+- Keep intentional fault-injection results separate from operational MTBF
+  data. Do not combine differing revisions or workloads without identifying
+  them, or use time spent inactive/faulted to inflate active exposure.
+- For each containment test, prove that the denied effect did not occur,
+  Mallory remains faulted as an Abstraction, the Thread is not disabled, and
+  other authorized work continues under Amobea.
+
+No numerical MTBF target, observation duration, or statistical confidence
+requirement has yet been approved. Report those as unspecified, not passed.
+The priority remains exposing the fault at its first occurrence and fixing
+its cause, not masking it with retries or recovery claims.
+
 ## 8. Operator presentation and installation receipt
 
 Use one progress view with distinct states:
