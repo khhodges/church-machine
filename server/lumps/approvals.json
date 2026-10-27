@@ -4092,6 +4092,155 @@
         "signature": "b8914b4676c42d29488cd1f40048cf8cdc4e9d7444df7946e0f75bd6824fa2e0"
       },
       "identity_hash": "ba1427c1973e591cf4956427bec9aaa336a9cfc8a7460adacca980be7e5fb543"
+    },
+    "5d4e013b3eaeda2482096b2fe1becfa74bc9bc1de7c0c0ecbd1e2d3d08294171": {
+      "binary_hash": "5d4e013b3eaeda2482096b2fe1becfa74bc9bc1de7c0c0ecbd1e2d3d08294171",
+      "dot_name": "ide.CapabilityTest",
+      "issue_n": 1,
+      "abstraction": "ide.CapabilityTest",
+      "filename": "ide.CapabilityTest.1.8a9ae900.lump",
+      "compiled_at": 1793128569.3438337,
+      "portable_binding": {
+        "calls": [
+          {
+            "word_offset": 25,
+            "full_name": "ide.SelfTest",
+            "row": 1,
+            "source_line": 109,
+            "condition": 14
+          },
+          {
+            "word_offset": 26,
+            "full_name": "ide.WukongCallHome",
+            "row": 7,
+            "source_line": 110,
+            "condition": 14
+          }
+        ],
+        "dependencies": [
+          {
+            "name": "SELF",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 0,
+            "symbolic_self": true
+          },
+          {
+            "name": "ide.SelfTest",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 1,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.LED_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 2,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.UART_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 3,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.BTN_DEV",
+            "rights": [
+              "R"
+            ],
+            "relocation_row": 4,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.TIMER_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 5,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.M_BIT_DEV",
+            "rights": [
+              "R",
+              "W"
+            ],
+            "relocation_row": 6,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.WukongCallHome",
+            "rights": [
+              "E"
+            ],
+            "relocation_row": 7,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread2",
+            "rights": [],
+            "relocation_row": 8,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.Thread3",
+            "rights": [],
+            "relocation_row": 9,
+            "symbolic_self": false
+          },
+          {
+            "name": "ide.BootThread",
+            "rights": [],
+            "relocation_row": 10,
+            "symbolic_self": false
+          }
+        ],
+        "owner": "ide.CapabilityTest",
+        "schema": "church.symbolic-lump-binding/v1"
+      },
+      "trust_origin": "trusted-home-ide",
+      "compiler_identity": "Trusted Home IDE compiler",
+      "compiler_version": "server-compile-v1",
+      "compiler_record": {
+        "binary_hash": "5d4e013b3eaeda2482096b2fe1becfa74bc9bc1de7c0c0ecbd1e2d3d08294171",
+        "source_hash": "ee4bc5fa83b8e9993091a7a4304bc7a56e3fdeb90504f140421cf7390770fd33",
+        "language": "assembly",
+        "compiler_identity": "Trusted Home IDE compiler",
+        "compiler_version": "server-compile-v1",
+        "compact_compile_context": {
+          "compiler_sha256": "a87239f560f3b6d12380c1430d18f1d2449eda9c79a81eaa85abe3f8d4fb4468",
+          "inputs": {
+            "language": "auto",
+            "_ide_hierarchy": {
+              "node": "ide",
+              "aliases": {
+                "Thread.2": "ide.Thread2",
+                "Thread.3": "ide.Thread3",
+                "ide.Thread.2": "ide.Thread2",
+                "ide.Thread.3": "ide.Thread3",
+                "Boot.Thread": "ide.BootThread"
+              },
+              "definitions": {}
+            }
+          },
+          "source_language": "assembly"
+        },
+        "hardfault_sites": [],
+        "signing_scheme": "church-compiler-hmac-sha256/v2",
+        "signing_key_id": "compiler-signing-secret/v1",
+        "signature": "d1ca30ac75674e737f48c7c2b834770bc518e5acdbaf4defa4531a94612fc86e"
+      },
+      "identity_hash": "e34d95a87b1d5de3ea01d7c44b37f0801dbe44b7ff791d2a976640f61157e97e"
     }
   }
 }
