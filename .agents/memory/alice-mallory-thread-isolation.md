@@ -105,6 +105,17 @@ access, or that this requires separate Namespaces or SWITCH.
 Isolated actor fixture provisioning is not adoption into the user's selected
 Namespace. Keep the evidence and user-facing claims distinct.
 
+The corrected-Mallory example also demonstrates side-by-side LUMPs, code
+evolution, and fallback when needed during an upgrade.
+
+**Why:** The user explicitly added upgrade/fallback as a lesson of this example.
+
+**How to apply:** Preserve distinct immutable revisions and explicit caller
+adoption. Fallback must target an eligible, compatible known-good revision,
+not the OFFLINE attacking Mallory. Demonstrate with a safe baseline and safe
+upgrade candidate where executable fallback is needed. Do not equate retaining
+old code with rollback of data or external effects.
+
 **Why:** An ascending-layout runtime can exercise protection correctly using
 preboot fixture provisioning without proving the saved-design preparation path.
 

@@ -322,6 +322,31 @@ Label the observed error-free run duration/cycles; it does not establish an
 unmeasured operational MTBF. This is a design correction and explicit adoption,
 not automatic recovery of the original attacking object.
 
+### Side-by-side LUMPs, evolution, and upgrade fallback
+
+The example must also demonstrate side-by-side LUMPs and code evolution.
+Retain distinct immutable revisions instead of overwriting the old LUMP.
+Show which exact revision Amoeba currently uses and make adoption of the
+replacement explicit; coexistence alone does not switch callers.
+
+Demonstrate controlled fallback during an upgrade to an approved, compatible,
+still-eligible known-good LUMP. The original attacking Mallory may remain
+available as historical evidence, but its OFFLINE status makes it an invalid
+fallback target. To demonstrate executable fallback, retain a safe baseline
+alongside an upgraded safe candidate rather than revive the attack.
+
+Fallback must use authorized bindings and respect slot versions, capability
+checks, and state compatibility. Code selection is not automatic restoration
+of older data or reversal of external effects. Identify any state transition
+requirements explicitly; never assume that retaining old code makes current
+state compatible with it.
+
+Acceptance must show side-by-side identities, deliberate upgrade selection,
+actual execution of the selected revision, and a controlled return to the
+eligible baseline without disturbing unrelated work. Reject fallback to the
+OFFLINE attacking revision. Retain the upgrade/fallback evidence alongside
+the original denial and corrected-Mallory evidence.
+
 ## 8. Operator presentation and installation receipt
 
 Use one progress view with distinct states:
