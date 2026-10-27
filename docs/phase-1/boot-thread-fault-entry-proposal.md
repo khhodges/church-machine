@@ -37,12 +37,66 @@ The user's PP250 experience is the rationale for expecting such blocking
 Thread hard faults to be few and readily diagnosed. This is an engineering
 expectation, not measured FPGA evidence or permission to omit failure tests.
 
-**Next register review:** assign receiving registers for the existing Thread
-GT and faulting Namespace capability (CR1 for the Thread is a candidate,
-not yet selected); specify how the save outcome reaches Boot.Thread and how
-the existing authority is used
-for inspection. Do not invent a generic R capability over protected Thread
-state or refresh the supplied GT. The exact assignments remain unapproved.
+## Active register proposal — saved-context handoff
+
+**Proposed assignments for approval, not implemented.** The existing Thread
+and Namespace references are agreed inputs; their placement below is proposed.
+These tables replace the separate-dump register table in the historical draft.
+
+### Capability registers
+
+| Register | Value at Boot.Thread handler entry | Source and meaning |
+| --- | --- | --- |
+| CR0 | Configured fault-handler E capability | Explicitly prepared Boot Namespace binding; not a replacement normal-boot application selection. |
+| CR1 | Existing GT/capability of the Thread executing at the original fault | Capture from original CR12 before priming. Identifies the saved Thread context in the Namespace supplied in CR2. No minting, refresh or conversion to a generic R capability. |
+| CR2 | Existing faulting Namespace capability | Capture from original CR15 before changing the live root. Retains the Namespace association of CR1. |
+| CR3–CR4 | NULL triples | All three words zero. |
+| CR5 | Boot.Thread heap capability | Derive through the existing validated Thread geometry; no access to protected context or stack is added. |
+| CR6 | Fault handler's C-list capability | Establish through normal executable-entry validation against Boot Namespace. |
+| CR7–CR11 | NULL triples | No unrelated application authority survives priming. |
+| CR12 | Boot.Thread capability | Active Thread identity, distinct from CR1. |
+| CR13 | NULL triple | Preserve Phase 1 reservation. |
+| CR14 | Executing fault-handler capability | Establish actual handler identity and executable bounds. |
+| CR15 | Boot Namespace capability | Active Namespace/root, distinct from the faulting Namespace retained in CR2. |
+
+CR1 and CR2 are a pair: do not interpret CR1's slot against live CR15.
+Preserving the existing GT does not make a stale capability valid, expand
+permissions, or authorize unrestricted access to protected Thread homes.
+The exact checked inspection operation using this pair must be specified
+before implementation. Capture existing references before priming; do not
+manufacture fresh caches from Boot's slot table.
+
+### Data registers
+
+Propose carrying only the fault facts needed in addition to the saved context.
+There is no separate-dump pointer, completion marker or hardware incident
+sequence in this revised table.
+
+| Register | Proposed value |
+| --- | --- |
+| DR0 | Architectural zero; never writable. |
+| DR1 | Original fault code, zero-extended. |
+| DR2 | Original faulting instruction byte address; use the latched issuer address for delayed faults. |
+| DR3 | Protected Thread-save outcome: 0 = not completed/no complete save established; 1 = complete; 2 = failed or interrupted and possibly partial. |
+| DR4 | Original faulting instruction word. |
+| DR5 | Secondary save-failure code, zero when none. Does not replace DR1. |
+| DR6–DR15 | Zero. |
+
+Set DR3=1 only after the entire defined protected save completes. Never
+interpret DR3=0 or 2 as a valid resumable context. These status encodings
+do not approve handler execution after a failed save; that disposition remains
+part of failure-path review. If safe handler entry itself fails, do not imply
+that these registers were successfully delivered.
+
+### Entry ordering and remaining review
+
+Retain original CR12/CR15 and the fault facts; perform the protected save
+attempt; prime the proposed registers; publish Boot Namespace, Boot.Thread
+ownership and handler entry without a second CHANGE save. Condition flags
+are proposed as zero. Entry NIA, fresh root-frame construction, ownership
+commit, inspection ABI and partial-save disposition still require approval.
+Neither these tables nor the saved-context reference authorize resuming the
+denied instruction, changing Namespace versions or retrying the application.
 
 The 96-word layout, COMPLETE-only entry rule, diagnostic-object authority,
 FAULT_RELEASE interface, single-slot capture policy and watchdog selection

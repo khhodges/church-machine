@@ -380,9 +380,11 @@ Boot.Thread inspects that saved context. The earlier separate-dump register
 table, release interface and capture policy are superseded, not approved.
 Microcode primes Boot.Thread with both the existing GT of the Thread executing
 at the fault and its existing Namespace capability. No replacement GT
-or separate dump capability is introduced. Their receiving registers remain
-to be selected; these references are distinct from Boot.Thread's own active
-CR12 identity and Boot Namespace in live CR15.
+or separate dump capability is introduced. The
+[active register proposal](boot-thread-fault-entry-proposal.md#active-register-proposal--saved-context-handoff)
+places these in CR1 and CR2 respectively, distinct from Boot.Thread's own
+active CR12 identity and Boot Namespace in live CR15. Assignments and the
+saved-context status DRs remain proposals for approval.
 Define only the additional fault facts and faulting Namespace information
 not already retained by the saved context; their exact placement and
 Boot.Thread inspection authority remain review items.
