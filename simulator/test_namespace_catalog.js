@@ -73,6 +73,35 @@ console.log('PASS Namespace catalog: exact historical selection, slot authority,
     scope.window.NamespaceDesignV1.state.document = {rows:[]};
     await scope.renderLumps();
     assert.doesNotMatch(nodes.lumpsListContent.innerHTML,/12345678|87654321/);
+    // Opening detail while the list is in flight must not strand the loader
+    // or let the late list response replace the user's detail/History tab.
+    scope.window.NamespaceDesignV1.state.document = {rows};
+    let release;
+    scope.fetch = () => new Promise(resolve => { release = resolve; });
+    const loading = scope.renderLumps();
+    assert.match(nodes.lumpsListContent.innerHTML, /Loading lumps/);
+    const detailSource = fs.readFileSync(__dirname + '/app-lumps.js', 'utf8');
+    scope._lumpEditDirty = false;
+    node('liveLumpBanner').style = {};
+    vm.runInContext(detailSource.slice(detailSource.indexOf('function showLumpDetail('),
+        detailSource.indexOf('    const lump = options && options.assignedLump')) + '\n}', scope);
+    scope.showLumpDetail(newer.token);
+    nodes.lumpsDetailContent.innerHTML = 'newer History tab';
+    release({ok:true,json:async () => [old,newer]});
+    await loading;
+    assert.doesNotMatch(nodes.lumpsListContent.innerHTML,/Loading lumps/);
+    assert.match(nodes.lumpsListContent.innerHTML,/12345678/);
+    assert.equal(current,newer.token,'late list cannot replace explicit detail selection');
+    assert.equal(nodes.lumpsDetailContent.innerHTML,'newer History tab');
+    // A newer list request still supersedes an older request, including errors.
+    const first = scope.renderLumps();
+    const rejectOld = release;
+    scope.fetch = async () => ({ok:true,json:async () => [old,newer]});
+    await scope.renderLumps();
+    const latestHtml = nodes.lumpsListContent.innerHTML;
+    rejectOld({ok:true,json:async () => {throw Error('old response failed');}});
+    await first;
+    assert.equal(nodes.lumpsListContent.innerHTML,latestHtml);
     scope.fetch = async url => {
         assert.match(url,/exact_filename=test.Old.lump/);
         assert.match(url,/binary_hash=aaaa/);

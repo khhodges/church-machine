@@ -1189,6 +1189,8 @@ window.toggleLumpLibrary = function() {
 
 async function renderLumps(options) {
     const requestId = (window._lumpRepositoryRequestId || 0) + 1;
+    const focusId = window._lumpRepositoryFocusId || 0;
+    const ownsFocus = () => (window._lumpRepositoryFocusId || 0) === focusId;
     window._lumpRepositoryRequestId = requestId;
     if (options && options.followExecution) window._lumpRepositoryFollowsExecution = true;
     const listEl = document.getElementById('lumpsListContent');
@@ -1201,6 +1203,10 @@ async function renderLumps(options) {
             await design.load();
             if (window._lumpRepositoryRequestId !== requestId) return;
             if (!design.state.document) {
+                if (!ownsFocus()) {
+                    listEl.textContent = 'Selected Namespace is unavailable. Open Namespace and retry.';
+                    return;
+                }
                 window.LumpRegistry.setCurrent(null);
                 _showUnresolvedExecutedLump({absName: 'Selected Namespace', cw: null});
                 listEl.textContent = 'Selected Namespace is unavailable. Open Namespace and retry; no catalog default was selected.';
@@ -1228,13 +1234,13 @@ async function renderLumps(options) {
         if (window.LumpRegistry) window.LumpRegistry.registerFromServer(lumps);
         if (!libraryBrowsing && window.LumpRegistry) window.LumpRegistry.registerFromServer(catalog.assigned);
         if (!libraryBrowsing) lumps = catalog.assigned;
-        if (!libraryBrowsing && window.LumpRegistry &&
+        if (ownsFocus() && !libraryBrowsing && window.LumpRegistry &&
                 !lumps.some(row => row.token === window.LumpRegistry.getCurrent())) {
             window.LumpRegistry.setCurrent(null);
         }
 
         // A name-based navigation resolves only through the selected Namespace.
-        if (_pendingLumpAbstractionName) {
+        if (ownsFocus() && _pendingLumpAbstractionName) {
             window._lumpRepositoryFollowsExecution = false;
             const _targetState = {absName: _pendingLumpAbstractionName, ignoreFocus: true};
             const _matched = _namespaceLumpSelection(lumps, _targetState);
@@ -1254,7 +1260,7 @@ async function renderLumps(options) {
         // Must run BEFORE the live-state auto-select so an explicit "Open Lump"
         // is never overridden by the slot lookup.
         var _pendingTokenResolved = false;
-        if (window.LumpRegistry) {
+        if (ownsFocus() && window.LumpRegistry) {
             const _ptToken = window.LumpRegistry.consumePending();
             if (_ptToken && (libraryBrowsing || lumps.some(row => row.token === _ptToken))) {
                 window._lumpRepositoryFollowsExecution = false;
@@ -1274,15 +1280,15 @@ async function renderLumps(options) {
                         console.warn('[lumps] historical deep link unavailable', _historicalError);
                     }
                 }
-                window.LumpRegistry.setCurrent(_ptToken);
+                if (ownsFocus()) window.LumpRegistry.setCurrent(_ptToken);
                 _pendingTokenResolved = true;
                 // If the token is not in the server list (freshly assembled, not yet saved),
                 // fall back to the in-memory path via openLumpInEditor.
                 const _ptEntry = window.LumpRegistry.resolve(_ptToken);
-                if (!_ptEntry || !_ptEntry.sources || !_ptEntry.sources.server) {
+                if (ownsFocus() && (!_ptEntry || !_ptEntry.sources || !_ptEntry.sources.server)) {
                     if (!window._pendingLumpTab) window._pendingLumpTab = null;
                     setTimeout(function() {
-                        if (typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
+                        if (ownsFocus() && typeof openLumpInEditor === 'function') openLumpInEditor(_ptToken);
                     }, 0);
                 }
             }
@@ -1293,7 +1299,7 @@ async function renderLumps(options) {
         //   1. Pending token (already consumed above) — highest priority.
         //   2. Exact live CR14 artifact when entering from execution.
         //   3. Browsing history — only when there is no live executable LUMP.
-        if (!_pendingTokenResolved && window.LumpRegistry &&
+        if (ownsFocus() && !_pendingTokenResolved && window.LumpRegistry &&
                 window._lumpRepositoryFollowsExecution !== false) {
             const _liveState = (typeof _getLiveLumpState === 'function') ? _getLiveLumpState() : null;
             const _liveRow = _namespaceLumpSelection(lumps, _liveState);
@@ -1421,6 +1427,10 @@ async function renderLumps(options) {
         const _ss = document.getElementById('lumpSortSelect');
         if (_ss) _ss.value = _lumpSortOrder;
 
+        // Selection changes cancel automatic focus, not repository loading.
+        // Complete the list without replacing the newer detail or its tab.
+        _updateLumpRepoCount(lumps.filter(l => l.binary_valid !== false).length, lumps.length);
+        if (!ownsFocus()) return;
         if (_selTok) {
             // Always re-render the detail panel so compress/POLA/save changes
             // (lump_size, cc, etc.) are reflected without a manual click.
@@ -1471,6 +1481,7 @@ async function renderLumps(options) {
         const _rcHealthy = lumps.filter(l => l.binary_valid !== false).length;
         _updateLumpRepoCount(_rcHealthy, _rcTotal);
     } catch (err) {
+        if (window._lumpRepositoryRequestId !== requestId) return;
         listEl.innerHTML = `<div class="lumps-placeholder">Error loading lumps: ${_escHtml(err.message)}</div>`;
     }
 }
@@ -1519,7 +1530,7 @@ window.lumpPickerChanged = function(token) {
         assignedLump = assigned[0];
     }
     window._lumpRepositoryFollowsExecution = false;
-    window._lumpRepositoryRequestId = (window._lumpRepositoryRequestId || 0) + 1;
+    window._lumpRepositoryFocusId = (window._lumpRepositoryFocusId || 0) + 1;
     if (!token) {
         _updateLumpViewingLabel('');
         _setLumpRepositoryCollapsed(false);

@@ -24,7 +24,7 @@ function _openLumpVariantInspector(token) {
 function showLumpDetail(token, options) {
     if (!(options && options.executionFocus)) window._lumpRepositoryFollowsExecution = false;
     if (!(options && options.executionFocus)) {
-        window._lumpRepositoryRequestId = (window._lumpRepositoryRequestId || 0) + 1;
+        window._lumpRepositoryFocusId = (window._lumpRepositoryFocusId || 0) + 1;
         const banner = document.getElementById('liveLumpBanner');
         if (banner) banner.style.display = 'none';
     }

@@ -41,3 +41,13 @@ comments instead of the authored instruction.
 **How to apply:** Test both backward-branch decoding and actual gutter/overlay
 placement using the compiled layout. Distinguish stale test fixtures from
 regressions by checking their failures against the unchanged baseline.
+
+Repository loading and detail-navigation ownership must be independent.
+
+**Why:** Cancelling an in-flight list response when the user opens a detail
+leaves the list's loading placeholder stranded. Conversely, completing that
+response must not overwrite the newer detail or History tab.
+
+**How to apply:** Exercise explicit detail navigation during a delayed catalog
+response: the list must finish, while the selected artifact and tab stay intact.
+Newer list requests still supersede older list successes and failures.
