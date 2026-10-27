@@ -1438,3 +1438,17 @@ mtime_ms = 1793104326368
 storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/cda6f3c8-143f-4741-951d-c85ad8fab248/d46048ec-47a3-400c-9607-bf0f9360f61e"
 storage_version_token = "1793104327843404"
 content_type = "text/plain"
+
+[[outputs]]
+id = "Z8M0gNP4rpGl5uyoM0R2C"
+uri = "file://docs/phase-1/nfb1-mallory-fault-reconciliation.md"
+type = "text"
+title = "NFB1 — Mallory Fault Reconciliation"
+description = "Explains the recorded BOUNDS fault using the retained image, board snapshot, model endpoint, and two passing isolated RTL tests; distinguishes C-list denial from target RW access."
+logical_id = "822e011f-bd54-4e0e-b499-09384d375319"
+content_hash = "sha256:95f809f9acbc109b51fff8965bd40433f740e20e8540db7e8add2f31887ee3fd"
+size = 7097
+mtime_ms = 1793104938936
+storage_uri = "gcs://replit-rams-assets-janeway/rams/assets/repl:31592a69-0a64-402e-9237-89b7ce66a127/822e011f-bd54-4e0e-b499-09384d375319/20e32da2-500a-4844-ab1e-7bb4fb69e4a0"
+storage_version_token = "1793104970190810"
+content_type = "text/markdown"

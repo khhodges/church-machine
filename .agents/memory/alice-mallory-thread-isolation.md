@@ -19,6 +19,17 @@ containment evidence rather than a generic fault badge. Do not invent which
 permission/bounds check failed or label a blocked access as actual corruption.
 Attribute per-object reliability to the actual object, not a whole Thread.
 
+Distinguish failure to acquire a target capability from failure to use that
+capability for RW data access in the tutorial.
+
+**Why:** The retained Mallory denial is consistent with source C-list bounds
+rejecting a capability fetch; treating every BOUNDS event as target-object
+corruption or a target permission test would teach the wrong mechanism.
+
+**How to apply:** Follow the exact faulting instruction and participating
+checks, not the intended attack narrative. Keep source-check evidence,
+target-check evidence, and physical execution claims distinct.
+
 Mallory's denied “steal” attempt must be reported but must not halt the whole
 FPGA. This supersedes treating that denial as a whole-board stopping endpoint
 for the next Factory Build.

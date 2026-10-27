@@ -209,6 +209,16 @@ Access denial alone does not settle this question. Keep exact fault-code
 conformance open until this evidence is reconciled; then cross-reference the
 result in the physical reload evidence and tutorial acceptance record.
 
+**Reconciliation result:** See
+[Mallory fault-mechanism reconciliation](nfb1-mallory-fault-reconciliation.md).
+The retained CR6 has a two-entry C-list (inclusive limit 1); the instruction
+requests entry 2. Current RTL replay raises BOUNDS before any GT fetch.
+This enforces source-capability C-list bounds, after source NULL/L checks
+and before target Namespace/permission or RW-object access. Do not teach this
+historical endpoint as a demonstrated RW-object access violation.
+Exact-build physical acceptance and approval of the tutorial explanation
+remain open.
+
 Keep the executing Abstraction, affected data object, capability, and Thread
 distinct in the report. Attribute per-object reliability evidence to the
 actual affected object rather than collapsing every Mallory incident into one

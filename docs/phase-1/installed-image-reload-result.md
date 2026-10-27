@@ -109,6 +109,13 @@ This matches the retained model's denied-access endpoint. Program comments
 name NO_CAPABILITY; the actual BOUNDS result is not silently counted as exact
 fault-code conformance.
 
+Subsequent software-only analysis:
+[NFB1 Mallory fault-mechanism reconciliation](nfb1-mallory-fault-reconciliation.md)
+identifies the captured CR6 C-list limit of 1 and requested index 2.
+Two current-RTL unit checks reproduce BOUNDS before target GT fetch.
+This explains the observed endpoint without claiming a target RW-object
+access or upgrading the original physical evidence.
+
 ## Remaining limitations and anomalies
 
 - **Post-reboot automatic halt timed out.** The loaded program ran to its
