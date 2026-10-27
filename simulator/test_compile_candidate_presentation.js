@@ -45,6 +45,8 @@ vm.runInContext([
     extractFunction(source, '_setDisassemblyPresentationStatus'),
     extractFunction(source, '_lumpDispatchAnnotation'),
     extractFunction(source, '_formatLumpHeaderDisassembly'),
+    extractFunction(source, '_isExactSavedLumpWordArray'),
+    extractFunction(source, '_formatCanonicalSavedLumpWords'),
     extractFunction(source, '_showCompilerOutputBesideSource'),
     extractFunction(source, '_showCompiledCandidateBesideSource'),
 ].join('\n'), context);
@@ -233,4 +235,12 @@ assert.doesNotMatch(renderCalls(absent), /pending binding|test.Target/);
 assert.match(renderCalls(absent), /WORD_f7000000/);
 assert.match(renderCalls(callWords), /pending binding/, 'fresh evidence restores attribution');
 assert.equal(dom.window.document.getElementById('asmEditor').value, 'CALL mutable.Wrong');
+const savedCalls = context._formatCanonicalSavedLumpWords(callWords, {methodCount:1});
+assert.match(savedCalls, /CALL test.Target.Run — pending binding/);
+assert.match(savedCalls, /CALLEQ test.Target.Other — pending binding/);
+assert.match(savedCalls, new RegExp('\\[' + String(faultOffset).padStart(4, '0') +
+    '\\]  0xF7000000  WORD_f7000000'), 'intentional HARDFAULT stays raw in saved view');
+assert.doesNotMatch(context._formatCanonicalSavedLumpWords(mismatch, {}), /pending binding/);
+assert.doesNotMatch(context._formatCanonicalSavedLumpWords(absent, {}), /pending binding/);
+assert.equal(JSON.stringify(callWords), frozenCalls, 'saved display never patches portable bytes');
 console.log('PASS exact candidate CALL attribution, missing/mismatched evidence and HARDFAULT isolation');

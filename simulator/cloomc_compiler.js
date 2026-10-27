@@ -2129,10 +2129,20 @@ class CLOOMCCompiler {
         }
 
         if (errors.length === 0) {
-            const lastOpcode = code.length > 0 ? (code[code.length - 1] >>> 27) : -1;
+            const lastWord = code.length > 0 ? code[code.length - 1] >>> 0 : 0;
+            const lastOpcode = code.length > 0 ? (lastWord >>> 27) : -1;
+            // An unconditional branch into this method cannot fall through.
+            // Keep the implicit return for conditional branches and branches
+            // to an end label (whose target still needs a real instruction).
+            const branchTarget = code.length - 1 +
+                ((lastWord & 0x40000) ? -(lastWord & 0x3ffff) : (lastWord & 0x3ffff));
+            const terminalBranch = lastOpcode === 23 &&
+                ((lastWord >>> 23) & 15) === 14 &&
+                branchTarget >= 0 && branchTarget < code.length &&
+                !labelRefs.some(ref => labels[ref.label] === code.length);
             // main methods are non-returning entry points — never append implicit RETURN.
             // The static scan in compile() will reject any explicit RETURN in the body.
-            if (!method.isMain && lastOpcode !== this.opcodes.RETURN) {
+            if (!method.isMain && lastOpcode !== this.opcodes.RETURN && !terminalBranch) {
                 manifest.push({ src: method.startLine, addr: code.length, desc: 'RETURN (implicit)' });
                 code.push(this.encode(this.opcodes.RETURN, 14, 0, 0, 0));
             }

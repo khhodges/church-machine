@@ -2522,6 +2522,33 @@ function _formatCanonicalSavedLumpWords(words, details) {
     }
     var caps = embedded && Array.isArray(embedded.capabilities) ? embedded.capabilities : [];
     var embeddedMethods = embedded && Array.isArray(embedded.methods) ? embedded.methods : [];
+    var symbolicAnnotations = {};
+    if (embedded && embedded.symbolic_binding) {
+        try {
+            if (!window.SymbolicLumpGuard) throw new Error('Symbolic relocation validator unavailable');
+            var verifiedCalls = window.SymbolicLumpGuard.validate(words, {
+                planContract: embedded.symbolic_binding
+            });
+            if (!verifiedCalls.symbolic) throw new Error('No matching embedded relocation evidence');
+            var conditions = ['EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC',
+                'HI', 'LS', 'GE', 'LT', 'GT', 'LE', '', 'NV'];
+            verifiedCalls.contract.calls.forEach(function(call) {
+                var dependency = verifiedCalls.contract.dependencies[call.row];
+                if (call.row >= 32 || !/^[A-Za-z_][\w-]*(?:\.[\w-]+)+$/.test(call.full_name) ||
+                        !dependency || !Array.isArray(dependency.rights) ||
+                        !dependency.rights.includes('E')) {
+                    throw new Error('Symbolic CALL name or capability evidence is invalid');
+                }
+                symbolicAnnotations[call.word_offset] = 'CALL' + conditions[call.condition] +
+                    ' ' + call.full_name + ' — pending binding (C-list row ' + call.row +
+                    '; faults only if referenced while unresolved)';
+            });
+        } catch (error) {
+            symbolicAnnotations = {};
+            definitionStatus += ' Symbolic CALL attribution unavailable: ' + error.message +
+                '; raw instruction decoding retained.';
+        }
+    }
     var lines = [
         '; SAVED BINARY — exact canonical server response',
         '; Source at left is unchanged. These are the exact fetched saved words.',
@@ -2560,6 +2587,7 @@ function _formatCanonicalSavedLumpWords(words, details) {
         } else if (i > cw) {
             annotation = 'non-code data / embedded source / API frame';
         }
+        if (symbolicAnnotations[i]) annotation = symbolicAnnotations[i];
         lines.push('[' + String(i).padStart(4, '0') + ']  0x' +
             word.toString(16).padStart(8, '0').toUpperCase() +
             (annotation ? '  ' + annotation : ''));
